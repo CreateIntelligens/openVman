@@ -1,0 +1,1197 @@
+[
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "50EUBL 的固體通過粒徑是多少？",
+  "expect": "EUBL"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "污泥泵有幾匹馬力？",
+  "expect": "EUBL|DIVA"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "DIVA PRO 有攪拌器嗎？",
+  "expect": "DIVA PRO"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "HIPPO 是什麼樣的泵？",
+  "expect": "HIPPO"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "LEOPARD 切碎泵的轉速多少？",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "ALLIGATOR 可以處理什麼？",
+  "expect": "ALLIGATOR"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "沉水泵最深可以放多深？",
+  "expect": "10"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "水溫限制是幾度？",
+  "expect": "40"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "絕緣等級是什麼？",
+  "expect": "Class|絕緣"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "著脫座要怎麼選？",
+  "expect": "QD|著脫"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "EUS 可以改成殘水泵嗎？",
+  "expect": "EUS"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "你們公司電話幾號？",
+  "expect": "26233556"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What is the solids passage of the 50EUBL?",
+  "expect": "EUBL"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "How much horsepower does the sludge pump have?",
+  "expect": "EUBL|DIVA"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "Does DIVA PRO have an agitator?",
+  "expect": "DIVA PRO"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What kind of pump is HIPPO?",
+  "expect": "HIPPO"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What speed does the LEOPARD cutter pump run at?",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What can the ALLIGATOR handle?",
+  "expect": "ALLIGATOR"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "How deep can the submersible pump go?",
+  "expect": "10"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What is the water temperature limit?",
+  "expect": "40"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What insulation class is used?",
+  "expect": "Class|insulation"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "How do I choose a duck foot?",
+  "expect": "QD|duck foot|Duck Foot"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "Can the EUS be converted to a residue pump?",
+  "expect": "EUS"
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What is your company phone number?",
+  "expect": "26233556"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuál es el paso de sólidos de la 50EUBL?",
+  "expect": "EUBL"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuántos caballos tiene la bomba de lodos?",
+  "expect": "EUBL|DIVA"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿La DIVA PRO tiene agitador?",
+  "expect": "DIVA PRO"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Qué tipo de bomba es HIPPO?",
+  "expect": "HIPPO"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿A qué velocidad gira la bomba cortadora LEOPARD?",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Qué puede manejar la ALLIGATOR?",
+  "expect": "ALLIGATOR"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿A qué profundidad se puede sumergir la bomba?",
+  "expect": "10"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuál es el límite de temperatura del agua?",
+  "expect": "40"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Qué clase de aislamiento usa?",
+  "expect": "Clase|aislamiento|Class"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cómo elijo la base de acoplamiento?",
+  "expect": "QD|acoplamiento"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Se puede convertir la EUS en bomba de achique residual?",
+  "expect": "EUS"
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuál es el teléfono de la empresa?",
+  "expect": "26233556"
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "今天天氣如何？",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "你好",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "講個笑話",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What's the weather tomorrow?",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "hi there",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "Tell me a joke",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Qué tiempo hará mañana?",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "hola",
+  "expect": null
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "Cuéntame un chiste",
+  "expect": null
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我要接3吋出水管，先看最大揚程至少20米的款式。EDW跟EUB-M有哪些符合？幫我都列出來，順便寫最大揚程。",
+  "models": [
+   "80EDW-5.30S/T",
+   "80EDW-5.50T",
+   "80EUB-M-5.30T",
+   "80EUB-M-5.50T",
+   "80EUB-M-5.75T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "現場是三相電，我想找3HP以下、最大流量至少500 LPM的泵，口徑不限。這兩系列有哪些能選？請把馬力跟最大流量一起列給我。",
+  "models": [
+   "80EDW-5.20S/T",
+   "80EDW-5.30S/T",
+   "100EDW-5.30S/T",
+   "80EUB-M-5.20T",
+   "50EUB-M-5.30T",
+   "80EUB-M-5.30T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "先不管口徑跟馬力，這批EDW和EUB-M裡，哪一款的最大流量最大？是多少LPM？",
+  "models": [
+   "100EUB-M-5.75T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "如果都選3HP，哪一款最大揚程最高？也幫我列出其他3HP款的最大揚程，好比較。",
+  "models": [
+   "80EDW-5.30S/T",
+   "100EDW-5.30S/T",
+   "50EUB-M-5.30T",
+   "80EUB-M-5.30T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "都是3吋出水的話，EDW和EUB-M各挑最大揚程最高的一款，分別是誰？兩邊差幾米？",
+  "models": [
+   "80EDW-5.50T",
+   "80EUB-M-5.75T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我有兩個現場，符合任一邊都可以，但請分開給完整清單：甲要單相、2HP、3吋，最大流量至少650 LPM；乙要三相、3HP，口徑不限，最大揚程至少23米。各有哪些？把甲的最大流量和乙的最大揚程寫上。",
+  "models": {
+   "甲": [
+    "80EDW-5.20S/T",
+    "80EUB-M-5.20S"
+   ],
+   "乙": [
+    "80EDW-5.30S/T",
+    "50EUB-M-5.30T",
+    "80EUB-M-5.30T"
+   ]
+  }
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "幫我把EUB-M裡三相、最大揚程至少20米的款式全部排一下：先按最大揚程由高到低，同分再按最大流量由大到小。每款兩個數字都寫上。",
+  "models": [
+   "80EUB-M-5.75T",
+   "80EUB-M-5.50T",
+   "50EUB-M-5.30T",
+   "100EUB-M-5.75T",
+   "80EUB-M-5.30T",
+   "50EUB-M-5.20T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我只有單相電，想用2HP，最大流量至少每小時30立方米，口徑不限。這相當於多少LPM？EDW和EUB-M有哪些符合？也把各款最大流量寫出來。",
+  "models": [
+   "80EDW-5.20S/T",
+   "50EUB-M-5.20S",
+   "80EUB-M-5.20S"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我想在15米揚程下抽400 LPM，光看這份表能保證哪款嗎？如果沒列15米、400 LPM這個點，就先把「同一個額定點的揚程至少15米、流量至少400 LPM」的候選全部列出，附額定點。最大揚程跟最大流量可以直接拼成一個工作點嗎？",
+  "models": [
+   "80EDW-5.50T",
+   "80EUB-M-5.50T",
+   "80EUB-M-5.75T",
+   "100EUB-M-5.75T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "如果出水口都用4吋，EDW跟EUB-M各自最大流量最多的是哪款？各多少LPM，哪邊多多少？",
+  "models": [
+   "100EDW-5.50T",
+   "100EUB-M-5.75T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "這些EDW跟EUB-M裡哪一款最便宜？這份型錄有售價讓你幫我排嗎？沒有的話就直接說缺什麼。",
+  "models": []
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "EDW跟EUB-M哪個保固比較長？這份型錄有寫各保幾年、保哪些東西嗎？",
+  "models": []
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我要三相電的泵，滿載電流最多5.5A，而且三相款重量不能超過30公斤，口徑不限。這批EDW和EUB-M有哪些符合？每款的三相電流和重量都列給我。",
+  "models": [
+   "50EUB-M-5.20T",
+   "80EUB-M-5.20T",
+   "50EUB-M-5.30T",
+   "80EUB-M-5.30T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "先看通過粒徑至少10毫米、功率不超過3.7kW的款式，相數和口徑都不限。EDW和EUB-M符合的全部有哪些？幫我把kW、HP和粒徑一起寫出來。",
+  "models": [
+   "80EDW-5.20S/T",
+   "80EDW-5.30S/T",
+   "100EDW-5.30S/T",
+   "80EDW-5.50T",
+   "100EDW-5.50T",
+   "80EUB-M-5.50T",
+   "100EUB-M-5.50T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "這批泵裡三相、功率不超過2.2kW的全部排給我：先按三相滿載電流由小到大，電流相同就按三相重量由輕到重。每款的kW、電流和重量都寫上。",
+  "models": [
+   "80EUB-M-5.20T",
+   "50EUB-M-5.20T",
+   "80EDW-5.20S/T",
+   "50EUB-M-5.30T",
+   "80EUB-M-5.30T",
+   "80EDW-5.30S/T",
+   "100EDW-5.30S/T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我有兩個現場，符合其中一邊就能考慮，但清單請分開列：甲用三相，滿載電流不超過8A、重量不超過50公斤、通過粒徑至少10毫米；乙用單相，重量不超過28公斤、通過粒徑至少9毫米。口徑不限，兩邊每款的相應電流、重量和粒徑也給我。",
+  "models": {
+   "甲": [
+    "80EDW-5.20S/T",
+    "80EDW-5.30S/T",
+    "100EDW-5.30S/T",
+    "80EDW-5.50T"
+   ],
+   "乙": [
+    "50EUB-M-5.20S",
+    "80EUB-M-5.20S"
+   ]
+  }
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "都選三相、4吋出水口，EDW和EUB-M各找重量最輕的一款，分別是誰、幾公斤？兩邊差多少公斤？",
+  "models": [
+   "100EDW-5.30S/T",
+   "100EUB-M-5.50T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我要12.5米揚程、1000 LPM，這批泵哪款明列這一組額定點？再把同一額定點揚程至少12米、流量至少750 LPM的候選全部列出並附額定點。其他候選能直接保證符合我的目標嗎？最大揚程和最大流量能拼成同時達到的數字嗎？",
+  "models": [
+   "100EDW-5.50T",
+   "100EUB-M-5.50T",
+   "100EUB-M-5.75T"
+  ]
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "我看到EDW有CH選配。如果換成CH，最大揚程、最大流量和重量會比標準款增加多少？這份型錄能幫我挑出最輕的CH款嗎？沒有數字就直接說缺什麼，別用標準款硬算。",
+  "models": []
+ },
+ {
+  "set": "r3",
+  "lang": "zh",
+  "q": "50EUB-M-5.20S和80EUB-M-5.20S的三相欄都是橫線，能當作三相0A、0公斤來挑最省電最輕的嗎？表上實際寫的是哪個相數、多少滿載電流和重量？沒寫的三相數字能光靠型號補出來嗎？",
+  "models": [
+   "50EUB-M-5.20S",
+   "80EUB-M-5.20S"
+  ]
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "50EUBL の固形物通過径はいくつですか？",
+  "expect": "EUBL"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "汚泥ポンプは何馬力ですか？",
+  "expect": "EUBL|DIVA"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "DIVA PRO に攪拌機は付いていますか？",
+  "expect": "DIVA PRO"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "HIPPO はどんなポンプですか？",
+  "expect": "HIPPO"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "LEOPARD 切断ポンプの回転数は？",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "ALLIGATOR は何を処理できますか？",
+  "expect": "ALLIGATOR"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "水中ポンプはどのくらいの深さまで沈められますか？",
+  "expect": "10"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "水温の上限は何度ですか？",
+  "expect": "40"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "絶縁クラスは何ですか？",
+  "expect": "Class|絕緣"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "着脱装置はどう選べばいいですか？",
+  "expect": "QD|著脫"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "EUS は残水ポンプに改造できますか？",
+  "expect": "EUS"
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "御社の電話番号は何番ですか？",
+  "expect": "26233556"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "50EUBL의 고형물 통과 크기는 얼마인가요?",
+  "expect": "EUBL"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "오니 펌프는 몇 마력인가요?",
+  "expect": "EUBL|DIVA"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "DIVA PRO에 교반기가 있나요?",
+  "expect": "DIVA PRO"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "HIPPO는 어떤 펌프인가요?",
+  "expect": "HIPPO"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "LEOPARD 절단 펌프의 회전 속도는?",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "ALLIGATOR는 무엇을 처리할 수 있나요?",
+  "expect": "ALLIGATOR"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "수중 펌프는 얼마나 깊이 넣을 수 있나요?",
+  "expect": "10"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "수온 제한은 몇 도인가요?",
+  "expect": "40"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "절연 등급은 무엇인가요?",
+  "expect": "Class|絕緣"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "탈착 장치는 어떻게 선택하나요?",
+  "expect": "QD|著脫"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "EUS를 잔수 펌프로 바꿀 수 있나요?",
+  "expect": "EUS"
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "회사 전화번호가 몇 번인가요?",
+  "expect": "26233556"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What is the solids passage of the 50EUBL?",
+  "expect": "EUBL"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "How much horsepower does the sludge pump have?",
+  "expect": "EUBL|DIVA"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "Does DIVA PRO have an agitator?",
+  "expect": "DIVA PRO"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What kind of pump is HIPPO?",
+  "expect": "HIPPO"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What speed does the LEOPARD cutter pump run at?",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What can the ALLIGATOR handle?",
+  "expect": "ALLIGATOR"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "How deep can the submersible pump go?",
+  "expect": "10"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What is the water temperature limit?",
+  "expect": "40"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What insulation class is used?",
+  "expect": "Class|insulation"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "How do I choose a duck foot?",
+  "expect": "QD|duck foot|Duck Foot"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "Can the EUS be converted to a residue pump?",
+  "expect": "EUS"
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What is your company phone number?",
+  "expect": "26233556"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuál es el paso de sólidos de la 50EUBL?",
+  "expect": "EUBL"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuántos caballos tiene la bomba de lodos?",
+  "expect": "EUBL|DIVA"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿La DIVA PRO tiene agitador?",
+  "expect": "DIVA PRO"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Qué tipo de bomba es HIPPO?",
+  "expect": "HIPPO"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿A qué velocidad gira la bomba cortadora LEOPARD?",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Qué puede manejar la ALLIGATOR?",
+  "expect": "ALLIGATOR"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿A qué profundidad se puede sumergir la bomba?",
+  "expect": "10"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuál es el límite de temperatura del agua?",
+  "expect": "40"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Qué clase de aislamiento usa?",
+  "expect": "Clase|aislamiento|Class"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cómo elijo la base de acoplamiento?",
+  "expect": "QD|acoplamiento"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Se puede convertir la EUS en bomba de achique residual?",
+  "expect": "EUS"
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuál es el teléfono de la empresa?",
+  "expect": "26233556"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "請問 Divo 有攪拌器嗎？",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "請問 DVD 有小扳手嗎？",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "請問, 你有腳踏車嗎?",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "加盟 DIA 五角板起",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "UBL 有哪些馬力規格？",
+  "expect": "EUBL",
+  "ref": "EUBL 有哪些馬力規格？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EU 必要、舞臺在馬德里軌跡。",
+  "expect": "EUBL",
+  "ref": "EUBL 有哪些馬力規格？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EUBL 五代乖馬力規格",
+  "expect": "EUBL",
+  "ref": "EUBL 有哪些馬力規格？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "51 USR 的出水口徑是多少？",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "51 衛賽的出水口徑是多少？",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我佇 EU SRA 出嘴口語是頭次。",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我這 EU SRA 出口景是打結。",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Hippo 無水本最大流量是多少？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "hippocampus 泵最大流量是多少？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "HIPO 汙水泵流量是多少？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "HIPO 屋主澎，最大流量是幾位？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Alligator 嚼碎泵可以嚼碎石嗎？",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Alligator 攪碎棒可以攪碎石嗎？",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Nike 的茶到嘴邊，可以到嘴什麼？",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "LL I J 到處跑，可以到處下米。",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "等一下要跳泥沼，推薦大只款泥沼胖。",
+  "expect": "泥漿泵",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "剛到愛爾蘭州，推薦多吃款愛爾蘭胖。",
+  "expect": "泥漿泵",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "自動摺疊裝置要怎麼安裝？",
+  "expect": "自動著脫裝置",
+  "ref": "自動著脫裝置要怎麼安裝？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "主動的脫中地，要安裝安裝。",
+  "expect": "自動著脫裝置",
+  "ref": "自動著脫裝置要怎麼安裝？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "主動的脫妝的，愛安怎安怎。",
+  "expect": "自動著脫裝置",
+  "ref": "自動著脫裝置要怎麼安裝？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Leopard 切割泵是何用在哪裡？",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Le Petit Chef 蹦迪餐廳在哪裡？",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "哪把切瓜棒適合用在哪裡？",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "leopard 的捷克文是哈用疊搭。",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Diva Pro 跟 Diva 差在哪裡？",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Diverpool 跟 Diverchase 在哪裡？",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Diva Pro가 Diva 찾았대리.",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "el abril 的 el abril 的",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Steel 系列的機械軸封是什麼材質？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Steel City 的機械軸封是什麼材質？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "steel 嘿咧機械條風是啥物在製？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "steal 呢個字係嘲諷，係咩意思？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "潛水泵可以抽到多低的水位？",
+  "expect": "殘水泵",
+  "ref": "殘水泵可以抽到多低的水位？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "參差不齊的當選者，早該退位。",
+  "expect": "殘水泵",
+  "ref": "殘水泵可以抽到多低的水位？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "沉睡泵，えだんてぃうでぃお、ざけえのずいみ。",
+  "expect": "殘水泵",
+  "ref": "殘水泵可以抽到多低的水位？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "UBM 跟 EDW 哪一款比較省電？",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EBM 跟 EDW 哪一款比較省電？",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EUBM 的 EDW 那種比價系統",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EUPM的EDW哪一種比較省電？",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "鍋蓋保護器跳掉了要怎麼處理？",
+  "expect": "過載保護器",
+  "ref": "過載保護器跳掉了要怎麼處理？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "跪在包好去跳掉了，欲按怎處理？",
+  "expect": "過載保護器",
+  "ref": "過載保護器跳掉了要怎麼處理？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "櫃檯保護貼掉掉了，要怎麼處理？",
+  "expect": "過載保護器",
+  "ref": "過載保護器跳掉了要怎麼處理？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "一輪卡住的話，那模板要換嗎？",
+  "expect": "葉輪|耐磨板",
+  "ref": "葉輪卡住的話耐磨板要換嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "葉倫卡多的話，那麼辦，愛我嗎？",
+  "expect": "葉輪|耐磨板",
+  "ref": "葉輪卡住的話耐磨板要換嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "葉倫卡多夫的模板愛瓦修。",
+  "expect": "葉輪|耐磨板",
+  "ref": "葉輪卡住的話耐磨板要換嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Yamada 歌磨本有現貨嗎？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "一發蹦出的 imari 隔膜蹦有些貨嗎？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "一發棒球，山田阿哥摸棒，五很會嗎？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "叶っぱを食べるヤマダゲモムは很会吗？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想找和記企業的業務問 EVAK 的報價。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想找賀記企業的業務問 EVK 的報價。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想要找最好的汽車業務員的報告。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想欲找合適去業界的業務部門的報告。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "EUBL 有哪些馬力規格？",
+  "expect": "EUBL.*(1 HP|0\\.75)|1 HP.*EUBL"
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "EUSR 的出水口徑是多少？",
+  "expect": "EUSR"
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "LEOPARD 的固體通過粒徑",
+  "expect": "LEOPARD"
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "ALLIGATOR 有幾種馬力",
+  "expect": "ALLIGATOR"
+ }
+]

@@ -1,0 +1,4844 @@
+[
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "50EUBL 的固體通過粒徑是多少？",
+  "expect": "EUBL",
+  "simple": {
+   "ms": 32.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：50EUB-5.05 的固體通過粒徑是多少？ 回答：標準款 50EUB-5.05 固體通過粒徑為 6 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：HIPPO DN65 的固體通過粒徑是多少？ 回答：HIPPO DN65 的固體通過粒徑為 65 mm。  【工程要點說明】 - 對"
+   ]
+  },
+  "ngram23": {
+   "ms": 39.1,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：50EUB-5.05 的固體通過粒徑是多少？ 回答：標準款 50EUB-5.05 固體通過粒徑為 6 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：殘水款 50EUBR-5.05 的固體通過粒徑是多少？ 回答：殘水款 50EUBR-5.05 固體通過粒徑僅有 2 mm。  【工程"
+   ]
+  },
+  "ngram24": {
+   "ms": 53.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：50EUB-5.05 的固體通過粒徑是多少？ 回答：標準款 50EUB-5.05 固體通過粒徑為 6 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：殘水款 50EUBR-5.05 的固體通過粒徑是多少？ 回答：殘水款 50EUBR-5.05 固體通過粒徑僅有 2 mm。  【工程"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "污泥泵有幾匹馬力？",
+  "expect": "EUBL|DIVA",
+  "simple": {
+   "ms": 17.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 13 頁：DIVA 4極重型沉水"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：HIPPO DN 單相最大到幾馬力？ 回答：單相最大馬力僅至 2HP（1.5kW），3HP 以上皆僅供應三相。  【工程要點說明】 ",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram24": {
+   "ms": 25.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：HIPPO DN 單相最大到幾馬力？ 回答：單相最大馬力僅至 2HP（1.5kW），3HP 以上皆僅供應三相。  【工程要點說明】 ",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "DIVA PRO 有攪拌器嗎？",
+  "expect": "DIVA PRO",
+  "simple": {
+   "ms": 18.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極"
+   ]
+  },
+  "ngram23": {
+   "ms": 23.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "HIPPO 是什麼樣的泵？",
+  "expect": "HIPPO",
+  "simple": {
+   "ms": 21.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO DN 哪些型號有單相電源？ 回答：僅限 1.5HP 與 2HP 機型：HIPPO-150 DN65、HIPPO-200 ",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D"
+   ]
+  },
+  "ngram23": {
+   "ms": 23.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO 污水泵標準版是什麼出水口？ 回答：HIPPO 標準版為垂直出水、PT 內牙接頭（Vertical, threaded o",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D"
+   ]
+  },
+  "ngram24": {
+   "ms": 23.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO 污水泵標準版是什麼出水口？ 回答：HIPPO 標準版為垂直出水、PT 內牙接頭（Vertical, threaded o",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "LEOPARD 切碎泵的轉速多少？",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 18.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP"
+   ]
+  },
+  "ngram24": {
+   "ms": 22.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "ALLIGATOR 可以處理什麼？",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 18.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.1,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "沉水泵最深可以放多深？",
+  "expect": "10",
+  "simple": {
+   "ms": 13.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog "
+   ]
+  },
+  "ngram23": {
+   "ms": 18.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：evak_qa 問題：EUB-M 系列最深可以下潛幾公尺？ 回答：EUB-M 2~7.5HP 最大下潛深度為 10M；10~20HP 為 20M。  【工",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：evak_qa 問題：EUB-M 系列最深可以下潛幾公尺？ 回答：EUB-M 2~7.5HP 最大下潛深度為 10M；10~20HP 為 20M。  【工",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "水溫限制是幾度？",
+  "expect": "40",
+  "simple": {
+   "ms": 12.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：HIPPO DN80 是幾吋出水口？ 回答：HIPPO DN80 對應 3\"（3 吋）出水口。  【工程要點說明】 - 對應出處：第"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：HIPPO DN80 是幾吋出水口？ 回答：HIPPO DN80 對應 3\"（3 吋）出水口。  【工程要點說明】 - 對應出處：第"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "絕緣等級是什麼？",
+  "expect": "Class|絕緣",
+  "simple": {
+   "ms": 13.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 系列的馬達絕緣等級是多少？ 回答：EUB-M 2~7.5HP 與 10HP 為 Class F；15~20HP 提高至 ",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 系列的馬達絕緣等級是多少？ 回答：EUB-M 2~7.5HP 與 10HP 為 Class F；15~20HP 提高至 ",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：evak_qa 問題：EUB-M 系列的軸心是什麼材質？ 回答：EUB-M 2~7.5HP 為 AISI 410；10~20HP 為 AISI 410/4"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 系列的馬達絕緣等級是多少？ 回答：EUB-M 2~7.5HP 與 10HP 為 Class F；15~20HP 提高至 ",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：evak_qa 問題：EUB-M 系列的軸心是什麼材質？ 回答：EUB-M 2~7.5HP 為 AISI 410；10~20HP 為 AISI 410/4"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "著脫座要怎麼選？",
+  "expect": "QD|著脫",
+  "simple": {
+   "ms": 15.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN65? 內容：The HIPPO",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN65? 內容：The HIPPO"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN65? 內容：The HIPPO"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "EUS 可以改成殘水泵嗎？",
+  "expect": "EUS",
+  "simple": {
+   "ms": 20.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  },
+  "ngram23": {
+   "ms": 19.5,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "zh",
+  "q": "你們公司電話幾號？",
+  "expect": "26233556",
+  "simple": {
+   "ms": 12.8,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA_es 章節：¿Cuál es el teléfono de la sede de EVAK? 內容：Prefijo internacion"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.5,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What is the solids passage of the 50EUBL?",
+  "expect": "EUBL",
+  "simple": {
+   "ms": 17.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram23": {
+   "ms": 35.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso"
+   ]
+  },
+  "ngram24": {
+   "ms": 41.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "How much horsepower does the sludge pump have?",
+  "expect": "EUBL|DIVA",
+  "simple": {
+   "ms": 24.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：How much does the HIPPO-50 (Q) version weigh? 內容：HIPPO-50 incre"
+   ]
+  },
+  "ngram23": {
+   "ms": 37.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  },
+  "ngram24": {
+   "ms": 44.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "Does DIVA PRO have an agitator?",
+  "expect": "DIVA PRO",
+  "simple": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series can be fitted with an",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram24": {
+   "ms": 27.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series can be fitted with an",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What kind of pump is HIPPO?",
+  "expect": "HIPPO",
+  "simple": {
+   "ms": 18.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with ",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：What kind of handle does the EUB-M series have? 內容：An ergonomic"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the discharge type of the sta",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5"
+   ]
+  },
+  "ngram24": {
+   "ms": 28.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the discharge type of the sta",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What speed does the LEOPARD cutter pump run at?",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 21.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram23": {
+   "ms": 28.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram24": {
+   "ms": 34.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What can the ALLIGATOR handle?",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 19.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_en 章節：What kind of handle does the EUB-M series have? 內容：An ergonomic",
+    "主題：EVAK_QA_en 章節：In the lower-right corner of the ALLIGATOR series catalog page,"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：In the lower-right corner of the ALLIGATOR series catalog page,"
+   ]
+  },
+  "ngram24": {
+   "ms": 26.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：In the lower-right corner of the ALLIGATOR series catalog page,"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "How deep can the submersible pump go?",
+  "expect": "10",
+  "simple": {
+   "ms": 18.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog "
+   ]
+  },
+  "ngram23": {
+   "ms": 25.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram24": {
+   "ms": 29.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What is the water temperature limit?",
+  "expect": "40",
+  "simple": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram23": {
+   "ms": 25.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 33.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What insulation class is used?",
+  "expect": "Class|insulation",
+  "simple": {
+   "ms": 18.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up ",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the HIPPO 2 inch sewage pump serie",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up "
+   ]
+  },
+  "ngram24": {
+   "ms": 26.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the HIPPO 2 inch sewage pump serie",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up "
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "How do I choose a duck foot?",
+  "expect": "QD|duck foot|Duck Foot",
+  "simple": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "Can the EUS be converted to a residue pump?",
+  "expect": "EUS",
+  "simple": {
+   "ms": 18.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容："
+   ]
+  },
+  "ngram23": {
+   "ms": 26.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容："
+   ]
+  },
+  "ngram24": {
+   "ms": 30.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "en",
+  "q": "What is your company phone number?",
+  "expect": "26233556",
+  "simple": {
+   "ms": 18.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of ",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of ",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram24": {
+   "ms": 26.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of ",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuál es el paso de sólidos de la 50EUBL?",
+  "expect": "EUBL",
+  "simple": {
+   "ms": 18.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el pas"
+   ]
+  },
+  "ngram23": {
+   "ms": 26.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli"
+   ]
+  },
+  "ngram24": {
+   "ms": 31.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuántos caballos tiene la bomba de lodos?",
+  "expect": "EUBL|DIVA",
+  "simple": {
+   "ms": 18.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie HIP",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram23": {
+   "ms": 28.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la esquina i",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 32.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie HIP",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿La DIVA PRO tiene agitador?",
+  "expect": "DIVA PRO",
+  "simple": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：La serie DIVA admite un agitador (Agitator) externo opcional. ¿",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：La serie DIVA admite un agitador (Agitator) externo opcional. ¿",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  },
+  "ngram24": {
+   "ms": 26.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：La serie DIVA admite un agitador (Agitator) externo opcional. ¿",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Qué tipo de bomba es HIPPO?",
+  "expect": "HIPPO",
+  "simple": {
+   "ms": 20.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la HIPPO DN8",
+    "主題：EVAK_QA_es 章節：¿Qué descarga tiene la versión estándar de la bomba HIPPO? 內容：L",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué descarga tiene la versión estándar de la bomba HIPPO? 內容：L",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la HIPPO DN8",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué tipo de de"
+   ]
+  },
+  "ngram24": {
+   "ms": 25.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la HIPPO DN8",
+    "主題：EVAK_QA_es 章節：¿Qué descarga tiene la versión estándar de la bomba HIPPO? 內容：L",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué tipo de de"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿A qué velocidad gira la bomba cortadora LEOPARD?",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 16.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 32.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Qué puede manejar la ALLIGATOR?",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 20.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：Con la placa de succión opcional, ¿hasta qué nivel puede achica",
+    "主題：EVAK_QA_es 章節：¿A qué velocidad giran los motores de ALLIGATOR y LEOPARD? 內容：A"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：¿A qué velocidad giran los motores de ALLIGATOR y LEOPARD? 內容：A",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：¿A qué velocidad giran los motores de ALLIGATOR y LEOPARD? 內容：A",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿A qué profundidad se puede sumergir la bomba?",
+  "expect": "10",
+  "simple": {
+   "ms": 18.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En el catálogo,",
+    "主題：EVAK_QA_es 章節：En el catálogo, la profundidad máxima de inmersión de la mayorí",
+    "主題：EVAK_QA_es 章節：¿Se puede cambiar la dirección de descarga de la bomba EUSR? 內容"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：En el catálogo, la profundidad máxima de inmersión de la mayorí",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion "
+   ]
+  },
+  "ngram24": {
+   "ms": 27.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：En el catálogo, la profundidad máxima de inmersión de la mayorí",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion "
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuál es el límite de temperatura del agua?",
+  "expect": "40",
+  "simple": {
+   "ms": 18.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  },
+  "ngram24": {
+   "ms": 26.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Qué clase de aislamiento usa?",
+  "expect": "Clase|aislamiento|Class",
+  "simple": {
+   "ms": 17.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué clase de aislamiento tiene el motor de la serie EUB-M? 內容：",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué tipo de impulsor usa la serie EUB-M? 內容：La EUB-M de 2~7.5H"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué clase de aislamiento tiene el motor de la serie EUB-M? 內容：",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué tipo de impulsor usa la serie EUB-M? 內容：La EUB-M de 2~7.5H"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué clase de aislamiento tiene el motor de la serie EUB-M? 內容：",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cómo elijo la base de acoplamiento?",
+  "expect": "QD|acoplamiento",
+  "simple": {
+   "ms": 15.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：EVAK_QA_es 章節：Para la serie HIPPO DN, ¿qué diseño integrado especial señala l",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Para la serie H"
+   ]
+  },
+  "ngram23": {
+   "ms": 24.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > La base de acop"
+   ]
+  },
+  "ngram24": {
+   "ms": 27.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Se puede convertir la EUS en bomba de achique residual?",
+  "expect": "EUS",
+  "simple": {
+   "ms": 17.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué modelos EUS se convierten en bomba de achique residual con",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie EUS",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  },
+  "ngram23": {
+   "ms": 26.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué modelos EUS se convierten en bomba de achique residual con",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie EUS",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  },
+  "ngram24": {
+   "ms": 29.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué modelos EUS se convierten en bomba de achique residual con",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie EUS",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  }
+ },
+ {
+  "set": "kb",
+  "lang": "es",
+  "q": "¿Cuál es el teléfono de la empresa?",
+  "expect": "26233556",
+  "simple": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el cód",
+    "主題：EVAK_QA_es 章節：¿Cuál es el teléfono de la sede de EVAK? 內容：Prefijo internacion",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el cód",
+    "主題：EVAK_QA_es 章節：¿Cuál es el teléfono de la sede de EVAK? 內容：Prefijo internacion",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram24": {
+   "ms": 23.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el cód",
+    "主題：EVAK_QA_es 章節：¿Cuál es el teléfono de la sede de EVAK? 內容：Prefijo internacion",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "50EUBL の固形物通過径はいくつですか？",
+  "expect": "EUBL",
+  "simple": {
+   "ms": 15.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：evak_qa 問題：50EUB-5.05 的固體通過粒徑是多少？ 回答：標準款 50EUB-5.05 固體通過粒徑為 6 mm。  【工程要點說明】 -"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "汚泥ポンプは何馬力ですか？",
+  "expect": "EUBL|DIVA",
+  "simple": {
+   "ms": 13.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：DIVA PRO 最小從幾馬力起跳？ 回答：DIVA PRO 最低由 10HP 起跳（馬力涵蓋 10, 15, 20, 24, 30",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：DIVA PRO 最小從幾馬力起跳？ 回答：DIVA PRO 最低由 10HP 起跳（馬力涵蓋 10, 15, 20, 24, 30",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "DIVA PRO に攪拌機は付いていますか？",
+  "expect": "DIVA PRO",
+  "simple": {
+   "ms": 17.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：evak_qa 問題：DIVA PRO 最小從幾馬力起跳？ 回答：DIVA PRO 最低由 10HP 起跳（馬力涵蓋 10, 15, 20, 24, 30"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "HIPPO はどんなポンプですか？",
+  "expect": "HIPPO",
+  "simple": {
+   "ms": 16.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO DN 哪些型號有單相電源？ 回答：僅限 1.5HP 與 2HP 機型：HIPPO-150 DN65、HIPPO-200 ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with "
+   ]
+  },
+  "ngram23": {
+   "ms": 15.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO DN 哪些型號有單相電源？ 回答：僅限 1.5HP 與 2HP 機型：HIPPO-150 DN65、HIPPO-200 ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with "
+   ]
+  },
+  "ngram24": {
+   "ms": 19.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO DN 哪些型號有單相電源？ 回答：僅限 1.5HP 與 2HP 機型：HIPPO-150 DN65、HIPPO-200 ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "LEOPARD 切断ポンプの回転数は？",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 18.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "ALLIGATOR は何を処理できますか？",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 17.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_en 章節：How hard are the ALLIGATOR and LEOPARD cutters? 內容：ALLIGATOR is"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.1,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.8,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "水中ポンプはどのくらいの深さまで沈められますか？",
+  "expect": "10",
+  "simple": {
+   "ms": 14.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 5 頁：50EUSR 輕量沉水殘",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog "
+   ]
+  },
+  "ngram24": {
+   "ms": 15.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 5 頁：50EUSR 輕量沉水殘",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "水温の上限は何度ですか？",
+  "expect": "40",
+  "simple": {
+   "ms": 13.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  },
+  "ngram24": {
+   "ms": 13.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "絶縁クラスは何ですか？",
+  "expect": "Class|絕緣",
+  "simple": {
+   "ms": 16.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-"
+   ]
+  },
+  "ngram23": {
+   "ms": 14.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-"
+   ]
+  },
+  "ngram24": {
+   "ms": 12.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "着脱装置はどう選べばいいですか？",
+  "expect": "QD|著脫",
+  "simple": {
+   "ms": 15.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_en 章節：What suction plate does the EDW (CH) custom version use? 內容：The"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_en 章節：What suction plate does the EDW (CH) custom version use? 內容：The"
+   ]
+  },
+  "ngram24": {
+   "ms": 13.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_en 章節：What suction plate does the EDW (CH) custom version use? 內容：The"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "EUS は残水ポンプに改造できますか？",
+  "expect": "EUS",
+  "simple": {
+   "ms": 15.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  },
+  "ngram23": {
+   "ms": 15.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  },
+  "ngram24": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t",
+    "主題：EVAK_QA_es 章節：¿Qué modelos EUS se convierten en bomba de achique residual con"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ja",
+  "q": "御社の電話番号は何番ですか？",
+  "expect": "26233556",
+  "simple": {
+   "ms": 14.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of "
+   ]
+  },
+  "ngram23": {
+   "ms": 14.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 型錄的泵浦適用什麼電源頻率？ 回答：適用電源頻率為 50Hz。  【工程要點說明】 - 對應出處：第 1 頁（封面） - "
+   ]
+  },
+  "ngram24": {
+   "ms": 13.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 型錄的泵浦適用什麼電源頻率？ 回答：適用電源頻率為 50Hz。  【工程要點說明】 - 對應出處：第 1 頁（封面） - "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "50EUBL의 고형물 통과 크기는 얼마인가요?",
+  "expect": "EUBL",
+  "simple": {
+   "ms": 12.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.5,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "오니 펌프는 몇 마력인가요?",
+  "expect": "EUBL|DIVA",
+  "simple": {
+   "ms": 13.1,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the maximum single-phase horsepower of the HIPPO DN? 內容",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram23": {
+   "ms": 13.3,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the maximum single-phase horsepower of the HIPPO DN? 內容",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram24": {
+   "ms": 11.1,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the maximum single-phase horsepower of the HIPPO DN? 內容",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "DIVA PRO에 교반기가 있나요?",
+  "expect": "DIVA PRO",
+  "simple": {
+   "ms": 15.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "HIPPO는 어떤 펌프인가요?",
+  "expect": "HIPPO",
+  "simple": {
+   "ms": 12.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up ",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO DN 哪些型號有單相電源？ 回答：僅限 1.5HP 與 2HP 機型：HIPPO-150 DN65、HIPPO-200 "
+   ]
+  },
+  "ngram24": {
+   "ms": 18.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：evak_qa 問題：HIPPO DN 哪些型號有單相電源？ 回答：僅限 1.5HP 與 2HP 機型：HIPPO-150 DN65、HIPPO-200 "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "LEOPARD 절단 펌프의 회전 속도는?",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 15.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "ALLIGATOR는 무엇을 처리할 수 있나요?",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 13.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "수중 펌프는 얼마나 깊이 넣을 수 있나요?",
+  "expect": "10",
+  "simple": {
+   "ms": 14.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  },
+  "ngram23": {
+   "ms": 14.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "수온 제한은 몇 도인가요?",
+  "expect": "40",
+  "simple": {
+   "ms": 15.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram23": {
+   "ms": 14.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 13.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "절연 등급은 무엇인가요?",
+  "expect": "Class|絕緣",
+  "simple": {
+   "ms": 14.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：evak_qa 問題：EUB-M 系列的馬達絕緣等級是多少？ 回答：EUB-M 2~7.5HP 與 10HP 為 Class F；15~20HP 提高至 "
+   ]
+  },
+  "ngram23": {
+   "ms": 13.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：evak_qa 問題：EUB-M 系列的馬達絕緣等級是多少？ 回答：EUB-M 2~7.5HP 與 10HP 為 Class F；15~20HP 提高至 "
+   ]
+  },
+  "ngram24": {
+   "ms": 13.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：evak_qa 問題：EUB-M 系列的馬達絕緣等級是多少？ 回答：EUB-M 2~7.5HP 與 10HP 為 Class F；15~20HP 提高至 "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "탈착 장치는 어떻게 선택하나요?",
+  "expect": "QD|著脫",
+  "simple": {
+   "ms": 12.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_en 章節：What suction plate does the EDW (CH) custom version use? 內容：The"
+   ]
+  },
+  "ngram23": {
+   "ms": 13.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_en 章節：What suction plate does the EDW (CH) custom version use? 內容：The"
+   ]
+  },
+  "ngram24": {
+   "ms": 12.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_en 章節：What suction plate does the EDW (CH) custom version use? 內容：The"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "EUS를 잔수 펌프로 바꿀 수 있나요?",
+  "expect": "EUS",
+  "simple": {
+   "ms": 12.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t",
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUS 哪幾款可以加裝底盤變成殘水泵？ 回答：僅限 0.5HP 與 1HP（型號 50EUS-5.05、50(80)EUS-5.10",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：EVAK_QA_en 章節：With the optional suction plate, how low can an EUS pump down t"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "ko",
+  "q": "회사 전화번호가 몇 번인가요?",
+  "expect": "26233556",
+  "simple": {
+   "ms": 13.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of "
+   ]
+  },
+  "ngram23": {
+   "ms": 14.5,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of "
+   ]
+  },
+  "ngram24": {
+   "ms": 16.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What is the solids passage of the 50EUBL?",
+  "expect": "EUBL",
+  "simple": {
+   "ms": 19.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso"
+   ]
+  },
+  "ngram24": {
+   "ms": 26.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "How much horsepower does the sludge pump have?",
+  "expect": "EUBL|DIVA",
+  "simple": {
+   "ms": 20.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：How much does the HIPPO-50 (Q) version weigh? 內容：HIPPO-50 incre"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  },
+  "ngram24": {
+   "ms": 25.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "Does DIVA PRO have an agitator?",
+  "expect": "DIVA PRO",
+  "simple": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series can be fitted with an",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series can be fitted with an",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What kind of pump is HIPPO?",
+  "expect": "HIPPO",
+  "simple": {
+   "ms": 17.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with ",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：What kind of handle does the EUB-M series have? 內容：An ergonomic"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the discharge type of the sta",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > When the HIPPO series is fitted with ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the discharge type of the sta",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What speed does the LEOPARD cutter pump run at?",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 18.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram24": {
+   "ms": 23.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What can the ALLIGATOR handle?",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 15.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_en 章節：What kind of handle does the EUB-M series have? 內容：An ergonomic",
+    "主題：EVAK_QA_en 章節：In the lower-right corner of the ALLIGATOR series catalog page,"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：In the lower-right corner of the ALLIGATOR series catalog page,"
+   ]
+  },
+  "ngram24": {
+   "ms": 22.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the",
+    "主題：EVAK_QA_en 章節：In the lower-right corner of the ALLIGATOR series catalog page,"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "How deep can the submersible pump go?",
+  "expect": "10",
+  "simple": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog "
+   ]
+  },
+  "ngram23": {
+   "ms": 22.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo"
+   ]
+  },
+  "ngram24": {
+   "ms": 22.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What is the water temperature limit?",
+  "expect": "40",
+  "simple": {
+   "ms": 14.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What insulation class is used?",
+  "expect": "Class|insulation",
+  "simple": {
+   "ms": 17.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up ",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the HIPPO 2 inch sewage pump serie",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up "
+   ]
+  },
+  "ngram24": {
+   "ms": 18.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What motor insulation class does the EUB-M series have? 內容：EUB-",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the HIPPO 2 inch sewage pump serie",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "How do I choose a duck foot?",
+  "expect": "QD|duck foot|Duck Foot",
+  "simple": {
+   "ms": 15.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "Can the EUS be converted to a residue pump?",
+  "expect": "EUS",
+  "simple": {
+   "ms": 18.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容："
+   ]
+  },
+  "ngram23": {
+   "ms": 23.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容："
+   ]
+  },
+  "ngram24": {
+   "ms": 23.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the ",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the EUS light-duty submersible dew"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "en",
+  "q": "What is your company phone number?",
+  "expect": "26233556",
+  "simple": {
+   "ms": 17.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of ",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of ",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > What is the document edition code of ",
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuál es el paso de sólidos de la 50EUBL?",
+  "expect": "EUBL",
+  "simple": {
+   "ms": 17.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el pas"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUBL-5.10? 內容：The soli"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuántos caballos tiene la bomba de lodos?",
+  "expect": "EUBL|DIVA",
+  "simple": {
+   "ms": 15.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie HIP",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la esquina i",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie HIP",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿La DIVA PRO tiene agitador?",
+  "expect": "DIVA PRO",
+  "simple": {
+   "ms": 19.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：La serie DIVA admite un agitador (Agitator) externo opcional. ¿",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：La serie DIVA admite un agitador (Agitator) externo opcional. ¿",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：La serie DIVA admite un agitador (Agitator) externo opcional. ¿",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Qué tipo de bomba es HIPPO?",
+  "expect": "HIPPO",
+  "simple": {
+   "ms": 17.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la HIPPO DN8",
+    "主題：EVAK_QA_es 章節：¿Qué descarga tiene la versión estándar de la bomba HIPPO? 內容：L",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué descarga tiene la versión estándar de la bomba HIPPO? 內容：L",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la HIPPO DN8",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué tipo de de"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la HIPPO DN8",
+    "主題：EVAK_QA_es 章節：¿Qué descarga tiene la versión estándar de la bomba HIPPO? 內容：L",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué tipo de de"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿A qué velocidad gira la bomba cortadora LEOPARD?",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 17.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Compare los mec",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Qué puede manejar la ALLIGATOR?",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：Con la placa de succión opcional, ¿hasta qué nivel puede achica",
+    "主題：EVAK_QA_es 章節：¿A qué velocidad giran los motores de ALLIGATOR y LEOPARD? 內容：A"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：¿A qué velocidad giran los motores de ALLIGATOR y LEOPARD? 內容：A",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：¿A qué velocidad giran los motores de ALLIGATOR y LEOPARD? 內容：A",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿A qué profundidad se puede sumergir la bomba?",
+  "expect": "10",
+  "simple": {
+   "ms": 18.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En el catálogo,",
+    "主題：EVAK_QA_es 章節：En el catálogo, la profundidad máxima de inmersión de la mayorí",
+    "主題：EVAK_QA_es 章節：¿Se puede cambiar la dirección de descarga de la bomba EUSR? 內容"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：En el catálogo, la profundidad máxima de inmersión de la mayorí",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion "
+   ]
+  },
+  "ngram24": {
+   "ms": 20.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：En el catálogo, la profundidad máxima de inmersión de la mayorí",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuál es el límite de temperatura del agua?",
+  "expect": "40",
+  "simple": {
+   "ms": 17.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  },
+  "ngram23": {
+   "ms": 23.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  },
+  "ngram24": {
+   "ms": 22.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 附錄：全系列通用運轉條件與著脫座對照"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Qué clase de aislamiento usa?",
+  "expect": "Clase|aislamiento|Class",
+  "simple": {
+   "ms": 17.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué clase de aislamiento tiene el motor de la serie EUB-M? 內容：",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué tipo de impulsor usa la serie EUB-M? 內容：La EUB-M de 2~7.5H"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué clase de aislamiento tiene el motor de la serie EUB-M? 內容：",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué tipo de impulsor usa la serie EUB-M? 內容：La EUB-M de 2~7.5H"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué clase de aislamiento tiene el motor de la serie EUB-M? 內容：",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla",
+    "主題：EVAK_QA_es 章節：¿Qué potencias de la HIPPO de 2 pulgadas tienen aislamiento Cla"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cómo elijo la base de acoplamiento?",
+  "expect": "QD|acoplamiento",
+  "simple": {
+   "ms": 16.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：EVAK_QA_es 章節：Para la serie HIPPO DN, ¿qué diseño integrado especial señala l",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > Para la serie H"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > La base de acop"
+   ]
+  },
+  "ngram24": {
+   "ms": 22.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj"
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Se puede convertir la EUS en bomba de achique residual?",
+  "expect": "EUS",
+  "simple": {
+   "ms": 19.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué modelos EUS se convierten en bomba de achique residual con",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie EUS",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  },
+  "ngram23": {
+   "ms": 23.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué modelos EUS se convierten en bomba de achique residual con",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie EUS",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  },
+  "ngram24": {
+   "ms": 24.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué modelos EUS se convierten en bomba de achique residual con",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En la serie EUS",
+    "主題：EVAK_QA_en 章節：Which EUS models can become a residue dewatering pump with the "
+   ]
+  }
+ },
+ {
+  "set": "xl",
+  "lang": "es",
+  "q": "¿Cuál es el teléfono de la empresa?",
+  "expect": "26233556",
+  "simple": {
+   "ms": 19.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el cód",
+    "主題：EVAK_QA_es 章節：¿Cuál es el teléfono de la sede de EVAK? 內容：Prefijo internacion",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el cód",
+    "主題：EVAK_QA_es 章節：¿Cuál es el teléfono de la sede de EVAK? 內容：Prefijo internacion",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  },
+  "ngram24": {
+   "ms": 23.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Cuál es el cód",
+    "主題：EVAK_QA_es 章節：¿Cuál es el teléfono de la sede de EVAK? 內容：Prefijo internacion",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "請問 Divo 有攪拌器嗎？",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "simple": {
+   "ms": 14.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato",
+    "主題：EVAK_QA_es 章節：La serie DIVA admite un agitador (Agitator) externo opcional. ¿",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：evak_qa 問題：DIVA 系列可選配外加擾流器（Agitator），型錄左上角明確標註該選配擾流器的材質金屬牌號為何？ 回答：球狀石墨鑄鐵 EN-G",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：evak_qa 問題：DIVA 系列可選配外加擾流器（Agitator），型錄左上角明確標註該選配擾流器的材質金屬牌號為何？ 回答：球狀石墨鑄鐵 EN-G",
+    "主題：EVAK_QA_en 章節：The DIVA series can be fitted with an optional external agitato"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "請問 DVD 有小扳手嗎？",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "simple": {
+   "ms": 15.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配",
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat",
+    "主題：EVAK_QA_en 章節：What shaft does the EDW (CH) custom version use? 內容：The EDW (CH"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。",
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配",
+    "主題：evak_qa 問題：DIVA PRO 有 3HP、5HP 或 7.5HP 嗎？ 回答：沒有，DIVA PRO 無 3HP、5HP 或 7.5HP 機型。",
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "請問, 你有腳踏車嗎?",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "simple": {
+   "ms": 14.4,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -",
+    "主題：evak_qa 問題：EUB-M 高鉻葉輪的硬度有多高？ 回答：熱處理後硬度可達 HRC 55（can reach HRC55 hardness）。  【"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.9,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：EUB-M 3HP 以上有單相機型嗎？ 回答：沒有。EUB-M 3HP、5HP、7.5HP 僅提供三相（Three Phase, 4",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.3,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：EUB-M 3HP 以上有單相機型嗎？ 回答：沒有。EUB-M 3HP、5HP、7.5HP 僅提供三相（Three Phase, 4",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "加盟 DIA 五角板起",
+  "expect": "DIVA",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "simple": {
+   "ms": 13.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which DIVA and DIVA PRO models have the wearing plate (part no.",
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配",
+    "主題：EVAK_QA_en 章節：Into which three brackets is the solids free passage (Free Pass"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which DIVA and DIVA PRO models have the wearing plate (part no.",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué fundición ",
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which DIVA and DIVA PRO models have the wearing plate (part no.",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "UBL 有哪些馬力規格？",
+  "expect": "EUBL",
+  "ref": "EUBL 有哪些馬力規格？",
+  "simple": {
+   "ms": 14.5,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Up to what horsepower is the EUB-M 2~7.5HP available in single ",
+    "主題：EVAK_QA_en 章節：Which EUB-M 10~20HP model has the largest maximum capacity? 內容：",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7."
+   ]
+  },
+  "ngram23": {
+   "ms": 22.2,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Up to what horsepower is the EUB-M 2~7.5HP available in single ",
+    "主題：evak_qa 問題：HIPPO 2 吋污水泵哪些馬力是 Class F 絕緣？ 回答：HIPPO 1.5HP 以上（含 1.5HP、2HP）為 Clas",
+    "主題：EVAK_QA_en 章節：Which EUB-M 10~20HP model has the largest maximum capacity? 內容："
+   ]
+  },
+  "ngram24": {
+   "ms": 21.0,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Up to what horsepower is the EUB-M 2~7.5HP available in single ",
+    "主題：evak_qa 問題：HIPPO 2 吋污水泵哪些馬力是 Class F 絕緣？ 回答：HIPPO 1.5HP 以上（含 1.5HP、2HP）為 Clas",
+    "主題：EVAK_QA_en 章節：Which EUB-M 10~20HP model has the largest maximum capacity? 內容："
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EU 必要、舞臺在馬德里軌跡。",
+  "expect": "EUBL",
+  "ref": "EUBL 有哪些馬力規格？",
+  "simple": {
+   "ms": 13.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la EUB-M de 2HP y 3HP? 內容："
+   ]
+  },
+  "ngram23": {
+   "ms": 16.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En las especifi",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos de la 50EUBL-5.10? 內容：El paso",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En las especifi",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EUBL 五代乖馬力規格",
+  "expect": "EUBL",
+  "ref": "EUBL 有哪些馬力規格？",
+  "simple": {
+   "ms": 17.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程",
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：EUB-M 2~7.5HP 單相最大到幾馬力？ 回答：單相（230V）最高僅提供至 2HP，型號為 50EUB-M-5.20S 與 "
+   ]
+  },
+  "ngram23": {
+   "ms": 20.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 頁面導航目錄 (Table of C",
+    "主題：evak_qa 問題：EUB-M 2~7.5HP 單相最大到幾馬力？ 回答：單相（230V）最高僅提供至 2HP，型號為 50EUB-M-5.20S 與 "
+   ]
+  },
+  "ngram24": {
+   "ms": 21.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程",
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：EUB-M 2~7.5HP 單相最大到幾馬力？ 回答：單相（230V）最高僅提供至 2HP，型號為 50EUB-M-5.20S 與 "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "51 USR 的出水口徑是多少？",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "simple": {
+   "ms": 20.2,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：殘水款 50EUBR-5.05 的固體通過粒徑是多少？ 回答：殘水款 50EUBR-5.05 固體通過粒徑僅有 2 mm。  【工程",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.",
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：殘水款 50EUBR-5.05 的固體通過粒徑是多少？ 回答：殘水款 50EUBR-5.05 固體通過粒徑僅有 2 mm。  【工程",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is "
+   ]
+  },
+  "ngram24": {
+   "ms": 25.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：殘水款 50EUBR-5.05 的固體通過粒徑是多少？ 回答：殘水款 50EUBR-5.05 固體通過粒徑僅有 2 mm。  【工程",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "51 衛賽的出水口徑是多少？",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "simple": {
+   "ms": 17.2,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.",
+    "主題：EVAK_QA_en 章節：What discharge size in inches is the HIPPO DN65? 內容：The HIPPO D"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.2,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：EUB-M 2HP、3HP 的固體通過粒徑是多少？ 回答：EUB-M 2HP 與 3HP 的固體通過粒徑為 9 mm。  【工程要點",
+    "主題：EVAK_QA_en 章節：What discharge size in inches is the HIPPO DN65? 內容：The HIPPO D"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.1,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：EUB-M 2HP、3HP 的固體通過粒徑是多少？ 回答：EUB-M 2HP 與 3HP 的固體通過粒徑為 9 mm。  【工程要點",
+    "主題：EVAK_QA_en 章節：What discharge size in inches is the HIPPO DN65? 內容：The HIPPO D"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我佇 EU SRA 出嘴口語是頭次。",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "simple": {
+   "ms": 13.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA_en 章節：What does the suffix \"C\" mean in an EUS model number? 內容：\"C\" st",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容："
+   ]
+  },
+  "ngram23": {
+   "ms": 17.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué diseño esp",
+    "主題：EVAK_QA_en 章節：What does the suffix \"C\" mean in an EUS model number? 內容：\"C\" st"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué diseño esp",
+    "主題：EVAK_QA_en 章節：What does the suffix \"C\" mean in an EUS model number? 內容：\"C\" st"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我這 EU SRA 出口景是打結。",
+  "expect": "EUSR",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "simple": {
+   "ms": 14.2,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN65? 內容：The HIPPO",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué diseño esp",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN65? 內容：The HIPPO"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > ¿Qué diseño esp",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN65? 內容：The HIPPO"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Hippo 無水本最大流量是多少？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "simple": {
+   "ms": 16.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D",
+    "主題：evak_qa 問題：HIPPO DN 哪些型號有單相電源？ 回答：僅限 1.5HP 與 2HP 機型：HIPPO-150 DN65、HIPPO-200 ",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN80? 內容：The HIPPO"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D",
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN80? 內容：The HIPPO"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D",
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN80? 內容：The HIPPO"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "hippocampus 泵最大流量是多少？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "simple": {
+   "ms": 12.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What discharge does the standard HIPPO sewage pump have? 內容：The",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In HIPPO DN80 there are two 7.5HP mod",
+    "主題：EVAK_QA_en 章節：What is the maximum single-phase horsepower of the HIPPO DN? 內容"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What discharge does the standard HIPPO sewage pump have? 內容：The",
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In HIPPO DN80 there are two 7.5HP mod"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What discharge does the standard HIPPO sewage pump have? 內容：The",
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In HIPPO DN80 there are two 7.5HP mod"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "HIPO 汙水泵流量是多少？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "simple": {
+   "ms": 14.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 16 頁：HIPPO 2\" 大通",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 16 頁：HIPPO 2\" 大通"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 16 頁：HIPPO 2\" 大通",
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 16 頁：HIPPO 2\" 大通",
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 17 頁：HIPPO DN (D"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "HIPO 屋主澎，最大流量是幾位？",
+  "expect": "HIPPO",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "simple": {
+   "ms": 17.1,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：EVAK_QA_en 章節：What is the maximum single-phase horsepower of the HIPPO DN? 內容",
+    "主題：evak_qa 問題：高揚程版 HIPPO-750H 的揚程與流量是多少？ 回答：HIPPO-750H 為高揚程型：額定 16M / 710 LPM，最大"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：evak_qa 問題：高揚程版 HIPPO-750H 的揚程與流量是多少？ 回答：HIPPO-750H 為高揚程型：額定 16M / 710 LPM，最大",
+    "主題：EVAK_QA_en 章節：What is the maximum single-phase horsepower of the HIPPO DN? 內容"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：HIPPO-750 的揚程與流量是多少？ 回答：HIPPO-750 為標準流量型：額定 11M / 900 LPM，最大 18M /",
+    "主題：evak_qa 問題：高揚程版 HIPPO-750H 的揚程與流量是多少？ 回答：HIPPO-750H 為高揚程型：額定 16M / 710 LPM，最大",
+    "主題：EVAK_QA_en 章節：What is the maximum single-phase horsepower of the HIPPO DN? 內容"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Alligator 嚼碎泵可以嚼碎石嗎？",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "simple": {
+   "ms": 18.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.8,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Alligator 攪碎棒可以攪碎石嗎？",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "simple": {
+   "ms": 17.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Compare the cutting mechanisms of the"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Nike 的茶到嘴邊，可以到嘴什麼？",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "simple": {
+   "ms": 16.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > In the applications of the EUS series"
+   ]
+  },
+  "ngram23": {
+   "ms": 22.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：evak_qa 問題：50EUBL-5.10 的零件 36 是什麼？ 回答：零件 36 為排氣閥（Air Exhauster / Air vent mec",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：evak_qa 問題：50EUBL-5.10 的零件 36 是什麼？ 回答：零件 36 為排氣閥（Air Exhauster / Air vent mec",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "LL I J 到處跑，可以到處下米。",
+  "expect": "ALLIGATOR|絞碎泵",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "simple": {
+   "ms": 14.6,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid",
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.1,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.4,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：What does the suffix \"L\" mean in an EUS model number? 內容：\"L\" st",
+    "主題：EVAK_QA_en 章節：How tall is the EUB-M 10~20HP in vertical discharge mode? 內容：Th",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the 50EUB-5.05? 內容：The solid"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "等一下要跳泥沼，推薦大只款泥沼胖。",
+  "expect": "泥漿泵",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "simple": {
+   "ms": 15.1,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up "
+   ]
+  },
+  "ngram23": {
+   "ms": 14.3,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up "
+   ]
+  },
+  "ngram24": {
+   "ms": 15.3,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class F insulation? 內容：1.5",
+    "主題：EVAK_QA_en 章節：Which HIPPO 2 inch sewage pumps have Class B insulation? 內容：Up "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "剛到愛爾蘭州，推薦多吃款愛爾蘭胖。",
+  "expect": "泥漿泵",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "simple": {
+   "ms": 15.2,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：HIPPO-50 的 (Q) 版重幾公斤？ 回答：HIPPO-50 由 12.9 kg 增加至 14.3 kg（+1.4kg）。  ",
+    "主題：evak_qa 問題：HIPPO-200 的 (Q) 版重幾公斤？ 回答：HIPPO-200 由 25.2 kg 增加至 27.2 kg（+2.0kg）。"
+   ]
+  },
+  "ngram23": {
+   "ms": 14.3,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：HIPPO-50 的 (Q) 版重幾公斤？ 回答：HIPPO-50 由 12.9 kg 增加至 14.3 kg（+1.4kg）。  ",
+    "主題：evak_qa 問題：HIPPO-200 的 (Q) 版重幾公斤？ 回答：HIPPO-200 由 25.2 kg 增加至 27.2 kg（+2.0kg）。"
+   ]
+  },
+  "ngram24": {
+   "ms": 14.2,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：HIPPO-50 的 (Q) 版重幾公斤？ 回答：HIPPO-50 由 12.9 kg 增加至 14.3 kg（+1.4kg）。  ",
+    "主題：evak_qa 問題：HIPPO-200 的 (Q) 版重幾公斤？ 回答：HIPPO-200 由 25.2 kg 增加至 27.2 kg（+2.0kg）。"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "自動摺疊裝置要怎麼安裝？",
+  "expect": "自動著脫裝置",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "simple": {
+   "ms": 14.2,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：evak_qa 問題：針對 HIPPO DN 系列，型錄註腳特別註明 QD-65 與 QD-80 這兩款自動著脫基座（Q.D.C.）在構造上有何特殊整合設",
+    "主題：EVAK_QA_en 章節：How does the LEOPARD suction plate prevent clogging? 內容：It feat"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：evak_qa 問題：針對 HIPPO DN 系列，型錄註腳特別註明 QD-65 與 QD-80 這兩款自動著脫基座（Q.D.C.）在構造上有何特殊整合設"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_QA_es 章節：¿Cuál es la base de acoplamiento automático dedicada de la seri",
+    "主題：evak_qa 問題：針對 HIPPO DN 系列，型錄註腳特別註明 QD-65 與 QD-80 這兩款自動著脫基座（Q.D.C.）在構造上有何特殊整合設"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "主動的脫中地，要安裝安裝。",
+  "expect": "自動著脫裝置",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "simple": {
+   "ms": 12.9,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The ",
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.9,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The "
+   ]
+  },
+  "ngram24": {
+   "ms": 15.8,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "主動的脫妝的，愛安怎安怎。",
+  "expect": "自動著脫裝置",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "simple": {
+   "ms": 14.7,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷",
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.2,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.3,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Leopard 切割泵是何用在哪裡？",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？",
+  "simple": {
+   "ms": 15.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -",
+    "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.1,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Le Petit Chef 蹦迪餐廳在哪裡？",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？",
+  "simple": {
+   "ms": 17.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA_en 章節：What motor speed do the ALLIGATOR and LEOPARD run at? 內容：ALLIGA",
+    "主題：EVAK_QA_es 章節：¿De qué material es la placa de succión de la LEOPARD? 內容：Utili"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_QA_en 章節：How does the LEOPARD suction plate prevent clogging? 內容：It feat",
+    "主題：EVAK_QA_en 章節：What motor speed do the ALLIGATOR and LEOPARD run at? 內容：ALLIGA"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the phone number of EVAK headquarters? 內容：Taiwan countr",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_en 章節：What motor speed do the ALLIGATOR and LEOPARD run at? 內容：ALLIGA"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "哪把切瓜棒適合用在哪裡？",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？",
+  "simple": {
+   "ms": 13.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT"
+   ]
+  },
+  "ngram23": {
+   "ms": 13.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT"
+   ]
+  },
+  "ngram24": {
+   "ms": 12.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "leopard 的捷克文是哈用疊搭。",
+  "expect": "LEOPARD|切割泵",
+  "ref": "LEOPARD 切割泵適合用在哪裡？",
+  "simple": {
+   "ms": 15.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤如何防止堵塞？ 回答：LEOPARD 吸水底盤設計有徑向固體排渣溝槽（radial solid relief",
+    "主題：EVAK_QA_es 章節：¿De qué material es la placa de succión de la LEOPARD? 內容：Utili"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la placa de succión de la LEOPARD? 內容：Utili",
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la placa de succión de la LEOPARD? 內容：Utili",
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Diva Pro 跟 Diva 差在哪裡？",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+  "simple": {
+   "ms": 15.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_QA_en 章節：Which DIVA and DIVA PRO models have the lip seal (part no. 6)? "
+   ]
+  },
+  "ngram24": {
+   "ms": 19.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P",
+    "主題：evak_qa 問題：DIVA 與 DIVA PRO 哪些機型有耐磨板？ 回答：耐磨板（Wearing Plate，零件編號 24）僅限 30HP 機型配",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Diverpool 跟 Diverchase 在哪裡？",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+  "simple": {
+   "ms": 13.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Into which three brackets is the solids free passage (Free Pass",
+    "主題：EVAK_QA_en 章節：Is there a 3HP, 5HP or 7.5HP DIVA PRO? 內容：No, there are no 3HP,",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog "
+   ]
+  },
+  "ngram23": {
+   "ms": 20.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Into which three brackets is the solids free passage (Free Pass",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Is there a 3HP, 5HP or 7.5HP DIVA PRO? 內容：No, there are no 3HP,"
+   ]
+  },
+  "ngram24": {
+   "ms": 24.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Into which three brackets is the solids free passage (Free Pass",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_en 章節：Is there a 3HP, 5HP or 7.5HP DIVA PRO? 內容：No, there are no 3HP,"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Diva Pro가 Diva 찾았대리.",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+  "simple": {
+   "ms": 19.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which DIVA and DIVA PRO models have the wearing plate (part no.",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which DIVA and DIVA PRO models have the wearing plate (part no.",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which DIVA and DIVA PRO models have the wearing plate (part no.",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > The DIVA series covers 3HP to 30HP. F",
+    "主題：EVAK_QA_en 章節：What is the lowest horsepower in the DIVA PRO series? 內容：DIVA P"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "el abril 的 el abril 的",
+  "expect": "DIVA PRO",
+  "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+  "simple": {
+   "ms": 20.4,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué dureza tienen las cuchillas de ALLIGATOR y LEOPARD? 內容：ALL",
+    "主題：evak_qa 問題：EUB-M 用哪個牌子的軸承？ 回答：EUB-M 的 C3 等級深溝滾珠軸承採用 NTN / TPI 品牌。  【工程要點說明】 -",
+    "主題：EVAK_QA_es 章節：¿De qué material es el eje de la versión EDW (CH)? 內容：La versió"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.3,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué dureza tienen las cuchillas de ALLIGATOR y LEOPARD? 內容：ALL",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：EVAK_QA_es 章節：¿De qué material es el eje de la versión EDW (CH)? 內容：La versió"
+   ]
+  },
+  "ngram24": {
+   "ms": 23.5,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Qué dureza tienen las cuchillas de ALLIGATOR y LEOPARD? 內容：ALL",
+    "主題：EVAK_CATALOG.es 章節：Catálogo de productos EVAK de bombas sumergibles de drenaj",
+    "主題：EVAK_QA_es 章節：¿De qué material es el eje de la versión EDW (CH)? 內容：La versió"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Steel 系列的機械軸封是什麼材質？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？",
+  "simple": {
+   "ms": 15.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What anti-corrosion coating is optional for the STEEL series? 內",
+    "主題：evak_qa 問題：STEEL 2HP 以上是什麼出水接頭？ 回答：50(80)STEEL-5.20~30（2~3HP）與 80(100)STEEL-5",
+    "主題：evak_qa 問題：STEEL 系列可選配什麼電纜護套？ 回答：防水波紋耐酸鹼電纜護套（Watertight Corrugated Cable Slee"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What anti-corrosion coating is optional for the STEEL series? 內",
+    "主題：evak_qa 問題：EUB-M 系列的軸心是什麼材質？ 回答：EUB-M 2~7.5HP 為 AISI 410；10~20HP 為 AISI 410/4",
+    "主題：evak_qa 問題：STEEL 系列可選配什麼電纜護套？ 回答：防水波紋耐酸鹼電纜護套（Watertight Corrugated Cable Slee"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What anti-corrosion coating is optional for the STEEL series? 內",
+    "主題：evak_qa 問題：EUB-M 系列的軸心是什麼材質？ 回答：EUB-M 2~7.5HP 為 AISI 410；10~20HP 為 AISI 410/4",
+    "主題：evak_qa 問題：STEEL 系列可選配什麼電纜護套？ 回答：防水波紋耐酸鹼電纜護套（Watertight Corrugated Cable Slee"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Steel City 的機械軸封是什麼材質？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？",
+  "simple": {
+   "ms": 18.7,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What discharge connection do STEEL pumps of 2HP and above have?",
+    "主題：EVAK_QA_en 章節：Are the STEEL SQS and SQM auto-couplings made of cast iron? 內容：",
+    "主題：evak_qa 問題：STEEL 2HP 以上是什麼出水接頭？ 回答：50(80)STEEL-5.20~30（2~3HP）與 80(100)STEEL-5"
+   ]
+  },
+  "ngram23": {
+   "ms": 20.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Are the STEEL SQS and SQM auto-couplings made of cast iron? 內容：",
+    "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2",
+    "主題：EVAK_QA_en 章節：What anti-corrosion coating is optional for the STEEL series? 內"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.4,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Are the STEEL SQS and SQM auto-couplings made of cast iron? 內容：",
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】",
+    "主題：EVAK_QA_en 章節：What anti-corrosion coating is optional for the STEEL series? 內"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "steel 嘿咧機械條風是啥物在製？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？",
+  "simple": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage for each STEEL horsepower range",
+    "主題：evak_qa 問題：STEEL 2HP 以上是什麼出水接頭？ 回答：50(80)STEEL-5.20~30（2~3HP）與 80(100)STEEL-5",
+    "主題：EVAK_QA_en 章節：What discharge connection does the STEEL 0.5~1HP have? 內容：50STE"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：What is the solids free passage for each STEEL horsepower range",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水",
+    "主題：EVAK_QA_en 章節：What discharge connection does the STEEL 0.5~1HP have? 內容：50STE"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 系列各馬力的固體通過粒徑是多少？ 回答：STEEL 0.5~1HP 為 35mm；2~7.5HP 為 45mm；10HP",
+    "主題：EVAK_QA_en 章節：What is the solids free passage for each STEEL horsepower range",
+    "主題：evak_qa 問題：STEEL 2HP 以上是什麼出水接頭？ 回答：50(80)STEEL-5.20~30（2~3HP）與 80(100)STEEL-5"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "steal 呢個字係嘲諷，係咩意思？",
+  "expect": "STEEL|機械軸封",
+  "ref": "STEEL 系列的機械軸封是什麼材質？",
+  "simple": {
+   "ms": 12.8,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：evak_qa 問題：STEEL 系列可選配什麼電纜護套？ 回答：防水波紋耐酸鹼電纜護套（Watertight Corrugated Cable Slee",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS、SQM 是鑄鐵嗎？ 回答：不是，SQS 與 SQM 為全脫蠟 AISI 316 不銹鋼打造。  【工"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：STEEL 系列可選配什麼電纜護套？ 回答：防水波紋耐酸鹼電纜護套（Watertight Corrugated Cable Slee"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：STEEL 系列可選配什麼電纜護套？ 回答：防水波紋耐酸鹼電纜護套（Watertight Corrugated Cable Slee"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "潛水泵可以抽到多低的水位？",
+  "expect": "殘水泵",
+  "ref": "殘水泵可以抽到多低的水位？",
+  "simple": {
+   "ms": 12.3,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度",
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > Most light-duty pumps in the catalog "
+   ]
+  },
+  "ngram23": {
+   "ms": 16.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Most light-duty pumps in the catalog have a maximum submersion ",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：evak_qa 問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "參差不齊的當選者，早該退位。",
+  "expect": "殘水泵",
+  "ref": "殘水泵可以抽到多低的水位？",
+  "simple": {
+   "ms": 13.5,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  },
+  "ngram23": {
+   "ms": 13.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  },
+  "ngram24": {
+   "ms": 11.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "沉睡泵，えだんてぃうでぃお、ざけえのずいみ。",
+  "expect": "殘水泵",
+  "ref": "殘水泵可以抽到多低的水位？",
+  "simple": {
+   "ms": 12.4,
+   "hit": false,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: dev-c0c8fdff34) > 🌀 REM S",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：EUS 加裝底盤後，最低可抽水到幾 mm？ 回答：EUS 0.5HP 與 1HP 加裝選配底盤後，最低可抽水至 3 mm。  【工程",
+    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: dev-c0c8fdff34) > 🌀 REM S"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
+    "主題：evak_qa 問題：EUS 加裝底盤後，最低可抽水到幾 mm？ 回答：EUS 0.5HP 與 1HP 加裝選配底盤後，最低可抽水至 3 mm。  【工程",
+    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: dev-c0c8fdff34) > 🌀 REM S"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "UBM 跟 EDW 哪一款比較省電？",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+  "simple": {
+   "ms": 14.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M ",
+    "主題：evak_qa 問題：EDW (CH) 規格的吸水盤是什麼材質？ 回答：EDW (CH) 規格的吸水盤改為熱處理球狀石墨鑄鐵（Heat treated d",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款流量最大？ 回答：150EUB-M-5.100（10HP）的最大流量最高，達 2250 LPM。 "
+   ]
+  },
+  "ngram23": {
+   "ms": 18.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款流量最大？ 回答：150EUB-M-5.100（10HP）的最大流量最高，達 2250 LPM。 ",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M "
+   ]
+  },
+  "ngram24": {
+   "ms": 20.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款流量最大？ 回答：150EUB-M-5.100（10HP）的最大流量最高，達 2250 LPM。 ",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EBM 跟 EDW 哪一款比較省電？",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+  "simple": {
+   "ms": 14.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M ",
+    "主題：evak_qa 問題：EDW (CH) 規格的吸水盤是什麼材質？ 回答：EDW (CH) 規格的吸水盤改為熱處理球狀石墨鑄鐵（Heat treated d"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款流量最大？ 回答：150EUB-M-5.100（10HP）的最大流量最高，達 2250 LPM。 ",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M ",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款流量最大？ 回答：150EUB-M-5.100（10HP）的最大流量最高，達 2250 LPM。 ",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M ",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EUBM 的 EDW 那種比價系統",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+  "simple": {
+   "ms": 14.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUB-M 用哪個牌子的軸承？ 回答：EUB-M 的 C3 等級深溝滾珠軸承採用 NTN / TPI 品牌。  【工程要點說明】 -",
+    "主題：EVAK_QA_en 章節：How much weight does aluminium alloy save on the EUB-M? 內容：Weig"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.1,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUB-M 用哪個牌子的軸承？ 回答：EUB-M 的 C3 等級深溝滾珠軸承採用 NTN / TPI 品牌。  【工程要點說明】 -",
+    "主題：EVAK_QA_en 章節：How much weight does aluminium alloy save on the EUB-M? 內容：Weig"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.1,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUB-M 用哪個牌子的軸承？ 回答：EUB-M 的 C3 等級深溝滾珠軸承採用 NTN / TPI 品牌。  【工程要點說明】 -",
+    "主題：EVAK_QA_en 章節：How much weight does aluminium alloy save on the EUB-M? 內容：Weig"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "EUPM的EDW哪一種比較省電？",
+  "expect": "EUB-M|EDW",
+  "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+  "simple": {
+   "ms": 14.2,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el rendimiento nominal de la 80EDW-5.50? 內容：80EDW-5.50",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M ",
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el rendimiento nominal de la 80EDW-5.50? 內容：80EDW-5.50",
+    "主題：evak_qa 問題：EUS 系列的應用場景（Applications）中，明確標註適用於哪一種一般沉水泵容易燒毀、吸入大量空氣與水交替的特殊運轉模式？ ",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M "
+   ]
+  },
+  "ngram24": {
+   "ms": 20.1,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el rendimiento nominal de la 80EDW-5.50? 內容：80EDW-5.50",
+    "主題：evak_qa 問題：EUS 系列的應用場景（Applications）中，明確標註適用於哪一種一般沉水泵容易燒毀、吸入大量空氣與水交替的特殊運轉模式？ ",
+    "主題：EVAK_QA_en 章節：Is there a single-phase EUB-M of 3HP or more? 內容：No. The EUB-M "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "鍋蓋保護器跳掉了要怎麼處理？",
+  "expect": "過載保護器",
+  "ref": "過載保護器跳掉了要怎麼處理？",
+  "simple": {
+   "ms": 14.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：How does the LEOPARD suction plate prevent clogging? 內容：It feat",
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？",
+    "主題：EVAK_QA_en 章節：In the EUS and EUSR series, the KLIXON protector built into the"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？",
+    "主題：EVAK_QA_en 章節：How does the LEOPARD suction plate prevent clogging? 內容：It feat",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？",
+    "主題：EVAK_QA_en 章節：How does the LEOPARD suction plate prevent clogging? 內容：It feat",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "跪在包好去跳掉了，欲按怎處理？",
+  "expect": "過載保護器",
+  "ref": "過載保護器跳掉了要怎麼處理？",
+  "simple": {
+   "ms": 13.1,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The ",
+    "主題：EVAK_QA_en 章節：Which coupling foot is dedicated to the HIPPO series? 內容：The de"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.5,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：EDW (CH) 規格的軸心是什麼材質？ 回答：EDW (CH) 規格的軸心改為 AISI 410 熱處理軸心（AISI 410 h",
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The "
+   ]
+  },
+  "ngram24": {
+   "ms": 19.7,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：EDW (CH) 規格的軸心是什麼材質？ 回答：EDW (CH) 規格的軸心改為 AISI 410 熱處理軸心（AISI 410 h",
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "櫃檯保護貼掉掉了，要怎麼處理？",
+  "expect": "過載保護器",
+  "ref": "過載保護器跳掉了要怎麼處理？",
+  "simple": {
+   "ms": 13.6,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The ",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷",
+    "主題：EVAK_QA_en 章節：How does the LEOPARD suction plate prevent clogging? 內容：It feat"
+   ]
+  },
+  "ngram23": {
+   "ms": 16.3,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.2,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The ",
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS 與 SQM 怎麼選？ 回答：依馬力選用：SQS 適用於 0.5HP~1HP；SQM 適用於 2HP~",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "一輪卡住的話，那模板要換嗎？",
+  "expect": "葉輪|耐磨板",
+  "ref": "葉輪卡住的話耐磨板要換嗎？",
+  "simple": {
+   "ms": 14.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat",
+    "主題：EVAK_QA_en 章節：Are the STEEL SQS and SQM auto-couplings made of cast iron? 內容："
+   ]
+  },
+  "ngram23": {
+   "ms": 16.5,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS、SQM 是鑄鐵嗎？ 回答：不是，SQS 與 SQM 為全脫蠟 AISI 316 不銹鋼打造。  【工",
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is "
+   ]
+  },
+  "ngram24": {
+   "ms": 14.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 的著脫裝置 SQS、SQM 是鑄鐵嗎？ 回答：不是，SQS 與 SQM 為全脫蠟 AISI 316 不銹鋼打造。  【工",
+    "主題：evak_qa 問題：EDW 選配 (CH) 規格，葉輪有什麼不同？ 回答：EDW (CH) 規格的葉輪改為高鉻閉式葉輪（High chrome encl",
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is "
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "葉倫卡多的話，那麼辦，愛我嗎？",
+  "expect": "葉輪|耐磨板",
+  "ref": "葉輪卡住的話耐磨板要換嗎？",
+  "simple": {
+   "ms": 12.7,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的刀刃硬度是多少？ 回答：ALLIGATOR 為 55-60 HRC（洛氏 C 標尺）；LE",
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.4,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：EUB-M 3HP 以上有單相機型嗎？ 回答：沒有。EUB-M 3HP、5HP、7.5HP 僅提供三相（Three Phase, 4",
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的刀刃硬度是多少？ 回答：ALLIGATOR 為 55-60 HRC（洛氏 C 標尺）；LE"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.8,
+   "hit": false,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：evak_qa 問題：EUB-M 3HP 以上有單相機型嗎？ 回答：沒有。EUB-M 3HP、5HP、7.5HP 僅提供三相（Three Phase, 4",
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的刀刃硬度是多少？ 回答：ALLIGATOR 為 55-60 HRC（洛氏 C 標尺）；LE"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "葉倫卡多夫的模板愛瓦修。",
+  "expect": "葉輪|耐磨板",
+  "ref": "葉輪卡住的話耐磨板要換嗎？",
+  "simple": {
+   "ms": 14.6,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How hard are the ALLIGATOR and LEOPARD cutters? 內容：ALLIGATOR is",
+    "主題：EVAK_QA_es 章節：¿De qué material es el eje de la versión EDW (CH)? 內容：La versió",
+    "主題：EVAK_QA_en 章節：What shaft does the EDW (CH) custom version use? 內容：The EDW (CH"
+   ]
+  },
+  "ngram23": {
+   "ms": 14.8,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How hard are the ALLIGATOR and LEOPARD cutters? 內容：ALLIGATOR is",
+    "主題：EVAK_QA_es 章節：¿De qué material es el eje de la versión EDW (CH)? 內容：La versió",
+    "主題：EVAK_QA_en 章節：What shaft does the EDW (CH) custom version use? 內容：The EDW (CH"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.4,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How hard are the ALLIGATOR and LEOPARD cutters? 內容：ALLIGATOR is",
+    "主題：EVAK_QA_es 章節：¿De qué material es el eje de la versión EDW (CH)? 內容：La versió",
+    "主題：EVAK_QA_en 章節：What shaft does the EDW (CH) custom version use? 內容：The EDW (CH"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "Yamada 歌磨本有現貨嗎？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+  "simple": {
+   "ms": 18.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > For the DIVA and DIVA PRO heavy-duty ",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En las series D",
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > For the DIVA and DIVA PRO heavy-duty ",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En las series D",
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？"
+   ]
+  },
+  "ngram24": {
+   "ms": 21.5,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA.en 章節：EVAK Pump FAQ (English) > For the DIVA and DIVA PRO heavy-duty ",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > En las series D",
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "一發蹦出的 imari 隔膜蹦有些貨嗎？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+  "simple": {
+   "ms": 13.2,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN80? 內容：The HIPPO",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.3,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat",
+    "主題：EVAK_QA.es 章節：Preguntas frecuentes de bombas EVAK (Español) > La serie EUB-M ",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN80? 內容：The HIPPO"
+   ]
+  },
+  "ngram24": {
+   "ms": 20.7,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：How hard is the EUB-M high chrome impeller? 內容：After heat treat",
+    "主題：EVAK_QA_en 章節：Into which three brackets is the solids free passage (Free Pass",
+    "主題：EVAK_QA_en 章節：What is the solids free passage of the HIPPO DN80? 內容：The HIPPO"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "一發棒球，山田阿哥摸棒，五很會嗎？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+  "simple": {
+   "ms": 15.6,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明",
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的刀刃硬度是多少？ 回答：ALLIGATOR 為 55-60 HRC（洛氏 C 標尺）；LE"
+   ]
+  },
+  "ngram23": {
+   "ms": 21.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？",
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.8,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿Cuál es el paso libre de sólidos del 50EUB-5.05? 內容：El paso li",
+    "主題：evak_qa 問題：重型泥漿與排水泵 DIVA 與 DIVA PRO 系列，其內建防止馬達過載燒毀的保護器，型錄明確指名採用哪一個特定品牌的過載保護器？",
+    "主題：evak_qa 問題：HIPPO 選配 (Q) 水平出水會重多少？ 回答：HIPPO (Q) 版各機型增加約 1.4 ~ 2.0 kg。  【工程要點說明"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "叶っぱを食べるヤマダゲモムは很会吗？",
+  "expect": "億發泵浦|Yamada",
+  "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+  "simple": {
+   "ms": 15.0,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：¿Qué dureza tienen las cuchillas de ALLIGATOR y LEOPARD? 內容：ALL",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba con cuchilla de cor"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.5,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：¿Qué dureza tienen las cuchillas de ALLIGATOR y LEOPARD? 內容：ALL",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba con cuchilla de cor"
+   ]
+  },
+  "ngram24": {
+   "ms": 11.9,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba trituradora ALLIGAT",
+    "主題：EVAK_QA_es 章節：¿Qué dureza tienen las cuchillas de ALLIGATOR y LEOPARD? 內容：ALL",
+    "主題：EVAK_QA_es 章節：¿De qué material es la cuchilla de la bomba con cuchilla de cor"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想找和記企業的業務問 EVAK 的報價。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "simple": {
+   "ms": 18.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
+    "主題：EVAK_QA_en 章節：What is EVAK's full company name? 內容：The publisher is EVAK PUMP",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 1 頁：封面與企業基本資訊 內容"
+   ]
+  },
+  "ngram23": {
+   "ms": 19.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水",
+    "主題：EVAK_QA_en 章節：What is EVAK's full company name? 內容：The publisher is EVAK PUMP"
+   ]
+  },
+  "ngram24": {
+   "ms": 19.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
+    "主題：EVAK_QA_en 章節：What is EVAK's full company name? 內容：The publisher is EVAK PUMP",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想找賀記企業的業務問 EVK 的報價。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "simple": {
+   "ms": 14.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：evak_qa 問題：100EDW-5.50 的額定揚程與流量是多少？ 回答：100EDW-5.50 額定揚程 12.5 M，額定流量 1000 LPM，",
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
+    "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想要找最好的汽車業務員的報告。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "simple": {
+   "ms": 14.0,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：LEOPARD 吸水底盤如何防止堵塞？ 回答：LEOPARD 吸水底盤設計有徑向固體排渣溝槽（radial solid relief",
+    "主題：evak_qa 問題：軸承品牌 TPI 與 NTN 是什麼關係？ 回答：型錄頁底註記 TPI 為 NTN 集團旗下品牌（TPI is a family b",
+    "主題：EVAK_QA_en 章節：How are the bearing brands TPI and NTN related? 內容：A note at th"
+   ]
+  },
+  "ngram23": {
+   "ms": 15.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：LEOPARD 吸水底盤如何防止堵塞？ 回答：LEOPARD 吸水底盤設計有徑向固體排渣溝槽（radial solid relief",
+    "主題：evak_qa 問題：軸承品牌 TPI 與 NTN 是什麼關係？ 回答：型錄頁底註記 TPI 為 NTN 集團旗下品牌（TPI is a family b",
+    "主題：EVAK_QA_en 章節：How are the bearing brands TPI and NTN related? 內容：A note at th"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：LEOPARD 吸水底盤如何防止堵塞？ 回答：LEOPARD 吸水底盤設計有徑向固體排渣溝槽（radial solid relief",
+    "主題：evak_qa 問題：軸承品牌 TPI 與 NTN 是什麼關係？ 回答：型錄頁底註記 TPI 為 NTN 集團旗下品牌（TPI is a family b",
+    "主題：EVAK_QA_en 章節：How are the bearing brands TPI and NTN related? 內容：A note at th"
+   ]
+  }
+ },
+ {
+  "set": "asr",
+  "lang": "zh",
+  "q": "我想欲找合適去業界的業務部門的報告。",
+  "expect": "鶴記企業|EVAK",
+  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "simple": {
+   "ms": 14.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：How are the bearing brands TPI and NTN related? 內容：A note at th",
+    "主題：EVAK_QA_en 章節：What is the solids free passage for each STEEL horsepower range",
+    "主題：evak_qa 問題：軸承品牌 TPI 與 NTN 是什麼關係？ 回答：型錄頁底註記 TPI 為 NTN 集團旗下品牌（TPI is a family b"
+   ]
+  },
+  "ngram23": {
+   "ms": 14.6,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：How are the bearing brands TPI and NTN related? 內容：A note at th",
+    "主題：EVAK_QA_en 章節：What is the solids free passage for each STEEL horsepower range",
+    "主題：evak_qa 問題：軸承品牌 TPI 與 NTN 是什麼關係？ 回答：型錄頁底註記 TPI 為 NTN 集團旗下品牌（TPI is a family b"
+   ]
+  },
+  "ngram24": {
+   "ms": 15.0,
+   "hit": true,
+   "top": [
+    "主題：EVAK_QA_en 章節：How are the bearing brands TPI and NTN related? 內容：A note at th",
+    "主題：EVAK_QA_en 章節：What is the solids free passage for each STEEL horsepower range",
+    "主題：evak_qa 問題：軸承品牌 TPI 與 NTN 是什麼關係？ 回答：型錄頁底註記 TPI 為 NTN 集團旗下品牌（TPI is a family b"
+   ]
+  }
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "EUBL 有哪些馬力規格？",
+  "expect": "EUBL.*(1 HP|0\\.75)|1 HP.*EUBL",
+  "simple": {
+   "ms": 16.4,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUB-M 10~20HP model has the largest maximum capacity? 內容：",
+    "主題：evak_qa 問題：50EUBL-5.10 的固體通過粒徑是多少？ 回答：50EUBL-5.10 固體通過粒徑高達 38 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程"
+   ]
+  },
+  "ngram23": {
+   "ms": 18.6,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUB-M 10~20HP model has the largest maximum capacity? 內容：",
+    "主題：evak_qa 問題：HIPPO 2 吋污水泵哪些馬力是 Class F 絕緣？ 回答：HIPPO 1.5HP 以上（含 1.5HP、2HP）為 Clas",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程"
+   ]
+  },
+  "ngram24": {
+   "ms": 18.2,
+   "hit": false,
+   "top": [
+    "主題：EVAK_QA_en 章節：Which EUB-M 10~20HP model has the largest maximum capacity? 內容：",
+    "主題：evak_qa 問題：HIPPO 2 吋污水泵哪些馬力是 Class F 絕緣？ 回答：HIPPO 1.5HP 以上（含 1.5HP、2HP）為 Clas",
+    "主題：evak_qa 問題：EUB-M 10~20HP 哪一款揚程最高？ 回答：150EUB-M-5.200（20HP）的最大揚程最高，達 54 M。  【工程"
+   ]
+  }
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "EUSR 的出水口徑是多少？",
+  "expect": "EUSR",
+  "simple": {
+   "ms": 18.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：EVAK_QA_en 章節：How does the EUSR residue pump avoid scratching floors? 內容：The "
+   ]
+  },
+  "ngram23": {
+   "ms": 17.2,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.4,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：EUSR 殘水泵的出水方向可以切換嗎？ 回答：可以，使用者可自行切換為垂直或水平排水（Discharge direction is ",
+    "主題：EVAK_QA_en 章節：Can the EUSR residue pump's discharge direction be changed? 內容：",
+    "主題：evak_qa 問題：EUSR 殘水泵如何避免刮傷地面？ 回答：EUSR 底盤採用橡膠包覆底板（Rubber lined base plate），防止刮傷"
+   ]
+  }
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "LEOPARD 的固體通過粒徑",
+  "expect": "LEOPARD",
+  "simple": {
+   "ms": 15.6,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：50EUB-5.05 的固體通過粒徑是多少？ 回答：標準款 50EUB-5.05 固體通過粒徑為 6 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：LEOPARD 吸水底盤是什麼材質？ 回答：LEOPARD 吸水底盤採用球狀石墨鑄鐵 EN-GJS-700。  【工程要點說明】 -",
+    "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.3,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 15HP 的固體通過粒徑是多少？ 回答：80(100)STEEL-5.150（15HP）的固體通過粒徑僅有 25 mm。",
+    "主題：evak_qa 問題：50EUB-5.05 的固體通過粒徑是多少？ 回答：標準款 50EUB-5.05 固體通過粒徑為 6 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：HIPPO DN65 的固體通過粒徑是多少？ 回答：HIPPO DN65 的固體通過粒徑為 65 mm。  【工程要點說明】 - 對"
+   ]
+  },
+  "ngram24": {
+   "ms": 17.9,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：STEEL 15HP 的固體通過粒徑是多少？ 回答：80(100)STEEL-5.150（15HP）的固體通過粒徑僅有 25 mm。",
+    "主題：evak_qa 問題：50EUB-5.05 的固體通過粒徑是多少？ 回答：標準款 50EUB-5.05 固體通過粒徑為 6 mm。  【工程要點說明】 -",
+    "主題：evak_qa 問題：HIPPO DN65 的固體通過粒徑是多少？ 回答：HIPPO DN65 的固體通過粒徑為 65 mm。  【工程要點說明】 - 對"
+   ]
+  }
+ },
+ {
+  "set": "probe",
+  "lang": "zh",
+  "q": "ALLIGATOR 有幾種馬力",
+  "expect": "ALLIGATOR",
+  "simple": {
+   "ms": 16.5,
+   "hit": true,
+   "top": [
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：evak_qa 問題：ALLIGATOR 絞碎泵的切刀是什麼材質？ 回答：ALLIGATOR 採用 AISI 440C 徑向絞碎刀組。  【工程要點說明】"
+   ]
+  },
+  "ngram23": {
+   "ms": 17.3,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規"
+   ]
+  },
+  "ngram24": {
+   "ms": 16.9,
+   "hit": true,
+   "top": [
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：EVAK_CATALOG 章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規",
+    "主題：evak_qa 問題：ALLIGATOR 與 LEOPARD 的馬達轉速是多少？ 回答：ALLIGATOR 為 2 Pole / 2850 rpm；LEO"
+   ]
+  }
+ }
+]

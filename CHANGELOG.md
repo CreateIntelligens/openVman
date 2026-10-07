@@ -39,6 +39,7 @@
 
 ### Documentation
 
+- 實驗 `scripts/experiments/fts-ngram/`：knowledge 表的全文索引改用 ngram 斷詞，鶴記dev 145 題前 5 名命中 123 → 128，多命中的幾乎都是語音辨識聽錯的句子；型號縮寫查詢（「EUBL 有哪些馬力」）兩種都撈不到，未採用。
 - `docs/specs/03_BRAIN_SPEC.md` 改寫成只描述現況：workspace 結構改成實際的 `/data/projects/<id>/`，拿掉 `~/.openclaw/` 目錄樹、OpenClaw 設計來源、日期與實驗數字，以及已不存在的模組、環境變數、SSE 串流與影子模式；更正 embedding 精度（CUDA bf16、CPU fp32）、Session 存活時間（30 天）、輸入過長回 400 不截斷、每日摘要不呼叫 LLM、Action request 由前端執行等敘述。
 - `brain/README.md` 改寫成依主題組織的 Brain 說明，移除已退場功能（BGE 意圖影子、Jev 影子、SemIf）的歷程與實測紀錄，並依程式更正過時說法（Brain 僅內部呼叫、子套件路徑、session 存在各專案的 SQLite、增量重建索引、記憶自動召回預設開、隱私過濾只偵測不遮罩）。`.env.example` 拿掉不存在的 `PRIVACY_FILTER_EGRESS_ENABLED`，`AUTO_RECALL_ENABLED` 預設改註明為 true。
 - 根目錄 `README.md` 改寫成依主題組織的專案說明（架構、功能、部署、開發、文件索引），只描述目前部署中使用的元件；移除依時間追加的功能段落、實驗紀錄、已退場與未啟用元件的說明（IndexTTS、VLM、A2A 改列「選用元件」），細節改連到 `docs/`。隱私一節更正為「送 LLM 前偵測個資並記錄、提醒，不改寫內容」。
