@@ -104,11 +104,17 @@ def test_long_chinese_document_with_a_stray_spanish_mark_stays_chinese():
 @pytest.mark.parametrize(
     ("text", "default", "expected"),
     [
-        # 一兩個字的招呼判斷不出語言，歸專案主要語言。
-        ("hi", "zh", "zh"),
-        ("hi", "en", "en"),
-        ("hola", "es", "es"),
-        ("ok thanks", "en", "en"),
+        # 一兩個字、看不出語言的輸入歸專案主要語言。
+        ("ok", "zh", "zh"),
+        ("ok", "es", "es"),
+        ("EUBL", "en", "en"),
+        ("DIVA PRO", "zh", "zh"),
+        # 只有一種語言會用的招呼照該語言。
+        ("hi", "zh", "en"),
+        ("hi there", "zh", "en"),
+        ("hola", "zh", "es"),
+        ("buenos dias", "zh", "es"),
+        ("ok thanks", "zh", "en"),
         # ¿¡ñ 只有西語用：再短也看得出是西語。
         ("¿Quién eres?", "zh", "es"),
         ("¡Hola!", "zh", "es"),
@@ -129,7 +135,7 @@ def test_short_text_is_never_sent_to_jev(jev, monkeypatch):
         raise AssertionError("short text should not reach Jev")
 
     monkeypatch.setattr("core.jev_client.jev_nouls", boom)
-    language_detect.refine_language_in_background("hi", "zh", lambda _l: None)
+    language_detect.refine_language_in_background("ok", "zh", lambda _l: None)
 
 
 @pytest.mark.parametrize(
@@ -154,6 +160,8 @@ def test_short_japanese_and_korean_are_not_treated_as_unknown():
     assert not is_short_text("はい")
     assert not is_short_text("네")
     assert not is_short_text("¿Quién eres?")
+    assert not is_short_text("hola")
+    assert is_short_text("ok")
 
 
 def test_jev_does_not_pull_japanese_back_to_chinese(monkeypatch):

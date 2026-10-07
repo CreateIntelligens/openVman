@@ -36,9 +36,20 @@ def test_clear_language_is_stated(message, expected):
     assert line.startswith(f"這一輪的回答語言：{expected}。")
 
 
-def test_short_greeting_follows_the_primary_language(primary):
+def test_short_unclear_text_follows_the_primary_language(primary):
     primary("en")
+    assert prompt_templates.reply_language_line("p", "ok").startswith(
+        "這一輪的回答語言：English。",
+    )
+
+
+def test_greeting_is_answered_in_its_own_language(primary):
+    """盲測（2026-10-07）：「hola」「hi there」歸主要語言，外國客人打招呼被回中文。"""
+    primary("zh")
     assert prompt_templates.reply_language_line("p", "hola").startswith(
+        "這一輪的回答語言：Español。",
+    )
+    assert prompt_templates.reply_language_line("p", "hi there").startswith(
         "這一輪的回答語言：English。",
     )
 

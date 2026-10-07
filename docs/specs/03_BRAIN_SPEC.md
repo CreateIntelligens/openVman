@@ -399,12 +399,12 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 * 分流由管理者在後台知識庫標題列的「分流」按鈕勾選，不看有哪些文件（例如醫院的文件可能只有中文，但仍要開台語分流）。設定存在 workspace 的 `.kb_settings.json`（`language_routes`），由 `GET/PUT /brain/knowledge/settings` 讀寫。可選 `zh`、`en`、`es`、`nan`（台語）、`ja`、`ko`，至少一條、不一定是中文，預設只有 `zh`；清單順序即優先序，排第一的是主要語言。
 * **只有一條分流**：不做語言排序，所有文件一起查。
 * **多條分流**：所有文件都查得到，語言只決定誰先進 `top_k`——使用者語言的文件優先，不夠再用主要語言補，最後才是其他語言（例如只勾英、西時，中文提問先拿中文文件、再英文、再西語）。使用者語言有勾時會逐次擴大候選窗找同語言的原文，直到同語言結果達 `top_k` 或查完候選；沒勾就只在第一輪候選窗內排序。去重時留排前面的，所以同一段內容的其他語言版本會讓給同語言的原文。擴展詞向量在單次搜尋內重用。
-* 文字 `search_knowledge` 與 Live 的知識檢索都經 `search_records(language=...)`，以使用者原話判斷語言（規則，不等 Jev；模型改寫成其他語言的查詢不影響），「hi」這類短句以主要語言查。Graph RAG 帶出的相關段落只留與命中段落同語言的。
+* 文字 `search_knowledge` 與 Live 的知識檢索都經 `search_records(language=...)`，以使用者原話判斷語言（規則，不等 Jev；模型改寫成其他語言的查詢不影響），「ok」這類看不出語言的短句以主要語言查。Graph RAG 帶出的相關段落只留與命中段落同語言的。
 * **多語版本**：跨語言提問靠同一份內容的多語版本（例如產品型錄的中英西三版，翻譯版在後台手動標語言），不在查詢時翻譯；使用者用哪種語言問就用那個版本的原文回答。沒有其他語言文件的專案拿到的都是中文文件，不需要開關。
 
 #### 14.2 語言判斷
 
-* **使用者訊息**（`memory/language_detect.detect_language`）：有中文字就是中文；日文、韓文靠假名、諺文判斷（實測見 `scripts/experiments/ja-ko/`）；一兩個拉丁字的短句（hi、ok、hola）與判斷不出來的歸主要語言，但有 ¿¡ñ 的再短也是西語（「¿Quién eres?」）。
+* **使用者訊息**（`memory/language_detect.detect_language`）：有中文字就是中文；日文、韓文靠假名、諺文判斷（實測見 `scripts/experiments/ja-ko/`）；一兩個拉丁字的短句（ok、型號）與判斷不出來的歸主要語言；但有 ¿¡ñ 的再短也是西語（「¿Quién eres?」），用到只有一種語言會用的招呼或客套話（hi、hello、thanks／hola、gracias、buenos días）的照該語言。
 * **文件語言**存在 `.doc_meta.json` 的 `language`／`language_source`：`auto` 由文件開頭 2 萬字以規則判斷，第一次被列表或查詢用到時判斷並存下，內容儲存後清掉重判；`manual` 是後台指定，永不覆蓋。`PATCH /brain/knowledge/document/meta` 帶 `language=zh|en|es|nan|ja|ko` 指定、`auto` 取消指定；文件列表回傳 `language` 與 `language_source`。
 * 文件自動判斷也認台語：有台羅聲調符號，或台語特有漢字與詞的密度達 3%（先排除「給予」「欲望」等華語詞）。後台可手動標「台語」。實驗見 `scripts/experiments/taigi/`。
 

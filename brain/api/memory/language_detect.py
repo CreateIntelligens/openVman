@@ -44,20 +44,43 @@ _ES_WORDS = frozenset(
 )
 
 
-# 「hi」「ok」「thanks」「hola」這種一兩個字的招呼或單字判斷不出語言，歸專案的主要語言
-# （知識庫分流排第一的；回答規則同步用主要語言），標籤與回覆才不會一個英文一個中文。
+# 「ok」「no」、型號這種一兩個字的輸入判斷不出語言，歸專案的主要語言（知識庫分流排第一的；
+# 回答規則同步用主要語言），標籤與回覆才不會一個英文一個中文。
 _SHORT_TEXT_WORDS = 2
+
+# 只有一種語言會用的招呼與客套話：短句裡有這些字就照該語言。之前「hi there」「hola」
+# 也歸主要語言，外國客人打招呼被回中文。兩種語言都會用的（ok、no）不列。
+_EN_GREETINGS = frozenset(
+    "hi hello hey thanks thank there bye goodbye good morning afternoon evening "
+    "please sorry yes".split()
+)
+_ES_GREETINGS = frozenset(
+    "hola gracias buenos buenas dias días tardes noches adios adiós sí por favor "
+    "perdón perdon".split()
+)
+
+
+def _greeting_language(words: list[str]) -> str | None:
+    """en/es when a short text uses greeting words of exactly one of them."""
+    en = any(word in _EN_GREETINGS for word in words)
+    es = any(word in _ES_GREETINGS for word in words)
+    if en == es:
+        return None
+    return "en" if en else "es"
 
 
 def is_short_text(text: str) -> bool:
-    """Too short to tell a language: at most two Latin words, no CJK script, no ¿¡ñ."""
+    """Too short to tell a language: at most two Latin words, no CJK script, no ¿¡ñ, no greeting."""
     text = text or ""
     if _HAN.search(text) or _KANA.search(text) or _HANGUL.search(text):
         return False
     # 「¿Quién eres?」只有兩個字，但 ¿¡ñ 只有西語會用：之前歸主要語言，西語問句被回中文。
     if _SPANISH_MARKS.search(text.lower()):
         return False
-    return len(_LATIN_WORD.findall(text.lower())) <= _SHORT_TEXT_WORDS
+    words = _LATIN_WORD.findall(text.lower())
+    if _greeting_language(words):
+        return False
+    return len(words) <= _SHORT_TEXT_WORDS
 
 
 def _cjk_language(text: str) -> str | None:
@@ -89,7 +112,7 @@ def detect_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
     if _SPANISH_MARKS.search(lowered):
         return "es"
     if len(words) <= _SHORT_TEXT_WORDS:
-        return default
+        return _greeting_language(words) or default
     en_hits = sum(word in _EN_WORDS for word in words)
     es_hits = sum(word in _ES_WORDS for word in words)
     if en_hits == es_hits:

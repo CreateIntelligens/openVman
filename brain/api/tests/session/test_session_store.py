@@ -328,10 +328,10 @@ def test_stored_language_wins_over_rules(store: SessionStore, monkeypatch):
         lambda text, rule, on_change: refined.append((text, rule, on_change)),
     )
     store.get_or_create_session("s1", "default")
-    store.append_message("s1", "default", "user", "buenos dias")
-    store.append_message("s1", "default", "assistant", "¡Buenos días!")
+    store.append_message("s1", "default", "user", "cuanto cuesta")
+    store.append_message("s1", "default", "assistant", "Cuesta 100 dólares.")
 
-    assert [(t, r) for t, r, _ in refined] == [("buenos dias", "zh")]
+    assert [(t, r) for t, r, _ in refined] == [("cuanto cuesta", "zh")]
     assert store.list_sessions("default")[0]["language"] == "zh"
 
     refined[0][2]("es")
