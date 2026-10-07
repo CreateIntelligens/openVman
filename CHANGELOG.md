@@ -39,6 +39,7 @@
 
 ### Documentation
 
+- `docs/specs/03_BRAIN_SPEC.md` 改寫成只描述現況：workspace 結構改成實際的 `/data/projects/<id>/`，拿掉 `~/.openclaw/` 目錄樹、OpenClaw 設計來源、日期與實驗數字，以及已不存在的模組、環境變數、SSE 串流與影子模式；更正 embedding 精度（CUDA bf16、CPU fp32）、Session 存活時間（30 天）、輸入過長回 400 不截斷、每日摘要不呼叫 LLM、Action request 由前端執行等敘述。
 - `brain/README.md` 改寫成依主題組織的 Brain 說明，移除已退場功能（BGE 意圖影子、Jev 影子、SemIf）的歷程與實測紀錄，並依程式更正過時說法（Brain 僅內部呼叫、子套件路徑、session 存在各專案的 SQLite、增量重建索引、記憶自動召回預設開、隱私過濾只偵測不遮罩）。`.env.example` 拿掉不存在的 `PRIVACY_FILTER_EGRESS_ENABLED`，`AUTO_RECALL_ENABLED` 預設改註明為 true。
 - 根目錄 `README.md` 改寫成依主題組織的專案說明（架構、功能、部署、開發、文件索引），只描述目前部署中使用的元件；移除依時間追加的功能段落、實驗紀錄、已退場與未啟用元件的說明（IndexTTS、VLM、A2A 改列「選用元件」），細節改連到 `docs/`。隱私一節更正為「送 LLM 前偵測個資並記錄、提醒，不改寫內容」。
 - 產品筆記實驗第三輪（`scripts/experiments/product-notes/round3/`，交辦 `TASK.md`，結論在 `REPORT.md` 第三輪一節）：加對照組 D（全部 15 篇筆記、不給篩選工具），沿用 12 題再加 8 題新題、每題每組跑 3 次。60 份回答（對／部分對／錯）：A 9／14／37、B 14／19／27、C（篩選工具）55／2／3、D 45／10／5；C 對 D 同題同次 14 勝 41 平 5 敗，贏在漏款、排序與必要限定。新題 C 87.5% 低於舊題 94.4%；C 有 2 次條件解析失敗，C／D 參考資料格式長度也不同，優勢不能全歸給篩選運算。重新生成的 15 篇筆記規格、正文與出處檢查 0 錯；篩選工具與第二輪逐位元組相同。鏡像檢查 exit 0、workspace／LanceDB 未變；正式程式與知識庫未變。
