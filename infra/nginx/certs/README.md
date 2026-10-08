@@ -21,6 +21,11 @@ standard `/etc/letsencrypt` path inside that container, so the renewal config
 stays portable while the host nginx reads the same files through their real
 path.
 
+The directory can hold multiple domain lineages. The `clef.create360.ai`
+API vhost stores its certificate in `letsencrypt/live/clef.create360.ai/`;
+the existing renewal script processes that lineage together with
+`146.5gao.ai`.
+
 `scripts/setup-public-https.sh` installs the renewal cron automatically during
 the initial public HTTPS setup. The marked cron block is replaced on rerun, so
 it does not create duplicate jobs. Its default log is

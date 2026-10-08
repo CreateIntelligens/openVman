@@ -20,6 +20,44 @@ That layer is not managed by compose, so it has to be set up once per machine.
 | `deploy.sh` | Renders, backs up, validates and reloads the host vhost. |
 | `146-openvman.conf` | What currently runs on the production host, kept for reference and asserted against the template by `backend/tests/config/test_https_edge_proxy.py`. |
 | `openvman.conf` | Render output. Git-ignored — never edit by hand. |
+| `clef-api.conf` | Independent source vhost for `clef.create360.ai`; deployed to `/etc/nginx/conf.d/clef-api.conf`. |
+
+## Clef-Flash API domain
+
+`clef.create360.ai` resolves to `60.248.142.145`. The host nginx serves the
+HTTP-01 challenge on port 80, redirects normal HTTP requests to HTTPS, and
+proxies TLS requests to the API facade on `127.0.0.1:18100`. The dedicated
+vhost in `clef-api.conf` is separate from `146-openvman.conf`.
+
+The initial certificate setup uses the repository's pinned Certbot container
+and shared Let's Encrypt directory. With DNS already pointed at this host and
+port 80 reachable, install a temporary HTTP challenge vhost, issue the
+certificate, then deploy the final vhost:
+
+1. Install an HTTP-only server block for `clef.create360.ai` at
+   `/etc/nginx/conf.d/clef-api.conf`. It must serve
+   `/.well-known/acme-challenge/` from `/usr/share/nginx/html` and return 404
+   for other paths. Run `sudo nginx -t && sudo systemctl reload nginx`.
+2. Read `LETSENCRYPT_EMAIL` from the host `.env`, then run the pinned Certbot
+   image with `/usr/share/nginx/html:/var/www/certbot` and
+   `infra/nginx/certs/letsencrypt:/etc/letsencrypt` mounted:
+
+   ```sh
+   docker run --rm \
+     -v /usr/share/nginx/html:/var/www/certbot \
+     -v "$PWD/infra/nginx/certs/letsencrypt:/etc/letsencrypt" \
+     certbot/certbot@sha256:34ee91d2f43008eb78a007d22f23ed4b2eaa9a454cb27ca2c042b49527a695b4 \
+     certonly --webroot -w /var/www/certbot \
+     -d clef.create360.ai -m "$LETSENCRYPT_EMAIL" --agree-tos --non-interactive
+   ```
+
+3. Copy `infra/nginx/native/clef-api.conf` to
+   `/etc/nginx/conf.d/clef-api.conf`, then run `sudo nginx -t && sudo systemctl
+   reload nginx`.
+
+The existing `scripts/renew-letsencrypt.sh` renews every lineage in the shared
+certificate directory, including `clef.create360.ai`, and reloads host nginx.
+The existing daily cron entry therefore manages renewal without a second job.
 
 ## Updating an already-deployed host
 

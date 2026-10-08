@@ -27,6 +27,8 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
                              └── /grafana/    → grafana ──> prometheus
 ```
 
+Clef-Flash 決策 API 使用獨立網域 `https://clef.create360.ai`，由同一台主機 nginx 終止 TLS，再代理到主機本機的 API 門面 `127.0.0.1:18100`。公開文件為 `/docs`、`/redoc`、`/openapi.json`，健康檢查與推論分別為 `/health`、`POST /v1/systemone`；Nginx 設定及憑證流程見 [Native nginx vhost](infra/nginx/native/README.md)。
+
 前台有兩種對話模式。文字模式：辨識結果送 `POST /api/v1/chat`，Backend 轉給 Brain 產生回答，再經 TTS 串流（`/api/v1/tts/stream`）播放並驅動對嘴。Live 模式：前台經 `/api/v1/ws` 連線，由 Gemini Live 直接以語音回答，工具呼叫在 Brain 執行。Brain 不對外開放（`/brain/` 一律 404），公開 API 以 Backend 的 `/docs` 為準。
 
 協定與各層細節見 [系統架構](docs/specs/00_SYSTEM_ARCHITECTURE.md) 與 [核心協定](docs/specs/00_CORE_PROTOCOL.md)。
