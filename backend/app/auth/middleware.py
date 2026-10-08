@@ -33,6 +33,7 @@ _INTERNAL_AUTH_BYPASS_PATHS = frozenset({
     "/api/v1/internal/a2a/peers",
     "/api/v1/internal/a2a/tasks",
     "/api/v1/internal/a2a/groups/messages",
+    "/api/v1/internal/decision-providers",
 })
 _PUBLIC_PREFIXES = (
     "/static/characters/",

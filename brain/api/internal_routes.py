@@ -11,10 +11,12 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    HTTPException,
     Request,
     WebSocket,
     WebSocketDisconnect,
 )
+from pydantic import BaseModel, ConfigDict, Field
 
 from protocol.schemas import InternalAsrJudgeRequest, InternalEnrichRequest
 from safety.internal_auth import INTERNAL_TOKEN_HEADER, require_internal_token
@@ -25,6 +27,39 @@ router = APIRouter(
     tags=["Internal"],
     dependencies=[Depends(require_internal_token)],
 )
+
+
+class InternalDecisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: str | dict[str, Any] | list[Any] | None
+    questions: dict[str, dict[str, Any]]
+    purpose: str = Field(min_length=1, max_length=64)
+    timeout_seconds: float = Field(gt=0, le=10)
+
+
+@router.post("/internal/decision")
+def internal_decision(payload: InternalDecisionRequest) -> dict[str, Any]:
+    """Internal decision endpoint for Backend control paths."""
+    from core.decision_router import DecisionProviderError, decide
+
+    try:
+        result = decide(
+            payload.state,
+            payload.questions,
+            timeout=payload.timeout_seconds,
+            purpose=payload.purpose,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="invalid decision request") from exc
+    except DecisionProviderError as exc:
+        raise HTTPException(status_code=503, detail="decision providers unavailable") from exc
+    return {
+        "answers": result.answers,
+        "provider": result.provider,
+        "hop_id": result.hop_id,
+        "model": result.model,
+    }
 
 
 def get_or_create_session(

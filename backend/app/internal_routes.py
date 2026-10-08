@@ -111,6 +111,17 @@ def _check_internal_auth(token: str) -> None:
         raise HTTPException(status_code=403, detail="invalid internal token")
 
 
+@router.get("/api/v1/internal/decision-providers")
+async def internal_decision_provider_configuration(
+    x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
+) -> dict[str, Any]:
+    _check_internal_auth(x_internal_token)
+    from app.auth.runtime import get_auth_runtime
+    from app.auth.decision_provider_routes import internal_runtime_configuration
+
+    return internal_runtime_configuration(get_auth_runtime())
+
+
 @router.get("/api/v1/internal/a2a/peers")
 async def internal_a2a_peers(
     state: str | None = None,

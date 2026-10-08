@@ -8,6 +8,10 @@ active_project_id: ContextVar[str] = ContextVar("brain_active_project_id", defau
 active_user_message: ContextVar[str] = ContextVar("brain_active_user_message", default="")
 # 前台 ASR 聽出的語言（例如台語 "nan"）；轉錄後的文字看不出來，查知識庫要靠它。
 active_speech_language: ContextVar[str] = ContextVar("brain_active_speech_language", default="")
+active_retrieval_language: ContextVar[str] = ContextVar("brain_active_retrieval_language", default="")
+active_turn_decision_unavailable: ContextVar[bool] = ContextVar(
+    "brain_active_turn_decision_unavailable", default=False,
+)
 # 這一輪的回覆模式（fast / standard / deep）。工具透過 mode_settings() 取用，
 # 才能在同一個行程裡讓不同請求有不同的查詢深度。
 active_reply_mode: ContextVar[str] = ContextVar("brain_active_reply_mode", default="")

@@ -186,11 +186,11 @@ R2T2 使用 `ASR_R2T2_STREAM_URL`（部署值 `ws://10.9.0.35:8040/asr_stream_ap
 
 前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES；前台帶 `project_id` 時另帶 `customVocabulary`，是 Brain `/brain/internal/asr-glossary` 回的專案詞表逐詞清單，最多 100 個，拿不到就不帶）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。查詢參數 `engine` 只有管理員能用（後台串流試聽），指定 `STREAM_ASR_ENGINES` 之一就不看帳號偏好；一般帳號或嵌入金鑰帶了回 `not_allowed`。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。
 
-前台連線時帶 `project_id`、`language_routes`（query string）：`languageCodes` 依該專案的語言分流產生（zh→zh-TW、en→en-US、es→es-ES、ja→ja-JP、ko→ko-KR），沒帶專案才用 `ASR_GEMINI_STREAM_LANGUAGES`。Gemini 的定稿偶爾比最後的暫定字幕還差（「who am i」定稿成「OMI」、定稿成韓文）：兩者不同時 Backend 呼叫 Brain `POST /brain/internal/asr-judge`（Jev 判斷，最多等 1.5 秒），回傳的文字當 `final` 送給前台；逾時或失敗照定稿。每次判斷在 `backend/logs/asr_final_judge.jsonl` 記一行（時間、專案、兩段文字、選擇、分數、毫秒），用來拿真實資料驗證準度。
+前台連線時帶 `project_id`、`language_routes`（query string）：`languageCodes` 依該專案的語言分流產生（zh→zh-TW、en→en-US、es→es-ES、ja→ja-JP、ko→ko-KR），沒帶專案才用 `ASR_GEMINI_STREAM_LANGUAGES`。Gemini 的定稿偶爾比最後的暫定字幕還差（「who am i」定稿成「OMI」、定稿成韓文）：兩者不同時 Backend 呼叫 Brain `POST /brain/internal/asr-judge`，由決策供應鏈判斷（最多等 1.5 秒），回傳的文字當 `final` 送給前台；逾時或失敗照定稿。每次判斷在 `backend/logs/asr_final_judge.jsonl` 記一行（時間、專案、兩段文字、選擇、分數、毫秒），用來拿真實資料驗證準度。
 
 `client_interrupt` 分成兩種情況：未附帶 `partial_asr`，或內容為空白時，代表明確的停止控制（例如主頁停止操作），直接中斷；帶有辨識文字時，先由 `GuardAgent` 的本地規則判斷。非字串的辨識欄位會被忽略，不中斷或關閉連線。
 
-辨識文字中的單字「停」、stop、等一下、新問題及修正要求可觸發停止；已識別的附和、繼續／否定停止語句和帶引號的背景話不單獨觸發停止。規則僅移除已識別的非中斷片語，因此「不用停，繼續說。請問明天幾點開門？」仍會因新問題中斷。以上是確定性啟發式規則，不是完整語意理解。規則判不出的未知長句改問 Jev 要不要停（`JEV_INTERRUPT_ENABLED`，預設開，需 `TYPESAFE_API_KEY`；自寫 30 題規則 23/30、Jev 29/30），逾時 0.6 秒或失敗維持保守停止；設 false 則未知長句一律停止。
+辨識文字中的單字「停」、stop、等一下、新問題及修正要求可觸發停止；已識別的附和、繼續／否定停止語句和帶引號的背景話不單獨觸發停止。規則僅移除已識別的非中斷片語，因此「不用停，繼續說。請問明天幾點開門？」仍會因新問題中斷。以上是確定性啟發式規則，不是完整語意理解。規則判不出的未知長句改呼叫 Brain `POST /internal/decision`，由管理者設定的決策供應鏈分類；請求以 `X-Internal-Token` 驗證，`JEV_INTERRUPT_ENABLED` 預設開，最多等待 0.6 秒，逾時或所有供應商失敗維持保守停止；設 false 則未知長句一律停止。每次決策記錄 provider、model、hop 與分類結果，不記原文。
 
 判斷為停止後，後端必須立即執行以下清理動作，避免浪費算力與頻寬：
 

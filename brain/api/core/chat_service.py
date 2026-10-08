@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any
 
@@ -19,6 +19,11 @@ from core.agent_loop import (  # noqa: F401 (ToolPhaseError re-exported)
 from core.llm_client import LLMEmptyReplyError, LLMReply, generate_chat_turn
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
+from core.turn_decisions import (
+    TurnDecision,
+    run_turn_decision,
+    turn_decision_config,
+)
 from infra.learnings import record_error_event
 from memory.memory import (
     append_session_message_with_id,
@@ -40,7 +45,12 @@ from protocol.message_envelope import (
     serialize_context,
 )
 from safety.guardrails import enforce_guardrails, enforce_session_limits
-from tools.context import active_speech_language
+from tools.context import (
+    active_retrieval_language,
+    active_speech_language,
+    active_turn_decision_unavailable,
+)
+from tools.tool_registry import get_tool_registry
 
 _pii_writeback_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-writeback")
 
@@ -60,6 +70,8 @@ class GenerationContext:
     prior_messages: list[dict[str, Any]] = field(default_factory=list)
     forced_tool_name: str | None = None
     reply_mode: str = ""
+    turn_decision: TurnDecision | None = None
+    input_language: str | None = None
 
 
 def prepare_generation(
@@ -87,12 +99,69 @@ def prepare_generation(
     session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
     prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
 
+    # Decision policy is server-owned and bound to this finalized user turn.
+    # Client metadata can provide ASR evidence, but cannot supply a policy.
+    metadata = envelope.context.metadata
+    eligible_turn = (
+        envelope.context.message_type == "user"
+        and not bool(metadata.get("ephemeral_user_message"))
+        and not route.skip_tools
+    )
+    turn_decision: TurnDecision | None = None
+    if eligible_turn:
+        from knowledge.kb_settings import primary_language
+
+        cfg = turn_decision_config(cfg)
+        registered = {
+            tool.get("function", {}).get("name")
+            for tool in get_tool_registry().build_openai_tools()
+        }
+        turn_decision = run_turn_decision(
+            user_text=stored_user_message,
+            history=prior_messages,
+            project_id=project_id,
+            project_language=primary_language(project_id),
+            speech_language=str(metadata.get("speech_language") or ""),
+            available_tools=tuple(registered),
+            config=cfg,
+            turn_id=envelope.context.trace_id,
+        )
+        if turn_decision.policy.needs_memory is True:
+            from memory.memory import is_session_recall_disabled
+
+            if is_session_recall_disabled(session.session_id, project_id):
+                turn_decision = replace(
+                    turn_decision,
+                    policy=replace(
+                        turn_decision.policy,
+                        needs_memory=None,
+                        auto_recall=False,
+                    ),
+                )
+
     request_ctx = serialize_context(envelope.context)
+    input_language = None
+    if turn_decision is not None:
+        from knowledge.kb_settings import primary_language
+        from memory.language_detect import detect_language
+
+        speech_language = str(metadata.get("speech_language") or "")
+        supported = {"zh", "en", "es", "nan", "ja", "ko"}
+        input_language = (
+            speech_language if speech_language in supported else
+            turn_decision.policy.dominant_language
+            if turn_decision.policy.dominant_language in supported else
+            detect_language(stored_user_message, primary_language(project_id))
+        )
     prompt_messages = build_chat_messages(
         user_message=cleaned_message,
         request_context=request_ctx,
         session_messages=prior_messages,
         allow_tools=not route.skip_tools,
+        turn_policy=turn_decision.policy if turn_decision else None,
+        decision_dependency_unavailable=bool(
+            turn_decision and turn_decision.dependency_unavailable
+        ),
     )
 
     return GenerationContext(
@@ -107,6 +176,8 @@ def prepare_generation(
         prior_messages=prior_messages,
         forced_tool_name=route.forced_tool_name,
         reply_mode=reply_mode,
+        turn_decision=turn_decision,
+        input_language=input_language,
     )
 
 
@@ -271,6 +342,11 @@ def finalize_generation(
         )
         # 前台語音經 ASR 時會帶 speech_language（例如聽出是台語），轉錄文字看不出來。
         speech_language = context.request_context.get("metadata", {}).get("speech_language")
+        input_language = (
+            context.turn_decision.policy.dominant_language
+            if context.turn_decision is not None
+            else None
+        )
         if persisted_message_ids is not None:
             user_message_id = persisted_message_ids[0]
         else:
@@ -278,9 +354,8 @@ def finalize_generation(
                 context.session_id, context.persona_id,
                 "user", context.user_message,
                 project_id=context.project_id,
-                language=(
-                    speech_language
-                    if isinstance(speech_language, str) else None
+                language=context.input_language or (
+                    speech_language if isinstance(speech_language, str) else None
                 ),
             )
         _pii_writeback_executor.submit(
@@ -405,6 +480,15 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     speech_token = active_speech_language.set(
         speech_language if isinstance(speech_language, str) else "",
     )
+    retrieval_language = (
+        context.turn_decision.policy.retrieval_language
+        if context.turn_decision is not None
+        else ""
+    )
+    retrieval_token = active_retrieval_language.set(retrieval_language or "")
+    unavailable_token = active_turn_decision_unavailable.set(bool(
+        context.turn_decision and context.turn_decision.dependency_unavailable
+    ))
     try:
         return run_agent_loop(
             context.prompt_messages,
@@ -415,8 +499,24 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             # role=tool 的訊息雖然 path 也是 "tool" 但 skip_rag=True，都不該強制。
             allow_forced_knowledge_search=(
                 not context.route.skip_rag and not context.forced_tool_name
+                and not (
+                    context.turn_decision is not None
+                    and context.turn_decision.policy.force_knowledge_search is False
+                )
             ),
             reply_mode=context.reply_mode,
+            force_web_search=bool(
+                context.turn_decision
+                and context.turn_decision.policy.needs_web is True
+            ),
+            force_memory_search=bool(
+                context.turn_decision
+                and context.turn_decision.policy.needs_memory is True
+            ),
+            force_knowledge_search=bool(
+                context.turn_decision
+                and context.turn_decision.policy.needs_knowledge is True
+            ),
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
@@ -428,6 +528,8 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
         return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=exc.partial_steps)
     finally:
         active_speech_language.reset(speech_token)
+        active_retrieval_language.reset(retrieval_token)
+        active_turn_decision_unavailable.reset(unavailable_token)
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:

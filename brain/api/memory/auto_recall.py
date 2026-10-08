@@ -207,6 +207,8 @@ def _run_recall(
     persona_id: str,
     project_id: str,
     config: Any,
+    *,
+    skip_jev_filter: bool = False,
 ) -> RecallResult:
     """Execute vector search on memories table and optionally summarize."""
     from core.retrieval_service import retrieve_context
@@ -232,7 +234,7 @@ def _run_recall(
 
     summary = None
     source = "none"
-    if getattr(config, "auto_recall_use_jev_filter", False) and jev_available():
+    if not skip_jev_filter and getattr(config, "auto_recall_use_jev_filter", False) and jev_available():
         try:
             relevant = _jev_filter(query, memory_results, config)
             summary = _truncate_text(
@@ -273,6 +275,7 @@ def run_auto_recall(
     project_id: str,
     *,
     session_id: str = "",
+    skip_jev_filter: bool = False,
 ) -> RecallResult:
     """Top-level auto recall: cache check → search → summarize → cache store."""
     start = monotonic()
@@ -306,7 +309,10 @@ def run_auto_recall(
 
         # Execute with timeout
         timeout_s = config.auto_recall_timeout_ms / 1000.0
-        future = _executor.submit(_run_recall, query, persona_id, project_id, config)
+        future = _executor.submit(
+            _run_recall, query, persona_id, project_id, config,
+            skip_jev_filter=skip_jev_filter,
+        )
         try:
             result = future.result(timeout=timeout_s)
         except TimeoutError:

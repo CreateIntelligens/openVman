@@ -3,7 +3,7 @@ from functools import cached_property
 import json
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from memory.thresholds import SimilarityThresholds, thresholds_for
@@ -171,6 +171,25 @@ class BrainSettings(BaseSettings):
     # 強制查完知識庫後的回合不再提供 search_knowledge（避免重複翻書），
     # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
     chat_answer_pass_excludes_knowledge_search: bool = True
+
+    # Per-turn typed decisions use the shared Brain provider chain. Group switches
+    # allow operational rollback without changing provider configuration.
+    turn_decisions_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_ENABLED")
+    turn_decisions_retrieval_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_RETRIEVAL_ENABLED")
+    turn_decisions_language_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_LANGUAGE_ENABLED")
+    turn_decisions_tone_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_TONE_ENABLED")
+    turn_decisions_timeout_seconds: float = Field(default=2.0, gt=0, le=10, validation_alias="TURN_DECISIONS_TIMEOUT_SECONDS")
+    turn_decisions_hop_timeout_seconds: float = Field(default=0.4, gt=0, le=5, validation_alias="TURN_DECISIONS_HOP_TIMEOUT_SECONDS")
+    turn_decisions_noul_positive_threshold: float = Field(default=0.7, ge=0, le=1, validation_alias="TURN_DECISIONS_NOUL_POSITIVE_THRESHOLD")
+    turn_decisions_noul_negative_threshold: float = Field(default=0.1, ge=0, le=1, validation_alias="TURN_DECISIONS_NOUL_NEGATIVE_THRESHOLD")
+    turn_decisions_choice_confidence_threshold: float = Field(default=0.8, ge=0.5, le=1, validation_alias="TURN_DECISIONS_CHOICE_CONFIDENCE_THRESHOLD")
+    turn_decisions_choice_margin_threshold: float = Field(default=0.2, ge=0, le=1, validation_alias="TURN_DECISIONS_CHOICE_MARGIN_THRESHOLD")
+
+    @model_validator(mode="after")
+    def validate_turn_decision_thresholds(self) -> "BrainSettings":
+        if self.turn_decisions_noul_negative_threshold >= self.turn_decisions_noul_positive_threshold:
+            raise ValueError("turn decision negative threshold must be below positive threshold")
+        return self
 
     # Jev（TypeSafe System One）：外部 API。舊名 JEV_SHADOW_BASE_URL 照讀。
     jev_base_url: str = Field(

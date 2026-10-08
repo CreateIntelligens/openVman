@@ -115,6 +115,9 @@ def run_agent_loop(
     forced_tool_name: str | None = None,
     allow_forced_knowledge_search: bool = False,
     reply_mode: str = "",
+    force_web_search: bool = False,
+    force_memory_search: bool = False,
+    force_knowledge_search: bool = False,
 ) -> AgentLoopResult:
     """Run a bounded think -> tool -> observe loop until the model returns text."""
     working_messages, tool_steps, final_turn = _run_tool_phase(
@@ -124,6 +127,9 @@ def run_agent_loop(
         forced_tool_name=forced_tool_name,
         allow_forced_knowledge_search=allow_forced_knowledge_search,
         reply_mode=reply_mode,
+        force_web_search=force_web_search,
+        force_memory_search=force_memory_search,
+        force_knowledge_search=force_knowledge_search,
     )
     if final_turn is None:
         raise ToolPhaseError(
@@ -142,22 +148,25 @@ def _resolve_forced_first_tool(
     tools: list[dict[str, Any]],
     forced_tool_name: str | None,
     allow_forced_knowledge_search: bool,
+    force_web_search: bool,
+    force_memory_search: bool,
+    force_knowledge_search: bool,
 ) -> str | None:
     """Decide the tool_choice for the first LLM call.
 
-    A slash-command forced tool always wins. Otherwise an ordinary user turn
-    must use tools (``REQUIRE_ANY_TOOL``): the model decides in one shot which
-    searches it needs — search_knowledge is added automatically if it leaves it
-    out — so knowledge base and web run in the same parallel round instead of
-    one after the other. Only when search_knowledge is registered.
+    A slash-command forced tool always wins. Otherwise an ordinary turn uses
+    ``REQUIRE_ANY_TOOL`` when baseline or accepted policy requires a read. The
+    model selects searches in one call; required reads are backfilled if omitted.
     """
     if forced_tool_name:
         return forced_tool_name
-    if not (allow_forced_knowledge_search and cfg.chat_force_knowledge_search):
-        return None
-    if any(
-        tool.get("function", {}).get("name") == KNOWLEDGE_SEARCH_TOOL
-        for tool in tools
+    names = {tool.get("function", {}).get("name") for tool in tools}
+    if (force_web_search and "search_web" in names) or (force_memory_search and "search_memory" in names):
+        return REQUIRE_ANY_TOOL
+    if (
+        allow_forced_knowledge_search
+        and (cfg.chat_force_knowledge_search or force_knowledge_search)
+        and KNOWLEDGE_SEARCH_TOOL in names
     ):
         return REQUIRE_ANY_TOOL
     return None
@@ -173,6 +182,30 @@ def _ensure_knowledge_search(turn: LLMReply, user_message: str) -> LLMReply:
     synthetic = LLMToolCall(
         id="auto-search-knowledge",
         name=KNOWLEDGE_SEARCH_TOOL,
+        arguments=json.dumps({"queries": [user_message]}, ensure_ascii=False),
+        extra_content=None,
+    )
+    return replace(turn, tool_calls=[*turn.tool_calls, synthetic])
+
+
+def _ensure_web_search(turn: LLMReply, user_message: str) -> LLMReply:
+    if any(call.name == "search_web" for call in turn.tool_calls):
+        return turn
+    synthetic = LLMToolCall(
+        id="auto-search-web",
+        name="search_web",
+        arguments=json.dumps({"query": user_message}, ensure_ascii=False),
+        extra_content=None,
+    )
+    return replace(turn, tool_calls=[*turn.tool_calls, synthetic])
+
+
+def _ensure_memory_search(turn: LLMReply, user_message: str) -> LLMReply:
+    if any(call.name == "search_memory" for call in turn.tool_calls):
+        return turn
+    synthetic = LLMToolCall(
+        id="auto-search-memory",
+        name="search_memory",
         arguments=json.dumps({"queries": [user_message]}, ensure_ascii=False),
         extra_content=None,
     )
@@ -221,6 +254,9 @@ def _run_tool_phase(
     forced_tool_name: str | None = None,
     allow_forced_knowledge_search: bool = False,
     reply_mode: str = "",
+    force_web_search: bool = False,
+    force_memory_search: bool = False,
+    force_knowledge_search: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
     """Execute tool call rounds until the LLM returns a text turn or rounds are exhausted.
 
@@ -233,10 +269,14 @@ def _run_tool_phase(
     tool_steps: list[dict[str, Any]] = []
     registry = get_tool_registry()
     tools = _tools_for_project(_tools_for_mode(registry.build_openai_tools(), mode), project_id)
+    force_web_search = force_web_search and any(
+        tool.get("function", {}).get("name") == "search_web" for tool in tools
+    )
     hallucination_pattern = _build_hallucination_pattern(tools)
     hallucination_retried = False
     first_forced = _resolve_forced_first_tool(
-        cfg, tools, forced_tool_name, allow_forced_knowledge_search
+        cfg, tools, forced_tool_name, allow_forced_knowledge_search,
+        force_web_search, force_memory_search, force_knowledge_search,
     )
     exclude_knowledge_after_search = bool(
         first_forced == REQUIRE_ANY_TOOL
@@ -282,10 +322,24 @@ def _run_tool_phase(
                 tools=current_tools,
                 forced_tool_name=current_forced,
             )
+            if iteration == 0 and current_forced == REQUIRE_ANY_TOOL and not turn.tool_calls:
+                if force_knowledge_search:
+                    turn = _ensure_knowledge_search(turn, last_user_message)
+                if force_web_search:
+                    turn = _ensure_web_search(turn, last_user_message)
+                if force_memory_search:
+                    turn = _ensure_memory_search(turn, last_user_message)
             if turn.tool_calls:
                 turn, dropped = _drop_unoffered_calls(turn, current_tools)
                 if iteration == 0 and current_forced == REQUIRE_ANY_TOOL:
-                    turn = _ensure_knowledge_search(turn, last_user_message)
+                    if force_knowledge_search or (
+                        allow_forced_knowledge_search and cfg.chat_force_knowledge_search
+                    ):
+                        turn = _ensure_knowledge_search(turn, last_user_message)
+                    if force_web_search:
+                        turn = _ensure_web_search(turn, last_user_message)
+                    if force_memory_search:
+                        turn = _ensure_memory_search(turn, last_user_message)
                 if turn.tool_calls:
                     _append_tool_turns(working_messages, tool_steps, turn, round_index=iteration)
                     continue

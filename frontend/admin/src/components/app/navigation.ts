@@ -24,6 +24,7 @@ export const systemTabs = [
   { key: "Projects", label: "專案管理", icon: "folder_copy" },
   { key: "Accounts", label: "帳號管理", icon: "manage_accounts" },
   { key: "EmbedKeys", label: "Embed 金鑰", icon: "key" },
+  { key: "DecisionProviders", label: "決策模型", icon: "neurology" },
   { key: "Usage", label: "用量", icon: "data_usage" },
   { key: "Health", label: "系統健康", icon: "health_metrics" },
   { key: "Monitoring", label: "系統監控", icon: "monitoring" },
@@ -59,6 +60,7 @@ export const pageComponents: Record<
   Projects: lazy(() => import("../../pages/Projects")),
   Accounts: lazy(() => import("../../pages/Accounts")),
   EmbedKeys: lazy(() => import("../../pages/EmbedKeys")),
+  DecisionProviders: lazy(() => import("../../pages/DecisionProviders")),
   Usage: lazy(() => import("../../pages/Usage")),
   Health: lazy(() => import("../../pages/Health")),
   Monitoring: lazy(() => import("../../pages/Monitoring")),
@@ -78,6 +80,7 @@ const tabPathSegments: Record<Tab, string> = {
   Projects: "projects",
   Accounts: "accounts",
   EmbedKeys: "embed-keys",
+  DecisionProviders: "decision-providers",
   Usage: "usage",
   Health: "health",
   Monitoring: "monitoring",
@@ -131,7 +134,7 @@ export function isTab(value: string | null): value is Tab {
   return value !== null && allTabs.some((tab) => tab.key === value);
 }
 
-const ADMIN_ONLY_TABS = new Set<Tab>(["Accounts", "EmbedKeys"]);
+const ADMIN_ONLY_TABS = new Set<Tab>(["Accounts", "EmbedKeys", "DecisionProviders"]);
 
 export function isTabVisible(tab: TabConfig, isAdmin: boolean): boolean {
   return !ADMIN_ONLY_TABS.has(tab.key) || isAdmin;

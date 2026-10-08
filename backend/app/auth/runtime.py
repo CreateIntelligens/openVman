@@ -9,6 +9,7 @@ from app.config import TTSRouterConfig, get_tts_config
 
 from .attempt_limiter import FailedAttemptLimiter
 from .database import AuthDatabase
+from .decision_provider_repository import DecisionProviderRepository
 from .repositories import (
     AccountAccessRepository,
     AdminScopeRepository,
@@ -36,6 +37,7 @@ class AuthRuntime:
     embed_keys: EmbedKeyRepository
     tokens: SessionTokenService
     settings: SystemSettingsRepository
+    decision_providers: DecisionProviderRepository
     temporary_passwords: TemporaryPasswordCipher
     # 每個 runtime 各自一份，測試與重建 runtime 時不會共用失敗次數。
     password_verify_attempts: FailedAttemptLimiter = field(
@@ -63,6 +65,10 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
         temporary_accounts=TemporaryAccountRepository(database),
         embed_keys=EmbedKeyRepository(database),
         settings=SystemSettingsRepository(database),
+        decision_providers=DecisionProviderRepository(
+            database,
+            encryption_secret=config.decision_provider_encryption_secret,
+        ),
         tokens=tokens,
         temporary_passwords=TemporaryPasswordCipher(
             config.auth_temporary_password_secret or config.session_jwt_secret,

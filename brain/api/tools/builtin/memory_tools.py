@@ -7,6 +7,7 @@ from tools.context import (
     active_persona_id,
     active_project_id,
     active_user_message,
+    active_turn_decision_unavailable,
 )
 
 from .knowledge_tools import _search_tool
@@ -29,7 +30,9 @@ _MEMORY_REQUEST_QUESTION = {
 }
 
 
-def is_explicit_memory_request(user_message: str) -> bool:
+def is_explicit_memory_request(
+    user_message: str, *, skip_decision: bool = False,
+) -> bool:
     """Whether the current user turn explicitly asks to persist something.
 
     Only the user's own words authorize a long-term write: a model must not be
@@ -43,7 +46,7 @@ def is_explicit_memory_request(user_message: str) -> bool:
     from core.jev_client import jev_available, jev_noul
 
     cfg = get_settings()
-    if cfg.jev_memory_gate_enabled and jev_available():
+    if not skip_decision and cfg.jev_memory_gate_enabled and jev_available():
         try:
             score = jev_noul(
                 text, _MEMORY_REQUEST_QUESTION,
@@ -67,7 +70,10 @@ def _save_memory(args: dict[str, Any]) -> dict[str, Any]:
     content = str(args.get("content", "")).strip()
     if not content:
         raise ValueError("content 不可為空")
-    if not is_explicit_memory_request(active_user_message.get()):
+    if not is_explicit_memory_request(
+        active_user_message.get(),
+        skip_decision=active_turn_decision_unavailable.get(),
+    ):
         raise ValueError("只有使用者明確要求記憶時才能寫入長期記憶")
     if len(content) > 2000:
         raise ValueError("content 過長")

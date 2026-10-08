@@ -95,11 +95,18 @@ async def _classify_ambiguous(text: str) -> Literal["STOP", "IGNORE"]:
         )
     except Exception as exc:
         logger.warning(json.dumps(
-            {"event": "interrupt_jev_fallback", "error_type": type(exc).__name__},
+            {"event": "interrupt_decision_fallback", "error_type": type(exc).__name__},
         ))
         return "STOP"
     choice = answer.get("choice")
     logger.info(json.dumps(
-        {"event": "interrupt_jev", "choice": choice, "confidence": answer.get("confidence")},
+        {
+            "event": "interrupt_decision",
+            "provider": answer.get("provider", ""),
+            "model": answer.get("model", ""),
+            "hop_id": answer.get("hop_id", ""),
+            "choice": choice,
+            "confidence": answer.get("confidence"),
+        },
     ))
     return "IGNORE" if choice == "IGNORE" else "STOP"

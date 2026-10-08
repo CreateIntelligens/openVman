@@ -26,6 +26,7 @@ from .prompt_templates import (
     NO_TOOLS_INSTRUCTIONS,
     reply_language_line,
 )
+from .turn_decisions import TurnPolicy
 
 
 # Workspace blocks injected into the system prompt, ordered by priority.
@@ -53,6 +54,8 @@ def build_chat_messages(
     session_messages: list[dict[str, Any]],
     *,
     allow_tools: bool = True,
+    turn_policy: TurnPolicy | None = None,
+    decision_dependency_unavailable: bool = False,
 ) -> list[dict[str, str]]:
     """Build the system and conversation messages for the LLM call.
 
@@ -81,12 +84,18 @@ def build_chat_messages(
         persona_id=persona_id,
         project_id=project_id,
         session_id=session_id,
+        enabled_by_policy=turn_policy.auto_recall is not False if turn_policy else True,
+        skip_jev_filter=decision_dependency_unavailable,
     )
     if recall_block:
         workspace_blocks.insert(0, recall_block)
 
     tool_instructions = DEFAULT_TOOL_INSTRUCTIONS if allow_tools else NO_TOOLS_INSTRUCTIONS
     answer_rules = DEFAULT_ANSWER_RULES if allow_tools else NO_TOOLS_ANSWER_RULES
+    if allow_tools and turn_policy is not None:
+        tool_instructions, answer_rules = _apply_retrieval_policy_to_instructions(
+            tool_instructions, answer_rules, turn_policy,
+        )
 
     system_prompt = "\n\n".join(
 
@@ -102,7 +111,10 @@ def build_chat_messages(
             glossary_line(project_id),
             reply_language_line(
                 project_id, user_message, _speech_language(request_context),
+                resolved_language=turn_policy.response_language if turn_policy else None,
             ),
+            _tone_delivery_line(turn_policy.tone if turn_policy else None),
+            _turn_retrieval_line(turn_policy),
         ]
         if block
     )
@@ -132,9 +144,11 @@ def _build_recall_block(
     persona_id: str,
     project_id: str,
     session_id: str,
+    enabled_by_policy: bool = True,
+    skip_jev_filter: bool = False,
 ) -> str:
     """Return the formatted auto-recall block, degrading silently on failure."""
-    if not cfg.auto_recall_enabled:
+    if not enabled_by_policy or not cfg.auto_recall_enabled:
         return ""
     if _is_session_recall_disabled(session_id=session_id, project_id=project_id):
         return ""
@@ -148,6 +162,7 @@ def _build_recall_block(
             persona_id,
             project_id,
             session_id=session_id,
+            skip_jev_filter=skip_jev_filter,
         )
     except Exception:
         logger.warning("auto_recall failed, skipping recall block", exc_info=True)
@@ -156,16 +171,74 @@ def _build_recall_block(
     return _format_recall_block(result)
 
 
+def _tone_delivery_line(tone: str | None) -> str:
+    lines = {
+        "confused": "當輪語氣提示：使用清楚、分步的說明；先回答核心問題，再補必要背景。",
+        "frustrated": "當輪語氣提示：簡潔承認使用者的困擾，直接處理問題與下一步；避免辯解或揣測情緒。",
+        "urgent": "當輪語氣提示：先給可立即採取的答案或步驟，再補充限制。",
+        "lighthearted": "當輪語氣提示：可自然輕鬆地回應，仍保持資訊準確。",
+    }
+    return lines.get(tone or "", "")
+
+
+def _turn_retrieval_line(policy: TurnPolicy | None) -> str:
+    if policy is None:
+        return ""
+    lines = []
+    if policy.needs_knowledge is False:
+        lines.append("當輪分類判定目前問題不需要專案知識；可直接回答，若回答過程發現需要專案事實仍可使用 search_knowledge。")
+    elif policy.needs_knowledge is True:
+        lines.append("當輪需要專案知識，請先使用 search_knowledge。")
+    if policy.needs_web is True:
+        lines.append("當輪需要公開或即時資訊，請使用 search_web。")
+    if policy.needs_memory is True:
+        lines.append("當輪需要過去對話或個人偏好時，請使用 search_memory。")
+    return "當輪檢索提示：" + "".join(lines) if lines else ""
+
+
+def _apply_retrieval_policy_to_instructions(
+    tool_instructions: str,
+    answer_rules: str,
+    policy: TurnPolicy,
+) -> tuple[str, str]:
+    if policy.needs_knowledge is False:
+        tool_instructions = tool_instructions.replace(
+            "**必須先呼叫此工具再回答**",
+            "若回答需要專案事實才呼叫此工具",
+        ).replace(
+            "search_knowledge 一定要叫；",
+            "search_knowledge 依本輪分類與回答需要呼叫；",
+        )
+        answer_rules = answer_rules.replace(
+            "**先呼叫 search_knowledge / search_memory 再回答**",
+            "需要相應資料時先呼叫 search_knowledge / search_memory 再回答",
+        )
+    if policy.needs_memory is False:
+        tool_instructions = tool_instructions.replace(
+            "當使用者提到過去對話、偏好或可能曾經告訴過你的個人資訊時主動呼叫",
+            "只有本輪分類為需要過去對話或回答缺少必要個人資訊時才呼叫",
+        )
+    if policy.needs_web is False:
+        tool_instructions = tool_instructions.replace(
+            "最新資訊、新聞、天氣、店家地點或其他公開資料必須搜尋。",
+            "只有回答需要最新資訊、新聞、天氣、店家地點或其他公開資料時才搜尋。",
+        )
+        answer_rules = answer_rules.replace(
+            "涉及即時或公開網路資訊（包含新聞、天氣）時，使用 search_web；",
+            "回答需要即時或公開網路資訊（包含新聞、天氣）時，使用 search_web；",
+        )
+    return tool_instructions, answer_rules
+
+
 def _is_session_recall_disabled(*, session_id: str, project_id: str) -> bool:
     """Best-effort per-session recall toggle lookup."""
     if not session_id:
         return False
 
     try:
-        from memory.memory import get_session_store
+        from memory.memory import is_session_recall_disabled
 
-        store = get_session_store(project_id=project_id)
-        return store.is_recall_disabled(session_id)
+        return is_session_recall_disabled(session_id, project_id)
     except Exception:
         return False
 

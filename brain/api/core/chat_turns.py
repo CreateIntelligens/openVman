@@ -64,7 +64,7 @@ def stage_turn(
         key: getattr(context, key)
         for key in (
             "trace_id", "session_id", "persona_id", "project_id",
-            "user_message", "request_context", "prior_messages",
+            "user_message", "request_context", "prior_messages", "input_language",
         )
     }
     saved = {

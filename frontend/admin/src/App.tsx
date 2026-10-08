@@ -84,7 +84,8 @@ function AppContent() {
   const isAdmin = account ? isAtLeastAdmin(account.role) : false;
   const canLoadPage = projects.some((project) => project.project_id === projectId)
     || route.tab === "Projects"
-    || route.tab === "Accounts";
+    || route.tab === "Accounts"
+    || route.tab === "DecisionProviders";
 
   const applyRoute = useCallback(
     (
@@ -188,7 +189,7 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
-  if (route.tab === "Accounts" && !isAdmin) {
+  if ((route.tab === "Accounts" || route.tab === "DecisionProviders") && !isAdmin) {
     return <ForbiddenState />;
   }
 

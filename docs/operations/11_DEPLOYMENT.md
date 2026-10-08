@@ -35,8 +35,14 @@ cp .env.example .env
 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、
 `INDEXTTS_*` 等）也讀這一份。
 
-`GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`GRAFANA_PASSWORD` 留空即可，
-啟動時會自動產生高熵值。Grafana 預設不開放匿名瀏覽，每個部署都必須有唯一密碼。
+`GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`DECISION_PROVIDER_ENCRYPTION_SECRET`、
+`GRAFANA_PASSWORD` 留空即可，啟動時會自動產生高熵值。`DECISION_PROVIDER_ENCRYPTION_SECRET`
+用來加密 Auth DB 中由後台輸入的決策供應商 key；備份與還原必須保留同一個值。若更換此 secret，
+既有決策 key 會變成不可解密，需在後台重新輸入。Grafana 預設不開放匿名瀏覽，每個部署都必須有唯一密碼。
+
+決策供應商可以透過 Admin「System → 決策模型」管理；若改用部署預設，Jev 讀
+`TYPESAFE_API_KEY`，OpenAI Decisions 讀 `OPENAI_API_KEY`，Clef 可選讀 `CLEF_API_KEY`。
+Admin 設定覆寫環境預設，清除 Admin key 會停用該 provider key，「使用部署預設」會移除覆寫。
 
 LLM 的 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<model>` 加入
 鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，

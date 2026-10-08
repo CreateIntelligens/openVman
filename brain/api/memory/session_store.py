@@ -322,8 +322,10 @@ class SessionStore:
             speech_language = context["request_context"].get(
                 "metadata", {},
             ).get("speech_language")
+            input_language = context.get("input_language")
             user_language, given_language = _message_language(
                 "user", context["user_message"],
+                input_language if isinstance(input_language, str) else
                 speech_language if isinstance(speech_language, str) else None,
                 default_language,
             )
@@ -348,7 +350,7 @@ class SessionStore:
                 "AND owner = ? AND turn_id = ?",
                 (session_id, owner, turn_id),
             )
-        if given_language is None:
+        if given_language is None and user_language is not None:
             refine_language_in_background(
                 context["user_message"], user_language,
                 lambda refined: self.update_message_language(ids[0], refined),

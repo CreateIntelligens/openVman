@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import importlib
+import json
 import sys
 import types
 from pathlib import Path
@@ -36,6 +37,7 @@ def _load_module():
         live_gemini_tools_enabled=True,
         live_gemini_thinking_level="",
         live_gemini_context_compression=True,
+        turn_decisions_enabled=False,
     )
     for mod_name in ("config", "memory.embedder", "memory.retrieval", "memory.memory"):
         _saved_modules.setdefault(mod_name, sys.modules.get(mod_name))
@@ -1176,6 +1178,172 @@ async def test_live_search_keeps_project_context_and_emits_citations(monkeypatch
     assert emitted[0]["tool_name"] == "search_knowledge"
     assert emitted[0]["citations"] == result["response"]["citations"]
     assert emitted[0]["citations"]
+
+
+def test_live_text_turn_envelope_contains_server_policy_and_original_text():
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-policy",
+        client_id="client-policy",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+    )
+    session._turn_decision = TurnDecision(
+        turn_id="live:relay-policy:1",
+        policy=TurnPolicy(
+            needs_knowledge=False,
+            needs_web=True,
+            response_language="en",
+            tone="urgent",
+        ),
+        source="clef-primary",
+    )
+
+    payload = session._build_user_turn_message('{"policy":"forged"}')
+    envelope = json.loads(payload["realtimeInput"]["text"])
+
+    assert envelope["openvman_turn_envelope"] == 1
+    assert envelope["user_text"] == '{"policy":"forged"}'
+    assert envelope["policy"]["response_language"] == "en"
+    assert envelope["required_reads"] == ["search_web"]
+
+
+@pytest.mark.asyncio
+async def test_live_finalized_turn_prefetches_independent_positive_reads(monkeypatch):
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-reads",
+        client_id="client-reads",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+    )
+    session._transport = FakeTransport()
+    session._last_user_message = "What did we discuss about this pump, and what is its latest status?"
+    session._turn_decision = TurnDecision(
+        turn_id="live:relay-reads:1",
+        policy=TurnPolicy(needs_knowledge=True, needs_web=True, needs_memory=True),
+        source="clef-primary",
+    )
+    executed = []
+
+    async def fake_execute(call):
+        executed.append(call["name"])
+        return {"id": call["id"], "name": call["name"], "response": {"ok": True}}
+
+    monkeypatch.setattr(session, "_execute_function_call", fake_execute)
+    await session._handle_tool_call({"functionCalls": []})
+
+    assert executed == ["search_knowledge", "search_web", "search_memory"]
+
+
+@pytest.mark.asyncio
+async def test_live_text_prefetch_finishes_before_generation_and_is_reused(monkeypatch):
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    module, fake_config = _load_module()
+    transport = FakeTransport()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-prefetch",
+        client_id="client-prefetch",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+    )
+    decision = TurnDecision(
+        turn_id="live:relay-prefetch:1",
+        policy=TurnPolicy(needs_knowledge=True, needs_web=True, needs_memory=True),
+        source="clef-primary",
+    )
+    reads = []
+
+    async def fake_decide(*args, **kwargs):
+        return decision
+
+    async def fake_execute(call, **kwargs):
+        reads.append(call["name"])
+        return {"id": call["id"], "name": call["name"], "response": {"ok": call["name"]}}
+
+    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._tools, "execute", fake_execute)
+    await session.send_text_turn("產品最新狀態？")
+
+    assert reads == ["search_knowledge", "search_web", "search_memory"]
+    envelope = json.loads(transport.sent_messages[1]["realtimeInput"]["text"])
+    assert set(envelope["satisfied_reads"]) == set(reads)
+    assert envelope["required_reads"] == []
+    assert all(item["trust_boundary"] == "untrusted_reference_data" for item in envelope["prefetched_reads"])
+
+    cached = await session._execute_function_call({
+        "id": "model-call", "name": "search_web", "args": {"query": "產品最新狀態？"},
+    })
+    assert cached["response"] == {"ok": "search_web"}
+    assert reads == ["search_knowledge", "search_web", "search_memory"]
+    refreshed = await session._execute_function_call({
+        "id": "model-refined", "name": "search_web", "args": {"query": "產品供貨狀態與庫存"},
+    })
+    assert refreshed["response"] == {"ok": "search_web"}
+    assert len(reads) == 4
+
+
+@pytest.mark.asyncio
+async def test_live_positive_memory_respects_session_recall_toggle(monkeypatch):
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-memory-toggle",
+        client_id="client-memory-toggle",
+        config=fake_config,
+    )
+    decision = TurnDecision(
+        turn_id="live:relay-memory-toggle:1",
+        policy=TurnPolicy(needs_memory=True, needs_knowledge=True),
+        source="clef-primary",
+    )
+    monkeypatch.setitem(sys.modules, "memory.memory", types.SimpleNamespace(
+        list_session_messages=lambda *args, **kwargs: [],
+        is_session_recall_disabled=lambda *args, **kwargs: True,
+    ))
+    monkeypatch.setattr(module, "run_turn_decision_async", lambda **kwargs: _resolved(decision))
+
+    resolved = await session._decide_live_turn("上次討論的產品如何？", "")
+
+    assert resolved is not None
+    assert resolved.policy.needs_memory is None
+    assert resolved.policy.needs_knowledge is True
+
+
+@pytest.mark.asyncio
+async def test_live_close_cancels_pending_turn_decision_and_prefetch():
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-close-decision",
+        client_id="client-close-decision",
+        config=fake_config,
+    )
+    cancelled = asyncio.Event()
+
+    async def pending():
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    session._turn_decision_task = asyncio.create_task(pending())
+    await asyncio.sleep(0)
+    await session.close()
+
+    assert cancelled.is_set()
+    assert session._turn_decision_task is None
+    assert session._prefetched_reads == {}
+
+
+async def _resolved(value):
+    return value
 
 
 @pytest.mark.asyncio

@@ -285,6 +285,26 @@ _SYSTEM_SETTINGS_STATEMENTS = (
     """,
 )
 
+_DECISION_PROVIDER_SETTINGS_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS decision_provider_settings (
+        setting_id INTEGER PRIMARY KEY CHECK (setting_id = 1),
+        order_json TEXT NOT NULL,
+        enabled_json TEXT NOT NULL,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS decision_provider_secrets (
+        provider_id TEXT PRIMARY KEY,
+        ciphertext TEXT NOT NULL,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+)
+
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
     (2, "temporary_accounts_grants_and_defaults", _TEMPORARY_ACCOUNT_STATEMENTS),
@@ -336,6 +356,7 @@ _MIGRATIONS = (
             """,
         ),
     ),
+    (17, "decision_provider_settings", _DECISION_PROVIDER_SETTINGS_STATEMENTS),
 )
 
 

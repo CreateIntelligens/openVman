@@ -154,6 +154,38 @@ def test_acknowledgement_is_scoped_to_principal_and_persona(delivery):
     assert len(store.list_messages("s1")) == 2
 
 
+def test_accepted_turn_reuses_server_resolved_input_language(delivery):
+    _, store, _, _ = delivery
+    assert store.register_chat_turn("s1", "default", "user:user-1", "turn-language", 1)
+    payload = {
+        "context": {
+            "persona_id": "default",
+            "user_message": "What did we decide?",
+            "request_context": {"metadata": {}},
+            "input_language": "en",
+        },
+        "response": {
+            "reply": "We decided to continue.",
+            "history": [{"role": "assistant", "content": "We decided to continue."}],
+        },
+        "tool_steps": [],
+        "response_time_s": 0.2,
+    }
+    assert store.stage_chat_turn("s1", "user:user-1", "turn-language", 1, payload)
+
+    accepted = store.accept_chat_turn(
+        "s1", "default", "user:user-1", "turn-language", 1,
+    )
+
+    assert accepted is not None
+    with store._connect() as conn:
+        row = conn.execute(
+            "SELECT language FROM messages WHERE session_id = ? AND role = 'user'",
+            ("s1",),
+        ).fetchone()
+    assert row == ("en",)
+
+
 def test_sqlite_guards_work_between_independent_store_instances(delivery):
     client, store, _, _ = delivery
     assert generate(client).status_code == 200

@@ -4,6 +4,8 @@ import {
   buildAdminPath,
   consumeChatDeepLink,
   parseAdminRoute,
+  allTabs,
+  isTabVisible,
 } from "./navigation";
 
 beforeEach(() => window.history.replaceState(null, "", "/admin/chat"));
@@ -96,5 +98,16 @@ describe("canonical subpage routes", () => {
     // 語音頁從 /admin/tts 搬到 /admin/voice，舊路徑不轉址。
     expect(parseAdminRoute("/admin/tts")).toBeNull();
     expect(parseAdminRoute("/admin/tts/asr")).toBeNull();
+  });
+});
+
+describe("decision-provider administration route", () => {
+  it("is reachable by route and visible only to administrators", () => {
+    const tab = allTabs.find((item) => item.key === "DecisionProviders");
+    expect(tab).toBeTruthy();
+    expect(buildAdminPath("DecisionProviders")).toBe("/admin/decision-providers");
+    expect(parseAdminRoute("/admin/decision-providers")).toEqual({ tab: "DecisionProviders" });
+    expect(isTabVisible(tab!, true)).toBe(true);
+    expect(isTabVisible(tab!, false)).toBe(false);
   });
 });

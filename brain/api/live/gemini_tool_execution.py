@@ -39,6 +39,8 @@ class GeminiLiveToolExecutor:
         *,
         user_message: str,
         heard_language: str | None = None,
+        retrieval_language: str | None = None,
+        decision_dependency_unavailable: bool = False,
     ) -> dict[str, Any]:
         name = str(function_call.get("name", "")).strip()
         call_id = str(function_call.get("id", "")).strip()
@@ -48,7 +50,8 @@ class GeminiLiveToolExecutor:
 
         tool_map = {
             "search_knowledge": lambda: self.search(
-                "knowledge", args, user_message, heard_language
+                "knowledge", args, user_message, heard_language,
+                retrieval_language,
             ),
             "search_memory": lambda: self.search(
                 "memories", args, user_message
@@ -57,7 +60,8 @@ class GeminiLiveToolExecutor:
                 self._get_chat_history, args
             ),
             "save_memory": lambda: asyncio.to_thread(
-                self.save_memory, args, user_message
+                self.save_memory, args, user_message,
+                decision_dependency_unavailable,
             ),
             "search_web": lambda: asyncio.to_thread(self._search_web, args),
             "read_web_page": lambda: asyncio.to_thread(
@@ -93,7 +97,8 @@ class GeminiLiveToolExecutor:
         return {"id": call_id, "name": name, "response": response}
 
     def save_memory(
-        self, args: dict[str, Any], user_message: str
+        self, args: dict[str, Any], user_message: str,
+        decision_dependency_unavailable: bool = False,
     ) -> dict[str, Any]:
         from memory.embedder import encode_text
         from memory.memory import add_memory
@@ -103,7 +108,9 @@ class GeminiLiveToolExecutor:
         if not content:
             raise ValueError("content 不可為空")
         # 文字模式早有這道檢查，Live 以前沒有，模型想存就存。
-        if not is_explicit_memory_request(user_message):
+        if not is_explicit_memory_request(
+            user_message, skip_decision=decision_dependency_unavailable,
+        ):
             raise ValueError("只有使用者明確要求記憶時才能寫入長期記憶")
         vector = encode_text(content)
         add_memory(
@@ -155,13 +162,15 @@ class GeminiLiveToolExecutor:
         args: dict[str, Any],
         user_message: str,
         heard_language: str | None = None,
+        retrieval_language: str | None = None,
     ) -> dict[str, Any]:
+        if retrieval_language is None:
+            return await asyncio.to_thread(
+                self.search_sync, table, args, user_message, heard_language,
+            )
         return await asyncio.to_thread(
-            self.search_sync,
-            table,
-            args,
-            user_message,
-            heard_language,
+            self.search_sync, table, args, user_message, heard_language,
+            retrieval_language,
         )
 
     def search_sync(
@@ -170,6 +179,7 @@ class GeminiLiveToolExecutor:
         args: dict[str, Any],
         user_message: str,
         heard_language: str | None = None,
+        retrieval_language: str | None = None,
     ) -> dict[str, Any]:
         from tools.search_helpers import (
             build_citations,
@@ -188,13 +198,13 @@ class GeminiLiveToolExecutor:
         top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
         # Gemini 常把問題改寫成中英西多條查詢；語言要看使用者原話，不看查詢。
         # 「hi」這類短句歸專案主要語言，跟訊息標籤、回覆語言一致。
-        language = (
+        language = retrieval_language or (
             detect_language(fallback, primary_language(self.project_id))
             if table == "knowledge" and fallback
             else None
         )
         # 聽出是台語就讓台語文件優先（沒有台語文件時 search_records 用其他語言補）。
-        if heard_language == TAIWANESE:
+        if retrieval_language is None and heard_language == TAIWANESE:
             language = TAIWANESE
         grouped: list[tuple[str, list[dict[str, Any]]]] = []
         embedding_versions: list[str] = []

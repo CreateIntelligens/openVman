@@ -12,7 +12,8 @@ Backend (/api/v1/*)
        -> 專案資料    brain/data/projects/<project_id>/（workspace、LanceDB、sessions.db）
        -> Embedding gateway（compose 服務 embedding，:8009，或外部 EMBEDDING_SERVICE_URL）
        -> LLM providers（Gemini、OpenAI、Groq、NEN 等，依 fallback chain）
-       -> 外部工具：2md（搜尋／讀網頁）、David888 Wiki、Jev（TypeSafe）
+       -> 決策供應鏈：Clef 主／備援、Jev、OpenAI Decisions
+       -> 外部工具：2md（搜尋／讀網頁）、David888 Wiki
        -> Redis（2md circuit 協調，選用）
 ```
 
@@ -187,9 +188,9 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 - 短期記憶：session 與訊息存在專案的 `sessions.db`。prompt 帶最近的對話並附上較早歷史的摘要（`SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`）；超過 `MAX_SESSION_TTL_MINUTES` 未更新的 session 與空 session 會被清理。
 - 每日日誌：每輪對話的摘要追加到 `memory/<persona_id>/YYYY-MM-DD.md`（以 fingerprint 去重），記憶維護再把每日摘要整理進 `memories` 表。
-- 長期記憶：`memories` 表。`save_memory` 只在使用者明確要求時執行，判斷由 Jev 負責；未設 `TYPESAFE_API_KEY`、`JEV_MEMORY_GATE_ENABLED=false` 或呼叫失敗時改用關鍵字規則。文字對話與 Gemini Live 都會檢查。
+- 長期記憶：`memories` 表。`save_memory` 只在使用者明確要求時執行，判斷走決策供應鏈；供應鏈失敗時改用關鍵字規則。文字對話與 Gemini Live 都會檢查。
 - 記憶治理（`memory/memory_governance.py`）：最多每 `MEMORY_MAINTENANCE_INTERVAL_SECONDS` 秒執行一次，負責每日摘要入庫、衰減、去重與相似記憶合併。
-- Auto recall（`AUTO_RECALL_ENABLED`，程式預設開）：生成前依本輪訊息檢索記憶並摘要放進 prompt；有 Jev 時先由 Jev 篩選相關記憶（`AUTO_RECALL_USE_JEV_FILTER`），失敗才用 LLM 摘要。單一 session 可用 `POST /brain/sessions/{id}/recall-toggle` 關閉。
+- Auto recall（`AUTO_RECALL_ENABLED`，程式預設開）：生成前依本輪訊息檢索記憶並摘要放進 prompt；啟用決策供應鏈時先篩選相關記憶，失敗才用 LLM 摘要。單一 session 可用 `POST /brain/sessions/{id}/recall-toggle` 關閉。
 - Dreaming（`DREAMING_ENABLED`，預設關）：依 `DREAMING_CRON` 執行 Light → Deep → REM 記憶整合。以 `DREAMING_TIMEZONE` 判斷當天是否已執行，`force=true` 可強制重跑。
 - 對話備份：每天 `SESSION_BACKUP_HOUR` 點（台北時間）把所有專案的對話依語言分檔備份到 `/data/backups/sessions`，保留 `SESSION_BACKUP_KEEP` 份；也可由 `POST /brain/backups/sessions` 立即執行（`{"dry_run": true}` 只計數）。
 
@@ -198,15 +199,46 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 支援語言：`zh`、`en`、`es`、`nan`（台語）、`ja`、`ko`。每個專案在 `.kb_settings.json` 設定 `language_routes`（至少一條，順序即優先序，第一條為主要語言），由 `GET/PUT /brain/knowledge/settings` 讀寫。
 - 只有一條分流時不分流。多條時文件不會被過濾，只排先後：使用者語言的文件優先，不足再以主要語言與其他語言補；候選窗逐次擴大直到同語言結果足夠。圖譜帶入的相關段落只保留命中段落有的語言。
 - 文件語言存在 `.doc_meta.json`，可由 `PATCH /brain/knowledge/document/meta` 指定（`zh|en|es|auto`）。
-- 使用者訊息語言先以規則即時判斷，看不出語言的短句（ok、型號）歸主要語言，hi、hola 這類只有一種語言會用的招呼照該語言；`JEV_LANGUAGE_ENABLED` 時再於背景由 Jev 校正存檔的標籤。
+- 使用者訊息語言先以規則即時判斷，看不出語言的短句（ok、型號）歸主要語言，hi、hola 這類只有一種語言會用的招呼照該語言；`JEV_LANGUAGE_ENABLED` 時再於背景由決策供應鏈校正存檔的標籤。
 - 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。
 - 每輪 system prompt 結尾指定回答語言，並依 `reply_seconds`（預設 20 秒，0 為不限制，上限 120）換算成字數上限：中日韓每秒 4 字，其他語言每秒 1.5 個單字（`core/prompt_templates.reply_length_line`）。只靠提示詞，不截斷輸出。
 - ASR 詞表：workspace 的 `ASR_PROMPT.md` 為選填，`#` 開頭為說明，其餘最多 800 字放進每輪 prompt，提醒模型訊息可能是語音辨識結果；可寫「常見誤聽：A→B」對照。`GET /brain/internal/asr-glossary` 只回正確詞（不含對照行）給 Backend 的辨識引擎：`terms` 是整串前文（最多 2000 字），`vocabulary` 是以頓號、逗號、分號或換行切開的逐詞清單（含空白的詞算一個，去重，最多 100 個），給 Gemini 串流的 `customVocabulary`。檔案缺失或讀取失敗時忽略；內容經 HTML 跳脫後放在 `<glossary>` 內，明確標示為參考資料而非指令。
-- ASR 定稿判斷：`POST /brain/internal/asr-judge` 在 Gemini Live 串流辨識的定稿與最後暫定字幕不同時，由 Jev 判斷送哪一句；暫定字幕需明顯較佳才換，Jev 關閉、逾時或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`）。
+- ASR 定稿判斷：`POST /brain/internal/asr-judge` 在 Gemini Live 串流辨識的定稿與最後暫定字幕不同時，由決策供應鏈判斷送哪一句；暫定字幕需明顯較佳才換，供應鏈關閉、逾時或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`）。
 
-## Jev
+## 決策供應鏈
 
-Jev（TypeSafe System One，`core/jev_client.py`）需要 `TYPESAFE_API_KEY`，網址為 `JEV_BASE_URL`（舊名 `JEV_SHADOW_BASE_URL` 仍可讀）。用途只有四項：記憶寫入把關、訊息語言背景校正、ASR 定稿判斷、auto recall 相關性篩選，各有獨立開關，未設定或失敗時都有規則或 LLM 的退路。每次呼叫以 `provider=typesafe`、`kind=jev_<用途>` 記入用量帳本。
+Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設 hop 是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions。ROOT／admin 在 Admin「System → 決策模型」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 取得 10 秒快取的 runtime 設定。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「使用部署預設」會清除後台覆寫。
+
+| Hop | 端點／model | 驗證與 contract |
+|---|---|---|
+| Clef 主 | `https://clef.create360.ai/v1/systemone`、`clef-flash` | 選填 Bearer key；System One JSON 的 `state`、`questions`，支援 `noul`／`choice`／`score`，回應為 `answers` 與 `usage` |
+| Clef 備援 | `https://clef.aiurl.tw/v1/systemone`、`clef-flash` | 與 Clef 主端點共用 key 與 contract |
+| Jev | `${JEV_BASE_URL}/v1/systemone`、`jev-latest` | `Authorization: Bearer TYPESAFE_API_KEY`；沿用 System One request／response |
+| OpenAI Decisions | `https://api.openai.com/v1/decisions`、`gpt-6-luna` | `Authorization: Bearer OPENAI_API_KEY`；`input` 加 `questions[]`，`noul` 轉成 `predicate`，支援 `choice`／`score`，解析 `answers[]`；[官方文件](https://developers.openai.com/api/docs/guides/decisions)目前標示 public beta |
+
+所有 provider 共用 `noul`、`choice`、`score` normalized contract。Brain 依序嘗試啟用且符合 key 條件的 hop；超時、連線／HTTP 錯誤、拒答或無效答案會進下一個 hop；超過單次 request deadline 後交回 feature 原本的安全退路。每個 hop 以 provider、model、用途、耗時、狀態與供應商回傳的 token usage 寫入 usage ledger，不保存判斷原文或 key。Jev、OpenAI 與 Clef 會收到該次判斷的 `state` 與問題；內容可能包含使用者訊息、記憶或語音辨識文字，外送前需依部署的資料處理政策管理。現有 `core/jev_client.py` 是相容 facade，供既有 feature call sites 呼叫共用 broker。
+
+Backend 的 `GuardAgent` 先跑本地規則；規則無法分類時呼叫 Brain `POST /internal/decision`，整體逾時或供應鏈失敗時維持保守 STOP。`POST /internal/decision` 僅接受 `X-Internal-Token`，一次最多 32 個 typed questions。
+
+## 每輪對話決策
+
+`TURN_DECISIONS_ENABLED` 與 retrieval／language／tone 三個分組開關預設開啟。Brain 對 HTTP Chat user turn 與送入 Gemini Live `send_text_turn()` 的 finalized text／ASR text 組成一次 batch；同一 turn 的工具呼叫不重跑 batch。Live 原始 PCM 仍使用既有串流生成；當 Gemini 送來 finalized transcription 時，Brain 會分類並用於其後的 retrieval/tool policy，該音訊回合已開始的回覆仍沿用 Live session baseline 語言與 tone。Evidence 包含原句（最多 6,000 字元）、最近 6 則 user／assistant 歷史（每則最多 600 字，總計不超過 evidence 上限）、ASR `speech_language`、專案主要語言、支援語言代碼和 allowlisted read-tool 名稱。不送 system/persona prompt、帳號 ID、秘密、工具結果或 knowledge 內容。固定 question IDs 包含 `needs_knowledge`、`needs_web`、`needs_memory`、`turn_intent`、`uses_{zh,en,es,nan,ja,ko,other}`、`dominant_language`、`requested_response_language` 與 `tone`；輸出只接受 typed `noul`／`choice` 值，不接受 provider 生成的自由文字指令。
+
+檢索需求分開判斷：明確不需要專案知識時可以略過強制 RAG，web／memory 仍可同時需要。低信心時維持既有檢索政策；Fast mode、工具 registry、專案權限與 session recall toggle 仍由既有程式限制。`needs_memory=true` 使用 `search_memory` 並略過同回合重複 auto recall；session 關閉記憶召回時不會強制 memory read。`needs_memory=false` 可略過 auto recall；任何結果都不會授權 `save_memory`。
+
+輸入語言、knowledge retrieval language、明確回覆語言和當輪 tone 是不同欄位。使用者明確要求的回覆語言優先於輸入／ASR 語言；回覆語言不會覆寫檢索語言或 TTS 的 speech-language。Tone 只映射清楚、同理、急迫優先等當輪措辭，低信心沿用 persona，不記入持久記憶。
+
+Noul positive 門檻為 0.7、negative 門檻為 0.1；choice confidence 至少 0.8 且第一名領先至少 0.2 才採用，其他情況逐信號棄權。預設 budget 為整輪 2 秒、每 hop 最多 0.4 秒。四個 provider 全部失敗、設定取不到或逾時時，Chat 按既有 RAG／recall／語言／persona 規則繼續生成；同一回合不重試失效的決策鏈。Live raw PCM partial 不觸發決策；正式 `send_text_turn()` 會使用 server-owned envelope 並完整套用 language/tone policy。Live 內部 ASR transcription 在原音訊回覆已啟動後才到達，因此只影響該回合其後的合法 reads；該音訊回覆維持 session baseline 語言與 tone。這是目前 Gemini Developer API Live WebSocket 對 setup config 固定的限制。可用環境變數調整總開關、分組、門檻與時間；詳細欄位見 `.env.example` 與 `api/config.py`。
+
+### 手動驗收
+
+1. 問候：「早安，今天還好嗎？」確認正常回覆、不執行強制 knowledge search。
+2. 產品追問：先談產品，再問「那它有保固嗎？」確認沿用前文並先查 knowledge。
+3. 多來源：問某產品「今天是否仍有供貨？」確認 knowledge 與 web 可同時讀取；停用 web 或使用 fast mode 時，確認 web tool 不會執行。
+4. 語言／語氣：用中文問並指定英文回答，確認 retrieval language 保持中文、回答提示為英文；困惑或急迫訊號只改措辭，不改答案依據與長度限制。
+5. 故障退路：依序讓 Clef 主、Clef 備援、Jev、OpenAI hop 失敗或停用，確認 Chat 仍用既有 RAG／語言／persona 路徑回答；Live 新 turn 不沿用前一輪語言或 tone。
+
+本機模擬矩陣與 tool-count／端到端延遲比較尚未建立；這些指標需要獨立人工標籤案例與可用 provider 測試設定，完成前以 focused tests 與 Brain 非 integration suite 驗證程式退路。
 
 ## 隱私過濾
 
@@ -256,7 +288,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 工具與技能 | `GET /tools`、`POST /skills`、`PATCH /skills/{id}/toggle`、`GET/PUT /skills/{id}/files`、`DELETE /skills/{id}`、`POST /skills/reload` |
 | 用量與備份 | `/usage/*`（見上節）、`GET/POST /backups/sessions` |
 | Dreaming | `GET /dreaming/status`、`POST /dreaming/run`、`GET /dreaming/candidates`、`GET /dreaming/report` |
-| 內部 | `GET /internal/asr-glossary`、`POST /internal/asr-judge`、`POST /internal/audio-language`、WebSocket `/internal/live/{relay_session_id}`；另有不帶前綴的 `POST /internal/enrich`（把外部內容以 system 訊息寫入 session） |
+| 內部 | `POST /internal/decision`（最多 32 個 typed questions）、`GET /internal/asr-glossary`、`POST /internal/asr-judge`、`POST /internal/audio-language`、WebSocket `/internal/live/{relay_session_id}`；另有不帶前綴的 `POST /internal/enrich`（把外部內容以 system 訊息寫入 session） |
 | 協定 | `POST /protocol/validate` |
 
 Brain 沒有 SSE 端點：`POST /chat` 一次回傳完整結果，即時語音走 Live WebSocket。
@@ -273,7 +305,8 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 | 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`EMBEDDING_THRESHOLDS`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
 | Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
 | 記憶 | `SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`、`MAX_SESSION_TTL_MINUTES`、`AUTO_RECALL_ENABLED`、`DREAMING_ENABLED`、`DREAMING_CRON`、`DREAMING_TIMEZONE`、`SESSION_BACKUP_ENABLED`、`SESSION_BACKUP_HOUR`、`SESSION_BACKUP_KEEP` |
-| Jev | `TYPESAFE_API_KEY`、`JEV_BASE_URL`、`JEV_MEMORY_GATE_ENABLED`、`JEV_LANGUAGE_ENABLED`、`JEV_GATE_TIMEOUT_SECONDS`、`AUTO_RECALL_USE_JEV_FILTER`、`ASR_FINAL_JUDGE_ENABLED` |
+| 決策供應鏈 | `CLEF_API_KEY`（選填）、`TYPESAFE_API_KEY`、`JEV_BASE_URL`、`OPENAI_API_KEY`、`JEV_MEMORY_GATE_ENABLED`、`JEV_LANGUAGE_ENABLED`、`JEV_GATE_TIMEOUT_SECONDS`、`AUTO_RECALL_USE_JEV_FILTER`、`ASR_FINAL_JUDGE_ENABLED` |
+| 每輪決策 | `TURN_DECISIONS_ENABLED`、`TURN_DECISIONS_RETRIEVAL_ENABLED`、`TURN_DECISIONS_LANGUAGE_ENABLED`、`TURN_DECISIONS_TONE_ENABLED`、`TURN_DECISIONS_TIMEOUT_SECONDS`、`TURN_DECISIONS_HOP_TIMEOUT_SECONDS`、`TURN_DECISIONS_NOUL_*`、`TURN_DECISIONS_CHOICE_*` |
 | 網路工具 | `URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`URL2MD_BASE_URLS`、`URL2MD_TOTAL_BUDGET_S`、`URL2MD_CIRCUIT_COOLDOWN_S`、`REDIS_URL`、`WEB_SEARCH_BLOCKED_DOMAINS`（結果重排門檻在 `EMBEDDING_THRESHOLDS`） |
 | Wiki | `WIKI_PUBLISH_ENABLED`、`WIKI_API_BASE_URL`、`WIKI_PUBLISH_MAX_CHARS` |
 | 隱私 | `PRIVACY_FILTER_ENABLED`、`PRIVACY_FILTER_DEVICE`、`PRIVACY_FILTER_INCLUDE_SYSTEM`、`PRIVACY_FILTER_BLOCK_CATEGORIES` |

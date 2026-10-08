@@ -7,6 +7,7 @@ from memory.language_detect import detect_language, route_language
 from tools.context import (
     active_persona_id,
     active_project_id,
+    active_retrieval_language,
     active_speech_language,
     active_user_message,
     mode_settings,
@@ -65,13 +66,12 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     persona_id, project_id = active_persona_id.get(), active_project_id.get()
     # 依使用者這句話的語言讓同語言文件優先（規則即時判斷；Jev 要 0.5 秒，查詢路徑等不起）。
     # 「hi」這類判斷不出語言的短句歸專案主要語言，跟訊息標籤、回覆語言一致。
-    language = (
+    language = active_retrieval_language.get() or (
         detect_language(user_msg, primary_language(project_id))
-        if table_name == "knowledge" and user_msg
-        else None
+        if table_name == "knowledge" and user_msg else None
     )
     # 前台 ASR 聽出是台語時，Breeze 已把它翻成華語文字；照聽到的語言查。
-    if table_name == "knowledge" and active_speech_language.get() == "nan":
+    if table_name == "knowledge" and not active_retrieval_language.get() and active_speech_language.get() == "nan":
         language = "nan"
 
     # 2. Execute searches and collect unique embedding versions

@@ -48,6 +48,10 @@ _SEARCH_TOOL_SPEC = {
     "type": "function",
     "function": {"name": "search_knowledge", "description": "kb", "parameters": {}},
 }
+_MEMORY_TOOL_SPEC = {
+    "type": "function",
+    "function": {"name": "search_memory", "description": "memory", "parameters": {}},
+}
 
 
 def _install_loop_stubs(
@@ -681,6 +685,35 @@ class TestEmptyReply:
 
 
 class TestParallelFirstRound:
+    def test_positive_memory_signal_cannot_be_lost_when_model_returns_text_first(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=[_MEMORY_TOOL_SPEC], force=False,
+        )
+        executed: list[str] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call",
+            lambda name, args: executed.append(name) or '{"ok":true}',
+        )
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            generate_reply=[agent_loop.LLMReply(content="第一輪文字", tool_calls=[], model="m1")],
+            stream_reply=[agent_loop.LLMReply(content="完成", tool_calls=[], model="m2")],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "上次討論的產品後來怎麼決定？"}],
+            force_memory_search=True,
+        )
+
+        assert result.reply == "完成"
+        assert executed == ["search_memory"]
+        assert len(calls) == 2
+
     def test_first_round_requires_any_tool_and_backfills_knowledge_search(
         self, monkeypatch: pytest.MonkeyPatch
     ):

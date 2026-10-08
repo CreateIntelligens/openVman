@@ -271,6 +271,11 @@ class TTSRouterConfig(BaseSettings):
         repr=False,
         validation_alias="AUTH_TEMPORARY_PASSWORD_SECRET",
     )
+    decision_provider_encryption_secret: str = Field(
+        default="",
+        repr=False,
+        validation_alias="DECISION_PROVIDER_ENCRYPTION_SECRET",
+    )
     auth_database_path: str = Field(
         default="/data/auth/accounts.db",
         validation_alias="AUTH_DATABASE_PATH",
@@ -296,6 +301,8 @@ class TTSRouterConfig(BaseSettings):
     # --- Jev (TypeSafe System One) ---
     typesafe_api_key: str = Field(default="", repr=False, validation_alias="TYPESAFE_API_KEY")
     jev_base_url: str = Field(default="https://api.typesafe.ai", validation_alias="JEV_BASE_URL")
+    clef_api_key: str = Field(default="", repr=False, validation_alias="CLEF_API_KEY")
+    decision_openai_api_key: str = Field(default="", repr=False, validation_alias="OPENAI_API_KEY")
     # 語音打斷：規則判不出來、原本「超過 5 字就當打斷」的那一段改問 Jev。自寫 30 題規則
     # 23/30、Jev 29/30（附和、對旁人說話不再誤停），2026-10-02 改預設開。只有這段長句會
     # 多等最多 timeout；沒有 TYPESAFE_API_KEY、失敗或逾時都維持 STOP。

@@ -84,6 +84,7 @@ def primary_language_line(project_id: str) -> str:
 
 def reply_language_line(
     project_id: str, user_message: str, speech_language: str = "",
+    *, resolved_language: str | None = None,
 ) -> str:
     """Tell the model which language this turn's reply must be in.
 
@@ -93,7 +94,15 @@ def reply_language_line(
     from memory.language_detect import TAIWANESE, detect_language, is_short_text
 
     primary = _primary_language(project_id)
-    if speech_language == TAIWANESE:
+    if resolved_language == "follow_user":
+        code = ""
+        return (
+            "這一輪的回答語言：遵照使用者明確指定的語言；若原句沒有可辨識指定，沿用使用者主要用語。"
+            + reply_length_line("", _reply_seconds(project_id))
+        )
+    if resolved_language in PRIMARY_LANGUAGE_NAMES:
+        code = resolved_language
+    elif speech_language == TAIWANESE:
         code = "zh"
     elif is_short_text(user_message):
         code = primary

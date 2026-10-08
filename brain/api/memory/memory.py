@@ -257,3 +257,13 @@ def delete_session_for_project(
 def get_session_store(project_id: str = "default") -> SessionStore:
     ctx = resolve_project_context(project_id)
     return get_project_session_store(ctx)
+
+
+def is_session_recall_disabled(session_id: str, project_id: str = "default") -> bool:
+    """Return the persisted per-session recall setting, failing closed on lookup errors."""
+    if not session_id:
+        return False
+    try:
+        return get_session_store(project_id).is_recall_disabled(session_id) is True
+    except Exception:
+        return True

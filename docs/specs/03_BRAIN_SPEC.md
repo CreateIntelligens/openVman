@@ -24,7 +24,8 @@
 | 知識庫格式 | Markdown + Raw | 原始檔留在 `raw/`，Markdown 是可編輯的 canonical form |
 | 文件解析 | Gateway（pdf-inspector + Docling + AnyDoc）與 Brain 內建轉換 | 見第 4.1 節 |
 | 路由層 | Fallback chain + Key Pool | 金鑰冷卻、模型與 provider 切換、有界跳轉 |
-| 外部工具 | 2md、David888 Wiki、Jev（TypeSafe） | 網路搜尋與讀網頁、發布報告、分類與判斷 |
+| 外部工具 | 2md、David888 Wiki | 網路搜尋與讀網頁、發布報告 |
+| 決策供應鏈 | Clef（主／備援）、Jev（TypeSafe）、OpenAI Decisions | 本地規則不確定時執行 typed decision；管理者可調整供應商順序 |
 | Redis | 選用 | 只用於多 worker 共用 2md circuit 狀態 |
 
 #### 2.1 Embedding gateway（EmbeddingGemma 2）
@@ -290,6 +291,10 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 請求欄位 `mode` 選擇深度，未知值退回 `standard`；`GET /brain/chat/modes` 列出目前設定。模式值透過 `core/reply_modes.ModeSettings` 覆寫設定，不修改全域 settings。
 
+一般 HTTP user turn 在載入近期歷史後、建立 prompt 前執行一次 `core.turn_decisions` batch，結果只存於伺服器端 `GenerationContext`。固定 typed questions 分開分類 knowledge、web、memory、turn intent、輸入語言、主語言、明確回覆語言與當輪 tone；evidence 僅含當輪原句、最多 6 則 user／assistant 歷史（每則 600 字元）、語言和允許的 read-tool 名稱，總字元上限 6,000。Noul 門檻為 positive 0.7、negative 0.1；choice confidence 0.8 且領先 0.2 才採用。信號逐項棄權，整體 2 秒、每 hop 0.4 秒。全部 hops、設定讀取或 timeout 失敗時使用 baseline policy；auto recall 會跳過本回合的 Jev filter，改走原有 LLM／formatted 摘要路徑。
+
+高信心 `needs_knowledge=false` 會略過強制知識檢索，但仍保留 knowledge tool 供 agent 補查；正向 web／memory 會在合法工具第一輪以原句補上缺失 read call。Live finalized text 會在送出 generation 前執行必要 read-only prefetch，並以 bounded envelope 提供結果；結果明確標為不可信參考資料，已完成來源不重複呼叫。Mode、工具 registry、URL2MD 開關與 session recall 開關仍由既有程式決定。memory positive 使用 `search_memory` 並略過同回合 auto-recall；session recall 關閉時不會強制 memory read。memory write 仍由原本明確使用者意圖閘門控制。語言解析把 input、retrieval 與 response 分開；明確回覆語言優先於 ASR，response language 不會改寫訊息標籤或 TTS speech-language。Tone 只加當輪 delivery hint，不持久化。
+
 | 模式 | 追加工具輪 | 知識融合筆數 | 網路搜尋 | `read_web_page` 網址上限 |
 |---|---|---|---|---|
 | `fast` | 0 | 3 | 不提供網路工具 | 1 |
@@ -306,7 +311,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 | `get_document` | 讀取 workspace 內單一文件（`TOOL_DOCUMENT_CHAR_LIMIT` 截斷） | |
 | `filter_products` | 依產品規格表篩選、排序產品 | 專案有 `knowledge/products/_catalog.yaml` |
 | `search_memory` | 檢索 `memories` 表 | |
-| `save_memory` | 寫入長期記憶 | 僅在使用者本輪明確要求記住時執行，由 Jev 判斷（失敗時用關鍵字規則） |
+| `save_memory` | 寫入長期記憶 | 僅在使用者本輪明確要求記住時執行，由決策供應鏈判斷（失敗時用關鍵字規則） |
 | `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | `URL2MD_SEARCH_ENABLED`；`fast` 模式不提供 |
 | `read_web_page` | 透過 2md 將網頁、PDF 等轉成 Markdown，參數 `urls` 一次帶多個 | `URL2MD_READ_ENABLED`；只接受公開位址；`fast` 模式不提供 |
 | `publish_wiki` | 發布長篇報告到 David888 Wiki，只回傳公開 `shareUrl` | `WIKI_PUBLISH_ENABLED` |
@@ -381,7 +386,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 #### 13.2 訊息語言
 
 * 每筆 session 摘要都帶 `language`，取最後一則使用者訊息的語言；列表與匯出都可用 `language=<code>` 篩選。
-* 語言存在 `messages.language`（只有使用者訊息有值）：請求帶 `speech_language`（第 14.4 節）時直接採用；否則寫入時先用字元與常用字規則判斷（`memory/language_detect.py`，判斷不出來的短句歸專案主要語言），再在背景問 Jev 校正，Jev 結果不同才改寫（`JEV_LANGUAGE_ENABLED`，預設開，需 `TYPESAFE_API_KEY`；短句、日文、韓文不送 Jev；失敗保留規則結果）。欄位為 NULL 的舊訊息在列表時用規則補算。規則與 Jev 的比較見 `scripts/experiments/lang-detect/`。
+* 語言存在 `messages.language`（只有使用者訊息有值）：請求帶 `speech_language`（第 14.4 節）時直接採用；否則寫入時先用字元與常用字規則判斷（`memory/language_detect.py`，判斷不出來的短句歸專案主要語言），再於背景透過決策供應鏈校正，結果不同才改寫（`JEV_LANGUAGE_ENABLED`，預設開；短句、日文、韓文不送；供應鏈失敗保留規則結果）。欄位為 NULL 的舊訊息在列表時用規則補算。舊 Jev 專用評估見 `scripts/experiments/lang-detect/`。
 
 #### 13.3 對話備份
 
@@ -412,9 +417,9 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 #### 14.3 回答語言與長度
 
-* **文字對話**：每一輪在 system prompt 最後明講「這一輪的回答語言」（`core/prompt_templates.reply_language_line`）——規則判得出來就指定該語言，短句用主要語言，台語語音用繁體中文，規則判不出來才請模型看使用者用哪種語言寫；並要求知識庫與人設裡的中文固定說法翻成回答語言。不寫「本專案主要語言：繁體中文」這類句子，模型會照抄中文固定句回中文。
+* **文字對話**：每一輪在 system prompt 最後明講「這一輪的回答語言」（`core/prompt_templates.reply_language_line`）。有效 per-turn decision 的明確回覆語言優先，接著使用輸入主語言；台語語音 retrieval 保留 `nan`，回覆文字使用指定的文字語言或繁體中文。decision 棄權時沿用規則判斷、ASR 與 project fallback。知識庫與人設裡的中文固定說法翻成回答語言。
 * **回答長度**（`reply_length_line`，接在回答語言之後）：以念多久為準，秒數是專案的 `reply_seconds`（後台知識庫設定，預設 20、上限 120、0＝不限制且不加這行），中日韓每秒 4 字、其他語言每秒 1.5 個單字（20 秒＝80 字／30 個單字），寫成硬上限「每次回覆嚴格不超過 N 字，超過即違規」，一次問好幾件事時每件只講重點；不給「要詳細規格可以更長」的例外，也不截斷輸出。`GET /brain/knowledge/settings` 回應附 `speech_rates`。
-* **Gemini Live**：指令整個連線共用，只寫「使用者的語言判斷不出來時預設用某語言」（`primary_language_line`），由模型依使用者最新一句的語言回答；Live 沒有長度這行。
+* **Gemini Live**：session setup instruction 維持連線共用；`send_text_turn()` 收到 finalized text（含 Backend 完成的 ASR 文字）會帶 server-owned JSON envelope，包含固定 policy code、必要 read 名稱與原始 user text。模型只把 envelope 的 policy 當當輪 guidance，`user_text` 保持不可信輸入。Gemini 直接接收 raw PCM 時，內部 ASR finalized transcript 更新當輪 policy/retrieval context，raw PCM partial 不單獨觸發 batch；此時 Gemini 生成已啟動，當輪音訊回覆維持 session baseline 語言與語氣。每輪 revision 更新會取消舊決策並防止舊預取套用。Live 仍使用既有語音回答長度行為。
 
 #### 14.4 台語
 
@@ -431,11 +436,11 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 * 語音辨識的專有名詞靠專案 workspace 的 `ASR_PROMPT.md`（選填）：詞表與「常見誤聽：A→B」對照，`#` 開頭是說明。
 * 每輪對話 prompt 放入最多 800 字（`core/asr_glossary.py`，在回答語言那行前面），提醒模型訊息可能是語音辨識結果，由模型在理解問題與寫查詢時對回誤聽，不多一次模型呼叫。內容經 HTML 跳脫後放在 `<glossary>` 內，明確標示為參考資料而非指令；檔案缺失或讀取失敗時忽略。
 * `GET /brain/internal/asr-glossary` 只回正確詞（不含對照行）給 Backend 的辨識引擎：`terms` 是整串前文（最多 2000 字），給 Breeze、R2T2 與 OpenAI 辨識當前文；`vocabulary` 是以頓號、逗號、分號或換行切開的逐詞清單（去重，最多 100 個），給 Gemini 串流當 `customVocabulary`。
-* **ASR 定稿判斷**：`POST /brain/internal/asr-judge` 在串流辨識的定稿與最後暫定字幕不同時，由 Jev 判斷送哪一句；暫定字幕需明顯較佳才換，Jev 關閉、逾時或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`）。
+* **ASR 定稿判斷**：`POST /brain/internal/asr-judge` 在串流辨識的定稿與最後暫定字幕不同時，由決策供應鏈判斷送哪一句；暫定字幕需明顯較佳才換，供應鏈關閉、逾時或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`）。
 
 ### 15. 用量帳本 (Token Usage Ledger)
 
-Brain 將每次 LLM 呼叫的 input、output、cached、reasoning 與 total token 數，連同 provider、model、延遲及 request scope 寫入 `/data/usage.db`（跨專案共用的 append-only SQLite，由 Brain 單一擁有）。scope 包含 `user_id`、`principal_type`、`principal_id`、`project_id`、`session_id`、`trace_id`、persona、channel 與呼叫類型 `kind`；所有查詢都可依這些欄位篩選。Jev 呼叫以 `provider=typesafe`、`kind=jev_<用途>` 記入。
+Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、延遲及 request scope 寫入 `/data/usage.db`。每個 fallback hop 都有自己的 provider、用途和狀態記錄，不保存判斷原文或 API key。
 
 | `unit_type` | 來源 | `units` 的意義 |
 |---|---|---|
@@ -528,9 +533,12 @@ SESSION_BACKUP_ENABLED=true
 SESSION_BACKUP_HOUR=3
 SESSION_BACKUP_KEEP=30
 
-# === Jev ===
+# === 決策供應鏈（部署預設；後台可設定排序並覆寫金鑰） ===
+# Clef 主端點與備援端點固定在程式設定。兩端共用選填的 Clef API key。
+# CLEF_API_KEY=
 TYPESAFE_API_KEY=
 JEV_BASE_URL=https://api.typesafe.ai
+OPENAI_API_KEY=
 JEV_MEMORY_GATE_ENABLED=true
 JEV_LANGUAGE_ENABLED=true
 AUTO_RECALL_USE_JEV_FILTER=true
@@ -584,6 +592,7 @@ Content-Type: application/json
 
 **其他介面**：
 * `POST /internal/enrich`（不帶 `/brain` 前綴）：把 Gateway 產生的外部內容（視覺、檔案描述等）以 system 訊息寫入 session。
+* `POST /internal/decision`：Backend 以 `X-Internal-Token` 呼叫共用決策供應鏈；request 帶 `state`、`questions`、`purpose` 與 `timeout_seconds`（0–10 秒），最多 32 題；response 回 `answers`、實際 provider、hop 與 model。失敗回 503，呼叫端執行該功能的既有安全退路。
 * Gemini Live：Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接（第 19 節）。
 * 健康檢查：`GET /brain/health`（liveness）、`GET /brain/health/ready`（readiness，compose healthcheck 使用）、`GET /brain/health/detailed`、`GET /brain/metrics`、`GET /brain/metrics/prometheus`。
 

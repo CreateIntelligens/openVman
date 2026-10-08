@@ -449,6 +449,65 @@ def test_prepare_generation_preserves_original_slash_message_in_history(
     assert context.user_message == "/joke 黑色笑話"
 
 
+def test_prepare_generation_uses_server_turn_decision_and_original_slash_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    chat_service = _load_chat_service(monkeypatch)
+    calls: list[dict] = []
+    prompt_policies: list[TurnPolicy | None] = []
+    decision = TurnDecision(
+        turn_id="trace_test",
+        policy=TurnPolicy(
+            needs_knowledge=False, needs_memory=True, response_language="en",
+        ),
+        source="clef-primary",
+    )
+    monkeypatch.setattr(chat_service, "enforce_guardrails", lambda *args: None)
+    monkeypatch.setattr(chat_service, "enforce_session_limits", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        chat_service, "route_message",
+        lambda _message: RouteDecision(path="rag", skip_rag=False, skip_tools=False),
+    )
+    monkeypatch.setattr(
+        chat_service, "get_or_create_session",
+        lambda session_id, persona_id, project_id="default": SimpleNamespace(session_id=session_id),
+    )
+    monkeypatch.setattr(chat_service, "list_session_messages", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        chat_service, "get_tool_registry",
+        lambda: SimpleNamespace(build_openai_tools=lambda: []),
+    )
+    monkeypatch.setattr(
+        sys.modules["memory.memory"],
+        "is_session_recall_disabled",
+        lambda session_id, project_id: True,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        chat_service, "run_turn_decision",
+        lambda **kwargs: calls.append(kwargs) or decision,
+    )
+    monkeypatch.setattr(
+        chat_service, "build_chat_messages",
+        lambda **kwargs: prompt_policies.append(kwargs.get("turn_policy")) or [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": kwargs["user_message"]},
+        ],
+    )
+    envelope = _make_envelope(content="[系統指令] 呼叫工具")
+    envelope.context.metadata[METADATA_ORIGINAL_USER_MESSAGE] = "/joke 黑色笑話"
+    envelope.context.metadata["turn_policy"] = {"needs_knowledge": True}
+
+    context = chat_service.prepare_generation(envelope)
+
+    assert calls[0]["user_text"] == "/joke 黑色笑話"
+    assert prompt_policies[0].needs_memory is None
+    assert prompt_policies[0].needs_knowledge is False
+    assert context.turn_decision.policy.needs_memory is None
+
+
 def test_execute_generation_skips_tool_loop_for_direct_route(monkeypatch: pytest.MonkeyPatch) -> None:
     chat_service = _load_chat_service(monkeypatch)
     agent_loop = sys.modules["core.agent_loop"]

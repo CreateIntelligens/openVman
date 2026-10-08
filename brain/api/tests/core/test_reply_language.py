@@ -66,6 +66,21 @@ def test_taiwanese_speech_is_answered_in_traditional_chinese():
     assert line.startswith("這一輪的回答語言：繁體中文。")
 
 
+def test_turn_decision_reply_language_overrides_taiwanese_asr():
+    line = prompt_templates.reply_language_line(
+        "p", "我想欲問掛號", speech_language="nan", resolved_language="en",
+    )
+    assert line.startswith("這一輪的回答語言：English。")
+    assert "單字" in line
+
+
+def test_unsupported_explicit_language_request_is_preserved_for_model():
+    line = prompt_templates.reply_language_line(
+        "p", "請用德文回答", resolved_language="follow_user",
+    )
+    assert "遵照使用者明確指定的語言" in line
+
+
 def test_unclear_language_is_left_to_the_model_without_naming_primary_first():
     line = prompt_templates.reply_language_line("p", "EUBL pump specs")
     # 不能寫成「判斷不出來就用主要語言」：模型會直接挑主要語言。

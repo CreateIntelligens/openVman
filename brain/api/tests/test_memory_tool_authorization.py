@@ -23,7 +23,7 @@ def gate(monkeypatch):
 
     settings = BrainSettings(_env_file=None, typesafe_api_key="k")
     monkeypatch.setattr("config.get_settings", lambda: settings)
-    monkeypatch.setattr(jev_client, "get_settings", lambda: settings)
+    monkeypatch.setattr(jev_client, "jev_available", lambda: bool(settings.typesafe_api_key))
     control = {"score": 0.9, "error": None, "calls": []}
 
     def fake_noul(state, question, *, timeout, purpose):

@@ -366,6 +366,22 @@ describe("App tab mounting", () => {
     expect(screen.queryByText("權限不足")).toBeNull();
   });
 
+  it("blocks normal users from the decision-provider settings deep link", async () => {
+    window.history.replaceState(null, "", "/admin/decision-providers");
+    vi.mocked(getCurrentAccount).mockResolvedValue({
+      id: "user-1",
+      username: "regular",
+      role: "user",
+      disabled: false,
+      created_at: "2026-08-24T00:00:00Z",
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("權限不足")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /決策模型/ })).toBeNull();
+  });
+
   it("keeps the mascot from covering account administration controls", async () => {
     window.history.replaceState(null, "", "/admin/accounts");
 
