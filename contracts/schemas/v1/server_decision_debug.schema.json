@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "x-contract-version": "1.0.0",
+  "$id": "openvman://protocol/v1/server_decision_debug",
+  "title": "Server Decision Debug",
+  "x-direction": "server_to_client",
+  "properties": {
+    "event": {
+      "const": "server_decision_debug"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "enum": [
+        "text",
+        "audio_retrieval_only"
+      ]
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "turn_id": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "status": {
+          "enum": [
+            "available",
+            "fallback",
+            "disabled"
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "hop_id": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "elapsed_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "signals": {
+          "type": "array",
+          "maxItems": 14,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "type": {
+                "enum": [
+                  "noul",
+                  "choice"
+                ]
+              },
+              "probability_true": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 64
+              },
+              "confidence": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "probabilities": {
+                "type": "object",
+                "maxProperties": 10,
+                "additionalProperties": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "accepted": {
+                "type": "boolean"
+              },
+              "resolved": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "accepted"
+            ]
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "needs_knowledge": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "needs_web": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "needs_memory": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "mixed_languages": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "dominant_language": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "requested_response_language": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "retrieval_language": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "response_language": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "turn_intent": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "tone": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "input_languages": {
+              "type": "array",
+              "maxItems": 7,
+              "items": {
+                "type": "string",
+                "maxLength": 16
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "turn_id",
+        "status",
+        "provider",
+        "hop_id",
+        "model",
+        "elapsed_ms",
+        "signals",
+        "policy"
+      ]
+    },
+    "client_turn_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "required": [
+    "event",
+    "session_id",
+    "scope",
+    "diagnostics"
+  ]
+}

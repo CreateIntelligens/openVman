@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "x-contract-version": "1.0.0",
+  "$id": "openvman://protocol/v1/set_decision_debug",
+  "title": "Set Decision Debug",
+  "x-direction": "client_to_server",
+  "properties": {
+    "event": {
+      "const": "set_decision_debug"
+    },
+    "enabled": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "event",
+    "enabled"
+  ]
+}

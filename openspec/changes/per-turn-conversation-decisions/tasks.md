@@ -53,3 +53,11 @@
 ## Workflow follow-up
 
 - 驗收及 review 完成後，依使用者指示封存本 change；前置供應商 change 保持獨立的完成紀錄。
+
+
+## 8. 前台決策 Debug（2026-10-08）
+
+- [x] 8.1 加入明確選用的 HTTP／Live 診斷傳輸；只回固定 IDs、typed 答案與實際 provider／policy，排除 evidence 並驗證 delivery／history 不保存診斷。
+- [x] 8.2 加入虛擬人舞台 Debug 開關與 14 項判讀面板，顯示情緒、信心／成立機率、門檻結果、fallback 和實際策略；清除舊回合／專案／session 資料。
+- [x] 8.3 更新 protocol schemas 與 generated contracts、日期版 CHANGELOG／README／詳細規格；以實際桌面／手機瀏覽器驗證顯示、清除、fallback、opt-out 與排版。
+- [x] 8.4 完成獨立 code review 並處理 findings，執行受影響前後端測試、build、contract check 與 diff check。

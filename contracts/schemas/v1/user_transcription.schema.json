@@ -19,6 +19,11 @@
     },
     "timestamp": {
       "type": "integer"
+    },
+    "decision_turn_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
     }
   },
   "required": [

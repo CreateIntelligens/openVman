@@ -343,3 +343,15 @@ def test_asr_judge_endpoint_returns_the_chosen_transcript(monkeypatch):
         denied = client.post("/brain/internal/asr-judge", json={"final": "OMI"})
     assert ok.json()["text"] == "who am i" and ok.json()["chosen"] == "interim"
     assert denied.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_live_debug_toggle_is_session_local(monkeypatch):
+    import internal_routes
+    fake = FakeLiveSession()
+    state = {'live_session': fake}
+    monkeypatch.setattr(internal_routes, '_ensure_live_session', lambda *args: None)
+    await internal_routes._dispatch_live_event(state, 'relay', None, {'event': 'set_decision_debug', 'enabled': True})
+    assert fake.decision_debug_enabled is True
+    await internal_routes._dispatch_live_event(state, 'relay', None, {'event': 'set_decision_debug', 'enabled': False})
+    assert fake.decision_debug_enabled is False

@@ -332,3 +332,26 @@ def test_disabled_groups_do_not_send_questions(monkeypatch):
 
     assert calls == []
     assert result.source == "baseline"
+
+
+def test_opt_in_debug_reports_normalized_signals_without_evidence(monkeypatch):
+    from core.decision_router import DecisionResult
+    answers = {
+        'needs_knowledge': _noul(0.04),
+        'tone': {**_choice('frustrated'), 'rationale': 'secret free-form text'},
+    }
+    monkeypatch.setattr(turn_decisions, 'decide', lambda *a, **kw: DecisionResult(answers, 'clef', 'clef-primary', 'clef-flash'))
+    kwargs = dict(user_text='private user text', history=[], project_id='private-id', project_language='zh',
+                  speech_language='', available_tools=[], config=TurnDecisionConfig(), turn_id='turn-1')
+    ordinary = run_turn_decision(**kwargs)
+    assert ordinary.debug_signals is None
+    debug = run_turn_decision(**kwargs, capture_debug=True).to_debug_payload()
+    assert debug['provider'] == 'clef'
+    assert debug['policy']['tone'] == 'frustrated'
+    tone = next(signal for signal in debug['signals'] if signal['id'] == 'tone')
+    assert tone['value'] == 'frustrated' and tone['accepted'] is True
+    assert tone['confidence'] == 0.95
+    serialized = str(debug)
+    assert 'private user text' not in serialized
+    assert 'private-id' not in serialized
+    assert 'secret free-form text' not in serialized

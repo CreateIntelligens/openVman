@@ -12,6 +12,7 @@
  */
 import { ref, readonly, onUnmounted } from 'vue'
 import { apiFetch } from '../api/http'
+import { parseDecisionDebug, type DecisionDebug } from '../components/debug/decisionDebug'
 
 export type AvatarState = 'DISCONNECTED' | 'CONNECTING' | 'RECONNECTING' | 'IDLE' | 'THINKING' | 'SPEAKING' | 'ERROR'
 export type VisualSignalState = 'clear' | 'detecting' | 'locked'
@@ -46,6 +47,7 @@ interface Citation {
 }
 
 interface ChatResponse {
+       decision_debug?: unknown
        reply?: string
        session_id?: string
        citations?: unknown
@@ -171,6 +173,10 @@ function normalizeVisualState(value: unknown): VisualState | null {
 export function useAvatarChat(options: ChatOptions = {}) {
        const state = ref<AvatarState>('DISCONNECTED')
        const messages = ref<ChatMessage[]>([])
+       const decisionDebugEnabled = ref(false)
+       const decisionDebug = ref<DecisionDebug | null>(null)
+       let pendingDecisionClientTurn: string | null = null
+       let pendingDecisionServerTurn: string | null = null
        const sessionId = ref<string | null>(null)
        const visualState = ref<VisualState>({ ...DEFAULT_VISUAL_STATE })
        let activeSourcePath: string | undefined = undefined
@@ -277,15 +283,30 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Reinitialize with a new persona (safe when IDLE/DISCONNECTED) ──
        function reinit(personaId: string): void {
+              clearDecisionDebug()
               currentPersonaId = personaId
               sendEvent(_buildClientInit())
        }
 
+       function clearDecisionDebug(): void {
+              decisionDebug.value = null
+              pendingDecisionClientTurn = null
+              pendingDecisionServerTurn = null
+       }
+
+       function setDecisionDebug(enabled: boolean): void {
+              decisionDebugEnabled.value = enabled
+              clearDecisionDebug()
+              sendEvent({ event: 'set_decision_debug', enabled })
+       }
+
        function setProject(projectId: string): void {
+              clearDecisionDebug()
               currentProjectId = projectId
        }
 
        function setPersona(personaId: string): void {
+              clearDecisionDebug()
               currentPersonaId = personaId
        }
 
@@ -331,6 +352,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      }
 
                      socket.onclose = () => {
+                            clearDecisionDebug()
                             console.log('[AvatarChat] WebSocket disconnected')
                             const disconnectError = new Error('WebSocket disconnected before initialization')
                             rejectPendingConnect(disconnectError)
@@ -397,6 +419,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             resolvePendingConnect()
                             console.log(`[AvatarChat] Session: ${sessionId.value}`)
                             sendEvent({ event: 'set_lip_sync_mode', mode: currentLipSyncMode })
+                            sendEvent({ event: 'set_decision_debug', enabled: decisionDebugEnabled.value })
                             break
 
                      case 'server_stream_chunk': {
@@ -423,6 +446,23 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             }
                             break
                      }
+
+                     case 'server_decision_debug':
+                            if (decisionDebugEnabled.value && data.session_id === sessionId.value) {
+                                   const report = parseDecisionDebug({ ...(data.diagnostics as object), scope: data.scope })
+                                   const matchesTurn = report && (
+                                          report.scope === 'text'
+                                                 ? pendingDecisionClientTurn !== null && data.client_turn_id === pendingDecisionClientTurn
+                                                 : pendingDecisionServerTurn !== null && report.turn_id === pendingDecisionServerTurn
+                                   )
+                                   if (matchesTurn) decisionDebug.value = report
+                            }
+                            break
+
+                     case 'user_transcription':
+                            clearDecisionDebug()
+                            if (typeof data.decision_turn_id === 'string') pendingDecisionServerTurn = data.decision_turn_id
+                            break
 
                      case 'server_search_results':
                             applyResponseMedia({ citations: data.citations })
@@ -489,6 +529,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       return { accepted: false, reason: 'not_ready' }
                }
 
+               clearDecisionDebug()
                const merge = mergeTarget(sourcePath)
                stopActiveResponse()
                activeSourcePath = sourcePath
@@ -508,8 +549,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                liveSpeechLanguage = speechLanguage ?? null
                messages.value.push({ role: 'user', text: trimmed, timestamp: Date.now() })
                state.value = 'THINKING'
+               pendingDecisionClientTurn = createClientId()
                sendEvent({
                       event: 'user_speak',
+                      turn_id: pendingDecisionClientTurn,
                       text: trimmed,
                       timestamp: Date.now(),
                       ...(speechLanguage ? { speech_language: speechLanguage } : {}),
@@ -564,6 +607,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                                     turn_id: turnId,
                                     turn_revision: revision,
                                     mode: options.replyMode?.() ?? '',
+                                    decision_debug: decisionDebugEnabled.value,
                                     ...(speechLanguage ? { metadata: { speech_language: speechLanguage } } : {}),
                              }),
                              signal: abort.signal,
@@ -603,6 +647,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                              if (requestId !== textRequestId || abort.signal.aborted) return
                       }
                       if (data.session_id) sessionId.value = data.session_id
+                      if (decisionDebugEnabled.value) decisionDebug.value = parseDecisionDebug(data.decision_debug)
                       applyResponseMedia(data)
                       state.value = 'IDLE'
                       if (data.reply?.trim()) {
@@ -754,6 +799,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Interrupt ──────────────────────────────────────────
        function interrupt(): void {
+               clearDecisionDebug()
                stopActiveResponse()
                state.value = 'IDLE'
        }
@@ -806,6 +852,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Disconnect ─────────────────────────────────────────
        function disconnect(): void {
+               clearDecisionDebug()
                intentionalDisconnect = true
                textRequestId += 1
                textAbortController?.abort()
@@ -826,6 +873,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
        }
 
        function setMode(mode: 'live' | 'text'): void {
+               clearDecisionDebug()
                currentMode = mode
        }
 
@@ -877,6 +925,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                messages,
                sessionId: readonly(sessionId),
                visualState: readonly(visualState),
+               decisionDebug: readonly(decisionDebug),
+               decisionDebugEnabled: readonly(decisionDebugEnabled),
+               setDecisionDebug,
+               clearDecisionDebug,
                connect,
                disconnect,
                sendMessage,

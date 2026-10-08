@@ -1,3 +1,4 @@
+import { decisionDebugModuleUrl } from './helpers/decisionDebugModule.mjs';
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
-}).outputText
+}).outputText.replace(/from ['"]\.\.\/components\/debug\/decisionDebug['"]/, `from "${decisionDebugModuleUrl}"`)
   .replace(
     /import \{ ref, readonly, onUnmounted \} from ['"]vue['"];?/,
     [

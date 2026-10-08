@@ -255,6 +255,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     chat.disconnect();
     audio.stopAll();
     chat.messages.value = [];
+    chat.setDecisionDebug(false);
     isTyping.value = false;
     isStarted.value = false;
   }

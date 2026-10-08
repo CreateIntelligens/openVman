@@ -1,3 +1,4 @@
+import { decisionDebugModuleUrl } from './helpers/decisionDebugModule.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -6,7 +7,7 @@ import ts from "typescript";
 const source = readFileSync(new URL("../useAvatarChat.ts", import.meta.url), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
-}).outputText
+}).outputText.replace(/from ['"]\.\.\/components\/debug\/decisionDebug['"]/, `from "${decisionDebugModuleUrl}"`)
   .replace(/import \{ ref, readonly, onUnmounted \} from ['"]vue['"];?/, `
     const ref = (value) => ({ value });
     const readonly = (value) => value;
@@ -120,3 +121,69 @@ test("a rejected acknowledgement is surfaced and never played", async (t) => {
   assert.deepEqual(replies, []);
   assert.equal(errors[0][0], "BRAIN_ERROR");
 });
+
+test('decision debug is opt-in, shows actual provider, and clears on toggle and new turn', async t => {
+  const { chat, requests } = await harness(t)
+  assert.equal(chat.decisionDebugEnabled.value, false)
+  chat.setDecisionDebug(true)
+  chat.sendMessage('請直接講重點')
+  assert.equal(requests[0].body.decision_debug, true)
+  const diagnostic = {
+    turn_id: 'turn', status: 'available', provider: 'jev', hop_id: 'jev', model: 'jev-latest',
+    elapsed_ms: 35, signals: [{ id: 'tone', type: 'choice', value: 'frustrated', confidence: .95, accepted: true }],
+    policy: { tone: 'frustrated' },
+  }
+  requests[0].resolve({ ok: true, json: async () => ({ reply: '先做這件事。', decision_debug: diagnostic }) })
+  await tick()
+  assert.equal(chat.decisionDebug.value.provider, 'jev')
+  assert.equal(chat.decisionDebug.value.signals[0].value, 'frustrated')
+  chat.sendMessage('下一題')
+  assert.equal(chat.decisionDebug.value, null)
+  chat.setDecisionDebug(false)
+  assert.equal(chat.decisionDebug.value, null)
+  assert.equal(chat.decisionDebugEnabled.value, false)
+})
+
+test('Live debug rejects late turns and clears on interruption and reconnect', async t => {
+  const originalWebSocket = globalThis.WebSocket
+  const originalWindow = globalThis.window
+  globalThis.window = {location:{protocol:'http:',host:'test'}}
+  class FakeSocket {
+    static OPEN = 1
+    readyState = 1
+    sent = []
+    constructor() { FakeSocket.last = this }
+    send(text) { this.sent.push(JSON.parse(text)) }
+    close() {}
+    receive(data) { this.onmessage({data:JSON.stringify(data)}) }
+  }
+  globalThis.WebSocket = FakeSocket
+  const chat = useAvatarChat({mode:'live',wsUrlBuilder:()=> 'ws://test'})
+  t.after(()=>{ chat.disconnect();globalThis.WebSocket=originalWebSocket;globalThis.window=originalWindow })
+  const connecting = chat.connect()
+  const socket = FakeSocket.last
+  socket.onopen()
+  socket.receive({event:'server_init_ack',session_id:'s1'})
+  await connecting
+  chat.setDecisionDebug(true)
+  const report={turn_id:'server:1',status:'available',provider:'clef',hop_id:'clef-primary',model:'clef-flash',elapsed_ms:40,signals:[],policy:{tone:'confused'}}
+  chat.sendMessage('第一題')
+  const first = socket.sent.findLast(event=>event.event==='user_speak').turn_id
+  chat.sendMessage('第二題')
+  const latest = socket.sent.findLast(event=>event.event==='user_speak').turn_id
+  const event={event:'server_decision_debug',session_id:'s1',scope:'text',diagnostics:report}
+  socket.receive({...event,client_turn_id:first})
+  assert.equal(chat.decisionDebug.value,null)
+  socket.receive({...event,client_turn_id:latest})
+  assert.equal(chat.decisionDebug.value.policy.tone,'confused')
+  chat.interrupt()
+  assert.equal(chat.decisionDebug.value,null)
+  socket.receive({...event,client_turn_id:latest})
+  assert.equal(chat.decisionDebug.value,null)
+  chat.sendMessage('第三題')
+  const third = socket.sent.findLast(event=>event.event==='user_speak').turn_id
+  socket.receive({...event,client_turn_id:third})
+  assert.notEqual(chat.decisionDebug.value,null)
+  socket.onclose()
+  assert.equal(chat.decisionDebug.value,null)
+})

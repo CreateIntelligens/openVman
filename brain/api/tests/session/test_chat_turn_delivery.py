@@ -210,3 +210,24 @@ def test_incomplete_or_invalid_turn_contract_is_rejected(delivery, invalid):
         "/brain/chat", json={**turn(), "message": "你好", **invalid},
     )
     assert response.status_code == 422
+
+
+def test_debug_is_returned_on_opt_in_without_entering_staged_turn(delivery, monkeypatch):
+    from core.turn_decisions import TurnDecision, TurnPolicy
+    client, store, _, _ = delivery
+    original_prepare = chat_routes._prepare_chat_context
+    def prepare(request, payload):
+        context = original_prepare(request, payload)
+        context.turn_decision = TurnDecision('trace', TurnPolicy(tone='frustrated'), 'clef', provider='clef')
+        return context
+    monkeypatch.setattr(chat_routes, '_prepare_chat_context', prepare)
+    response = client.post('/brain/chat', json={**turn(), 'message': '請直接講重點', 'decision_debug': True})
+    assert response.status_code == 200
+    assert response.json()['decision_debug']['policy']['tone'] == 'frustrated'
+    with store._connect() as conn:
+        saved = conn.execute('SELECT payload FROM chat_turns').fetchone()[0]
+    assert 'decision_debug' not in saved
+    assert 'frustrated' not in saved
+    assert client.post('/brain/chat/accept', json=turn()).status_code == 200
+    ordinary = client.post('/brain/chat', json={'message': 'hi', 'session_id': 's1'})
+    assert 'decision_debug' not in ordinary.json()

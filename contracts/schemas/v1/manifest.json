@@ -54,6 +54,14 @@
     "user_transcription": {
       "direction": "server_to_client",
       "schema": "user_transcription.schema.json"
+    },
+    "set_decision_debug": {
+      "direction": "client_to_server",
+      "schema": "set_decision_debug.schema.json"
+    },
+    "server_decision_debug": {
+      "direction": "server_to_client",
+      "schema": "server_decision_debug.schema.json"
     }
   }
 }

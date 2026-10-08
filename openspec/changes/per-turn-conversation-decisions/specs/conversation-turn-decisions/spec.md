@@ -170,3 +170,20 @@ The system SHALL bound the complete turn-decision phase with a wall-clock deadli
 #### Scenario: Shared deadline is exhausted
 - **WHEN** the turn-decision budget expires before a complete answer is available
 - **THEN** the baseline conversation path starts without waiting for late decisions
+
+
+### Requirement: Opt-in avatar Decision Debug displays the actual typed interpretation
+The avatar frontend SHALL offer a decision debug switch that is off by default. Enabled diagnostics SHALL display the actual provider's fixed typed interpretations and accepted policy for the current turn. Diagnostics SHALL be transient and exclude evidence, prompts, secrets, and free-text rationales.
+
+
+#### Scenario: A caller explicitly enables diagnostics
+- **WHEN** the avatar user opens Decision Debug and submits a finalized turn
+- **THEN** the panel displays the actual provider's typed interpretations for the configured questions, including tone and language, alongside the accepted policy
+- **THEN** fallback provider results are attributed to that provider rather than Clef
+- **THEN** HTTP returns diagnostics only for `decision_debug=true` and Live uses the correlated `set_decision_debug` / `server_decision_debug` events
+- **THEN** diagnostics are excluded from staged delivery, history, usage, and server logs
+
+#### Scenario: Diagnostics are disabled or the provider is unavailable
+- **WHEN** debug is disabled or all providers fail
+- **THEN** disabled debug sends no diagnostics and provider failure follows the normal baseline reply path
+- **THEN** enabled debug describes fallback without inventing emotion labels

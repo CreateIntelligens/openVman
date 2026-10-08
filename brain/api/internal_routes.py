@@ -380,7 +380,10 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
     _ensure_live_session(state, relay_id, sink)
     live = state["live_session"]
 
-    if event == "user_speak" and (text := str(payload.get("text", "")).strip()):
+    if event == "set_decision_debug":
+        live.decision_debug_enabled = payload.get("enabled") is True
+    elif event == "user_speak" and (text := str(payload.get("text", "")).strip()):
+        live.debug_client_turn_id = payload.get("turn_id") if isinstance(payload.get("turn_id"), str) else None
         # ephemeral=True 的視覺脈絡只餵給 AI，不落歷史（避免污染對話）。
         if payload.get("ephemeral"):
             await live.send_text_turn(text)

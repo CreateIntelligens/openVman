@@ -72,6 +72,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
 - 工具：知識檢索、圖譜、記憶、網路搜尋與網頁轉 Markdown（2md）、Wiki 發布，以及依專案 `knowledge/products/_catalog.yaml` 啟用的產品規格篩選 `filter_products`。
 - 模型路由：`LLM_PROVIDER` 指定主要供應商（目前為 Gemini），失敗時依 `LLM_FALLBACK_CHAIN` 依序切換。
 - 決策輔助：本地 Guard Agent 規則先判；規則無法判斷時依後台順序呼叫 Clef 主／備援、Jev、OpenAI Decisions。ROOT／admin 可在「System → 決策模型」調整順序並管理 API key。
+- 前台決策 Debug：虛擬人舞台可開啟當輪判讀面板，直接查看情緒／語氣、檢索、語言、供應商及信心度；預設關閉，診斷不持久化。
 - 每輪決策：文字回合以一個 batch 評估檢索來源、多語言、回覆語言與當輪語氣；全部決策服務失效時沿用既有對話流程。門檻、資料邊界與 Live 限制見 [Brain 文件](brain/README.md#每輪對話決策)。
 - 隱私：送給 LLM 的訊息先偵測個資，記錄稽核事件並在後台對話顯示提醒，不改寫內容（`PRIVACY_FILTER_ENABLED`）。
 - 用量帳本：每次模型呼叫記錄 token 與歸屬，供後台用量頁查詢。

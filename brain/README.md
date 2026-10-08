@@ -230,6 +230,14 @@ Backend 的 `GuardAgent` 先跑本地規則；規則無法分類時呼叫 Brain 
 
 Noul positive 門檻為 0.7、negative 門檻為 0.1；choice confidence 至少 0.8 且第一名領先至少 0.2 才採用，其他情況逐信號棄權。預設 budget 為整輪 2 秒、每 hop 最多 0.4 秒。四個 provider 全部失敗、設定取不到或逾時時，Chat 按既有 RAG／recall／語言／persona 規則繼續生成；同一回合不重試失效的決策鏈。Live raw PCM partial 不觸發決策；正式 `send_text_turn()` 會使用 server-owned envelope 並完整套用 language/tone policy。Live 內部 ASR transcription 在原音訊回覆已啟動後才到達，因此只影響該回合其後的合法 reads；該音訊回覆維持 session baseline 語言與 tone。這是目前 Gemini Developer API Live WebSocket 對 setup config 固定的限制。可用環境變數調整總開關、分組、門檻與時間；詳細欄位見 `.env.example` 與 `api/config.py`。
 
+### 前台決策 Debug
+
+虛擬人舞台的「決策 Debug」預設關閉。開啟後下一輪會顯示真實供應商（Clef 主／備援、Jev、OpenAI 或 baseline）、耗時、14 個固定判讀項目、noul 成立機率、choice 信心度、是否達到採用門檻，以及實際套用策略。「挫折／不耐煩」對應現有 `frustrated` code；分類不確定時顯示棄權。
+
+HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 true 時才在回應頂層加入 `decision_debug`。欄位是 `turn_id/status/provider/hop_id/model/elapsed_ms/signals/policy`，只含固定代碼與數值，不含原句、帳號、prompt、工具資料或自由文字理由。診斷在 delivery 暫存完成後加入回應，接受回覆時不保存。Live 使用 `set_decision_debug {enabled}` 開關及 `server_decision_debug {session_id, scope, diagnostics, client_turn_id?}` 事件；scope 是 `text` 或 `audio_retrieval_only`。Live 文字輸入的 `user_speak.turn_id` 會由 `client_turn_id` 回傳配對，原始音訊以 `user_transcription.decision_turn_id` 與 diagnostic turn ID 配對；前台拒絕舊回合事件。所有資料僅供當輪前台記憶體檢視，關閉面板、換專案／session 或開始新回合即清除。
+
+驗收：開啟面板後問「我很不耐煩，直接講重點」，核對情緒原始 code、信心度與實際採用語氣；再問產品或明確指定英文回答，核對 knowledge/web/memory 與語言結果。把供應商停用後面板會顯示 fallback／disabled，對話仍可繼續。
+
 ### 手動驗收
 
 1. 問候：「早安，今天還好嗎？」確認正常回覆、不執行強制 knowledge search。

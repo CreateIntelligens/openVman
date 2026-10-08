@@ -86,6 +86,8 @@ class GeminiLiveSession:
         self._prefetched_reads: dict[str, dict[str, Any]] = {}
         self._prefetched_queries: dict[str, str] = {}
         self._turn_revision = 0
+        self.decision_debug_enabled = False
+        self.debug_client_turn_id: str | None = None
         # 一個 turn 的回覆會拆成多個 chunk 送來，累積到 turnComplete 才寫入歷史。
         self._assistant_text_buf: list[str] = []
         # Live 按音訊秒數計價，不是 token。逐 turn 累積、turnComplete 時記帳。
@@ -135,6 +137,7 @@ class GeminiLiveSession:
             return transport
 
     async def send_text_turn(self, user_text: str, speech_language: str | None = None) -> None:
+        client_turn_id = self.debug_client_turn_id
         transport = await self.ensure_connected()
         self._cancel_turn_decision()
         self._turn_revision += 1
@@ -165,6 +168,8 @@ class GeminiLiveSession:
                     self._turn_decision_task = None
             if revision != self._turn_revision:
                 return
+        if not user_text.startswith("[視覺事件]"):
+            await self._emit_decision_debug(revision, "text", client_turn_id)
         await transport.send_json(self._build_user_turn_message(user_text))
 
     async def send_realtime_input(self, audio_b64: str, mime_type: str) -> None:
@@ -432,6 +437,7 @@ class GeminiLiveSession:
                 available_tools=("search_knowledge", "search_web", "search_memory"),
                 config=cfg,
                 turn_id=f"live:{self.relay_session_id}:{self._turn_revision}",
+                capture_debug=self.decision_debug_enabled and not text.startswith("[視覺事件]"),
             )
             if decision.policy.needs_memory is True:
                 from dataclasses import replace
@@ -470,6 +476,17 @@ class GeminiLiveSession:
         )
         if revision == self._turn_revision:
             self._turn_decision = decision
+            await self._emit_decision_debug(revision, "audio_retrieval_only")
+
+    async def _emit_decision_debug(self, revision: int, scope: str, client_turn_id: str | None = None) -> None:
+        if self.decision_debug_enabled and revision == self._turn_revision and self._turn_decision is not None:
+            await self._emit({
+                "event": "server_decision_debug",
+                "session_id": self.relay_session_id,
+                "scope": scope,
+                **({"client_turn_id": client_turn_id} if client_turn_id is not None else {}),
+                "diagnostics": self._turn_decision.to_debug_payload(),
+            })
 
     async def _prefetch_required_reads(
         self,
@@ -689,6 +706,7 @@ class GeminiLiveSession:
         await self._emit(
             {
                 "event": "user_transcription",
+                **({"decision_turn_id": f"live:{self.relay_session_id}:{self._turn_revision}"} if self.decision_debug_enabled else {}),
                 "text": text,
                 "session_id": self.relay_session_id,
                 "timestamp": int(time.time() * 1000),

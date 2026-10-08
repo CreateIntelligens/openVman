@@ -81,6 +81,7 @@ class AddMemoryRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    decision_debug: bool = Field(False, strict=True, description="Return transient decision diagnostics for this turn")
     message: str = Field(..., description="User message content")
     project_id: str = "default"
     persona_id: str = "default"

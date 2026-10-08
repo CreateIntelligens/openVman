@@ -78,6 +78,13 @@
             </div>
           </button>
 
+          <DecisionDebugPanel
+            v-if="visitor.settingsVisible.value"
+            :enabled="chat.decisionDebugEnabled.value"
+            :report="chat.decisionDebug.value"
+            :waiting="chat.state.value === 'THINKING'"
+            @toggle="chat.setDecisionDebug"
+          />
           <QuickQaPanel
             :open="showQuickQa"
             :project-id="settings.projectId"
@@ -192,6 +199,7 @@
 import { computed, onMounted, ref } from "vue";
 import { BROWSER_ASR } from "@shared/speech";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
+import DecisionDebugPanel from "./components/debug/DecisionDebugPanel.vue";
 import CameraPreview from "./components/avatar/CameraPreview.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";

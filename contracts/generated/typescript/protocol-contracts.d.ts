@@ -4,9 +4,9 @@ export const PROTOCOL_NAME = "openvman-core";
 export const DEFAULT_PROTOCOL_VERSION = "1.0.0";
 
 export type ProtocolDirection = "client_to_server" | "server_to_client";
-export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "client_audio_chunk" | "client_video_frame" | "client_audio_end" | "set_lip_sync_mode" | "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio" | "server_camera_frame_status" | "user_transcription";
-export type ClientEventName = "client_init" | "user_speak" | "client_interrupt" | "client_audio_chunk" | "client_video_frame" | "client_audio_end" | "set_lip_sync_mode";
-export type ServerEventName = "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio" | "server_camera_frame_status" | "user_transcription";
+export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "client_audio_chunk" | "client_video_frame" | "client_audio_end" | "set_lip_sync_mode" | "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio" | "server_camera_frame_status" | "user_transcription" | "set_decision_debug" | "server_decision_debug";
+export type ClientEventName = "client_init" | "user_speak" | "client_interrupt" | "client_audio_chunk" | "client_video_frame" | "client_audio_end" | "set_lip_sync_mode" | "set_decision_debug";
+export type ServerEventName = "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio" | "server_camera_frame_status" | "user_transcription" | "server_decision_debug";
 
 export interface ContractEventEntry {
   direction: ProtocolDirection;
@@ -38,6 +38,7 @@ export interface UserSpeakEvent {
   event: "user_speak";
   text: string;
   timestamp: number;
+  turn_id?: string;
 }
 
 export interface ClientInterruptEvent {
@@ -123,8 +124,22 @@ export interface UserTranscriptionEvent {
   text: string;
   session_id: string;
   timestamp?: number;
+  decision_turn_id?: string;
 }
 
-export type ClientEvent = ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientVideoFrameEvent | ClientAudioEndEvent | SetLipSyncModeEvent;
-export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | ServerCameraFrameStatusEvent | UserTranscriptionEvent;
+export interface SetDecisionDebugEvent {
+  event: "set_decision_debug";
+  enabled: boolean;
+}
+
+export interface ServerDecisionDebugEvent {
+  event: "server_decision_debug";
+  session_id: string;
+  scope: "text" | "audio_retrieval_only";
+  diagnostics: Record<string, unknown>;
+  client_turn_id?: string;
+}
+
+export type ClientEvent = ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientVideoFrameEvent | ClientAudioEndEvent | SetLipSyncModeEvent | SetDecisionDebugEvent;
+export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | ServerCameraFrameStatusEvent | UserTranscriptionEvent | ServerDecisionDebugEvent;
 export type ProtocolEvent = ClientEvent | ServerEvent;

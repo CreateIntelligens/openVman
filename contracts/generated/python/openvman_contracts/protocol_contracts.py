@@ -30,6 +30,7 @@ class UserSpeakEvent(GeneratedProtocolModel):
     event: Literal['user_speak']
     text: str = Field(min_length=1)
     timestamp: int = Field(ge=0)
+    turn_id: str | None = Field(default=None, min_length=1, max_length=256)
 
 class ClientInterruptEvent(GeneratedProtocolModel):
     event: Literal['client_interrupt']
@@ -104,9 +105,21 @@ class UserTranscriptionEvent(GeneratedProtocolModel):
     text: str
     session_id: str = Field(min_length=1)
     timestamp: int | None = Field(default=None)
+    decision_turn_id: str | None = Field(default=None, min_length=1, max_length=256)
 
-ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientVideoFrameEvent | ClientAudioEndEvent | SetLipSyncModeEvent, Field(discriminator='event')]
-ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | ServerCameraFrameStatusEvent | UserTranscriptionEvent, Field(discriminator='event')]
+class SetDecisionDebugEvent(GeneratedProtocolModel):
+    event: Literal['set_decision_debug']
+    enabled: bool
+
+class ServerDecisionDebugEvent(GeneratedProtocolModel):
+    event: Literal['server_decision_debug']
+    session_id: str = Field(min_length=1)
+    scope: Literal['text', 'audio_retrieval_only']
+    diagnostics: dict[str, object]
+    client_turn_id: str | None = Field(default=None, min_length=1, max_length=256)
+
+ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientVideoFrameEvent | ClientAudioEndEvent | SetLipSyncModeEvent | SetDecisionDebugEvent, Field(discriminator='event')]
+ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | ServerCameraFrameStatusEvent | UserTranscriptionEvent | ServerDecisionDebugEvent, Field(discriminator='event')]
 ProtocolEvent = ClientEvent | ServerEvent
 
 CLIENT_EVENT_ADAPTER = TypeAdapter(ClientEvent)
@@ -127,11 +140,13 @@ __all__ = [
     "ProtocolEvent",
     "SERVER_EVENT_ADAPTER",
     "ServerCameraFrameStatusEvent",
+    "ServerDecisionDebugEvent",
     "ServerErrorEvent",
     "ServerEvent",
     "ServerInitAckEvent",
     "ServerStopAudioEvent",
     "ServerStreamChunkEvent",
+    "SetDecisionDebugEvent",
     "SetLipSyncModeEvent",
     "UserSpeakEvent",
     "UserTranscriptionEvent",

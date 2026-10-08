@@ -1372,3 +1372,23 @@ async def test_live_disabled_external_tool_never_calls_provider(
         "id": "blocked", "name": name, "response": {"error": f"{name} 已停用"},
     }
     assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_live_debug_events_are_opt_in_and_turn_bound():
+    from core.turn_decisions import TurnDecision, TurnPolicy
+    module, cfg = _load_module()
+    events = []
+    async def sink(event):
+        events.append(event)
+    session = module.GeminiLiveSession(relay_session_id='debug', client_id='client', config=cfg, event_sink=sink)
+    session._turn_revision = 2
+    session._turn_decision = TurnDecision('live:2', TurnPolicy(tone='confused'), 'clef', provider='clef')
+    await session._emit_decision_debug(2, 'text')
+    assert events == []
+    session.decision_debug_enabled = True
+    await session._emit_decision_debug(1, 'text')
+    assert events == []
+    await session._emit_decision_debug(2, 'text')
+    assert events[0]['event'] == 'server_decision_debug'
+    assert events[0]['diagnostics']['policy']['tone'] == 'confused'

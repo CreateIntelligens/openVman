@@ -147,3 +147,24 @@ async def test_missing_asr_is_explicit_stop_control(monkeypatch):
         assert json.loads(sent[0]["text"])["event"] == "server_stop_audio"
     finally:
         await session.cancel_all_tasks()
+
+
+@pytest.mark.asyncio
+async def test_decision_debug_toggle_is_forwarded_without_changing_user_input(monkeypatch):
+    session = Session('debug-test')
+    session.brain_live_relay = AsyncMock()
+    monkeypatch.setattr(websocket_routes, '_ensure_brain_relay', AsyncMock())
+    payload = {'event': 'set_decision_debug', 'enabled': True}
+    await websocket_routes._handle_websocket_event('set_decision_debug', payload, session, AsyncMock())
+    session.brain_live_relay.send_event.assert_awaited_once_with(payload)
+
+
+@pytest.mark.asyncio
+async def test_live_user_text_forwards_debug_turn_correlation(monkeypatch):
+    session = Session('debug-turn')
+    session.brain_live_relay = AsyncMock()
+    monkeypatch.setattr(websocket_routes, '_ensure_brain_relay', AsyncMock())
+    await websocket_routes._handle_user_speak({'text':'hello','turn_id':'client-turn-2'}, session, AsyncMock())
+    forwarded = session.brain_live_relay.send_event.await_args.args[0]
+    assert forwarded['turn_id'] == 'client-turn-2'
+    assert forwarded['text'] == 'hello'

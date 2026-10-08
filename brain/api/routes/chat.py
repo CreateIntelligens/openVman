@@ -68,7 +68,7 @@ def _maybe_rewrite_slash(payload: ChatRequest) -> dict[str, Any]:
 def _prepare_chat_context(request: Request, payload: ChatRequest) -> Any:
     raw = _maybe_rewrite_slash(payload)
     envelope = build_message_envelope(request, raw, content_key="message")
-    return prepare_generation(envelope, reply_mode=payload.mode)
+    return prepare_generation(envelope, reply_mode=payload.mode, decision_debug=payload.decision_debug)
 
 
 def _log_generation_success(context: Any, tool_steps: int) -> None:
@@ -145,6 +145,9 @@ async def chat(request: Request, payload: ChatRequest):
             response = finalize_generation(
                 context, result.reply, result.tool_steps, response_time_s,
             )
+        if payload.decision_debug and context.turn_decision is not None:
+            # Added after stage_turn: never persist emotional diagnostics in the delivery payload.
+            response["decision_debug"] = context.turn_decision.to_debug_payload()
         response["tool_steps"] = result.tool_steps
         response["response_time_s"] = response_time_s
         response["usage"] = summarize_collected(scope)

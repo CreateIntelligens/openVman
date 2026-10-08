@@ -1,3 +1,4 @@
+import { decisionDebugModuleUrl } from './helpers/decisionDebugModule.mjs';
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,7 +14,7 @@ const compiled = ts.transpileModule(source, {
     module: ts.ModuleKind.ES2022,
     target: ts.ScriptTarget.ES2022,
   },
-}).outputText
+}).outputText.replace(/from ['"]\.\.\/components\/debug\/decisionDebug['"]/, `from "${decisionDebugModuleUrl}"`)
   .replace(
     /import \{ ref, readonly, onUnmounted \} from ['"]vue['"];?/,
     [

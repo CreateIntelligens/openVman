@@ -6,7 +6,7 @@ import asyncio
 import logging
 from time import monotonic
 from threading import Event
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Final
 
 from core.decision_router import (
@@ -137,6 +137,21 @@ class TurnDecision:
     hop_id: str = ""
     model: str = ""
     dependency_unavailable: bool = False
+    debug_signals: tuple[dict[str, Any], ...] | None = None
+    elapsed_ms: float = 0.0
+
+    def to_debug_payload(self) -> dict[str, Any]:
+        """Opt-in, transient diagnostics: fixed codes and scores only."""
+        return {
+            "turn_id": self.turn_id,
+            "status": "fallback" if self.dependency_unavailable else "disabled" if self.source == "baseline" else "available",
+            "provider": self.provider or self.source,
+            "hop_id": self.hop_id,
+            "model": self.model,
+            "elapsed_ms": round(self.elapsed_ms, 1),
+            "signals": list(self.debug_signals or ()),
+            "policy": self.policy.to_prompt_fields(),
+        }
 
 
 def turn_decision_config(settings: Any) -> TurnDecisionConfig:
@@ -332,10 +347,12 @@ def run_turn_decision(
     config: TurnDecisionConfig,
     turn_id: str,
     cancel_event: Event | None = None,
+    capture_debug: bool = False,
 ) -> TurnDecision:
     started = monotonic()
 
     def record(decision: TurnDecision) -> TurnDecision:
+        decision = replace(decision, elapsed_ms=(monotonic() - started) * 1000)
         try:
             from safety.observability import get_metrics_store
 
@@ -410,6 +427,7 @@ def run_turn_decision(
         provider=result.provider,
         hop_id=result.hop_id,
         model=result.model,
+        debug_signals=_debug_signals(result.answers, questions, config) if capture_debug else None,
     ))
 
 
@@ -427,6 +445,36 @@ async def run_turn_decision_async(**kwargs: Any) -> TurnDecision:
         cancel_event.set()
         task.cancel()
         raise
+
+
+def _debug_signals(
+    answers: dict[str, dict[str, Any]],
+    questions: dict[str, dict[str, Any]],
+    config: TurnDecisionConfig,
+) -> tuple[dict[str, Any], ...]:
+    signals = []
+    for name, question in questions.items():
+        answer = answers.get(name, {})
+        if question["type"] == "noul":
+            signals.append({
+                "id": name, "type": "noul",
+                "probability_true": answer.get("noul"),
+                "resolved": _noul_signal(name, answers, config),
+                "accepted": _noul_signal(name, answers, config) is not None,
+            })
+        else:
+            options = tuple(question.get("criteria", {}))
+            probabilities = answer.get("probabilities", {})
+            signals.append({
+                "id": name, "type": "choice",
+                "value": answer.get("choice") if answer.get("choice") in options else None,
+                "confidence": answer.get("confidence"),
+                "probabilities": {
+                    key: value for key, value in probabilities.items() if key in options
+                } if isinstance(probabilities, dict) else {},
+                "accepted": _choice_signal(name, answers, options, config) is not None,
+            })
+    return tuple(signals)
 
 
 def _noul_signal(

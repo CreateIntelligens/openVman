@@ -187,3 +187,10 @@ Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 
 * **MINOR** 變更：向後相容的新增功能（如新增可選欄位）。
 * **PATCH** 變更：修正與澄清（不影響實作）。
 * 伺服器在 `server_init_ack` 中回傳自身版本，客戶端應比對 MAJOR 版本是否一致。
+
+
+### 前台決策 Debug（2026-10-08）
+
+預設關閉。Client 可送 `set_decision_debug {enabled: boolean}` 為目前 Live session 開關當輪診斷；Server 在開啟時送 `server_decision_debug {session_id, scope, diagnostics, client_turn_id?}`。`scope` 為 `text` 或 `audio_retrieval_only`，後者只影響原始 PCM 回合的後續 reads。`diagnostics` 包含 `turn_id/status/provider/hop_id/model/elapsed_ms/signals/policy`，signal 是固定 question ID、typed 結果、數值機率／信心與 confidence 門檻接受狀態。結果只在前台目前回合顯示，不寫入 history、delivery、usage 或日誌；排除 evidence、prompt、工具內容與自由文字理由。Schema 以 `contracts/schemas/v1/set_decision_debug.schema.json`、`server_decision_debug.schema.json` 為準。HTTP Chat 的對應 opt-in 是 `decision_debug=true`，結果在回應頂層 `decision_debug`。
+
+Debug 回合關聯：Live 文字輸入可帶 `user_speak.turn_id`，診斷 event 回傳同一個 `client_turn_id`。原始音訊的 `user_transcription` 在 Debug 開啟時帶 `decision_turn_id`，對應稍後 diagnostics 的 `turn_id`；前台只顯示目前回合的結果，重連或中斷即清除。

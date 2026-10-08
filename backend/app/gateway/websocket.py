@@ -137,6 +137,10 @@ async def _handle_websocket_event(
         _handle_set_lip_sync_mode(data, session)
     elif event == "user_speak":
         await _handle_user_speak(data, session, websocket)
+    elif event == "set_decision_debug":
+        await _ensure_brain_relay(session, websocket)
+        assert session.brain_live_relay is not None
+        await session.brain_live_relay.send_event(data)
     elif event in ("client_audio_chunk", "client_audio_end"):
         await _handle_client_audio_event(data, session, websocket)
     elif event == "client_video_frame":
@@ -216,7 +220,7 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
         or chat_session_id != previous_chat_session_id
         or persona_id != previous_persona_id
     )
-    if relay_needs_refresh:
+    if relay_needs_refresh and existing_relay is not None:
         await existing_relay.close()
         session.brain_live_relay = None
 
@@ -274,9 +278,11 @@ async def _handle_user_speak(data: dict, session: Session, websocket: WebSocket)
 
     logger.info("[LIVE CHAT] User: %r", text)
     await _ensure_brain_relay(session, websocket)
+    assert session.brain_live_relay is not None
     await session.brain_live_relay.send_event(
         {
             "event": "user_speak",
+            **({"turn_id": data["turn_id"]} if isinstance(data.get("turn_id"), str) else {}),
             "text": text,
             "timestamp": _now_ms(),
         }
@@ -288,6 +294,7 @@ async def _handle_client_audio_event(data: dict, session: Session, websocket: We
         logger.debug("Dropping %s before client_init for session %s", data.get("event"), session.session_id)
         return
     await _ensure_brain_relay(session, websocket)
+    assert session.brain_live_relay is not None
     await session.brain_live_relay.send_event(data)
 
 

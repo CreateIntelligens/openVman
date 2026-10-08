@@ -301,6 +301,8 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 | `standard`（預設） | 1 | 5 | 最多 8 筆 | 3 |
 | `deep` | 4 | 10 | 最多 12 筆 | 5 |
 
+前台可用 HTTP `decision_debug=true` 或 Live `set_decision_debug` 開啟當輪診斷。HTTP 回應的 `decision_debug` 與 Live `server_decision_debug` 只回固定 question IDs、normalized 答案／機率、接受門檻結果與套用 policy，排除 evidence、自由文字理由與密鑰。這是明確選用的前台顯示例外，情緒標籤仍不寫入 session/history、chat-turn delivery payload、usage 或服務日誌。Live event schema 及 generated contracts 位於 `contracts/`。
+
 #### 9.3 內建工具
 
 內建工具由 `tools/builtin/__init__.py` 註冊，再依回覆模式與專案篩選（`agent_loop._tools_for_mode`、`_tools_for_project`）。

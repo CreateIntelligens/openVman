@@ -1,3 +1,4 @@
+import { decisionDebugModuleUrl } from './helpers/decisionDebugModule.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -7,7 +8,7 @@ async function loadComposable(file, replacements) {
   let compiled = ts.transpileModule(
     readFileSync(new URL(file, import.meta.url), "utf8"),
     { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } },
-  ).outputText;
+  ).outputText.replace(/from ['"]\.\.\/components\/debug\/decisionDebug['"]/, `from "${decisionDebugModuleUrl}"`);
   for (const [pattern, replacement] of replacements) {
     compiled = compiled.replace(pattern, replacement);
   }

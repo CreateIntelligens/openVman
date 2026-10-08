@@ -75,7 +75,7 @@ class GenerationContext:
 
 
 def prepare_generation(
-    envelope: MessageEnvelope, *, reply_mode: str = "",
+    envelope: MessageEnvelope, *, reply_mode: str = "", decision_debug: bool = False,
 ) -> GenerationContext:
     """Build prompt inputs and update the user side of the session.
 
@@ -125,6 +125,7 @@ def prepare_generation(
             available_tools=tuple(registered),
             config=cfg,
             turn_id=envelope.context.trace_id,
+            capture_debug=decision_debug,
         )
         if turn_decision.policy.needs_memory is True:
             from memory.memory import is_session_recall_disabled
