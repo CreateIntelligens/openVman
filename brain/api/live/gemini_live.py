@@ -23,7 +23,9 @@ from core.turn_decisions import (
     run_turn_decision_async,
     turn_decision_config,
 )
-from .gemini_payloads import build_setup_message, parse_sample_rate, pcm_to_wav
+from .gemini_payloads import (
+    build_setup_message, build_user_turn_message, parse_sample_rate, pcm_to_wav,
+)
 from .gemini_tool_execution import GeminiLiveToolExecutor
 from .gemini_transport import GeminiLiveWebSocketTransport, JsonTransport
 
@@ -754,7 +756,15 @@ class GeminiLiveSession:
 
     async def _execute_function_call(self, function_call: dict[str, Any]) -> dict[str, Any]:
         name = str(function_call.get("name", "")).strip()
-        if name in self._prefetched_reads and self._matches_prefetched_query(function_call, name):
+        from .gemini_tool_execution import matches_prefetched_query
+
+        if (
+            name in self._prefetched_reads
+            and matches_prefetched_query(
+                function_call, name, self._prefetched_queries.get(name, ""),
+                self._last_user_message,
+            )
+        ):
             return {
                 "id": str(function_call.get("id", "")),
                 "name": name,
@@ -790,31 +800,6 @@ class GeminiLiveSession:
                 }
             )
         return result
-
-    def _matches_prefetched_query(self, function_call: dict[str, Any], name: str) -> bool:
-        expected = self._prefetched_queries.get(name)
-        if expected is None:
-            return False
-        args = function_call.get("args") or {}
-        if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except json.JSONDecodeError:
-                return False
-        if not isinstance(args, dict):
-            return False
-        if name == "search_web":
-            return str(args.get("query") or "").strip() == expected
-        queries = args.get("queries")
-        if isinstance(queries, str):
-            normalized = [queries.strip()] if queries.strip() else []
-        elif isinstance(queries, list):
-            normalized = [str(query).strip() for query in queries if str(query).strip()]
-        else:
-            normalized = []
-        return normalized == [expected] or (
-            not normalized and self._last_user_message == expected
-        )
 
     async def _emit(self, event: dict[str, Any]) -> None:
         if self._event_sink is not None:
@@ -896,37 +881,9 @@ class GeminiLiveSession:
         return build_setup_message(self.config, instruction)
 
     def _build_user_turn_message(self, user_text: str) -> dict[str, Any]:
-        text = user_text
-        if self._turn_decision is not None and self._turn_decision.source != "baseline":
-            policy = self._turn_decision.policy
-            required_reads = [
-                name for name, required in (
-                    ("search_knowledge", policy.needs_knowledge is True),
-                    ("search_web", policy.needs_web is True),
-                    ("search_memory", policy.needs_memory is True),
-                ) if required and name not in self._prefetched_reads
-            ]
-            prefetched_reads = [
-                {
-                    "name": name,
-                    "result": json.dumps(result, ensure_ascii=False)[:4_000],
-                    "trust_boundary": "untrusted_reference_data",
-                }
-                for name, result in self._prefetched_reads.items()
-            ]
-            text = json.dumps({
-                "openvman_turn_envelope": 1,
-                "policy": policy.to_prompt_fields(),
-                "required_reads": required_reads,
-                "satisfied_reads": sorted(self._prefetched_reads),
-                "prefetched_reads": prefetched_reads,
-                "user_text": user_text,
-            }, ensure_ascii=False)
-        return {
-            "realtimeInput": {
-                "text": text,
-            }
-        }
+        return build_user_turn_message(
+            user_text, self._turn_decision, self._prefetched_reads,
+        )
 
     async def _wait_for_setup_complete(self, transport: JsonTransport) -> None:
         try:

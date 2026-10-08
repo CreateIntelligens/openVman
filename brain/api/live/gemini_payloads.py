@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import logging
+import json
 import re
 from typing import Any
+
+from core.turn_decisions import TurnDecision
 
 from config import BrainSettings
 
@@ -112,3 +115,36 @@ def pcm_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
         ]
     )
     return header + pcm_bytes
+
+
+def build_user_turn_message(
+    user_text: str, decision: TurnDecision | None, prefetched_reads: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Build the bounded trusted decision envelope for a finalized text turn."""
+    text = user_text
+    if decision is not None and decision.source != "baseline":
+        policy = decision.policy
+        required_reads = [
+            name for name, required in (
+                ("search_knowledge", policy.needs_knowledge is True),
+                ("search_web", policy.needs_web is True),
+                ("search_memory", policy.needs_memory is True),
+            ) if required and name not in prefetched_reads
+        ]
+        prefetched = [
+            {
+                "name": name,
+                "result": json.dumps(result, ensure_ascii=False)[:4_000],
+                "trust_boundary": "untrusted_reference_data",
+            }
+            for name, result in prefetched_reads.items()
+        ]
+        text = json.dumps({
+            "openvman_turn_envelope": 1,
+            "policy": policy.to_prompt_fields(),
+            "required_reads": required_reads,
+            "satisfied_reads": sorted(prefetched_reads),
+            "prefetched_reads": prefetched,
+            "user_text": user_text,
+        }, ensure_ascii=False)
+    return {"realtimeInput": {"text": text}}

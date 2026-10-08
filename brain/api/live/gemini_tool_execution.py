@@ -249,3 +249,27 @@ class GeminiLiveToolExecutor:
             "results": merged,
             "citations": build_citations(merged),
         }
+
+
+def matches_prefetched_query(
+    function_call: dict[str, Any], name: str, expected: str, original_user_message: str,
+) -> bool:
+    """Reuse prefetched data only when the model asks for the same query."""
+    args = function_call.get("args") or {}
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except json.JSONDecodeError:
+            return False
+    if not isinstance(args, dict):
+        return False
+    if name == "search_web":
+        return str(args.get("query") or "").strip() == expected
+    queries = args.get("queries")
+    if isinstance(queries, str):
+        normalized = [queries.strip()] if queries.strip() else []
+    elif isinstance(queries, list):
+        normalized = [str(query).strip() for query in queries if str(query).strip()]
+    else:
+        normalized = []
+    return normalized == [expected] or (not normalized and original_user_message == expected)

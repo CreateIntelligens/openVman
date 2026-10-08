@@ -15,6 +15,8 @@
 - **[2026-10-02]** 講話中插話的分類端點（預設不用）：新增登入保護的 `POST /api/v1/voice/interrupt`（`{transcript, reply_text}` → `{action: "STOP" | "IGNORE"}`），先丟掉完整出現在回答裡的文字（當成喇叭回音），再交給既有 GuardAgent／Jev 判斷。前台串流辨識接好了，但開關 `INTERRUPT_WHILE_SPEAKING`（`useAvatarVoiceInput.ts`）預設關：回音過濾只擋完全相同的文字，辨識錯一個字就擋不住，現場喇叭與麥克風的回音消除還沒實測，開了可能讓虛擬人自己打斷自己。虛擬人出聲時所有引擎照舊停止收音。
 
 
+- **[2026-10-08]** **整理 Gemini Live 決策 helper**：將 finalized text envelope 與預取查詢比對移至 `gemini_payloads.py`、`gemini_tool_execution.py`，讓 Live 會話模組通過 1,000 行 CI 邊界檢查。
+
 ### Fixed
 
 - **[2026-10-07]** **embedding 失敗一次就整個服務停擺一分鐘**：gateway 對失敗的 provider 冷卻 60 秒再改用下一家，但移除 BGE 與雲端備援後只剩 Gemma 一家，冷卻等於所有請求都回 503。實測另一個程式佔滿 GPU 造成一次 OOM 後，GPU 第 14 秒就放掉，服務仍拒絕到第 66 秒。現在所有 provider 都在冷卻時每秒放一個請求去試，同一實驗在 GPU 放掉後立即恢復；健康檢查照舊冷卻，模型壞掉時不會每 15 秒重載。
