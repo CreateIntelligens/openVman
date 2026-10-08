@@ -5,6 +5,7 @@ import type {
   ClientInterruptEvent,
   ClientVideoFrameEvent,
   UserSpeakEvent,
+  SetDecisionDebugEvent,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
   clientAudioChunkSchema,
@@ -13,6 +14,7 @@ import {
   clientInterruptSchema,
   clientVideoFrameSchema,
   userSpeakSchema,
+  setDecisionDebugSchema,
 } from "./schema";
 import {
   assertShape,
@@ -22,6 +24,7 @@ import {
   expectOptionalStringMap,
   expectSemver,
   throwInvalidField,
+  expectBoolean,
 } from "./shared";
 
 export function validateClientInit(record: Record<string, unknown>, version: string): ClientInitEvent {
@@ -43,6 +46,7 @@ export function validateUserSpeak(record: Record<string, unknown>, version: stri
     event: "user_speak",
     text: expectNonEmptyString(record.text, version, "text", "user_speak"),
     timestamp: expectNonNegativeInteger(record.timestamp, version, "user_speak", "timestamp"),
+    turn_id: expectOptionalNonEmptyString(record.turn_id, version, "turn_id", "user_speak"),
   };
 }
 
@@ -87,4 +91,10 @@ export function validateClientAudioEnd(record: Record<string, unknown>, version:
     event: "client_audio_end",
     timestamp: expectNonNegativeInteger(record.timestamp, version, "client_audio_end", "timestamp"),
   };
+}
+
+
+export function validateSetDecisionDebug(record: Record<string, unknown>, version: string): SetDecisionDebugEvent {
+  assertShape(record, setDecisionDebugSchema, version, "set_decision_debug");
+  return { event: "set_decision_debug", enabled: expectBoolean(record.enabled, version, "set_decision_debug", "enabled") };
 }

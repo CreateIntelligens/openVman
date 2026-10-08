@@ -184,6 +184,10 @@ test('Live debug rejects late turns and clears on interruption and reconnect', a
   const third = socket.sent.findLast(event=>event.event==='user_speak').turn_id
   socket.receive({...event,client_turn_id:third})
   assert.notEqual(chat.decisionDebug.value,null)
+  chat.setMode('text')
+  socket.receive({event:'user_transcription',session_id:'s1',text:'old audio',decision_turn_id:'live:s1:8'})
+  socket.receive({...event,scope:'audio_retrieval_only',diagnostics:{...report,turn_id:'live:s1:8'}})
+  assert.equal(chat.decisionDebug.value,null)
   socket.onclose()
   assert.equal(chat.decisionDebug.value,null)
 })

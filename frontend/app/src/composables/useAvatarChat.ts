@@ -461,7 +461,9 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
                      case 'user_transcription':
                             clearDecisionDebug()
-                            if (typeof data.decision_turn_id === 'string') pendingDecisionServerTurn = data.decision_turn_id
+                            if (currentMode === 'live' && typeof data.decision_turn_id === 'string') {
+                                   pendingDecisionServerTurn = data.decision_turn_id
+                            }
                             break
 
                      case 'server_search_results':

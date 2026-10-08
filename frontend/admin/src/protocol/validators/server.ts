@@ -6,6 +6,7 @@ import type {
   ServerStreamChunkEvent,
   SetLipSyncModeEvent,
   UserTranscriptionEvent,
+  ServerDecisionDebugEvent,
   VisemeFrame,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
@@ -21,6 +22,7 @@ import {
   serverStreamChunkSchema,
   setLipSyncModeSchema,
   userTranscriptionSchema,
+  serverDecisionDebugSchema,
 } from "./schema";
 import {
   assertShape,
@@ -164,6 +166,7 @@ export function validateUserTranscription(record: Record<string, unknown>, versi
     text: expectString(record.text, version, "text", eventName),
     session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
     timestamp: expectOptionalNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
+    decision_turn_id: expectOptionalNonEmptyString(record.decision_turn_id, version, "decision_turn_id", eventName),
   };
 }
 
@@ -190,4 +193,18 @@ function expectOptionalVisemeFrames(value: unknown, version: string): VisemeFram
       value: frameValue,
     };
   });
+}
+
+
+export function validateServerDecisionDebug(record: Record<string, unknown>, version: string): ServerDecisionDebugEvent {
+  const eventName = "server_decision_debug";
+  assertShape(record, serverDecisionDebugSchema, version, eventName);
+  const scope = expectEnumValue(record.scope, ["text", "audio_retrieval_only"], version, eventName, "scope");
+  return {
+    event: eventName,
+    session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
+    scope,
+    diagnostics: expectRecord(record.diagnostics, version),
+    ...(typeof record.client_turn_id === "string" ? { client_turn_id: record.client_turn_id } : {}),
+  };
 }

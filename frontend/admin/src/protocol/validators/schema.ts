@@ -12,6 +12,8 @@ import setLipSyncModeSchemaJson from "@contracts/schemas/v1/set_lip_sync_mode.sc
 import serverStopAudioSchemaJson from "@contracts/schemas/v1/server_stop_audio.schema.json";
 import serverCameraFrameStatusSchemaJson from "@contracts/schemas/v1/server_camera_frame_status.schema.json";
 import userTranscriptionSchemaJson from "@contracts/schemas/v1/user_transcription.schema.json";
+import setDecisionDebugSchemaJson from "@contracts/schemas/v1/set_decision_debug.schema.json";
+import serverDecisionDebugSchemaJson from "@contracts/schemas/v1/server_decision_debug.schema.json";
 import type {
   ContractManifest,
   ProtocolEventName,
@@ -47,6 +49,8 @@ export const schemaRegistry = {
   server_stop_audio: serverStopAudioSchemaJson as EventSchema,
   server_camera_frame_status: serverCameraFrameStatusSchemaJson as EventSchema,
   user_transcription: userTranscriptionSchemaJson as EventSchema,
+  set_decision_debug: setDecisionDebugSchemaJson as EventSchema,
+  server_decision_debug: serverDecisionDebugSchemaJson as EventSchema,
 } satisfies Record<ProtocolEventName, EventSchema>;
 
 export const clientInitSchema = schemaRegistry.client_init;
@@ -62,6 +66,8 @@ export const setLipSyncModeSchema = schemaRegistry.set_lip_sync_mode;
 export const serverStopAudioSchema = schemaRegistry.server_stop_audio;
 export const serverCameraFrameStatusSchema = schemaRegistry.server_camera_frame_status;
 export const userTranscriptionSchema = schemaRegistry.user_transcription;
+export const setDecisionDebugSchema = schemaRegistry.set_decision_debug;
+export const serverDecisionDebugSchema = schemaRegistry.server_decision_debug;
 
 export const allowedServerErrorCodes = readEnum(serverErrorSchema, "error_code") as ServerErrorEvent["error_code"][];
 export const allowedVisemeValues = readEnum(serverStreamChunkSchema, "visemes", "value") as VisemeFrame["value"][];

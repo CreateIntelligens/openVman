@@ -10,6 +10,7 @@ import {
   validateClientInterrupt,
   validateClientVideoFrame,
   validateUserSpeak,
+  validateSetDecisionDebug,
 } from "./validators/client";
 import { DEFAULT_PROTOCOL_VERSION, manifest } from "./validators/schema";
 import {
@@ -27,6 +28,7 @@ import {
   validateServerStreamChunk,
   validateSetLipSyncMode,
   validateUserTranscription,
+  validateServerDecisionDebug,
 } from "./validators/server";
 
 export { DEFAULT_PROTOCOL_VERSION, ProtocolValidationError };
@@ -80,6 +82,8 @@ function validateEvent(
       return validateClientAudioEnd(record, version);
     case "set_lip_sync_mode":
       return validateSetLipSyncMode(record, version);
+    case "set_decision_debug":
+      return validateSetDecisionDebug(record, version);
     case "server_stream_chunk":
       return validateServerStreamChunk(record, version);
     case "server_error":
@@ -92,6 +96,8 @@ function validateEvent(
       return validateServerCameraFrameStatus(record, version);
     case "user_transcription":
       return validateUserTranscription(record, version);
+    case "server_decision_debug":
+      return validateServerDecisionDebug(record, version);
     default:
       throw new ProtocolValidationError(
         `Unsupported protocol event \`${eventName}\``,
