@@ -51,6 +51,7 @@
 
 ### Documentation
 
+- **[2026-10-09]** 新增計畫 `docs/plans/turn-latency.md`（Draft）：每輪從講完到聽到聲音 p50 約 7 秒的拆解（Brain 4 秒、每輪 LLM 2 次各約 1.3 秒、TTS 等整段回答才開始），依效益排序的待做，外部 Clef 包裝層建議，以及決策功能（e9b49ee 等）的審查待辦。
 - **[2026-10-07]** 實驗 `scripts/experiments/fts-ngram/`：knowledge 表的全文索引改用 ngram 斷詞，鶴記dev 145 題前 5 名命中 123 → 128，多命中的幾乎都是語音辨識聽錯的句子；型號縮寫查詢（「EUBL 有哪些馬力」）兩種都撈不到，未採用。
 - **[2026-10-07]** `docs/specs/03_BRAIN_SPEC.md` 改寫成只描述現況：workspace 結構改成實際的 `/data/projects/<id>/`，拿掉 `~/.openclaw/` 目錄樹、OpenClaw 設計來源、日期與實驗數字，以及已不存在的模組、環境變數、SSE 串流與影子模式；更正 embedding 精度（CUDA bf16、CPU fp32）、Session 存活時間（30 天）、輸入過長回 400 不截斷、每日摘要不呼叫 LLM、Action request 由前端執行等敘述。
 - **[2026-10-06]** `brain/README.md` 改寫成依主題組織的 Brain 說明，移除已退場功能（BGE 意圖影子、Jev 影子、SemIf）的歷程與實測紀錄，並依程式更正過時說法（Brain 僅內部呼叫、子套件路徑、session 存在各專案的 SQLite、增量重建索引、記憶自動召回預設開、隱私過濾只偵測不遮罩）。`.env.example` 拿掉不存在的 `PRIVACY_FILTER_EGRESS_ENABLED`，`AUTO_RECALL_ENABLED` 預設改註明為 true。
