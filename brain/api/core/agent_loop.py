@@ -172,6 +172,24 @@ def _resolve_forced_first_tool(
     return None
 
 
+# Gemini 3 要求每一輪第一筆工具呼叫帶 thought_signature；模型只回文字、由伺服器補上的
+# 呼叫就是第一筆，沒帶會 400 後換下一站（實測多等約 2.7 秒）。官方給伺服器自行插入的呼叫
+# 用這個值略過檢查；排在模型自己呼叫之後的平行呼叫不需要簽章。
+_SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator"
+
+
+def _append_synthetic_call(
+    turn: LLMReply, call_id: str, name: str, arguments: dict[str, Any],
+) -> LLMReply:
+    synthetic = LLMToolCall(
+        id=call_id,
+        name=name,
+        arguments=json.dumps(arguments, ensure_ascii=False),
+        extra_content=None if turn.tool_calls else {"thought_signature": _SKIP_THOUGHT_SIGNATURE},
+    )
+    return replace(turn, tool_calls=[*turn.tool_calls, synthetic])
+
+
 def _ensure_knowledge_search(turn: LLMReply, user_message: str) -> LLMReply:
     """Add a search_knowledge call with the raw user message when the model skipped it.
 
@@ -179,37 +197,21 @@ def _ensure_knowledge_search(turn: LLMReply, user_message: str) -> LLMReply:
     """
     if any(call.name == KNOWLEDGE_SEARCH_TOOL for call in turn.tool_calls):
         return turn
-    synthetic = LLMToolCall(
-        id="auto-search-knowledge",
-        name=KNOWLEDGE_SEARCH_TOOL,
-        arguments=json.dumps({"queries": [user_message]}, ensure_ascii=False),
-        extra_content=None,
+    return _append_synthetic_call(
+        turn, "auto-search-knowledge", KNOWLEDGE_SEARCH_TOOL, {"queries": [user_message]},
     )
-    return replace(turn, tool_calls=[*turn.tool_calls, synthetic])
 
 
 def _ensure_web_search(turn: LLMReply, user_message: str) -> LLMReply:
     if any(call.name == "search_web" for call in turn.tool_calls):
         return turn
-    synthetic = LLMToolCall(
-        id="auto-search-web",
-        name="search_web",
-        arguments=json.dumps({"query": user_message}, ensure_ascii=False),
-        extra_content=None,
-    )
-    return replace(turn, tool_calls=[*turn.tool_calls, synthetic])
+    return _append_synthetic_call(turn, "auto-search-web", "search_web", {"query": user_message})
 
 
 def _ensure_memory_search(turn: LLMReply, user_message: str) -> LLMReply:
     if any(call.name == "search_memory" for call in turn.tool_calls):
         return turn
-    synthetic = LLMToolCall(
-        id="auto-search-memory",
-        name="search_memory",
-        arguments=json.dumps({"queries": [user_message]}, ensure_ascii=False),
-        extra_content=None,
-    )
-    return replace(turn, tool_calls=[*turn.tool_calls, synthetic])
+    return _append_synthetic_call(turn, "auto-search-memory", "search_memory", {"queries": [user_message]})
 
 
 _WEB_TOOLS = frozenset({"search_web", "read_web_page"})

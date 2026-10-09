@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- **[2026-10-09]** **模型第一輪只回文字時，補上的查詢被 Gemini 拒絕、換站多等約 2.7 秒**：強制查詢那一輪模型沒叫工具時，伺服器會補一筆 `search_knowledge`（以及需要時的 `search_web`、`search_memory`），但這筆是這一輪第一筆工具呼叫，Gemini 3 要求帶 thought_signature，沒帶就回 400、整輪改由下一站重來。現在伺服器補的呼叫若是第一筆就帶官方的略過值 `skip_thought_signature_validator`；排在模型自己的呼叫之後時不需要簽章。
 - **[2026-10-09]** **Gemini Live 預取知識庫後前台沒有引用與圖片**：每輪決策判定要查知識庫時，Brain 先替模型查好並告訴它「已查過」，模型就不再呼叫 `search_knowledge`，而預取路徑從沒送 `server_search_results`，前台的引用與媒體不會出現。預取完成且仍是同一輪時，現在照一般工具呼叫送出引用（共用同一個送出函式）；模型照樣呼叫時拿快取，不重送。
 - **[2026-10-09]** **Gemini Live 決策被新回合取消時整條連線斷掉**：工具呼叫等決策、或文字回合等決策時，若新的一輪（語音轉錄、`send_turn_complete`）取消了決策 task，`CancelledError` 會穿出 listener 或 relay dispatch，listener 結束、連線被關、這輪回答遺失。現在決策 task 被取消只算沒有決策，呼叫端自己被取消才往上拋。語音轉錄進來時也會清掉上一輪的決策，決策沒回來前不會拿上一輪的 policy 配這一句。
 - **[2026-10-09]** **Gemini Live 文字回合預取沒有總時限**：知識庫、網路、記憶並行預取完才送給模型，`search_web` 最長約 20 秒，使用者講完到模型開口全在乾等。現在預取總時限 `LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`（預設 1 秒），逾時的那項取消並改列 `required_reads` 讓模型自己查；`[視覺事件]` 回合不再跑決策與預取。

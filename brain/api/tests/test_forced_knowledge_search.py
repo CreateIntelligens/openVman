@@ -818,3 +818,32 @@ class TestFollowupRoundCap:
         assert len(calls) == 3
         assert calls[1]["tools"] == [_WEB_TOOL_SPEC]
         assert calls[2]["tools"] is None
+
+
+class TestSyntheticCallSignature:
+    """Gemini 3 rejects a turn whose first tool call has no thought_signature (400, then a fallback hop)."""
+
+    def test_first_synthetic_call_carries_the_skip_signature(self, monkeypatch):
+        agent_loop = _load_agent_loop(monkeypatch)
+        text_only = agent_loop.LLMReply(content="", tool_calls=[], model="m1")
+
+        turn = agent_loop._ensure_knowledge_search(text_only, "50EUBL 口徑")
+        turn = agent_loop._ensure_web_search(turn, "50EUBL 口徑")
+
+        first, second = turn.tool_calls
+        assert first.extra_content == {"thought_signature": "skip_thought_signature_validator"}
+        assert second.extra_content is None
+        payload = agent_loop._serialize_tool_call(first)
+        assert payload["extra_content"] == {"google": {"thought_signature": "skip_thought_signature_validator"}}
+
+    def test_synthetic_call_after_a_model_call_needs_no_signature(self, monkeypatch):
+        agent_loop = _load_agent_loop(monkeypatch)
+        model_call = agent_loop.LLMToolCall(
+            id="c1", name="search_web", arguments="{}", extra_content={"thought_signature": "real"},
+        )
+        turn = agent_loop.LLMReply(content="", tool_calls=[model_call], model="m1")
+
+        turn = agent_loop._ensure_knowledge_search(turn, "50EUBL 口徑")
+
+        assert turn.tool_calls[0].extra_content == {"thought_signature": "real"}
+        assert turn.tool_calls[1].extra_content is None
