@@ -20,6 +20,9 @@
 
 ### Fixed
 
+- **[2026-10-09]** **Gemini Live 預取知識庫後前台沒有引用與圖片**：每輪決策判定要查知識庫時，Brain 先替模型查好並告訴它「已查過」，模型就不再呼叫 `search_knowledge`，而預取路徑從沒送 `server_search_results`，前台的引用與媒體不會出現。預取完成且仍是同一輪時，現在照一般工具呼叫送出引用（共用同一個送出函式）；模型照樣呼叫時拿快取，不重送。
+- **[2026-10-09]** **Gemini Live 決策被新回合取消時整條連線斷掉**：工具呼叫等決策、或文字回合等決策時，若新的一輪（語音轉錄、`send_turn_complete`）取消了決策 task，`CancelledError` 會穿出 listener 或 relay dispatch，listener 結束、連線被關、這輪回答遺失。現在決策 task 被取消只算沒有決策，呼叫端自己被取消才往上拋。語音轉錄進來時也會清掉上一輪的決策，決策沒回來前不會拿上一輪的 policy 配這一句。
+- **[2026-10-09]** **Gemini Live 文字回合預取沒有總時限**：知識庫、網路、記憶並行預取完才送給模型，`search_web` 最長約 20 秒，使用者講完到模型開口全在乾等。現在預取總時限 `LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`（預設 1 秒），逾時的那項取消並改列 `required_reads` 讓模型自己查；`[視覺事件]` 回合不再跑決策與預取。
 - **[2026-10-09]** 測試 `test_failed_provider_chain_builds_baseline_and_never_raises` 時好時壞：它 patch `decision_router.decide`，但 `turn_decisions` 直接 import `decide`，實際呼叫到真的決策路由，結果取決於前面測試留下的設定快取。改成 patch `turn_decisions.decide`。
 - **[2026-10-09]** **每輪決策多等 1 秒、Clef 從沒被用到**：每輪送 14 題給決策供應鏈，Clef（.32 本機）要約 2,000 tokens、960 ms，主備兩站都在每站 0.4 秒時逾時，每輪固定由 Jev 回答、多等約 1.03 秒（正式環境實測 9 輪皆如此）。輸入語言 9 題（佔六成 tokens）改由既有規則判斷、拿掉只進 prompt 資訊的意圖題，剩 5 題約 700～1,000 tokens，Clef 0.39～0.52 秒；每站時限預設改 0.6 秒。上網題補「新聞、天氣、匯率才算，問本專案產品不算」，明確語言的選項寫語言名稱（只寫 `nan` 時 Clef 認不出台語）。30 句標註訊息：5 題＋Clef 判錯 0 個欄位，原 14 題＋Jev 判錯 6 個（上網 3、記憶 2、語氣 1）。
 - **[2026-10-07]** **embedding 失敗一次就整個服務停擺一分鐘**：gateway 對失敗的 provider 冷卻 60 秒再改用下一家，但移除 BGE 與雲端備援後只剩 Gemma 一家，冷卻等於所有請求都回 503。實測另一個程式佔滿 GPU 造成一次 OOM 後，GPU 第 14 秒就放掉，服務仍拒絕到第 66 秒。現在所有 provider 都在冷卻時每秒放一個請求去試，同一實驗在 GPU 放掉後立即恢復；健康檢查照舊冷卻，模型壞掉時不會每 15 秒重載。

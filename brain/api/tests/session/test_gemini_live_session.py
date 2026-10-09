@@ -1392,3 +1392,285 @@ async def test_live_debug_events_are_opt_in_and_turn_bound():
     await session._emit_decision_debug(2, 'text')
     assert events[0]['event'] == 'server_decision_debug'
     assert events[0]['diagnostics']['policy']['tone'] == 'confused'
+
+
+def _decision(turn_id: str, **policy):
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    return TurnDecision(turn_id=turn_id, policy=TurnPolicy(**policy), source="clef-primary")
+
+
+@pytest.mark.asyncio
+async def test_live_text_prefetch_emits_citations_like_a_tool_call(monkeypatch):
+    """預取取代了模型自己的 search_knowledge，前台的引用與媒體也要照樣送到。"""
+    module, fake_config = _load_module()
+    transport = FakeTransport()
+    emitted = []
+
+    async def sink(event):
+        emitted.append(event)
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-prefetch-cite",
+        client_id="client-prefetch-cite",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=sink,
+    )
+    citations = [{"source": "pump.md", "image_id": "img-1"}]
+
+    async def fake_decide(*args, **kwargs):
+        return _decision("live:cite:1", needs_knowledge=True)
+
+    async def fake_execute(call, **kwargs):
+        return {"id": call["id"], "name": call["name"], "response": {
+            "queries": ["幫浦規格？"], "citations": citations,
+        }}
+
+    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._tools, "execute", fake_execute)
+    await session.send_text_turn("幫浦規格？")
+
+    results = [event for event in emitted if event["event"] == "server_search_results"]
+    assert len(results) == 1
+    assert results[0]["session_id"] == "relay-prefetch-cite"
+    assert results[0]["tool_name"] == "search_knowledge"
+    assert results[0]["citations"] == citations
+    # 模型被告知已查過、照樣呼叫時拿快取，不再送第二次引用。
+    cached = await session._execute_function_call({
+        "id": "model-call", "name": "search_knowledge", "args": {"queries": ["幫浦規格？"]},
+    })
+    assert cached["response"]["citations"] == citations
+    assert len([e for e in emitted if e["event"] == "server_search_results"]) == 1
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_live_stale_prefetch_does_not_emit_citations(monkeypatch):
+    module, fake_config = _load_module()
+    emitted = []
+
+    async def sink(event):
+        emitted.append(event)
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-stale-cite",
+        client_id="client-stale-cite",
+        config=fake_config,
+        event_sink=sink,
+    )
+
+    async def fake_decide(*args, **kwargs):
+        return _decision("live:stale:1", needs_knowledge=True)
+
+    async def fake_execute(call, **kwargs):
+        session._turn_revision += 1  # 查詢途中來了新的一輪
+        return {"id": call["id"], "name": call["name"], "response": {"citations": [{"source": "old.md"}]}}
+
+    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._tools, "execute", fake_execute)
+    session._turn_revision = 1
+    await session._decide_and_prefetch_live_turn("舊問題", "", 1)
+
+    assert emitted == []
+    assert session._prefetched_reads == {}
+
+
+@pytest.mark.asyncio
+async def test_live_listener_survives_decision_cancelled_during_tool_call(monkeypatch):
+    """工具呼叫等決策時，新回合取消了決策 task：只算沒有決策，listener 不能跟著結束。"""
+    module, fake_config = _load_module()
+    transport = FakeTransport()
+
+    async def sink(event):
+        pass
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-cancel-tool",
+        client_id="client-cancel-tool",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=sink,
+    )
+    await session.ensure_connected()
+    waiting = asyncio.Event()
+
+    async def pending_decision():
+        waiting.set()
+        await asyncio.Event().wait()
+
+    async def fake_execute(call):
+        return {"id": call["id"], "name": call["name"], "response": {"ok": True}}
+
+    monkeypatch.setattr(session, "_execute_function_call", fake_execute)
+    session._turn_decision_task = asyncio.create_task(pending_decision())
+    await waiting.wait()
+    transport._messages.put_nowait({"toolCall": {"functionCalls": [
+        {"id": "call-1", "name": "search_knowledge", "args": {"queries": ["x"]}},
+    ]}})
+    for _ in range(5):
+        await asyncio.sleep(0)
+    await session.send_turn_complete()  # 取消決策 task
+
+    await _wait_for(lambda: any("toolResponse" in m for m in transport.sent_messages))
+    assert session._listener_task is not None and not session._listener_task.done()
+    assert session._transport is transport
+    assert transport.close_calls == 0
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_live_tool_call_still_propagates_its_own_cancellation():
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-own-cancel",
+        client_id="client-own-cancel",
+        config=fake_config,
+    )
+    decision_task = asyncio.create_task(asyncio.Event().wait())
+    session._turn_decision_task = decision_task
+    handler = asyncio.create_task(session._handle_tool_call({"functionCalls": []}))
+    await asyncio.sleep(0)
+    handler.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await handler
+    # 等決策時本來就不取消它；它屬於這一輪，不屬於這次工具呼叫。
+    assert not decision_task.done()
+    decision_task.cancel()
+
+
+@pytest.mark.asyncio
+async def test_text_turn_survives_decision_cancelled_by_transcription(monkeypatch):
+    """文字回合等決策時語音轉錄進來取消了它：relay dispatch 不能收到 CancelledError。"""
+    module, fake_config = _load_module()
+    _stub_memory()
+    transport = FakeTransport()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-cancel-text",
+        client_id="client-cancel-text",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+    )
+    deciding = asyncio.Event()
+
+    async def hanging_decide(*args, **kwargs):
+        deciding.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(session, "_decide_live_turn", hanging_decide)
+    send = asyncio.create_task(session.send_text_turn("文字問題"))
+    await deciding.wait()
+    await session._handle_input_transcription({"text": "語音問題"})
+
+    await asyncio.wait_for(send, timeout=1.0)
+    # 被較新的語音回合取代，舊的文字回合不送出。
+    assert not any("realtimeInput" in m for m in transport.sent_messages)
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_text_turn_cancellation_still_cancels_its_decision(monkeypatch):
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-cancel-own-text",
+        client_id="client-cancel-own-text",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+    )
+    deciding = asyncio.Event()
+
+    async def hanging_decide(*args, **kwargs):
+        deciding.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(session, "_decide_live_turn", hanging_decide)
+    send = asyncio.create_task(session.send_text_turn("文字問題"))
+    await deciding.wait()
+    decision_task = session._turn_decision_task
+    send.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await send
+    await asyncio.sleep(0)
+    assert decision_task is not None and decision_task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_live_prefetch_over_budget_is_left_to_the_model(monkeypatch):
+    """search_web 可能卡 20 秒；超過預取時限的那項改列 required_reads，回合照送。"""
+    module, fake_config = _load_module()
+    fake_config.live_gemini_prefetch_timeout_seconds = 0.05
+    transport = FakeTransport()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-budget",
+        client_id="client-budget",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+    )
+    web_cancelled = asyncio.Event()
+
+    async def fake_decide(*args, **kwargs):
+        return _decision("live:budget:1", needs_knowledge=True, needs_web=True)
+
+    async def fake_execute(call, **kwargs):
+        if call["name"] == "search_web":
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                web_cancelled.set()
+                raise
+        return {"id": call["id"], "name": call["name"], "response": {"ok": call["name"]}}
+
+    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._tools, "execute", fake_execute)
+    await asyncio.wait_for(session.send_text_turn("今天的匯率？"), timeout=1.0)
+
+    envelope = json.loads(transport.sent_messages[1]["realtimeInput"]["text"])
+    assert envelope["satisfied_reads"] == ["search_knowledge"]
+    assert envelope["required_reads"] == ["search_web"]
+    assert set(session._prefetched_reads) == {"search_knowledge"}
+    await asyncio.wait_for(web_cancelled.wait(), timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_visual_event_text_turn_skips_decision_and_prefetch(monkeypatch):
+    module, fake_config = _load_module()
+    transport = FakeTransport()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-visual",
+        client_id="client-visual",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+    )
+    decided = []
+
+    async def fake_decide(*args, **kwargs):
+        decided.append(args)
+        return _decision("live:visual:1", needs_knowledge=True)
+
+    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    await session.send_text_turn("[視覺事件] 畫面中出現一位訪客。")
+
+    assert decided == []
+    assert transport.sent_messages[1]["realtimeInput"]["text"] == "[視覺事件] 畫面中出現一位訪客。"
+
+
+@pytest.mark.asyncio
+async def test_audio_transcription_drops_previous_turn_decision(monkeypatch):
+    """新一句語音的決策還沒回來前，不能拿上一輪的 policy 配這一句。"""
+    module, fake_config = _load_module()
+    _stub_memory()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-audio-reset",
+        client_id="client-audio-reset",
+        config=fake_config,
+    )
+
+    async def hanging_decide(*args, **kwargs):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(session, "_decide_live_turn", hanging_decide)
+    session._turn_decision = _decision("live:previous:1", needs_web=True)
+    await session._handle_input_transcription({"text": "換個問題"})
+
+    assert session._turn_decision is None
+    await session.close()

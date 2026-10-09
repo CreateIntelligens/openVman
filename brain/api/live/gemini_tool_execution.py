@@ -96,6 +96,38 @@ class GeminiLiveToolExecutor:
 
         return {"id": call_id, "name": name, "response": response}
 
+    async def prefetch(
+        self,
+        reads: list[tuple[str, dict[str, Any]]],
+        *,
+        timeout: float,
+        **context: Any,
+    ) -> dict[str, dict[str, Any]]:
+        """Run read-only tools concurrently; reads still running at the budget are dropped."""
+        tasks = {
+            name: asyncio.create_task(self.execute(
+                {"id": f"prefetch-{name}", "name": name, "args": args}, **context,
+            ))
+            for name, args in reads
+        }
+        try:
+            # 使用者講完到模型開口之間全卡在這裡（search_web 可到 20 秒）；超過時限的
+            # 那項不等，呼叫端會把它留在 required_reads 讓模型自己查。
+            await asyncio.wait(tasks.values(), timeout=timeout)
+        finally:
+            for task in tasks.values():
+                task.cancel()
+        completed: dict[str, dict[str, Any]] = {}
+        for name, task in tasks.items():
+            # cancel() 之後要等下一輪事件迴圈才算 cancelled；沒做完的都算逾時。
+            if not task.done() or task.cancelled():
+                logger.info("Gemini Live prefetch over budget tool=%s", name)
+            elif task.exception() is not None:
+                completed[name] = {"error": type(task.exception()).__name__}
+            else:
+                completed[name] = task.result().get("response", {})
+        return completed
+
     def save_memory(
         self, args: dict[str, Any], user_message: str,
         decision_dependency_unavailable: bool = False,

@@ -73,6 +73,9 @@ class BrainSettings(BaseSettings):
     # 知識庫有台語文件的專案，Live 會把轉錄成中文字的句子另送這個模型聽是不是台語。
     # 13 句（台語 8、華英西 5）：3.5-flash-lite 台語 8/8、西語誤判 1，p50 1.4 s；3.5-flash 漏 1 句台語、2.3 s。
     live_audio_language_id_model: str = "gemini-3.5-flash-lite"
+    # 文字回合的預取（search_knowledge／web／memory）在送給模型前做完，這段時間使用者
+    # 只能乾等；search_web 最長約 20 秒。知識庫查詢通常 1 秒內回來，超過的那項改由模型自己查。
+    live_gemini_prefetch_timeout_seconds: float = Field(default=1.0, gt=0, le=10)
 
     # === Embedding 設定 ===
     # EmbeddingGemma 2（2026-10 取代 BGE-M3，scripts/experiments/embeddinggemma2/）。版本機制保留：

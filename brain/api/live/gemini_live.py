@@ -157,6 +157,8 @@ class GeminiLiveSession:
                 verdict = asyncio.get_running_loop().create_future()
                 verdict.set_result(TAIWANESE)
                 self._utterance_language = verdict
+        # 視覺事件是 routes_vision 注入的旁白，不是使用者提問；跑決策與預取只會拖慢反應。
+        if user_text and not user_text.startswith("[視覺事件]"):
             task = asyncio.create_task(
                 self._decide_and_prefetch_live_turn(
                     user_text, speech_language or "", revision,
@@ -164,13 +166,13 @@ class GeminiLiveSession:
             )
             self._turn_decision_task = task
             try:
-                self._turn_decision = await task
+                decision = await _turn_decision_result(task)
             finally:
                 if self._turn_decision_task is task:
                     self._turn_decision_task = None
             if revision != self._turn_revision:
                 return
-        if not user_text.startswith("[視覺事件]"):
+            self._turn_decision = decision
             await self._emit_decision_debug(revision, "text", client_turn_id)
         await transport.send_json(self._build_user_turn_message(user_text))
 
@@ -353,6 +355,7 @@ class GeminiLiveSession:
         self._cancel_turn_decision()
         self._turn_revision += 1
         revision = self._turn_revision
+        self._turn_decision = None
         self._prefetched_reads = {}
         self._prefetched_queries = {}
         utterance = bytes(self._utterance_pcm)
@@ -469,6 +472,11 @@ class GeminiLiveSession:
         if revision == self._turn_revision:
             self._prefetched_reads = reads
             self._prefetched_queries = {name: text for name in reads}
+            # 預取取代了模型自己的查詢（satisfied_reads），引用與媒體只能在這裡送給前台。
+            for name, response in reads.items():
+                if revision != self._turn_revision:
+                    break
+                await self._emit_search_results(name, response)
         return decision
 
     async def _update_live_turn_decision(self, text: str, revision: int) -> None:
@@ -520,29 +528,15 @@ class GeminiLiveSession:
         if not reads:
             return {}
 
-        async def execute_read(name: str, args: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-            result = await self._tools.execute(
-                {"id": f"prefetch-{name}", "name": name, "args": args},
-                user_message=user_text,
-                heard_language=speech_language or None,
-                retrieval_language=policy.retrieval_language,
-                decision_dependency_unavailable=decision.dependency_unavailable,
-            )
-            return name, result.get("response", {})
-
-        results = await asyncio.gather(
-            *(execute_read(name, args) for name, args in reads),
-            return_exceptions=True,
+        completed = await self._tools.prefetch(
+            reads,
+            timeout=float(getattr(self.config, "live_gemini_prefetch_timeout_seconds", 1.0)),
+            user_message=user_text,
+            heard_language=speech_language or None,
+            retrieval_language=policy.retrieval_language,
+            decision_dependency_unavailable=decision.dependency_unavailable,
         )
-        if revision != self._turn_revision:
-            return {}
-        completed: dict[str, dict[str, Any]] = {}
-        for (name, _), result in zip(reads, results):
-            if isinstance(result, BaseException):
-                completed[name] = {"error": type(result).__name__}
-            else:
-                completed[result[0]] = result[1]
-        return completed
+        return completed if revision == self._turn_revision else {}
 
     def _cancel_turn_decision(self) -> None:
         task = self._turn_decision_task
@@ -718,12 +712,10 @@ class GeminiLiveSession:
     async def _handle_tool_call(self, tool_call: dict[str, Any]) -> None:
         function_calls = list(tool_call.get("functionCalls") or [])
         if self._turn_decision_task is not None:
-            try:
-                await asyncio.wait_for(
-                    asyncio.shield(self._turn_decision_task), timeout=2.2,
-                )
-            except (asyncio.TimeoutError, Exception):  # Keep the existing tool path on decision failure.
-                pass
+            # asyncio.wait 不會把決策 task 的取消（新回合開始）丟成這裡的 CancelledError；
+            # wait_for(shield()) 會，listener 就此結束、連線被關、這輪回答遺失。
+            # 逾時或失敗都照既有工具流程走。
+            await asyncio.wait({self._turn_decision_task}, timeout=2.2)
         if self._turn_decision is not None and self._turn_decision.source != "baseline":
             already_requested = {
                 str(call.get("name", "")) for call in function_calls
@@ -787,19 +779,21 @@ class GeminiLiveSession:
                 self._turn_decision and self._turn_decision.dependency_unavailable
             ),
         )
-        response = result["response"]
+        await self._emit_search_results(result["name"], result["response"])
+        return result
+
+    async def _emit_search_results(self, tool_name: str, response: Any) -> None:
         if isinstance(response, dict) and response.get("citations"):
             await self._emit(
                 {
                     "event": "server_search_results",
                     "session_id": self.relay_session_id,
-                    "tool_name": result["name"],
+                    "tool_name": tool_name,
                     "queries": response.get("queries", []),
                     "citations": response.get("citations", []),
                     "timestamp": int(time.time() * 1000),
                 }
             )
-        return result
 
     async def _emit(self, event: dict[str, Any]) -> None:
         if self._event_sink is not None:
@@ -954,6 +948,21 @@ class GeminiLiveSession:
         transcription = server_content.get("outputTranscription") or {}
         text = transcription.get("text", "")
         return text if isinstance(text, str) and text.strip() else ""
+
+
+async def _turn_decision_result(task: asyncio.Task) -> TurnDecision | None:
+    """Wait for a turn decision; the task being cancelled by a newer turn means none.
+
+    直接 `await task` 時，listener 收到新轉錄而取消決策 task，CancelledError 會穿出
+    send_text_turn、整條 relay WS 斷線。只有呼叫端自己被取消才往上拋。
+    """
+    try:
+        await asyncio.wait({task})
+    except asyncio.CancelledError:
+        task.cancel()
+        raise
+    return None if task.cancelled() else task.result()
+
 
 async def _sleep_before_retry(base_delay: int) -> None:
     await asyncio.sleep(base_delay + random.uniform(0, 0.25))
