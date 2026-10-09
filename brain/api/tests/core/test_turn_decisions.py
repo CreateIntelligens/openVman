@@ -239,7 +239,9 @@ def test_failed_provider_chain_builds_baseline_and_never_raises(monkeypatch):
     def unavailable(*args, **kwargs):
         raise decision_router.DecisionProviderError("all providers failed")
 
-    monkeypatch.setattr(decision_router, "decide", unavailable)
+    # turn_decisions 直接 import decide，要 patch 它用的那個名稱；只 patch decision_router
+    # 的話會呼叫到真的 decide，結果取決於前面測試留下的設定快取。
+    monkeypatch.setattr(turn_decisions, "decide", unavailable)
 
     result = run_turn_decision(
         user_text="你好",
