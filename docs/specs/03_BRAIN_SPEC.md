@@ -215,24 +215,28 @@ class BrainMessage:
 
 ### 7. Prompt 組裝與字元預算 (Prompt Assembly & Budget)
 
-`core/prompt_builder.build_chat_messages()` 組出 `[system, 最近對話..., user]`。system prompt 依序包含：
+`core/prompt_builder.build_chat_messages()` 組出 `[system, 最近對話..., user]`。system prompt 依序包含（固定內容在前、每輪會變的在後：Gemini 隱式快取只認完全相同的開頭，順序調整前只命中 25% 輸入 tokens；`tests/memory/test_prompt_recall.py` 檢查每輪內容不會插到固定內容之前）：
 
 ```
 ┌──────────────────────────────────────────────┐
 │ 開場定位（openVman Brain 的對話核心）           │
 │ 工具使用說明（不給工具時改為無工具版本）         │
 │ 產品規格篩選規則（專案有規格表時）               │
-│ ACTIVE_RECALL_CONTEXT（auto recall 摘要）      │
 │ IDENTITY → SOUL → MEMORY → AGENTS → TOOLS      │
 │   → LEARNINGS → ERRORS（依人設解析的核心文件）   │
+│ 回答規則                                       │
+│ ASR 詞表（第 14.5 節）                          │
+├──────── 以下每輪會變 ─────────────────────────┤
+│ ACTIVE_RECALL_CONTEXT（auto recall 摘要）      │
 │ REQUEST CONTEXT（trace_id、channel、locale、    │
 │   persona_id、message_type、current_time）     │
 │ 較早對話摘要                                   │
-│ 回答規則                                       │
-│ ASR 詞表（第 14.5 節）                          │
 │ 本輪回答語言與長度（第 14.3 節）                 │
+│ 當輪語氣與檢索提示（每輪決策）                   │
 └──────────────────────────────────────────────┘
 ```
+
+每輪決策判定不需要知識庫時，會改寫工具說明與回答規則裡「一定要先查」的句子，只有這類回合的快取會從工具說明斷開。
 
 `current_time` 以 `DREAMING_TIMEZONE`（預設 `Asia/Taipei`）顯示。短期記憶取最近 `SHORT_TERM_MEMORY_ROUNDS × 2` 則訊息（至少 8 則），每則最多 600 字；更早的訊息另以「較早對話摘要」帶入最後 8 則、每則最多 120 字。
 

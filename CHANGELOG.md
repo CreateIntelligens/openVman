@@ -83,6 +83,7 @@
 
 ### Changed
 
+- **[2026-10-09]** **系統提示改成固定內容在前**：Gemini 隱式快取只認完全相同的開頭，近 3 天只有 25% 輸入 tokens 命中（36 萬／142 萬）。原本 REQUEST CONTEXT（trace_id、精確到秒的時間）夾在人設與回答規則之間、自動回憶插在人設前面；現在回答規則與詞表移到人設後面，自動回憶、REQUEST CONTEXT、對話摘要、回答語言、語氣與檢索提示放最後。正式鶴記兩個不同問題的系統提示相同開頭從 79% 提高到 96%；新增測試檢查每輪內容不會插到固定內容之前。
 - **[2026-10-07]** Embedding gateway 的 `POST /embed` 多收 `input_type: "search_query"`：EmbeddingGemma 用「task: search result | query: 」前綴，identity 的 input_semantics 是 `search_query`，文件端不變。jtai 的 85 題口語改寫題用這個前綴前 5 名命中 80，question answering 前綴 75（BGE 83）；openVman 自己的資料仍是 question answering 較好，Brain 照舊送 `query`。
 - **[2026-10-07]** **Embedding 環境變數精簡**：模型、revision、批次大小、雲端 embedding 的模型與網址等預設值只寫在程式（`brain/embedding/app.py`、`brain/api/config.py`），compose 不再重複列一份（embedding 服務只傳 Bearer token 與雲端 API key，api 只留 token 的預設串接），`.env.example` 只留 `EMBEDDING_ACTIVE_VERSION`、`EMBEDDING_THRESHOLDS`。好處是預設值改了，watchtower 換 image 就生效，不必重建容器才吃到新的環境變數。Gateway 的 `EMBEDDING_BATCH_SIZE` 程式預設改成正式在用的 8，`EMBEDDING_PROVIDER_FALLBACKS` 程式預設含 `gemma`；EmbeddingGemma 固定 768 維，拿掉截短選項。
 - **[2026-10-07]** **Embedding 預設改用 EmbeddingGemma 2，取代 BGE-M3**：因供應鏈政策要移除 BAAI 的 bge-m3，換成 Google 的 `google/embeddinggemma-2`（Apache 2.0，768 維，revision 釘在 `914f7f89…`）。鶴記實測打平：正式檢索路徑跨語言 47/48（BGE 46/48）、選型題前 5 段涵蓋應列型號 47%（23%）、語音辨識打錯字的查詢 25 對 25；89 題實際問答盲測 16 勝 16 負 57 平，回應時間相同（`scripts/experiments/embeddinggemma2/`）。

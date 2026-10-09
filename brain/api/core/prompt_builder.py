@@ -87,9 +87,6 @@ def build_chat_messages(
         enabled_by_policy=turn_policy.auto_recall is not False if turn_policy else True,
         skip_jev_filter=decision_dependency_unavailable,
     )
-    if recall_block:
-        workspace_blocks.insert(0, recall_block)
-
     tool_instructions = DEFAULT_TOOL_INSTRUCTIONS if allow_tools else NO_TOOLS_INSTRUCTIONS
     answer_rules = DEFAULT_ANSWER_RULES if allow_tools else NO_TOOLS_ANSWER_RULES
     if allow_tools and turn_policy is not None:
@@ -97,6 +94,9 @@ def build_chat_messages(
             tool_instructions, answer_rules, turn_policy,
         )
 
+    # 固定的在前、每輪會變的在後：Gemini 隱式快取只認完全相同的開頭。原本 REQUEST
+    # CONTEXT（trace_id、精確到秒的時間）夾在人設與回答規則中間、自動回憶插在人設
+    # 前面，近 3 天只有 25% 輸入 tokens 命中快取。
     system_prompt = "\n\n".join(
 
         block
@@ -105,10 +105,11 @@ def build_chat_messages(
             tool_instructions,
             product_prompt_line(project_id) if allow_tools else "",
             *workspace_blocks,
-            _format_request_context(request_context),
-            history_summary,
             answer_rules,
             glossary_line(project_id),
+            recall_block,
+            _format_request_context(request_context),
+            history_summary,
             reply_language_line(
                 project_id, user_message, _speech_language(request_context),
                 resolved_language=turn_policy.response_language if turn_policy else None,

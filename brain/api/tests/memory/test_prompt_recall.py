@@ -191,3 +191,37 @@ class TestRecallToggleEndpoint:
 
         store = SessionStore(db_path=str(tmp_path / "test.db"))
         assert store.is_recall_disabled("nonexistent") is False
+
+
+class TestPromptCachePrefix:
+    """Gemini 隱式快取只認完全相同的開頭：每輪會變的內容都要在固定內容之後。"""
+
+    @patch("core.prompt_builder.load_core_workspace_context", return_value=_fake_workspace())
+    @patch("core.prompt_builder.get_settings")
+    def test_turn_specific_blocks_come_after_the_fixed_prefix(self, mock_settings, mock_workspace):
+        mock_settings.return_value = _FakeConfig(auto_recall_enabled=True)
+
+        from memory.auto_recall import RecallResult
+
+        def build(user_message: str, trace_id: str, recall: str) -> str:
+            result = RecallResult(summary=recall, status="ok", source="formatted", elapsed_ms=1.0)
+            with patch("memory.auto_recall.run_auto_recall", return_value=result):
+                from core.prompt_builder import build_chat_messages
+
+                return build_chat_messages(
+                    user_message=user_message,
+                    request_context={
+                        "persona_id": "default", "project_id": "default", "session_id": trace_id,
+                        "trace_id": trace_id, "channel": "web", "locale": "zh-TW", "message_type": "user",
+                    },
+                    session_messages=[{"role": "user", "content": f"earlier {trace_id}"}],
+                    allow_tools=True,
+                )[0]["content"]
+
+        first = build("50EUBL 的出水口徑多大？", "trace-a", "使用者喜歡喝茶")
+        second = build("Which pump for my basement?", "trace-b", "使用者住在台中")
+
+        fixed = first[: first.index("ACTIVE_RECALL_CONTEXT")]
+        assert second.startswith(fixed)
+        assert "回答規則" in fixed
+        assert "REQUEST CONTEXT" not in fixed and "trace-a" not in fixed
