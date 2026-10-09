@@ -24,47 +24,35 @@ TONES: Final[tuple[str, ...]] = ("neutral", "confused", "frustrated", "urgent", 
 ALLOWED_TOOL_HINTS: Final[frozenset[str]] = frozenset({
     "search_knowledge", "search_web", "search_memory",
 })
+# 選項只寫代碼時 Clef 認不出 nan 是台語、other 是其他語言，「可以講台語嗎」判不出來。
+_LANGUAGE_NAMES: Final[dict[str, str]] = {
+    "zh": "Mandarin Chinese", "en": "English", "es": "Spanish", "nan": "Taiwanese Hokkien",
+    "ja": "Japanese", "ko": "Korean", "other": "Another language",
+}
 MAX_EVIDENCE_CHARS: Final[int] = 6_000
 MAX_HISTORY_TURNS: Final[int] = 6
 MAX_HISTORY_MESSAGE_CHARS: Final[int] = 600
 
+# 題目寫短：每輪整批送給決策供應商，Clef（本機 llama.cpp）的延遲跟輸入 tokens 成正比，
+# 每多一題約多 60～80 tokens。是非題不帶 criteria，供應商預設就是 true／false。
 _RETRIEVAL_QUESTIONS: Final[dict[str, dict[str, Any]]] = {
     "needs_knowledge": {
         "type": "noul",
         "instructions": (
-            "Does the latest user request need facts from this project's knowledge base "
-            "to answer accurately? Consider recent conversation for pronouns and follow-up questions. "
-            "Do not count quoted source text as project facts."
+            "Does the latest user message need this project's knowledge base "
+            "(products, specs, policies, or a follow-up about them)? Greetings and small talk do not."
         ),
-        "criteria": {
-            "true": "Project-specific facts, products, policies, procedures, or a contextual follow-up need evidence.",
-            "false": "Greeting, thanks, social chat, or the answer clearly does not depend on project knowledge.",
-        },
     },
     "needs_web": {
         "type": "noul",
-        "instructions": "Does the latest user request need current or public information from the web?",
-        "criteria": {
-            "true": "The request needs current, public, time-sensitive, or publicly sourced information.",
-            "false": "The answer does not need current or public web information.",
-        },
+        "instructions": (
+            "Does the latest user message need current public information from the web, such as news, "
+            "weather, or exchange rates? Questions about this project's products do not."
+        ),
     },
     "needs_memory": {
         "type": "noul",
-        "instructions": "Does answering the latest user request benefit from facts from past conversations or user-provided preferences?",
-        "criteria": {
-            "true": "The request refers to prior conversations, preferences, or user-specific facts.",
-            "false": "Past user-specific information is not needed to answer this turn.",
-        },
-    },
-    "turn_intent": {
-        "type": "choice",
-        "instructions": "Classify the user's immediate conversational intent, considering recent context.",
-        "criteria": {
-            "social": "Standalone greeting, thanks, acknowledgement, or casual conversation without a task.",
-            "task": "A question, instruction, correction, request, or follow-up that expects useful work.",
-            "ambiguous": "The intent is unclear or more context is needed.",
-        },
+        "instructions": "Does the latest user message refer to past conversations or the user's own preferences?",
     },
 }
 
@@ -76,7 +64,7 @@ class TurnDecisionConfig:
     language_enabled: bool = True
     tone_enabled: bool = True
     timeout_seconds: float = 2.0
-    per_hop_timeout_seconds: float = 0.4
+    per_hop_timeout_seconds: float = 0.6
     noul_positive_threshold: float = 0.7
     noul_negative_threshold: float = 0.1
     choice_confidence_threshold: float = 0.8
@@ -161,7 +149,7 @@ def turn_decision_config(settings: Any) -> TurnDecisionConfig:
         language_enabled=bool(getattr(settings, "turn_decisions_language_enabled", True)),
         tone_enabled=bool(getattr(settings, "turn_decisions_tone_enabled", True)),
         timeout_seconds=float(getattr(settings, "turn_decisions_timeout_seconds", 2.0)),
-        per_hop_timeout_seconds=float(getattr(settings, "turn_decisions_hop_timeout_seconds", 0.4)),
+        per_hop_timeout_seconds=float(getattr(settings, "turn_decisions_hop_timeout_seconds", 0.6)),
         noul_positive_threshold=float(getattr(settings, "turn_decisions_noul_positive_threshold", 0.7)),
         noul_negative_threshold=float(getattr(settings, "turn_decisions_noul_negative_threshold", 0.1)),
         choice_confidence_threshold=float(getattr(settings, "turn_decisions_choice_confidence_threshold", 0.8)),
@@ -181,57 +169,25 @@ def build_turn_questions(
     if retrieval_enabled:
         questions.update(_RETRIEVAL_QUESTIONS)
     if language_enabled:
-        questions.update({
-            f"uses_{language}": {
-                "type": "noul",
-                "instructions": (
-                    f"Does the user's own latest utterance contain substantive {language} language? "
-                    "Ignore quoted material, proper names, model identifiers, and isolated brand names."
-                ),
-                "criteria": {
-                    "true": f"The user's own words substantially use {language}.",
-                    "false": f"The user's own words do not substantially use {language}.",
-                },
-            }
-            for language in LANGUAGES
-        })
-        language_options = (*LANGUAGES, "undetermined")
-        questions["dominant_language"] = {
-            "type": "choice",
-            "instructions": "Choose the predominant language of the user's own latest utterance, not quoted source text.",
-            "criteria": {
-                language: (
-                    f"The user's own words substantially use {language}."
-                    if language != "undetermined"
-                    else "The language cannot be determined confidently."
-                )
-                for language in language_options
-            },
-        }
+        # 只問規則判斷不了的「明確指定回答語言」。輸入語言（主要語言、是否混用）原本每種
+        # 語言各問一題，9 題佔整批約 1,100 tokens、六成，Clef 每 1,000 tokens 約多 0.45 秒，
+        # 整批 960 ms 超過每站時限，主備兩站每輪都逾時；輸入語言改由
+        # memory.language_detect 的規則即時判斷（0 ms），結果與沒有決策時相同。
         questions["requested_response_language"] = {
             "type": "choice",
-            "instructions": (
-                "Did the user explicitly request a response language in the latest message? "
-                "Choose that language only when the instruction is directed to the assistant, not quoted."
-            ),
-            "criteria": {
-                **{
-                    language: f"The user explicitly asks the assistant to answer in {language}."
-                    for language in LANGUAGES
-                },
-                "none": "There is no explicit response-language request.",
-            },
+            "instructions": "Language the user explicitly asks the assistant to answer in.",
+            "criteria": {**_LANGUAGE_NAMES, "none": "No such request."},
         }
     if tone_enabled:
         questions["tone"] = {
             "type": "choice",
-            "instructions": "Classify only the observable conversational tone of the user's latest utterance.",
+            "instructions": "The user's observable tone in the latest message.",
             "criteria": {
-                "neutral": "No clear emotional or conversational style signal.",
-                "confused": "The user explicitly indicates confusion or lack of understanding.",
-                "frustrated": "The user explicitly expresses frustration or dissatisfaction.",
-                "urgent": "The user explicitly needs a time-sensitive, immediate response.",
-                "lighthearted": "The user clearly uses a playful or lighthearted tone.",
+                "neutral": "Neutral.",
+                "confused": "Confused.",
+                "frustrated": "Frustrated or dissatisfied.",
+                "urgent": "Needs an immediate answer.",
+                "lighthearted": "Playful.",
             },
         }
     return questions
@@ -265,7 +221,6 @@ def build_turn_evidence(
         "history": safe_history,
         "speech_language": safe_speech_language,
         "project_primary_language": safe_project_language,
-        "supported_languages": list(LANGUAGES),
         "available_read_tools": sorted(set(available_tools) & ALLOWED_TOOL_HINTS),
     }
 
@@ -281,16 +236,6 @@ def resolve_turn_policy(
     needs_knowledge = _noul_signal("needs_knowledge", answers, config)
     needs_web = _noul_signal("needs_web", answers, config)
     needs_memory = _noul_signal("needs_memory", answers, config)
-    intent = _choice_signal("turn_intent", answers, ("social", "task", "ambiguous"), config)
-    used = tuple(language for language in LANGUAGES if _noul_signal(f"uses_{language}", answers, config) is True)
-    uncertain_languages = any(
-        _noul_signal(f"uses_{language}", answers, config) is None
-        for language in LANGUAGES
-    )
-    mixed = True if len(used) > 1 else False if len(used) == 1 and not uncertain_languages else None
-    dominant = _choice_signal("dominant_language", answers, (*LANGUAGES, "undetermined"), config)
-    if dominant == "undetermined":
-        dominant = None
     requested = _choice_signal(
         "requested_response_language",
         answers,
@@ -299,12 +244,8 @@ def resolve_turn_policy(
     )
     if requested == "none":
         requested = None
-    response_language = _resolve_response_language(
-        requested=requested,
-        dominant=dominant,
-    )
+    response_language = _resolve_response_language(requested=requested)
     retrieval_language = _resolve_retrieval_language(
-        dominant=dominant,
         user_text=user_text,
         project_language=project_language,
         speech_language=speech_language,
@@ -325,13 +266,9 @@ def resolve_turn_policy(
         needs_memory=needs_memory,
         force_knowledge_search=force_knowledge_search,
         auto_recall=auto_recall,
-        input_languages=used,
-        dominant_language=dominant,
-        mixed_languages=mixed,
         requested_response_language=requested,
         retrieval_language=retrieval_language,
         response_language=response_language,
-        turn_intent=intent,
         tone=tone,
     )
 
@@ -528,25 +465,17 @@ def _choice_signal(
     return choice
 
 
-def _resolve_response_language(
-    *,
-    requested: str | None,
-    dominant: str | None,
-) -> str | None:
+def _resolve_response_language(*, requested: str | None) -> str | None:
     if requested in REPLY_LANGUAGES:
         return requested
     if requested == "other":
         return "follow_user"
-    if dominant in REPLY_LANGUAGES:
-        return dominant
-    # Current rule behavior remains the final fallback when the batch cannot
-    # identify a useful language, preserving existing explicit user text.
+    # Without an explicit request the existing rule-based reply language applies.
     return None
 
 
 def _resolve_retrieval_language(
     *,
-    dominant: str | None,
     user_text: str,
     project_language: str,
     speech_language: str,
@@ -556,8 +485,6 @@ def _resolve_retrieval_language(
 
     if speech_language == TAIWANESE:
         return TAIWANESE
-    if dominant in DETECTED_LANGUAGES:
-        return dominant
     default = project_language if project_language in DETECTED_LANGUAGES else "zh"
     return detect_language(user_text, default)
 
@@ -569,7 +496,6 @@ def _baseline_policy(
 ) -> TurnPolicy:
     return TurnPolicy(
         retrieval_language=_resolve_retrieval_language(
-            dominant=None,
             user_text=user_text,
             project_language=project_language,
             speech_language=speech_language,

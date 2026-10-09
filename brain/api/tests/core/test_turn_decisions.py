@@ -33,12 +33,10 @@ def _choice(choice: str, probability: float = 0.95) -> dict:
 def test_questions_batch_has_stable_independent_signals():
     questions = build_turn_questions()
 
-    assert {"needs_knowledge", "needs_web", "needs_memory"} <= questions.keys()
-    assert {"uses_zh", "uses_en", "uses_es", "uses_nan", "uses_ja", "uses_ko", "uses_other"} <= questions.keys()
-    assert "requested_response_language" in questions
-    assert "dominant_language" in questions
-    assert "tone" in questions
-    assert len(questions) <= 32
+    # 輸入語言改由規則判斷，整批只問規則做不到的五題，Clef 才在每站時限內（約 0.4～0.5 秒）。
+    assert set(questions) == {
+        "needs_knowledge", "needs_web", "needs_memory", "requested_response_language", "tone",
+    }
     assert questions["needs_knowledge"]["type"] == "noul"
     assert questions["requested_response_language"]["type"] == "choice"
 
@@ -150,17 +148,8 @@ def test_policy_keeps_retrieval_and_language_signals_independent():
         "needs_knowledge": _noul(0.02),
         "needs_web": _noul(0.97),
         "needs_memory": _noul(0.96),
-        "turn_intent": _choice("task"),
-        "dominant_language": _choice("zh"),
         "requested_response_language": _choice("en"),
         "tone": _choice("confused"),
-        "uses_zh": _noul(0.98),
-        "uses_en": _noul(0.78),
-        "uses_es": _noul(0.02),
-        "uses_nan": _noul(0.01),
-        "uses_ja": _noul(0.01),
-        "uses_ko": _noul(0.01),
-        "uses_other": _noul(0.01),
     }
 
     policy = resolve_turn_policy(
@@ -176,8 +165,6 @@ def test_policy_keeps_retrieval_and_language_signals_independent():
     assert policy.needs_memory is True
     assert policy.force_knowledge_search is False
     assert policy.auto_recall is False
-    assert policy.dominant_language == "zh"
-    assert policy.mixed_languages is True
     assert policy.response_language == "en"
     assert policy.retrieval_language == "zh"
     assert policy.tone == "confused"
@@ -189,15 +176,9 @@ def test_uncertain_knowledge_keeps_existing_rag_policy():
         "needs_knowledge": _noul(0.45),
         "needs_web": _noul(0.02),
         "needs_memory": _noul(0.01),
-        "turn_intent": _choice("ambiguous"),
-        "dominant_language": _choice("zh"),
         "requested_response_language": _choice("none"),
         "tone": _choice("neutral"),
     }
-    answers.update({
-        f"uses_{code}": _noul(0.98 if code == "zh" else 0.01)
-        for code in ("zh", "en", "es", "nan", "ja", "ko", "other")
-    })
 
     policy = resolve_turn_policy(
         answers,
@@ -209,7 +190,9 @@ def test_uncertain_knowledge_keeps_existing_rag_policy():
 
     assert policy.needs_knowledge is None
     assert policy.force_knowledge_search is None
-    assert policy.response_language == "zh"
+    # 沒有明確指定語言時不覆寫，交給既有的規則判斷回答語言。
+    assert policy.response_language is None
+    assert policy.retrieval_language == "zh"
 
 
 def test_confident_social_turn_can_skip_forced_knowledge_without_affecting_other_reads():
@@ -235,15 +218,9 @@ def test_speech_language_controls_retrieval_but_explicit_language_controls_reply
         "needs_knowledge": _noul(0.97),
         "needs_web": _noul(0.02),
         "needs_memory": _noul(0.01),
-        "turn_intent": _choice("task"),
-        "dominant_language": _choice("zh"),
         "requested_response_language": _choice("en"),
         "tone": _choice("neutral"),
     }
-    answers.update({
-        f"uses_{code}": _noul(0.98 if code == "zh" else 0.01)
-        for code in ("zh", "en", "es", "nan", "ja", "ko", "other")
-    })
 
     policy = resolve_turn_policy(
         answers,

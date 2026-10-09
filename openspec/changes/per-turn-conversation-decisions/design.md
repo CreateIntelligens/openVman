@@ -48,13 +48,12 @@ Alternative: 每個用途各呼叫一次。這會重複傳送訊息、累積時�
 | `needs_knowledge` | noul | 需要專案的事實、產品或流程證據 |
 | `needs_web` | noul | 需要公開或即時資訊 |
 | `needs_memory` | noul | 需要過去對話／使用者提供的資訊 |
-| `turn_intent` | choice | `social`、`task`、`ambiguous`；協助保守判斷，不取代三個需求 |
-| `uses_<language>` | 每種語言一題 noul | `zh/en/es/nan/ja/ko/other`；判斷本輪使用者自己的實質語句 |
-| `dominant_language` | choice | 上述語言加 `undetermined` |
-| `requested_response_language` | choice | 上述語言加 `none`；`other` 保留原始明確要求 |
+| `requested_response_language` | choice | `zh/en/es/nan/ja/ko/other` 加 `none`；`other` 保留原始明確要求；選項寫語言名稱（例如 Taiwanese Hokkien），只寫代碼時 Clef 認不出台語 |
 | `tone` | choice | `neutral/confused/frustrated/urgent/lighthearted` |
 
-`mixed_languages` 由符合門檻的 input language flags 推導。每題獨立接受／棄權；低信心不重新詢問另一家來投票，該用途直接使用其保守預設。Provider transport／schema／拒答錯誤仍依管理者 chain 備援。
+原本另有 `turn_intent`、每種語言一題的 `uses_<language>` 與 `dominant_language`，共 14 題。Clef（本機 llama.cpp，RTX A4000）的延遲與輸入 tokens 成正比，包裝層每題固定約 60～80 tokens；14 題約 2,000 tokens、960 ms，主備兩站每輪都超過每站時限，實際一律由 Jev 回答且每輪多等 0.8 秒。輸入語言已有 `memory.language_detect` 規則即時判斷，`turn_intent` 只進 prompt 資訊與 Debug 面板，所以拿掉這 9 題；`input_languages`、`dominant_language`、`mixed_languages` 欄位保留但不再由 batch 填值，語言改由規則判斷。現在 5 題約 700～1,000 tokens（依歷史長度），Clef 約 0.39～0.52 秒，每站時限預設改為 0.6 秒。30 句標註訊息比較：5 題＋Clef 判錯 0 個欄位，原 14 題＋Jev 判錯 6 個。
+
+每題獨立接受／棄權；低信心不重新詢問另一家來投票，該用途直接使用其保守預設。Provider transport／schema／拒答錯誤仍依管理者 chain 備援。
 
 只接受 allowlisted choice 值與有效機率。Prompt 僅使用程式對固定代碼的映射；provider 回傳的其他文字無法新增 system instruction。
 

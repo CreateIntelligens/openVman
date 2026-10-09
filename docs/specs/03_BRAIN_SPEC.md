@@ -291,7 +291,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 請求欄位 `mode` 選擇深度，未知值退回 `standard`；`GET /brain/chat/modes` 列出目前設定。模式值透過 `core/reply_modes.ModeSettings` 覆寫設定，不修改全域 settings。
 
-一般 HTTP user turn 在載入近期歷史後、建立 prompt 前執行一次 `core.turn_decisions` batch，結果只存於伺服器端 `GenerationContext`。固定 typed questions 分開分類 knowledge、web、memory、turn intent、輸入語言、主語言、明確回覆語言與當輪 tone；evidence 僅含當輪原句、最多 6 則 user／assistant 歷史（每則 600 字元）、語言和允許的 read-tool 名稱，總字元上限 6,000。Noul 門檻為 positive 0.7、negative 0.1；choice confidence 0.8 且領先 0.2 才採用。信號逐項棄權，整體 2 秒、每 hop 0.4 秒。全部 hops、設定讀取或 timeout 失敗時使用 baseline policy；auto recall 會跳過本回合的 Jev filter，改走原有 LLM／formatted 摘要路徑。
+一般 HTTP user turn 在載入近期歷史後、建立 prompt 前執行一次 `core.turn_decisions` batch，結果只存於伺服器端 `GenerationContext`。固定 5 題 typed questions：knowledge、web、memory 需求、明確回覆語言與當輪 tone；輸入語言不問供應商，由 `memory.language_detect` 規則判斷。題數影響延遲：Clef 包裝層每題固定約 60～80 tokens，延遲與 tokens 成正比，5 題約 0.39～0.52 秒。evidence 僅含當輪原句、最多 6 則 user／assistant 歷史（每則 600 字元）、語音語言、專案主要語言和允許的 read-tool 名稱，總字元上限 6,000。Noul 門檻為 positive 0.7、negative 0.1；choice confidence 0.8 且領先 0.2 才採用。信號逐項棄權，整體 2 秒、每 hop 0.6 秒（`TURN_DECISIONS_HOP_TIMEOUT_SECONDS`）。全部 hops、設定讀取或 timeout 失敗時使用 baseline policy；auto recall 會跳過本回合的 Jev filter，改走原有 LLM／formatted 摘要路徑。
 
 高信心 `needs_knowledge=false` 會略過強制知識檢索，但仍保留 knowledge tool 供 agent 補查；正向 web／memory 會在合法工具第一輪以原句補上缺失 read call。Live finalized text 會在送出 generation 前執行必要 read-only prefetch，並以 bounded envelope 提供結果；結果明確標為不可信參考資料，已完成來源不重複呼叫。Mode、工具 registry、URL2MD 開關與 session recall 開關仍由既有程式決定。memory positive 使用 `search_memory` 並略過同回合 auto-recall；session recall 關閉時不會強制 memory read。memory write 仍由原本明確使用者意圖閘門控制。語言解析把 input、retrieval 與 response 分開；明確回覆語言優先於 ASR，response language 不會改寫訊息標籤或 TTS speech-language。Tone 只加當輪 delivery hint，不持久化。
 
@@ -419,7 +419,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 #### 14.3 回答語言與長度
 
-* **文字對話**：每一輪在 system prompt 最後明講「這一輪的回答語言」（`core/prompt_templates.reply_language_line`）。有效 per-turn decision 的明確回覆語言優先，接著使用輸入主語言；台語語音 retrieval 保留 `nan`，回覆文字使用指定的文字語言或繁體中文。decision 棄權時沿用規則判斷、ASR 與 project fallback。知識庫與人設裡的中文固定說法翻成回答語言。
+* **文字對話**：每一輪在 system prompt 最後明講「這一輪的回答語言」（`core/prompt_templates.reply_language_line`）。有效 per-turn decision 的明確回覆語言優先，其餘照規則判斷；台語語音 retrieval 保留 `nan`，回覆文字使用指定的文字語言或繁體中文。decision 棄權時沿用規則判斷、ASR 與 project fallback。知識庫與人設裡的中文固定說法翻成回答語言。
 * **回答長度**（`reply_length_line`，接在回答語言之後）：以念多久為準，秒數是專案的 `reply_seconds`（後台知識庫設定，預設 20、上限 120、0＝不限制且不加這行），中日韓每秒 4 字、其他語言每秒 1.5 個單字（20 秒＝80 字／30 個單字），寫成硬上限「每次回覆嚴格不超過 N 字，超過即違規」，一次問好幾件事時每件只講重點；不給「要詳細規格可以更長」的例外，也不截斷輸出。`GET /brain/knowledge/settings` 回應附 `speech_rates`。
 * **Gemini Live**：session setup instruction 維持連線共用；`send_text_turn()` 收到 finalized text（含 Backend 完成的 ASR 文字）會帶 server-owned JSON envelope，包含固定 policy code、必要 read 名稱與原始 user text。模型只把 envelope 的 policy 當當輪 guidance，`user_text` 保持不可信輸入。Gemini 直接接收 raw PCM 時，內部 ASR finalized transcript 更新當輪 policy/retrieval context，raw PCM partial 不單獨觸發 batch；此時 Gemini 生成已啟動，當輪音訊回覆維持 session baseline 語言與語氣。每輪 revision 更新會取消舊決策並防止舊預取套用。Live 仍使用既有語音回答長度行為。
 
