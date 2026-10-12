@@ -6,7 +6,22 @@ import json
 import sqlite3
 from collections.abc import Iterable
 
-from ._repository_base import RepositoryError, now_iso
+from ._account_access_rules import (
+    _normalize_account_access,
+    _persist_account_access,
+)
+from ._account_records import (
+    _append_auth_audit,
+    _defaults_from_row,
+    _grant_from_row,
+    _user_from_row,
+)
+from ._repository_base import (
+    InvalidResourceGrantError,
+    RepositoryError,
+    UserNotFoundError,
+    now_iso,
+)
 from .database import AuthDatabase
 from .models import (
     AccountDefaultsRecord,
@@ -15,16 +30,6 @@ from .models import (
     ResourceType,
 )
 from .policy import ensure_can_manage_account
-from .repositories import (
-    InvalidResourceGrantError,
-    UserNotFoundError,
-    _append_auth_audit,
-    _defaults_from_row,
-    _grant_from_row,
-    _normalize_account_access,
-    _persist_account_access,
-    _user_from_row,
-)
 
 
 class AccountAccessRepository:

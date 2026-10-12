@@ -1,8 +1,8 @@
 """Temporary account batches, credentials, and their grant persistence.
 
-從 repositories.py 搬出來的，行為未改。共用的 row 轉換與稽核 helper 仍留在
-原檔並由此 import：它們同時服務正式帳號那幾個 repository，複製一份只會讓
-兩邊各自漂移。
+共用的 row 轉換、稽核與授權 helper 由 _account_records.py 與
+_account_access_rules.py 提供：它們同時服務正式帳號那幾個 repository，
+複製一份只會讓兩邊各自漂移。
 """
 
 from __future__ import annotations
@@ -13,7 +13,25 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from ._repository_base import RepositoryError, now_iso
+from ._account_access_rules import (
+    _ensure_grants_within_granter_scope,
+    _normalize_account_access,
+    _persist_account_access,
+)
+from ._account_records import (
+    _append_auth_audit,
+    _defaults_from_row,
+    _grant_from_row,
+    _user_from_row,
+    normalize_username,
+)
+from ._repository_base import (
+    InvalidResourceGrantError,
+    RepositoryError,
+    UserNotFoundError,
+    _as_utc,
+    now_iso,
+)
 from .database import AuthDatabase
 from .models import (
     AccountDefaultsRecord,
@@ -55,25 +73,6 @@ class TemporaryBatchAccount:
 class TemporaryBatch:
     batch: TemporaryBatchRecord
     accounts: tuple[TemporaryBatchAccount, ...]
-
-
-# 共用 helper 與錯誤型別仍住在 repositories.py：它們同時服務正式帳號那幾個
-# repository。延後到函式外的模組層 import 會造成循環（repositories 也要
-# re-export 這個模組的 class），所以放在檔案尾端由 repositories 注入不可行，
-# 改為在此直接引用——Python 只在第一次使用時解析，循環在 import 時不會觸發。
-from .repositories import (
-    InvalidResourceGrantError,
-    UserNotFoundError,
-    _append_auth_audit,
-    _as_utc,
-    _defaults_from_row,
-    _ensure_grants_within_granter_scope,
-    _grant_from_row,
-    _normalize_account_access,
-    _persist_account_access,
-    _user_from_row,
-    normalize_username,
-)
 
 
 def _temporary_credential_from_row(

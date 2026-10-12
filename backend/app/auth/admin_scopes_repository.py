@@ -1,29 +1,28 @@
 """ROOT-assigned resource ceilings for administrators.
 
-從 repositories.py 搬出來的，行為未改。scope 的計算與級聯（_load_admin_scope、
-_narrow_subordinate_scopes、_revoke_grants_outside_scope）仍留在原檔：建立帳號
-那條路也要用它們，搬過來會反向依賴。
+scope 的計算與級聯（_load_admin_scope、_narrow_subordinate_scopes、
+_revoke_grants_outside_scope）住在 _admin_scope_rules.py：建立帳號那條路也要
+用它們，放在這裡會讓帳號 repository 反過來依賴本模組。
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-from ._repository_base import now_iso
-from .database import AuthDatabase
-from .models import AccountRole, AdminScope, ResourceType
-from .policy import ensure_can_manage_account
-
-# 這些留在 repositories.py：建立帳號那條路也要用，搬過來會反向依賴。
-from .repositories import (
-    InvalidResourceGrantError,
-    UserNotFoundError,
-    _append_auth_audit,
+from ._account_records import _append_auth_audit, _user_from_row
+from ._admin_scope_rules import (
     _load_admin_scope,
     _narrow_subordinate_scopes,
     _revoke_grants_outside_scope,
-    _user_from_row,
 )
+from ._repository_base import (
+    InvalidResourceGrantError,
+    UserNotFoundError,
+    now_iso,
+)
+from .database import AuthDatabase
+from .models import AccountRole, AdminScope, ResourceType
+from .policy import ensure_can_manage_account
 
 
 class AdminScopeRepository:

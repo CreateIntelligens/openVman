@@ -7,7 +7,31 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime
 from uuid import uuid4
 
-from ._repository_base import RepositoryError, now_iso
+from ._account_access_rules import (
+    _normalize_account_access,
+    _persist_account_access,
+)
+from ._account_records import (
+    _ADMIN_OR_ABOVE_PLACEHOLDERS,
+    _append_auth_audit,
+    _display_username,
+    _load_actor_and_target,
+    _user_from_row,
+    normalize_username,
+)
+from ._admin_scope_rules import _inherit_admin_scope
+from ._repository_base import (
+    AccountEnabledError,
+    AdminAlreadyExistsError,
+    InvalidResourceGrantError,
+    LastAdminError,
+    OwnedResourcesError,
+    RepositoryError,
+    SelfProtectionError,
+    UserNotFoundError,
+    UsernameConflictError,
+    now_iso,
+)
 from .database import AuthDatabase
 from .models import (
     ADMIN_OR_ABOVE_VALUES,
@@ -26,26 +50,7 @@ from .policy import (
     ensure_can_manage_account,
     ensure_can_reset_password,
 )
-from .repositories import (
-    AccountEnabledError,
-    AdminAlreadyExistsError,
-    InvalidResourceGrantError,
-    LastAdminError,
-    OwnedResourcesError,
-    SelfProtectionError,
-    UserNotFoundError,
-    UsernameConflictError,
-    _ADMIN_OR_ABOVE_PLACEHOLDERS,
-    _append_auth_audit,
-    _as_utc,
-    _display_username,
-    _inherit_admin_scope,
-    _load_actor_and_target,
-    _normalize_account_access,
-    _persist_account_access,
-    _user_from_row,
-    normalize_username,
-)
+
 
 class UserRepository:
     def __init__(self, database: AuthDatabase) -> None:
