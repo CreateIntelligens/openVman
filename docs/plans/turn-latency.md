@@ -43,7 +43,7 @@ Brain 這段（`usage.db`，近 4 天 112 輪）：每輪呼叫 LLM 2 次（96 �
 - 只管一個專案的 admin 能改整站決策設定；repo 慣例跨專案設定限 ROOT。
 - 插話判斷呼叫決策鏈時沒帶每站時限，第一站慢就用完 0.6 秒，Jev 輪不到，一律判 STOP。
 - 判定需要知識庫／記憶時無視 `CHAT_FORCE_KNOWLEDGE_SEARCH`、`AUTO_RECALL_ENABLED`，與設計文件不符。
-- 前台 Debug 按鈕蓋住「快速問題」按鈕上半部，非 kiosk 都看得到；樣式寫死 px 與顏色。
+- ~~前台 Debug 按鈕蓋住「快速問題」按鈕上半部；樣式寫死 px 與顏色~~：已修，移到快速問題正下方並改用主題 tokens（2026-10-12）。
 - 其他：`JEV_SHADOW_BASE_URL` 舊名在 backend 失效、金鑰解不開時後台顯示成「尚未設定」、幾處死碼與重複 import。
 
 ## 驗收

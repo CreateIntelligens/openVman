@@ -52,23 +52,22 @@ const appliedRows = computed(() => {
 })
 </script>
 <style scoped>
+/* 排在「快速問題」按鈕（右上 1.5rem、4.5rem 圓鈕）正下方：同一角落並排會蓋住它的上半部。 */
 .decision-debug, .decision-debug * { box-sizing: border-box; }
-.decision-debug { position: absolute; top: 1.5rem; right: 1.5rem; z-index: 15; max-width: calc(100% - 3rem); color: #f1f5f9; font-size: .8rem; }
-.debug-toggle { display: flex; align-items: center; gap: .5rem; margin-left: auto; padding: .6rem .75rem; border: 1px solid #526075; border-radius: .6rem; background: #172131; color: inherit; cursor: pointer; }
+.decision-debug { position: absolute; top: 6.75rem; right: 1.5rem; z-index: 15; max-width: calc(100% - 3rem); color: var(--text); font-size: .8rem; }
+.debug-toggle { display: flex; align-items: center; gap: .5rem; margin-left: auto; padding: .6rem .75rem; border: var(--hairline) solid var(--line); border-radius: .6rem; background: var(--bg-soft); color: inherit; cursor: pointer; box-shadow: var(--surface-shadow); }
 .debug-toggle svg { width: 1rem; height: 1rem; }
-.debug-toggle span { color: #a8d6ff; }
-.debug-content { width: 360px; max-width: 100%; margin-top: .5rem; padding: 1rem; border-radius: .75rem; background: #111c2b; box-shadow: 0 8px 24px #0006; max-height: min(65vh, 480px); overflow-y: auto; }
+.debug-toggle span { color: var(--primary); font-weight: 700; }
+.debug-content { width: 22.5rem; max-width: 100%; margin-top: .5rem; padding: 1rem; border: var(--hairline) solid var(--line); border-radius: .75rem; background: var(--bg-soft); box-shadow: 0 .5rem 1.5rem rgb(var(--ov-color-content) / .18); max-height: min(60svh, 30rem); overflow-y: auto; scrollbar-color: var(--line) transparent; }
 .debug-heading, .debug-provider, .debug-tone { display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
-.debug-heading button { border: 0; background: transparent; color: #cbd5e1; cursor: pointer; }
-.debug-provider { margin: 1rem 0 .65rem; color: #a8d6ff; }
+.debug-heading button { border: 0; background: transparent; color: var(--text-soft); cursor: pointer; }
+.debug-provider { margin: 1rem 0 .65rem; color: var(--primary); }
 .debug-tone { flex-wrap: wrap; margin: .65rem 0; }
-.debug-caption, .debug-empty, .debug-notice { color: #cbd5e1; line-height: 1.5; }
-.debug-notice { padding: .65rem; background: #263248; border-radius: .5rem; }
+.debug-caption, .debug-empty, .debug-notice { color: var(--text-soft); line-height: 1.5; }
+.debug-notice { padding: .65rem; background: var(--bg); border-radius: .5rem; }
 table { width: 100%; border-collapse: collapse; font-size: .75rem; }
-th, td { text-align: left; padding: .55rem .3rem; border-bottom: 1px solid #344256; vertical-align: top; }
-tbody th { font-weight: 400; } td:last-child { white-space: nowrap; } small { display: block; color: #a9bad0; margin-top: .25rem; }
-summary { cursor: pointer; padding: .8rem 0; } dl { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; } dd { margin: 0; } dt { color: #cbd5e1; }
-button:focus-visible, summary:focus-visible { outline: 2px solid #a8d6ff; outline-offset: 3px; }
-.debug-content { scrollbar-color: #526075 #111c2b; }
-@media (max-width: 640px) { .decision-debug { top: .7rem; right: .7rem; max-width: calc(100% - 1.4rem); } .debug-content { width: min(360px, calc(100vw - 3.5rem)); max-height: 45vh; } }
+th, td { text-align: left; padding: .55rem .3rem; border-bottom: var(--hairline) solid var(--line); vertical-align: top; }
+tbody th { font-weight: 400; } td:last-child { white-space: nowrap; } small { display: block; color: var(--text-soft); margin-top: .25rem; }
+summary { cursor: pointer; padding: .8rem 0; } dl { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; } dd { margin: 0; } dt { color: var(--text-soft); }
+@media (max-width: 40rem) { .debug-content { width: min(22.5rem, calc(100vw - 3.5rem)); max-height: 45svh; } }
 </style>
