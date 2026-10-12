@@ -6,7 +6,7 @@
 >
 > 重點落差：
 > - 第 1、2、4、5、8、14 節描述的「三引擎插拔渲染架構」（`LipSyncManager` / `Wav2LipStrategy` / `DinetStrategy` / `WebGLStrategy` / `manifest.json`）**未曾實作**，實際前端採用單一的 DHLiveMini2 WASM engine（見 `frontend/app/src/composables/useMatesX.ts`、`components/avatar/AvatarCanvas.vue`）。
-> - 第 13 節描述的媒體上傳走 HTTP multipart POST，但實作走的是 **WebSocket 傳 base64**（`useAvatarChat.ts` 的 `sendVisualInput` / `client_video_frame`），方向相反。
+> - 第 13 節描述的媒體上傳走 HTTP multipart POST，但實作走的是 **WebSocket 傳 base64**（`useAvatarVisualInput.ts` 的 `sendVisualInput` / `client_video_frame`，經 `useAvatarChat` 對外提供），方向相反。
 > - 第 12 節的管理介面目前已補齊 Canonical Routes：`navigation.ts` 統一路徑，`App.tsx` 用 History API 同步頁面、專案與子視圖；支援 `/admin/knowledge` 與公開 `/openvman` 前綴。詳見[後台路由現況](../guides/admin-canonical-routes.md)（2026-09-30 核對）。
 > - 第 6、7、9、10、11、12.5 節與現況大致相符，僅部分細節有出入，各節內文已個別註記。
 
@@ -204,7 +204,7 @@ Brain 在 SQLite 同一交易內檢查版本並寫入兩則訊息，未確認答
 * **SPEAKING** -> **IDLE**：觸發時機為收到 `is_final: true` 且 `audioQueue` 播放完畢。行為：清空 Canvas，停止繪製。
 * **任何狀態** -> **ERROR**：收到 `server_error` 時，暫停播放、在畫面上疊加錯誤提示。若 `retry_after_ms` 存在，倒數後自動恢復為 IDLE。
 
-> **現況更新（2026-07-01）**：`useAvatarChat.ts` 的 `AvatarState` 實際為 `DISCONNECTED | CONNECTING | RECONNECTING | IDLE | THINKING | SPEAKING | ERROR`，比規格多出連線相關的三個狀態。`SPEAKING → IDLE` 實際觸發時機是後端送出 `server_stop_audio` 事件，而非規格所述「`is_final` + 佇列播完」。`retry_after_ms` 倒數後自動恢復 IDLE 的邏輯目前**未實作**——只是把 `retry_after_ms` 透傳給呼叫端的 callback（見 `App.vue` 的 `onServerError`），沒有內建計時器自動恢復。
+> **現況更新（2026-07-01）**：`useAvatarChat.ts` 對外匯出的 `AvatarState`（定義在 `avatarChatTypes.ts`）實際為 `DISCONNECTED | CONNECTING | RECONNECTING | IDLE | THINKING | SPEAKING | ERROR`，比規格多出連線相關的三個狀態。`SPEAKING → IDLE` 實際觸發時機是後端送出 `server_stop_audio` 事件，而非規格所述「`is_final` + 佇列播完」。`retry_after_ms` 倒數後自動恢復 IDLE 的邏輯目前**未實作**——只是把 `retry_after_ms` 透傳給呼叫端的 callback（見 `App.vue` 的 `onServerError`），沒有內建計時器自動恢復。
 
 ### 8. 素材清單與定位 (Asset Manifest)
 
@@ -375,7 +375,7 @@ ws.onclose = () => { reconnect(); };
 3. **Response**: 取得 `job_id` 並記錄在前端狀態中。
 4. **Enrichment**: Gateway 處理完後會通知 Backend，Backend 再透過 WebSocket 發送 `gateway_status` 通知前端處理進度。
 
-> **現況更新（2026-07-01）**：與規格方向相反。`/uploads`、`multipart/form-data`、`GATEWAY_URL` 在兩個前端目錄都搜尋不到。實際攝影機影像走的是 **WebSocket 傳 base64**：`useAvatarChat.ts` 的 `sendVisualInput()` 組成 `client_video_frame` 事件連同 `frame_base64` 送出（`frontend/admin` 的 `useLiveSession.ts` 也是同樣模式），並非本節描述的 HTTP POST 上傳流程。若要落實此節，需要新增獨立的 HTTP 上傳端點與前端呼叫邏輯。
+> **現況更新（2026-07-01）**：與規格方向相反。`/uploads`、`multipart/form-data`、`GATEWAY_URL` 在兩個前端目錄都搜尋不到。實際攝影機影像走的是 **WebSocket 傳 base64**：`useAvatarVisualInput.ts` 的 `sendVisualInput()` 組成 `client_video_frame` 事件連同 `frame_base64` 送出（`frontend/admin` 的 `useLiveSession.ts` 也是同樣模式），並非本節描述的 HTTP POST 上傳流程。若要落實此節，需要新增獨立的 HTTP 上傳端點與前端呼叫邏輯。
 
 ### 13. 網關狀態監控 (Gateway Status Monitoring)
 

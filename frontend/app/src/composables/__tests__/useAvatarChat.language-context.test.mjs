@@ -1,4 +1,5 @@
 import { decisionDebugModuleUrl } from './helpers/decisionDebugModule.mjs';
+import { loadAvatarChat } from './helpers/avatarChatModule.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -22,10 +23,7 @@ const vueStubs = `
   const computed = (get) => ({ get value() { return get(); } });
   const watch = () => {};
 `;
-const { useAvatarChat } = await loadComposable("../useAvatarChat.ts", [
-  [/import.*from ['"]vue['"];?/, vueStubs],
-  [/import.*from ['"]\.\.\/api\/http['"];?/, "const apiFetch = (...args) => fetch(...args);"],
-]);
+const { useAvatarChat } = await loadAvatarChat("const apiFetch = (...args) => fetch(...args);");
 const { useLanguageRoutes } = await loadComposable("../useLanguageRoutes.ts", [
   [/import.*from ['"]vue['"];?/, vueStubs],
   [/import.*from ['"]\.\.\/api\/http['"];?/, "const apiFetch = (...args) => fetch(...args); const parseJson = (r) => r.json();"],

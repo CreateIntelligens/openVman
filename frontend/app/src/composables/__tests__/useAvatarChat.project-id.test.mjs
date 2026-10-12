@@ -1,11 +1,8 @@
-import { readFileSync } from "node:fs";
+import { avatarChatSource } from "./helpers/avatarChatModule.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
+const source = avatarChatSource;
 
 test("avatar chat keeps project id mutable for settings changes", () => {
   assert.match(source, /let currentProjectId = options\.projectId \?\? ['"]default['"]/);

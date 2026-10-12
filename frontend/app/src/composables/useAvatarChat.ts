@@ -1,7 +1,10 @@
 /**
- * useAvatarChat — Vue 3 composable for WebSocket communication
- * with the openVman backend gateway, with an optional text-mode fallback
- * that uses HTTP POST /api/v1/chat for multi-provider LLM access.
+ * useAvatarChat — Vue 3 composable for chat with the openVman backend
+ * gateway: messages, turn state, decision debug and live protocol events.
+ * Transport and side channels live in sibling modules:
+ *   useAvatarTransport   — live-mode WebSocket connect / reconnect
+ *   useAvatarTextTurn    — text-mode HTTP POST /api/v1/chat turns
+ *   useAvatarVisualInput — camera frames and visual signal state
  *
  * Protocol (live mode):
  *   client_init → server_init_ack
@@ -11,163 +14,39 @@
  * Text mode: uses /api/v1/chat (standard chat completions, any provider)
  */
 import { ref, readonly, onUnmounted } from 'vue'
-import { apiFetch } from '../api/http'
 import { parseDecisionDebug, type DecisionDebug } from '../components/debug/decisionDebug'
+import {
+       createClientId,
+       isRecord,
+       type AvatarState,
+       type ChatMessage,
+       type ChatOptions,
+       type ChatResponse,
+       type SendMessageResult,
+       type UtteranceContext,
+       type VisualState,
+} from './avatarChatTypes'
+import { useAvatarTextTurn } from './useAvatarTextTurn'
+import { useAvatarTransport } from './useAvatarTransport'
+import { DEFAULT_VISUAL_STATE, useAvatarVisualInput } from './useAvatarVisualInput'
 
-export type AvatarState = 'DISCONNECTED' | 'CONNECTING' | 'RECONNECTING' | 'IDLE' | 'THINKING' | 'SPEAKING' | 'ERROR'
-export type VisualSignalState = 'clear' | 'detecting' | 'locked'
-export type VisualSignalColor = 'green' | 'yellow' | 'red'
-
-export interface VisualState {
-       event_key: string
-       state: VisualSignalState
-       color: VisualSignalColor
-       label: string
-       active: boolean
-       true_streak: number
-       confirm_frames: number
-}
-
-export interface ChatMessage {
-       role: 'user' | 'ai'
-       text: string
-       timestamp: number
-       sourcePath?: string
-       sourcePathContent?: string
-       imageId?: string
-       url?: string
-       projectId?: string
-}
+export type {
+       AvatarState,
+       ChatMessage,
+       SendMessageResult,
+       UtteranceContext,
+       VisualSignalColor,
+       VisualSignalState,
+       VisualState,
+} from './avatarChatTypes'
+export { DEFAULT_TEXT_CHAT_ENDPOINT } from './useAvatarTextTurn'
+export { DEFAULT_VISION_ENDPOINT, DEFAULT_VISION_RESET_ENDPOINT } from './useAvatarVisualInput'
 
 interface Citation {
        image_id?: unknown
        image?: unknown
        url?: unknown
        source_url?: unknown
-}
-
-interface ChatResponse {
-       decision_debug?: unknown
-       reply?: string
-       session_id?: string
-       citations?: unknown
-       image_id?: unknown
-       url?: unknown
-       requires_accept?: boolean
-       turn_id?: string
-       turn_revision?: number
-}
-
-export interface SendMessageResult {
-       accepted: boolean
-       reason?: 'empty' | 'not_ready'
-       /** 這句跟還在等回答的上一句合併重送了（同一輪，不是新的一輪）。 */
-       merged?: boolean
-}
-
-export interface UtteranceContext {
-       source: 'text' | 'visual' | 'live'
-       speechLanguage: string | null
-}
-
-interface ChatOptions {
-       /** Called when a PCM audio chunk arrives (binary frame) */
-       onAudioChunk?: (data: ArrayBuffer) => void
-       /** Called when audio playback should stop */
-       onStopAudio?: () => void
-       /**
-        * Called when an LLM utterance finishes (is_final=true on
-        * server_stream_chunk). Receives the fully accumulated text for the
-        * utterance — use this to drive a TTS synthesis pass.
-        */
-       onUtteranceComplete?: (text: string, context: UtteranceContext) => void
-       /** Initial persona ID to use (default: "default") */
-       personaId?: string
-       /** Lip-sync mode to advertise after server_init_ack (default: "webgl") */
-       lipSyncMode?: string
-       /** Called on server_error with parsed error code, message and optional retry delay */
-       onServerError?: (code: string, message: string, retryAfterMs?: number) => void
-       /** Called when gateway_status event arrives */
-       onGatewayStatus?: (plugin: string, status: string, message: string) => void
-       /** Called whenever the WebSocket disconnects (before reconnect scheduling) */
-       onDisconnect?: () => void
-       /** Called after automatic reconnect attempts are exhausted */
-       onReconnectExhausted?: () => void
-       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/v1/chat */
-       mode?: 'live' | 'text'
-       /** Override text-mode chat endpoint. */
-       chatEndpoint?: string
-       /** Delivery acknowledgement for replaceable text turns. */
-       chatAcceptEndpoint?: string
-       /** Override text-mode vision describe endpoint. */
-       visionEndpoint?: string
-       /** Override text-mode vision reset endpoint. */
-       visionResetEndpoint?: string
-       /** Extra headers for text-mode requests. */
-       requestHeaders?: () => Record<string, string>
-       /** 每次送出時讀取的回覆深度（fast / standard / deep）。用 getter 而不是
-        *  固定值，使用者在設定裡改完下一句就生效。 */
-       replyMode?: () => string
-       /** Override live-mode WebSocket URL creation. */
-       wsUrlBuilder?: (clientId: string) => string
-       /** Surface name sent in client_init capabilities. */
-       surface?: string
-       /** Project ID sent in client_init and text-mode requests. */
-       projectId?: string
-}
-
-function createClientId(): string {
-       if (crypto?.randomUUID) return crypto.randomUUID()
-
-       if (crypto?.getRandomValues) {
-              const bytes = new Uint8Array(16)
-              crypto.getRandomValues(bytes)
-              bytes[6] = (bytes[6] & 0x0f) | 0x40
-              bytes[8] = (bytes[8] & 0x3f) | 0x80
-              const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
-              return [hex.slice(0,4), hex.slice(4,6), hex.slice(6,8), hex.slice(8,10), hex.slice(10,16)]
-                     .map(g => g.join('')).join('-')
-       }
-
-       return `client-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-const MAX_RECONNECT_ATTEMPTS = 6
-const CONNECT_TIMEOUT_MS = 10000
-export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/v1/chat'
-export const DEFAULT_VISION_ENDPOINT = '/api/v1/vision/describe'
-export const DEFAULT_VISION_RESET_ENDPOINT = '/api/v1/vision/reset'
-
-const DEFAULT_VISUAL_STATE: VisualState = {
-       event_key: 'person',
-       state: 'clear',
-       color: 'green',
-       label: '無人',
-       active: false,
-       true_streak: 0,
-       confirm_frames: 3,
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-       return typeof value === 'object' && value !== null
-}
-
-function normalizeVisualState(value: unknown): VisualState | null {
-       if (!isRecord(value)) return null
-       const state = value.state
-       const color = value.color
-       if (state !== 'clear' && state !== 'detecting' && state !== 'locked') return null
-       if (color !== 'green' && color !== 'yellow' && color !== 'red') return null
-
-       return {
-              event_key: typeof value.event_key === 'string' ? value.event_key : 'person',
-              state,
-              color,
-              label: typeof value.label === 'string' ? value.label : DEFAULT_VISUAL_STATE.label,
-              active: Boolean(value.active),
-              true_streak: typeof value.true_streak === 'number' ? value.true_streak : 0,
-              confirm_frames: typeof value.confirm_frames === 'number' ? value.confirm_frames : 3,
-       }
 }
 
 export function useAvatarChat(options: ChatOptions = {}) {
@@ -184,45 +63,64 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let activeImageId: string | undefined = undefined
        let activeUrl: string | undefined = undefined
 
-       let socket: WebSocket | null = null
-       let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-       let connectTimer: ReturnType<typeof setTimeout> | null = null
-       let connectPromise: Promise<void> | null = null
-       let resolveConnect: (() => void) | null = null
-       let rejectConnect: ((reason?: unknown) => void) | null = null
-       let reconnectAttempt = 0
-       let intentionalDisconnect = false
-       let lastUrlOverride: string | undefined
-       let clientId = createClientId()
        let currentPersonaId = options.personaId ?? 'default'
        let currentProjectId = options.projectId ?? 'default'
        const surface = options.surface ?? 'avatar'
        const currentLipSyncMode = options.lipSyncMode ?? 'webgl'
        let currentMode: 'live' | 'text' = options.mode ?? 'live'
-       // AbortController for in-flight text-mode fetch
-       let textAbortController: AbortController | null = null
-       let textRequestId = 0
-       // 文字模式還在等回答的那一句。使用者這時再補一句，就跟它合併成一次重送，
-       // 而不是只答後一句；messages 裡也只改那一則，不多一個氣泡。
-       let awaitingReply: { text: string; messageIndex: number; turnId: string; revision: number } | null = null
-       // 下一輪的歷史必須包含前台已接受的上一輪；停止播放不能撤銷這次確認。
-       let acceptingReply: Promise<void> | null = null
-       // 視覺管道每秒一幀；後端兩段 LLM 可能超過 1 秒。此旗標在前一幀
-       // 仍在處理時丟棄新幀，避免堆疊請求（與後端 VLM busy 保護同精神）。
-       let visionInFlight = false
        // Buffer of text chunks for the in-flight LLM utterance. Flushed to
        // `onUtteranceComplete` when `is_final=true` arrives (or on interrupt).
        let utteranceBuffer = ''
        let liveSpeechLanguage: string | null = null
        let responsePlaybackActive = false
 
-       function resetVisualState(): void {
-              visualState.value = { ...DEFAULT_VISUAL_STATE }
+       const transport = useAvatarTransport({
+              options,
+              state,
+              sessionId,
+              isTextMode: () => currentMode === 'text',
+              onOpen: () => sendEvent(_buildClientInit()),
+              onJsonMessage: handleJsonMessage,
+              onClose: clearDecisionDebug,
+       })
+       const { connect, sendEvent } = transport
+       const textTurn = useAvatarTextTurn({
+              options,
+              state,
+              messages,
+              sessionId,
+              decisionDebugEnabled,
+              decisionDebug,
+              projectId: () => currentProjectId,
+              personaId: () => currentPersonaId,
+              applyResponseMedia,
+              playReply,
+       })
+       const {
+              resetVisualState,
+              applyVisualState,
+              sendVisualInput,
+              canSendVisualInput,
+              resetVisualInput,
+       } = useAvatarVisualInput({
+              options,
+              visualState,
+              sessionId,
+              isTextMode: () => currentMode === 'text',
+              isLiveReady,
+              sendEvent,
+              projectId: () => currentProjectId,
+              personaId: () => currentPersonaId,
+              playReply,
+       })
+
+       function isLiveReady(): boolean {
+              return Boolean(transport.isOpen() && sessionId.value)
        }
 
-       function applyVisualState(value: unknown): void {
-              const next = normalizeVisualState(value)
-              if (next) visualState.value = next
+       function playReply(text: string, context: UtteranceContext): void {
+              responsePlaybackActive = true
+              options.onUtteranceComplete?.(text, context)
        }
 
        function optionalString(value: unknown): string | undefined {
@@ -268,7 +166,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
        function _buildClientInit(): Record<string, unknown> {
               return {
                      event: 'client_init',
-                     client_id: clientId,
+                     client_id: transport.clientId(),
                      protocol_version: '1.0.0',
                      capabilities: {
                             mode: 'gemini_live',
@@ -310,103 +208,6 @@ export function useAvatarChat(options: ChatOptions = {}) {
               currentPersonaId = personaId
        }
 
-       // ── Connect ────────────────────────────────────────────
-       function connect(url?: string): Promise<void> {
-               if (currentMode === 'text') {
-                      sessionId.value = createClientId()
-                      state.value = 'IDLE'
-                      return Promise.resolve()
-               }
-
-               if (sessionId.value && socket?.readyState === WebSocket.OPEN) {
-                      return Promise.resolve()
-               }
-               if (connectPromise) return connectPromise
-
-               intentionalDisconnect = false
-               connectPromise = new Promise((resolve, reject) => {
-                     resolveConnect = resolve
-                     rejectConnect = reject
-                     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-                     const host = window.location.host
-                     clientId = createClientId()
-                     const wsUrl = url ?? options.wsUrlBuilder?.(clientId) ?? `${protocol}://${host}/api/v1/ws/${clientId}`
-                     lastUrlOverride = url
-
-                     state.value = 'CONNECTING'
-                     socket = new WebSocket(wsUrl)
-                     socket.binaryType = 'arraybuffer'
-
-                     socket.onopen = () => {
-                            console.log('[AvatarChat] WebSocket connected')
-                            sendEvent(_buildClientInit())
-                     }
-
-                     socket.onmessage = (event) => {
-                            if (typeof event.data === 'string') {
-                                   handleJsonMessage(JSON.parse(event.data))
-                            } else {
-                                   // Binary frame = PCM audio chunk
-                                   options.onAudioChunk?.(event.data as ArrayBuffer)
-                            }
-                     }
-
-                     socket.onclose = () => {
-                            clearDecisionDebug()
-                            console.log('[AvatarChat] WebSocket disconnected')
-                            const disconnectError = new Error('WebSocket disconnected before initialization')
-                            rejectPendingConnect(disconnectError)
-                            socket = null
-                            sessionId.value = null
-                            state.value = 'DISCONNECTED'
-                            options.onDisconnect?.()
-                            if (intentionalDisconnect) return
-                            if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
-                                   state.value = 'ERROR'
-                                   console.warn('[AvatarChat] reconnect attempts exhausted')
-                                   options.onReconnectExhausted?.()
-                                   return
-                            }
-                            state.value = 'RECONNECTING'
-                            const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000)
-                            const delay = baseDelay * (0.75 + Math.random() * 0.5)
-                            reconnectAttempt++
-                            reconnectTimer = setTimeout(() => {
-                                   void connect(url).catch(console.error)
-                            }, delay)
-                     }
-
-                     socket.onerror = (err) => {
-                            console.error('[AvatarChat] WebSocket error:', err)
-                            state.value = 'ERROR'
-                     }
-
-                     connectTimer = setTimeout(() => {
-                            rejectPendingConnect(new Error('WebSocket initialization timed out'))
-                            socket?.close()
-                     }, CONNECT_TIMEOUT_MS)
-              })
-               return connectPromise
-       }
-
-       function resolvePendingConnect(): void {
-              if (connectTimer) clearTimeout(connectTimer)
-              connectTimer = null
-              resolveConnect?.()
-              connectPromise = null
-              resolveConnect = null
-              rejectConnect = null
-       }
-
-       function rejectPendingConnect(reason: unknown): void {
-              if (connectTimer) clearTimeout(connectTimer)
-              connectTimer = null
-              rejectConnect?.(reason)
-              connectPromise = null
-              resolveConnect = null
-              rejectConnect = null
-       }
-
        // ── Handle incoming JSON events ────────────────────────
        function handleJsonMessage(data: Record<string, unknown>): void {
               const event = data.event as string | undefined
@@ -415,8 +216,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      case 'server_init_ack':
                             sessionId.value = data.session_id as string
                             state.value = 'IDLE'
-                            reconnectAttempt = 0
-                            resolvePendingConnect()
+                            transport.resolvePendingConnect()
                             console.log(`[AvatarChat] Session: ${sessionId.value}`)
                             sendEvent({ event: 'set_lip_sync_mode', mode: currentLipSyncMode })
                             sendEvent({ event: 'set_decision_debug', enabled: decisionDebugEnabled.value })
@@ -500,17 +300,18 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             break
 
                      case 'ping':
-                            sendRaw(JSON.stringify({ event: 'pong', timestamp: Date.now() }))
+                            transport.sendRaw(JSON.stringify({ event: 'pong', timestamp: Date.now() }))
                             break
               }
        }
 
        /** 回答還沒出來（還沒有任何字）而且兩句都是使用者自己講的，才合併。
         *  快速問答帶著出處，跟別的話接在一起出處就不對了，所以不合併。 */
-       function mergeTarget(sourcePath?: string): typeof awaitingReply {
-               if (currentMode !== 'text' || state.value !== 'THINKING' || sourcePath) return null
-               if (!awaitingReply || activeSourcePath) return null
-               return messages.value[awaitingReply.messageIndex]?.role === 'user' ? awaitingReply : null
+       function mergeTarget(sourcePath?: string): ReturnType<typeof textTurn.pending> {
+              if (currentMode !== 'text' || state.value !== 'THINKING' || sourcePath) return null
+              const awaitingReply = textTurn.pending()
+              if (!awaitingReply || activeSourcePath) return null
+              return messages.value[awaitingReply.messageIndex]?.role === 'user' ? awaitingReply : null
        }
 
        // ── Send user message ──────────────────────────────────
@@ -521,370 +322,97 @@ export function useAvatarChat(options: ChatOptions = {}) {
               /** ASR 聽出的語言（例如台語 "nan"）；轉錄文字看不出來，要一起送給 Brain 記錄。 */
               speechLanguage?: string | null,
        ): SendMessageResult {
-               const trimmed = text.trim()
-               if (!trimmed) return { accepted: false, reason: 'empty' }
+              const trimmed = text.trim()
+              if (!trimmed) return { accepted: false, reason: 'empty' }
 
-               if (
-                      currentMode === 'live'
-                      && (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value)
-               ) {
-                      return { accepted: false, reason: 'not_ready' }
-               }
-
-               clearDecisionDebug()
-               const merge = mergeTarget(sourcePath)
-               stopActiveResponse()
-               activeSourcePath = sourcePath
-               activeSourcePathContent = sourcePathContent
-               activeImageId = undefined
-               activeUrl = undefined
-               if (currentMode === 'text') {
-                      if (merge) {
-                             // 語言以後一句為準：兩句不同語言時，最後講的那句通常才是使用者要的回答語言。
-                             void _sendMessageText(`${merge.text}\n${trimmed}`, speechLanguage, merge)
-                             return { accepted: true, merged: true }
-                      }
-                      void _sendMessageText(trimmed, speechLanguage)
-                      return { accepted: true }
-               }
-
-               liveSpeechLanguage = speechLanguage ?? null
-               messages.value.push({ role: 'user', text: trimmed, timestamp: Date.now() })
-               state.value = 'THINKING'
-               pendingDecisionClientTurn = createClientId()
-               sendEvent({
-                      event: 'user_speak',
-                      turn_id: pendingDecisionClientTurn,
-                      text: trimmed,
-                      timestamp: Date.now(),
-                      ...(speechLanguage ? { speech_language: speechLanguage } : {}),
-               })
-               return { accepted: true }
-       }
-
-       async function _sendMessageText(
-              text: string,
-              speechLanguage?: string | null,
-              /** 合併重送時，改寫這一則使用者訊息而不是新增一則。 */
-              mergedTurn?: NonNullable<typeof awaitingReply>,
-       ): Promise<void> {
-               const requestId = ++textRequestId
-               const abort = new AbortController()
-               textAbortController = abort
-               const previousAcceptance = acceptingReply
-               const turnId = mergedTurn?.turnId ?? createClientId()
-               const revision = (mergedTurn?.revision ?? 0) + 1
-               const requestSessionId = sessionId.value
-               const requestProjectId = currentProjectId
-               const requestPersonaId = currentPersonaId
-
-               const replaceMessageIndex = mergedTurn?.messageIndex
-               const replaced = replaceMessageIndex === undefined ? undefined : messages.value[replaceMessageIndex]
-               if (replaced) {
-                      replaced.text = text
-               } else {
-                      messages.value.push({ role: 'user', text, timestamp: Date.now() })
-               }
-               awaitingReply = {
-                      text,
-                      turnId,
-                      revision,
-                      messageIndex: replaced && replaceMessageIndex !== undefined
-                             ? replaceMessageIndex
-                             : messages.value.length - 1,
-               }
-               state.value = 'THINKING'
-
-               try {
-                      if (previousAcceptance) await previousAcceptance.catch(() => {})
-                      if (requestId !== textRequestId || abort.signal.aborted) return
-                      const res = await apiFetch(options.chatEndpoint ?? DEFAULT_TEXT_CHAT_ENDPOINT, {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
-                             body: JSON.stringify({
-                                    message: text,
-                                    persona_id: requestPersonaId,
-                                    project_id: requestProjectId,
-                                    session_id: requestSessionId,
-                                    turn_id: turnId,
-                                    turn_revision: revision,
-                                    mode: options.replyMode?.() ?? '',
-                                    decision_debug: decisionDebugEnabled.value,
-                                    ...(speechLanguage ? { metadata: { speech_language: speechLanguage } } : {}),
-                             }),
-                             signal: abort.signal,
-                      })
-
-                      if (requestId !== textRequestId || abort.signal.aborted) return
-                      if (!res.ok) {
-                             awaitingReply = null
-                             const err = await res.json().catch(() => ({}))
-                             const msg = (err as Record<string, string>).error ?? `HTTP ${res.status}`
-                             options.onServerError?.('BRAIN_ERROR', msg)
-                             state.value = 'ERROR'
-                             return
-                      }
-
-                      const data = await res.json() as ChatResponse
-                      if (requestId !== textRequestId || abort.signal.aborted) return
-                      // 解析出完整回答才關閉合併視窗；headers 到了但 body 未到仍可補句。
-                      awaitingReply = null
-                      if (data.requires_accept) {
-                             if (data.turn_id !== turnId || data.turn_revision !== revision) {
-                                    throw new Error('回答的回合版本不符')
-                             }
-                             const acceptance = acceptReply({
-                                    session_id: requestSessionId,
-                                    project_id: requestProjectId,
-                                    persona_id: requestPersonaId,
-                                    turn_id: turnId,
-                                    turn_revision: revision,
-                             })
-                             acceptingReply = acceptance
-                             try {
-                                    await acceptance
-                             } finally {
-                                    if (acceptingReply === acceptance) acceptingReply = null
-                             }
-                             if (requestId !== textRequestId || abort.signal.aborted) return
-                      }
-                      if (data.session_id) sessionId.value = data.session_id
-                      if (decisionDebugEnabled.value) decisionDebug.value = parseDecisionDebug(data.decision_debug)
-                      applyResponseMedia(data)
-                      state.value = 'IDLE'
-                      if (data.reply?.trim()) {
-                             responsePlaybackActive = true
-                             options.onUtteranceComplete?.(data.reply, {
-                                    source: 'text',
-                                    speechLanguage: speechLanguage ?? null,
-                             })
-                      }
-               } catch (err) {
-                      if ((err as Error).name !== 'AbortError' && requestId === textRequestId) {
-                             console.error('[AvatarChat] text chat error:', err)
-                             if (requestId === textRequestId) awaitingReply = null
-                             state.value = 'ERROR'
-                             options.onServerError?.('BRAIN_ERROR', (err as Error).message)
-                      }
-               } finally {
-                      if (textAbortController === abort) {
-                             textAbortController = null
-                      }
-               }
-       }
-
-       async function acceptReply(payload: Record<string, unknown>): Promise<void> {
-              const endpoint = options.chatAcceptEndpoint
-                     ?? `${options.chatEndpoint ?? DEFAULT_TEXT_CHAT_ENDPOINT}/accept`
-              // 回應丟失時最多重試一次；伺服器確認具冪等性，不會多寫一輪。
-              for (let attempt = 0; attempt < 2; attempt++) {
-                     try {
-                            const response = await apiFetch(endpoint, {
-                                   method: 'POST',
-                                   headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
-                                   body: JSON.stringify(payload),
-                                   signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
-                            })
-                            if (!response.ok) {
-                                   if (response.status < 500) throw new Error(`確認回答失敗：HTTP ${response.status}`)
-                                   if (attempt === 0) continue
-                                   throw new Error(`確認回答失敗：HTTP ${response.status}`)
-                            }
-                            return
-                     } catch (error) {
-                            if (attempt === 1 || (error as Error).message.startsWith('確認回答失敗：HTTP 4')) throw error
-                     }
+              if (currentMode === 'live' && !isLiveReady()) {
+                     return { accepted: false, reason: 'not_ready' }
               }
-       }
 
-       // ── Visual input (AI 的眼睛) ───────────────────────────
-       // 攝影機畫面是一條獨立的輸入管道：每秒一幀，由後端 VLM 轉成中性
-       // 視覺描述餵給 AI。不推 user bubble、不翻 THINKING——AI 是否/如何
-       // 反應完全自行決定。
-       function sendVisualInput(
-              frameBase64: string,
-              mimeType: string,
-              timestamp: number,
-       ): void {
+              clearDecisionDebug()
+              const merge = mergeTarget(sourcePath)
+              stopActiveResponse()
+              activeSourcePath = sourcePath
+              activeSourcePathContent = sourcePathContent
+              activeImageId = undefined
+              activeUrl = undefined
               if (currentMode === 'text') {
-                     void _sendVisualInputText(frameBase64, mimeType, timestamp)
-                     return
-              }
-
-              if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
-              sendEvent({
-                     event: 'client_video_frame',
-                     frame_base64: frameBase64,
-                     mime_type: mimeType,
-                     timestamp,
-              })
-       }
-
-       function canSendVisualInput(): boolean {
-              if (currentMode === 'text') return !visionInFlight
-              return Boolean(
-                     socket
-                     && socket.readyState === WebSocket.OPEN
-                     && sessionId.value,
-              )
-       }
-
-       async function _sendVisualInputText(
-              frameBase64: string,
-              mimeType: string,
-              timestamp: number,
-       ): Promise<void> {
-              if (visionInFlight) return
-              visionInFlight = true
-              try {
-                     const res = await apiFetch(options.visionEndpoint ?? DEFAULT_VISION_ENDPOINT, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
-                            body: JSON.stringify({
-                                   frame_base64: frameBase64,
-                                   mime_type: mimeType,
-                                   timestamp,
-                                   persona_id: currentPersonaId,
-                                   project_id: currentProjectId,
-                                   session_id: sessionId.value,
-                            }),
-                     })
-                     if (!res.ok) return
-                     const data = await res.json() as { reply?: string; session_id?: string; visual_state?: unknown }
-                     if (data.session_id) sessionId.value = data.session_id
-                     applyVisualState(data.visual_state)
-                     if (data.reply?.trim()) {
-                            responsePlaybackActive = true
-                            options.onUtteranceComplete?.(data.reply, {
-                                   source: 'visual',
-                                   speechLanguage: null,
-                            })
+                     if (merge) {
+                            // 語言以後一句為準：兩句不同語言時，最後講的那句通常才是使用者要的回答語言。
+                            void textTurn.send(`${merge.text}\n${trimmed}`, speechLanguage, merge)
+                            return { accepted: true, merged: true }
                      }
-              } catch (err) {
-                     // 視覺管道失敗靜默記 log，不打斷使用者
-                     console.warn('[AvatarChat] vision describe failed:', err)
-              } finally {
-                     visionInFlight = false
-              }
-       }
-
-       async function resetVisualInput(): Promise<void> {
-              visionInFlight = false
-              resetVisualState()
-              if (currentMode === 'text') {
-                     await _resetVisualInputText()
-                     return
+                     void textTurn.send(trimmed, speechLanguage)
+                     return { accepted: true }
               }
 
-              if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
+              liveSpeechLanguage = speechLanguage ?? null
+              messages.value.push({ role: 'user', text: trimmed, timestamp: Date.now() })
+              state.value = 'THINKING'
+              pendingDecisionClientTurn = createClientId()
               sendEvent({
-                     event: 'client_camera_reset',
+                     event: 'user_speak',
+                     turn_id: pendingDecisionClientTurn,
+                     text: trimmed,
                      timestamp: Date.now(),
+                     ...(speechLanguage ? { speech_language: speechLanguage } : {}),
               })
-       }
-
-       async function _resetVisualInputText(): Promise<void> {
-              if (!sessionId.value) return
-              try {
-                     const res = await apiFetch(options.visionResetEndpoint ?? DEFAULT_VISION_RESET_ENDPOINT, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
-                            body: JSON.stringify({ session_id: sessionId.value }),
-                     })
-                     if (!res.ok) return
-                     const data = await res.json() as { visual_state?: unknown }
-                     applyVisualState(data.visual_state)
-              } catch (err) {
-                     console.warn('[AvatarChat] vision reset failed:', err)
-              }
+              return { accepted: true }
        }
 
        // ── Interrupt ──────────────────────────────────────────
        function interrupt(): void {
-               clearDecisionDebug()
-               stopActiveResponse()
-               state.value = 'IDLE'
+              clearDecisionDebug()
+              stopActiveResponse()
+              state.value = 'IDLE'
        }
 
        function stopActiveResponse(): void {
-               const shouldStopLocal =
-                      responsePlaybackActive
-                      || Boolean(textAbortController)
-                      || state.value === 'THINKING'
-                      || state.value === 'SPEAKING'
-                      || utteranceBuffer.length > 0
+              const shouldStopLocal =
+                     responsePlaybackActive
+                     || textTurn.hasActiveRequest()
+                     || state.value === 'THINKING'
+                     || state.value === 'SPEAKING'
+                     || utteranceBuffer.length > 0
 
-               utteranceBuffer = ''
-               liveSpeechLanguage = null
-               responsePlaybackActive = false
-               awaitingReply = null
-               if (shouldStopLocal) options.onStopAudio?.()
+              utteranceBuffer = ''
+              liveSpeechLanguage = null
+              responsePlaybackActive = false
+              textTurn.forgetPending()
+              if (shouldStopLocal) options.onStopAudio?.()
 
-               if (currentMode === 'text') {
-                      textRequestId += 1
-                      textAbortController?.abort()
-                      textAbortController = null
-                      return
-               }
+              if (currentMode === 'text') {
+                     textTurn.cancel()
+                     return
+              }
 
-               if (
-                      socket
-                      && socket.readyState === WebSocket.OPEN
-                      && sessionId.value
-                      && (state.value === 'THINKING' || state.value === 'SPEAKING')
-               ) {
-                      sendEvent({
-                             event: 'client_interrupt',
-                             partial_asr: '',
-                             timestamp: Date.now(),
-                      })
-               }
-       }
-
-       // ── Low-level send ─────────────────────────────────────
-       function sendEvent(payload: Record<string, unknown>): void {
-              sendRaw(JSON.stringify(payload))
-       }
-
-       function sendRaw(data: string): void {
-              if (socket && socket.readyState === WebSocket.OPEN) {
-                     socket.send(data)
+              if (isLiveReady() && (state.value === 'THINKING' || state.value === 'SPEAKING')) {
+                     sendEvent({
+                            event: 'client_interrupt',
+                            partial_asr: '',
+                            timestamp: Date.now(),
+                     })
               }
        }
 
        // ── Disconnect ─────────────────────────────────────────
        function disconnect(): void {
-               clearDecisionDebug()
-               intentionalDisconnect = true
-               textRequestId += 1
-               textAbortController?.abort()
-               textAbortController = null
-               awaitingReply = null
-               if (reconnectTimer) clearTimeout(reconnectTimer)
-               reconnectTimer = null
-               rejectPendingConnect(new Error('Connection closed'))
-               const activeSocket = socket
-               socket = null
-               if (activeSocket) {
-                      activeSocket.onclose = null
-                      activeSocket.close()
-               }
-               sessionId.value = null
-               resetVisualState()
-               state.value = 'DISCONNECTED'
+              clearDecisionDebug()
+              textTurn.cancel()
+              textTurn.forgetPending()
+              transport.close()
+              sessionId.value = null
+              resetVisualState()
+              state.value = 'DISCONNECTED'
        }
 
        function setMode(mode: 'live' | 'text'): void {
-               clearDecisionDebug()
-               currentMode = mode
+              clearDecisionDebug()
+              currentMode = mode
        }
 
        function manualReconnect(): Promise<void> {
-               const urlOverride = lastUrlOverride
-               disconnect()
-               reconnectAttempt = 0
-               intentionalDisconnect = false
-               return connect(urlOverride)
+              return transport.manualReconnect(disconnect)
        }
 
        onUnmounted(() => {
@@ -923,28 +451,28 @@ export function useAvatarChat(options: ChatOptions = {}) {
        }
 
        return {
-               state: readonly(state),
-               messages,
-               sessionId: readonly(sessionId),
-               visualState: readonly(visualState),
-               decisionDebug: readonly(decisionDebug),
-               decisionDebugEnabled: readonly(decisionDebugEnabled),
-               setDecisionDebug,
-               clearDecisionDebug,
-               connect,
-               disconnect,
-               sendMessage,
-               mergesWithPending: (sourcePath?: string) => mergeTarget(sourcePath) !== null,
-               sendVisualInput,
-               canSendVisualInput,
-               resetVisualInput,
-               interrupt,
-               reinit,
-               setMode,
-               setProject,
-               setPersona,
-               manualReconnect,
-               beginAssistantMessage,
-               appendAssistantText,
+              state: readonly(state),
+              messages,
+              sessionId: readonly(sessionId),
+              visualState: readonly(visualState),
+              decisionDebug: readonly(decisionDebug),
+              decisionDebugEnabled: readonly(decisionDebugEnabled),
+              setDecisionDebug,
+              clearDecisionDebug,
+              connect,
+              disconnect,
+              sendMessage,
+              mergesWithPending: (sourcePath?: string) => mergeTarget(sourcePath) !== null,
+              sendVisualInput,
+              canSendVisualInput,
+              resetVisualInput,
+              interrupt,
+              reinit,
+              setMode,
+              setProject,
+              setPersona,
+              manualReconnect,
+              beginAssistantMessage,
+              appendAssistantText,
        }
 }

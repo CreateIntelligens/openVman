@@ -25,7 +25,7 @@ Brain 這段（`usage.db`，近 4 天 112 輪）：每輪呼叫 LLM 2 次（96 �
 
 1. **回答與語音合成重疊**：原本打算讓 Brain 逐句串流、第一句寫完就送 TTS，預估提早 2～3 秒。量過後改方向：
    - Brain 串流只省 0.15～0.25 秒。Brain 的 4 秒大多花在決策、工具輪與最後一次 LLM 等第一個 token；最後那次回答 p50 只有 47 tokens，生成本身很快。要動 Brain 回傳、backend 轉送與前台播放佇列三處，不划算，不做。
-   - 前台這邊有兩段可以拿掉的等待：拿到完整回答後先等 `/chat/accept` 來回才交給 TTS（`useAvatarChat.ts` 的 `acceptReply` 在 `onUtteranceComplete` 之前），以及整段回答一次送合成。改成拿到回答立刻開始合成、與確認並行（確認失敗再停播），並把回答切句、第一句先送；IndexTTS 整段合成，預估省 1.5～2 秒。前台小改，不動 Brain。
+   - 前台這邊有兩段可以拿掉的等待：拿到完整回答後先等 `/chat/accept` 來回才交給 TTS（`useAvatarTextTurn.ts` 的 `acceptReply` 在 `onUtteranceComplete` 之前），以及整段回答一次送合成。改成拿到回答立刻開始合成、與確認並行（確認失敗再停播），並把回答切句、第一句先送；IndexTTS 整段合成，預估省 1.5～2 秒。前台小改，不動 Brain。
 2. **需要知識庫時先查再叫 LLM**（2026-10-12 合併）：決策判定 `needs_knowledge=True` 且不必同時強制上網或查記憶時，伺服器先用原句、加「上一句問題＋這一句」一條查詢跑 `search_knowledge`，以已完成的工具呼叫放進對話（`CHAT_PREFETCH_KNOWLEDGE_SEARCH`）。第一次呼叫不強制、不再給 `search_knowledge`，選型題在這一輪叫 `filter_products`；fast 仍是最多一輪模型自選的工具。Gemini 3 會拒絕沒有 thought_signature 的工具呼叫（400 後換下一站，多約 2.7 秒），伺服器補的呼叫帶官方略過值。
    - 鶴記dev、fast、真的 Gemini，改前／改後各 3 次，每次 20 題＋6 題追問＋2 題換題對照（容器內 `build_chat_messages`＋`run_agent_loop`，先跑每輪決策）：
      | 題組 | 每輪 LLM 次數 | 每輪總耗時 p50（含決策） | 正確／部分對／錯（3 次合計） |

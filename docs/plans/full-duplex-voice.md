@@ -41,7 +41,7 @@ Brain 加入回答接收確認，Backend 公開代理端點，以避免舊請求
 
 **先懂的兩件事**
 
-- 前台主要跑**文字模式**（`useAvatarChat.ts` 的 `_sendMessageText`，HTTP `/api/v1/chat`）。回答一到，`state` 就從 `THINKING` 變回 `IDLE`，接著才合成、播放聲音（`ttsPending`、`audio.isPlaying`）。所以「講話中」不能只看 `state === 'SPEAKING'`，要看「`ttsPending` 或 `audio.isPlaying` 或 `isTyping`」（就是 `avatarResponding` 去掉 `THINKING` 那一項，`useAvatarConversation.ts:203-209`）。
+- 前台主要跑**文字模式**（`useAvatarTextTurn.ts` 的 `_sendMessageText`，HTTP `/api/v1/chat`）。回答一到，`state` 就從 `THINKING` 變回 `IDLE`，接著才合成、播放聲音（`ttsPending`、`audio.isPlaying`）。所以「講話中」不能只看 `state === 'SPEAKING'`，要看「`ttsPending` 或 `audio.isPlaying` 或 `isTyping`」（就是 `avatarResponding` 去掉 `THINKING` 那一項，`useAvatarConversation.ts:203-209`）。
 - 「思考中」＝文字模式 HTTP 請求還沒回來（`state === 'THINKING'`）。合併只發生在這段時間；回答一到（第一個字出來）就不再合併，之後講的話照原本流程當新的一輪。
 
 **步驟**
@@ -53,7 +53,7 @@ Brain 加入回答接收確認，Backend 公開代理端點，以避免舊請求
 2. **VAD（Breeze／台語分流）講完一句要自己重開**（`frontend/shared/speech/asr/vad-recognizer.ts:281-283`、`frontend/app/src/composables/useVadAsr.ts:45`）
    - 現在 `per-utterance` 模式在 `onSpeechEnd` 先 `stop()` 再上傳，所以思考中收不到第二句。改成：上傳後若沒被使用者手動關掉、也沒在講話中，就立刻重新 `start()`（或改用連續模式，只在 `avatarSpeaking` 時暫停）。
    - 瀏覽器內建辨識（`continuous: false`）先不處理，在文件註明它不支援補一句。
-3. **思考中的新訊息改成合併重送**（`frontend/app/src/composables/useAvatarChat.ts:458-531`）
+3. **思考中的新訊息改成合併重送**（`frontend/app/src/composables/useAvatarChat.ts` 的 `mergeTarget` / `sendMessage`，重送在 `useAvatarTextTurn.ts`）
    - 加兩個狀態：`pendingUserText`（目前在等回答的那句）、`pendingUserMessageIndex`（它在 `messages` 裡的位置）。
    - `sendMessage`：若 `currentMode === 'text'` 且 `state === 'THINKING'` 且 `pendingUserText` 有值，就把 `pendingUserText + '\n' + 新的一句` 當成要送的文字；把 `messages` 裡那一則改成合併後的內容（不要多一則氣泡），再照原本的 `stopActiveResponse()` → `_sendMessageText(merged)`。`speechLanguage` 用新的一句的（兩句不同語言時以後一句為準，寫進註解）。
    - `_sendMessageText` 開始時設 `pendingUserText`，回覆到了、錯誤、被中止時清掉。

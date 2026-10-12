@@ -1,3 +1,4 @@
+import { avatarChatSource } from "./helpers/avatarChatModule.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -25,7 +26,7 @@ test("an unrecognised stored mode falls back instead of sticking", () => {
 
 test("the chosen mode is read per request, not captured once", () => {
   // 用 getter 才能讓使用者改完設定的下一句就生效。
-  const chat = read("composables/useAvatarChat.ts");
+  const chat = avatarChatSource;
   assert.match(chat, /replyMode\?: \(\) => string/);
   assert.match(chat, /mode: options\.replyMode\?\.\(\) \?\? ''/);
 

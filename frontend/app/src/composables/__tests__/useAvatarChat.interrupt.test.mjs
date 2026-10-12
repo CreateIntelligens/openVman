@@ -1,35 +1,15 @@
-import { decisionDebugModuleUrl } from './helpers/decisionDebugModule.mjs';
+import { loadAvatarChat } from './helpers/avatarChatModule.mjs';
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
 const appSource = readFileSync(resolve(__dirname, "../../App.vue"), "utf8") + "\n" + readFileSync(resolve(__dirname, "..//useAvatarConversation.ts"), "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.ES2022,
-    target: ts.ScriptTarget.ES2022,
-  },
-}).outputText.replace(/from ['"]\.\.\/components\/debug\/decisionDebug['"]/, `from "${decisionDebugModuleUrl}"`)
-  .replace(
-    /import \{ ref, readonly, onUnmounted \} from ['"]vue['"];?/,
-    [
-      "const ref = (value) => ({ value });",
-      "const readonly = (value) => value;",
-      "const onUnmounted = () => undefined;",
-    ].join("\n"),
-  )
-  .replace(
-    /import\s*\{\s*apiFetch\s*\}\s*from\s*['"][^'"]+['"];?/,
-    "const apiFetch = (url, init) => fetch(url, { ...init, credentials: 'include' });",
-  );
-
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
-const { useAvatarChat } = await import(moduleUrl);
+const { useAvatarChat } = await loadAvatarChat(
+  "const apiFetch = (url, init) => fetch(url, { ...init, credentials: 'include' });",
+);
 
 async function waitForMicrotasks() {
   await new Promise((resolve) => setTimeout(resolve, 0));

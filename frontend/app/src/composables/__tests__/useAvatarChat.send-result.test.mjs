@@ -1,11 +1,8 @@
+import { avatarChatSource } from "./helpers/avatarChatModule.mjs";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
+const source = avatarChatSource;
 
 test("sendMessage reports whether the live message was accepted", () => {
   assert.match(source, /export interface SendMessageResult/);

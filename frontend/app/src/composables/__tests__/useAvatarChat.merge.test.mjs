@@ -1,32 +1,9 @@
-import { decisionDebugModuleUrl } from './helpers/decisionDebugModule.mjs';
-import { readFileSync } from "node:fs";
+import { loadAvatarChat } from './helpers/avatarChatModule.mjs';
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import ts from "typescript";
 
 // 2026-10-02：虛擬人還在想時使用者補一句，兩句要一起回答，而不是只答後一句。
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
-}).outputText.replace(/from ['"]\.\.\/components\/debug\/decisionDebug['"]/, `from "${decisionDebugModuleUrl}"`)
-  .replace(
-    /import \{ ref, readonly, onUnmounted \} from ['"]vue['"];?/,
-    [
-      "const ref = (value) => ({ value });",
-      "const readonly = (value) => value;",
-      "const onUnmounted = () => undefined;",
-    ].join("\n"),
-  )
-  .replace(
-    /import\s*\{\s*apiFetch\s*\}\s*from\s*['"][^'"]+['"];?/,
-    "const apiFetch = (url, init) => fetch(url, init);",
-  );
-const { useAvatarChat } = await import(
-  `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`
-);
+const { useAvatarChat } = await loadAvatarChat("const apiFetch = (url, init) => fetch(url, init);");
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
