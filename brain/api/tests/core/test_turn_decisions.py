@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 
 import pytest
@@ -71,25 +72,44 @@ def test_tone_delivery_hints_are_ephemeral_and_bounded():
     assert _tone_delivery_line("unrecognized") == ""
 
 
-def test_turn_decision_settings_validate_thresholds_and_map_feature_groups():
-    settings = BrainSettings(
-        _env_file=None,
-        turn_decisions_tone_enabled=False,
-        turn_decisions_timeout_seconds=1.4,
+@pytest.mark.parametrize("source", ["constructor", "environment"])
+def test_turn_decision_settings_validate_thresholds_and_map_feature_groups(
+    monkeypatch, source,
+):
+    for name in tuple(os.environ):
+        if name.upper().startswith("TURN_DECISIONS_"):
+            monkeypatch.delenv(name)
+
+    def load_settings(**values):
+        # These fields validate by their environment aliases, unlike the
+        # unaliased settings that accept lowercase constructor keywords.
+        if source == "environment":
+            for name, value in values.items():
+                monkeypatch.setenv(name, str(value))
+            return BrainSettings(_env_file=None)
+        return BrainSettings(_env_file=None, **values)
+
+    settings = load_settings(
+        TURN_DECISIONS_TONE_ENABLED=False,
+        TURN_DECISIONS_TIMEOUT_SECONDS=1.4,
     )
     config = turn_decision_config(settings)
 
+    assert settings.turn_decisions_tone_enabled is False
+    assert settings.turn_decisions_timeout_seconds == 1.4
     assert config.enabled is True
     assert config.retrieval_enabled is True
     assert config.language_enabled is True
     assert config.tone_enabled is False
     assert config.timeout_seconds == 1.4
     TurnDecisionConfig(timeout_seconds=0.01, per_hop_timeout_seconds=0.01).validate()
-    with pytest.raises(ValidationError):
-        BrainSettings(
-            _env_file=None,
-            turn_decisions_noul_negative_threshold=0.8,
-            turn_decisions_noul_positive_threshold=0.7,
+    with pytest.raises(
+        ValidationError,
+        match="negative threshold must be below positive threshold",
+    ):
+        load_settings(
+            TURN_DECISIONS_NOUL_NEGATIVE_THRESHOLD=0.8,
+            TURN_DECISIONS_NOUL_POSITIVE_THRESHOLD=0.7,
         )
 
 
