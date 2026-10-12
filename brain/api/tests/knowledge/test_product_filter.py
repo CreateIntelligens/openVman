@@ -220,6 +220,78 @@ def test_tool_reports_a_non_numeric_value_with_the_unit(workspace):
         ]}]})
 
 
+@pytest.mark.parametrize("conditions", [None, False, 0, "", {}])
+def test_tool_rejects_invalid_conditions_instead_of_matching_every_product(
+    workspace, conditions,
+):
+    with pytest.raises(FilterError, match="conditions 必須是陣列"):
+        _run_tool({"scenarios": [{"name": "x", "conditions": conditions}]})
+
+
+def test_tool_requires_explicit_conditions_for_an_unfiltered_scenario(workspace):
+    with pytest.raises(FilterError, match="conditions"):
+        _run_tool({"scenarios": [{"name": "x"}]})
+    result = _run_tool({"scenarios": [{"name": "all", "conditions": []}]})
+    assert result["scenarios"][0]["match_count"] == 4
+
+
+@pytest.mark.parametrize("sort", [None, False, 0, "", {}])
+def test_tool_rejects_invalid_sort_instead_of_returning_an_arbitrary_winner(
+    workspace, sort,
+):
+    with pytest.raises(FilterError, match="sort 必須是陣列"):
+        _run_tool({"scenarios": [{
+            "name": "流量最大", "conditions": [], "sort": sort, "limit": 1,
+        }]})
+
+
+@pytest.mark.parametrize("limit", [False, True, "", [], {}])
+def test_tool_rejects_invalid_limits_before_normalizing_provider_numbers(
+    workspace, limit,
+):
+    with pytest.raises(FilterError, match="limit"):
+        _run_tool({"scenarios": [{
+            "name": "x", "conditions": [], "limit": limit,
+        }]})
+
+
+@pytest.mark.parametrize("args", [
+    {"scenarios": [{"name": "x", "where": {
+        "field": "hp", "op": "lte", "value": 3,
+    }}]},
+    {"scenarios": [{"name": "x", "conditions": [], "where": {
+        "field": "hp", "op": "lte", "value": 3,
+    }}]},
+    {"scenarios": [{"name": "x", "conditions": [], "typo": True}]},
+    {"scenarios": [{"name": "x", "conditions": []}], "typo": True},
+])
+def test_tool_rejects_discarded_query_fields_instead_of_broadening_matches(
+    workspace, args,
+):
+    with pytest.raises(FilterError, match="不接受"):
+        _run_tool(args)
+
+
+def test_tool_keeps_unknown_head_out_of_matches_and_preserves_secondary_sort(
+    workspace,
+):
+    result = _run_tool({"scenarios": [{
+        "name": "揚程至少20米", "conditions": [
+            {"field": "max_head_m", "op": "gte", "value": "20"},
+        ], "sort": [
+            {"field": "hp", "direction": "asc"},
+            {"field": "max_flow_lpm", "direction": "desc"},
+        ],
+    }]})
+    scenario = result["scenarios"][0]
+    assert _models(scenario["matches"]) == [
+        "80EUB-M-5.30T", "80EDW-5.30S/T", "80EUB-M-5.75T",
+    ]
+    assert _models(scenario["unknown"]) == ["50EUB-M-5.20S"]
+    assert scenario["unknown"][0]["unknown_fields"] == ["max_head_m"]
+    assert scenario["excluded_count"] == 0
+
+
 def test_prompt_line_only_for_projects_with_a_catalog(workspace, monkeypatch):
     from tools.builtin import product_tools
 

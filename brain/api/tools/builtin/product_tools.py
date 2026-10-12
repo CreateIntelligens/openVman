@@ -166,14 +166,25 @@ def _condition(raw: Any, catalog: ProductCatalog) -> Any:
     return {**raw, "value": value}
 
 
-def _limit(raw: Any) -> Any:
+def _limit(raw: Any) -> int | None:
     # 有些 provider 把整數送成 3.0，或用 0 表示不限。
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        raise FilterError("limit 只能是 null、0（不限）或正整數")
     if isinstance(raw, float) and raw.is_integer():
         raw = int(raw)
-    return raw or None
+    if not isinstance(raw, int) or raw < 0:
+        raise FilterError("limit 只能是 null、0（不限）或正整數")
+    return None if raw == 0 else raw
 
 
 def _to_query(args: dict[str, Any], catalog: ProductCatalog) -> dict[str, Any]:
+    if not isinstance(args, dict):
+        raise FilterError("參數必須是物件")
+    extra = set(args) - {"scenarios"}
+    if extra:
+        raise FilterError(f"參數不接受 {', '.join(sorted(map(str, extra)))}")
     scenarios = args.get("scenarios")
     if not isinstance(scenarios, list):
         raise FilterError("scenarios 必須是陣列")
@@ -181,13 +192,20 @@ def _to_query(args: dict[str, Any], catalog: ProductCatalog) -> dict[str, Any]:
     for scenario in scenarios:
         if not isinstance(scenario, dict):
             raise FilterError("每個情境必須是物件")
-        conditions = scenario.get("conditions") or []
+        # 在轉換前檢查：舊 where 或拼錯的條件不能被丟掉後變成無條件。
+        extra = set(scenario) - {"name", "conditions", "sort", "limit"}
+        if extra:
+            raise FilterError(f"情境不接受 {', '.join(sorted(map(str, extra)))}")
+        conditions = scenario.get("conditions")
         if not isinstance(conditions, list):
-            raise FilterError("conditions 必須是陣列")
+            raise FilterError("conditions 必須是陣列；沒有篩選條件時請明確填 []")
+        orders = scenario.get("sort", [])
+        if not isinstance(orders, list):
+            raise FilterError("sort 必須是陣列；不排序時請省略或填 []")
         converted.append({
             "name": scenario.get("name"),
             "where": {"all": [_condition(item, catalog) for item in conditions]},
-            "sort": scenario.get("sort") or [],
+            "sort": orders,
             "limit": _limit(scenario.get("limit")),
         })
     return {"scenarios": converted}
