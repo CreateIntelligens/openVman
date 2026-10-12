@@ -17,7 +17,7 @@ const CREDENTIALS: Array<{
   {
     id: "clef",
     title: "Clef API key",
-    description: "主端點與備援端點共用；Clef 目前可不填 key。",
+    description: "主端點與備援端點共用；未填時沿用部署環境的 CLEF_API_KEY，自架端點可不填。",
   },
   {
     id: "jev",
@@ -27,7 +27,7 @@ const CREDENTIALS: Array<{
   {
     id: "openai",
     title: "OpenAI API key",
-    description: "用於 OpenAI Decisions 專用 API。",
+    description: "未填時沿用部署環境的 OPENAI_API_KEY。",
   },
 ];
 
@@ -330,10 +330,7 @@ export default function DecisionProviders() {
           </div>
         </section>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-2xl text-xs leading-5 text-content-subtle">
-            OpenAI Decisions 使用專用 Decisions API；模型依 OpenAI 目前支援設定為 gpt-6-luna。
-          </p>
+        <div className="flex justify-end border-t border-border pt-5">
           <button
             type="button"
             onClick={() => void save()}
