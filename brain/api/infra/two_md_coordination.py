@@ -12,7 +12,12 @@ from collections.abc import Callable, Iterator
 from threading import Lock
 from typing import Any, TypeVar
 
-from core.two_md import RedisCoordination, SingleFlight, full_jitter_delay
+from core.two_md import (
+    RedisCoordination,
+    SingleFlight,
+    full_jitter_delay,
+    resolve_base_urls,
+)
 from safety.observability import get_metrics_store
 
 logger = logging.getLogger("brain.tools.builtin.web")
@@ -144,11 +149,12 @@ def close_coordination() -> None:
         _coordination_signature = None
 
 
-def iter_endpoints(cfg: Any, bases: list[str]) -> Iterator[tuple[str, Budget]]:
+def iter_endpoints(cfg: Any) -> Iterator[tuple[str, Budget]]:
     """Yield (base, budget) for each host worth trying, freshest first.
 
     冷卻中的主機先跳過；冷卻結束後只允許受控的 half-open probe。
     """
+    bases = list(resolve_base_urls(cfg))
     cooldown = float(getattr(cfg, "url2md_circuit_cooldown_s", 0) or 0)
     budget = Budget(float(getattr(cfg, "url2md_total_budget_s", 0) or 0))
     max_attempts = max(

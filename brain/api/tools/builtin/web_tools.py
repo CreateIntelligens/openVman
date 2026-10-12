@@ -2,7 +2,8 @@
 
 Endpoint coordination lives in ``infra.two_md_coordination``, the HTTP
 transport and telemetry in ``infra.two_md_transport``, and the SSRF policy in
-``safety.url_policy``; the names below stay importable from here.
+``safety.url_policy``. This module declares the tools, validates their
+arguments and shapes and reranks what 2md returns.
 """
 
 from __future__ import annotations
@@ -12,42 +13,20 @@ import time
 from typing import Any
 from urllib.parse import quote, urlparse
 
-import httpx
-
-from core.two_md import (  # noqa: F401 (RedisCoordination, SingleFlight, full_jitter_delay re-exported)
-    RedisCoordination,
-    SingleFlight,
-    build_operation_key,
-    full_jitter_delay,
-    resolve_base_urls,
-)
-from infra import two_md_coordination
-from infra.two_md_coordination import (  # noqa: F401 (private aliases re-exported)
-    Budget as _Budget,
-    claim_endpoint as _claim_endpoint,
-    close_coordination,
+from core.two_md import build_operation_key
+from infra.two_md_coordination import (
+    Budget,
     coalesce,
-    get_coordination as _get_coordination,
-    is_circuit_open as _is_circuit_open,
     iter_endpoints,
-    note_endpoint_failure as _note_endpoint_failure,
-    note_endpoint_success as _note_endpoint_success,
-    note_failure as _note_failure,
-    note_success as _note_success,
-    release_endpoint_probe as _release_endpoint_probe,
-    reset_circuits as reset_url2md_circuits,
-    single_flight as _single_flight,
-    wait_before_fallback as _wait_before_fallback,
+    note_endpoint_success,
 )
-from infra.two_md_transport import (  # noqa: F401 (private aliases re-exported)
-    Url2mdUpstreamError,
-    record_attempt as _record_attempt,
-    record_operation as _record_operation,
+from infra.two_md_transport import (
+    record_attempt,
+    record_operation,
     request_json,
     run_fallback_chain,
 )
-from safety.observability import get_metrics_store, log_event  # noqa: F401
-from safety.url_policy import validate_public_url as _validate_url
+from safety.url_policy import validate_public_url
 from tools.context import (
     active_project_id,
     active_reply_mode,
@@ -56,61 +35,6 @@ from tools.context import (
 )
 
 logger = logging.getLogger("brain.tools.builtin.web")
-
-_url2md_client: httpx.Client | None = None
-_HTTP_TIMEOUT = httpx.Timeout(connect=5, read=25, write=10, pool=5)
-
-# Module-level state that moved to infra.two_md_coordination. Forwarding keeps
-# old imports reading the live value instead of a stale copy.
-_MOVED_STATE = frozenset({
-    "_circuit_lock",
-    "_circuit_opened_at",
-    "_circuit_probe_claimed",
-    "_coordination",
-    "_coordination_signature",
-})
-
-
-def __getattr__(name: str) -> Any:
-    if name in _MOVED_STATE:
-        return getattr(two_md_coordination, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def _get_url2md_client() -> httpx.Client:
-    global _url2md_client
-    if _url2md_client is None:
-        _url2md_client = httpx.Client(timeout=_HTTP_TIMEOUT, follow_redirects=True)
-    return _url2md_client
-
-
-def close_url2md_client() -> None:
-    global _url2md_client
-    if _url2md_client is not None:
-        _url2md_client.close()
-        _url2md_client = None
-    close_coordination()
-
-
-# Kept as a compatibility alias for the old Gateway client shutdown hook.
-close_gateway_client = close_url2md_client
-
-
-def _url2md_bases() -> list[str]:
-    cfg = mode_settings()
-    return list(resolve_base_urls(cfg))
-
-
-def _iter_bases(cfg: Any) -> Any:
-    yield from iter_endpoints(cfg, _url2md_bases())
-
-
-def _request_json(
-    method: str, endpoint: str, *, budget: _Budget | None = None, **kwargs: Any
-) -> dict[str, Any]:
-    return request_json(
-        _get_url2md_client(), method, endpoint, budget=budget, **kwargs
-    )
 
 
 def _privacy_scope() -> str:
@@ -131,7 +55,7 @@ def _normalize_read_urls(args: dict[str, Any]) -> list[str]:
 
     模型偶爾會偏離 schema：送舊版的 ``url``、把單一網址直接當字串傳、或是把
     ``urls`` 送成空陣列又另外給 ``url``。這些都當作同一個意思處理，不要為了
-    格式差異讓整個工具呼叫失敗。無效的網址仍然要擋（見 ``_validate_url``），
+    格式差異讓整個工具呼叫失敗。無效的網址仍然要擋（見 ``validate_public_url``），
     容忍的是外層形狀，不是內容。
     """
     raw = args.get("urls")
@@ -144,7 +68,7 @@ def _normalize_read_urls(args: dict[str, Any]) -> list[str]:
         # 陣列裡夾雜 None／空字串就跳過，不要讓一顆壞掉的元素毀掉整批。
         if candidate is None or (isinstance(candidate, str) and not candidate.strip()):
             continue
-        url = _validate_url(candidate)
+        url = validate_public_url(candidate)
         if url not in urls:
             urls.append(url)
     if not urls:
@@ -161,7 +85,7 @@ def _shape_page(item: dict[str, Any], fallback_url: str, max_chars: int, base: s
     if source_url.rstrip("/") != fallback_url.rstrip("/"):
         # The upstream may expose a post-redirect URL. Apply the same public
         # destination policy before returning it to the agent.
-        source_url = _validate_url(source_url)
+        source_url = validate_public_url(source_url)
     shaped: dict[str, Any] = {
         "title": str(item.get("title") or ""),
         "url": source_url,
@@ -180,12 +104,12 @@ def _shape_page(item: dict[str, Any], fallback_url: str, max_chars: int, base: s
 
 
 def _read_single(
-    base: str, url: str, max_chars: int, budget: _Budget | None = None
+    base: str, url: str, max_chars: int, budget: Budget | None = None
 ) -> dict[str, Any]:
     # The upstream API intentionally accepts the original URL as a path suffix.
     # Keep URL delimiters readable while encoding spaces and unsafe characters.
     target = quote(url, safe=":/?&=#%+;,[]@!$'()*-._~")
-    payload = _request_json(
+    payload = request_json(
         "GET",
         f"{base}/{target}",
         headers={"Accept": "application/json", "X-Preset": "agent"},
@@ -212,14 +136,14 @@ def _batch_payload_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _read_batch(
-    base: str, urls: list[str], max_chars: int, budget: _Budget | None = None
+    base: str, urls: list[str], max_chars: int, budget: Budget | None = None
 ) -> list[dict[str, Any]]:
     """Read several URLs in one upstream request via /v1/batch.
 
     上游對每個網址各自容錯，失敗的那筆就少一筆回來，所以要用回傳的 url
     對回原始清單，而不是假設順序與長度一致。
     """
-    payload = _request_json(
+    payload = request_json(
         "POST",
         f"{base}/v1/batch",
         json={"urls": urls},
@@ -243,7 +167,7 @@ def _read_batch(
 
 
 def _read_web_page_uncached(urls: list[str], cfg: Any, max_chars: int) -> dict[str, Any]:
-    def fetch(base: str, budget: _Budget, attempt: int, started_at: float) -> list[dict[str, Any]]:
+    def fetch(base: str, budget: Budget, attempt: int, started_at: float) -> list[dict[str, Any]]:
         if len(urls) == 1:
             return [_read_single(base, urls[0], max_chars, budget)]
         return _read_batch(base, urls, max_chars, budget)
@@ -251,8 +175,8 @@ def _read_web_page_uncached(urls: list[str], cfg: Any, max_chars: int) -> dict[s
     def finish(
         base: str, attempt: int, started_at: float, pages: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        _note_endpoint_success(base, cfg)
-        _record_attempt(
+        note_endpoint_success(base, cfg)
+        record_attempt(
             "read",
             base,
             attempt,
@@ -268,7 +192,7 @@ def _read_web_page_uncached(urls: list[str], cfg: Any, max_chars: int) -> dict[s
             if isinstance(page.get("usage"), dict)
             and isinstance(page["usage"].get("tokens"), int | float)
         )
-        _record_operation(
+        record_operation(
             "read",
             result="success",
             attempts=attempt,
@@ -284,7 +208,7 @@ def _read_web_page_uncached(urls: list[str], cfg: Any, max_chars: int) -> dict[s
 
     return run_fallback_chain(
         "read",
-        _iter_bases(cfg),
+        iter_endpoints(cfg),
         cfg,
         fetch,
         failure_message="無法讀取網址，2md fallback chain 皆失敗",
@@ -368,9 +292,9 @@ def _rerank_web_results(
 
 def _search_web_uncached(query: str, cfg: Any, max_results: int) -> dict[str, Any]:
     def attempt_search(
-        base: str, budget: _Budget, attempt: int, started_at: float
+        base: str, budget: Budget, attempt: int, started_at: float
     ) -> dict[str, Any]:
-        payload = _request_json(
+        payload = request_json(
             "GET",
             f"{base}/search",
             params={"q": query},
@@ -396,7 +320,7 @@ def _search_web_uncached(query: str, cfg: Any, max_results: int) -> dict[str, An
                 "content": str(item.get("content") or ""),
             })
 
-        _note_endpoint_success(base, cfg)
+        note_endpoint_success(base, cfg)
         anchor = (active_user_message.get() or "").strip()
         results = _rerank_web_results(
             candidates, f"{anchor}\n{query}" if anchor else query, cfg
@@ -404,7 +328,7 @@ def _search_web_uncached(query: str, cfg: Any, max_results: int) -> dict[str, An
         citations = [
             {"title": r["title"], "url": r["url"]} for r in results if r["url"]
         ]
-        _record_attempt(
+        record_attempt(
             "search",
             base,
             attempt,
@@ -414,7 +338,7 @@ def _search_web_uncached(query: str, cfg: Any, max_results: int) -> dict[str, An
         meta = payload.get("meta")
         usage = meta.get("usage") if isinstance(meta, dict) else None
         usage_tokens = usage.get("tokens") if isinstance(usage, dict) else None
-        _record_operation(
+        record_operation(
             "search",
             result="success",
             attempts=attempt,
@@ -436,7 +360,7 @@ def _search_web_uncached(query: str, cfg: Any, max_results: int) -> dict[str, An
 
     return run_fallback_chain(
         "search",
-        _iter_bases(cfg),
+        iter_endpoints(cfg),
         cfg,
         attempt_search,
         failure_message="無法搜尋網路，2md fallback chain 皆失敗",

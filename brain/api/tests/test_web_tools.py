@@ -16,6 +16,12 @@ def _response(status_code: int, payload: object, url: str = "https://test.invali
     )
 
 
+def _use_client(monkeypatch: pytest.MonkeyPatch, client: object) -> None:
+    from infra import two_md_transport
+
+    monkeypatch.setattr(two_md_transport, "get_client", lambda: client)
+
+
 def _settings(**overrides):
     values = {
         "url2md_primary_url": "https://primary.invalid",
@@ -58,7 +64,7 @@ def test_search_web_uses_primary_and_normalizes_results(monkeypatch: pytest.Monk
             )
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     result = web_tools._search_web({"query": "OpenAI"})
 
@@ -90,7 +96,7 @@ def test_read_web_page_falls_back_when_primary_fails(monkeypatch: pytest.MonkeyP
             )
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     result = web_tools._read_web_page({"url": "https://example.com"})
 
@@ -113,7 +119,7 @@ def test_non_retryable_upstream_error_does_not_probe_fallbacks(monkeypatch: pyte
             return _response(400, {"code": 400, "status": 400, "data": {}}, url)
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     with pytest.raises(ValueError, match="fallback chain"):
         web_tools._read_web_page({"url": "https://example.com"})
@@ -134,7 +140,7 @@ def test_read_web_page_rejects_unsafe_final_source_url(monkeypatch: pytest.Monke
         url2md_retry_base_delay_s=0,
         url2md_retry_max_delay_s=0,
     ))
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     with pytest.raises(ValueError, match="fallback chain"):
         web_tools._read_web_page({"url": "https://example.com"})
@@ -147,25 +153,40 @@ def test_url2md_telemetry_does_not_log_query_or_fetched_content(monkeypatch: pyt
     events: list[tuple[str, dict]] = []
     monkeypatch.setattr(two_md_transport, "log_event", lambda name, **fields: events.append((name, fields)))
 
-    web_tools._record_attempt(
-        "search", "https://2md.aiurl.tw", 1, result="failure", reason="http_503"
-    )
-    web_tools._record_operation(
-        "read",
-        result="success",
-        attempts=1,
-        provider="https://2md.aiurl.tw",
-        result_count=1,
-        content_chars=42,
-        truncated=False,
-        usage_tokens=29,
-    )
+    class FakeClient:
+        def request(self, method, url, **kwargs):
+            if "primary" in url:
+                return _response(503, {"code": 503, "status": 503, "data": {}}, url)
+            if url.endswith("/search"):
+                return _response(200, {"code": 200, "status": 200, "data": [
+                    {"title": "Hit", "url": "https://example.com/hit", "description": "d",
+                     "content": "secret fetched content"},
+                ]}, url)
+            return _response(200, {"code": 200, "status": 20000, "data": {
+                "title": "Page", "url": "https://example.com/", "content": "secret fetched content",
+                "usage": {"tokens": 29},
+            }}, url)
 
-    assert events
+    monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings(
+        web_search_min_relevance=0, web_search_relevance_ratio=0,
+        url2md_retry_base_delay_s=0, url2md_retry_max_delay_s=0,
+    ))
+    _use_client(monkeypatch, FakeClient())
+
+    web_tools._search_web({"query": "secret query"})
+    web_tools._read_web_page({"url": "https://example.com"})
+
+    names = [name for name, _ in events]
+    assert "url2md_attempt" in names and "url2md_operation" in names
+    assert any(fields.get("result") == "failure" and fields.get("reason") == "http_503"
+               for name, fields in events if name == "url2md_attempt")
+    assert any(fields.get("usage_tokens") == 29
+               for name, fields in events if name == "url2md_operation")
     for _, fields in events:
         assert "query" not in fields
         assert "content" not in fields
         assert "markdown" not in fields
+        assert "secret" not in repr(fields)
 
 
 def test_web_tools_reject_invalid_url_and_empty_query(monkeypatch: pytest.MonkeyPatch):
@@ -197,7 +218,7 @@ def test_search_web_drops_blocked_domains(monkeypatch: pytest.MonkeyPatch):
         "mode_settings",
         lambda: _settings(web_search_blocked_domains="wikipedia.org", web_search_min_relevance=0, web_search_relevance_ratio=0),
     )
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: _fake_client([
+    _use_client(monkeypatch, _fake_client([
         {"title": "麥當勞 - 維基百科", "url": "https://zh.wikipedia.org/wiki/McD", "description": "百科"},
         {"title": "內湖速食清單", "url": "https://example.com/neihu", "description": "在地"},
     ]))
@@ -215,7 +236,7 @@ def test_search_web_reranks_by_relevance_and_drops_the_weak_tail(monkeypatch: py
         "mode_settings",
         lambda: _settings(web_search_min_relevance=0.15, web_search_relevance_ratio=0.7),
     )
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: _fake_client([
+    _use_client(monkeypatch, _fake_client([
         {"title": "麥當勞 - 維基百科", "url": "https://a.invalid", "description": "全球連鎖歷史"},
         {"title": "內湖舊宗路速食店整理", "url": "https://b.invalid", "description": "在地清單"},
         {"title": "內湖美食", "url": "https://c.invalid", "description": "含速食"},
@@ -238,7 +259,7 @@ def test_search_web_keeps_engine_order_when_rerank_fails(monkeypatch: pytest.Mon
     from tools.builtin import web_tools
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings(web_search_min_relevance=0.15))
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: _fake_client([
+    _use_client(monkeypatch, _fake_client([
         {"title": "A", "url": "https://a.invalid", "description": ""},
         {"title": "B", "url": "https://b.invalid", "description": ""},
     ]))
@@ -269,7 +290,7 @@ def test_read_web_page_batches_multiple_urls_into_one_request(monkeypatch: pytes
             ]}}, url)
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     result = web_tools._read_web_page(
         {"urls": ["https://example.com", "https://www.iana.org"]}
@@ -298,7 +319,7 @@ def test_read_web_page_keeps_flat_shape_for_a_single_url(monkeypatch: pytest.Mon
             }}, url)
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     result = web_tools._read_web_page({"urls": ["https://example.com"]})
 
@@ -321,7 +342,7 @@ def test_read_web_page_maps_results_back_by_url_when_one_fails(
             ]}}, url)
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     result = web_tools._read_web_page(
         {"urls": ["https://example.com", "https://www.iana.org"]}
@@ -349,7 +370,7 @@ def test_read_web_page_batch_falls_back_to_next_provider(monkeypatch: pytest.Mon
             ]}}, url)
 
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     result = web_tools._read_web_page(
         {"urls": ["https://example.com", "https://www.iana.org"]}
@@ -389,11 +410,11 @@ def test_read_web_page_deduplicates_urls(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture(autouse=True)
 def _clean_circuits():
     """斷路器狀態存在模組層級，測試之間必須清乾淨。"""
-    from tools.builtin import web_tools
+    from infra import two_md_coordination
 
-    web_tools.reset_url2md_circuits()
+    two_md_coordination.reset_circuits()
     yield
-    web_tools.reset_url2md_circuits()
+    two_md_coordination.reset_circuits()
 
 
 def test_failed_host_is_skipped_while_its_circuit_is_open(monkeypatch: pytest.MonkeyPatch):
@@ -412,7 +433,7 @@ def test_failed_host_is_skipped_while_its_circuit_is_open(monkeypatch: pytest.Mo
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings(
         web_search_min_relevance=0, web_search_relevance_ratio=0,
     ))
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     web_tools._search_web({"query": "one"})
     first_round = list(attempted)
@@ -429,17 +450,37 @@ def test_circuit_reopens_after_the_cooldown_expires(monkeypatch: pytest.MonkeyPa
     """冷卻結束後要重新嘗試，否則上游復原了也永遠不會用回主要主機。"""
     from tools.builtin import web_tools
 
+    attempted: list[str] = []
+    primary_down = {"value": True}
+
+    class FakeClient:
+        def request(self, method, url, **kwargs):
+            attempted.append(url)
+            if "primary" in url and primary_down["value"]:
+                raise httpx.ConnectError("down", request=httpx.Request("GET", url))
+            return _response(200, {"code": 200, "status": 200, "data": []}, url)
+
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings(
         url2md_circuit_cooldown_s=0.01,
+        url2md_retry_base_delay_s=0,
+        url2md_retry_max_delay_s=0,
+        web_search_min_relevance=0,
+        web_search_relevance_ratio=0,
     ))
-    web_tools._note_failure("https://primary.invalid")
+    _use_client(monkeypatch, FakeClient())
 
-    assert web_tools._is_circuit_open("https://primary.invalid", 60.0)
+    web_tools._search_web({"query": "one"})
+    assert attempted[0].startswith("https://primary.invalid/")
 
     import time as _time
     _time.sleep(0.02)
+    primary_down["value"] = False
+    attempted.clear()
 
-    assert not web_tools._is_circuit_open("https://primary.invalid", 0.01)
+    result = web_tools._search_web({"query": "two"})
+
+    assert attempted == ["https://primary.invalid/search"]
+    assert result["provider"] == "https://primary.invalid"
 
 
 def test_all_hosts_in_cooldown_are_skipped(monkeypatch: pytest.MonkeyPatch):
@@ -451,16 +492,27 @@ def test_all_hosts_in_cooldown_are_skipped(monkeypatch: pytest.MonkeyPatch):
     class FakeClient:
         def request(self, method, url, *, json=None, headers=None, params=None, timeout=None):
             attempted.append(url)
-            return _response(200, {"code": 200, "status": 200, "data": []}, url)
+            raise httpx.ConnectError("down", request=httpx.Request("GET", url))
 
-    cfg = _settings(web_search_min_relevance=0, web_search_relevance_ratio=0)
-    monkeypatch.setattr(web_tools, "mode_settings", lambda: cfg)
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
-    for base in web_tools._url2md_bases():
-        web_tools._note_failure(base)
+    monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings(
+        url2md_retry_base_delay_s=0,
+        url2md_retry_max_delay_s=0,
+        web_search_min_relevance=0,
+        web_search_relevance_ratio=0,
+    ))
+    _use_client(monkeypatch, FakeClient())
 
     with pytest.raises(ValueError, match="fallback chain"):
-        web_tools._search_web({"query": "q"})
+        web_tools._search_web({"query": "first"})
+    assert attempted == [
+        "https://primary.invalid/search",
+        "https://fallback-1.invalid/search",
+        "https://fallback-2.invalid/search",
+    ]
+    attempted.clear()
+
+    with pytest.raises(ValueError, match="fallback chain"):
+        web_tools._search_web({"query": "second"})
 
     assert not attempted
 
@@ -481,7 +533,7 @@ def test_budget_caps_the_per_host_timeout(monkeypatch: pytest.MonkeyPatch):
         web_search_min_relevance=0,
         web_search_relevance_ratio=0,
     ))
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     web_tools._search_web({"query": "q"})
 
@@ -498,6 +550,7 @@ def test_chain_stops_once_the_budget_is_exhausted(monkeypatch: pytest.MonkeyPatc
     每次呼叫都讓時鐘前進，模擬真實的「掛在那裡等逾時」；預算 3 秒、每台耗掉
     2 秒，所以第二台之後就不該再試。
     """
+    from infra import two_md_coordination
     from tools.builtin import web_tools
 
     attempted: list[str] = []
@@ -509,11 +562,11 @@ def test_chain_stops_once_the_budget_is_exhausted(monkeypatch: pytest.MonkeyPatc
             clock["now"] += 2.0  # 這一台「花了」兩秒才逾時
             raise httpx.ReadTimeout("hang", request=httpx.Request("GET", url))
 
-    monkeypatch.setattr(web_tools.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(two_md_coordination.time, "monotonic", lambda: clock["now"])
     monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings(
         url2md_total_budget_s=3.0, url2md_circuit_cooldown_s=0,
     ))
-    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+    _use_client(monkeypatch, FakeClient())
 
     with pytest.raises(ValueError, match="fallback chain"):
         web_tools._search_web({"query": "q"})

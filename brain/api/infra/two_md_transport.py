@@ -17,6 +17,9 @@ from safety.observability import get_metrics_store, log_event
 
 T = TypeVar("T")
 
+_HTTP_TIMEOUT = httpx.Timeout(connect=5, read=25, write=10, pool=5)
+_client: httpx.Client | None = None
+
 
 class Url2mdUpstreamError(ValueError):
     """Classified upstream failure used to decide whether failover is safe."""
@@ -28,8 +31,21 @@ class Url2mdUpstreamError(ValueError):
         self.status_code = status_code
 
 
+def get_client() -> httpx.Client:
+    global _client
+    if _client is None:
+        _client = httpx.Client(timeout=_HTTP_TIMEOUT, follow_redirects=True)
+    return _client
+
+
+def close_client() -> None:
+    global _client
+    if _client is not None:
+        _client.close()
+        _client = None
+
+
 def request_json(
-    client: httpx.Client,
     method: str,
     endpoint: str,
     *,
@@ -42,7 +58,7 @@ def request_json(
             connect=min(5.0, remaining), read=remaining, write=min(10.0, remaining), pool=5,
         )
     try:
-        response = client.request(method, endpoint, **kwargs)
+        response = get_client().request(method, endpoint, **kwargs)
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code
