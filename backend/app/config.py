@@ -202,6 +202,15 @@ class TTSRouterConfig(BaseSettings):
     vision_llm_model: str = "gpt-4o"
     vision_llm_base_url: str = ""
 
+    # --- 視覺事件改問 Clef ---
+    # 攝影機每秒一幀，每個事件是一題是非題。2026-10-09 實測 33 張圖：Clef 每張 0.41 秒、
+    # 抓到訪客 15/18、誤報 0/63；Gemini VLM 18/18 但每張 1.3 秒，跟不上每秒一幀，退居備援。
+    # 留空就只用 VLM。金鑰沿用 CLEF_API_KEY（自架端點不需要）。
+    vision_clef_url: str = "https://clef.create360.ai/v1/systemone"
+    vision_clef_model: str = "clef-flash"
+    # Clef 第一次收圖曾花 16 秒載入影像模組，之後 0.4 秒；逾時太短會一直斷在第一張。
+    vision_clef_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+
     # --- ASR ---
     # "breeze" | "r2t2" | "r2t2-dev" | "sensevoice" | "openai"
     # 都是整檔上傳、無串流端點：使用者講完才開始辨識。我們要的是華語逐字稿：

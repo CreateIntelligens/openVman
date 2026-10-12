@@ -111,7 +111,7 @@ class CameraLivePlugin:
     ) -> dict[str, Any]:
         """Detect visual events on a frame; fire only on event edges.
 
-        攝影機是 AI 的眼睛。本方法用 VLM 做結構化判讀，交給 per-session
+        攝影機是 AI 的眼睛。本方法用 Clef（失敗時退回 VLM）做結構化判讀，交給 per-session
         狀態機，只有事件邊緣（首次出現）才回報 events。busy 保護確保
         推理不排隊。
         """
@@ -294,6 +294,16 @@ class CameraLivePlugin:
             build_detection_prompt,
             parse_detection,
         )
+        from app.gateway.vision_clef import clef_enabled, detect_events_with_clef
+        from app.gateway.vlm_client import resolve_vlm_route
+
+        if clef_enabled():
+            try:
+                return await detect_events_with_clef(b64_data, mime_type)
+            except Exception as exc:
+                logger.warning("vision_clef_detect_err err=%s", exc)
+            if not resolve_vlm_route().is_enabled:
+                return {}
 
         try:
             raw = await self._complete_vision(

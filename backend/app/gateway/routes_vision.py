@@ -1,4 +1,4 @@
-"""視覺輸入管道 — 把畫面用本地 VLM 轉成事件，僅在事件觸發時 ephemeral 餵給 AI（text 模式）。
+"""視覺輸入管道 — 把畫面用 Clef（備援 VLM）轉成事件，僅在事件觸發時 ephemeral 餵給 AI（text 模式）。
 
 攝影機是 AI 的眼睛。本端點供 text 模式使用：前端每秒推送一幀，
 describe_frame 判斷是否有語意事件（人出現、物體消失等）。
@@ -19,6 +19,7 @@ from app.auth.resources import ResourceNotFoundError, resolve_resource
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.config import get_tts_config
 from app.gateway.plugins.camera_live import InvalidFrameError, decode_frame_base64
+from app.gateway.vision_clef import probe_clef_health
 from app.gateway.vlm_client import probe_vlm_health
 from app.gateway.worker import get_camera_plugin
 from app.http_client import SharedAsyncClient
@@ -95,8 +96,13 @@ async def vision_describe(
 
 @router.get("/api/v1/vision/health", summary="視覺管道健康狀態")
 async def vision_health() -> dict[str, object]:
-    """回報 VLM 可用性，供前端決定是否開放攝影機 UI。"""
-    probe = await probe_vlm_health(client=_http.get(), cfg=get_tts_config())
+    """回報視覺判讀可用性（Clef 優先、VLM 備援），供前端決定是否開放攝影機 UI。"""
+    cfg = get_tts_config()
+    probe = await probe_clef_health(client=_http.get(), cfg=cfg)
+    if probe.get("status") != "ready":
+        vlm_probe = await probe_vlm_health(client=_http.get(), cfg=cfg)
+        if vlm_probe.get("status") != "disabled" or probe.get("status") == "disabled":
+            probe = vlm_probe
     status = str(probe.get("status", "unknown"))
     return {
         "available": status == "ready",

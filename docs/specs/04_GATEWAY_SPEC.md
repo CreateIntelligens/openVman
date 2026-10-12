@@ -9,6 +9,7 @@
 2. **非同步任務調度的**：使用 BullMQ + Redis 管理任務佇列，支援優先級與重試。
 3. **擴充插件系統**：
     * **Camera Live**：定時抓取即時畫面並透過 Vision LLM 轉為情境描述。
+    * **鏡頭事件判讀**：前台每秒推一幀（text 模式 `POST /api/v1/vision/describe`、Live `client_video_frame`），`CameraLivePlugin._detect_events` 把畫面以 data URL 放進 Clef 的 `images`，`vision_events.EVENT_DEFINITIONS` 每個事件一題 `noul`（機率 ≥ 0.5 成立），交給 `detect_edges` 狀態機（連續 3 幀觸發、5 幀解除）。Clef 失敗或逾時（`VISION_CLEF_TIMEOUT_SECONDS`，預設 5 秒）且有設定 VLM 時改請 VLM 輸出 JSON；同一 session 前一幀還在判讀時新幀直接丟棄。
     * **API Tool**：對外部 CRM/ERP 系統提供統一的代理解析與鑑權。
     * **Web Crawler**：爬取網頁內容並注入 Brain 層知識庫（RAG）。
 4. **臨時儲存管理**：管理媒體檔案上傳，提供 TTL 自動清理與配額限制。

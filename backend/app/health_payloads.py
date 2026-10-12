@@ -173,6 +173,7 @@ async def _probe_downstream_services(
     client: httpx.AsyncClient,
 ) -> dict[str, dict[str, Any]]:
     """Probe all known downstream services in parallel."""
+    from app.gateway.vision_clef import probe_clef_health
     from app.gateway.vlm_client import probe_vlm_health
 
     cfg = get_tts_config()
@@ -193,6 +194,7 @@ async def _probe_downstream_services(
 
     vlm_probe = await probe_vlm_health(client=client, cfg=cfg)
     probes["vlm"] = vlm_probe
+    probes["vision-clef"] = await probe_clef_health(client=client, cfg=cfg)
 
     indextts_probe = await probe_indextts_health(client, cfg)
     probes["index-tts"] = indextts_probe

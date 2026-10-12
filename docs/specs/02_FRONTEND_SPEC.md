@@ -179,7 +179,8 @@ VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 
 > 4. **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
 > 顯示（app 在 `App.vue`、admin 在 `useVisionAvailable.ts`）。三態：問到之前與
 > 401/403 都不顯示，`available: false` 不顯示，5xx 與網路錯誤 fail-open。不可用時
-> 是整個不出現，不是 disabled。
+> 是整個不出現，不是 disabled。`available` 先看 Clef（`VISION_CLEF_URL` 的 `/health`），
+> Clef 不通且有設定 VLM 時才看 VLM；兩者都沒有就是 `false`。
 
 #### 可合併回答的接收確認（2026-10-02）
 

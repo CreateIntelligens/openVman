@@ -52,6 +52,8 @@ def _clear_auth_and_config_caches(tmp_path_factory):
             "SESSION_JWT_SECRET": "test-session-jwt-secret-for-backend-unit-tests-32",
             "AUTH_DATABASE_PATH": test_db,
             "AUTH_COOKIE_SECURE": "false",
+            # 預設會連正式 Clef；單元測試一律關掉，要測的自己打開並 mock 傳輸層。
+            "VISION_CLEF_URL": "",
         },
         clear=False,
     ):
