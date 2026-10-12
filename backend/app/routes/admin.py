@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import dataclass
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import (
@@ -13,64 +11,61 @@ from app.auth.dependencies import (
     get_current_account,
     require_root,
 )
-from app.auth.models import (
-    AccountType,
-    ResourceRecord,
-    ResourceType,
-    is_at_least_admin,
-)
-from app.auth.resources import (
-    ResourceNotFoundError,
-    list_accessible_resources,
-    resolve_resource,
-)
+from app.auth.models import AccountType, is_at_least_admin
 from app.auth.runtime import AuthRuntime, get_auth_runtime
+from app.auth.voice_access import (
+    _RESOURCE_NOT_FOUND,
+    AuthorizedVoice,
+    _metadata_string,
+    _not_found,
+    _resolve_embed_tts_voice,
+    _voice_metadata,
+    embed_tts_providers as _embed_tts_providers,
+    resolve_tts_voice,
+    scoped_tts_providers as _scoped_tts_providers,
+)
 from app.config import get_tts_config
 from app.gateway.redis_pool import redis_available
 from app.gateway.temp_storage import get_temp_storage
 from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
-from app.providers.cosyvoice_adapter import (
-    COSYVOICE_DEFAULT_VOICE,
-    COSYVOICE_PROVIDER_NAME,
+from app.providers.voice_catalog import (
+    EDGE_TTS_VOICE_LABELS as _EDGE_TTS_VOICE_LABELS,
+    PROVIDER_NAMES as _PROVIDER_NAMES,
+    TTS_PROVIDER_TIMEOUT_SECONDS as _TTS_PROVIDER_TIMEOUT_SECONDS,
+    build_tts_provider_catalog,
+    excluded_voices,
+    extract_voice_names as _extract_voice_names,
+    fetch_castvoice_voices,
+    fetch_cosyvoice_voices,
+    fetch_gemini_voices,
+    fetch_indextts_voices,
+    fetch_provider_voices,
+    fetch_voxcpm_voices,
+    prepend_default_voice as _prepend_default_voice,
 )
-from app.providers.gemini_tts_adapter import GEMINI_DEFAULT_VOICE, GEMINI_PROVIDER_NAME
-from app.providers.voxcpm_adapter import VOXCPM_DEFAULT_VOICE, VOXCPM_PROVIDER_NAME
+from app.system_resources import (
+    ASR_ENGINE_LABELS as _ASR_ENGINE_LABELS,
+    BUILTIN_AVATAR_BACKGROUNDS as _BUILTIN_AVATAR_BACKGROUNDS,
+    drop_retired_asr_engines as _drop_retired_asr_engines,
+    sync_asr_engines,
+    sync_system_resources,
+)
 
 logger = logging.getLogger("backend")
 router = APIRouter()
 _health_http = SharedAsyncClient()
-_TTS_PROVIDER_TIMEOUT_SECONDS = 5
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
-_RESOURCE_NOT_FOUND = "Resource not found"
-_PROVIDER_NAMES = {
-    "aws": "AWS Polly",
-    "aws-polly": "AWS Polly",
-    "edge-tts": "Edge TTS",
-    "gcp": "GCP TTS",
-    "gcp-tts": "GCP TTS",
-    GEMINI_PROVIDER_NAME: "Gemini TTS",
-    "indextts": "IndexTTS",
-    VOXCPM_PROVIDER_NAME: "VoxCPM",
-    COSYVOICE_PROVIDER_NAME: "CosyVoice",
-}
-
-
-@dataclass(frozen=True, slots=True)
-class AuthorizedVoice:
-    """A voice resolved to the provider-facing identity and cache scope."""
-
-    provider: str
-    resource_id: str
-    runtime_key: str
-    cache_scope: str
 
 
 async def close_http() -> None:
     await _health_http.close()
 
 
+# The provider helpers take the client and config explicitly; these bind this
+# module's _health_http and get_tts_config at call time, so callers that patch
+# either name here keep reaching the voice fetches.
 async def _fetch_provider_voices(
     base_url: str,
     voices_path: str,
@@ -78,45 +73,21 @@ async def _fetch_provider_voices(
     *,
     headers: dict[str, str] | None = None,
 ) -> list[str]:
-    voices_url = f"{base_url.rstrip('/')}{voices_path}"
-    try:
-        if headers is None:
-            response = await _health_http.get().get(
-                voices_url,
-                timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
-                follow_redirects=True,
-            )
-        else:
-            response = await _health_http.get().get(
-                voices_url,
-                timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
-                headers=headers,
-                follow_redirects=True,
-            )
-        response.raise_for_status()
-        return _extract_voice_names(response.json())
-    except Exception as exc:
-        logger.warning("failed to fetch %s voices from %s: %s", provider_name, voices_url, exc)
-        return []
-
-
-async def _fetch_indextts_voices(base_url: str, internal_token: str) -> list[str]:
-    return await _fetch_provider_voices(
-        base_url,
-        "/audio/voices",
-        "indextts",
-        headers={_INTERNAL_TOKEN_HEADER: internal_token},
+    return await fetch_provider_voices(
+        _health_http, base_url, voices_path, provider_name, headers=headers,
     )
 
 
+async def _fetch_indextts_voices(base_url: str, internal_token: str) -> list[str]:
+    return await fetch_indextts_voices(_health_http, base_url, internal_token)
+
+
 async def _fetch_gemini_voices(base_url: str) -> list[str]:
-    return await _fetch_provider_voices(base_url, "/api/voices", "gemini")
+    return await fetch_gemini_voices(_health_http, base_url)
 
 
 def _excluded_voices(config_attr: str) -> frozenset[str]:
-    """voice_id 黑名單：上游清單不是我們維護的，這裡濾掉不想露出的聲音。"""
-    raw = getattr(get_tts_config(), config_attr, "") or ""
-    return frozenset(item.strip() for item in raw.split(",") if item.strip())
+    return excluded_voices(get_tts_config(), config_attr)
 
 
 async def _fetch_castvoice_voices(
@@ -126,486 +97,29 @@ async def _fetch_castvoice_voices(
     *,
     headers: dict[str, str] | None = None,
 ) -> list[tuple[str, str]]:
-    """回傳 CastAgent 相容 /voices 端點的 ``(voice_id, label)`` 清單。
-
-    這類端點用 ``voice_id``＋中文 ``label``，與其他 provider 的 ``name`` 欄位
-    不同，故不走 _extract_voice_names；label 留下來給 admin 選單。
-    """
-    # headers 只在有值時才傳：VoxCPM360 的 /voices 不需要驗證，多送一個空
-    # dict 只是噪音。
-    extra = {"headers": headers} if headers else {}
-    try:
-        response = await _health_http.get().get(
-            voices_url,
-            timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
-            follow_redirects=True,
-            **extra,
-        )
-        response.raise_for_status()
-        payload = response.json()
-    except Exception as exc:
-        logger.warning(
-            "failed to fetch %s voices from %s: %s", provider, voices_url, exc,
-        )
-        return []
-
-    voice_entries = payload.get("voices") if isinstance(payload, dict) else None
-    if not isinstance(voice_entries, list):
-        return []
-
-    voices: list[tuple[str, str]] = []
-    for entry in voice_entries:
-        if not isinstance(entry, dict):
-            continue
-        voice_id = entry.get("voice_id")
-        if not isinstance(voice_id, str) or not voice_id:
-            continue
-        if voice_id in excluded:
-            continue
-        label = entry.get("label")
-        display_label = label if isinstance(label, str) and label else voice_id
-        voices.append((voice_id, display_label))
-    return voices
+    return await fetch_castvoice_voices(
+        _health_http, voices_url, provider, excluded, headers=headers,
+    )
 
 
 async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
-    return await _fetch_castvoice_voices(
-        f"{base_url.rstrip('/')}/api/v1/tts/voices",
-        "voxcpm",
-        _excluded_voices("tts_voxcpm_excluded_voices"),
+    return await fetch_voxcpm_voices(
+        _health_http, base_url, _excluded_voices("tts_voxcpm_excluded_voices"),
     )
 
 
 async def _fetch_cosyvoice_voices(base_url: str) -> list[tuple[str, str]]:
-    """CosyVoice 的 /voices 需要 Bearer token（VoxCPM360 的不用）。"""
-    cfg = get_tts_config()
-    headers = (
-        {"Authorization": f"Bearer {cfg.tts_cosyvoice_api_key}"}
-        if cfg.tts_cosyvoice_api_key
-        else {}
-    )
-    return await _fetch_castvoice_voices(
-        f"{base_url.rstrip('/')}/voices",
-        COSYVOICE_PROVIDER_NAME,
+    return await fetch_cosyvoice_voices(
+        _health_http,
+        base_url,
+        get_tts_config().tts_cosyvoice_api_key,
         _excluded_voices("tts_cosyvoice_excluded_voices"),
-        headers=headers,
     )
-
-
-# 與 frontend/app/src/types/avatarBackground.ts 的 AVATAR_BACKGROUND_IDS 對應，
-# label 沿用前台選單（SettingsModal）的中文名稱。
-_BUILTIN_AVATAR_BACKGROUNDS = (
-    ("dark", "深色"),
-    ("clinic", "診間"),
-    ("studio", "棚拍"),
-)
-
-_EDGE_TTS_VOICE_LABELS = {
-    "zh-TW-HsiaoChenNeural": "曉臻 (Edge-TTS)",
-    "zh-TW-YunJheNeural": "雲哲 (Edge-TTS)",
-    "zh-CN-XiaoyiNeural": "曉伊 (Edge-TTS)",
-}
-
-
-# 引擎清單是程式碼決定的（_TRANSCRIBERS 加 browser），不像聲音要跟外部服務
-# 查。label 與前台選單一致，後台授權時看得懂在給什麼。
-_ASR_ENGINE_LABELS = {
-    "breeze": "Breeze-ASR-26（臺語轉華語）",
-    "r2t2": "Confucius4-R2T2（.35，華英混合，自動轉繁）",
-    "r2t2-dev": "Confucius4-R2T2 dev（.37）",
-    "sensevoice": "SenseVoice-Small（臺語漢字）",
-    "openai": "OpenAI Whisper（語音送往外部服務）",
-    "browser": "瀏覽器內建辨識（由瀏覽器廠商處理，不經本站伺服器）",
-    "r2t2-live": "Confucius4-R2T2 串流辨識（.35，邊講邊出字，帶專案詞表）",
-    "r2t2-dev-live": "Confucius4-R2T2 dev 串流辨識（.37）",
-    "gemini-live": "Gemini 串流辨識（邊講邊出字，語音送往 Google）",
-}
-
-
-def sync_asr_engines(runtime: AuthRuntime) -> None:
-    """Register the ASR engines so they can be granted per account.
-
-    跟聲音一樣註冊成 system_public 資源，管理者才能在帳號頁逐一授權。這裡不
-    管哪一家「設定齊全」——沒填 URL 的引擎照樣列出來，否則管理者會看到清單
-    隨部署設定忽隱忽現，反而難判斷。實際可不可用由 fallback chain 決定。
-    """
-    for engine_id, label in _ASR_ENGINE_LABELS.items():
-        try:
-            runtime.resources.upsert_system_resource(
-                resource_type=ResourceType.ASR_ENGINE,
-                resource_id=engine_id,
-                metadata={"label": label},
-            )
-        except Exception as exc:
-            logger.warning("failed to register asr engine %s: %s", engine_id, exc)
-    _drop_retired_asr_engines(runtime)
-
-
-def _drop_retired_asr_engines(runtime: AuthRuntime) -> None:
-    """Forget engines removed from the code, along with their grants and choices.
-
-    upsert 只會新增不會刪：拿掉的引擎（例如 xiaomi）會一直留在後台授權清單，
-    帳號存的偏好也還指著它。刪資源時 resource_grants 與 admin_resource_scopes
-    靠外鍵 ON DELETE CASCADE 一起清掉；偏好改回空字串，等於沒選過、用部署預設。
-    """
-    try:
-        for record in runtime.resources.list_by_type(ResourceType.ASR_ENGINE):
-            if record.resource_id not in _ASR_ENGINE_LABELS:
-                runtime.resources.unregister(ResourceType.ASR_ENGINE, record.resource_id)
-                logger.info("removed retired asr engine %s", record.resource_id)
-        cleared = runtime.account_access.clear_asr_providers_except(_ASR_ENGINE_LABELS)
-        if cleared:
-            logger.info("cleared %d asr preferences naming a retired engine", cleared)
-    except Exception as exc:
-        logger.warning("failed to drop retired asr engines: %s", exc)
 
 
 async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:
     """Register voices from enabled providers into the resource ownership registry."""
-    cfg = get_tts_config()
-
-    if cfg.edge_tts_enabled:
-        edge_voices = ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "zh-CN-XiaoyiNeural"]
-        if cfg.edge_tts_voice and cfg.edge_tts_voice not in edge_voices:
-            edge_voices.insert(0, cfg.edge_tts_voice)
-        for voice_id in edge_voices:
-            label = _EDGE_TTS_VOICE_LABELS.get(voice_id, f"{voice_id} (Edge-TTS)")
-            try:
-                runtime.resources.upsert_system_resource(
-                    resource_type=ResourceType.CUSTOM_VOICE,
-                    resource_id=voice_id,
-                    metadata={"provider": "edge-tts", "label": label},
-                )
-            except Exception as exc:
-                logger.warning("failed to register edge-tts voice %s: %s", voice_id, exc)
-
-    if cfg.tts_indextts_url:
-        try:
-            fetched_voices = await _fetch_indextts_voices(
-                cfg.tts_indextts_url,
-                cfg.gateway_internal_token,
-            )
-            for voice_id in fetched_voices:
-                runtime.resources.upsert_system_resource(
-                    resource_type=ResourceType.CUSTOM_VOICE,
-                    resource_id=voice_id,
-                    metadata={"provider": "indextts", "label": voice_id},
-                )
-        except Exception as exc:
-            logger.warning("failed to sync indextts voices: %s", exc)
-
-    if cfg.tts_gemini_url:
-        try:
-            gemini_voices = await _fetch_gemini_voices(cfg.tts_gemini_url)
-            for voice_id in gemini_voices:
-                runtime.resources.upsert_system_resource(
-                    resource_type=ResourceType.CUSTOM_VOICE,
-                    resource_id=voice_id,
-                    metadata={"provider": GEMINI_PROVIDER_NAME, "label": voice_id},
-                )
-        except Exception as exc:
-            logger.warning("failed to sync gemini voices: %s", exc)
-
-    if cfg.tts_voxcpm_url:
-        try:
-            for voice_id, label in await _fetch_voxcpm_voices(cfg.tts_voxcpm_url):
-                runtime.resources.upsert_system_resource(
-                    resource_type=ResourceType.CUSTOM_VOICE,
-                    resource_id=voice_id,
-                    metadata={"provider": VOXCPM_PROVIDER_NAME, "label": label},
-                )
-        except Exception as exc:
-            logger.warning("failed to sync voxcpm voices: %s", exc)
-
-    if cfg.tts_cosyvoice_url:
-        try:
-            for voice_id, label in await _fetch_cosyvoice_voices(cfg.tts_cosyvoice_url):
-                runtime.resources.upsert_system_resource(
-                    resource_type=ResourceType.CUSTOM_VOICE,
-                    resource_id=voice_id,
-                    metadata={"provider": COSYVOICE_PROVIDER_NAME, "label": label},
-                )
-        except Exception as exc:
-            logger.warning("failed to sync cosyvoice voices: %s", exc)
-
-    if cfg.tts_gcp_enabled and cfg.tts_gcp_voice_name:
-        try:
-            runtime.resources.upsert_system_resource(
-                resource_type=ResourceType.CUSTOM_VOICE,
-                resource_id=cfg.tts_gcp_voice_name,
-                metadata={"provider": "gcp", "label": f"{cfg.tts_gcp_voice_name} (GCP)"},
-            )
-        except Exception as exc:
-            logger.warning("failed to register gcp voice: %s", exc)
-
-    if cfg.tts_aws_enabled and cfg.tts_aws_polly_voice_id:
-        try:
-            runtime.resources.upsert_system_resource(
-                resource_type=ResourceType.CUSTOM_VOICE,
-                resource_id=cfg.tts_aws_polly_voice_id,
-                metadata={"provider": "aws", "label": f"{cfg.tts_aws_polly_voice_id} (AWS)"},
-            )
-        except Exception as exc:
-            logger.warning("failed to register aws voice: %s", exc)
-
-    try:
-        from app.routes.mascots import get_store as get_mascot_store
-        for mascot in get_mascot_store().list_mascots():
-            mid = mascot.get("mascot_id")
-            mlabel = mascot.get("label") or mid
-            if mid:
-                runtime.resources.upsert_system_resource(
-                    resource_type=ResourceType.AVATAR_MASCOT,
-                    resource_id=mid,
-                    metadata={"label": mlabel},
-                )
-    except Exception as exc:
-        logger.warning("failed to sync mascots: %s", exc)
-
-    try:
-        from app.routes.backgrounds import get_store as get_background_store
-        for bg in get_background_store().list_backgrounds():
-            bid = bg.get("background_id")
-            blabel = bg.get("label") or bid
-            if bid:
-                runtime.resources.upsert_system_resource(
-                    resource_type=ResourceType.AVATAR_BACKGROUND,
-                    resource_id=bid,
-                    metadata={"label": blabel},
-                )
-    except Exception as exc:
-        logger.warning("failed to sync backgrounds: %s", exc)
-
-    # 前端內建的純 CSS 背景（AvatarCanvas 直接渲染，沒有實體檔案），
-    # 仍要註冊成資源，否則管理端的權限選單看不到、也就無法指定成預設。
-    for bid, blabel in _BUILTIN_AVATAR_BACKGROUNDS:
-        try:
-            runtime.resources.upsert_system_resource(
-                resource_type=ResourceType.AVATAR_BACKGROUND,
-                resource_id=bid,
-                metadata={"label": blabel, "builtin": True},
-            )
-        except Exception as exc:
-            logger.warning("failed to register builtin background %s: %s", bid, exc)
-
-
-def _extract_voice_names(payload: object) -> list[str]:
-    if isinstance(payload, dict):
-        voices = payload.get("voices")
-        candidates = voices if isinstance(voices, list) else payload.keys()
-    elif isinstance(payload, list):
-        candidates = payload
-    else:
-        return []
-
-    names: list[str] = []
-    for candidate in candidates:
-        if isinstance(candidate, str) and candidate:
-            names.append(candidate)
-        elif isinstance(candidate, dict):
-            name = candidate.get("name")
-            if isinstance(name, str) and name:
-                names.append(name)
-    return names
-
-
-def _prepend_default_voice(voices: list[str], default_voice: str) -> list[str]:
-    if not default_voice or default_voice in voices:
-        return voices
-    return [default_voice, *voices]
-
-
-def _voice_metadata(record: ResourceRecord) -> dict[str, object]:
-    try:
-        payload = json.loads(record.metadata_json)
-    except (TypeError, ValueError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _metadata_string(metadata: dict[str, object], key: str) -> str:
-    value = metadata.get(key)
-    return value.strip() if isinstance(value, str) else ""
-
-
-def _not_found() -> HTTPException:
-    return HTTPException(status_code=404, detail=_RESOURCE_NOT_FOUND)
-
-
-def _resolve_embed_tts_voice(
-    current: CurrentAccount,
-    runtime: AuthRuntime,
-    requested_provider: str,
-    requested_voice: str,
-) -> AuthorizedVoice | None:
-    """Fall back to the key's default voice, and refuse anything else.
-
-    Embed 金鑰沒有帳號層的授權資料，發音人只能是金鑰上設定的那一個；
-    請求指定了別的 provider/voice 就當作查無資源。
-    """
-    key = current.embed_key
-    assert key is not None
-    provider = requested_provider or key.default_tts_provider
-    voice_id = requested_voice or key.default_tts_voice
-    if not voice_id or not provider:
-        # 金鑰沒設預設音色時不擋，交由下游服務用自己的預設值合成。
-        return None
-    if key.default_tts_provider and provider != key.default_tts_provider:
-        raise _not_found()
-    if key.default_tts_voice and voice_id != key.default_tts_voice:
-        raise _not_found()
-
-    record = runtime.resources.get(ResourceType.CUSTOM_VOICE, voice_id)
-    if record is None:
-        raise _not_found()
-    metadata = _voice_metadata(record)
-    registered_provider = _metadata_string(metadata, "provider")
-    if registered_provider and provider != registered_provider:
-        raise _not_found()
-    runtime_key = _metadata_string(metadata, "runtime_key") or record.resource_id
-    cache_owner = record.owner_user_id or "system"
-    return AuthorizedVoice(
-        provider=registered_provider or provider,
-        resource_id=record.resource_id,
-        runtime_key=runtime_key,
-        cache_scope=f"{cache_owner}:{record.resource_id}",
-    )
-
-
-def resolve_tts_voice(
-    current: CurrentAccount,
-    runtime: AuthRuntime,
-    *,
-    requested_provider: str,
-    requested_voice: str,
-) -> AuthorizedVoice | None:
-    """Resolve a voice before cache or provider access.
-
-    Administrators retain unrestricted provider access. Other accounts must use
-    their configured provider and an explicitly granted voice.
-    """
-    provider = requested_provider.strip()
-    voice_id = requested_voice.strip()
-    defaults = None
-
-    if current.embed_key is not None:
-        return _resolve_embed_tts_voice(current, runtime, provider, voice_id)
-
-    is_unrestricted_admin = (
-        current.user.account_type is AccountType.FORMAL
-        and is_at_least_admin(current.user.role)
-    )
-    if not is_unrestricted_admin:
-        defaults = runtime.account_access.get_defaults(current.user.id)
-        if (
-            defaults is None
-            or not defaults.voice_provider
-            or not defaults.voice_id
-        ):
-            raise _not_found()
-        provider = provider or defaults.voice_provider
-        voice_id = voice_id or defaults.voice_id
-        if provider != defaults.voice_provider:
-            raise _not_found()
-    elif not voice_id:
-        return None
-
-    if not voice_id:
-        raise _not_found()
-
-    try:
-        record = resolve_resource(
-            runtime.resources,
-            current.user,
-            ResourceType.CUSTOM_VOICE,
-            voice_id,
-        )
-    except ResourceNotFoundError as exc:
-        raise _not_found() from exc
-
-    metadata = _voice_metadata(record)
-    registered_provider = _metadata_string(metadata, "provider")
-    if registered_provider:
-        if provider and provider != "auto" and provider != registered_provider:
-            raise _not_found()
-        provider = registered_provider
-    elif defaults is not None:
-        # Account defaults are administrator-selected with the grants, so they
-        # remain authoritative for migrated rows that predate provider metadata.
-        provider = defaults.voice_provider
-
-    if not provider or provider == "auto":
-        raise _not_found()
-
-    runtime_key = _metadata_string(metadata, "runtime_key") or record.resource_id
-    cache_owner = record.owner_user_id or "system"
-    return AuthorizedVoice(
-        provider=provider,
-        resource_id=record.resource_id,
-        runtime_key=runtime_key,
-        cache_scope=f"{cache_owner}:{record.resource_id}",
-    )
-
-
-def _embed_tts_providers(current: CurrentAccount) -> list[dict[str, object]]:
-    """An embed key may only see the single provider and voice it carries."""
-    key = current.embed_key
-    if key is None or not key.default_tts_provider:
-        return []
-    return [
-        {
-            "id": key.default_tts_provider,
-            "name": _PROVIDER_NAMES.get(
-                key.default_tts_provider,
-                key.default_tts_provider,
-            ),
-            "default_voice": key.default_tts_voice,
-            "voices": [key.default_tts_voice] if key.default_tts_voice else [],
-        }
-    ]
-
-
-def _scoped_tts_providers(
-    current: CurrentAccount,
-    runtime: AuthRuntime,
-) -> list[dict[str, object]]:
-    defaults = runtime.account_access.get_defaults(current.user.id)
-    if defaults is None or not defaults.voice_provider or not defaults.voice_id:
-        return []
-
-    voices: list[str] = []
-    for record in list_accessible_resources(
-        runtime.resources,
-        current.user,
-        ResourceType.CUSTOM_VOICE,
-    ):
-        registered_provider = _metadata_string(
-            _voice_metadata(record),
-            "provider",
-        )
-        if (
-            registered_provider
-            and registered_provider != defaults.voice_provider
-        ):
-            continue
-        voices.append(record.resource_id)
-
-    if not voices:
-        return []
-    default_voice = (
-        defaults.voice_id if defaults.voice_id in voices else voices[0]
-    )
-    return [
-        {
-            "id": defaults.voice_provider,
-            "name": _PROVIDER_NAMES.get(
-                defaults.voice_provider,
-                defaults.voice_provider,
-            ),
-            "default_voice": default_voice,
-            "voices": voices,
-        }
-    ]
+    await sync_system_resources(runtime, get_tts_config(), _health_http)
 
 
 @router.get("/healthz", tags=["System"], summary="服務健康檢查")
@@ -825,6 +339,7 @@ async def metrics_prometheus():
     return build_prometheus_response()
 
 
+
 @router.get("/api/v1/tts/providers", tags=["TTS"], summary="取得 TTS Provider 清單")
 async def get_tts_providers(
     current: CurrentAccount = Depends(get_current_account),
@@ -838,99 +353,5 @@ async def get_tts_providers(
     ):
         return JSONResponse(content=_scoped_tts_providers(current, runtime))
 
-    cfg = get_tts_config()
-    providers: list[dict] = [
-        {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
-    ]
-
-    if cfg.tts_indextts_url:
-        # 探測 IndexTTS 健康狀態：抓不到 voices（容器掛掉/不可達）就不顯示，
-        # 避免選單列出一個會 502 的 provider。auto 仍由 backend fallback 處理。
-        fetched_voices = await _fetch_indextts_voices(
-            cfg.tts_indextts_url,
-            cfg.gateway_internal_token,
-        )
-        if fetched_voices:
-            providers.append({
-                "id": "indextts",
-                "name": "IndexTTS",
-                "default_voice": cfg.tts_indextts_default_character,
-                "voices": _prepend_default_voice(
-                    fetched_voices,
-                    cfg.tts_indextts_default_character,
-                ),
-            })
-
-    if cfg.tts_voxcpm_url:
-        # 同 IndexTTS：抓不到 voices 就不列，避免選單出現會 502 的 provider。
-        voxcpm_voices = [
-            voice_id
-            for voice_id, _label in await _fetch_voxcpm_voices(cfg.tts_voxcpm_url)
-        ]
-        if voxcpm_voices:
-            default_voice = cfg.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
-            providers.append({
-                "id": VOXCPM_PROVIDER_NAME,
-                "name": "VoxCPM",
-                "default_voice": default_voice,
-                "voices": _prepend_default_voice(voxcpm_voices, default_voice),
-            })
-
-    if cfg.tts_cosyvoice_url:
-        # 同 IndexTTS：抓不到 voices 就不列，避免選單出現會 502 的 provider。
-        cosyvoice_voices = [
-            voice_id
-            for voice_id, _label in await _fetch_cosyvoice_voices(cfg.tts_cosyvoice_url)
-        ]
-        if cosyvoice_voices:
-            default_voice = (
-                cfg.tts_cosyvoice_default_voice or COSYVOICE_DEFAULT_VOICE
-            )
-            providers.append({
-                "id": COSYVOICE_PROVIDER_NAME,
-                "name": "CosyVoice",
-                "default_voice": default_voice,
-                "voices": _prepend_default_voice(cosyvoice_voices, default_voice),
-            })
-
-    if cfg.tts_gcp_enabled:
-        providers.append({
-            "id": "gcp",
-            "name": "GCP TTS",
-            "default_voice": cfg.tts_gcp_voice_name,
-            "voices": [cfg.tts_gcp_voice_name],
-        })
-
-    if cfg.tts_aws_enabled:
-        providers.append({
-            "id": "aws",
-            "name": "AWS Polly",
-            "default_voice": cfg.tts_aws_polly_voice_id,
-            "voices": [cfg.tts_aws_polly_voice_id],
-        })
-
-    if cfg.tts_gemini_url:
-        fetched_voices = await _fetch_gemini_voices(cfg.tts_gemini_url)
-        if fetched_voices:
-            providers.append({
-                "id": GEMINI_PROVIDER_NAME,
-                "name": "Gemini TTS",
-                "default_voice": GEMINI_DEFAULT_VOICE,
-                "voices": _prepend_default_voice(
-                    fetched_voices,
-                    GEMINI_DEFAULT_VOICE,
-                ),
-            })
-
-    if cfg.edge_tts_enabled:
-        voices = ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "zh-CN-XiaoyiNeural"]
-        if cfg.edge_tts_voice not in voices:
-            voices.insert(0, cfg.edge_tts_voice)
-        providers.append({
-            "id": "edge-tts",
-            "name": "Edge TTS",
-            "default_voice": cfg.edge_tts_voice,
-            "voices": voices,
-        })
-
+    providers = await build_tts_provider_catalog(get_tts_config(), _health_http)
     return JSONResponse(content=providers)

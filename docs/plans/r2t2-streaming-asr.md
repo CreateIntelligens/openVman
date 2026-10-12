@@ -70,7 +70,7 @@
   - 沒設定網址時，這個引擎不能用，回 `not_configured`。
 - 引擎註冊：
   - `settings_repository.py`：`r2t2-live` 跟 `gemini-live` 一樣，屬於「前台直接驅動、不進 `transcribe()` 備援」的那一類。
-  - `routes/admin.py` 的 `_ASR_ENGINE_LABELS` 加 `r2t2-live`，後台才能授權給帳號。
+  - `system_resources.py` 的 `ASR_ENGINE_LABELS` 加 `r2t2-live`，後台才能授權給帳號。
   - 後端引擎清單和 `engines.ts` 的一致性，有 `backend/tests/auth/test_system_settings.py` 在檢查。
 
 ### 前台
