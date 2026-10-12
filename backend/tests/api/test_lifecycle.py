@@ -24,22 +24,18 @@ async def test_lifespan_closes_resources_after_application_failure(
     close_admin = AsyncMock()
     daemon = SimpleNamespace(start=Mock(), stop=AsyncMock())
     monkeypatch.setattr(lifecycle, "get_auth_runtime", lambda: runtime)
-    monkeypatch.setattr(
-        lifecycle, "get_tts_config",
-        lambda: SimpleNamespace(a2a_enabled=a2a_enabled),
-    )
+    cfg = SimpleNamespace(a2a_enabled=a2a_enabled)
+    monkeypatch.setattr(lifecycle, "get_tts_config", lambda: cfg)
     monkeypatch.setattr(lifecycle, "_startup_gateway_resources", start_gateway)
     monkeypatch.setattr(lifecycle, "_shutdown_gateway_resources", stop_gateway)
     monkeypatch.setattr(lifecycle, "get_a2a_bridge_daemon", lambda: daemon)
-    monkeypatch.setattr(lifecycle.admin_routes, "sync_asr_engines", sync_asr)
-    monkeypatch.setattr(
-        lifecycle.admin_routes, "sync_tts_custom_voices", sync_voices,
-    )
+    monkeypatch.setattr(lifecycle, "sync_asr_engines", sync_asr)
+    monkeypatch.setattr(lifecycle, "sync_system_resources", sync_voices)
     monkeypatch.setattr(lifecycle.admin_routes, "close_http", close_admin)
     clients = []
     for name in (
         "_brain_proxy_http", "_internal_http", "_forward_http", "_crawl_http",
-        "_health_http", "_vision_http", "_asr_http",
+        "_health_http", "_vision_http", "_asr_http", "_voice_catalog_http",
     ):
         client = SimpleNamespace(close=AsyncMock())
         clients.append(client)
@@ -50,7 +46,7 @@ async def test_lifespan_closes_resources_after_application_failure(
             start_gateway.assert_awaited_once_with()
             app.state.openapi_builder.build.assert_awaited_once_with()
             sync_asr.assert_called_once_with(runtime)
-            sync_voices.assert_awaited_once_with(runtime)
+            sync_voices.assert_awaited_once_with(runtime, cfg)
             raise RuntimeError("application failed")
 
     stop_gateway.assert_awaited_once_with()

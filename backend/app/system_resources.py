@@ -11,7 +11,6 @@ from typing import Any
 
 from app.auth.models import ResourceType
 from app.auth.runtime import AuthRuntime
-from app.http_client import SharedAsyncClient
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
 from app.providers.gemini_tts_adapter import GEMINI_PROVIDER_NAME
 from app.providers.voice_catalog import (
@@ -88,11 +87,7 @@ def drop_retired_asr_engines(runtime: AuthRuntime) -> None:
         logger.warning("failed to drop retired asr engines: %s", exc)
 
 
-async def sync_system_resources(
-    runtime: AuthRuntime,
-    cfg: Any,
-    http: SharedAsyncClient,
-) -> None:
+async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
     """Register voices from enabled providers, mascots and backgrounds."""
     if cfg.edge_tts_enabled:
         edge_voices = list(EDGE_TTS_VOICES)
@@ -112,7 +107,6 @@ async def sync_system_resources(
     if cfg.tts_indextts_url:
         try:
             fetched_voices = await fetch_indextts_voices(
-                http,
                 cfg.tts_indextts_url,
                 cfg.gateway_internal_token,
             )
@@ -127,7 +121,7 @@ async def sync_system_resources(
 
     if cfg.tts_gemini_url:
         try:
-            gemini_voices = await fetch_gemini_voices(http, cfg.tts_gemini_url)
+            gemini_voices = await fetch_gemini_voices(cfg.tts_gemini_url)
             for voice_id in gemini_voices:
                 runtime.resources.upsert_system_resource(
                     resource_type=ResourceType.CUSTOM_VOICE,
@@ -140,7 +134,6 @@ async def sync_system_resources(
     if cfg.tts_voxcpm_url:
         try:
             for voice_id, label in await fetch_voxcpm_voices(
-                http,
                 cfg.tts_voxcpm_url,
                 excluded_voices(cfg, "tts_voxcpm_excluded_voices"),
             ):
@@ -155,7 +148,6 @@ async def sync_system_resources(
     if cfg.tts_cosyvoice_url:
         try:
             for voice_id, label in await fetch_cosyvoice_voices(
-                http,
                 cfg.tts_cosyvoice_url,
                 cfg.tts_cosyvoice_api_key,
                 excluded_voices(cfg, "tts_cosyvoice_excluded_voices"),

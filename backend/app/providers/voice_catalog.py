@@ -2,7 +2,8 @@
 
 Each provider publishes its voices in its own shape; this module turns them
 into plain voice ids (plus labels where the provider has them) for the admin
-provider menu and the resource registry.
+provider menu and the resource registry. The module owns the HTTP client for
+those lookups; the app lifespan closes it.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ logger = logging.getLogger("backend")
 
 TTS_PROVIDER_TIMEOUT_SECONDS = 5
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+_http = SharedAsyncClient()
 
 PROVIDER_NAMES = {
     "aws": "AWS Polly",
@@ -49,7 +51,6 @@ EDGE_TTS_VOICE_LABELS = {
 
 
 async def fetch_provider_voices(
-    http: SharedAsyncClient,
     base_url: str,
     voices_path: str,
     provider_name: str,
@@ -59,13 +60,13 @@ async def fetch_provider_voices(
     voices_url = f"{base_url.rstrip('/')}{voices_path}"
     try:
         if headers is None:
-            response = await http.get().get(
+            response = await _http.get().get(
                 voices_url,
                 timeout=TTS_PROVIDER_TIMEOUT_SECONDS,
                 follow_redirects=True,
             )
         else:
-            response = await http.get().get(
+            response = await _http.get().get(
                 voices_url,
                 timeout=TTS_PROVIDER_TIMEOUT_SECONDS,
                 headers=headers,
@@ -78,13 +79,8 @@ async def fetch_provider_voices(
         return []
 
 
-async def fetch_indextts_voices(
-    http: SharedAsyncClient,
-    base_url: str,
-    internal_token: str,
-) -> list[str]:
+async def fetch_indextts_voices(base_url: str, internal_token: str) -> list[str]:
     return await fetch_provider_voices(
-        http,
         base_url,
         "/audio/voices",
         "indextts",
@@ -92,8 +88,8 @@ async def fetch_indextts_voices(
     )
 
 
-async def fetch_gemini_voices(http: SharedAsyncClient, base_url: str) -> list[str]:
-    return await fetch_provider_voices(http, base_url, "/api/voices", "gemini")
+async def fetch_gemini_voices(base_url: str) -> list[str]:
+    return await fetch_provider_voices(base_url, "/api/voices", "gemini")
 
 
 def excluded_voices(cfg: Any, config_attr: str) -> frozenset[str]:
@@ -103,7 +99,6 @@ def excluded_voices(cfg: Any, config_attr: str) -> frozenset[str]:
 
 
 async def fetch_castvoice_voices(
-    http: SharedAsyncClient,
     voices_url: str,
     provider: str,
     excluded: frozenset[str],
@@ -119,7 +114,7 @@ async def fetch_castvoice_voices(
     # dict 只是噪音。
     extra = {"headers": headers} if headers else {}
     try:
-        response = await http.get().get(
+        response = await _http.get().get(
             voices_url,
             timeout=TTS_PROVIDER_TIMEOUT_SECONDS,
             follow_redirects=True,
@@ -153,12 +148,10 @@ async def fetch_castvoice_voices(
 
 
 async def fetch_voxcpm_voices(
-    http: SharedAsyncClient,
     base_url: str,
     excluded: frozenset[str],
 ) -> list[tuple[str, str]]:
     return await fetch_castvoice_voices(
-        http,
         f"{base_url.rstrip('/')}/api/v1/tts/voices",
         "voxcpm",
         excluded,
@@ -166,7 +159,6 @@ async def fetch_voxcpm_voices(
 
 
 async def fetch_cosyvoice_voices(
-    http: SharedAsyncClient,
     base_url: str,
     api_key: str,
     excluded: frozenset[str],
@@ -174,7 +166,6 @@ async def fetch_cosyvoice_voices(
     """CosyVoice 的 /voices 需要 Bearer token（VoxCPM360 的不用）。"""
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     return await fetch_castvoice_voices(
-        http,
         f"{base_url.rstrip('/')}/voices",
         COSYVOICE_PROVIDER_NAME,
         excluded,
@@ -208,10 +199,7 @@ def prepend_default_voice(voices: list[str], default_voice: str) -> list[str]:
     return [default_voice, *voices]
 
 
-async def build_tts_provider_catalog(
-    cfg: Any,
-    http: SharedAsyncClient,
-) -> list[dict]:
+async def build_tts_provider_catalog(cfg: Any) -> list[dict]:
     """Every configured provider and its voices, for unrestricted admins."""
     providers: list[dict] = [
         {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
@@ -221,7 +209,6 @@ async def build_tts_provider_catalog(
         # 探測 IndexTTS 健康狀態：抓不到 voices（容器掛掉/不可達）就不顯示，
         # 避免選單列出一個會 502 的 provider。auto 仍由 backend fallback 處理。
         fetched_voices = await fetch_indextts_voices(
-            http,
             cfg.tts_indextts_url,
             cfg.gateway_internal_token,
         )
@@ -241,7 +228,6 @@ async def build_tts_provider_catalog(
         voxcpm_voices = [
             voice_id
             for voice_id, _label in await fetch_voxcpm_voices(
-                http,
                 cfg.tts_voxcpm_url,
                 excluded_voices(cfg, "tts_voxcpm_excluded_voices"),
             )
@@ -260,7 +246,6 @@ async def build_tts_provider_catalog(
         cosyvoice_voices = [
             voice_id
             for voice_id, _label in await fetch_cosyvoice_voices(
-                http,
                 cfg.tts_cosyvoice_url,
                 cfg.tts_cosyvoice_api_key,
                 excluded_voices(cfg, "tts_cosyvoice_excluded_voices"),
@@ -294,7 +279,7 @@ async def build_tts_provider_catalog(
         })
 
     if cfg.tts_gemini_url:
-        fetched_voices = await fetch_gemini_voices(http, cfg.tts_gemini_url)
+        fetched_voices = await fetch_gemini_voices(cfg.tts_gemini_url)
         if fetched_voices:
             providers.append({
                 "id": GEMINI_PROVIDER_NAME,

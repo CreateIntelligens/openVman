@@ -350,9 +350,9 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
     async def _fake_close() -> None:
         return None
 
-    module.admin_routes._health_http = types.SimpleNamespace(
-        get=lambda: FakeClient(),
-        close=_fake_close,
+    monkeypatch.setattr(
+        "app.providers.voice_catalog._http",
+        types.SimpleNamespace(get=lambda: FakeClient(), close=_fake_close),
     )
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
         document_max_upload_bytes=1024,
@@ -396,9 +396,9 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
     async def _fake_close() -> None:
         return None
 
-    module.admin_routes._health_http = types.SimpleNamespace(
-        get=lambda: FakeClient(),
-        close=_fake_close,
+    monkeypatch.setattr(
+        "app.providers.voice_catalog._http",
+        types.SimpleNamespace(get=lambda: FakeClient(), close=_fake_close),
     )
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
         document_max_upload_bytes=1024,
@@ -440,7 +440,7 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
         async def close(self):
             pass
 
-    module.admin_routes._health_http = FakeClient()
+    monkeypatch.setattr("app.providers.voice_catalog._http", FakeClient())
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
         document_max_upload_bytes=1024,
         tts_indextts_url="",
@@ -923,9 +923,9 @@ def test_tts_providers_includes_voxcpm_when_configured(monkeypatch):
     async def _fake_close() -> None:
         return None
 
-    module.admin_routes._health_http = types.SimpleNamespace(
-        get=lambda: FakeClient(),
-        close=_fake_close,
+    monkeypatch.setattr(
+        "app.providers.voice_catalog._http",
+        types.SimpleNamespace(get=lambda: FakeClient(), close=_fake_close),
     )
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
         document_max_upload_bytes=1024,
@@ -976,9 +976,9 @@ def test_tts_providers_includes_cosyvoice_when_configured(monkeypatch):
     async def _fake_close() -> None:
         return None
 
-    module.admin_routes._health_http = types.SimpleNamespace(
-        get=lambda: FakeClient(),
-        close=_fake_close,
+    monkeypatch.setattr(
+        "app.providers.voice_catalog._http",
+        types.SimpleNamespace(get=lambda: FakeClient(), close=_fake_close),
     )
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
         document_max_upload_bytes=1024,
@@ -1258,7 +1258,7 @@ def test_tts_stream_explicit_edge_skips_indextts(monkeypatch):
         "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=1024, tts_indextts_url="http://indextts:8011"),
     )
-    monkeypatch.setattr(module.tts_routes.admin_routes, "resolve_tts_voice", lambda *a, **kw: None)
+    monkeypatch.setattr("app.auth.voice_access.resolve_tts_voice", lambda *a, **kw: None)
 
     client, _ = _authenticated_client(module)
     response = client.post(
@@ -1298,13 +1298,7 @@ def test_tts_stream_auto_provider_streams_voxcpm_when_indextts_is_absent(monkeyp
 
 def test_voxcpm_voice_list_drops_excluded_ids(monkeypatch):
     """上游清單不是我們維護的：黑名單裡的 voice_id 不該出現在選單。"""
-    from app.routes import admin
-
-    monkeypatch.setattr(
-        admin,
-        "_excluded_voices",
-        lambda _attr: frozenset({"barbet-hung-yi-lee"}),
-    )
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 
     class _Response:
         def raise_for_status(self):
@@ -1320,11 +1314,29 @@ def test_voxcpm_voice_list_drops_excluded_ids(monkeypatch):
         async def get(self, *args, **kwargs):
             return _Response()
 
-    monkeypatch.setattr(admin._health_http, "get", lambda: _Client())
+    monkeypatch.setattr(
+        "app.providers.voice_catalog._http",
+        types.SimpleNamespace(get=lambda: _Client()),
+    )
+    monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
+        tts_indextts_url="",
+        tts_gcp_enabled=False,
+        tts_aws_enabled=False,
+        tts_gemini_url="",
+        tts_voxcpm_url="http://voxcpm.invalid",
+        tts_voxcpm_default_voice="",
+        tts_voxcpm_excluded_voices=" barbet-hung-yi-lee, ",
+        tts_cosyvoice_url="",
+        edge_tts_enabled=False,
+    ))
 
-    voices = asyncio.run(admin._fetch_voxcpm_voices("http://voxcpm.invalid"))
-
-    assert [voice_id for voice_id, _ in voices] == ["voxcpm2-cosy-young-female-01"]
+    voxcpm = [
+        provider for provider in _get_tts_provider_payload(module)
+        if provider["id"] == "voxcpm"
+    ]
+    assert [provider["voices"] for provider in voxcpm] == [
+        ["voxcpm2-cosy-young-female-01"],
+    ]
 
 
 def test_asr_preview_returns_the_transcript_and_the_engine_that_answered(monkeypatch):
@@ -1698,7 +1710,7 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
             return _gen()
 
     monkeypatch.setattr(module.tts_routes.language_routes_mod, "effective_routes", fake_routes)
-    monkeypatch.setattr(module.admin_routes, "resolve_tts_voice", must_not_authorize)
+    monkeypatch.setattr("app.auth.voice_access.resolve_tts_voice", must_not_authorize)
     monkeypatch.setattr(module.tts_routes, "_get_service", lambda: types.SimpleNamespace(voxcpm_adapter=FakeVox()))
     async def _clean(text):
         return text
@@ -1723,7 +1735,7 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
         authorized.append(requested_provider)
         return None
 
-    monkeypatch.setattr(module.admin_routes, "resolve_tts_voice", record_authorization)
+    monkeypatch.setattr("app.auth.voice_access.resolve_tts_voice", record_authorization)
     typed = module.tts_routes.TtsStreamRequest(
         text="你好", provider="voxcpm", voice="", project_id="p", language_routes="zh,nan",
     )

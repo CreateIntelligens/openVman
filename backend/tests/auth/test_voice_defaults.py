@@ -15,8 +15,9 @@ from app.auth.repository_errors import InvalidResourceGrantError
 from app.auth.routes import auth_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.auth.temporary_accounts_repository import TemporaryCredentialCreate
+from app.auth.voice_access import resolve_tts_voice
 from app.config import TTSRouterConfig
-from app.routes.admin import resolve_tts_voice, router
+from app.routes.admin import router
 
 _PASSWORD = "voice-default-test-password"
 _BAD_METADATA = [

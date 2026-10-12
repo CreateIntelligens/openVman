@@ -13,113 +13,24 @@ from app.auth.dependencies import (
 )
 from app.auth.models import AccountType, is_at_least_admin
 from app.auth.runtime import AuthRuntime, get_auth_runtime
-from app.auth.voice_access import (
-    _RESOURCE_NOT_FOUND,
-    AuthorizedVoice,
-    _metadata_string,
-    _not_found,
-    _resolve_embed_tts_voice,
-    _voice_metadata,
-    embed_tts_providers as _embed_tts_providers,
-    resolve_tts_voice,
-    scoped_tts_providers as _scoped_tts_providers,
-)
+from app.auth.voice_access import embed_tts_providers, scoped_tts_providers
 from app.config import get_tts_config
 from app.gateway.redis_pool import redis_available
 from app.gateway.temp_storage import get_temp_storage
 from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
-from app.providers.voice_catalog import (
-    EDGE_TTS_VOICE_LABELS as _EDGE_TTS_VOICE_LABELS,
-    PROVIDER_NAMES as _PROVIDER_NAMES,
-    TTS_PROVIDER_TIMEOUT_SECONDS as _TTS_PROVIDER_TIMEOUT_SECONDS,
-    build_tts_provider_catalog,
-    excluded_voices,
-    extract_voice_names as _extract_voice_names,
-    fetch_castvoice_voices,
-    fetch_cosyvoice_voices,
-    fetch_gemini_voices,
-    fetch_indextts_voices,
-    fetch_provider_voices,
-    fetch_voxcpm_voices,
-    prepend_default_voice as _prepend_default_voice,
-)
-from app.system_resources import (
-    ASR_ENGINE_LABELS as _ASR_ENGINE_LABELS,
-    BUILTIN_AVATAR_BACKGROUNDS as _BUILTIN_AVATAR_BACKGROUNDS,
-    drop_retired_asr_engines as _drop_retired_asr_engines,
-    sync_asr_engines,
-    sync_system_resources,
-)
+from app.providers.voice_catalog import build_tts_provider_catalog
 
 logger = logging.getLogger("backend")
 router = APIRouter()
 _health_http = SharedAsyncClient()
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+_USAGE_TIMEOUT_SECONDS = 5
 
 
 async def close_http() -> None:
     await _health_http.close()
-
-
-# The provider helpers take the client and config explicitly; these bind this
-# module's _health_http and get_tts_config at call time, so callers that patch
-# either name here keep reaching the voice fetches.
-async def _fetch_provider_voices(
-    base_url: str,
-    voices_path: str,
-    provider_name: str,
-    *,
-    headers: dict[str, str] | None = None,
-) -> list[str]:
-    return await fetch_provider_voices(
-        _health_http, base_url, voices_path, provider_name, headers=headers,
-    )
-
-
-async def _fetch_indextts_voices(base_url: str, internal_token: str) -> list[str]:
-    return await fetch_indextts_voices(_health_http, base_url, internal_token)
-
-
-async def _fetch_gemini_voices(base_url: str) -> list[str]:
-    return await fetch_gemini_voices(_health_http, base_url)
-
-
-def _excluded_voices(config_attr: str) -> frozenset[str]:
-    return excluded_voices(get_tts_config(), config_attr)
-
-
-async def _fetch_castvoice_voices(
-    voices_url: str,
-    provider: str,
-    excluded: frozenset[str],
-    *,
-    headers: dict[str, str] | None = None,
-) -> list[tuple[str, str]]:
-    return await fetch_castvoice_voices(
-        _health_http, voices_url, provider, excluded, headers=headers,
-    )
-
-
-async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
-    return await fetch_voxcpm_voices(
-        _health_http, base_url, _excluded_voices("tts_voxcpm_excluded_voices"),
-    )
-
-
-async def _fetch_cosyvoice_voices(base_url: str) -> list[tuple[str, str]]:
-    return await fetch_cosyvoice_voices(
-        _health_http,
-        base_url,
-        get_tts_config().tts_cosyvoice_api_key,
-        _excluded_voices("tts_cosyvoice_excluded_voices"),
-    )
-
-
-async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:
-    """Register voices from enabled providers into the resource ownership registry."""
-    await sync_system_resources(runtime, get_tts_config(), _health_http)
 
 
 @router.get("/healthz", tags=["System"], summary="服務健康檢查")
@@ -205,7 +116,7 @@ async def _forward_usage_query(
             url,
             params=params,
             headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
-            timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
+            timeout=_USAGE_TIMEOUT_SECONDS,
         )
         content = response.json()
     except Exception as exc:
@@ -339,19 +250,18 @@ async def metrics_prometheus():
     return build_prometheus_response()
 
 
-
 @router.get("/api/v1/tts/providers", tags=["TTS"], summary="取得 TTS Provider 清單")
 async def get_tts_providers(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> JSONResponse:
     if current.embed_key is not None:
-        return JSONResponse(content=_embed_tts_providers(current))
+        return JSONResponse(content=embed_tts_providers(current))
     if not (
         current.user.account_type is AccountType.FORMAL
         and is_at_least_admin(current.user.role)
     ):
-        return JSONResponse(content=_scoped_tts_providers(current, runtime))
+        return JSONResponse(content=scoped_tts_providers(current, runtime))
 
-    providers = await build_tts_provider_catalog(get_tts_config(), _health_http)
+    providers = await build_tts_provider_catalog(get_tts_config())
     return JSONResponse(content=providers)

@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app import language_routes as language_routes_mod
+from app.auth import voice_access
 from app.auth.dependencies import CurrentAccount, get_current_account
 from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
@@ -26,7 +27,6 @@ from app.providers.voxcpm_adapter import (
     VOXCPM_STREAM_CONTENT_TYPE,
     VoxCPMHTTPError,
 )
-from app.routes import admin as admin_routes
 from app.service import TTSRouterService
 from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.tts_text import prepare_tts_text_async
@@ -83,7 +83,7 @@ async def create_speech(
     current: CurrentAccount = Depends(get_current_account),
 ) -> Response:
     cfg = get_tts_config()
-    authorized = admin_routes.resolve_tts_voice(
+    authorized = voice_access.resolve_tts_voice(
         current,
         get_auth_runtime(),
         requested_provider=body.provider,
@@ -212,7 +212,7 @@ async def tts_stream_endpoint(
         # 聲音授權判斷，否則只開了別家聲音的帳號會在換家前就被擋下。
         provider, voice, character = override, "", ""
     else:
-        authorized = admin_routes.resolve_tts_voice(
+        authorized = voice_access.resolve_tts_voice(
             current,
             get_auth_runtime(),
             requested_provider=body.provider,

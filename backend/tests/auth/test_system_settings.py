@@ -170,7 +170,7 @@ def test_streaming_engines_match_frontend_relay_and_admin_registration():
         STREAM_ASR_PROVIDERS,
     )
     from app.gateway.asr_stream import _STREAM_ENGINES
-    from app.routes.admin import _ASR_ENGINE_LABELS
+    from app.system_resources import ASR_ENGINE_LABELS
 
     source = (
         Path(__file__).resolve().parents[3]
@@ -185,4 +185,4 @@ def test_streaming_engines_match_frontend_relay_and_admin_registration():
     }
     assert frontend == STREAM_ASR_PROVIDERS == _STREAM_ENGINES
     assert not STREAM_ASR_PROVIDERS & SERVER_ASR_PROVIDERS
-    assert STREAM_ASR_PROVIDERS <= _ASR_ENGINE_LABELS.keys()
+    assert STREAM_ASR_PROVIDERS <= ASR_ENGINE_LABELS.keys()

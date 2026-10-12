@@ -27,7 +27,9 @@ from app.gateway.worker import (
 )
 from app.internal_routes import _http as _internal_http
 from app.openapi import _health_http
+from app.providers.voice_catalog import _http as _voice_catalog_http
 from app.routes import admin as admin_routes
+from app.system_resources import sync_asr_engines, sync_system_resources
 
 logger = logging.getLogger("backend")
 
@@ -57,8 +59,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     runtime = get_auth_runtime()
     await _startup_gateway_resources()
     await _app.state.openapi_builder.build()
-    admin_routes.sync_asr_engines(runtime)
-    await admin_routes.sync_tts_custom_voices(runtime)
+    sync_asr_engines(runtime)
+    await sync_system_resources(runtime, get_tts_config())
     a2a_daemon = get_a2a_bridge_daemon() if get_tts_config().a2a_enabled else None
     if a2a_daemon:
         a2a_daemon.start()
@@ -71,6 +73,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         clients = [
             _brain_proxy_http, _internal_http, _forward_http,
             _crawl_http, _health_http, _vision_http, _asr_http,
+            _voice_catalog_http,
         ]
         await asyncio.gather(*(c.close() for c in clients), admin_routes.close_http())
         await _shutdown_gateway_resources()
