@@ -453,7 +453,7 @@ async def test_gemini_live_session_search_tool_runs_in_thread(monkeypatch):
         event_sink=None,
     )
 
-    response = await session._execute_function_call(
+    response = await session._turns.execute_function_call(
         {
             "id": "call-1",
             "name": "search_knowledge",
@@ -509,11 +509,11 @@ async def test_gemini_live_session_dispatches_2md_and_wiki_tools(monkeypatch):
     monkeypatch.setattr(session._tools, "_read_web_page", lambda args: {"content": "page"})
     monkeypatch.setattr(session._tools, "_publish_wiki", lambda args: {"shareUrl": "https://wiki/share/1"})
 
-    search_response = await session._execute_function_call({"id": "1", "name": "search_web", "args": {"query": "x"}})
-    read_response = await session._execute_function_call(
+    search_response = await session._turns.execute_function_call({"id": "1", "name": "search_web", "args": {"query": "x"}})
+    read_response = await session._turns.execute_function_call(
         {"id": "2", "name": "read_web_page", "args": {"url": "https://example.com"}}
     )
-    wiki_response = await session._execute_function_call(
+    wiki_response = await session._turns.execute_function_call(
         {"id": "3", "name": "publish_wiki", "args": {"path": "r", "markdown": "# r"}}
     )
 
@@ -712,7 +712,7 @@ async def test_live_flush_is_noop_without_reply_text():
         transport_factory=lambda _cfg: FakeTransport(),
         event_sink=lambda _event: asyncio.sleep(0),
     )
-    session._last_user_message = "你誰"
+    session._turns._last_user_message = "你誰"
 
     await session._flush_assistant_turn()
 
@@ -735,11 +735,11 @@ async def test_live_voice_turn_records_user_message_for_archive():
     )
 
     await session._handle_input_transcription({"text": "我剛問了幾題"})
-    assert session._last_user_message == "我剛問了幾題"
+    assert session._turns._last_user_message == "我剛問了幾題"
 
     # 視覺脈絡不是真實發言，不該覆蓋本回合的問句。
     await session._handle_input_transcription({"text": "[視覺事件] 有人走近。"})
-    assert session._last_user_message == "我剛問了幾題"
+    assert session._turns._last_user_message == "我剛問了幾題"
 
 
 @pytest.mark.asyncio
@@ -855,17 +855,17 @@ async def test_live_meters_audio_seconds_per_turn(principal_type, principal_id):
     )
 
     # 24000 Hz、16-bit mono：48000 bytes = 1.0 秒。
-    session._output_audio_seconds = 0.0
+    session._audio._output_audio_seconds = 0.0
     session._events_from_server_content({
         "modelTurn": {"parts": [{"inlineData": {
             "mimeType": "audio/pcm;rate=24000",
             "data": base64.b64encode(b"\x00" * 48000).decode("ascii"),
         }}]},
     })
-    assert session._output_audio_seconds == pytest.approx(1.0)
+    assert session._audio._output_audio_seconds == pytest.approx(1.0)
 
-    session._input_audio_seconds = 2.5
-    await session._record_audio_usage()
+    session._audio._input_audio_seconds = 2.5
+    await session._audio.record_usage()
 
     by_direction = {e["raw"]["direction"]: e for e in events}
     assert set(by_direction) == {"input", "output"}
@@ -878,8 +878,8 @@ async def test_live_meters_audio_seconds_per_turn(principal_type, principal_id):
     assert all(e["scope"].principal_id == principal_id for e in events)
 
     # 記完要歸零，否則下一輪會重複計費。
-    assert session._input_audio_seconds == 0.0
-    assert session._output_audio_seconds == 0.0
+    assert session._audio._input_audio_seconds == 0.0
+    assert session._audio._output_audio_seconds == 0.0
     await session.close()
     assert len(events) == 2
 
@@ -926,10 +926,10 @@ async def test_live_close_waits_for_cancelled_listener_ledger_write(monkeypatch)
         await release.wait()
         recorded.extend(pending)
 
-    monkeypatch.setattr(session, "_persist_audio_usage", persist)
-    session._input_audio_seconds = 1.0
-    session._output_audio_seconds = 2.0
-    session._listener_task = asyncio.create_task(session._record_audio_usage())
+    monkeypatch.setattr(session._audio, "_persist_usage", persist)
+    session._audio._input_audio_seconds = 1.0
+    session._audio._output_audio_seconds = 2.0
+    session._listener_task = asyncio.create_task(session._audio.record_usage())
     await entered.wait()
     closing = asyncio.create_task(session.close())
     await asyncio.sleep(0)
@@ -994,7 +994,7 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
     assert languages == [(42, "nan", "proj-hospital")]
     # 兩個 chunk 的 PCM 加 44 bytes WAV 檔頭。
     assert len(heard[0]) == 2 * 3200 + 44
-    assert session._utterance_pcm == bytearray(), "判斷完要清空，下一句不能混到上一句"
+    assert session._audio._utterance_pcm == bytearray(), "判斷完要清空，下一句不能混到上一句"
 
     # 英西看轉錄文字就分得出來，不送去聽；判斷不是台語也不覆寫。
     await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
@@ -1026,7 +1026,7 @@ async def test_live_skips_audio_language_without_taiwanese_route(monkeypatch):
     await session.send_realtime_input(base64.b64encode(b"\x01\x00" * 1600).decode(), "audio/pcm;rate=16000")
     await session._handle_input_transcription({"text": "你好"})
     await asyncio.sleep(0.05)
-    assert session._utterance_pcm == bytearray()
+    assert session._audio._utterance_pcm == bytearray()
     await session.close()
 
 
@@ -1056,8 +1056,8 @@ async def test_live_knowledge_search_waits_for_taiwanese_verdict(monkeypatch):
         await asyncio.sleep(0.05)
         return "nan"
 
-    session._utterance_language = asyncio.create_task(slow_verdict())
-    await session._execute_function_call({"name": "search_knowledge", "args": {"queries": ["急診在哪裡"]}})
+    session._audio._utterance_language = asyncio.create_task(slow_verdict())
+    await session._turns.execute_function_call({"name": "search_knowledge", "args": {"queries": ["急診在哪裡"]}})
     assert captured["heard"] == "nan"
     await session.close()
 
@@ -1086,11 +1086,11 @@ async def test_text_turn_does_not_reuse_previous_audio_language(monkeypatch):
     async def verdict():
         return "nan"
 
-    session._utterance_language = asyncio.create_task(verdict())
-    await session._utterance_language
-    await session._execute_function_call({"name": "search_knowledge", "args": {"queries": ["急診在哪裡"]}})
+    session._audio._utterance_language = asyncio.create_task(verdict())
+    await session._audio._utterance_language
+    await session._turns.execute_function_call({"name": "search_knowledge", "args": {"queries": ["急診在哪裡"]}})
     await session.send_text_turn("Which pump do you recommend?")
-    await session._execute_function_call({"name": "search_knowledge", "args": {"queries": ["pump"]}})
+    await session._turns.execute_function_call({"name": "search_knowledge", "args": {"queries": ["pump"]}})
     assert captured == ["nan", None]
     await session.close()
 
@@ -1111,10 +1111,10 @@ async def test_text_turn_language_is_bound_to_its_own_turn(monkeypatch):
     )
 
     await session.send_text_turn("我現在頭很痛", speech_language="nan")
-    assert await session._utterance_language_for_search() == "nan"
+    assert await session._audio.language_for_search() == "nan"
 
     await session.send_text_turn("Which pump do you recommend?")
-    assert await session._utterance_language_for_search() is None
+    assert await session._audio.language_for_search() is None
     await session.close()
 
 
@@ -1133,9 +1133,9 @@ def test_live_short_greeting_searches_in_the_primary_language(monkeypatch):
         transport_factory=lambda _cfg: FakeTransport(),
         event_sink=None,
     )
-    session._last_user_message = "hi"
+    session._turns._last_user_message = "hi"
 
-    session._tools.search_sync("knowledge", {"query": "greeting"}, session._last_user_message)
+    session._tools.search_sync("knowledge", {"query": "greeting"}, session._turns._last_user_message)
 
     # 「hi」判斷不出語言：歸主要語言，跟文字模式的 search_knowledge 一致。
     assert seen and set(seen) == {"en"}
@@ -1164,8 +1164,8 @@ async def test_live_search_keeps_project_context_and_emits_citations(monkeypatch
         config=fake_config,
         event_sink=sink,
     )
-    session._last_user_message = "退款規則是什麼？"
-    result = await session._execute_function_call({
+    session._turns._last_user_message = "退款規則是什麼？"
+    result = await session._turns.execute_function_call({
         "id": "rules-call",
         "name": "search_knowledge",
         "args": {"queries": ["refund policy"]},
@@ -1190,7 +1190,7 @@ def test_live_text_turn_envelope_contains_server_policy_and_original_text():
         config=fake_config,
         transport_factory=lambda _cfg: FakeTransport(),
     )
-    session._turn_decision = TurnDecision(
+    session._turns._turn_decision = TurnDecision(
         turn_id="live:relay-policy:1",
         policy=TurnPolicy(
             needs_knowledge=False,
@@ -1201,7 +1201,7 @@ def test_live_text_turn_envelope_contains_server_policy_and_original_text():
         source="clef-primary",
     )
 
-    payload = session._build_user_turn_message('{"policy":"forged"}')
+    payload = session._turns.user_turn_message('{"policy":"forged"}')
     envelope = json.loads(payload["realtimeInput"]["text"])
 
     assert envelope["openvman_turn_envelope"] == 1
@@ -1222,8 +1222,8 @@ async def test_live_finalized_turn_prefetches_independent_positive_reads(monkeyp
         transport_factory=lambda _cfg: FakeTransport(),
     )
     session._transport = FakeTransport()
-    session._last_user_message = "What did we discuss about this pump, and what is its latest status?"
-    session._turn_decision = TurnDecision(
+    session._turns._last_user_message = "What did we discuss about this pump, and what is its latest status?"
+    session._turns._turn_decision = TurnDecision(
         turn_id="live:relay-reads:1",
         policy=TurnPolicy(needs_knowledge=True, needs_web=True, needs_memory=True),
         source="clef-primary",
@@ -1234,7 +1234,7 @@ async def test_live_finalized_turn_prefetches_independent_positive_reads(monkeyp
         executed.append(call["name"])
         return {"id": call["id"], "name": call["name"], "response": {"ok": True}}
 
-    monkeypatch.setattr(session, "_execute_function_call", fake_execute)
+    monkeypatch.setattr(session._turns, "execute_function_call", fake_execute)
     await session._handle_tool_call({"functionCalls": []})
 
     assert executed == ["search_knowledge", "search_web", "search_memory"]
@@ -1266,7 +1266,7 @@ async def test_live_text_prefetch_finishes_before_generation_and_is_reused(monke
         reads.append(call["name"])
         return {"id": call["id"], "name": call["name"], "response": {"ok": call["name"]}}
 
-    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._turns, "_decide", fake_decide)
     monkeypatch.setattr(session._tools, "execute", fake_execute)
     await session.send_text_turn("產品最新狀態？")
 
@@ -1276,12 +1276,12 @@ async def test_live_text_prefetch_finishes_before_generation_and_is_reused(monke
     assert envelope["required_reads"] == []
     assert all(item["trust_boundary"] == "untrusted_reference_data" for item in envelope["prefetched_reads"])
 
-    cached = await session._execute_function_call({
+    cached = await session._turns.execute_function_call({
         "id": "model-call", "name": "search_web", "args": {"query": "產品最新狀態？"},
     })
     assert cached["response"] == {"ok": "search_web"}
     assert reads == ["search_knowledge", "search_web", "search_memory"]
-    refreshed = await session._execute_function_call({
+    refreshed = await session._turns.execute_function_call({
         "id": "model-refined", "name": "search_web", "args": {"query": "產品供貨狀態與庫存"},
     })
     assert refreshed["response"] == {"ok": "search_web"}
@@ -1309,7 +1309,7 @@ async def test_live_positive_memory_respects_session_recall_toggle(monkeypatch):
     ))
     monkeypatch.setattr(importlib.import_module("live.gemini_turns"), "run_turn_decision_async", lambda **kwargs: _resolved(decision))
 
-    resolved = await session._decide_live_turn("上次討論的產品如何？", "")
+    resolved = await session._turns._decide("上次討論的產品如何？", "")
 
     assert resolved is not None
     assert resolved.policy.needs_memory is None
@@ -1333,13 +1333,13 @@ async def test_live_close_cancels_pending_turn_decision_and_prefetch():
             cancelled.set()
             raise
 
-    session._turn_decision_task = asyncio.create_task(pending())
+    session._turns._turn_decision_task = asyncio.create_task(pending())
     await asyncio.sleep(0)
     await session.close()
 
     assert cancelled.is_set()
-    assert session._turn_decision_task is None
-    assert session._prefetched_reads == {}
+    assert session._turns._turn_decision_task is None
+    assert session._turns._prefetched_reads == {}
 
 
 async def _resolved(value):
@@ -1367,7 +1367,7 @@ async def test_live_disabled_external_tool_never_calls_provider(
     )
     calls = []
     monkeypatch.setattr(session._tools, handler, lambda args: calls.append(args))
-    result = await session._execute_function_call({"id": "blocked", "name": name})
+    result = await session._turns.execute_function_call({"id": "blocked", "name": name})
     assert result == {
         "id": "blocked", "name": name, "response": {"error": f"{name} 已停用"},
     }
@@ -1382,14 +1382,14 @@ async def test_live_debug_events_are_opt_in_and_turn_bound():
     async def sink(event):
         events.append(event)
     session = module.GeminiLiveSession(relay_session_id='debug', client_id='client', config=cfg, event_sink=sink)
-    session._turn_revision = 2
-    session._turn_decision = TurnDecision('live:2', TurnPolicy(tone='confused'), 'clef', provider='clef')
-    await session._emit_decision_debug(2, 'text')
+    session._turns._turn_revision = 2
+    session._turns._turn_decision = TurnDecision('live:2', TurnPolicy(tone='confused'), 'clef', provider='clef')
+    await session._turns.emit_decision_debug(2, 'text')
     assert events == []
     session.decision_debug_enabled = True
-    await session._emit_decision_debug(1, 'text')
+    await session._turns.emit_decision_debug(1, 'text')
     assert events == []
-    await session._emit_decision_debug(2, 'text')
+    await session._turns.emit_decision_debug(2, 'text')
     assert events[0]['event'] == 'server_decision_debug'
     assert events[0]['diagnostics']['policy']['tone'] == 'confused'
 
@@ -1427,7 +1427,7 @@ async def test_live_text_prefetch_emits_citations_like_a_tool_call(monkeypatch):
             "queries": ["幫浦規格？"], "citations": citations,
         }}
 
-    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._turns, "_decide", fake_decide)
     monkeypatch.setattr(session._tools, "execute", fake_execute)
     await session.send_text_turn("幫浦規格？")
 
@@ -1437,7 +1437,7 @@ async def test_live_text_prefetch_emits_citations_like_a_tool_call(monkeypatch):
     assert results[0]["tool_name"] == "search_knowledge"
     assert results[0]["citations"] == citations
     # 模型被告知已查過、照樣呼叫時拿快取，不再送第二次引用。
-    cached = await session._execute_function_call({
+    cached = await session._turns.execute_function_call({
         "id": "model-call", "name": "search_knowledge", "args": {"queries": ["幫浦規格？"]},
     })
     assert cached["response"]["citations"] == citations
@@ -1464,16 +1464,16 @@ async def test_live_stale_prefetch_does_not_emit_citations(monkeypatch):
         return _decision("live:stale:1", needs_knowledge=True)
 
     async def fake_execute(call, **kwargs):
-        session._turn_revision += 1  # 查詢途中來了新的一輪
+        session._turns._turn_revision += 1  # 查詢途中來了新的一輪
         return {"id": call["id"], "name": call["name"], "response": {"citations": [{"source": "old.md"}]}}
 
-    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._turns, "_decide", fake_decide)
     monkeypatch.setattr(session._tools, "execute", fake_execute)
-    session._turn_revision = 1
-    await session._decide_and_prefetch_live_turn("舊問題", "", 1)
+    session._turns._turn_revision = 1
+    await session._turns._decide_and_prefetch("舊問題", "", 1)
 
     assert emitted == []
-    assert session._prefetched_reads == {}
+    assert session._turns._prefetched_reads == {}
 
 
 @pytest.mark.asyncio
@@ -1502,8 +1502,8 @@ async def test_live_listener_survives_decision_cancelled_during_tool_call(monkey
     async def fake_execute(call):
         return {"id": call["id"], "name": call["name"], "response": {"ok": True}}
 
-    monkeypatch.setattr(session, "_execute_function_call", fake_execute)
-    session._turn_decision_task = asyncio.create_task(pending_decision())
+    monkeypatch.setattr(session._turns, "execute_function_call", fake_execute)
+    session._turns._turn_decision_task = asyncio.create_task(pending_decision())
     await waiting.wait()
     transport._messages.put_nowait({"toolCall": {"functionCalls": [
         {"id": "call-1", "name": "search_knowledge", "args": {"queries": ["x"]}},
@@ -1528,7 +1528,7 @@ async def test_live_tool_call_still_propagates_its_own_cancellation():
         config=fake_config,
     )
     decision_task = asyncio.create_task(asyncio.Event().wait())
-    session._turn_decision_task = decision_task
+    session._turns._turn_decision_task = decision_task
     handler = asyncio.create_task(session._handle_tool_call({"functionCalls": []}))
     await asyncio.sleep(0)
     handler.cancel()
@@ -1557,7 +1557,7 @@ async def test_text_turn_survives_decision_cancelled_by_transcription(monkeypatc
         deciding.set()
         await asyncio.Event().wait()
 
-    monkeypatch.setattr(session, "_decide_live_turn", hanging_decide)
+    monkeypatch.setattr(session._turns, "_decide", hanging_decide)
     send = asyncio.create_task(session.send_text_turn("文字問題"))
     await deciding.wait()
     await session._handle_input_transcription({"text": "語音問題"})
@@ -1583,10 +1583,10 @@ async def test_text_turn_cancellation_still_cancels_its_decision(monkeypatch):
         deciding.set()
         await asyncio.Event().wait()
 
-    monkeypatch.setattr(session, "_decide_live_turn", hanging_decide)
+    monkeypatch.setattr(session._turns, "_decide", hanging_decide)
     send = asyncio.create_task(session.send_text_turn("文字問題"))
     await deciding.wait()
-    decision_task = session._turn_decision_task
+    decision_task = session._turns._turn_decision_task
     send.cancel()
     with pytest.raises(asyncio.CancelledError):
         await send
@@ -1623,7 +1623,7 @@ async def test_live_follow_up_prefetch_searches_with_the_previous_question(monke
         calls.append(call)
         return {"id": call["id"], "name": call["name"], "response": {"ok": True}}
 
-    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._turns, "_decide", fake_decide)
     monkeypatch.setattr(session._tools, "execute", fake_execute)
     await asyncio.wait_for(session.send_text_turn("那價格呢？"), timeout=1.0)
 
@@ -1657,14 +1657,14 @@ async def test_live_prefetch_over_budget_is_left_to_the_model(monkeypatch):
                 raise
         return {"id": call["id"], "name": call["name"], "response": {"ok": call["name"]}}
 
-    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._turns, "_decide", fake_decide)
     monkeypatch.setattr(session._tools, "execute", fake_execute)
     await asyncio.wait_for(session.send_text_turn("今天的匯率？"), timeout=1.0)
 
     envelope = json.loads(transport.sent_messages[1]["realtimeInput"]["text"])
     assert envelope["satisfied_reads"] == ["search_knowledge"]
     assert envelope["required_reads"] == ["search_web"]
-    assert set(session._prefetched_reads) == {"search_knowledge"}
+    assert set(session._turns._prefetched_reads) == {"search_knowledge"}
     await asyncio.wait_for(web_cancelled.wait(), timeout=1.0)
 
 
@@ -1684,7 +1684,7 @@ async def test_visual_event_text_turn_skips_decision_and_prefetch(monkeypatch):
         decided.append(args)
         return _decision("live:visual:1", needs_knowledge=True)
 
-    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._turns, "_decide", fake_decide)
     await session.send_text_turn("[視覺事件] 畫面中出現一位訪客。")
 
     assert decided == []
@@ -1705,9 +1705,9 @@ async def test_audio_transcription_drops_previous_turn_decision(monkeypatch):
     async def hanging_decide(*args, **kwargs):
         await asyncio.Event().wait()
 
-    monkeypatch.setattr(session, "_decide_live_turn", hanging_decide)
-    session._turn_decision = _decision("live:previous:1", needs_web=True)
+    monkeypatch.setattr(session._turns, "_decide", hanging_decide)
+    session._turns._turn_decision = _decision("live:previous:1", needs_web=True)
     await session._handle_input_transcription({"text": "換個問題"})
 
-    assert session._turn_decision is None
+    assert session._turns._turn_decision is None
     await session.close()

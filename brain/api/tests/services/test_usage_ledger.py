@@ -441,8 +441,8 @@ async def test_live_close_usage_visible_only_to_its_owner(
         principal_id=principal_id,
         config=SimpleNamespace(live_gemini_model="test-live"),
     )
-    session._input_audio_seconds = 1.0
-    session._output_audio_seconds = 2.0
+    session._audio._input_audio_seconds = 1.0
+    session._audio._output_audio_seconds = 2.0
     await session.close()
     await session.close()
 
