@@ -182,12 +182,21 @@ def build_turn_questions(
         questions["tone"] = {
             "type": "choice",
             "instructions": "The user's observable tone in the latest message.",
+            # 選項只寫一個字時 Clef 只能猜字面：「我聽不懂，請一步一步說明」困惑信心 0.49～0.74，
+            # 過不了 0.8 門檻。寫出可觀察的線索後 20 句標註語氣套用正確 14 → 17、套錯 0，
+            # 每輪多約 56 tokens、27 ms（2026-10-12）。
             "criteria": {
-                "neutral": "Neutral.",
-                "confused": "Confused.",
-                "frustrated": "Frustrated or dissatisfied.",
-                "urgent": "Needs an immediate answer.",
-                "lighthearted": "Playful.",
+                "neutral": "Ordinary question, answer or greeting with no notable emotion.",
+                "confused": (
+                    "Says they do not understand, asks what something means, "
+                    "or asks for a simpler or step-by-step explanation."
+                ),
+                "frustrated": (
+                    "Complains, is impatient or annoyed, says the problem or "
+                    "question keeps going unresolved."
+                ),
+                "urgent": "Needs it right now or under a tight deadline; an emergency is happening.",
+                "lighthearted": "Joking, teasing or playful small talk.",
             },
         }
     return questions
