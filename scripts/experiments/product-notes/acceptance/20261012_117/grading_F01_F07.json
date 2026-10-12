@@ -1,0 +1,2196 @@
+{
+  "grader": "independent_review_round3_note_validation",
+  "rubric_source": "answers_for_grading_F01_F07.json#grading_rubric",
+  "input_sha256": "a6b15a946adce945cab17d0c41cc6d6c0d8d1fe27f7f2092c6770e7e90bf4229",
+  "grades": [
+    {
+      "id": "F01",
+      "repeat": 1,
+      "verdict": "部分對",
+      "reason": "十七款、三相3吋與每款HP及最大流量數字均完整正確，中文逐位讀法一二五○等可對應1250。流量全部只寫「公升」而未明示每分鐘／LPM，缺必要流量單位的時間基準，按遺漏判部分對。",
+      "matched_points": [
+        "80DIVA-5.30：hp=3 HP，max_flow_lpm=1250 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80DIVA-5.50：hp=5 HP，max_flow_lpm=1500 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80EDW-5.30S/T：hp=3 HP，max_flow_lpm=980 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80EDW-5.50T：hp=5 HP，max_flow_lpm=1040 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80EUB-M-5.20T：hp=2 HP，max_flow_lpm=630 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80EUB-M-5.30T：hp=3 HP，max_flow_lpm=700 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80EUB-M-5.50T：hp=5 HP，max_flow_lpm=900 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80STEEL-5.30：hp=3 HP，max_flow_lpm=700 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80STEEL-5.50：hp=5 HP，max_flow_lpm=1000 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "80LEOPARD-5.30：hp=3 HP，max_flow_lpm=1400 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "HIPPO-300 DN80：hp=3 HP，max_flow_lpm=1100 LPM（HP與流量數字正確，流量未明示每分鐘）",
+        "HIPPO-400 DN80：hp=4 HP，max_flow_lpm=1200 LPM（HP與流量數字正確，流量未明示每分鐘）"
+      ],
+      "missing_points": [
+        "十七款最大流量的LPM／公升每分鐘時間基準；原文只有公升，不能單靠語音策略省略此單位。"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.20S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.30S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.20T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.30T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.30.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "82ab54584390c619ba3d33f7ff12eb2bbc249da20fbdcb0f195c28e8bdcc16de"
+    },
+    {
+      "id": "F01",
+      "repeat": 2,
+      "verdict": "對",
+      "reason": "十七款完整且各自HP／最大流量皆對應來源，包含DIVA、EDW、EUB-M、EUS、STEEL、LEOPARD及四款HIPPO DN80。三相與3吋限定正確，沒有漏單三相合併列或錯納其他口徑。",
+      "matched_points": [
+        "80DIVA-5.30：hp=3 HP，max_flow_lpm=1250 LPM",
+        "80DIVA-5.50：hp=5 HP，max_flow_lpm=1500 LPM",
+        "80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM",
+        "80EDW-5.30S/T：hp=3 HP，max_flow_lpm=980 LPM",
+        "80EDW-5.50T：hp=5 HP，max_flow_lpm=1040 LPM",
+        "80EUB-M-5.20T：hp=2 HP，max_flow_lpm=630 LPM",
+        "80EUB-M-5.30T：hp=3 HP，max_flow_lpm=700 LPM",
+        "80EUB-M-5.50T：hp=5 HP，max_flow_lpm=900 LPM",
+        "80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "80STEEL-5.30：hp=3 HP，max_flow_lpm=700 LPM",
+        "80STEEL-5.50：hp=5 HP，max_flow_lpm=1000 LPM",
+        "80LEOPARD-5.30：hp=3 HP，max_flow_lpm=1400 LPM",
+        "HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM",
+        "HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM",
+        "HIPPO-300 DN80：hp=3 HP，max_flow_lpm=1100 LPM",
+        "HIPPO-400 DN80：hp=4 HP，max_flow_lpm=1200 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.20S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.30S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.20T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.30T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.30.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "f2d443ec14d948c53870dcfa316420a43ea9c94ceb7563190b5cdb82d192ffae"
+    },
+    {
+      "id": "F01",
+      "repeat": 3,
+      "verdict": "對",
+      "reason": "十七款及每款HP與LPM完整正確，沒有錯納或漏款。80EDW-5.20T與80EDW-5.30T可唯一對應原S/T合併列的三相版本，本題要求三相，接受等值命名。",
+      "matched_points": [
+        "80DIVA-5.30：hp=3 HP，max_flow_lpm=1250 LPM",
+        "80DIVA-5.50：hp=5 HP，max_flow_lpm=1500 LPM",
+        "80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM",
+        "80EDW-5.30S/T：hp=3 HP，max_flow_lpm=980 LPM",
+        "80EDW-5.50T：hp=5 HP，max_flow_lpm=1040 LPM",
+        "80EUB-M-5.20T：hp=2 HP，max_flow_lpm=630 LPM",
+        "80EUB-M-5.30T：hp=3 HP，max_flow_lpm=700 LPM",
+        "80EUB-M-5.50T：hp=5 HP，max_flow_lpm=900 LPM",
+        "80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "80STEEL-5.30：hp=3 HP，max_flow_lpm=700 LPM",
+        "80STEEL-5.50：hp=5 HP，max_flow_lpm=1000 LPM",
+        "80LEOPARD-5.30：hp=3 HP，max_flow_lpm=1400 LPM",
+        "HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM",
+        "HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM",
+        "HIPPO-300 DN80：hp=3 HP，max_flow_lpm=1100 LPM",
+        "HIPPO-400 DN80：hp=4 HP，max_flow_lpm=1200 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.20S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.30S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.20T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.30T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.30.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "EDW兩款用所選T版代替原S/T合併列名，符合凍結命名規則。",
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "aa91652b7ee3430cccc82e05a6b0223078ddcfa807d3fe2c3ade0d6d2b091520"
+    },
+    {
+      "id": "F02",
+      "repeat": 1,
+      "verdict": "對",
+      "reason": "十款單相2吋候選與HP／最大流量2/658、2/500、2/500、2/630、1/500、1.5/580、2/660完整正確。HIPPO-100與100Q、150與150Q、200與200Q的普通／Q版本均明示，前綴省略不造成歧義，兩版本共享同一HP與流量數字可接受。",
+      "matched_points": [
+        "50EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "50EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "50EUB-M-5.20S：hp=2 HP，max_flow_lpm=500 LPM",
+        "50STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "HIPPO-100：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-100Q：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-150：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-150Q：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-200：hp=2 HP，max_flow_lpm=660 LPM",
+        "HIPPO-200Q：hp=2 HP，max_flow_lpm=660 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUB-M-5.20S.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "3d47e687dd304565795c02e350eeb75ae97b4c6ecb07223e388a948f7e9360a0"
+    },
+    {
+      "id": "F02",
+      "repeat": 2,
+      "verdict": "部分對",
+      "reason": "十款型號全部列齊，普通與Q版本沒有漏，所述1至2 HP及流量至少500 LPM範圍正確。未逐款給HP與最大流量，例如50EUS-5.20的2HP／658 LPM、50STEEL-5.20的2HP／630 LPM及三組HIPPO的1/500、1.5/580、2/660均漏答。",
+      "matched_points": [
+        "十款型號全部列齊，含50EUS-5.20、50EUS-5.20C、50EUB-M-5.20S、50STEEL-5.20及HIPPO三組普通／Q版。",
+        "HP總範圍1至2與所有最大流量至少500 LPM正確。"
+      ],
+      "missing_points": [
+        "50EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "50EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "50EUB-M-5.20S：hp=2 HP，max_flow_lpm=500 LPM",
+        "50STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "HIPPO-100：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-100Q：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-150：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-150Q：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-200：hp=2 HP，max_flow_lpm=660 LPM",
+        "HIPPO-200Q：hp=2 HP，max_flow_lpm=660 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUB-M-5.20S.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "a54d04d9570ad31207dc27924b582c0186882402ac56312b66991eb1c6908d05"
+    },
+    {
+      "id": "F02",
+      "repeat": 3,
+      "verdict": "對",
+      "reason": "十款單相2吋候選與HP／最大流量2/658、2/500、2/500、2/630、1/500、1.5/580、2/660完整正確。HIPPO-100與100Q、150與150Q、200與200Q的普通／Q版本均明示，前綴省略不造成歧義，兩版本共享同一HP與流量數字可接受。",
+      "matched_points": [
+        "50EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "50EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "50EUB-M-5.20S：hp=2 HP，max_flow_lpm=500 LPM",
+        "50STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "HIPPO-100：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-100Q：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-150：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-150Q：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-200：hp=2 HP，max_flow_lpm=660 LPM",
+        "HIPPO-200Q：hp=2 HP，max_flow_lpm=660 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUB-M-5.20S.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "4b1a605f42c7ad9eecaf10cafc83819407870fab32ee69af254afab975ee6618"
+    },
+    {
+      "id": "F03",
+      "repeat": 1,
+      "verdict": "對",
+      "reason": "九款全部列齊，七款HIPPO DN與兩款LEOPARD的HP、粒徑與最大流量逐一正確。包含65毫米邊界兩款、76毫米DN80各款及LEOPARD的80／68毫米，沒有錯納或混淆DN65／DN80版本。",
+      "matched_points": [
+        "HIPPO-300 DN80：hp=3 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "HIPPO-400 DN65：hp=4 HP，solids_mm=65 mm，max_flow_lpm=1000 LPM",
+        "HIPPO-400 DN80：hp=4 HP，solids_mm=76 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN65：hp=5.5 HP，solids_mm=65 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：hp=5.5 HP，solids_mm=76 mm，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1600 LPM",
+        "HIPPO-750H DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "100LEOPARD-5.50：hp=5 HP，solids_mm=80 mm，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：hp=7.5 HP，solids_mm=68 mm，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750H-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.75.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "74c32248849d3b704a5ac4a6d36f204a82293112bc7c10c4aceeb9d6105163b6"
+    },
+    {
+      "id": "F03",
+      "repeat": 2,
+      "verdict": "對",
+      "reason": "九款全部列齊，七款HIPPO DN與兩款LEOPARD的HP、粒徑與最大流量逐一正確。包含65毫米邊界兩款、76毫米DN80各款及LEOPARD的80／68毫米，沒有錯納或混淆DN65／DN80版本。",
+      "matched_points": [
+        "HIPPO-300 DN80：hp=3 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "HIPPO-400 DN65：hp=4 HP，solids_mm=65 mm，max_flow_lpm=1000 LPM",
+        "HIPPO-400 DN80：hp=4 HP，solids_mm=76 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN65：hp=5.5 HP，solids_mm=65 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：hp=5.5 HP，solids_mm=76 mm，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1600 LPM",
+        "HIPPO-750H DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "100LEOPARD-5.50：hp=5 HP，solids_mm=80 mm，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：hp=7.5 HP，solids_mm=68 mm，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750H-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.75.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "d2942276ded8bcf4277d85a908339a1c77c74dc02f92950436ccfb07aae01533"
+    },
+    {
+      "id": "F03",
+      "repeat": 3,
+      "verdict": "對",
+      "reason": "九款全部列齊，七款HIPPO DN與兩款LEOPARD的HP、粒徑與最大流量逐一正確。包含65毫米邊界兩款、76毫米DN80各款及LEOPARD的80／68毫米，沒有錯納或混淆DN65／DN80版本。",
+      "matched_points": [
+        "HIPPO-300 DN80：hp=3 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "HIPPO-400 DN65：hp=4 HP，solids_mm=65 mm，max_flow_lpm=1000 LPM",
+        "HIPPO-400 DN80：hp=4 HP，solids_mm=76 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN65：hp=5.5 HP，solids_mm=65 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：hp=5.5 HP，solids_mm=76 mm，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1600 LPM",
+        "HIPPO-750H DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "100LEOPARD-5.50：hp=5 HP，solids_mm=80 mm，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：hp=7.5 HP，solids_mm=68 mm，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750H-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.75.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "7eb5f0acdf37366611fd8a8c8b9880d381153d5681a3f85af5c6b951af9e8e14"
+    },
+    {
+      "id": "F04",
+      "repeat": 1,
+      "verdict": "錯",
+      "reason": "3.7kW對應5HP與EDW、EUB-M、LEOPARD三款數字正確，但原文明列不存在的100DIVT-5.50，不能當成100DIVA-5.50的合法等值型號。又明確稱符合有四款，實際有五款且漏100STEEL-5.50的3.7kW／5HP／1000 LPM邊界，屬型號與完整集合數量錯誤。",
+      "matched_points": [
+        "100EDW-5.50T：3.7kW、5HP、1680 LPM。",
+        "100EUB-M-5.50T：3.7kW、5HP、1400 LPM。",
+        "100LEOPARD-5.50：3.7kW、5HP、1900 LPM。",
+        "本表3.7kW對應5HP，沒有當成3.7HP。"
+      ],
+      "missing_points": [
+        "100DIVA-5.50的正確型號未列，原文寫100DIVT-5.50。",
+        "100STEEL-5.50：kw=3.7kW、hp=5HP、max_flow_lpm=1000 LPM。"
+      ],
+      "false_claims": [
+        {
+          "claim": "100DIVT-5.50的3.7kW、5HP、最大流量1600 LPM。",
+          "correction": "不存在此型號，來源型號為100DIVA-5.50。",
+          "source": "knowledge/products/100DIVA-5.50.md:2"
+        },
+        {
+          "claim": "符合三相、4吋、3.7kW且最大流量至少1000 LPM的有四款。",
+          "correction": "完整符合集合有五款，另含100STEEL-5.50的1000 LPM邊界。",
+          "source": "knowledge/products/100STEEL-5.50.md:10"
+        }
+      ],
+      "source_lines": [
+        {
+          "path": "knowledge/products/100DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響內容判分。"
+      ],
+      "answer_sha256": "43f198baa50b9edef9ef1579c6dbefb1084ea6c5ebff9555abfc0513cea05d1f"
+    },
+    {
+      "id": "F04",
+      "repeat": 2,
+      "verdict": "對",
+      "reason": "五款及每款3.7kW、5HP與1600／1680／1400／1900／1000 LPM完整正確，表列kW與HP區別也正確。開頭寫「大於1000」但仍明確列入100STEEL-5.50的1000 LPM邊界，實際候選符合題目至少1000，未錯排除邊界款。",
+      "matched_points": [
+        "100DIVA-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1600 LPM",
+        "100EDW-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1680 LPM",
+        "100EUB-M-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1400 LPM",
+        "100LEOPARD-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1900 LPM",
+        "100STEEL-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1000 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "表列3.7 kW對應5 HP，是不同單位；不能把3.7 kW當3.7 HP"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/100DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "開头門檻「大於1000」應為「至少1000」，與自己的完整候選清單不一致；保留1000邊界的最終清單與數字正確，列措辭品質。",
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "0688c42fce62081cb5c01f40d9dc30be1ebb35e9992c13625c13ce8e4a37a15c"
+    },
+    {
+      "id": "F04",
+      "repeat": 3,
+      "verdict": "對",
+      "reason": "五款4吋三相產品與每款3.7kW、5HP、最大流量1600／1680／1400／1900／1000 LPM完整正確。明示3.7kW對應5HP且包含1000 LPM邊界的100STEEL-5.50，沒有單位混用或漏款。",
+      "matched_points": [
+        "100DIVA-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1600 LPM",
+        "100EDW-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1680 LPM",
+        "100EUB-M-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1400 LPM",
+        "100LEOPARD-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1900 LPM",
+        "100STEEL-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1000 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "表列3.7 kW對應5 HP，是不同單位；不能把3.7 kW當3.7 HP"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/100DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/100STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "a2601398919f577aa5a7aca76b6da25ee83647ec08eecbd6046a624cd9062979"
+    },
+    {
+      "id": "F05",
+      "repeat": 1,
+      "verdict": "對",
+      "reason": "門檻1200 LPM正確，七款及功率2.2／3.7／5.5／2.2／3／4.1／5.5kW完整對應。每款雙流量1250/75、1500/90、1200/72、1400/84、1200/72、1350/81、1600/96的LPM與m³/h皆正確，口徑及功率邊界未漏。",
+      "matched_points": [
+        "80DIVA-5.30：kw=2.2 kW，max_flow_lpm=1250 LPM",
+        "80DIVA-5.50：kw=3.7 kW，max_flow_lpm=1500 LPM",
+        "80EUB-M-5.75T：kw=5.5 kW，max_flow_lpm=1200 LPM",
+        "80LEOPARD-5.30：kw=2.2 kW，max_flow_lpm=1400 LPM",
+        "HIPPO-400 DN80：kw=3 kW，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：kw=4.1 kW，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：kw=5.5 kW，max_flow_lpm=1600 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "72 m³/h ×1000÷60=1200 LPM；每款最大流量LPM乘0.06轉m³/h",
+        "80DIVA-5.30：最大流量1250 LPM=75 m³/h",
+        "80DIVA-5.50：最大流量1500 LPM=90 m³/h",
+        "80EUB-M-5.75T：最大流量1200 LPM=72 m³/h",
+        "80LEOPARD-5.30：最大流量1400 LPM=84 m³/h",
+        "HIPPO-400 DN80：最大流量1200 LPM=72 m³/h",
+        "HIPPO-550 DN80：最大流量1350 LPM=81 m³/h",
+        "HIPPO-750 DN80：最大流量1600 LPM=96 m³/h"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.75T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "46798ff1a83b6f9e219ca0f80d5d53613677ffd543931543b66a7cc8b59af7db"
+    },
+    {
+      "id": "F05",
+      "repeat": 2,
+      "verdict": "部分對",
+      "reason": "72 m³/h換算1200 LPM正確，沒有錯誤換算或錯納。七款80DIVA-5.30／5.50、80EUB-M-5.75T、80LEOPARD-5.30及HIPPO-400／550／750 DN80全部未列，其功率與每款LPM／m³/h也都漏答，只說型錄資料未提及全部款屬資訊缺漏。",
+      "matched_points": [
+        "72 m³/h=1200 LPM門檻正確。"
+      ],
+      "missing_points": [
+        "80DIVA-5.30：kw=2.2 kW，max_flow_lpm=1250 LPM",
+        "80DIVA-5.50：kw=3.7 kW，max_flow_lpm=1500 LPM",
+        "80EUB-M-5.75T：kw=5.5 kW，max_flow_lpm=1200 LPM",
+        "80LEOPARD-5.30：kw=2.2 kW，max_flow_lpm=1400 LPM",
+        "HIPPO-400 DN80：kw=3 kW，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：kw=4.1 kW，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：kw=5.5 kW，max_flow_lpm=1600 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "80DIVA-5.30：最大流量1250 LPM=75 m³/h",
+        "80DIVA-5.50：最大流量1500 LPM=90 m³/h",
+        "80EUB-M-5.75T：最大流量1200 LPM=72 m³/h",
+        "80LEOPARD-5.30：最大流量1400 LPM=84 m³/h",
+        "HIPPO-400 DN80：最大流量1200 LPM=72 m³/h",
+        "HIPPO-550 DN80：最大流量1350 LPM=81 m³/h",
+        "HIPPO-750 DN80：最大流量1600 LPM=96 m³/h"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.75T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "「型錄資料未提及全部符合款」混淆檢索資料不足與型錄完整資料；未明確宣稱真實候選不存在／不符合，依凍結邊界判部分對。",
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "3e72d515248dfd04dc6976cce9ec7f9ec8f1f55de005a897d0bb069515f09167"
+    },
+    {
+      "id": "F05",
+      "repeat": 3,
+      "verdict": "對",
+      "reason": "門檻1200 LPM正確，七款及功率2.2／3.7／5.5／2.2／3／4.1／5.5kW完整對應。每款雙流量1250/75、1500/90、1200/72、1400/84、1200/72、1350/81、1600/96的LPM與m³/h皆正確，口徑及功率邊界未漏。",
+      "matched_points": [
+        "80DIVA-5.30：kw=2.2 kW，max_flow_lpm=1250 LPM",
+        "80DIVA-5.50：kw=3.7 kW，max_flow_lpm=1500 LPM",
+        "80EUB-M-5.75T：kw=5.5 kW，max_flow_lpm=1200 LPM",
+        "80LEOPARD-5.30：kw=2.2 kW，max_flow_lpm=1400 LPM",
+        "HIPPO-400 DN80：kw=3 kW，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：kw=4.1 kW，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：kw=5.5 kW，max_flow_lpm=1600 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "72 m³/h ×1000÷60=1200 LPM；每款最大流量LPM乘0.06轉m³/h",
+        "80DIVA-5.30：最大流量1250 LPM=75 m³/h",
+        "80DIVA-5.50：最大流量1500 LPM=90 m³/h",
+        "80EUB-M-5.75T：最大流量1200 LPM=72 m³/h",
+        "80LEOPARD-5.30：最大流量1400 LPM=84 m³/h",
+        "HIPPO-400 DN80：最大流量1200 LPM=72 m³/h",
+        "HIPPO-550 DN80：最大流量1350 LPM=81 m³/h",
+        "HIPPO-750 DN80：最大流量1600 LPM=96 m³/h"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.75T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "6f43f287687748544450ca98e96df1a30d8d3efcbf5a9ce1a1c79df3550c1cfd"
+    },
+    {
+      "id": "F06",
+      "repeat": 1,
+      "verdict": "錯",
+      "reason": "門檻250 LPM與五款名單正確，但50EUS-5.20及80EUS-5.20均錯寫250 LPM／15 m³/h。兩款原表額定流量實為315 LPM／18.9 m³/h，屬實質數字錯誤，其餘C版與80EUS-5.10L數字正確也不能抵銷。",
+      "matched_points": [
+        "15 m³/h=250 LPM門檻正確，五款型號列齊。",
+        "50EUS-5.20C及80EUS-5.20C：250 LPM=15 m³/h。",
+        "80EUS-5.10L：290 LPM=17.4 m³/h。"
+      ],
+      "missing_points": [],
+      "false_claims": [
+        {
+          "claim": "50EUS-5.20（250 LPM，15 m3/h）",
+          "correction": "額定流量315 LPM=18.9 m³/h。",
+          "source": "knowledge/products/50EUS-5.20.md:8"
+        },
+        {
+          "claim": "80EUS-5.20（250 LPM，15 m3/h）",
+          "correction": "額定流量315 LPM=18.9 m³/h。",
+          "source": "knowledge/products/80EUS-5.20.md:8"
+        }
+      ],
+      "source_lines": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.10L.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "672e80d84ef923c544dbc540265e86ea36649f1b141d3e19ec0ce1a5274c0bc1"
+    },
+    {
+      "id": "F06",
+      "repeat": 2,
+      "verdict": "部分對",
+      "reason": "250 LPM／15 m³/h門檻以及八十EUS槓五點一零L的290 LPM／17.4 m³/h正確，朗讀名可唯一辨識為80EUS-5.10L。漏50EUS-5.20與80EUS-5.20的315／18.9，以及50EUS-5.20C與80EUS-5.20C的250／15，共四款與各自雙單位數字。",
+      "matched_points": [
+        "15 m³/h=250 LPM門檻。",
+        "80EUS-5.10L：額定流量290 LPM=17.4 m³/h；中文朗讀名與換算數字可唯一辨識。"
+      ],
+      "missing_points": [
+        "50EUS-5.20：315 LPM=18.9 m³/h。",
+        "80EUS-5.20：315 LPM=18.9 m³/h。",
+        "50EUS-5.20C：250 LPM=15 m³/h。",
+        "80EUS-5.20C：250 LPM=15 m³/h。"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.10L.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "c76643ccb3ae8f9d7d4ecd90b48c5b1eb5dda522ea84197bef657fca449a1a63"
+    },
+    {
+      "id": "F06",
+      "repeat": 3,
+      "verdict": "錯",
+      "reason": "250 LPM／15 m³/h門檻正確，但沒有逐一列五款及其額定數字，只含模糊的五十EUS五二零名稱。明說五款額定流量「皆超過」250 LPM與15 m³/h錯誤，50EUS-5.20C與80EUS-5.20C都剛好250／15，不能把邊界數值說成超過。",
+      "matched_points": [
+        "15 m³/h=250 LPM門檻正確。",
+        "稱符合款共五款的總數正確，但沒有完整列名。"
+      ],
+      "missing_points": [
+        "50EUS-5.20：rated_flow_lpm=315 LPM",
+        "50EUS-5.20C：rated_flow_lpm=250 LPM",
+        "80EUS-5.10L：rated_flow_lpm=290 LPM",
+        "80EUS-5.20：rated_flow_lpm=315 LPM",
+        "80EUS-5.20C：rated_flow_lpm=250 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "50EUS-5.20：額定流量315 LPM=18.9 m³/h",
+        "50EUS-5.20C：額定流量250 LPM=15 m³/h",
+        "80EUS-5.10L：額定流量290 LPM=17.4 m³/h",
+        "80EUS-5.20：額定流量315 LPM=18.9 m³/h",
+        "80EUS-5.20C：額定流量250 LPM=15 m³/h"
+      ],
+      "false_claims": [
+        {
+          "claim": "額定流量皆超過兩百五十LPM與每小時十五立方米。",
+          "correction": "50EUS-5.20C與80EUS-5.20C額定流量均250 LPM=15 m³/h，屬等於邊界，其他三款為315、315、290 LPM。",
+          "sources": [
+            "knowledge/products/50EUS-5.20C.md:8",
+            "knowledge/products/80EUS-5.20C.md:8"
+          ]
+        }
+      ],
+      "source_lines": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.10L.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122
+        }
+      ],
+      "quality_issues": [
+        "「五五十EUS五二零等五款」朗讀表述不清，未逐款識別；判錯依明確的邊界數字錯誤，不因朗讀名稱本身加重。",
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "6b0c7150a9b15eab9fb2e5ccf5051be6fe05a134bc3fc9be2c966f97bcbd5f5b"
+    },
+    {
+      "id": "F07",
+      "repeat": 1,
+      "verdict": "對",
+      "reason": "十款普通／Q版分開且所有LPM與單相kg數字完整正確，排序為200、200Q、150、150Q、100、100Q、75、75Q、50、50Q。每組同流量均普通版較輕先列，雙欄排序及版本完整，沒有錯用三相重量。",
+      "matched_points": [
+        "HIPPO-200：max_flow_lpm=660 LPM，weight_1ph_kg=25.2 kg",
+        "HIPPO-200Q：max_flow_lpm=660 LPM，weight_1ph_kg=27.2 kg",
+        "HIPPO-150：max_flow_lpm=580 LPM，weight_1ph_kg=24.2 kg",
+        "HIPPO-150Q：max_flow_lpm=580 LPM，weight_1ph_kg=26.2 kg",
+        "HIPPO-100：max_flow_lpm=500 LPM，weight_1ph_kg=15.4 kg",
+        "HIPPO-100Q：max_flow_lpm=500 LPM，weight_1ph_kg=16.8 kg",
+        "HIPPO-75：max_flow_lpm=390 LPM，weight_1ph_kg=13.9 kg",
+        "HIPPO-75Q：max_flow_lpm=390 LPM，weight_1ph_kg=15.3 kg",
+        "HIPPO-50：max_flow_lpm=330 LPM，weight_1ph_kg=12.9 kg",
+        "HIPPO-50Q：max_flow_lpm=330 LPM，weight_1ph_kg=14.3 kg",
+        "完整指定順序：HIPPO-200、HIPPO-200Q、HIPPO-150、HIPPO-150Q、HIPPO-100、HIPPO-100Q、HIPPO-75、HIPPO-75Q、HIPPO-50、HIPPO-50Q",
+        "普通版與Q版分開，各同最大流量均按已載單相重量由輕到重"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-75.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-75Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-50.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-50Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "710c97a60f858e1637cb9c093db7c31b21a0af93b6b568ccfb997d6214c6eeab"
+    },
+    {
+      "id": "F07",
+      "repeat": 2,
+      "verdict": "對",
+      "reason": "十款普通／Q版分開且所有LPM與單相kg數字完整正確，排序為200、200Q、150、150Q、100、100Q、75、75Q、50、50Q。每組同流量均普通版較輕先列，雙欄排序及版本完整，沒有錯用三相重量。",
+      "matched_points": [
+        "HIPPO-200：max_flow_lpm=660 LPM，weight_1ph_kg=25.2 kg",
+        "HIPPO-200Q：max_flow_lpm=660 LPM，weight_1ph_kg=27.2 kg",
+        "HIPPO-150：max_flow_lpm=580 LPM，weight_1ph_kg=24.2 kg",
+        "HIPPO-150Q：max_flow_lpm=580 LPM，weight_1ph_kg=26.2 kg",
+        "HIPPO-100：max_flow_lpm=500 LPM，weight_1ph_kg=15.4 kg",
+        "HIPPO-100Q：max_flow_lpm=500 LPM，weight_1ph_kg=16.8 kg",
+        "HIPPO-75：max_flow_lpm=390 LPM，weight_1ph_kg=13.9 kg",
+        "HIPPO-75Q：max_flow_lpm=390 LPM，weight_1ph_kg=15.3 kg",
+        "HIPPO-50：max_flow_lpm=330 LPM，weight_1ph_kg=12.9 kg",
+        "HIPPO-50Q：max_flow_lpm=330 LPM，weight_1ph_kg=14.3 kg",
+        "完整指定順序：HIPPO-200、HIPPO-200Q、HIPPO-150、HIPPO-150Q、HIPPO-100、HIPPO-100Q、HIPPO-75、HIPPO-75Q、HIPPO-50、HIPPO-50Q",
+        "普通版與Q版分開，各同最大流量均按已載單相重量由輕到重"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-75.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-75Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-50.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-50Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "ab22d324e74ea78f7b8e555d1b6d8c2a2dd21aedce8cadf15218b7f90e83449c"
+    },
+    {
+      "id": "F07",
+      "repeat": 3,
+      "verdict": "部分對",
+      "reason": "十款普通／Q版、流量660／580／500／390／330與各自單相重量數字全部正確，實際雙欄排序也正確。全文流量只有數字而沒有LPM／公升每分鐘單位，缺必要流量單位，不能因語音簡短放寬必答標準。",
+      "matched_points": [
+        "十款全部列齊，普通／Q版分開。",
+        "所有最大流量數字660、580、500、390、330與單相重量25.2、27.2、24.2、26.2、15.4、16.8、13.9、15.3、12.9、14.3 kg對應正確。",
+        "實際順序200、200Q、150、150Q、100、100Q、75、75Q、50、50Q符合雙欄排序。"
+      ],
+      "missing_points": [
+        "每款流量的LPM／公升每分鐘單位，全文未明示。"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-75.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-75Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-50.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/products/HIPPO-50Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338
+        }
+      ],
+      "quality_issues": [
+        "回答未列來源頁或行；來源品質另列，不影響正確內容分。"
+      ],
+      "answer_sha256": "da802859bb70212cdaaff8d1b9ddfbb695c9dbbea3de20d27ccc693d03ef3a10"
+    }
+  ]
+}

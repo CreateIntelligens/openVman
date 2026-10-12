@@ -1,0 +1,1562 @@
+{
+  "grader": "Codex獨立代理逐份完整最終回答及來源核對；非人類人工驗收、無額外LLM API或模型自評",
+  "rubric_source": "answers_for_grading_F08_F14.json的凍結grading_rubric與required_points/forbidden_claims；21份最終answer全文，不能由tool_steps補足。sources逐字核對notes與source_catalog.md；清楚可辨識口述／兩個型號前綴可接受，純漏資料partial、實際假資訊或錯排序wrong。",
+  "input_sha256": "dc36cba22235f661bc05faaf2199a1929229c020851b4002ec2f98eda7f790bf",
+  "grades": [
+    {
+      "id": "F08",
+      "repeat": 1,
+      "verdict": "correct",
+      "reason": "前三款依序為150DIVA-5.200、150DIVA PRO-5.200、200DIVA-5.200，排序正確。三款6200 LPM、22 m及各自6、6、8吋完整，沒有多列第四款。",
+      "matched_points": [
+        "150DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋",
+        "150DIVA PRO-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋",
+        "200DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=8 吋",
+        "完整指定順序：150DIVA-5.200、150DIVA PRO-5.200、200DIVA-5.200",
+        "最大流量降冪、最大揚程升冪、口徑升冪、同值DIVA在DIVA PRO之前；只給指定前三款"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/150DIVA-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/150DIVA-PRO-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/200DIVA-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 288,
+          "line_end": 299,
+          "page": 13
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "4e111c25218b65399f83cf7c77c02ef5e2c568621737544d24dcaf8c5b1a7dee"
+    },
+    {
+      "id": "F08",
+      "repeat": 2,
+      "verdict": "correct",
+      "reason": "前三款依序為150DIVA-5.200、150DIVA PRO-5.200、200DIVA-5.200，排序正確。三款6200 LPM、22 m及各自6、6、8吋完整，沒有多列第四款。",
+      "matched_points": [
+        "150DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋",
+        "150DIVA PRO-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋",
+        "200DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=8 吋",
+        "完整指定順序：150DIVA-5.200、150DIVA PRO-5.200、200DIVA-5.200",
+        "最大流量降冪、最大揚程升冪、口徑升冪、同值DIVA在DIVA PRO之前；只給指定前三款"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/150DIVA-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/150DIVA-PRO-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/200DIVA-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 288,
+          "line_end": 299,
+          "page": 13
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "ca33bd163310a2e75c818b52d9829ae3a9b41f920f5a4e6ee80246f482f201fe"
+    },
+    {
+      "id": "F08",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "三款型號及出現順序正確，6200 LPM與22 m可共同對應三款。只寫口徑6吋與8吋，未說明前兩款各6吋、第三款8吋，漏逐款口徑對應。",
+      "matched_points": [
+        "完整指定順序：150DIVA-5.200、150DIVA PRO-5.200、200DIVA-5.200",
+        "三款最大流量均6200 LPM、最大揚程均22 m",
+        "只列三款，沒有錯誤排序或額外型號"
+      ],
+      "missing_points": [
+        "150DIVA-5.200的口徑明確為6吋",
+        "150DIVA PRO-5.200的口徑明確為6吋",
+        "200DIVA-5.200的口徑明確為8吋"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/150DIVA-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/150DIVA-PRO-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/200DIVA-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 288,
+          "line_end": 299,
+          "page": 13
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "2002d7f1ba606c5354d05db4a131e5150f8d269bd26fe126a1e942f0f662c2d2"
+    },
+    {
+      "id": "F09",
+      "repeat": 1,
+      "verdict": "correct",
+      "reason": "50/80STEEL-5.30與80/100LEOPARD-5.30各明示兩個型號前綴，可唯一對應兩款並列冠軍。三系列45/700、76/1100、56/1400的粒徑／最大流量正確，並指出HIPPO-300 DN80的76 mm最大。",
+      "matched_points": [
+        "50STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM",
+        "80STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM",
+        "HIPPO-300 DN80：solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "80LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "100LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "STEEL冠軍兩款45 mm、HIPPO DN冠軍HIPPO-300 DN80為76 mm、LEOPARD冠軍兩款56 mm；三系列最高為HIPPO DN的76 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/50STEEL-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/80STEEL-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-300-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/80LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 353,
+          "line_end": 366,
+          "page": 17
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [
+        "用斜線合寫兩個明確型號前綴，但兩個變體均可辨識；本題未要求各款口徑，不額外扣分"
+      ],
+      "answer_sha256": "f05012316bd84f2419d150d49c6345f2ce8f865530ec91e9d90f3b5247bba1a8"
+    },
+    {
+      "id": "F09",
+      "repeat": 2,
+      "verdict": "correct",
+      "reason": "STEEL兩款明列，LEOPARD的八十與百型在本題3HP範圍可唯一對應80LEOPARD-5.30及100LEOPARD-5.30。口述45 mm/700 LPM、56 mm/1400 LPM、76 mm/1100 LPM及HIPPO DN最大結論均正確。",
+      "matched_points": [
+        "50STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM",
+        "80STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM",
+        "HIPPO-300 DN80：solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "80LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "100LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "STEEL冠軍兩款45 mm、HIPPO DN冠軍HIPPO-300 DN80為76 mm、LEOPARD冠軍兩款56 mm；三系列最高為HIPPO DN的76 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/50STEEL-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/80STEEL-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-300-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/80LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 353,
+          "line_end": 366,
+          "page": 17
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [
+        "LEOPARD以口述八十與百型簡稱，依題目限定的系列與3HP可唯一對應；仍建議完整念出型號"
+      ],
+      "answer_sha256": "548ede4f23c1a54ded362f4c965883590753d64ca3080c99376541117567c5b5"
+    },
+    {
+      "id": "F09",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "三系列粒徑與最大流量45/700、76/1100、56/1400及HIPPO DN最大結論正確。只有HIPPO-300 DN80完整型號，漏STEEL兩款及LEOPARD兩款並列冠軍名稱。",
+      "matched_points": [
+        "HIPPO-300 DN80：76 mm、最大流量1100 LPM",
+        "STEEL系列3HP最大粒徑45 mm、最大流量700 LPM",
+        "LEOPARD系列3HP最大粒徑56 mm、最大流量1400 LPM",
+        "三系列粒徑最大為HIPPO DN的76 mm"
+      ],
+      "missing_points": [
+        "STEEL並列冠軍50STEEL-5.30及80STEEL-5.30的型號名稱",
+        "LEOPARD並列冠軍80LEOPARD-5.30及100LEOPARD-5.30的型號名稱"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/50STEEL-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/80STEEL-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-300-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/80LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 353,
+          "line_end": 366,
+          "page": 17
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "5ae0e3ea55c2a1508fbbc6aed908694f62569a1a6d6c5b4af24d9db197929854"
+    },
+    {
+      "id": "F10",
+      "repeat": 1,
+      "verdict": "correct",
+      "reason": "150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75依54、50、46 m由高到低，前三名與順序正確。各自20 HP/15 kW、15 HP/11 kW、7.5 HP/5.5 kW全部完整且正確。",
+      "matched_points": [
+        "150EUB-M-5.200：max_head_m=54 m，hp=20 HP，kw=15 kW",
+        "100EUB-M-5.150：max_head_m=50 m，hp=15 HP，kw=11 kW",
+        "50ALLIGATOR-5.75：max_head_m=46 m，hp=7.5 HP，kw=5.5 kW",
+        "完整指定順序：150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/150EUB-M-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "notes/100EUB-M-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "notes/50ALLIGATOR-5.75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 19
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 266,
+          "line_end": 271,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 428,
+          "line_end": 434,
+          "page": 19
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "105fe2a2ae7e8e9ea7a9520f829f6a5c50afdc13817ced93951d044238ee7063"
+    },
+    {
+      "id": "F10",
+      "repeat": 2,
+      "verdict": "correct",
+      "reason": "150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75依54、50、46 m由高到低，前三名與順序正確。各自20 HP/15 kW、15 HP/11 kW、7.5 HP/5.5 kW全部完整且正確。",
+      "matched_points": [
+        "150EUB-M-5.200：max_head_m=54 m，hp=20 HP，kw=15 kW",
+        "100EUB-M-5.150：max_head_m=50 m，hp=15 HP，kw=11 kW",
+        "50ALLIGATOR-5.75：max_head_m=46 m，hp=7.5 HP，kw=5.5 kW",
+        "完整指定順序：150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/150EUB-M-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "notes/100EUB-M-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "notes/50ALLIGATOR-5.75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 19
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 266,
+          "line_end": 271,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 428,
+          "line_end": 434,
+          "page": 19
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "55db38da0f7c5560783d3fef9d0e4540199e0f69c369385d42e2a33c2e7ebb27"
+    },
+    {
+      "id": "F10",
+      "repeat": 3,
+      "verdict": "correct",
+      "reason": "150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75依54、50、46 m由高到低，前三名與順序正確。各自20 HP/15 kW、15 HP/11 kW、7.5 HP/5.5 kW全部完整且正確。",
+      "matched_points": [
+        "150EUB-M-5.200：max_head_m=54 m，hp=20 HP，kw=15 kW",
+        "100EUB-M-5.150：max_head_m=50 m，hp=15 HP，kw=11 kW",
+        "50ALLIGATOR-5.75：max_head_m=46 m，hp=7.5 HP，kw=5.5 kW",
+        "完整指定順序：150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/150EUB-M-5.200.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "notes/100EUB-M-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "notes/50ALLIGATOR-5.75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 19
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 266,
+          "line_end": 271,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 428,
+          "line_end": 434,
+          "page": 19
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "bad89fc21f4765dae6eaeaaa2a600f3e4834d29718591d1599ab3ad9f955d8a8"
+    },
+    {
+      "id": "F11",
+      "repeat": 1,
+      "verdict": "partial",
+      "reason": "甲現場8款及HP／最大流量完整，甲乙分開且沒有壓成AND。乙只列100LEOPARD-5.30的2.2 kW、56 mm、1400 LPM，漏100STEEL-5.50及100LEOPARD-5.50兩款與數值。",
+      "matched_points": [
+        "甲：80EUS-5.10L：hp=1 HP，max_flow_lpm=560 LPM",
+        "甲：80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "甲：80EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "甲：80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM",
+        "甲：80EUB-M-5.20S：hp=2 HP，max_flow_lpm=690 LPM",
+        "甲：80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM",
+        "乙：100LEOPARD-5.30：kw=2.2 kW，solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "甲乙分開給候選，正確使用各現場相數與門檻；EDW單相版本可辨識"
+      ],
+      "missing_points": [
+        "乙：100STEEL-5.50：kw=3.7 kW，solids_mm=45 mm，max_flow_lpm=1000 LPM",
+        "乙：100LEOPARD-5.50：kw=3.7 kW，solids_mm=80 mm，max_flow_lpm=1900 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/80EUS-5.10L.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.20.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.20C.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EDW-5.20S-T.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 9
+        },
+        {
+          "path": "notes/80EUB-M-5.20S.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 11
+        },
+        {
+          "path": "notes/80STEEL-5.20.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-150-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/HIPPO-200-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/100STEEL-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/100LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 116,
+          "line_end": 122,
+          "page": 4
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 216,
+          "line_end": 222,
+          "page": 9
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 248,
+          "line_end": 259,
+          "page": 11
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 353,
+          "line_end": 366,
+          "page": 17
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "72850857ceb63bed8e9e40576933a687b81dcd37f58147dd7395a47b757f1f56"
+    },
+    {
+      "id": "F11",
+      "repeat": 2,
+      "verdict": "partial",
+      "reason": "甲8款、乙3款型號完整，80EDW-5.20S可對應原S/T列的單相版本，情境也正確分開。最終回答完全省略甲每款HP與最大流量、乙每款kW／粒徑／最大流量，不能以工具結果補足。",
+      "matched_points": [
+        "甲完整8款：80EUS-5.10L、80EUS-5.20、80EUS-5.20C、80EDW-5.20S/T單相版本、80EUB-M-5.20S、80STEEL-5.20、HIPPO-150 DN80、HIPPO-200 DN80",
+        "乙完整3款：100STEEL-5.50、100LEOPARD-5.30、100LEOPARD-5.50",
+        "甲乙分開，沒有混用相數或合併為AND"
+      ],
+      "missing_points": [
+        "甲：80EUS-5.10L：hp=1 HP，max_flow_lpm=560 LPM",
+        "甲：80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "甲：80EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "甲：80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM",
+        "甲：80EUB-M-5.20S：hp=2 HP，max_flow_lpm=690 LPM",
+        "甲：80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM",
+        "乙：100STEEL-5.50：kw=3.7 kW，solids_mm=45 mm，max_flow_lpm=1000 LPM",
+        "乙：100LEOPARD-5.30：kw=2.2 kW，solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "乙：100LEOPARD-5.50：kw=3.7 kW，solids_mm=80 mm，max_flow_lpm=1900 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/80EUS-5.10L.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.20.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.20C.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EDW-5.20S-T.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 9
+        },
+        {
+          "path": "notes/80EUB-M-5.20S.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 11
+        },
+        {
+          "path": "notes/80STEEL-5.20.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-150-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/HIPPO-200-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/100STEEL-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/100LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 116,
+          "line_end": 122,
+          "page": 4
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 216,
+          "line_end": 222,
+          "page": 9
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 248,
+          "line_end": 259,
+          "page": 11
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 353,
+          "line_end": 366,
+          "page": 17
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "042841d445cdf7dbb3b87c5f68c11375434373647ed708dbde158cc979bf8dc9"
+    },
+    {
+      "id": "F11",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "甲現場8款及HP／最大流量完整，甲乙分開且沒有壓成AND。乙只列100LEOPARD-5.30的2.2 kW、56 mm、1400 LPM，漏100STEEL-5.50及100LEOPARD-5.50兩款與數值。",
+      "matched_points": [
+        "甲：80EUS-5.10L：hp=1 HP，max_flow_lpm=560 LPM",
+        "甲：80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "甲：80EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "甲：80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM",
+        "甲：80EUB-M-5.20S：hp=2 HP，max_flow_lpm=690 LPM",
+        "甲：80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM",
+        "乙：100LEOPARD-5.30：kw=2.2 kW，solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "甲乙分開給候選，正確使用各現場相數與門檻；EDW單相版本可辨識"
+      ],
+      "missing_points": [
+        "乙：100STEEL-5.50：kw=3.7 kW，solids_mm=45 mm，max_flow_lpm=1000 LPM",
+        "乙：100LEOPARD-5.50：kw=3.7 kW，solids_mm=80 mm，max_flow_lpm=1900 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/80EUS-5.10L.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.20.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.20C.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EDW-5.20S-T.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 9
+        },
+        {
+          "path": "notes/80EUB-M-5.20S.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 11
+        },
+        {
+          "path": "notes/80STEEL-5.20.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-150-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/HIPPO-200-DN80.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 17
+        },
+        {
+          "path": "notes/100STEEL-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/100LEOPARD-5.30.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 116,
+          "line_end": 122,
+          "page": 4
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 216,
+          "line_end": 222,
+          "page": 9
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 248,
+          "line_end": 259,
+          "page": 11
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 353,
+          "line_end": 366,
+          "page": 17
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "33e6809c4c557da8e64defbf74320c1fca93f1c24442dc9ae6c79c9710307112"
+    },
+    {
+      "id": "F12",
+      "repeat": 1,
+      "verdict": "partial",
+      "reason": "正確說沒有15 m @1600 LPM明列額定點，且候選不保證目標、需性能曲線。只給150EUB-M-5.100的7.5 kW、15 m @1550 LPM，漏DIVA及DIVA PRO各100、150兩款共4個11 kW候選。",
+      "matched_points": [
+        "150EUB-M-5.100：kw=7.5 kW，rated_head_m=15 m，rated_flow_lpm=1550 LPM",
+        "117款沒有15 m @1600 LPM的明列額定點",
+        "候選不能保證15 m @1600 LPM，須性能曲線／實際工況確認"
+      ],
+      "missing_points": [
+        "100DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "100DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/100DIVA-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/150DIVA-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/100DIVA-PRO-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/150DIVA-PRO-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/150EUB-M-5.100.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 266,
+          "line_end": 271,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 288,
+          "line_end": 299,
+          "page": 13
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "df6ddeb11e77fd9eeba994212fb06a5fc6e493ef06e7b2e2d1d8209abb5b5bda"
+    },
+    {
+      "id": "F12",
+      "repeat": 2,
+      "verdict": "partial",
+      "reason": "100(150)DIVA-5.150的11 kW、15 m @2000 LPM正確，原圖合寫名稱可辨識100與150兩款；也正確說無目標額定點、不能保證而須曲線。漏100DIVA PRO-5.150、150DIVA PRO-5.150及150EUB-M-5.100三款候選與數值。",
+      "matched_points": [
+        "100DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "117款沒有15 m @1600 LPM的明列額定點",
+        "候選不能保證15 m @1600 LPM，須性能曲線確認"
+      ],
+      "missing_points": [
+        "100DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150EUB-M-5.100：kw=7.5 kW，rated_head_m=15 m，rated_flow_lpm=1550 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/100DIVA-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/150DIVA-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/100DIVA-PRO-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/150DIVA-PRO-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/150EUB-M-5.100.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 266,
+          "line_end": 271,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 288,
+          "line_end": 299,
+          "page": 13
+        }
+      ],
+      "quality_issues": [
+        "100(150)DIVA合併名稱保留兩個型號前綴，但未明說4吋與6吋；應拆列兩款以避免口徑變體含混"
+      ],
+      "answer_sha256": "68a6de9a2ef7aaf75c518aeb2e3d96d807b74599bf1651455166da7577c2b63a"
+    },
+    {
+      "id": "F12",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "正確說沒有15 m @1600 LPM明列額定點，且候選不保證目標、需性能曲線。只給150EUB-M-5.100的7.5 kW、15 m @1550 LPM，漏DIVA及DIVA PRO各100、150兩款共4個11 kW候選。",
+      "matched_points": [
+        "150EUB-M-5.100：kw=7.5 kW，rated_head_m=15 m，rated_flow_lpm=1550 LPM",
+        "117款沒有15 m @1600 LPM的明列額定點",
+        "候選不能保證15 m @1600 LPM，須性能曲線／實際工況確認"
+      ],
+      "missing_points": [
+        "100DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "100DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/100DIVA-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/150DIVA-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 13
+        },
+        {
+          "path": "notes/100DIVA-PRO-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/150DIVA-PRO-5.150.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 14
+        },
+        {
+          "path": "notes/150EUB-M-5.100.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 266,
+          "line_end": 271,
+          "page": 12
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 288,
+          "line_end": 299,
+          "page": 13
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "e5991797e2f3cd6cf8c980c9fe4f0fa833816dd22f8c9c8dcbf78face606d7ce"
+    },
+    {
+      "id": "F13",
+      "repeat": 1,
+      "verdict": "correct",
+      "reason": "兩款額定點11 m/800 LPM、13 m/800 LPM及各自最大揚程16、18 m與最大流量1900、2300 LPM完整正確。明確說兩個最大值各自獨立，不能拼成同時達成的工作點。",
+      "matched_points": [
+        "100LEOPARD-5.50：rated_head_m=11 m，rated_flow_lpm=800 LPM，max_head_m=16 m，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：rated_head_m=13 m，rated_flow_lpm=800 LPM，max_head_m=18 m，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "每款額定揚程及額定流量是同一額定點",
+        "最大揚程及最大流量各自獨立，不是同一工作點，不能直接拼成同時達成的數字"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/100LEOPARD-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "1bc96abdb2fdf65797f39cdbeb87eb3e6563fd0b6fe6aeb4a148c53de7e25bd0"
+    },
+    {
+      "id": "F13",
+      "repeat": 2,
+      "verdict": "correct",
+      "reason": "兩款額定點11 m/800 LPM、13 m/800 LPM及各自最大揚程16、18 m與最大流量1900、2300 LPM完整正確。明確說兩個最大值各自獨立，不能拼成同時達成的工作點。",
+      "matched_points": [
+        "100LEOPARD-5.50：rated_head_m=11 m，rated_flow_lpm=800 LPM，max_head_m=16 m，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：rated_head_m=13 m，rated_flow_lpm=800 LPM，max_head_m=18 m，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "每款額定揚程及額定流量是同一額定點",
+        "最大揚程及最大流量各自獨立，不是同一工作點，不能直接拼成同時達成的數字"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/100LEOPARD-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "f7832405241052691f70d25b9ec949d1e14fab23c1397d265aab013d869de8ae"
+    },
+    {
+      "id": "F13",
+      "repeat": 3,
+      "verdict": "correct",
+      "reason": "兩款額定點11 m/800 LPM、13 m/800 LPM及各自最大揚程16、18 m與最大流量1900、2300 LPM完整正確。明確說兩個最大值各自獨立，不能拼成同時達成的工作點。",
+      "matched_points": [
+        "100LEOPARD-5.50：rated_head_m=11 m，rated_flow_lpm=800 LPM，max_head_m=16 m，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：rated_head_m=13 m，rated_flow_lpm=800 LPM，max_head_m=18 m，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "每款額定揚程及額定流量是同一額定點",
+        "最大揚程及最大流量各自獨立，不是同一工作點，不能直接拼成同時達成的數字"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/100LEOPARD-5.50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "notes/100LEOPARD-5.75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 20
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 443,
+          "line_end": 448,
+          "page": 20
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "1bc96abdb2fdf65797f39cdbeb87eb3e6563fd0b6fe6aeb4a148c53de7e25bd0"
+    },
+    {
+      "id": "F14",
+      "repeat": 1,
+      "verdict": "partial",
+      "reason": "已列10款的單相電流、重量與粒徑全部正確，也保留6 A及6 mm邊界。漏50EUBL-5.10的5.8 A／14 kg／38 mm及50STEEL-5.05的3.5 A／13 kg／35 mm，完整清單應有12款。",
+      "matched_points": [
+        "50EUB-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUB-5.10：current_1ph_a=6 A，weight_1ph_kg=13.7 kg，solids_mm=6 mm",
+        "50EUBI-5.05：current_1ph_a=3 A，weight_1ph_kg=13.8 kg，solids_mm=6 mm",
+        "50EUBS-5.05：current_1ph_a=3 A，weight_1ph_kg=14.1 kg，solids_mm=6 mm",
+        "50EUS-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "80EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "HIPPO-50：current_1ph_a=4.2 A，weight_1ph_kg=12.9 kg，solids_mm=50 mm",
+        "HIPPO-50Q：current_1ph_a=4.2 A，weight_1ph_kg=14.3 kg，solids_mm=50 mm",
+        "HIPPO-75：current_1ph_a=5.5 A，weight_1ph_kg=13.9 kg，solids_mm=50 mm",
+        "按單相電流與重量篩選，保留6 A及6 mm邊界",
+        "沒有把未載粒徑的款式列為確認符合"
+      ],
+      "missing_points": [
+        "50EUBL-5.10：current_1ph_a=5.8 A，weight_1ph_kg=14 kg，solids_mm=38 mm",
+        "50STEEL-5.05：current_1ph_a=3.5 A，weight_1ph_kg=13 kg，solids_mm=35 mm"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/50EUB-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUB-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUBI-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUBS-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUS-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/50EUS-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/50EUBL-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 8
+        },
+        {
+          "path": "notes/50STEEL-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "notes/HIPPO-50Q.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "notes/HIPPO-75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 116,
+          "line_end": 122,
+          "page": 4
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 162,
+          "line_end": 169,
+          "page": 6
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 332,
+          "line_end": 338,
+          "page": 16
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "1f704d0483328ba44fae7b68078df0ccae52b698fc62bb7e51f5db2da9ea3e28"
+    },
+    {
+      "id": "F14",
+      "repeat": 2,
+      "verdict": "partial",
+      "reason": "已列11款的電流／重量／粒徑全部正確，含50EUBL-5.10及6 A與6 mm邊界。僅漏50STEEL-5.05的3.5 A、13 kg、35 mm，完整清單應有12款。",
+      "matched_points": [
+        "50EUB-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUB-5.10：current_1ph_a=6 A，weight_1ph_kg=13.7 kg，solids_mm=6 mm",
+        "50EUBI-5.05：current_1ph_a=3 A，weight_1ph_kg=13.8 kg，solids_mm=6 mm",
+        "50EUBS-5.05：current_1ph_a=3 A，weight_1ph_kg=14.1 kg，solids_mm=6 mm",
+        "50EUS-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "80EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "50EUBL-5.10：current_1ph_a=5.8 A，weight_1ph_kg=14 kg，solids_mm=38 mm",
+        "HIPPO-50：current_1ph_a=4.2 A，weight_1ph_kg=12.9 kg，solids_mm=50 mm",
+        "HIPPO-50Q：current_1ph_a=4.2 A，weight_1ph_kg=14.3 kg，solids_mm=50 mm",
+        "HIPPO-75：current_1ph_a=5.5 A，weight_1ph_kg=13.9 kg，solids_mm=50 mm",
+        "按單相電流與重量篩選，保留6 A及6 mm邊界",
+        "沒有把未載粒徑的款式列為確認符合"
+      ],
+      "missing_points": [
+        "50STEEL-5.05：current_1ph_a=3.5 A，weight_1ph_kg=13 kg，solids_mm=35 mm"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/50EUB-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUB-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUBI-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUBS-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUS-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/50EUS-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/50EUBL-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 8
+        },
+        {
+          "path": "notes/50STEEL-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "notes/HIPPO-50Q.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "notes/HIPPO-75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 116,
+          "line_end": 122,
+          "page": 4
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 162,
+          "line_end": 169,
+          "page": 6
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 332,
+          "line_end": 338,
+          "page": 16
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "64feaf51843e1468801ac4858d6234cb970ac0d80e1346d9db4c0ee5bfd02b6a"
+    },
+    {
+      "id": "F14",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "已列10款的單相電流、重量與粒徑全部正確，也保留6 A及6 mm邊界。漏50EUBL-5.10的5.8 A／14 kg／38 mm及50STEEL-5.05的3.5 A／13 kg／35 mm，完整清單應有12款。",
+      "matched_points": [
+        "50EUB-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUB-5.10：current_1ph_a=6 A，weight_1ph_kg=13.7 kg，solids_mm=6 mm",
+        "50EUBI-5.05：current_1ph_a=3 A，weight_1ph_kg=13.8 kg，solids_mm=6 mm",
+        "50EUBS-5.05：current_1ph_a=3 A，weight_1ph_kg=14.1 kg，solids_mm=6 mm",
+        "50EUS-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "80EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "HIPPO-50：current_1ph_a=4.2 A，weight_1ph_kg=12.9 kg，solids_mm=50 mm",
+        "HIPPO-50Q：current_1ph_a=4.2 A，weight_1ph_kg=14.3 kg，solids_mm=50 mm",
+        "HIPPO-75：current_1ph_a=5.5 A，weight_1ph_kg=13.9 kg，solids_mm=50 mm",
+        "按單相電流與重量篩選，保留6 A及6 mm邊界",
+        "沒有把未載粒徑的款式列為確認符合"
+      ],
+      "missing_points": [
+        "50EUBL-5.10：current_1ph_a=5.8 A，weight_1ph_kg=14 kg，solids_mm=38 mm",
+        "50STEEL-5.05：current_1ph_a=3.5 A，weight_1ph_kg=13 kg，solids_mm=35 mm"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "notes/50EUB-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUB-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUBI-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUBS-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 6
+        },
+        {
+          "path": "notes/50EUS-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/50EUS-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/80EUS-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 4
+        },
+        {
+          "path": "notes/50EUBL-5.10.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 8
+        },
+        {
+          "path": "notes/50STEEL-5.05.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 18
+        },
+        {
+          "path": "notes/HIPPO-50.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "notes/HIPPO-50Q.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "notes/HIPPO-75.md",
+          "line_start": 1,
+          "line_end": 20,
+          "page": 16
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 116,
+          "line_end": 122,
+          "page": 4
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 162,
+          "line_end": 169,
+          "page": 6
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 332,
+          "line_end": 338,
+          "page": 16
+        },
+        {
+          "path": "source_catalog.md",
+          "line_start": 386,
+          "line_end": 395,
+          "page": 18
+        }
+      ],
+      "quality_issues": [],
+      "answer_sha256": "a7c1301f127cc6b8615e73126db5d9e13fa6912423873184fdc5449829dbd95d"
+    }
+  ]
+}

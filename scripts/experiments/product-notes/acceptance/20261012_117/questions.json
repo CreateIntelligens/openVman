@@ -1,0 +1,2047 @@
+{
+  "scope": {
+    "row_count": 117,
+    "source_snapshot": "source_snapshot.json",
+    "catalog_path": "knowledge/products/_catalog.yaml",
+    "source_catalog_path": "knowledge/EVAK_CATALOG.md",
+    "series": [
+      "ALLIGATOR",
+      "DIVA",
+      "DIVA PRO",
+      "EDW",
+      "EUB",
+      "EUB-M",
+      "EUBI",
+      "EUBL",
+      "EUBR",
+      "EUBRI",
+      "EUBRS",
+      "EUBS",
+      "EUS",
+      "EUSR",
+      "HIPPO",
+      "HIPPO DN",
+      "LEOPARD",
+      "STEEL"
+    ],
+    "models": [
+      "100DIVA PRO-5.100",
+      "100DIVA PRO-5.150",
+      "100DIVA-5.100",
+      "100DIVA-5.150",
+      "100DIVA-5.50",
+      "100DIVA-5.75",
+      "100EDW-5.30S/T",
+      "100EDW-5.50T",
+      "100EUB-M-5.100",
+      "100EUB-M-5.150",
+      "100EUB-M-5.50T",
+      "100EUB-M-5.75T",
+      "100LEOPARD-5.100",
+      "100LEOPARD-5.30",
+      "100LEOPARD-5.50",
+      "100LEOPARD-5.75",
+      "100STEEL-5.100",
+      "100STEEL-5.150",
+      "100STEEL-5.50",
+      "100STEEL-5.75",
+      "150DIVA PRO-5.100",
+      "150DIVA PRO-5.150",
+      "150DIVA PRO-5.200",
+      "150DIVA PRO-5.240",
+      "150DIVA PRO-5.300",
+      "150DIVA-5.100",
+      "150DIVA-5.150",
+      "150DIVA-5.200",
+      "150DIVA-5.240",
+      "150DIVA-5.300",
+      "150EUB-M-5.100",
+      "150EUB-M-5.200",
+      "200DIVA PRO-5.200",
+      "200DIVA PRO-5.240",
+      "200DIVA PRO-5.300",
+      "200DIVA PRO-5.300L",
+      "200DIVA-5.200",
+      "200DIVA-5.240",
+      "200DIVA-5.300",
+      "200DIVA-5.300L",
+      "32ALLIGATOR-5.15",
+      "32ALLIGATOR-5.20",
+      "32ALLIGATOR-5.30",
+      "50ALLIGATOR-5.50",
+      "50ALLIGATOR-5.75",
+      "50EUB-5.05",
+      "50EUB-5.10",
+      "50EUB-5.20",
+      "50EUB-M-5.20S",
+      "50EUB-M-5.20T",
+      "50EUB-M-5.30T",
+      "50EUBI-5.05",
+      "50EUBI-5.10",
+      "50EUBL-5.10",
+      "50EUBR-5.05",
+      "50EUBR-5.10",
+      "50EUBRI-5.05",
+      "50EUBRI-5.10",
+      "50EUBRS-5.05",
+      "50EUBRS-5.10",
+      "50EUBS-5.05",
+      "50EUBS-5.10",
+      "50EUBS-5.20",
+      "50EUS-5.05",
+      "50EUS-5.10",
+      "50EUS-5.20",
+      "50EUS-5.20C",
+      "50EUSR-5.05",
+      "50STEEL-5.05",
+      "50STEEL-5.10",
+      "50STEEL-5.20",
+      "50STEEL-5.30",
+      "80DIVA-5.30",
+      "80DIVA-5.50",
+      "80EDW-5.20S/T",
+      "80EDW-5.30S/T",
+      "80EDW-5.50T",
+      "80EUB-5.20",
+      "80EUB-M-5.20S",
+      "80EUB-M-5.20T",
+      "80EUB-M-5.30T",
+      "80EUB-M-5.50T",
+      "80EUB-M-5.75T",
+      "80EUBS-5.20",
+      "80EUS-5.10",
+      "80EUS-5.10L",
+      "80EUS-5.20",
+      "80EUS-5.20C",
+      "80LEOPARD-5.30",
+      "80STEEL-5.100",
+      "80STEEL-5.150",
+      "80STEEL-5.20",
+      "80STEEL-5.30",
+      "80STEEL-5.50",
+      "80STEEL-5.75",
+      "HIPPO-100",
+      "HIPPO-100Q",
+      "HIPPO-150",
+      "HIPPO-150 DN65",
+      "HIPPO-150 DN80",
+      "HIPPO-150Q",
+      "HIPPO-200",
+      "HIPPO-200 DN65",
+      "HIPPO-200 DN80",
+      "HIPPO-200Q",
+      "HIPPO-300 DN65",
+      "HIPPO-300 DN80",
+      "HIPPO-400 DN65",
+      "HIPPO-400 DN80",
+      "HIPPO-50",
+      "HIPPO-50Q",
+      "HIPPO-550 DN65",
+      "HIPPO-550 DN80",
+      "HIPPO-75",
+      "HIPPO-750 DN80",
+      "HIPPO-750H DN80",
+      "HIPPO-75Q"
+    ],
+    "model_rule": "按117篇實際模型列，口徑、Q版及材質拆分款各自一款；EDW S/T合併列仍保留，名稱及phase按已載值，不從型號猜。",
+    "comparison_rule": "額定揚程及流量同一點，兩個最大值獨立；缺值未知不可視0或確認否。"
+  },
+  "grading_rubric": {
+    "對": "必要主結論正確，所有應列型號完整且沒有錯納；題目要求的數字、單位、排序、情境與重要限定均正確。只評required_points，不以expected_answer額外補充自動扣分。",
+    "部分對": "主結論至少一部分正確且未有錯誤數字、錯納型號、虛構資訊或錯誤運轉點，但漏列型號、漏題目要求的數字、漏情境、次排序或重要限定。",
+    "錯": "數字答錯、錯納型號、單位換算錯、主結論錯誤、虛構價格或保固，或把最大揚程與最大流量合成同時達成的運轉點；任一重大forbidden_claims成立即判錯。",
+    "等值與名稱": "精確等值單位與同義敘述可接受；原表單三相合併列保留名稱，若答明同一列的單相或三相版本亦可接受，不要求把合併列拆成兩款。117列中的口徑、材質或Q版拆分款需各自完整；可用原圖合併名稱，但須明示本題對應的口徑、材質或Q版本，不能因此少算變體。",
+    "範圍與缺資料": "只比較scope的117列；未知不可說成確認不符合。價格、保固問答不能自行補值。",
+    "OR與排序": "多現場情境各自給完整集合，不能壓成AND；題目指定的多欄排序及同分次序為必要，其他集合題不要求型號出現順序。",
+    "出處": "來源引用品質另列；chunk id不是頁碼。未提供逐行引用本身不扣內容分。"
+  },
+  "questions": [
+    {
+      "id": "F01",
+      "kind": "跨系列完整AND清單",
+      "question": "我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。",
+      "expected_answer": "80DIVA-5.30：hp=3 HP，max_flow_lpm=1250 LPM；80DIVA-5.50：hp=5 HP，max_flow_lpm=1500 LPM；80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM；80EDW-5.30S/T：hp=3 HP，max_flow_lpm=980 LPM；80EDW-5.50T：hp=5 HP，max_flow_lpm=1040 LPM；80EUB-M-5.20T：hp=2 HP，max_flow_lpm=630 LPM；80EUB-M-5.30T：hp=3 HP，max_flow_lpm=700 LPM；80EUB-M-5.50T：hp=5 HP，max_flow_lpm=900 LPM；80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM；80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM；80STEEL-5.30：hp=3 HP，max_flow_lpm=700 LPM；80STEEL-5.50：hp=5 HP，max_flow_lpm=1000 LPM；80LEOPARD-5.30：hp=3 HP，max_flow_lpm=1400 LPM；HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM；HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM；HIPPO-300 DN80：hp=3 HP，max_flow_lpm=1100 LPM；HIPPO-400 DN80：hp=4 HP，max_flow_lpm=1200 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+      "required_points": [
+        "80DIVA-5.30：hp=3 HP，max_flow_lpm=1250 LPM",
+        "80DIVA-5.50：hp=5 HP，max_flow_lpm=1500 LPM",
+        "80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM",
+        "80EDW-5.30S/T：hp=3 HP，max_flow_lpm=980 LPM",
+        "80EDW-5.50T：hp=5 HP，max_flow_lpm=1040 LPM",
+        "80EUB-M-5.20T：hp=2 HP，max_flow_lpm=630 LPM",
+        "80EUB-M-5.30T：hp=3 HP，max_flow_lpm=700 LPM",
+        "80EUB-M-5.50T：hp=5 HP，max_flow_lpm=900 LPM",
+        "80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "80STEEL-5.30：hp=3 HP，max_flow_lpm=700 LPM",
+        "80STEEL-5.50：hp=5 HP，max_flow_lpm=1000 LPM",
+        "80LEOPARD-5.30：hp=3 HP，max_flow_lpm=1400 LPM",
+        "HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM",
+        "HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM",
+        "HIPPO-300 DN80：hp=3 HP，max_flow_lpm=1100 LPM",
+        "HIPPO-400 DN80：hp=4 HP，max_flow_lpm=1200 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把單三相合併列排除該相數，或將未提供那一相數值當0／另一相值"
+      ],
+      "expected_models": [
+        "80DIVA-5.30",
+        "80DIVA-5.50",
+        "80EDW-5.20S/T",
+        "80EDW-5.30S/T",
+        "80EDW-5.50T",
+        "80EUB-M-5.20T",
+        "80EUB-M-5.30T",
+        "80EUB-M-5.50T",
+        "80EUS-5.20",
+        "80STEEL-5.20",
+        "80STEEL-5.30",
+        "80STEEL-5.50",
+        "80LEOPARD-5.30",
+        "HIPPO-150 DN80",
+        "HIPPO-200 DN80",
+        "HIPPO-300 DN80",
+        "HIPPO-400 DN80"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80DIVA-5.30\nseries: DIVA\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 550\nmax_head_m: 12.7\nmax_flow_lpm: 1250\nsolids_mm: 12\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 78\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80DIVA-5.50\nseries: DIVA\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 15\nrated_flow_lpm: 500\nmax_head_m: 17.4\nmax_flow_lpm: 1500\nsolids_mm: 12\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.0\nweight_1ph_kg: null\nweight_3ph_kg: 104\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/80EDW-5.20S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n---"
+        },
+        {
+          "path": "knowledge/products/80EDW-5.30S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EDW-5.30S/T\nseries: EDW\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 14.5\nrated_flow_lpm: 500\nmax_head_m: 26.5\nmax_flow_lpm: 980\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 46\nweight_3ph_kg: 45\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n---"
+        },
+        {
+          "path": "knowledge/products/80EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 21.5\nrated_flow_lpm: 400\nmax_head_m: 32.4\nmax_flow_lpm: 1040\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 49.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n---"
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.20T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9\nrated_flow_lpm: 400\nmax_head_m: 16\nmax_flow_lpm: 630\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 25.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n---"
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.30T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 500\nmax_head_m: 23\nmax_flow_lpm: 700\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 30.0\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n---"
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 19\nrated_flow_lpm: 600\nmax_head_m: 30\nmax_flow_lpm: 900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 35.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n---"
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.20\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 16\nrated_flow_lpm: 315\nmax_head_m: 21.5\nmax_flow_lpm: 658\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 13\ncurrent_3ph_a: 3.7\nweight_1ph_kg: 18.1\nweight_3ph_kg: 18.1\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80STEEL-5.20\nseries: STEEL\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 12\nrated_flow_lpm: 375\nmax_head_m: 19\nmax_flow_lpm: 630\nsolids_mm: 45\nphase: [1,3]\ncurrent_1ph_a: 10.5\ncurrent_3ph_a: 4.5\nweight_1ph_kg: 31.2\nweight_3ph_kg: 29.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.30.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80STEEL-5.30\nseries: STEEL\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 14.7\nrated_flow_lpm: 360\nmax_head_m: 21.5\nmax_flow_lpm: 700\nsolids_mm: 45\nphase: [1,3]\ncurrent_1ph_a: 12.6\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 32.8\nweight_3ph_kg: 31.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80STEEL-5.50\nseries: STEEL\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 13\nrated_flow_lpm: 500\nmax_head_m: 22\nmax_flow_lpm: 1000\nsolids_mm: 45\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.2\nweight_1ph_kg: null\nweight_3ph_kg: 48\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80LEOPARD-5.30\nseries: LEOPARD\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 700\nmax_head_m: 14\nmax_flow_lpm: 1400\nsolids_mm: 56\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5\nweight_1ph_kg: null\nweight_3ph_kg: 75\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-150-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-150 DN80\nseries: HIPPO DN\nhp: 1.5\nkw: 1.1\noutlet_inch: 3\nrated_head_m: 4.4\nrated_flow_lpm: 415\nmax_head_m: 7\nmax_flow_lpm: 630\nsolids_mm: 76\nphase: [1,3]\ncurrent_1ph_a: 10\ncurrent_3ph_a: 3\nweight_1ph_kg: 40.4\nweight_3ph_kg: 40.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-200-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-200 DN80\nseries: HIPPO DN\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 5\nrated_flow_lpm: 460\nmax_head_m: 9\nmax_flow_lpm: 780\nsolids_mm: 76\nphase: [1,3]\ncurrent_1ph_a: 12\ncurrent_3ph_a: 3.9\nweight_1ph_kg: 42.6\nweight_3ph_kg: 42.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-300 DN80\nseries: HIPPO DN\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 400\nmax_head_m: 13\nmax_flow_lpm: 1100\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 6\nweight_1ph_kg: null\nweight_3ph_kg: 43.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-400 DN80\nseries: HIPPO DN\nhp: 4\nkw: 3\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 600\nmax_head_m: 15.5\nmax_flow_lpm: 1200\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 6.7\nweight_1ph_kg: null\nweight_3ph_kg: 49.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg |\n| 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg |\n| 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg |\n| 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg |\n| 50(80)EUS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80DIVA-5.30 | 3 HP / 2.2 kW | 3\" | 10 m @ 550 LPM | 12.7 m @ 1250 LPM | 12 mm | 5.2 A | 78 kg |\n| 80DIVA-5.50 | 5 HP / 3.7 kW | 3\" | 15 m @ 500 LPM | 17.4 m @ 1500 LPM | 12 mm | 9.0 A | 104 kg |\n| 100DIVA-5.50 | 5 HP / 3.7 kW | 4\" | 10 m @ 1000 LPM | 14.0 m @ 1600 LPM | 12 mm | 9.0 A | 102 kg |\n| 100DIVA-5.75 | 7.5 HP / 5.5 kW | 4\" | 15 m @ 900 LPM | 19.0 m @ 2000 LPM | 12 mm | 12.4 A | 107 kg |\n| 100(150)DIVA-5.100| 10 HP / 7.5 kW | 4\" (6\") | 13 m @ 1500 LPM | 19.0 m @ 2800 LPM | 20 mm | 16.0 A | 150 kg |\n| 100(150)DIVA-5.150| 15 HP / 11 kW | 4\" (6\") | 15 m @ 2000 LPM | 22.0 m @ 3700 LPM | 20 mm | 22.0 A | 175 kg |\n| 150(200)DIVA-5.200| 20 HP / 15 kW | 6\" (8\") | 15 m @ 4000 LPM | 22.0 m @ 6200 LPM | 25 mm | 31.9 A | 250 kg |\n| 150(200)DIVA-5.240| 24 HP / 18 kW | 6\" (8\") | 21 m @ 3000 LPM | 29.0 m @ 5000 LPM | 25 mm | 35.5 A | 360 kg |\n| 150(200)DIVA-5.300| 30 HP / 22 kW | 6\" (8\") | 20 m @ 3800 LPM | 35.0 m @ 5200 LPM | 25 mm | 44.6 A | 390 kg |\n| 200DIVA-5.300L | 30 HP / 22 kW | 8\" | 15 m @ 4900 LPM | 26.0 m @ 6000 LPM | 25 mm | 44.6 A | 400 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 1ø 230V | 滿載電流 3ø 400V | 額定揚程 (m) | 額定流量 (LPM) | 最大揚程 (m) | 最大流量 (LPM) | 通過粒徑 (mm) | 重量 1ø (kg) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-150 DN65 | 1.5 | 1.1 | 2.5\" | 10 A | 3 A | 6.6 | 330 | 11 | 600 | 65 | 30.7 | 30.7 | QM-65/QD-65 |\n| HIPPO-200 DN65 | 2 | 1.5 | 2.5\" | 12 A | 3.9 A | 8.4 | 360 | 13 | 720 | 65 | 32.9 | 32.9 | QM-65/QD-65 |\n| HIPPO-300 DN65 | 3 | 2.2 | 2.5\" | - | 6 A | 12.6 | 300 | 17 | 870 | 65 | - | 34 | QM-65/QD-65 |\n| HIPPO-400 DN65 | 4 | 3 | 2.5\" | - | 6.7 A | 13 | 500 | 20 | 1000 | 65 | - | 41.7 | QM-65/QD-65 |\n| HIPPO-550 DN65 | 5.5 | 4.1 | 2.5\" | - | 9.1 A | 15 | 500 | 22.5 | 1200 | 65 | - | 43.7 | QM-65/QD-65 |\n| HIPPO-150 DN80 | 1.5 | 1.1 | 3\" | 10 A | 3 A | 4.4 | 415 | 7 | 630 | 76 | 40.4 | 40.4 | QD-80 |\n| HIPPO-200 DN80 | 2 | 1.5 | 3\" | 12 A | 3.9 A | 5 | 460 | 9 | 780 | 76 | 42.6 | 42.6 | QD-80 |\n| HIPPO-300 DN80 | 3 | 2.2 | 3\" | - | 6 A | 9.5 | 400 | 13 | 1100 | 76 | - | 43.7 | QD-80 |\n| HIPPO-400 DN80 | 4 | 3 | 3\" | - | 6.7 A | 8 | 600 | 15.5 | 1200 | 76 | - | 49.9 | QD-80 |\n| HIPPO-550 DN80 | 5.5 | 4.1 | 3\" | - | 9.1 A | 8 | 900 | 18.5 | 1350 | 76 | - | 51.9 | QD-80 |\n| HIPPO-750 DN80 | 7.5 | 5.5 | 3\" | - | 12.3 A | 11 | 900 | 18 | 1600 | 76 | - | 65.5 | QD-80 |\n| HIPPO-750H DN80 | 7.5 | 5.5 | 3\" | - | 12 A | 16 | 710 | 21 | 1100 | 76 | - | 65.5 | QD-80 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "kind": "單相與合併列",
+      "question": "只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。",
+      "expected_answer": "50EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM；50EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM；50EUB-M-5.20S：hp=2 HP，max_flow_lpm=500 LPM；50STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM；HIPPO-100：hp=1 HP，max_flow_lpm=500 LPM；HIPPO-100Q：hp=1 HP，max_flow_lpm=500 LPM；HIPPO-150：hp=1.5 HP，max_flow_lpm=580 LPM；HIPPO-150Q：hp=1.5 HP，max_flow_lpm=580 LPM；HIPPO-200：hp=2 HP，max_flow_lpm=660 LPM；HIPPO-200Q：hp=2 HP，max_flow_lpm=660 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+      "required_points": [
+        "50EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "50EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "50EUB-M-5.20S：hp=2 HP，max_flow_lpm=500 LPM",
+        "50STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "HIPPO-100：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-100Q：hp=1 HP，max_flow_lpm=500 LPM",
+        "HIPPO-150：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-150Q：hp=1.5 HP，max_flow_lpm=580 LPM",
+        "HIPPO-200：hp=2 HP，max_flow_lpm=660 LPM",
+        "HIPPO-200Q：hp=2 HP，max_flow_lpm=660 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把單三相合併列排除該相數，或將未提供那一相數值當0／另一相值"
+      ],
+      "expected_models": [
+        "50EUS-5.20",
+        "50EUS-5.20C",
+        "50EUB-M-5.20S",
+        "50STEEL-5.20",
+        "HIPPO-100",
+        "HIPPO-100Q",
+        "HIPPO-150",
+        "HIPPO-150Q",
+        "HIPPO-200",
+        "HIPPO-200Q"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUS-5.20\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 16\nrated_flow_lpm: 315\nmax_head_m: 21.5\nmax_flow_lpm: 658\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 13\ncurrent_3ph_a: 3.7\nweight_1ph_kg: 18.1\nweight_3ph_kg: 18.1\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUS-5.20C\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 13\nrated_flow_lpm: 250\nmax_head_m: 19\nmax_flow_lpm: 500\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 9.5\ncurrent_3ph_a: 2.9\nweight_1ph_kg: 18\nweight_3ph_kg: 18\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/50EUB-M-5.20S.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 270\nmax_head_m: 23\nmax_flow_lpm: 500\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n---"
+        },
+        {
+          "path": "knowledge/products/50STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50STEEL-5.20\nseries: STEEL\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 12\nrated_flow_lpm: 375\nmax_head_m: 19\nmax_flow_lpm: 630\nsolids_mm: 45\nphase: [1,3]\ncurrent_1ph_a: 10.5\ncurrent_3ph_a: 4.5\nweight_1ph_kg: 31.2\nweight_3ph_kg: 29.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-100\nseries: HIPPO\nhp: 1\nkw: 0.75\noutlet_inch: 2\nrated_head_m: 7.7\nrated_flow_lpm: 300\nmax_head_m: 11.3\nmax_flow_lpm: 500\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 7.2\ncurrent_3ph_a: 2.5\nweight_1ph_kg: 15.4\nweight_3ph_kg: 15.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-100Q\nseries: HIPPO\nhp: 1\nkw: 0.75\noutlet_inch: 2\nrated_head_m: 7.7\nrated_flow_lpm: 300\nmax_head_m: 11.3\nmax_flow_lpm: 500\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 7.2\ncurrent_3ph_a: 2.5\nweight_1ph_kg: 16.8\nweight_3ph_kg: 16.8\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-150\nseries: HIPPO\nhp: 1.5\nkw: 1.1\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 390\nmax_head_m: 12.5\nmax_flow_lpm: 580\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 9\ncurrent_3ph_a: 2.8\nweight_1ph_kg: 24.2\nweight_3ph_kg: 24.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-150Q\nseries: HIPPO\nhp: 1.5\nkw: 1.1\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 390\nmax_head_m: 12.5\nmax_flow_lpm: 580\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 9\ncurrent_3ph_a: 2.8\nweight_1ph_kg: 26.2\nweight_3ph_kg: 26.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-200\nseries: HIPPO\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 10\nrated_flow_lpm: 420\nmax_head_m: 15.5\nmax_flow_lpm: 660\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 12\ncurrent_3ph_a: 3.9\nweight_1ph_kg: 25.2\nweight_3ph_kg: 25.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-200Q\nseries: HIPPO\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 10\nrated_flow_lpm: 420\nmax_head_m: 15.5\nmax_flow_lpm: 660\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 12\ncurrent_3ph_a: 3.9\nweight_1ph_kg: 27.2\nweight_3ph_kg: 27.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg |\n| 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg |\n| 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg |\n| 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg |\n| 50(80)EUS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 重量（1ø 與 3ø 相同，括號為 Q 版） |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-50(Q) | 0.5 HP / 0.37 kW | 2\" | 4.5 m @ 240 LPM | 8.0 m @ 330 LPM | 50 mm (2\") | 4.2 A | 1.6 A | 12.9 kg (14.3 kg)|\n| HIPPO-75(Q) | 0.75 HP / 0.55 kW| 2\" | 6.4 m @ 240 LPM | 10.0 m @ 390 LPM | 50 mm (2\") | 5.5 A | 1.8 A | 13.9 kg (15.3 kg)|\n| HIPPO-100(Q)| 1.0 HP / 0.75 kW | 2\" | 7.7 m @ 300 LPM | 11.3 m @ 500 LPM | 50 mm (2\") | 7.2 A | 2.5 A | 15.4 kg (16.8 kg)|\n| HIPPO-150(Q)| 1.5 HP / 1.1 kW | 2\" | 8.0 m @ 390 LPM | 12.5 m @ 580 LPM | 50 mm (2\") | 9.0 A | 2.8 A | 24.2 kg (26.2 kg)|\n| HIPPO-200(Q)| 2.0 HP / 1.5 kW | 2\" | 10.0 m @ 420 LPM | 15.5 m @ 660 LPM | 50 mm (2\") | 12.0 A | 3.9 A | 25.2 kg (27.2 kg)|"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "kind": "跨系列粒徑AND",
+      "question": "泥水裡會有65毫米的顆粒，先只比明列通過粒徑至少65毫米、馬力不超過7.5HP、最大流量至少1000 LPM的款式。全部列給我，三個數字都寫上。",
+      "expected_answer": "HIPPO-300 DN80：hp=3 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM；HIPPO-400 DN65：hp=4 HP，solids_mm=65 mm，max_flow_lpm=1000 LPM；HIPPO-400 DN80：hp=4 HP，solids_mm=76 mm，max_flow_lpm=1200 LPM；HIPPO-550 DN65：hp=5.5 HP，solids_mm=65 mm，max_flow_lpm=1200 LPM；HIPPO-550 DN80：hp=5.5 HP，solids_mm=76 mm，max_flow_lpm=1350 LPM；HIPPO-750 DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1600 LPM；HIPPO-750H DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM；100LEOPARD-5.50：hp=5 HP，solids_mm=80 mm，max_flow_lpm=1900 LPM；100LEOPARD-5.75：hp=7.5 HP，solids_mm=68 mm，max_flow_lpm=2300 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+      "required_points": [
+        "HIPPO-300 DN80：hp=3 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "HIPPO-400 DN65：hp=4 HP，solids_mm=65 mm，max_flow_lpm=1000 LPM",
+        "HIPPO-400 DN80：hp=4 HP，solids_mm=76 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN65：hp=5.5 HP，solids_mm=65 mm，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：hp=5.5 HP，solids_mm=76 mm，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1600 LPM",
+        "HIPPO-750H DN80：hp=7.5 HP，solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "100LEOPARD-5.50：hp=5 HP，solids_mm=80 mm，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：hp=7.5 HP，solids_mm=68 mm，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位"
+      ],
+      "expected_models": [
+        "HIPPO-300 DN80",
+        "HIPPO-400 DN65",
+        "HIPPO-400 DN80",
+        "HIPPO-550 DN65",
+        "HIPPO-550 DN80",
+        "HIPPO-750 DN80",
+        "HIPPO-750H DN80",
+        "100LEOPARD-5.50",
+        "100LEOPARD-5.75"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-300 DN80\nseries: HIPPO DN\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 400\nmax_head_m: 13\nmax_flow_lpm: 1100\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 6\nweight_1ph_kg: null\nweight_3ph_kg: 43.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-400 DN65\nseries: HIPPO DN\nhp: 4\nkw: 3\noutlet_inch: 2.5\nrated_head_m: 13\nrated_flow_lpm: 500\nmax_head_m: 20\nmax_flow_lpm: 1000\nsolids_mm: 65\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 6.7\nweight_1ph_kg: null\nweight_3ph_kg: 41.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-400 DN80\nseries: HIPPO DN\nhp: 4\nkw: 3\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 600\nmax_head_m: 15.5\nmax_flow_lpm: 1200\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 6.7\nweight_1ph_kg: null\nweight_3ph_kg: 49.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN65.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-550 DN65\nseries: HIPPO DN\nhp: 5.5\nkw: 4.1\noutlet_inch: 2.5\nrated_head_m: 15\nrated_flow_lpm: 500\nmax_head_m: 22.5\nmax_flow_lpm: 1200\nsolids_mm: 65\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.1\nweight_1ph_kg: null\nweight_3ph_kg: 43.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-550 DN80\nseries: HIPPO DN\nhp: 5.5\nkw: 4.1\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 900\nmax_head_m: 18.5\nmax_flow_lpm: 1350\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.1\nweight_1ph_kg: null\nweight_3ph_kg: 51.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-750 DN80\nseries: HIPPO DN\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 11\nrated_flow_lpm: 900\nmax_head_m: 18\nmax_flow_lpm: 1600\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.3\nweight_1ph_kg: null\nweight_3ph_kg: 65.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-750H-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-750H DN80\nseries: HIPPO DN\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 16\nrated_flow_lpm: 710\nmax_head_m: 21\nmax_flow_lpm: 1100\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12\nweight_1ph_kg: null\nweight_3ph_kg: 65.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.50\nseries: LEOPARD\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 11\nrated_flow_lpm: 800\nmax_head_m: 16\nmax_flow_lpm: 1900\nsolids_mm: 80\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 8.2\nweight_1ph_kg: null\nweight_3ph_kg: 90\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.75.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.75\nseries: LEOPARD\nhp: 7.5\nkw: 5.5\noutlet_inch: 4\nrated_head_m: 13\nrated_flow_lpm: 800\nmax_head_m: 18\nmax_flow_lpm: 2300\nsolids_mm: 68\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.1\nweight_1ph_kg: null\nweight_3ph_kg: 140\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 1ø 230V | 滿載電流 3ø 400V | 額定揚程 (m) | 額定流量 (LPM) | 最大揚程 (m) | 最大流量 (LPM) | 通過粒徑 (mm) | 重量 1ø (kg) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-150 DN65 | 1.5 | 1.1 | 2.5\" | 10 A | 3 A | 6.6 | 330 | 11 | 600 | 65 | 30.7 | 30.7 | QM-65/QD-65 |\n| HIPPO-200 DN65 | 2 | 1.5 | 2.5\" | 12 A | 3.9 A | 8.4 | 360 | 13 | 720 | 65 | 32.9 | 32.9 | QM-65/QD-65 |\n| HIPPO-300 DN65 | 3 | 2.2 | 2.5\" | - | 6 A | 12.6 | 300 | 17 | 870 | 65 | - | 34 | QM-65/QD-65 |\n| HIPPO-400 DN65 | 4 | 3 | 2.5\" | - | 6.7 A | 13 | 500 | 20 | 1000 | 65 | - | 41.7 | QM-65/QD-65 |\n| HIPPO-550 DN65 | 5.5 | 4.1 | 2.5\" | - | 9.1 A | 15 | 500 | 22.5 | 1200 | 65 | - | 43.7 | QM-65/QD-65 |\n| HIPPO-150 DN80 | 1.5 | 1.1 | 3\" | 10 A | 3 A | 4.4 | 415 | 7 | 630 | 76 | 40.4 | 40.4 | QD-80 |\n| HIPPO-200 DN80 | 2 | 1.5 | 3\" | 12 A | 3.9 A | 5 | 460 | 9 | 780 | 76 | 42.6 | 42.6 | QD-80 |\n| HIPPO-300 DN80 | 3 | 2.2 | 3\" | - | 6 A | 9.5 | 400 | 13 | 1100 | 76 | - | 43.7 | QD-80 |\n| HIPPO-400 DN80 | 4 | 3 | 3\" | - | 6.7 A | 8 | 600 | 15.5 | 1200 | 76 | - | 49.9 | QD-80 |\n| HIPPO-550 DN80 | 5.5 | 4.1 | 3\" | - | 9.1 A | 8 | 900 | 18.5 | 1350 | 76 | - | 51.9 | QD-80 |\n| HIPPO-750 DN80 | 7.5 | 5.5 | 3\" | - | 12.3 A | 11 | 900 | 18 | 1600 | 76 | - | 65.5 | QD-80 |\n| HIPPO-750H DN80 | 7.5 | 5.5 | 3\" | - | 12 A | 16 | 710 | 21 | 1100 | 76 | - | 65.5 | QD-80 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "kind": "kW與HP對照邊界",
+      "question": "我說的是3.7kW，不是3.7HP。三相、4吋、功率剛好3.7kW，最大流量至少1000 LPM有哪些？每款寫kW、HP和最大流量，順便說這份表的3.7kW對應幾HP。",
+      "expected_answer": "100DIVA-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1600 LPM；100EDW-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1680 LPM；100EUB-M-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1400 LPM；100LEOPARD-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1900 LPM；100STEEL-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1000 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除；表列3.7 kW對應5 HP，是不同單位；不能把3.7 kW當3.7 HP",
+      "required_points": [
+        "100DIVA-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1600 LPM",
+        "100EDW-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1680 LPM",
+        "100EUB-M-5.50T：kw=3.7 kW，hp=5 HP，max_flow_lpm=1400 LPM",
+        "100LEOPARD-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1900 LPM",
+        "100STEEL-5.50：kw=3.7 kW，hp=5 HP，max_flow_lpm=1000 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "表列3.7 kW對應5 HP，是不同單位；不能把3.7 kW當3.7 HP"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把單三相合併列排除該相數，或將未提供那一相數值當0／另一相值",
+        "以3.7 HP作門檻、排除表列5 HP／3.7 kW款"
+      ],
+      "expected_models": [
+        "100DIVA-5.50",
+        "100EDW-5.50T",
+        "100EUB-M-5.50T",
+        "100LEOPARD-5.50",
+        "100STEEL-5.50"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/100DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100DIVA-5.50\nseries: DIVA\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 10\nrated_flow_lpm: 1000\nmax_head_m: 14\nmax_flow_lpm: 1600\nsolids_mm: 12\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.0\nweight_1ph_kg: null\nweight_3ph_kg: 102\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/100EDW-5.50T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 1000\nmax_head_m: 22.0\nmax_flow_lpm: 1680\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 50.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n---"
+        },
+        {
+          "path": "knowledge/products/100EUB-M-5.50T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 800\nmax_head_m: 18.5\nmax_flow_lpm: 1400\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 34.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.50\nseries: LEOPARD\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 11\nrated_flow_lpm: 800\nmax_head_m: 16\nmax_flow_lpm: 1900\nsolids_mm: 80\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 8.2\nweight_1ph_kg: null\nweight_3ph_kg: 90\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/100STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100STEEL-5.50\nseries: STEEL\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 13\nrated_flow_lpm: 500\nmax_head_m: 22\nmax_flow_lpm: 1000\nsolids_mm: 45\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.2\nweight_1ph_kg: null\nweight_3ph_kg: 48\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80DIVA-5.30 | 3 HP / 2.2 kW | 3\" | 10 m @ 550 LPM | 12.7 m @ 1250 LPM | 12 mm | 5.2 A | 78 kg |\n| 80DIVA-5.50 | 5 HP / 3.7 kW | 3\" | 15 m @ 500 LPM | 17.4 m @ 1500 LPM | 12 mm | 9.0 A | 104 kg |\n| 100DIVA-5.50 | 5 HP / 3.7 kW | 4\" | 10 m @ 1000 LPM | 14.0 m @ 1600 LPM | 12 mm | 9.0 A | 102 kg |\n| 100DIVA-5.75 | 7.5 HP / 5.5 kW | 4\" | 15 m @ 900 LPM | 19.0 m @ 2000 LPM | 12 mm | 12.4 A | 107 kg |\n| 100(150)DIVA-5.100| 10 HP / 7.5 kW | 4\" (6\") | 13 m @ 1500 LPM | 19.0 m @ 2800 LPM | 20 mm | 16.0 A | 150 kg |\n| 100(150)DIVA-5.150| 15 HP / 11 kW | 4\" (6\") | 15 m @ 2000 LPM | 22.0 m @ 3700 LPM | 20 mm | 22.0 A | 175 kg |\n| 150(200)DIVA-5.200| 20 HP / 15 kW | 6\" (8\") | 15 m @ 4000 LPM | 22.0 m @ 6200 LPM | 25 mm | 31.9 A | 250 kg |\n| 150(200)DIVA-5.240| 24 HP / 18 kW | 6\" (8\") | 21 m @ 3000 LPM | 29.0 m @ 5000 LPM | 25 mm | 35.5 A | 360 kg |\n| 150(200)DIVA-5.300| 30 HP / 22 kW | 6\" (8\") | 20 m @ 3800 LPM | 35.0 m @ 5200 LPM | 25 mm | 44.6 A | 390 kg |\n| 200DIVA-5.300L | 30 HP / 22 kW | 8\" | 15 m @ 4900 LPM | 26.0 m @ 6000 LPM | 25 mm | 44.6 A | 400 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "kind": "每小時流量換算",
+      "question": "用三相、3吋管，功率最多5.5kW，最大流量至少每小時72立方米。這門檻是多少LPM？全部符合款幫我列功率，再把每款最大流量同時寫成LPM和每小時立方米。",
+      "expected_answer": "80DIVA-5.30：kw=2.2 kW，max_flow_lpm=1250 LPM；80DIVA-5.50：kw=3.7 kW，max_flow_lpm=1500 LPM；80EUB-M-5.75T：kw=5.5 kW，max_flow_lpm=1200 LPM；80LEOPARD-5.30：kw=2.2 kW，max_flow_lpm=1400 LPM；HIPPO-400 DN80：kw=3 kW，max_flow_lpm=1200 LPM；HIPPO-550 DN80：kw=4.1 kW，max_flow_lpm=1350 LPM；HIPPO-750 DN80：kw=5.5 kW，max_flow_lpm=1600 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除；72 m³/h ×1000÷60=1200 LPM；每款最大流量LPM乘0.06轉m³/h；80DIVA-5.30：最大流量1250 LPM=75 m³/h；80DIVA-5.50：最大流量1500 LPM=90 m³/h；80EUB-M-5.75T：最大流量1200 LPM=72 m³/h；80LEOPARD-5.30：最大流量1400 LPM=84 m³/h；HIPPO-400 DN80：最大流量1200 LPM=72 m³/h；HIPPO-550 DN80：最大流量1350 LPM=81 m³/h；HIPPO-750 DN80：最大流量1600 LPM=96 m³/h",
+      "required_points": [
+        "80DIVA-5.30：kw=2.2 kW，max_flow_lpm=1250 LPM",
+        "80DIVA-5.50：kw=3.7 kW，max_flow_lpm=1500 LPM",
+        "80EUB-M-5.75T：kw=5.5 kW，max_flow_lpm=1200 LPM",
+        "80LEOPARD-5.30：kw=2.2 kW，max_flow_lpm=1400 LPM",
+        "HIPPO-400 DN80：kw=3 kW，max_flow_lpm=1200 LPM",
+        "HIPPO-550 DN80：kw=4.1 kW，max_flow_lpm=1350 LPM",
+        "HIPPO-750 DN80：kw=5.5 kW，max_flow_lpm=1600 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "72 m³/h ×1000÷60=1200 LPM；每款最大流量LPM乘0.06轉m³/h",
+        "80DIVA-5.30：最大流量1250 LPM=75 m³/h",
+        "80DIVA-5.50：最大流量1500 LPM=90 m³/h",
+        "80EUB-M-5.75T：最大流量1200 LPM=72 m³/h",
+        "80LEOPARD-5.30：最大流量1400 LPM=84 m³/h",
+        "HIPPO-400 DN80：最大流量1200 LPM=72 m³/h",
+        "HIPPO-550 DN80：最大流量1350 LPM=81 m³/h",
+        "HIPPO-750 DN80：最大流量1600 LPM=96 m³/h"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把單三相合併列排除該相數，或將未提供那一相數值當0／另一相值",
+        "換算門檻或每款流量錯誤，或把最大流量冒充額定流量"
+      ],
+      "expected_models": [
+        "80DIVA-5.30",
+        "80DIVA-5.50",
+        "80EUB-M-5.75T",
+        "80LEOPARD-5.30",
+        "HIPPO-400 DN80",
+        "HIPPO-550 DN80",
+        "HIPPO-750 DN80"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/80DIVA-5.30.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80DIVA-5.30\nseries: DIVA\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 550\nmax_head_m: 12.7\nmax_flow_lpm: 1250\nsolids_mm: 12\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 78\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/80DIVA-5.50.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80DIVA-5.50\nseries: DIVA\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 15\nrated_flow_lpm: 500\nmax_head_m: 17.4\nmax_flow_lpm: 1500\nsolids_mm: 12\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.0\nweight_1ph_kg: null\nweight_3ph_kg: 104\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.75T.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n---"
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80LEOPARD-5.30\nseries: LEOPARD\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 700\nmax_head_m: 14\nmax_flow_lpm: 1400\nsolids_mm: 56\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5\nweight_1ph_kg: null\nweight_3ph_kg: 75\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-400-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-400 DN80\nseries: HIPPO DN\nhp: 4\nkw: 3\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 600\nmax_head_m: 15.5\nmax_flow_lpm: 1200\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 6.7\nweight_1ph_kg: null\nweight_3ph_kg: 49.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-550 DN80\nseries: HIPPO DN\nhp: 5.5\nkw: 4.1\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 900\nmax_head_m: 18.5\nmax_flow_lpm: 1350\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.1\nweight_1ph_kg: null\nweight_3ph_kg: 51.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-750 DN80\nseries: HIPPO DN\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 11\nrated_flow_lpm: 900\nmax_head_m: 18\nmax_flow_lpm: 1600\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.3\nweight_1ph_kg: null\nweight_3ph_kg: 65.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80DIVA-5.30 | 3 HP / 2.2 kW | 3\" | 10 m @ 550 LPM | 12.7 m @ 1250 LPM | 12 mm | 5.2 A | 78 kg |\n| 80DIVA-5.50 | 5 HP / 3.7 kW | 3\" | 15 m @ 500 LPM | 17.4 m @ 1500 LPM | 12 mm | 9.0 A | 104 kg |\n| 100DIVA-5.50 | 5 HP / 3.7 kW | 4\" | 10 m @ 1000 LPM | 14.0 m @ 1600 LPM | 12 mm | 9.0 A | 102 kg |\n| 100DIVA-5.75 | 7.5 HP / 5.5 kW | 4\" | 15 m @ 900 LPM | 19.0 m @ 2000 LPM | 12 mm | 12.4 A | 107 kg |\n| 100(150)DIVA-5.100| 10 HP / 7.5 kW | 4\" (6\") | 13 m @ 1500 LPM | 19.0 m @ 2800 LPM | 20 mm | 16.0 A | 150 kg |\n| 100(150)DIVA-5.150| 15 HP / 11 kW | 4\" (6\") | 15 m @ 2000 LPM | 22.0 m @ 3700 LPM | 20 mm | 22.0 A | 175 kg |\n| 150(200)DIVA-5.200| 20 HP / 15 kW | 6\" (8\") | 15 m @ 4000 LPM | 22.0 m @ 6200 LPM | 25 mm | 31.9 A | 250 kg |\n| 150(200)DIVA-5.240| 24 HP / 18 kW | 6\" (8\") | 21 m @ 3000 LPM | 29.0 m @ 5000 LPM | 25 mm | 35.5 A | 360 kg |\n| 150(200)DIVA-5.300| 30 HP / 22 kW | 6\" (8\") | 20 m @ 3800 LPM | 35.0 m @ 5200 LPM | 25 mm | 44.6 A | 390 kg |\n| 200DIVA-5.300L | 30 HP / 22 kW | 8\" | 15 m @ 4900 LPM | 26.0 m @ 6000 LPM | 25 mm | 44.6 A | 400 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 1ø 230V | 滿載電流 3ø 400V | 額定揚程 (m) | 額定流量 (LPM) | 最大揚程 (m) | 最大流量 (LPM) | 通過粒徑 (mm) | 重量 1ø (kg) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-150 DN65 | 1.5 | 1.1 | 2.5\" | 10 A | 3 A | 6.6 | 330 | 11 | 600 | 65 | 30.7 | 30.7 | QM-65/QD-65 |\n| HIPPO-200 DN65 | 2 | 1.5 | 2.5\" | 12 A | 3.9 A | 8.4 | 360 | 13 | 720 | 65 | 32.9 | 32.9 | QM-65/QD-65 |\n| HIPPO-300 DN65 | 3 | 2.2 | 2.5\" | - | 6 A | 12.6 | 300 | 17 | 870 | 65 | - | 34 | QM-65/QD-65 |\n| HIPPO-400 DN65 | 4 | 3 | 2.5\" | - | 6.7 A | 13 | 500 | 20 | 1000 | 65 | - | 41.7 | QM-65/QD-65 |\n| HIPPO-550 DN65 | 5.5 | 4.1 | 2.5\" | - | 9.1 A | 15 | 500 | 22.5 | 1200 | 65 | - | 43.7 | QM-65/QD-65 |\n| HIPPO-150 DN80 | 1.5 | 1.1 | 3\" | 10 A | 3 A | 4.4 | 415 | 7 | 630 | 76 | 40.4 | 40.4 | QD-80 |\n| HIPPO-200 DN80 | 2 | 1.5 | 3\" | 12 A | 3.9 A | 5 | 460 | 9 | 780 | 76 | 42.6 | 42.6 | QD-80 |\n| HIPPO-300 DN80 | 3 | 2.2 | 3\" | - | 6 A | 9.5 | 400 | 13 | 1100 | 76 | - | 43.7 | QD-80 |\n| HIPPO-400 DN80 | 4 | 3 | 3\" | - | 6.7 A | 8 | 600 | 15.5 | 1200 | 76 | - | 49.9 | QD-80 |\n| HIPPO-550 DN80 | 5.5 | 4.1 | 3\" | - | 9.1 A | 8 | 900 | 18.5 | 1350 | 76 | - | 51.9 | QD-80 |\n| HIPPO-750 DN80 | 7.5 | 5.5 | 3\" | - | 12.3 A | 11 | 900 | 18 | 1600 | 76 | - | 65.5 | QD-80 |\n| HIPPO-750H DN80 | 7.5 | 5.5 | 3\" | - | 12 A | 16 | 710 | 21 | 1100 | 76 | - | 65.5 | QD-80 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "kind": "額定流量單位與完整清單",
+      "question": "只看EUS這個系列，額定流量至少每小時15立方米的全部有哪些？口徑不限，把每款額定流量同時寫LPM和每小時立方米，也告訴我門檻換成LPM是多少。",
+      "expected_answer": "50EUS-5.20：rated_flow_lpm=315 LPM；50EUS-5.20C：rated_flow_lpm=250 LPM；80EUS-5.10L：rated_flow_lpm=290 LPM；80EUS-5.20：rated_flow_lpm=315 LPM；80EUS-5.20C：rated_flow_lpm=250 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；15 m³/h=250 LPM；依額定流量而非最大流量比較，250 LPM邊界符合；50EUS-5.20：額定流量315 LPM=18.9 m³/h；50EUS-5.20C：額定流量250 LPM=15 m³/h；80EUS-5.10L：額定流量290 LPM=17.4 m³/h；80EUS-5.20：額定流量315 LPM=18.9 m³/h；80EUS-5.20C：額定流量250 LPM=15 m³/h",
+      "required_points": [
+        "50EUS-5.20：rated_flow_lpm=315 LPM",
+        "50EUS-5.20C：rated_flow_lpm=250 LPM",
+        "80EUS-5.10L：rated_flow_lpm=290 LPM",
+        "80EUS-5.20：rated_flow_lpm=315 LPM",
+        "80EUS-5.20C：rated_flow_lpm=250 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "15 m³/h=250 LPM；依額定流量而非最大流量比較，250 LPM邊界符合",
+        "50EUS-5.20：額定流量315 LPM=18.9 m³/h",
+        "50EUS-5.20C：額定流量250 LPM=15 m³/h",
+        "80EUS-5.10L：額定流量290 LPM=17.4 m³/h",
+        "80EUS-5.20：額定流量315 LPM=18.9 m³/h",
+        "80EUS-5.20C：額定流量250 LPM=15 m³/h"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位"
+      ],
+      "expected_models": [
+        "50EUS-5.20",
+        "50EUS-5.20C",
+        "80EUS-5.10L",
+        "80EUS-5.20",
+        "80EUS-5.20C"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/50EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUS-5.20\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 16\nrated_flow_lpm: 315\nmax_head_m: 21.5\nmax_flow_lpm: 658\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 13\ncurrent_3ph_a: 3.7\nweight_1ph_kg: 18.1\nweight_3ph_kg: 18.1\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/50EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUS-5.20C\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 13\nrated_flow_lpm: 250\nmax_head_m: 19\nmax_flow_lpm: 500\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 9.5\ncurrent_3ph_a: 2.9\nweight_1ph_kg: 18\nweight_3ph_kg: 18\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80EUS-5.10L.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.10L\nseries: EUS\nhp: 1\nkw: 0.75\noutlet_inch: 3\nrated_head_m: 6\nrated_flow_lpm: 290\nmax_head_m: 10\nmax_flow_lpm: 560\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 5.8\ncurrent_3ph_a: 1.9\nweight_1ph_kg: 17.5\nweight_3ph_kg: 17.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.20\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 16\nrated_flow_lpm: 315\nmax_head_m: 21.5\nmax_flow_lpm: 658\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 13\ncurrent_3ph_a: 3.7\nweight_1ph_kg: 18.1\nweight_3ph_kg: 18.1\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.20C\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 13\nrated_flow_lpm: 250\nmax_head_m: 19\nmax_flow_lpm: 500\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 9.5\ncurrent_3ph_a: 2.9\nweight_1ph_kg: 18\nweight_3ph_kg: 18\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg |\n| 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg |\n| 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg |\n| 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg |\n| 50(80)EUS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |"
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "kind": "同分重量次排序",
+      "question": "把HIPPO的2吋款都排給我，普通版和Q版分開算一款。先按最大流量由大到小，同流量再按單相重量由輕到重，每款的流量和單相重量都寫出來。",
+      "expected_answer": "HIPPO-200：max_flow_lpm=660 LPM，weight_1ph_kg=25.2 kg；HIPPO-200Q：max_flow_lpm=660 LPM，weight_1ph_kg=27.2 kg；HIPPO-150：max_flow_lpm=580 LPM，weight_1ph_kg=24.2 kg；HIPPO-150Q：max_flow_lpm=580 LPM，weight_1ph_kg=26.2 kg；HIPPO-100：max_flow_lpm=500 LPM，weight_1ph_kg=15.4 kg；HIPPO-100Q：max_flow_lpm=500 LPM，weight_1ph_kg=16.8 kg；HIPPO-75：max_flow_lpm=390 LPM，weight_1ph_kg=13.9 kg；HIPPO-75Q：max_flow_lpm=390 LPM，weight_1ph_kg=15.3 kg；HIPPO-50：max_flow_lpm=330 LPM，weight_1ph_kg=12.9 kg；HIPPO-50Q：max_flow_lpm=330 LPM，weight_1ph_kg=14.3 kg；完整指定順序：HIPPO-200、HIPPO-200Q、HIPPO-150、HIPPO-150Q、HIPPO-100、HIPPO-100Q、HIPPO-75、HIPPO-75Q、HIPPO-50、HIPPO-50Q；普通版與Q版分開，各同最大流量均按已載單相重量由輕到重",
+      "required_points": [
+        "HIPPO-200：max_flow_lpm=660 LPM，weight_1ph_kg=25.2 kg",
+        "HIPPO-200Q：max_flow_lpm=660 LPM，weight_1ph_kg=27.2 kg",
+        "HIPPO-150：max_flow_lpm=580 LPM，weight_1ph_kg=24.2 kg",
+        "HIPPO-150Q：max_flow_lpm=580 LPM，weight_1ph_kg=26.2 kg",
+        "HIPPO-100：max_flow_lpm=500 LPM，weight_1ph_kg=15.4 kg",
+        "HIPPO-100Q：max_flow_lpm=500 LPM，weight_1ph_kg=16.8 kg",
+        "HIPPO-75：max_flow_lpm=390 LPM，weight_1ph_kg=13.9 kg",
+        "HIPPO-75Q：max_flow_lpm=390 LPM，weight_1ph_kg=15.3 kg",
+        "HIPPO-50：max_flow_lpm=330 LPM，weight_1ph_kg=12.9 kg",
+        "HIPPO-50Q：max_flow_lpm=330 LPM，weight_1ph_kg=14.3 kg",
+        "完整指定順序：HIPPO-200、HIPPO-200Q、HIPPO-150、HIPPO-150Q、HIPPO-100、HIPPO-100Q、HIPPO-75、HIPPO-75Q、HIPPO-50、HIPPO-50Q",
+        "普通版與Q版分開，各同最大流量均按已載單相重量由輕到重"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "明確列出錯誤排序／錯誤前三名；只漏排序資訊可部分對"
+      ],
+      "expected_models": [
+        "HIPPO-200",
+        "HIPPO-200Q",
+        "HIPPO-150",
+        "HIPPO-150Q",
+        "HIPPO-100",
+        "HIPPO-100Q",
+        "HIPPO-75",
+        "HIPPO-75Q",
+        "HIPPO-50",
+        "HIPPO-50Q"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/HIPPO-200.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-200\nseries: HIPPO\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 10\nrated_flow_lpm: 420\nmax_head_m: 15.5\nmax_flow_lpm: 660\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 12\ncurrent_3ph_a: 3.9\nweight_1ph_kg: 25.2\nweight_3ph_kg: 25.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-200Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-200Q\nseries: HIPPO\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 10\nrated_flow_lpm: 420\nmax_head_m: 15.5\nmax_flow_lpm: 660\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 12\ncurrent_3ph_a: 3.9\nweight_1ph_kg: 27.2\nweight_3ph_kg: 27.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-150.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-150\nseries: HIPPO\nhp: 1.5\nkw: 1.1\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 390\nmax_head_m: 12.5\nmax_flow_lpm: 580\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 9\ncurrent_3ph_a: 2.8\nweight_1ph_kg: 24.2\nweight_3ph_kg: 24.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-150Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-150Q\nseries: HIPPO\nhp: 1.5\nkw: 1.1\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 390\nmax_head_m: 12.5\nmax_flow_lpm: 580\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 9\ncurrent_3ph_a: 2.8\nweight_1ph_kg: 26.2\nweight_3ph_kg: 26.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-100.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-100\nseries: HIPPO\nhp: 1\nkw: 0.75\noutlet_inch: 2\nrated_head_m: 7.7\nrated_flow_lpm: 300\nmax_head_m: 11.3\nmax_flow_lpm: 500\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 7.2\ncurrent_3ph_a: 2.5\nweight_1ph_kg: 15.4\nweight_3ph_kg: 15.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-100Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-100Q\nseries: HIPPO\nhp: 1\nkw: 0.75\noutlet_inch: 2\nrated_head_m: 7.7\nrated_flow_lpm: 300\nmax_head_m: 11.3\nmax_flow_lpm: 500\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 7.2\ncurrent_3ph_a: 2.5\nweight_1ph_kg: 16.8\nweight_3ph_kg: 16.8\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-75.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-75\nseries: HIPPO\nhp: 0.75\nkw: 0.55\noutlet_inch: 2\nrated_head_m: 6.4\nrated_flow_lpm: 240\nmax_head_m: 10\nmax_flow_lpm: 390\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 5.5\ncurrent_3ph_a: 1.8\nweight_1ph_kg: 13.9\nweight_3ph_kg: 13.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-75Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-75Q\nseries: HIPPO\nhp: 0.75\nkw: 0.55\noutlet_inch: 2\nrated_head_m: 6.4\nrated_flow_lpm: 240\nmax_head_m: 10\nmax_flow_lpm: 390\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 5.5\ncurrent_3ph_a: 1.8\nweight_1ph_kg: 15.3\nweight_3ph_kg: 15.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-50.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-50\nseries: HIPPO\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 4.5\nrated_flow_lpm: 240\nmax_head_m: 8\nmax_flow_lpm: 330\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 4.2\ncurrent_3ph_a: 1.6\nweight_1ph_kg: 12.9\nweight_3ph_kg: 12.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-50Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-50Q\nseries: HIPPO\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 4.5\nrated_flow_lpm: 240\nmax_head_m: 8\nmax_flow_lpm: 330\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 4.2\ncurrent_3ph_a: 1.6\nweight_1ph_kg: 14.3\nweight_3ph_kg: 14.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 重量（1ø 與 3ø 相同，括號為 Q 版） |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-50(Q) | 0.5 HP / 0.37 kW | 2\" | 4.5 m @ 240 LPM | 8.0 m @ 330 LPM | 50 mm (2\") | 4.2 A | 1.6 A | 12.9 kg (14.3 kg)|\n| HIPPO-75(Q) | 0.75 HP / 0.55 kW| 2\" | 6.4 m @ 240 LPM | 10.0 m @ 390 LPM | 50 mm (2\") | 5.5 A | 1.8 A | 13.9 kg (15.3 kg)|\n| HIPPO-100(Q)| 1.0 HP / 0.75 kW | 2\" | 7.7 m @ 300 LPM | 11.3 m @ 500 LPM | 50 mm (2\") | 7.2 A | 2.5 A | 15.4 kg (16.8 kg)|\n| HIPPO-150(Q)| 1.5 HP / 1.1 kW | 2\" | 8.0 m @ 390 LPM | 12.5 m @ 580 LPM | 50 mm (2\") | 9.0 A | 2.8 A | 24.2 kg (26.2 kg)|\n| HIPPO-200(Q)| 2.0 HP / 1.5 kW | 2\" | 10.0 m @ 420 LPM | 15.5 m @ 660 LPM | 50 mm (2\") | 12.0 A | 3.9 A | 25.2 kg (27.2 kg)|"
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "kind": "多欄排序與前三名",
+      "question": "DIVA和DIVA PRO合在一起比最大流量，給我前三款。流量一樣先挑最大揚程較低，再挑口徑較小；還一樣就DIVA排在DIVA PRO前面。每款寫最大流量、最大揚程和吋數。",
+      "expected_answer": "150DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋；150DIVA PRO-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋；200DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=8 吋；完整指定順序：150DIVA-5.200、150DIVA PRO-5.200、200DIVA-5.200；最大流量降冪、最大揚程升冪、口徑升冪、同值DIVA在DIVA PRO之前；只給指定前三款",
+      "required_points": [
+        "150DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋",
+        "150DIVA PRO-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=6 吋",
+        "200DIVA-5.200：max_flow_lpm=6200 LPM，max_head_m=22 m，outlet_inch=8 吋",
+        "完整指定順序：150DIVA-5.200、150DIVA PRO-5.200、200DIVA-5.200",
+        "最大流量降冪、最大揚程升冪、口徑升冪、同值DIVA在DIVA PRO之前；只給指定前三款"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "明確列出錯誤排序／錯誤前三名；只漏排序資訊可部分對"
+      ],
+      "expected_models": [
+        "150DIVA-5.200",
+        "150DIVA PRO-5.200",
+        "200DIVA-5.200"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/150DIVA-5.200.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 150DIVA-5.200\nseries: DIVA\nhp: 20\nkw: 15\noutlet_inch: 6\nrated_head_m: 15\nrated_flow_lpm: 4000\nmax_head_m: 22\nmax_flow_lpm: 6200\nsolids_mm: 25\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 31.9\nweight_1ph_kg: null\nweight_3ph_kg: 250\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/150DIVA-PRO-5.200.md",
+          "page": 14,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 150DIVA PRO-5.200\nseries: DIVA PRO\nhp: 20\nkw: 15\noutlet_inch: 6\nrated_head_m: 15\nrated_flow_lpm: 4000\nmax_head_m: 22\nmax_flow_lpm: 6200\nsolids_mm: 25\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 31.9\nweight_1ph_kg: null\nweight_3ph_kg: 250\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 14\n---"
+        },
+        {
+          "path": "knowledge/products/200DIVA-5.200.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 200DIVA-5.200\nseries: DIVA\nhp: 20\nkw: 15\noutlet_inch: 8\nrated_head_m: 15\nrated_flow_lpm: 4000\nmax_head_m: 22\nmax_flow_lpm: 6200\nsolids_mm: 25\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 31.9\nweight_1ph_kg: null\nweight_3ph_kg: 250\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80DIVA-5.30 | 3 HP / 2.2 kW | 3\" | 10 m @ 550 LPM | 12.7 m @ 1250 LPM | 12 mm | 5.2 A | 78 kg |\n| 80DIVA-5.50 | 5 HP / 3.7 kW | 3\" | 15 m @ 500 LPM | 17.4 m @ 1500 LPM | 12 mm | 9.0 A | 104 kg |\n| 100DIVA-5.50 | 5 HP / 3.7 kW | 4\" | 10 m @ 1000 LPM | 14.0 m @ 1600 LPM | 12 mm | 9.0 A | 102 kg |\n| 100DIVA-5.75 | 7.5 HP / 5.5 kW | 4\" | 15 m @ 900 LPM | 19.0 m @ 2000 LPM | 12 mm | 12.4 A | 107 kg |\n| 100(150)DIVA-5.100| 10 HP / 7.5 kW | 4\" (6\") | 13 m @ 1500 LPM | 19.0 m @ 2800 LPM | 20 mm | 16.0 A | 150 kg |\n| 100(150)DIVA-5.150| 15 HP / 11 kW | 4\" (6\") | 15 m @ 2000 LPM | 22.0 m @ 3700 LPM | 20 mm | 22.0 A | 175 kg |\n| 150(200)DIVA-5.200| 20 HP / 15 kW | 6\" (8\") | 15 m @ 4000 LPM | 22.0 m @ 6200 LPM | 25 mm | 31.9 A | 250 kg |\n| 150(200)DIVA-5.240| 24 HP / 18 kW | 6\" (8\") | 21 m @ 3000 LPM | 29.0 m @ 5000 LPM | 25 mm | 35.5 A | 360 kg |\n| 150(200)DIVA-5.300| 30 HP / 22 kW | 6\" (8\") | 20 m @ 3800 LPM | 35.0 m @ 5200 LPM | 25 mm | 44.6 A | 390 kg |\n| 200DIVA-5.300L | 30 HP / 22 kW | 8\" | 15 m @ 4900 LPM | 26.0 m @ 6000 LPM | 25 mm | 44.6 A | 400 kg |"
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "kind": "跨系列並列冠軍",
+      "question": "都只看3HP，STEEL、HIPPO DN和LEOPARD這三系列各自通過粒徑最大的是誰？並列的都要列，附粒徑與最大流量，再說三系列誰的粒徑最大。",
+      "expected_answer": "50STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM；80STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM；HIPPO-300 DN80：solids_mm=76 mm，max_flow_lpm=1100 LPM；80LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM；100LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；STEEL冠軍兩款45 mm、HIPPO DN冠軍HIPPO-300 DN80為76 mm、LEOPARD冠軍兩款56 mm；三系列最高為HIPPO DN的76 mm",
+      "required_points": [
+        "50STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM",
+        "80STEEL-5.30：solids_mm=45 mm，max_flow_lpm=700 LPM",
+        "HIPPO-300 DN80：solids_mm=76 mm，max_flow_lpm=1100 LPM",
+        "80LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "100LEOPARD-5.30：solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "STEEL冠軍兩款45 mm、HIPPO DN冠軍HIPPO-300 DN80為76 mm、LEOPARD冠軍兩款56 mm；三系列最高為HIPPO DN的76 mm"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "漏並列冠軍僅部分對，錯選較低粒徑為冠軍或錯比較則判錯"
+      ],
+      "expected_models": [
+        "50STEEL-5.30",
+        "80STEEL-5.30",
+        "HIPPO-300 DN80",
+        "80LEOPARD-5.30",
+        "100LEOPARD-5.30"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/50STEEL-5.30.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50STEEL-5.30\nseries: STEEL\nhp: 3\nkw: 2.2\noutlet_inch: 2\nrated_head_m: 14.7\nrated_flow_lpm: 360\nmax_head_m: 21.5\nmax_flow_lpm: 700\nsolids_mm: 45\nphase: [1,3]\ncurrent_1ph_a: 12.6\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 32.8\nweight_3ph_kg: 31.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.30.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80STEEL-5.30\nseries: STEEL\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 14.7\nrated_flow_lpm: 360\nmax_head_m: 21.5\nmax_flow_lpm: 700\nsolids_mm: 45\nphase: [1,3]\ncurrent_1ph_a: 12.6\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 32.8\nweight_3ph_kg: 31.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-300-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-300 DN80\nseries: HIPPO DN\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 400\nmax_head_m: 13\nmax_flow_lpm: 1100\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 6\nweight_1ph_kg: null\nweight_3ph_kg: 43.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/80LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80LEOPARD-5.30\nseries: LEOPARD\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 700\nmax_head_m: 14\nmax_flow_lpm: 1400\nsolids_mm: 56\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5\nweight_1ph_kg: null\nweight_3ph_kg: 75\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.30\nseries: LEOPARD\nhp: 3\nkw: 2.2\noutlet_inch: 4\nrated_head_m: 8\nrated_flow_lpm: 700\nmax_head_m: 14\nmax_flow_lpm: 1400\nsolids_mm: 56\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5\nweight_1ph_kg: null\nweight_3ph_kg: 75\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 1ø 230V | 滿載電流 3ø 400V | 額定揚程 (m) | 額定流量 (LPM) | 最大揚程 (m) | 最大流量 (LPM) | 通過粒徑 (mm) | 重量 1ø (kg) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-150 DN65 | 1.5 | 1.1 | 2.5\" | 10 A | 3 A | 6.6 | 330 | 11 | 600 | 65 | 30.7 | 30.7 | QM-65/QD-65 |\n| HIPPO-200 DN65 | 2 | 1.5 | 2.5\" | 12 A | 3.9 A | 8.4 | 360 | 13 | 720 | 65 | 32.9 | 32.9 | QM-65/QD-65 |\n| HIPPO-300 DN65 | 3 | 2.2 | 2.5\" | - | 6 A | 12.6 | 300 | 17 | 870 | 65 | - | 34 | QM-65/QD-65 |\n| HIPPO-400 DN65 | 4 | 3 | 2.5\" | - | 6.7 A | 13 | 500 | 20 | 1000 | 65 | - | 41.7 | QM-65/QD-65 |\n| HIPPO-550 DN65 | 5.5 | 4.1 | 2.5\" | - | 9.1 A | 15 | 500 | 22.5 | 1200 | 65 | - | 43.7 | QM-65/QD-65 |\n| HIPPO-150 DN80 | 1.5 | 1.1 | 3\" | 10 A | 3 A | 4.4 | 415 | 7 | 630 | 76 | 40.4 | 40.4 | QD-80 |\n| HIPPO-200 DN80 | 2 | 1.5 | 3\" | 12 A | 3.9 A | 5 | 460 | 9 | 780 | 76 | 42.6 | 42.6 | QD-80 |\n| HIPPO-300 DN80 | 3 | 2.2 | 3\" | - | 6 A | 9.5 | 400 | 13 | 1100 | 76 | - | 43.7 | QD-80 |\n| HIPPO-400 DN80 | 4 | 3 | 3\" | - | 6.7 A | 8 | 600 | 15.5 | 1200 | 76 | - | 49.9 | QD-80 |\n| HIPPO-550 DN80 | 5.5 | 4.1 | 3\" | - | 9.1 A | 8 | 900 | 18.5 | 1350 | 76 | - | 51.9 | QD-80 |\n| HIPPO-750 DN80 | 7.5 | 5.5 | 3\" | - | 12.3 A | 11 | 900 | 18 | 1600 | 76 | - | 65.5 | QD-80 |\n| HIPPO-750H DN80 | 7.5 | 5.5 | 3\" | - | 12 A | 16 | 710 | 21 | 1100 | 76 | - | 65.5 | QD-80 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "kind": "全型錄最大揚程前三名",
+      "question": "口徑和相數先不限，全型錄最大揚程最高的前三款是哪些？由高到低排，寫最大揚程、HP和kW。",
+      "expected_answer": "150EUB-M-5.200：max_head_m=54 m，hp=20 HP，kw=15 kW；100EUB-M-5.150：max_head_m=50 m，hp=15 HP，kw=11 kW；50ALLIGATOR-5.75：max_head_m=46 m，hp=7.5 HP，kw=5.5 kW；完整指定順序：150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75",
+      "required_points": [
+        "150EUB-M-5.200：max_head_m=54 m，hp=20 HP，kw=15 kW",
+        "100EUB-M-5.150：max_head_m=50 m，hp=15 HP，kw=11 kW",
+        "50ALLIGATOR-5.75：max_head_m=46 m，hp=7.5 HP，kw=5.5 kW",
+        "完整指定順序：150EUB-M-5.200、100EUB-M-5.150、50ALLIGATOR-5.75"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "明確列出錯誤排序／錯誤前三名；只漏排序資訊可部分對"
+      ],
+      "expected_models": [
+        "150EUB-M-5.200",
+        "100EUB-M-5.150",
+        "50ALLIGATOR-5.75"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/150EUB-M-5.200.md",
+          "page": 12,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 150EUB-M-5.200\nseries: EUB-M\nhp: 20\nkw: 15\noutlet_inch: 6\nrated_head_m: 35\nrated_flow_lpm: 1500\nmax_head_m: 54\nmax_flow_lpm: 2200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 27\nweight_1ph_kg: null\nweight_3ph_kg: 112\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 12\n---"
+        },
+        {
+          "path": "knowledge/products/100EUB-M-5.150.md",
+          "page": 12,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100EUB-M-5.150\nseries: EUB-M\nhp: 15\nkw: 11\noutlet_inch: 4\nrated_head_m: 35\nrated_flow_lpm: 1000\nmax_head_m: 50\nmax_flow_lpm: 1800\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 22\nweight_1ph_kg: null\nweight_3ph_kg: 104\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 12\n---"
+        },
+        {
+          "path": "knowledge/products/50ALLIGATOR-5.75.md",
+          "page": 19,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50ALLIGATOR-5.75\nseries: ALLIGATOR\nhp: 7.5\nkw: 5.5\noutlet_inch: 2\nrated_head_m: 36\nrated_flow_lpm: 250\nmax_head_m: 46\nmax_flow_lpm: 300\nsolids_mm: null\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 46.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 19\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 12,
+          "line_start": 266,
+          "line_end": 271,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 絕緣等級 | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 100EUB-M-5.100 | 10 HP / 7.5 kW | 4\" | 25 m @ 980 LPM | 39 m @ 1900 LPM | 10 mm | 16.0 A | Class F | 69 kg |\n| 150EUB-M-5.100 | 10 HP / 7.5 kW | 6\" | 15 m @ 1550 LPM | 29 m @ 2250 LPM | 10 mm | 16.0 A | Class F | 70 kg |\n| 100EUB-M-5.150 | 15 HP / 11 kW | 4\" | 35 m @ 1000 LPM | 50 m @ 1800 LPM | 10 mm | 22.0 A | Class H | 104 kg |\n| 150EUB-M-5.200 | 20 HP / 15 kW | 6\" | 35 m @ 1500 LPM | 54 m @ 2200 LPM | 10 mm | 27.0 A | Class H | 112 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 19,
+          "line_start": 428,
+          "line_end": 434,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg |\n| 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg |\n| 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg |\n| 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg |\n| 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\" | 36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |"
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "kind": "兩現場獨立OR",
+      "question": "我有兩個現場，符合任何一邊都能考慮，但請分開列完整清單：甲要單相、3吋、最多2HP、最大流量至少500 LPM；乙要三相、4吋、功率最多3.7kW、明列通過粒徑至少40毫米、最大流量至少1000 LPM。甲每款寫HP和最大流量，乙寫kW、粒徑和最大流量。",
+      "expected_answer": "甲：80EUS-5.10L：hp=1 HP，max_flow_lpm=560 LPM；甲：80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM；甲：80EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM；甲：80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM；甲：80EUB-M-5.20S：hp=2 HP，max_flow_lpm=690 LPM；甲：80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM；甲：HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM；甲：HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM；乙：100STEEL-5.50：kw=3.7 kW，solids_mm=45 mm，max_flow_lpm=1000 LPM；乙：100LEOPARD-5.30：kw=2.2 kW，solids_mm=56 mm，max_flow_lpm=1400 LPM；乙：100LEOPARD-5.50：kw=3.7 kW，solids_mm=80 mm，max_flow_lpm=1900 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除；甲8款、乙3款獨立給完整清單，符合任一情境可考慮，不壓成AND",
+      "required_points": [
+        "甲：80EUS-5.10L：hp=1 HP，max_flow_lpm=560 LPM",
+        "甲：80EUS-5.20：hp=2 HP，max_flow_lpm=658 LPM",
+        "甲：80EUS-5.20C：hp=2 HP，max_flow_lpm=500 LPM",
+        "甲：80EDW-5.20S/T：hp=2 HP，max_flow_lpm=820 LPM",
+        "甲：80EUB-M-5.20S：hp=2 HP，max_flow_lpm=690 LPM",
+        "甲：80STEEL-5.20：hp=2 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-150 DN80：hp=1.5 HP，max_flow_lpm=630 LPM",
+        "甲：HIPPO-200 DN80：hp=2 HP，max_flow_lpm=780 LPM",
+        "乙：100STEEL-5.50：kw=3.7 kW，solids_mm=45 mm，max_flow_lpm=1000 LPM",
+        "乙：100LEOPARD-5.30：kw=2.2 kW，solids_mm=56 mm，max_flow_lpm=1400 LPM",
+        "乙：100LEOPARD-5.50：kw=3.7 kW，solids_mm=80 mm，max_flow_lpm=1900 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "甲8款、乙3款獨立給完整清單，符合任一情境可考慮，不壓成AND"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把單三相合併列排除該相數，或將未提供那一相數值當0／另一相值",
+        "把兩現場合併為單一同時要滿足的AND，或混用甲乙相數及門檻"
+      ],
+      "expected_models": {
+        "甲": [
+          "80EUS-5.10L",
+          "80EUS-5.20",
+          "80EUS-5.20C",
+          "80EDW-5.20S/T",
+          "80EUB-M-5.20S",
+          "80STEEL-5.20",
+          "HIPPO-150 DN80",
+          "HIPPO-200 DN80"
+        ],
+        "乙": [
+          "100STEEL-5.50",
+          "100LEOPARD-5.30",
+          "100LEOPARD-5.50"
+        ]
+      },
+      "sources": [
+        {
+          "path": "knowledge/products/80EUS-5.10L.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.10L\nseries: EUS\nhp: 1\nkw: 0.75\noutlet_inch: 3\nrated_head_m: 6\nrated_flow_lpm: 290\nmax_head_m: 10\nmax_flow_lpm: 560\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 5.8\ncurrent_3ph_a: 1.9\nweight_1ph_kg: 17.5\nweight_3ph_kg: 17.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.20\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 16\nrated_flow_lpm: 315\nmax_head_m: 21.5\nmax_flow_lpm: 658\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 13\ncurrent_3ph_a: 3.7\nweight_1ph_kg: 18.1\nweight_3ph_kg: 18.1\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80EUS-5.20C.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.20C\nseries: EUS\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 13\nrated_flow_lpm: 250\nmax_head_m: 19\nmax_flow_lpm: 500\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 9.5\ncurrent_3ph_a: 2.9\nweight_1ph_kg: 18\nweight_3ph_kg: 18\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80EDW-5.20S-T.md",
+          "page": 9,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n---"
+        },
+        {
+          "path": "knowledge/products/80EUB-M-5.20S.md",
+          "page": 11,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 400\nmax_head_m: 17\nmax_flow_lpm: 690\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n---"
+        },
+        {
+          "path": "knowledge/products/80STEEL-5.20.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80STEEL-5.20\nseries: STEEL\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 12\nrated_flow_lpm: 375\nmax_head_m: 19\nmax_flow_lpm: 630\nsolids_mm: 45\nphase: [1,3]\ncurrent_1ph_a: 10.5\ncurrent_3ph_a: 4.5\nweight_1ph_kg: 31.2\nweight_3ph_kg: 29.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-150-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-150 DN80\nseries: HIPPO DN\nhp: 1.5\nkw: 1.1\noutlet_inch: 3\nrated_head_m: 4.4\nrated_flow_lpm: 415\nmax_head_m: 7\nmax_flow_lpm: 630\nsolids_mm: 76\nphase: [1,3]\ncurrent_1ph_a: 10\ncurrent_3ph_a: 3\nweight_1ph_kg: 40.4\nweight_3ph_kg: 40.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-200-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-200 DN80\nseries: HIPPO DN\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 5\nrated_flow_lpm: 460\nmax_head_m: 9\nmax_flow_lpm: 780\nsolids_mm: 76\nphase: [1,3]\ncurrent_1ph_a: 12\ncurrent_3ph_a: 3.9\nweight_1ph_kg: 42.6\nweight_3ph_kg: 42.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/100STEEL-5.50.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100STEEL-5.50\nseries: STEEL\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 13\nrated_flow_lpm: 500\nmax_head_m: 22\nmax_flow_lpm: 1000\nsolids_mm: 45\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.2\nweight_1ph_kg: null\nweight_3ph_kg: 48\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.30.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.30\nseries: LEOPARD\nhp: 3\nkw: 2.2\noutlet_inch: 4\nrated_head_m: 8\nrated_flow_lpm: 700\nmax_head_m: 14\nmax_flow_lpm: 1400\nsolids_mm: 56\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5\nweight_1ph_kg: null\nweight_3ph_kg: 75\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.50\nseries: LEOPARD\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 11\nrated_flow_lpm: 800\nmax_head_m: 16\nmax_flow_lpm: 1900\nsolids_mm: 80\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 8.2\nweight_1ph_kg: null\nweight_3ph_kg: 90\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg |\n| 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg |\n| 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg |\n| 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg |\n| 50(80)EUS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 248,
+          "line_end": 259,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 1ø 230V | 滿載電流 3ø 400V | 額定揚程 (m) | 額定流量 (LPM) | 最大揚程 (m) | 最大流量 (LPM) | 通過粒徑 (mm) | 重量 1ø (kg) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-150 DN65 | 1.5 | 1.1 | 2.5\" | 10 A | 3 A | 6.6 | 330 | 11 | 600 | 65 | 30.7 | 30.7 | QM-65/QD-65 |\n| HIPPO-200 DN65 | 2 | 1.5 | 2.5\" | 12 A | 3.9 A | 8.4 | 360 | 13 | 720 | 65 | 32.9 | 32.9 | QM-65/QD-65 |\n| HIPPO-300 DN65 | 3 | 2.2 | 2.5\" | - | 6 A | 12.6 | 300 | 17 | 870 | 65 | - | 34 | QM-65/QD-65 |\n| HIPPO-400 DN65 | 4 | 3 | 2.5\" | - | 6.7 A | 13 | 500 | 20 | 1000 | 65 | - | 41.7 | QM-65/QD-65 |\n| HIPPO-550 DN65 | 5.5 | 4.1 | 2.5\" | - | 9.1 A | 15 | 500 | 22.5 | 1200 | 65 | - | 43.7 | QM-65/QD-65 |\n| HIPPO-150 DN80 | 1.5 | 1.1 | 3\" | 10 A | 3 A | 4.4 | 415 | 7 | 630 | 76 | 40.4 | 40.4 | QD-80 |\n| HIPPO-200 DN80 | 2 | 1.5 | 3\" | 12 A | 3.9 A | 5 | 460 | 9 | 780 | 76 | 42.6 | 42.6 | QD-80 |\n| HIPPO-300 DN80 | 3 | 2.2 | 3\" | - | 6 A | 9.5 | 400 | 13 | 1100 | 76 | - | 43.7 | QD-80 |\n| HIPPO-400 DN80 | 4 | 3 | 3\" | - | 6.7 A | 8 | 600 | 15.5 | 1200 | 76 | - | 49.9 | QD-80 |\n| HIPPO-550 DN80 | 5.5 | 4.1 | 3\" | - | 9.1 A | 8 | 900 | 18.5 | 1350 | 76 | - | 51.9 | QD-80 |\n| HIPPO-750 DN80 | 7.5 | 5.5 | 3\" | - | 12.3 A | 11 | 900 | 18 | 1600 | 76 | - | 65.5 | QD-80 |\n| HIPPO-750H DN80 | 7.5 | 5.5 | 3\" | - | 12 A | 16 | 710 | 21 | 1100 | 76 | - | 65.5 | QD-80 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "kind": "額定點與工況保證",
+      "question": "我想在15米揚程抽1600 LPM，表上有直接明列這一組額定點的嗎？先把功率最多11kW、同一額定點揚程至少15米且流量至少1500 LPM的候選全列出，附功率和額定點。這樣就能保證我的目標嗎？",
+      "expected_answer": "100DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM；150DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM；100DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM；150DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM；150EUB-M-5.100：kw=7.5 kW，rated_head_m=15 m，rated_flow_lpm=1550 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；117款沒有15 m @1600 LPM的明列額定點；五款只滿足同一額定點門檻，是待核對候選，不能直接保證目標；需性能曲線／工況確認",
+      "required_points": [
+        "100DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "100DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150DIVA PRO-5.150：kw=11 kW，rated_head_m=15 m，rated_flow_lpm=2000 LPM",
+        "150EUB-M-5.100：kw=7.5 kW，rated_head_m=15 m，rated_flow_lpm=1550 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "117款沒有15 m @1600 LPM的明列額定點",
+        "五款只滿足同一額定點門檻，是待核對候選，不能直接保證目標；需性能曲線／工況確認"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "說候選已保證15 m @1600 LPM，或未知能力可確認不符合",
+        "用最大值代替額定值篩選，或把最大揚程與最大流量拼成同時點"
+      ],
+      "expected_models": [
+        "100DIVA-5.150",
+        "150DIVA-5.150",
+        "100DIVA PRO-5.150",
+        "150DIVA PRO-5.150",
+        "150EUB-M-5.100"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/100DIVA-5.150.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100DIVA-5.150\nseries: DIVA\nhp: 15\nkw: 11\noutlet_inch: 4\nrated_head_m: 15\nrated_flow_lpm: 2000\nmax_head_m: 22\nmax_flow_lpm: 3700\nsolids_mm: 20\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 22\nweight_1ph_kg: null\nweight_3ph_kg: 175\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/150DIVA-5.150.md",
+          "page": 13,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 150DIVA-5.150\nseries: DIVA\nhp: 15\nkw: 11\noutlet_inch: 6\nrated_head_m: 15\nrated_flow_lpm: 2000\nmax_head_m: 22\nmax_flow_lpm: 3700\nsolids_mm: 20\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 22\nweight_1ph_kg: null\nweight_3ph_kg: 175\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 13\n---"
+        },
+        {
+          "path": "knowledge/products/100DIVA-PRO-5.150.md",
+          "page": 14,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100DIVA PRO-5.150\nseries: DIVA PRO\nhp: 15\nkw: 11\noutlet_inch: 4\nrated_head_m: 15\nrated_flow_lpm: 2000\nmax_head_m: 22\nmax_flow_lpm: 3700\nsolids_mm: 20\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 22\nweight_1ph_kg: null\nweight_3ph_kg: 175\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 14\n---"
+        },
+        {
+          "path": "knowledge/products/150DIVA-PRO-5.150.md",
+          "page": 14,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 150DIVA PRO-5.150\nseries: DIVA PRO\nhp: 15\nkw: 11\noutlet_inch: 6\nrated_head_m: 15\nrated_flow_lpm: 2000\nmax_head_m: 22\nmax_flow_lpm: 3700\nsolids_mm: 20\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 22\nweight_1ph_kg: null\nweight_3ph_kg: 175\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 14\n---"
+        },
+        {
+          "path": "knowledge/products/150EUB-M-5.100.md",
+          "page": 12,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 150EUB-M-5.100\nseries: EUB-M\nhp: 10\nkw: 7.5\noutlet_inch: 6\nrated_head_m: 15\nrated_flow_lpm: 1550\nmax_head_m: 29\nmax_flow_lpm: 2250\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 16\nweight_1ph_kg: null\nweight_3ph_kg: 70\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 12\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 12,
+          "line_start": 266,
+          "line_end": 271,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 絕緣等級 | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 100EUB-M-5.100 | 10 HP / 7.5 kW | 4\" | 25 m @ 980 LPM | 39 m @ 1900 LPM | 10 mm | 16.0 A | Class F | 69 kg |\n| 150EUB-M-5.100 | 10 HP / 7.5 kW | 6\" | 15 m @ 1550 LPM | 29 m @ 2250 LPM | 10 mm | 16.0 A | Class F | 70 kg |\n| 100EUB-M-5.150 | 15 HP / 11 kW | 4\" | 35 m @ 1000 LPM | 50 m @ 1800 LPM | 10 mm | 22.0 A | Class H | 104 kg |\n| 150EUB-M-5.200 | 20 HP / 15 kW | 6\" | 35 m @ 1500 LPM | 54 m @ 2200 LPM | 10 mm | 27.0 A | Class H | 112 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80DIVA-5.30 | 3 HP / 2.2 kW | 3\" | 10 m @ 550 LPM | 12.7 m @ 1250 LPM | 12 mm | 5.2 A | 78 kg |\n| 80DIVA-5.50 | 5 HP / 3.7 kW | 3\" | 15 m @ 500 LPM | 17.4 m @ 1500 LPM | 12 mm | 9.0 A | 104 kg |\n| 100DIVA-5.50 | 5 HP / 3.7 kW | 4\" | 10 m @ 1000 LPM | 14.0 m @ 1600 LPM | 12 mm | 9.0 A | 102 kg |\n| 100DIVA-5.75 | 7.5 HP / 5.5 kW | 4\" | 15 m @ 900 LPM | 19.0 m @ 2000 LPM | 12 mm | 12.4 A | 107 kg |\n| 100(150)DIVA-5.100| 10 HP / 7.5 kW | 4\" (6\") | 13 m @ 1500 LPM | 19.0 m @ 2800 LPM | 20 mm | 16.0 A | 150 kg |\n| 100(150)DIVA-5.150| 15 HP / 11 kW | 4\" (6\") | 15 m @ 2000 LPM | 22.0 m @ 3700 LPM | 20 mm | 22.0 A | 175 kg |\n| 150(200)DIVA-5.200| 20 HP / 15 kW | 6\" (8\") | 15 m @ 4000 LPM | 22.0 m @ 6200 LPM | 25 mm | 31.9 A | 250 kg |\n| 150(200)DIVA-5.240| 24 HP / 18 kW | 6\" (8\") | 21 m @ 3000 LPM | 29.0 m @ 5000 LPM | 25 mm | 35.5 A | 360 kg |\n| 150(200)DIVA-5.300| 30 HP / 22 kW | 6\" (8\") | 20 m @ 3800 LPM | 35.0 m @ 5200 LPM | 25 mm | 44.6 A | 390 kg |\n| 200DIVA-5.300L | 30 HP / 22 kW | 8\" | 15 m @ 4900 LPM | 26.0 m @ 6000 LPM | 25 mm | 44.6 A | 400 kg |"
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "kind": "額定與獨立最大值",
+      "question": "100LEOPARD-5.50和100LEOPARD-5.75各自的額定揚程配流量是多少？也分別寫最大揚程與最大流量。能直接把每款這兩個最大值拼在一起，當成能同時做到的工作點嗎？",
+      "expected_answer": "100LEOPARD-5.50：rated_head_m=11 m，rated_flow_lpm=800 LPM，max_head_m=16 m，max_flow_lpm=1900 LPM；100LEOPARD-5.75：rated_head_m=13 m，rated_flow_lpm=800 LPM，max_head_m=18 m，max_flow_lpm=2300 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；每款額定揚程及額定流量是同一額定點；最大揚程及最大流量各自獨立，不是同一工作點，不能直接拼成同時達成的數字",
+      "required_points": [
+        "100LEOPARD-5.50：rated_head_m=11 m，rated_flow_lpm=800 LPM，max_head_m=16 m，max_flow_lpm=1900 LPM",
+        "100LEOPARD-5.75：rated_head_m=13 m，rated_flow_lpm=800 LPM，max_head_m=18 m，max_flow_lpm=2300 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "每款額定揚程及額定流量是同一額定點",
+        "最大揚程及最大流量各自獨立，不是同一工作點，不能直接拼成同時達成的數字"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "將16 m／1900 LPM或18 m／2300 LPM說成該款可同時達成或額定點"
+      ],
+      "expected_models": [
+        "100LEOPARD-5.50",
+        "100LEOPARD-5.75"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/100LEOPARD-5.50.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.50\nseries: LEOPARD\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 11\nrated_flow_lpm: 800\nmax_head_m: 16\nmax_flow_lpm: 1900\nsolids_mm: 80\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 8.2\nweight_1ph_kg: null\nweight_3ph_kg: 90\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.75.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.75\nseries: LEOPARD\nhp: 7.5\nkw: 5.5\noutlet_inch: 4\nrated_head_m: 13\nrated_flow_lpm: 800\nmax_head_m: 18\nmax_flow_lpm: 2300\nsolids_mm: 68\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.1\nweight_1ph_kg: null\nweight_3ph_kg: 140\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "kind": "單相電流重量與已知粒徑",
+      "question": "全型錄找單相滿載電流不超過6A、單相重量不超過15公斤，而且粒徑有明列並至少6毫米的款式。全部列給我，每款三個數字都要；沒寫粒徑的先不要當確認符合。",
+      "expected_answer": "50EUB-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm；50EUB-5.10：current_1ph_a=6 A，weight_1ph_kg=13.7 kg，solids_mm=6 mm；50EUBI-5.05：current_1ph_a=3 A，weight_1ph_kg=13.8 kg，solids_mm=6 mm；50EUBS-5.05：current_1ph_a=3 A，weight_1ph_kg=14.1 kg，solids_mm=6 mm；50EUS-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm；50EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm；80EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm；50EUBL-5.10：current_1ph_a=5.8 A，weight_1ph_kg=14 kg，solids_mm=38 mm；50STEEL-5.05：current_1ph_a=3.5 A，weight_1ph_kg=13 kg，solids_mm=35 mm；HIPPO-50：current_1ph_a=4.2 A，weight_1ph_kg=12.9 kg，solids_mm=50 mm；HIPPO-50Q：current_1ph_a=4.2 A，weight_1ph_kg=14.3 kg，solids_mm=50 mm；HIPPO-75：current_1ph_a=5.5 A，weight_1ph_kg=13.9 kg，solids_mm=50 mm；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除；未載粒徑不列確認符合，也不能由null推成已確認不符合；6 A與6 mm精確邊界包括",
+      "required_points": [
+        "50EUB-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUB-5.10：current_1ph_a=6 A，weight_1ph_kg=13.7 kg，solids_mm=6 mm",
+        "50EUBI-5.05：current_1ph_a=3 A，weight_1ph_kg=13.8 kg，solids_mm=6 mm",
+        "50EUBS-5.05：current_1ph_a=3 A，weight_1ph_kg=14.1 kg，solids_mm=6 mm",
+        "50EUS-5.05：current_1ph_a=3 A，weight_1ph_kg=11.3 kg，solids_mm=6 mm",
+        "50EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "80EUS-5.10：current_1ph_a=5.8 A，weight_1ph_kg=13.9 kg，solids_mm=6 mm",
+        "50EUBL-5.10：current_1ph_a=5.8 A，weight_1ph_kg=14 kg，solids_mm=38 mm",
+        "50STEEL-5.05：current_1ph_a=3.5 A，weight_1ph_kg=13 kg，solids_mm=35 mm",
+        "HIPPO-50：current_1ph_a=4.2 A，weight_1ph_kg=12.9 kg，solids_mm=50 mm",
+        "HIPPO-50Q：current_1ph_a=4.2 A，weight_1ph_kg=14.3 kg，solids_mm=50 mm",
+        "HIPPO-75：current_1ph_a=5.5 A，weight_1ph_kg=13.9 kg，solids_mm=50 mm",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "未載粒徑不列確認符合，也不能由null推成已確認不符合；6 A與6 mm精確邊界包括"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把單三相合併列排除該相數，或將未提供那一相數值當0／另一相值"
+      ],
+      "expected_models": [
+        "50EUB-5.05",
+        "50EUB-5.10",
+        "50EUBI-5.05",
+        "50EUBS-5.05",
+        "50EUS-5.05",
+        "50EUS-5.10",
+        "80EUS-5.10",
+        "50EUBL-5.10",
+        "50STEEL-5.05",
+        "HIPPO-50",
+        "HIPPO-50Q",
+        "HIPPO-75"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/50EUB-5.05.md",
+          "page": 6,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUB-5.05\nseries: EUB\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 125\nmax_head_m: 10.5\nmax_flow_lpm: 225\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 3\ncurrent_3ph_a: 0.9\nweight_1ph_kg: 11.3\nweight_3ph_kg: 11.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 6\n---"
+        },
+        {
+          "path": "knowledge/products/50EUB-5.10.md",
+          "page": 6,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUB-5.10\nseries: EUB\nhp: 1\nkw: 0.75\noutlet_inch: 2\nrated_head_m: 10\nrated_flow_lpm: 225\nmax_head_m: 16.5\nmax_flow_lpm: 345\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 6\ncurrent_3ph_a: 1.9\nweight_1ph_kg: 13.7\nweight_3ph_kg: 13.7\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 6\n---"
+        },
+        {
+          "path": "knowledge/products/50EUBI-5.05.md",
+          "page": 6,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUBI-5.05\nseries: EUBI\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 125\nmax_head_m: 10.5\nmax_flow_lpm: 225\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 3\ncurrent_3ph_a: 0.9\nweight_1ph_kg: 13.8\nweight_3ph_kg: 13.8\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 6\n---"
+        },
+        {
+          "path": "knowledge/products/50EUBS-5.05.md",
+          "page": 6,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUBS-5.05\nseries: EUBS\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 125\nmax_head_m: 10.5\nmax_flow_lpm: 225\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 3\ncurrent_3ph_a: 0.9\nweight_1ph_kg: 14.1\nweight_3ph_kg: 14.1\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 6\n---"
+        },
+        {
+          "path": "knowledge/products/50EUS-5.05.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUS-5.05\nseries: EUS\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 9.6\nrated_flow_lpm: 110\nmax_head_m: 12\nmax_flow_lpm: 240\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 3\ncurrent_3ph_a: 1.1\nweight_1ph_kg: 11.3\nweight_3ph_kg: 11.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/50EUS-5.10.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUS-5.10\nseries: EUS\nhp: 1\nkw: 0.75\noutlet_inch: 2\nrated_head_m: 12\nrated_flow_lpm: 190\nmax_head_m: 18\nmax_flow_lpm: 375\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 5.8\ncurrent_3ph_a: 1.9\nweight_1ph_kg: 13.9\nweight_3ph_kg: 13.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/80EUS-5.10.md",
+          "page": 4,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 80EUS-5.10\nseries: EUS\nhp: 1\nkw: 0.75\noutlet_inch: 3\nrated_head_m: 12\nrated_flow_lpm: 190\nmax_head_m: 18\nmax_flow_lpm: 375\nsolids_mm: 6\nphase: [1,3]\ncurrent_1ph_a: 5.8\ncurrent_3ph_a: 1.9\nweight_1ph_kg: 13.9\nweight_3ph_kg: 13.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n---"
+        },
+        {
+          "path": "knowledge/products/50EUBL-5.10.md",
+          "page": 8,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUBL-5.10\nseries: EUBL\nhp: 1\nkw: 0.75\noutlet_inch: 2\nrated_head_m: 8\nrated_flow_lpm: 170\nmax_head_m: 12\nmax_flow_lpm: 380\nsolids_mm: 38\nphase: [1,3]\ncurrent_1ph_a: 5.8\ncurrent_3ph_a: 2\nweight_1ph_kg: 14\nweight_3ph_kg: 14\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 8\n---"
+        },
+        {
+          "path": "knowledge/products/50STEEL-5.05.md",
+          "page": 18,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50STEEL-5.05\nseries: STEEL\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 5.4\nrated_flow_lpm: 200\nmax_head_m: 9.5\nmax_flow_lpm: 360\nsolids_mm: 35\nphase: [1,3]\ncurrent_1ph_a: 3.5\ncurrent_3ph_a: 1.4\nweight_1ph_kg: 13\nweight_3ph_kg: 12.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 18\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-50.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-50\nseries: HIPPO\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 4.5\nrated_flow_lpm: 240\nmax_head_m: 8\nmax_flow_lpm: 330\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 4.2\ncurrent_3ph_a: 1.6\nweight_1ph_kg: 12.9\nweight_3ph_kg: 12.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-50Q.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-50Q\nseries: HIPPO\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 4.5\nrated_flow_lpm: 240\nmax_head_m: 8\nmax_flow_lpm: 330\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 4.2\ncurrent_3ph_a: 1.6\nweight_1ph_kg: 14.3\nweight_3ph_kg: 14.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-75.md",
+          "page": 16,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-75\nseries: HIPPO\nhp: 0.75\nkw: 0.55\noutlet_inch: 2\nrated_head_m: 6.4\nrated_flow_lpm: 240\nmax_head_m: 10\nmax_flow_lpm: 390\nsolids_mm: 50\nphase: [1,3]\ncurrent_1ph_a: 5.5\ncurrent_3ph_a: 1.8\nweight_1ph_kg: 13.9\nweight_3ph_kg: 13.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 16\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg |\n| 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg |\n| 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg |\n| 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg |\n| 50(80)EUS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 6,
+          "line_start": 162,
+          "line_end": 169,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-5.05 | 0.5 HP / 0.37 kW | 2\" | 8 m @ 125 LPM | 10.5 m @ 225 LPM | 6 mm | 3 A | 0.9 A | 11.3 kg / 11.3 kg |\n| 50EUBS(I)-5.05 | 0.5 HP / 0.37 kW | 2\" | 8 m @ 125 LPM | 10.5 m @ 225 LPM | 6 mm | 3 A | 0.9 A | 14.1 kg (13.8 kg) / 14.1 kg (13.8 kg) |\n| 50EUB-5.10 | 1 HP / 0.75 kW | 2\" | 10 m @ 225 LPM | 16.5 m @ 345 LPM | 6 mm | 6 A | 1.9 A | 13.7 kg / 13.7 kg |\n| 50EUBS(I)-5.10 | 1 HP / 0.75 kW | 2\" | 10 m @ 205 LPM | 15.5 m @ 330 LPM | 6 mm | 6 A | 1.9 A | 17.2 kg (16.7 kg) / 17.2 kg (16.7 kg) |\n| 50(80)EUB-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 11 m @ 275 LPM | 19.5 m @ 470 LPM | 6 mm | 12 A | 3.5 A | 21.1 kg / 21.1 kg |\n| 50(80)EUBS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 11 m @ 215 LPM | 18 m @ 470 LPM | 6 mm | 12 A | 3.5 A | 25 kg / 25 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 重量（1ø 與 3ø 相同，括號為 Q 版） |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-50(Q) | 0.5 HP / 0.37 kW | 2\" | 4.5 m @ 240 LPM | 8.0 m @ 330 LPM | 50 mm (2\") | 4.2 A | 1.6 A | 12.9 kg (14.3 kg)|\n| HIPPO-75(Q) | 0.75 HP / 0.55 kW| 2\" | 6.4 m @ 240 LPM | 10.0 m @ 390 LPM | 50 mm (2\") | 5.5 A | 1.8 A | 13.9 kg (15.3 kg)|\n| HIPPO-100(Q)| 1.0 HP / 0.75 kW | 2\" | 7.7 m @ 300 LPM | 11.3 m @ 500 LPM | 50 mm (2\") | 7.2 A | 2.5 A | 15.4 kg (16.8 kg)|\n| HIPPO-150(Q)| 1.5 HP / 1.1 kW | 2\" | 8.0 m @ 390 LPM | 12.5 m @ 580 LPM | 50 mm (2\") | 9.0 A | 2.8 A | 24.2 kg (26.2 kg)|\n| HIPPO-200(Q)| 2.0 HP / 1.5 kW | 2\" | 10.0 m @ 420 LPM | 15.5 m @ 660 LPM | 50 mm (2\") | 12.0 A | 3.9 A | 25.2 kg (27.2 kg)|"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "kind": "三門檻含精確邊界",
+      "question": "三相泵裡，馬力最多10HP、最大揚程至少18米、明列通過粒徑至少68毫米的有哪些？全部列出HP、最大揚程和粒徑，剛好等於門檻也算。",
+      "expected_answer": "100LEOPARD-5.75：hp=7.5 HP，max_head_m=18 m，solids_mm=68 mm；100LEOPARD-5.100：hp=10 HP，max_head_m=23 m，solids_mm=68 mm；HIPPO-550 DN80：hp=5.5 HP，max_head_m=18.5 m，solids_mm=76 mm；HIPPO-750 DN80：hp=7.5 HP，max_head_m=18 m，solids_mm=76 mm；HIPPO-750H DN80：hp=7.5 HP，max_head_m=21 m，solids_mm=76 mm；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除；18 m、68 mm、10 HP等於門檻也符合",
+      "required_points": [
+        "100LEOPARD-5.75：hp=7.5 HP，max_head_m=18 m，solids_mm=68 mm",
+        "100LEOPARD-5.100：hp=10 HP，max_head_m=23 m，solids_mm=68 mm",
+        "HIPPO-550 DN80：hp=5.5 HP，max_head_m=18.5 m，solids_mm=76 mm",
+        "HIPPO-750 DN80：hp=7.5 HP，max_head_m=18 m，solids_mm=76 mm",
+        "HIPPO-750H DN80：hp=7.5 HP，max_head_m=21 m，solids_mm=76 mm",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "18 m、68 mm、10 HP等於門檻也符合"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把單三相合併列排除該相數，或將未提供那一相數值當0／另一相值"
+      ],
+      "expected_models": [
+        "100LEOPARD-5.75",
+        "100LEOPARD-5.100",
+        "HIPPO-550 DN80",
+        "HIPPO-750 DN80",
+        "HIPPO-750H DN80"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/100LEOPARD-5.75.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.75\nseries: LEOPARD\nhp: 7.5\nkw: 5.5\noutlet_inch: 4\nrated_head_m: 13\nrated_flow_lpm: 800\nmax_head_m: 18\nmax_flow_lpm: 2300\nsolids_mm: 68\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.1\nweight_1ph_kg: null\nweight_3ph_kg: 140\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/100LEOPARD-5.100.md",
+          "page": 20,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 100LEOPARD-5.100\nseries: LEOPARD\nhp: 10\nkw: 7.5\noutlet_inch: 4\nrated_head_m: 16\nrated_flow_lpm: 850\nmax_head_m: 23\nmax_flow_lpm: 2500\nsolids_mm: 68\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 15.9\nweight_1ph_kg: null\nweight_3ph_kg: 166\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 20\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-550 DN80\nseries: HIPPO DN\nhp: 5.5\nkw: 4.1\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 900\nmax_head_m: 18.5\nmax_flow_lpm: 1350\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.1\nweight_1ph_kg: null\nweight_3ph_kg: 51.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-750-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-750 DN80\nseries: HIPPO DN\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 11\nrated_flow_lpm: 900\nmax_head_m: 18\nmax_flow_lpm: 1600\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.3\nweight_1ph_kg: null\nweight_3ph_kg: 65.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/products/HIPPO-750H-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-750H DN80\nseries: HIPPO DN\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 16\nrated_flow_lpm: 710\nmax_head_m: 21\nmax_flow_lpm: 1100\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12\nweight_1ph_kg: null\nweight_3ph_kg: 65.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 1ø 230V | 滿載電流 3ø 400V | 額定揚程 (m) | 額定流量 (LPM) | 最大揚程 (m) | 最大流量 (LPM) | 通過粒徑 (mm) | 重量 1ø (kg) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-150 DN65 | 1.5 | 1.1 | 2.5\" | 10 A | 3 A | 6.6 | 330 | 11 | 600 | 65 | 30.7 | 30.7 | QM-65/QD-65 |\n| HIPPO-200 DN65 | 2 | 1.5 | 2.5\" | 12 A | 3.9 A | 8.4 | 360 | 13 | 720 | 65 | 32.9 | 32.9 | QM-65/QD-65 |\n| HIPPO-300 DN65 | 3 | 2.2 | 2.5\" | - | 6 A | 12.6 | 300 | 17 | 870 | 65 | - | 34 | QM-65/QD-65 |\n| HIPPO-400 DN65 | 4 | 3 | 2.5\" | - | 6.7 A | 13 | 500 | 20 | 1000 | 65 | - | 41.7 | QM-65/QD-65 |\n| HIPPO-550 DN65 | 5.5 | 4.1 | 2.5\" | - | 9.1 A | 15 | 500 | 22.5 | 1200 | 65 | - | 43.7 | QM-65/QD-65 |\n| HIPPO-150 DN80 | 1.5 | 1.1 | 3\" | 10 A | 3 A | 4.4 | 415 | 7 | 630 | 76 | 40.4 | 40.4 | QD-80 |\n| HIPPO-200 DN80 | 2 | 1.5 | 3\" | 12 A | 3.9 A | 5 | 460 | 9 | 780 | 76 | 42.6 | 42.6 | QD-80 |\n| HIPPO-300 DN80 | 3 | 2.2 | 3\" | - | 6 A | 9.5 | 400 | 13 | 1100 | 76 | - | 43.7 | QD-80 |\n| HIPPO-400 DN80 | 4 | 3 | 3\" | - | 6.7 A | 8 | 600 | 15.5 | 1200 | 76 | - | 49.9 | QD-80 |\n| HIPPO-550 DN80 | 5.5 | 4.1 | 3\" | - | 9.1 A | 8 | 900 | 18.5 | 1350 | 76 | - | 51.9 | QD-80 |\n| HIPPO-750 DN80 | 7.5 | 5.5 | 3\" | - | 12.3 A | 11 | 900 | 18 | 1600 | 76 | - | 65.5 | QD-80 |\n| HIPPO-750H DN80 | 7.5 | 5.5 | 3\" | - | 12 A | 16 | 710 | 21 | 1100 | 76 | - | 65.5 | QD-80 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "kind": "null未知不可確認否",
+      "question": "EUSR和ALLIGATOR有哪些款式沒寫通過粒徑？請逐款列，順便寫各自已知的最大揚程。沒寫就當0毫米嗎？如果我要至少10毫米，能直接判它們都不符合嗎？",
+      "expected_answer": "50EUSR-5.05：solids_mm=未提供／null，max_head_m=14 m；32ALLIGATOR-5.15：solids_mm=未提供／null，max_head_m=21 m；32ALLIGATOR-5.20：solids_mm=未提供／null，max_head_m=28.5 m；32ALLIGATOR-5.30：solids_mm=未提供／null，max_head_m=31 m；50ALLIGATOR-5.50：solids_mm=未提供／null，max_head_m=37 m；50ALLIGATOR-5.75：solids_mm=未提供／null，max_head_m=46 m；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；六款通過粒徑未提供／null，不等於0，也不能確認不符合≥10 mm；需要原廠通過粒徑／工況資料，不憑型號或用途補值",
+      "required_points": [
+        "50EUSR-5.05：solids_mm=未提供／null，max_head_m=14 m",
+        "32ALLIGATOR-5.15：solids_mm=未提供／null，max_head_m=21 m",
+        "32ALLIGATOR-5.20：solids_mm=未提供／null，max_head_m=28.5 m",
+        "32ALLIGATOR-5.30：solids_mm=未提供／null，max_head_m=31 m",
+        "50ALLIGATOR-5.50：solids_mm=未提供／null，max_head_m=37 m",
+        "50ALLIGATOR-5.75：solids_mm=未提供／null，max_head_m=46 m",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "六款通過粒徑未提供／null，不等於0，也不能確認不符合≥10 mm",
+        "需要原廠通過粒徑／工況資料，不憑型號或用途補值"
+      ],
+      "forbidden_claims": [
+        "將缺粒徑當0或其他數字",
+        "說這六款已確認不符合至少10 mm，或由研磨／殘水用途推算粒徑"
+      ],
+      "expected_models": [
+        "50EUSR-5.05",
+        "32ALLIGATOR-5.15",
+        "32ALLIGATOR-5.20",
+        "32ALLIGATOR-5.30",
+        "50ALLIGATOR-5.50",
+        "50ALLIGATOR-5.75"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/50EUSR-5.05.md",
+          "page": 5,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50EUSR-5.05\nseries: EUSR\nhp: 0.5\nkw: 0.37\noutlet_inch: 2\nrated_head_m: 10\nrated_flow_lpm: 75\nmax_head_m: 14\nmax_flow_lpm: 140\nsolids_mm: null\nphase: [1,3]\ncurrent_1ph_a: 3\ncurrent_3ph_a: 0.9\nweight_1ph_kg: 11.3\nweight_3ph_kg: 11.3\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 5\n---"
+        },
+        {
+          "path": "knowledge/products/32ALLIGATOR-5.15.md",
+          "page": 19,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 32ALLIGATOR-5.15\nseries: ALLIGATOR\nhp: 1.5\nkw: 1.1\noutlet_inch: 1.25\nrated_head_m: 15.5\nrated_flow_lpm: 90\nmax_head_m: 21\nmax_flow_lpm: 160\nsolids_mm: null\nphase: [1,3]\ncurrent_1ph_a: 9.4\ncurrent_3ph_a: 3.3\nweight_1ph_kg: 29.4\nweight_3ph_kg: 29.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 19\n---"
+        },
+        {
+          "path": "knowledge/products/32ALLIGATOR-5.20.md",
+          "page": 19,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 32ALLIGATOR-5.20\nseries: ALLIGATOR\nhp: 2\nkw: 1.5\noutlet_inch: 1.25\nrated_head_m: 23\nrated_flow_lpm: 100\nmax_head_m: 28.5\nmax_flow_lpm: 160\nsolids_mm: null\nphase: [1,3]\ncurrent_1ph_a: 11.5\ncurrent_3ph_a: 4.5\nweight_1ph_kg: 32\nweight_3ph_kg: 32\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 19\n---"
+        },
+        {
+          "path": "knowledge/products/32ALLIGATOR-5.30.md",
+          "page": 19,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 32ALLIGATOR-5.30\nseries: ALLIGATOR\nhp: 3\nkw: 2.2\noutlet_inch: 1.25\nrated_head_m: 25\nrated_flow_lpm: 120\nmax_head_m: 31\nmax_flow_lpm: 160\nsolids_mm: null\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 4.7\nweight_1ph_kg: null\nweight_3ph_kg: 33.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 19\n---"
+        },
+        {
+          "path": "knowledge/products/50ALLIGATOR-5.50.md",
+          "page": 19,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50ALLIGATOR-5.50\nseries: ALLIGATOR\nhp: 5\nkw: 3.7\noutlet_inch: 2\nrated_head_m: 26\nrated_flow_lpm: 250\nmax_head_m: 37\nmax_flow_lpm: 300\nsolids_mm: null\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 8.7\nweight_1ph_kg: null\nweight_3ph_kg: 41.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 19\n---"
+        },
+        {
+          "path": "knowledge/products/50ALLIGATOR-5.75.md",
+          "page": 19,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 50ALLIGATOR-5.75\nseries: ALLIGATOR\nhp: 7.5\nkw: 5.5\noutlet_inch: 2\nrated_head_m: 36\nrated_flow_lpm: 250\nmax_head_m: 46\nmax_flow_lpm: 300\nsolids_mm: null\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 46.2\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 19\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 5,
+          "line_start": 146,
+          "line_end": 148,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 額定揚程 (Head) | 額定流量 (Cap.) | 最大揚程 (Head) | 最大流量 (Cap.) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 機身淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUSR-5.05 | 0.5 HP / 0.37 kW | 2\" | 10 m | 75 LPM | 14 m | 140 LPM | 3.0 A | 0.9 A | 11.3 kg / 11.3 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 19,
+          "line_start": 428,
+          "line_end": 434,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg |\n| 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg |\n| 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg |\n| 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg |\n| 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\" | 36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |"
+        }
+      ]
+    },
+    {
+      "id": "F17",
+      "kind": "拆分口徑款不得混名",
+      "question": "DIVA PRO的20HP款，6吋和8吋出水口分別是哪個型號？功率、額定點、最大揚程和最大流量各是多少？換這兩個口徑，表上這幾個水力數字有差嗎？",
+      "expected_answer": "150DIVA PRO-5.200：hp=20 HP，kw=15 kW，outlet_inch=6 吋，rated_head_m=15 m，rated_flow_lpm=4000 LPM，max_head_m=22 m，max_flow_lpm=6200 LPM；200DIVA PRO-5.200：hp=20 HP，kw=15 kW，outlet_inch=8 吋，rated_head_m=15 m，rated_flow_lpm=4000 LPM，max_head_m=22 m，max_flow_lpm=6200 LPM；應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留；兩口徑各自型號；除6吋／8吋外，表列功率、額定點、最大揚程與最大流量相同；兩個最大值仍不可合工作點",
+      "required_points": [
+        "150DIVA PRO-5.200：hp=20 HP，kw=15 kW，outlet_inch=6 吋，rated_head_m=15 m，rated_flow_lpm=4000 LPM，max_head_m=22 m，max_flow_lpm=6200 LPM",
+        "200DIVA PRO-5.200：hp=20 HP，kw=15 kW，outlet_inch=8 吋，rated_head_m=15 m，rated_flow_lpm=4000 LPM，max_head_m=22 m，max_flow_lpm=6200 LPM",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "兩口徑各自型號；除6吋／8吋外，表列功率、額定點、最大揚程與最大流量相同；兩個最大值仍不可合工作點"
+      ],
+      "forbidden_claims": [
+        "錯納範圍外、未滿足明示條件的型號或給錯規格／單位",
+        "把6吋與8吋合成一個未分口徑的型號、猜口徑或推論水力數字有差"
+      ],
+      "expected_models": [
+        "150DIVA PRO-5.200",
+        "200DIVA PRO-5.200"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/150DIVA-PRO-5.200.md",
+          "page": 14,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 150DIVA PRO-5.200\nseries: DIVA PRO\nhp: 20\nkw: 15\noutlet_inch: 6\nrated_head_m: 15\nrated_flow_lpm: 4000\nmax_head_m: 22\nmax_flow_lpm: 6200\nsolids_mm: 25\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 31.9\nweight_1ph_kg: null\nweight_3ph_kg: 250\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 14\n---"
+        },
+        {
+          "path": "knowledge/products/200DIVA-PRO-5.200.md",
+          "page": 14,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: 200DIVA PRO-5.200\nseries: DIVA PRO\nhp: 20\nkw: 15\noutlet_inch: 8\nrated_head_m: 15\nrated_flow_lpm: 4000\nmax_head_m: 22\nmax_flow_lpm: 6200\nsolids_mm: 25\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 31.9\nweight_1ph_kg: null\nweight_3ph_kg: 250\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 14\n---"
+        }
+      ]
+    },
+    {
+      "id": "F18",
+      "kind": "價格缺資料",
+      "question": "這117款裡哪款買起來最便宜？能照型錄把最便宜的前三款和售價排給我嗎？沒價格就說缺什麼，不要拿馬力或重量當價格。",
+      "expected_answer": "117款與型錄未提供售價，不能挑最低價款或排行前三售價；需各款同條件報價／售價；不能以馬力、重量或其他規格當價格",
+      "required_points": [
+        "117款與型錄未提供售價，不能挑最低價款或排行前三售價",
+        "需各款同條件報價／售價；不能以馬力、重量或其他規格當價格"
+      ],
+      "forbidden_claims": [
+        "虛構價格、最低價型號或前三價格排序",
+        "把沒有價格當0元，或以馬力／重量猜售價"
+      ],
+      "expected_models": [],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg |\n| 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg |\n| 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg |\n| 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg |\n| 50(80)EUS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80DIVA-5.30 | 3 HP / 2.2 kW | 3\" | 10 m @ 550 LPM | 12.7 m @ 1250 LPM | 12 mm | 5.2 A | 78 kg |\n| 80DIVA-5.50 | 5 HP / 3.7 kW | 3\" | 15 m @ 500 LPM | 17.4 m @ 1500 LPM | 12 mm | 9.0 A | 104 kg |\n| 100DIVA-5.50 | 5 HP / 3.7 kW | 4\" | 10 m @ 1000 LPM | 14.0 m @ 1600 LPM | 12 mm | 9.0 A | 102 kg |\n| 100DIVA-5.75 | 7.5 HP / 5.5 kW | 4\" | 15 m @ 900 LPM | 19.0 m @ 2000 LPM | 12 mm | 12.4 A | 107 kg |\n| 100(150)DIVA-5.100| 10 HP / 7.5 kW | 4\" (6\") | 13 m @ 1500 LPM | 19.0 m @ 2800 LPM | 20 mm | 16.0 A | 150 kg |\n| 100(150)DIVA-5.150| 15 HP / 11 kW | 4\" (6\") | 15 m @ 2000 LPM | 22.0 m @ 3700 LPM | 20 mm | 22.0 A | 175 kg |\n| 150(200)DIVA-5.200| 20 HP / 15 kW | 6\" (8\") | 15 m @ 4000 LPM | 22.0 m @ 6200 LPM | 25 mm | 31.9 A | 250 kg |\n| 150(200)DIVA-5.240| 24 HP / 18 kW | 6\" (8\") | 21 m @ 3000 LPM | 29.0 m @ 5000 LPM | 25 mm | 35.5 A | 360 kg |\n| 150(200)DIVA-5.300| 30 HP / 22 kW | 6\" (8\") | 20 m @ 3800 LPM | 35.0 m @ 5200 LPM | 25 mm | 44.6 A | 390 kg |\n| 200DIVA-5.300L | 30 HP / 22 kW | 8\" | 15 m @ 4900 LPM | 26.0 m @ 6000 LPM | 25 mm | 44.6 A | 400 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 重量（1ø 與 3ø 相同，括號為 Q 版） |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-50(Q) | 0.5 HP / 0.37 kW | 2\" | 4.5 m @ 240 LPM | 8.0 m @ 330 LPM | 50 mm (2\") | 4.2 A | 1.6 A | 12.9 kg (14.3 kg)|\n| HIPPO-75(Q) | 0.75 HP / 0.55 kW| 2\" | 6.4 m @ 240 LPM | 10.0 m @ 390 LPM | 50 mm (2\") | 5.5 A | 1.8 A | 13.9 kg (15.3 kg)|\n| HIPPO-100(Q)| 1.0 HP / 0.75 kW | 2\" | 7.7 m @ 300 LPM | 11.3 m @ 500 LPM | 50 mm (2\") | 7.2 A | 2.5 A | 15.4 kg (16.8 kg)|\n| HIPPO-150(Q)| 1.5 HP / 1.1 kW | 2\" | 8.0 m @ 390 LPM | 12.5 m @ 580 LPM | 50 mm (2\") | 9.0 A | 2.8 A | 24.2 kg (26.2 kg)|\n| HIPPO-200(Q)| 2.0 HP / 1.5 kW | 2\" | 10.0 m @ 420 LPM | 15.5 m @ 660 LPM | 50 mm (2\") | 12.0 A | 3.9 A | 25.2 kg (27.2 kg)|"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 19,
+          "line_start": 428,
+          "line_end": 434,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg |\n| 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg |\n| 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg |\n| 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg |\n| 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\" | 36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F19",
+      "kind": "保固缺資料",
+      "question": "我想挑保固最長的，這117款哪幾款保固年數最高，保馬達還是也保軸封？型錄沒講就直接說，不要用品牌或系列來猜。",
+      "expected_answer": "型錄未提供各款保固年數及涵蓋馬達／軸封的條款，不能選最長保固；需各型號保固年數與涵蓋範圍資料，不從品牌／系列猜",
+      "required_points": [
+        "型錄未提供各款保固年數及涵蓋馬達／軸封的條款，不能選最長保固",
+        "需各型號保固年數與涵蓋範圍資料，不從品牌／系列猜"
+      ],
+      "forbidden_claims": [
+        "虛構保固年數、條款或最長保固型號",
+        "把未載保固說成0年或沒有保固"
+      ],
+      "expected_models": [],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 4,
+          "line_start": 116,
+          "line_end": 122,
+          "quote": "| 機型 (Type) | 輸出馬力 (HP/kW) | 出水口徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 淨重 (1ø / 3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg |\n| 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg |\n| 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg |\n| 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg |\n| 50(80)EUS-5.20 | 2 HP / 1.5 kW | 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 216,
+          "line_end": 222,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 13,
+          "line_start": 288,
+          "line_end": 299,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (3ø 400V) | 淨重 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80DIVA-5.30 | 3 HP / 2.2 kW | 3\" | 10 m @ 550 LPM | 12.7 m @ 1250 LPM | 12 mm | 5.2 A | 78 kg |\n| 80DIVA-5.50 | 5 HP / 3.7 kW | 3\" | 15 m @ 500 LPM | 17.4 m @ 1500 LPM | 12 mm | 9.0 A | 104 kg |\n| 100DIVA-5.50 | 5 HP / 3.7 kW | 4\" | 10 m @ 1000 LPM | 14.0 m @ 1600 LPM | 12 mm | 9.0 A | 102 kg |\n| 100DIVA-5.75 | 7.5 HP / 5.5 kW | 4\" | 15 m @ 900 LPM | 19.0 m @ 2000 LPM | 12 mm | 12.4 A | 107 kg |\n| 100(150)DIVA-5.100| 10 HP / 7.5 kW | 4\" (6\") | 13 m @ 1500 LPM | 19.0 m @ 2800 LPM | 20 mm | 16.0 A | 150 kg |\n| 100(150)DIVA-5.150| 15 HP / 11 kW | 4\" (6\") | 15 m @ 2000 LPM | 22.0 m @ 3700 LPM | 20 mm | 22.0 A | 175 kg |\n| 150(200)DIVA-5.200| 20 HP / 15 kW | 6\" (8\") | 15 m @ 4000 LPM | 22.0 m @ 6200 LPM | 25 mm | 31.9 A | 250 kg |\n| 150(200)DIVA-5.240| 24 HP / 18 kW | 6\" (8\") | 21 m @ 3000 LPM | 29.0 m @ 5000 LPM | 25 mm | 35.5 A | 360 kg |\n| 150(200)DIVA-5.300| 30 HP / 22 kW | 6\" (8\") | 20 m @ 3800 LPM | 35.0 m @ 5200 LPM | 25 mm | 44.6 A | 390 kg |\n| 200DIVA-5.300L | 30 HP / 22 kW | 8\" | 15 m @ 4900 LPM | 26.0 m @ 6000 LPM | 25 mm | 44.6 A | 400 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 16,
+          "line_start": 332,
+          "line_end": 338,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 重量（1ø 與 3ø 相同，括號為 Q 版） |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-50(Q) | 0.5 HP / 0.37 kW | 2\" | 4.5 m @ 240 LPM | 8.0 m @ 330 LPM | 50 mm (2\") | 4.2 A | 1.6 A | 12.9 kg (14.3 kg)|\n| HIPPO-75(Q) | 0.75 HP / 0.55 kW| 2\" | 6.4 m @ 240 LPM | 10.0 m @ 390 LPM | 50 mm (2\") | 5.5 A | 1.8 A | 13.9 kg (15.3 kg)|\n| HIPPO-100(Q)| 1.0 HP / 0.75 kW | 2\" | 7.7 m @ 300 LPM | 11.3 m @ 500 LPM | 50 mm (2\") | 7.2 A | 2.5 A | 15.4 kg (16.8 kg)|\n| HIPPO-150(Q)| 1.5 HP / 1.1 kW | 2\" | 8.0 m @ 390 LPM | 12.5 m @ 580 LPM | 50 mm (2\") | 9.0 A | 2.8 A | 24.2 kg (26.2 kg)|\n| HIPPO-200(Q)| 2.0 HP / 1.5 kW | 2\" | 10.0 m @ 420 LPM | 15.5 m @ 660 LPM | 50 mm (2\") | 12.0 A | 3.9 A | 25.2 kg (27.2 kg)|"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 18,
+          "line_start": 386,
+          "line_end": 395,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 |\n| 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 |\n| 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 |\n| 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 360 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 |\n| 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 kg | 彎頭型 (Elbow) | SQM-100 |\n| 80(100)STEEL-5.150| 15 HP / 11 kW | 3\" (4\") | 26.5 m @ 846 LPM | 39.7 m @ 1352 LPM | 25 mm | - | 18 A | - / 81.5 kg | 彎頭型 (Elbow) | SQM-100 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 19,
+          "line_start": 428,
+          "line_end": 434,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg |\n| 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg |\n| 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg |\n| 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg |\n| 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\" | 36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 20,
+          "line_start": 443,
+          "line_end": 448,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 3ø 400V | 額定點 (m @ LPM) | 極限點 (m @ LPM) | 通過粒徑 (mm) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 80(100)LEOPARD-5.30 | 3 | 2.2 | 3\" (4\") | 5 A | 8 @ 700 | 14 @ 1400 | 56 | 75 | QL-100 |\n| 100LEOPARD-5.50 | 5 | 3.7 | 4\" | 8.2 A | 11 @ 800 | 16 @ 1900 | 80 | 90 | QL-100 |\n| 100LEOPARD-5.75 | 7.5 | 5.5 | 4\" | 12.1 A | 13 @ 800 | 18 @ 2300 | 68 | 140 | QL-100 |\n| 100LEOPARD-5.100 | 10 | 7.5 | 4\" | 15.9 A | 16 @ 850 | 23 @ 2500 | 68 | 166 | QL-100 |"
+        }
+      ]
+    },
+    {
+      "id": "F20",
+      "kind": "已載選配但組合重量缺值",
+      "question": "HIPPO-550 DN80標的著脫座是什麼？泵本身三相淨重多少？把那個著脫座一起裝上，整套會有幾公斤？別直接拿泵的淨重當整套，沒資料就說還缺什麼。",
+      "expected_answer": "HIPPO-550 DN80：weight_3ph_kg=51.9 kg；HIPPO-550 DN80明列可搭QD-80著脫座；51.9 kg是泵三相淨重；型錄沒有QD-80座本身重量／整套重量，不能計算總重；需QD-80及隨附組件重量，不能把泵淨重直接當整套重",
+      "required_points": [
+        "HIPPO-550 DN80：weight_3ph_kg=51.9 kg",
+        "HIPPO-550 DN80明列可搭QD-80著脫座",
+        "51.9 kg是泵三相淨重；型錄沒有QD-80座本身重量／整套重量，不能計算總重",
+        "需QD-80及隨附組件重量，不能把泵淨重直接當整套重"
+      ],
+      "forbidden_claims": [
+        "說沒有QD-80選配或推錯配座",
+        "把51.9 kg說成泵加座總重",
+        "把座未載重量當0、虛構座重或整套重"
+      ],
+      "expected_models": [
+        "HIPPO-550 DN80"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/products/HIPPO-550-DN80.md",
+          "page": 17,
+          "line_start": 1,
+          "line_end": 20,
+          "quote": "---\nmodel: HIPPO-550 DN80\nseries: HIPPO DN\nhp: 5.5\nkw: 4.1\noutlet_inch: 3\nrated_head_m: 8\nrated_flow_lpm: 900\nmax_head_m: 18.5\nmax_flow_lpm: 1350\nsolids_mm: 76\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.1\nweight_1ph_kg: null\nweight_3ph_kg: 51.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 17\n---"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 353,
+          "line_end": 366,
+          "quote": "| 機型 (Type) | HP | kW | 口徑 | 滿載電流 1ø 230V | 滿載電流 3ø 400V | 額定揚程 (m) | 額定流量 (LPM) | 最大揚程 (m) | 最大流量 (LPM) | 通過粒徑 (mm) | 重量 1ø (kg) | 重量 3ø (kg) | 著脫座 (Q.D.C.) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| HIPPO-150 DN65 | 1.5 | 1.1 | 2.5\" | 10 A | 3 A | 6.6 | 330 | 11 | 600 | 65 | 30.7 | 30.7 | QM-65/QD-65 |\n| HIPPO-200 DN65 | 2 | 1.5 | 2.5\" | 12 A | 3.9 A | 8.4 | 360 | 13 | 720 | 65 | 32.9 | 32.9 | QM-65/QD-65 |\n| HIPPO-300 DN65 | 3 | 2.2 | 2.5\" | - | 6 A | 12.6 | 300 | 17 | 870 | 65 | - | 34 | QM-65/QD-65 |\n| HIPPO-400 DN65 | 4 | 3 | 2.5\" | - | 6.7 A | 13 | 500 | 20 | 1000 | 65 | - | 41.7 | QM-65/QD-65 |\n| HIPPO-550 DN65 | 5.5 | 4.1 | 2.5\" | - | 9.1 A | 15 | 500 | 22.5 | 1200 | 65 | - | 43.7 | QM-65/QD-65 |\n| HIPPO-150 DN80 | 1.5 | 1.1 | 3\" | 10 A | 3 A | 4.4 | 415 | 7 | 630 | 76 | 40.4 | 40.4 | QD-80 |\n| HIPPO-200 DN80 | 2 | 1.5 | 3\" | 12 A | 3.9 A | 5 | 460 | 9 | 780 | 76 | 42.6 | 42.6 | QD-80 |\n| HIPPO-300 DN80 | 3 | 2.2 | 3\" | - | 6 A | 9.5 | 400 | 13 | 1100 | 76 | - | 43.7 | QD-80 |\n| HIPPO-400 DN80 | 4 | 3 | 3\" | - | 6.7 A | 8 | 600 | 15.5 | 1200 | 76 | - | 49.9 | QD-80 |\n| HIPPO-550 DN80 | 5.5 | 4.1 | 3\" | - | 9.1 A | 8 | 900 | 18.5 | 1350 | 76 | - | 51.9 | QD-80 |\n| HIPPO-750 DN80 | 7.5 | 5.5 | 3\" | - | 12.3 A | 11 | 900 | 18 | 1600 | 76 | - | 65.5 | QD-80 |\n| HIPPO-750H DN80 | 7.5 | 5.5 | 3\" | - | 12 A | 16 | 710 | 21 | 1100 | 76 | - | 65.5 | QD-80 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 17,
+          "line_start": 378,
+          "line_end": 378,
+          "quote": "> 3. 著脫基座：DN65 機型搭配 QM-65 或 QD-65；DN80 機型搭配 QD-80。QD-65 與 QD-80 採用自帶彎管設計（The QD-65&QD-80 are designed together with elbow）。"
+        }
+      ]
+    }
+  ]
+}

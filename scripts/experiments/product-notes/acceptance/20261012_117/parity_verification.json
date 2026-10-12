@@ -1,0 +1,16 @@
+{
+  "status": "verified",
+  "raw_metadata_equal": false,
+  "resolved_metadata_equal": true,
+  "different_language_cache_entries": 99,
+  "document_entries": 129,
+  "raw_metadata_sha256": [
+    "814180475e2bef1ade75ea721bac80f60b3684fa4102a955f54326f07f36c136",
+    "8654dac0de728750be89f179d02c35243367b290ce67b2c9786de74482aec58b"
+  ],
+  "resolved_metadata_sha256": "f3a652f596906e2335260fbc992fd76df08a747f8db0bc65b17344bd96ea99ad",
+  "knowledge_contents_equal": true,
+  "method": "Infer missing language/source only; preserve every other key; no writes",
+  "production_project": "proj-0cc5c610b4",
+  "test_project": "dev-c0c8fdff34"
+}

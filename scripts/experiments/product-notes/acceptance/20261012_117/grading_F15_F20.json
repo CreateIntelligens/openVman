@@ -1,0 +1,422 @@
+{
+  "grader": "Codex獨立人工式逐份閱讀；對照凍結規則與117筆記／來源，不呼叫模型；工具結果不代替回答。缺資料拒答仍須保留required_points必要限制。",
+  "rubric_source": "questions.json:grading_rubric＋F15–F20 required_points／forbidden_claims",
+  "input_sha256": "a09b63f4fdc4cd51bfbe5df2d686bca2ed1968f0fea658b7554429837c155cd2",
+  "grades": [
+    {
+      "id": "F15",
+      "repeat": 1,
+      "verdict": "correct",
+      "reason": "五款候選完整，所有HP／最大揚程／粒徑正確；18 m、68 mm與10 HP邊界皆納入。此集合題沒有排序要求，先列10 HP款不扣分。",
+      "matched_points": [
+        "100LEOPARD-5.75：hp=7.5 HP，max_head_m=18 m，solids_mm=68 mm",
+        "100LEOPARD-5.100：hp=10 HP，max_head_m=23 m，solids_mm=68 mm",
+        "HIPPO-550 DN80：hp=5.5 HP，max_head_m=18.5 m，solids_mm=76 mm",
+        "HIPPO-750 DN80：hp=7.5 HP，max_head_m=18 m，solids_mm=76 mm",
+        "HIPPO-750H DN80：hp=7.5 HP，max_head_m=21 m，solids_mm=76 mm",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "18 m、68 mm、10 HP等於門檻也符合"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:P17 L364–366（HIPPO DN三相HP／最大揚程／粒徑）",
+        "knowledge/EVAK_CATALOG.md:P20 L447–450（LEOPARD三相HP／最大揚程／粒徑）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "0038a9002a0b24501b37f947208845ab1a310371842729dedcbfb752550cad61"
+    },
+    {
+      "id": "F16",
+      "repeat": 1,
+      "verdict": "partial",
+      "reason": "六款型號與14、21、28.5、31、37、46 m全正確，明說未載不等於0且不能確認不符合；未保留需要原廠通過粒徑／工況資料、不能靠用途補值的必要確認限制。",
+      "matched_points": [
+        "六款未載通過粒徑型號完整",
+        "50EUSR-5.05 14 m；32ALLIGATOR-5.15 21 m；32ALLIGATOR-5.20 28.5 m；32ALLIGATOR-5.30 31 m；50ALLIGATOR-5.50 37 m；50ALLIGATOR-5.75 46 m",
+        "未載不代表0 mm，不能直接判不符合"
+      ],
+      "missing_points": [
+        "需要原廠通過粒徑／工況資料來確認，不憑型號或用途補粒徑值"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/products/50EUSR-5.05.md:P5 L2–19、L29（solids_mm=null，最大揚程14 m）",
+        "knowledge/EVAK_CATALOG.md:P5 L133–150（殘水排水泵特色／適用場合／規格，無通過粒徑欄與不鏽鋼材質）",
+        "knowledge/EVAK_CATALOG.md:P19 L415–434（研磨絞碎用途及五款規格，無通過粒徑欄）"
+      ],
+      "quality_issues": [
+        "以殘水／絞碎用途當作未載不等於0的原因，宜改為來源缺資料的直接說明；沒有由用途推算具體粒徑，未作重大能力捏造扣分"
+      ],
+      "answer_sha256": "84cf1fa9e605b642e86bff9a4ec90ffbf1887790527edd5c9173a3f9fa3e8b74"
+    },
+    {
+      "id": "F17",
+      "repeat": 1,
+      "verdict": "wrong",
+      "reason": "在20 HP上下文中150／200 DIVA PRO與6／8吋可唯一識別，15 kW也正確；但明說「水力規格依型號不同而異」，與兩款完全相同的額定15 m @4000 LPM、最大揚程22 m及最大流量6200 LPM相矛盾，是實質錯誤比較而非只漏數字。",
+      "matched_points": [
+        "6吋為150DIVA PRO-5.200、8吋為200DIVA PRO-5.200（上下文與口徑可識別）",
+        "兩款20 HP且15 kW"
+      ],
+      "missing_points": [
+        "兩款額定點各15 m @4000 LPM",
+        "兩款最大揚程各22 m、最大流量各6200 LPM",
+        "水力數字相同，兩個最大值仍不可當同工作點"
+      ],
+      "false_claims": [
+        "說兩款水力規格依型號不同而異，原兩篇筆記的全部水力數字相同"
+      ],
+      "source_lines": [
+        "knowledge/products/150DIVA-PRO-5.200.md:P14 L2–10、L24–29（6吋／20 HP／15 kW／15 m @4000 LPM／獨立最大22 m與6200 LPM）",
+        "knowledge/products/200DIVA-PRO-5.200.md:P14 L2–10、L24–29（8吋相同功率與水力數字）",
+        "knowledge/EVAK_CATALOG.md:P14 L314（DIVA PRO水力、馬力、電流與重量和DIVA相容）"
+      ],
+      "quality_issues": [
+        "型號名稱省略-5.200，但已限定20 HP及6／8吋，可唯一辨識，不把此口述省略當型號錯誤",
+        "把未檢索到完整數據誤說型錄未完整列出對照數字"
+      ],
+      "answer_sha256": "763aff28cd605b1e76e8c30517c95daf7aa373c0d9757de7449040745a5c0f09"
+    },
+    {
+      "id": "F18",
+      "repeat": 1,
+      "verdict": "partial",
+      "reason": "型錄沒有售價／價格的主結論正確，沒有捏造售價或排行；但未明確說無法挑最低價或前三，亦漏需各款同條件報價及不能以馬力／重量當價格的必要限制。不能僅因未編造便評完全正確。",
+      "matched_points": [
+        "型錄未提供售價／價格資料"
+      ],
+      "missing_points": [
+        "缺價格不能判最低價或最便宜前三款",
+        "需要各款同條件報價／售價，不能拿馬力、重量或其他規格當價格"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:L1–473（完整來源無售價／價格欄與報價資訊）",
+        "question_validation.json:full_catalog_absence_checks.price（全來源檢索與117 raw frontmatter欄位缺資料核對）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "7013c6a20fece064452a696d5d6e5abb1ae875fc400c3392a4a8701b1060d2a9"
+    },
+    {
+      "id": "F19",
+      "repeat": 1,
+      "verdict": "partial",
+      "reason": "未載保固年數／年限與範圍的主結論正確，沒有虛構保固或稱零年；但漏明確無法選保固最長款，需各型號年數與涵蓋條款，不從品牌／系列猜的必要限定。",
+      "matched_points": [
+        "型錄未提供保固年數及範圍"
+      ],
+      "missing_points": [
+        "不能判哪款保固最長或保固年數排行",
+        "需各型號保固年數及涵蓋馬達／軸封範圍資料，不從品牌／系列猜"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:L1–473（完整來源未提供各型號保固年數或涵蓋馬達／軸封條款）",
+        "question_validation.json:full_catalog_absence_checks.warranty（全來源與117 raw frontmatter缺保固欄核對）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "0864997d16019e8e887ded562ae46d006ac8a00dacdd4ab34107b4dbe81bb50a"
+    },
+    {
+      "id": "F20",
+      "repeat": 1,
+      "verdict": "correct",
+      "reason": "QD-80配座與泵三相淨重51.9 kg全正確，明確指出座重未載、無法計整套總重並需座重量資料；沒有把泵淨重當組裝總重或缺值當零。以整座重量資料表述包含所需座組件，不要求固定字串。",
+      "matched_points": [
+        "HIPPO-550 DN80：weight_3ph_kg=51.9 kg",
+        "HIPPO-550 DN80明列可搭QD-80著脫座",
+        "51.9 kg是泵三相淨重；型錄沒有QD-80座本身重量／整套重量，不能計算總重",
+        "需QD-80及隨附組件重量，不能把泵淨重直接當整套重"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/products/HIPPO-550-DN80.md:P17 L16、L29（泵三相淨重51.9 kg、著脫座QD-80）",
+        "knowledge/EVAK_CATALOG.md:P17 L353、L364、L378（51.9為泵重量3ø欄、搭QD-80；沒有座本身／整套重量）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "928033105d653da7c258ab7fa623febbdadf87625fb9b9602f00f911036eaf45"
+    },
+    {
+      "id": "F15",
+      "repeat": 2,
+      "verdict": "correct",
+      "reason": "五款候選完整，所有HP／最大揚程／粒徑正確；18 m、68 mm與10 HP邊界皆納入。此集合題沒有排序要求，先列10 HP款不扣分。",
+      "matched_points": [
+        "100LEOPARD-5.75：hp=7.5 HP，max_head_m=18 m，solids_mm=68 mm",
+        "100LEOPARD-5.100：hp=10 HP，max_head_m=23 m，solids_mm=68 mm",
+        "HIPPO-550 DN80：hp=5.5 HP，max_head_m=18.5 m，solids_mm=76 mm",
+        "HIPPO-750 DN80：hp=7.5 HP，max_head_m=18 m，solids_mm=76 mm",
+        "HIPPO-750H DN80：hp=7.5 HP，max_head_m=21 m，solids_mm=76 mm",
+        "應列型號完整，沒有錯納；模型別名需能無歧義對應原表列，口徑拆分款各自保留",
+        "按已載phase與各相對應規格判斷，單／三相合併列可提供所問相數，不把它當未知或排除",
+        "18 m、68 mm、10 HP等於門檻也符合"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:P17 L364–366（HIPPO DN三相HP／最大揚程／粒徑）",
+        "knowledge/EVAK_CATALOG.md:P20 L447–450（LEOPARD三相HP／最大揚程／粒徑）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "22dc8abff2773b6790b93415077778efa14f37fc9c9c442802eb3471585642c1"
+    },
+    {
+      "id": "F16",
+      "repeat": 2,
+      "verdict": "wrong",
+      "reason": "正確指出兩系列粒徑未載、不當0且需原廠確認，但漏全部六款及揚程；另虛構EUSR「不鏽鋼」具體材質。原文L133–150及該產品筆記只載殘水排水用途，未支持此材質，屬無來源規格主張，依凍結規則判錯。",
+      "matched_points": [
+        "EUSR與ALLIGATOR通過粒徑皆未列",
+        "不能把未載當0 mm",
+        "≥10 mm固體需洽原廠確認適用"
+      ],
+      "missing_points": [
+        "六款逐款名稱與最大揚程：50EUSR-5.05 14 m；32ALLIGATOR-5.15 21 m；32ALLIGATOR-5.20 28.5 m；32ALLIGATOR-5.30 31 m；50ALLIGATOR-5.50 37 m；50ALLIGATOR-5.75 46 m"
+      ],
+      "false_claims": [
+        "無來源稱EUSR為不鏽鋼殘水型；提供的來源與筆記沒有此材質規格"
+      ],
+      "source_lines": [
+        "knowledge/products/50EUSR-5.05.md:P5 L2–19、L29（solids_mm=null，最大揚程14 m）",
+        "knowledge/EVAK_CATALOG.md:P5 L133–150（殘水排水泵特色／適用場合／規格，無通過粒徑欄與不鏽鋼材質）",
+        "knowledge/EVAK_CATALOG.md:P19 L415–434（研磨絞碎用途及五款規格，無通過粒徑欄）"
+      ],
+      "quality_issues": [
+        "「主要用於抽排雜質或清泥」也未獲EUSR來源L143（住宅／工地／殘水排除）或ALLIGATOR L422–425（纖維絞碎）支持，不應額外增寫清泥工況",
+        "把泵浦固體通過說成「過濾」是用途措辭不精確，不能代替通過粒徑規格"
+      ],
+      "answer_sha256": "59197baa84cf73af043dedd27db037534ea9392a8c7a3f0b1fc1702798365740"
+    },
+    {
+      "id": "F17",
+      "repeat": 2,
+      "verdict": "wrong",
+      "reason": "8吋200DIVA PRO-5.200的20 HP、額定15 m @4000 LPM、最大22 m／6200 LPM正確；但以「型錄僅列出8吋」明確宣稱只有一款，錯排已載6吋150DIVA PRO-5.200。15 kW及兩口徑相同水力比較亦漏掉。",
+      "matched_points": [
+        "8吋200DIVA PRO-5.200，20 HP",
+        "8吋額定15 m @4000 LPM，最大揚程22 m與最大流量6200 LPM"
+      ],
+      "missing_points": [
+        "6吋150DIVA PRO-5.200及20 HP／15 kW",
+        "兩款15 kW與兩款相同額定／最大水力數字",
+        "兩個最大值獨立不可合工作點"
+      ],
+      "false_claims": [
+        "「型錄僅列出8吋」是錯誤完整性主張，原已載6吋150DIVA PRO-5.200"
+      ],
+      "source_lines": [
+        "knowledge/products/150DIVA-PRO-5.200.md:P14 L2–10、L24–29（6吋／20 HP／15 kW／15 m @4000 LPM／獨立最大22 m與6200 LPM）",
+        "knowledge/products/200DIVA-PRO-5.200.md:P14 L2–10、L24–29（8吋相同功率與水力數字）",
+        "knowledge/EVAK_CATALOG.md:P14 L314（DIVA PRO水力、馬力、電流與重量和DIVA相容）"
+      ],
+      "quality_issues": [
+        "回答功率20 HP是有來源的馬力值，並非20 kW或數字錯誤；缺15 kW分欄另記漏項",
+        "沒有明說最大22 m與6200 LPM同時達成，因此不另加最大工作點捏造扣分"
+      ],
+      "answer_sha256": "6260bca972df2ee94d953592123fd2b3ad258ca115abe8f89379064b8d175040"
+    },
+    {
+      "id": "F18",
+      "repeat": 2,
+      "verdict": "partial",
+      "reason": "型錄沒有售價／價格的主結論正確，沒有捏造售價或排行；但未明確說無法挑最低價或前三，亦漏需各款同條件報價及不能以馬力／重量當價格的必要限制。不能僅因未編造便評完全正確。",
+      "matched_points": [
+        "型錄未提供售價／價格資料"
+      ],
+      "missing_points": [
+        "缺價格不能判最低價或最便宜前三款",
+        "需要各款同條件報價／售價，不能拿馬力、重量或其他規格當價格"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:L1–473（完整來源無售價／價格欄與報價資訊）",
+        "question_validation.json:full_catalog_absence_checks.price（全來源檢索與117 raw frontmatter欄位缺資料核對）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "6c327ad1a4845bcf444e60990097a09994e694fef2b82a29518686689f406e61"
+    },
+    {
+      "id": "F19",
+      "repeat": 2,
+      "verdict": "partial",
+      "reason": "未載保固年數／年限與範圍的主結論正確，沒有虛構保固或稱零年；但漏明確無法選保固最長款，需各型號年數與涵蓋條款，不從品牌／系列猜的必要限定。",
+      "matched_points": [
+        "型錄未提供保固年數及範圍，亦明說沒有馬達／軸封相關規定"
+      ],
+      "missing_points": [
+        "不能判哪款保固最長或保固年數排行",
+        "需各型號保固年數及涵蓋馬達／軸封範圍資料，不從品牌／系列猜"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:L1–473（完整來源未提供各型號保固年數或涵蓋馬達／軸封條款）",
+        "question_validation.json:full_catalog_absence_checks.warranty（全來源與117 raw frontmatter缺保固欄核對）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "00e31916bf3b3c37af40b6682f265799b6110b926530a8e6110cff7f01b313a6"
+    },
+    {
+      "id": "F20",
+      "repeat": 2,
+      "verdict": "correct",
+      "reason": "QD-80配座與泵三相淨重51.9 kg全正確，明確指出座重未載、無法計整套總重並需座重量資料；沒有把泵淨重當組裝總重或缺值當零。以整座重量資料表述包含所需座組件，不要求固定字串。",
+      "matched_points": [
+        "HIPPO-550 DN80：weight_3ph_kg=51.9 kg",
+        "HIPPO-550 DN80明列可搭QD-80著脫座",
+        "51.9 kg是泵三相淨重；型錄沒有QD-80座本身重量／整套重量，不能計算總重",
+        "需QD-80及隨附組件重量，不能把泵淨重直接當整套重"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/products/HIPPO-550-DN80.md:P17 L16、L29（泵三相淨重51.9 kg、著脫座QD-80）",
+        "knowledge/EVAK_CATALOG.md:P17 L353、L364、L378（51.9為泵重量3ø欄、搭QD-80；沒有座本身／整套重量）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "61d1b262c1a7cdd9207c8fd82a57ef76809009ce423f1034fa1be7d56fb61ec6"
+    },
+    {
+      "id": "F15",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "兩款LEOPARD及7.5／10 HP、18／23 m、68 mm均正確，沒有錯納或錯數字；漏三款HIPPO DN及其數字，是完整清單不足而非錯誤排除。",
+      "matched_points": [
+        "100LEOPARD-5.75：7.5 HP、18 m、68 mm",
+        "100LEOPARD-5.100：10 HP、23 m、68 mm",
+        "18 m／68 mm／10 HP精確邊界有納入"
+      ],
+      "missing_points": [
+        "HIPPO-550 DN80：5.5 HP、18.5 m、76 mm",
+        "HIPPO-750 DN80：7.5 HP、18 m、76 mm",
+        "HIPPO-750H DN80：7.5 HP、21 m、76 mm",
+        "完整五款清單"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:P17 L364–366（HIPPO DN三相HP／最大揚程／粒徑）",
+        "knowledge/EVAK_CATALOG.md:P20 L447–450（LEOPARD三相HP／最大揚程／粒徑）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "a970d4d85b41fe60256d1ef016c0f4307dcd5d2def69598e975d3fb1e8e22ad3"
+    },
+    {
+      "id": "F16",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "未載粒徑不等於0、不能確認不符合≥10 mm且應洽原廠的限制正確；但只寫系列，沒有逐款列出六個型號與六個最大揚程，純漏必要清單／數字判部分對。",
+      "matched_points": [
+        "兩系列粒徑均未載",
+        "不能直接視0 mm，也不能確認不符合≥10 mm",
+        "需要原廠確認"
+      ],
+      "missing_points": [
+        "50EUSR-5.05：14 m",
+        "32ALLIGATOR-5.15：21 m",
+        "32ALLIGATOR-5.20：28.5 m",
+        "32ALLIGATOR-5.30：31 m",
+        "50ALLIGATOR-5.50：37 m",
+        "50ALLIGATOR-5.75：46 m",
+        "六款各自未載粒徑及已知最大揚程的完整清單"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/products/50EUSR-5.05.md:P5 L2–19、L29（solids_mm=null，最大揚程14 m）",
+        "knowledge/EVAK_CATALOG.md:P5 L133–150（殘水排水泵特色／適用場合／規格，無通過粒徑欄與不鏽鋼材質）",
+        "knowledge/EVAK_CATALOG.md:P19 L415–434（研磨絞碎用途及五款規格，無通過粒徑欄）"
+      ],
+      "quality_issues": [
+        "EUSR原文明示殘水排水泵，回答泛稱污水泵不精確；本回答仍保留未知並未藉此宣稱固體通過能力，列品質問題"
+      ],
+      "answer_sha256": "41609adab6a4f70ade0e5c747f1349880329f4565551bd77037b66154a88b2d6"
+    },
+    {
+      "id": "F17",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "已正確給8吋200DIVA PRO-5.200、20 HP及全部水力數字；6吋未提及以來源未取得資料表述，未明說6吋產品不存在或只有一款，依部分正確／漏列判部分對，來源缺資料聲稱另列品質。仍缺6吋款、15 kW及相同水力／獨立最大值限制。",
+      "matched_points": [
+        "8吋200DIVA PRO-5.200，20 HP",
+        "8吋額定15 m @4000 LPM、最大揚程22 m、最大流量6200 LPM"
+      ],
+      "missing_points": [
+        "6吋150DIVA PRO-5.200：20 HP、15 kW、額定15 m @4000 LPM、最大揚程22 m、最大流量6200 LPM",
+        "8吋200DIVA PRO-5.200的15 kW",
+        "兩口徑水力數字相同；兩個最大值仍不可當同工作點"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/products/150DIVA-PRO-5.200.md:P14 L2–10、L24–29（6吋／20 HP／15 kW／15 m @4000 LPM／獨立最大22 m與6200 LPM）",
+        "knowledge/products/200DIVA-PRO-5.200.md:P14 L2–10、L24–29（8吋相同功率與水力數字）",
+        "knowledge/EVAK_CATALOG.md:P14 L314（DIVA PRO水力、馬力、電流與重量和DIVA相容）"
+      ],
+      "quality_issues": [
+        "「6吋型號型錄未提及」是把檢索／回答缺資料誤作原型錄未載；6吋產品筆記確有，不能作不存在的證據",
+        "與R2「僅列8吋」的明確一款完整性主張區別；本次沒有明確否認6吋產品存在，採漏資料判部分對"
+      ],
+      "answer_sha256": "ad6bf5ca0758ec51697fe645a8a80263955e7ca3428c56d90e9251df6cd4f636"
+    },
+    {
+      "id": "F18",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "型錄沒有售價／價格的主結論正確，沒有捏造售價或排行；但未明確說無法挑最低價或前三，亦漏需各款同條件報價及不能以馬力／重量當價格的必要限制。不能僅因未編造便評完全正確。",
+      "matched_points": [
+        "型錄未提供售價／價格資料"
+      ],
+      "missing_points": [
+        "缺價格不能判最低價或最便宜前三款",
+        "需要各款同條件報價／售價，不能拿馬力、重量或其他規格當價格"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:L1–473（完整來源無售價／價格欄與報價資訊）",
+        "question_validation.json:full_catalog_absence_checks.price（全來源檢索與117 raw frontmatter欄位缺資料核對）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "5e7e60e41212ddc1953dec0d4062bc2e978bc69ab347470f5bd420711584bf4f"
+    },
+    {
+      "id": "F19",
+      "repeat": 3,
+      "verdict": "partial",
+      "reason": "未載保固年數／年限與範圍的主結論正確，沒有虛構保固或稱零年；但漏明確無法選保固最長款，需各型號年數與涵蓋條款，不從品牌／系列猜的必要限定。",
+      "matched_points": [
+        "型錄未提供保固年數及範圍"
+      ],
+      "missing_points": [
+        "不能判哪款保固最長或保固年數排行",
+        "需各型號保固年數及涵蓋馬達／軸封範圍資料，不從品牌／系列猜"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/EVAK_CATALOG.md:L1–473（完整來源未提供各型號保固年數或涵蓋馬達／軸封條款）",
+        "question_validation.json:full_catalog_absence_checks.warranty（全來源與117 raw frontmatter缺保固欄核對）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "019d24bb39ec96be08192b864cd5e2409d55db4e03da557154320058d50b4599"
+    },
+    {
+      "id": "F20",
+      "repeat": 3,
+      "verdict": "correct",
+      "reason": "QD-80配座與泵三相淨重51.9 kg全正確，明確指出座重未載、無法計整套總重並需座重量資料；沒有把泵淨重當組裝總重或缺值當零。以整座重量資料表述包含所需座組件，不要求固定字串。",
+      "matched_points": [
+        "HIPPO-550 DN80：weight_3ph_kg=51.9 kg",
+        "HIPPO-550 DN80明列可搭QD-80著脫座",
+        "51.9 kg是泵三相淨重；型錄沒有QD-80座本身重量／整套重量，不能計算總重",
+        "需QD-80及隨附組件重量，不能把泵淨重直接當整套重"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        "knowledge/products/HIPPO-550-DN80.md:P17 L16、L29（泵三相淨重51.9 kg、著脫座QD-80）",
+        "knowledge/EVAK_CATALOG.md:P17 L353、L364、L378（51.9為泵重量3ø欄、搭QD-80；沒有座本身／整套重量）"
+      ],
+      "quality_issues": [],
+      "answer_sha256": "48cd807e8d8ccd4e22c6c3d4f51b5668dba10437b88bc405d6e4f548c502e021"
+    }
+  ]
+}

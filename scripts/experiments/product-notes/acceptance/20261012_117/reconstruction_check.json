@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "checked_date": "2026-10-12",
+  "method": "Copy only proposed versioned acceptance files into an empty layout; reconstruct omitted files and verify offline",
+  "commands": [
+    {
+      "command": "materialize_snapshot.py --self-test",
+      "exit_code": 0
+    },
+    {
+      "command": "freeze_questions.py",
+      "exit_code": 0
+    },
+    {
+      "command": "run_acceptance.py --self-test",
+      "exit_code": 0
+    },
+    {
+      "command": "prepare_grading.py",
+      "exit_code": 0
+    },
+    {
+      "command": "audit_tools.py --self-test",
+      "exit_code": 0
+    },
+    {
+      "command": "audit_tools.py",
+      "exit_code": 0
+    },
+    {
+      "command": "verify_artifacts.py",
+      "exit_code": 0
+    },
+    {
+      "command": "finalize_report.py",
+      "exit_code": 0
+    }
+  ],
+  "recreated_source_views": 119,
+  "source_and_answers_unchanged": true,
+  "scores": {
+    "對": 28,
+    "部分對": 26,
+    "錯": 6
+  },
+  "report_rebuilt_identically": true,
+  "provider_calls": 0,
+  "live_workspace_access": false
+}

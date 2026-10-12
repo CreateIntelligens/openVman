@@ -1,0 +1,12 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Frozen acceptance source manifest contains file SHA-256 hashes"
+condition = "AND"
+regexTarget = "line"
+paths = ['''^scripts/experiments/product-notes/acceptance/20261012_117/(probe2_)?results\.json$''']
+regexes = ['''^\s*"brain/api/(core/key_pool\.py|safety/internal_auth\.py|tests/safety/test_internal_auth\.py|tests/session/test_(backup|recall_toggle|session_export)_api\.py)": "[a-f0-9]{64}",?\s*$''']

@@ -1,0 +1,10 @@
+*_checkpoint.jsonl
+*_integrity.full.json
+integrity.full.json
+__pycache__/
+# Reconstructed byte-for-byte from source_snapshot.json and raw answers.
+notes/
+source_catalog.md
+catalog.yaml
+answers_for_grading_*.json
+summary.json

@@ -1,0 +1,30 @@
+{
+  "status": "passed",
+  "checked_date": "2026-10-12",
+  "chat_measurement_commit": "0759f4f4ab1080fb1cc4ffd0dc8b44bb5a940087",
+  "chat_results_sha256": "e6e53b99e8f334db9ae50193a47dbf0089e42a3590585ccf03cd52e8205b7bcf",
+  "unit_test_checkout": "4b3debed5bda08ca8b471f85ed89015f6f973c0f",
+  "brain_non_integration": {
+    "command": "python3 -B -m pytest brain/api/tests -m 'not integration' -q -p no:cacheprovider",
+    "exit_code": 0,
+    "passed": 1243,
+    "skipped": 1,
+    "deselected": 15,
+    "warnings": 1,
+    "elapsed_seconds": 54.45,
+    "warning": "google.genai Pydantic classmethod model_validator deprecation"
+  },
+  "offline_checks": [
+    "freeze_questions: 20 questions, 117 notes, 181 exact citations",
+    "run_acceptance --self-test: oracle stripping, read-only guards, new-run evidence preservation",
+    "audit_tools --self-test and replay: 39 exact outputs, 1 reproduced error",
+    "verify_artifacts: 60 independent sessions, 60 bound grades, source and input hashes",
+    "check_behavior_parity: 99 auto-language-cache differences, 129 resolved entries equal",
+    "git diff --check: passed"
+  ],
+  "historical_round_bodies_unchanged": true,
+  "old_round_tracked_files_unchanged": true,
+  "pii_detector_disabled_in_measurement": true,
+  "chat_measurement_is_latest_checkout_acceptance": false,
+  "stage_commit_push_during_measurement": false
+}

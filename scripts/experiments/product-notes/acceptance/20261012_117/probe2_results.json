@@ -1,0 +1,1269 @@
+{
+  "status": "completed",
+  "error": null,
+  "questions": [
+    {
+      "id": "F01",
+      "repeat": 1,
+      "question": "我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。",
+      "answer": "符合三吋管、三相、五馬力以下且最大流量六百公升以上的型號有：八十帝華五點三零三馬力、八十帝華五點五零五馬力、八十歐德烏五點二零二馬力、八十歐德烏五點三零三馬力、八十歐德烏五點五零五馬力、八十伊優比姆五點二零二馬力、八十伊優比姆五點三零三馬力、八十伊優比姆五點五零五馬力、八十伊優愛斯五點二零二馬力、八十豹牌五點三零三馬力、八十鋼鐵五點二零二馬力、八十鋼鐵五點三零三馬力、八十鋼鐵五點五零五馬力、河馬一百五十點八十口徑一點五馬力、河馬二百點八十口徑二馬力、河馬三百點八十口徑三馬力、河馬四百點八十口徑四馬力。",
+      "final": {
+        "status": "ok",
+        "trace_id": "accept117-R1-F01",
+        "session_id": "accept117-R1-F01",
+        "request_context": {
+          "trace_id": "accept117-R1-F01",
+          "session_id": "accept117-R1-F01",
+          "message_type": "user",
+          "channel": "web",
+          "locale": "zh-TW",
+          "persona_id": "default",
+          "project_id": "dev-c0c8fdff34",
+          "client_ip": "",
+          "metadata": {}
+        },
+        "reply": "符合三吋管、三相、五馬力以下且最大流量六百公升以上的型號有：八十帝華五點三零三馬力、八十帝華五點五零五馬力、八十歐德烏五點二零二馬力、八十歐德烏五點三零三馬力、八十歐德烏五點五零五馬力、八十伊優比姆五點二零二馬力、八十伊優比姆五點三零三馬力、八十伊優比姆五點五零五馬力、八十伊優愛斯五點二零二馬力、八十豹牌五點三零三馬力、八十鋼鐵五點二零二馬力、八十鋼鐵五點三零三馬力、八十鋼鐵五點五零五馬力、河馬一百五十點八十口徑一點五馬力、河馬二百點八十口徑二馬力、河馬三百點八十口徑三馬力、河馬四百點八十口徑四馬力。",
+        "history": [
+          {
+            "role": "user",
+            "content": "我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。"
+          },
+          {
+            "role": "assistant",
+            "content": "符合三吋管、三相、五馬力以下且最大流量六百公升以上的型號有：八十帝華五點三零三馬力、八十帝華五點五零五馬力、八十歐德烏五點二零二馬力、八十歐德烏五點三零三馬力、八十歐德烏五點五零五馬力、八十伊優比姆五點二零二馬力、八十伊優比姆五點三零三馬力、八十伊優比姆五點五零五馬力、八十伊優愛斯五點二零二馬力、八十豹牌五點三零三馬力、八十鋼鐵五點二零二馬力、八十鋼鐵五點三零三馬力、八十鋼鐵五點五零五馬力、河馬一百五十點八十口徑一點五馬力、河馬二百點八十口徑二馬力、河馬三百點八十口徑三馬力、河馬四百點八十口徑四馬力。",
+            "tool_steps": [
+              {
+                "tool_call_id": "prefetch-search-knowledge",
+                "name": "search_knowledge",
+                "arguments": "{\"queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}",
+                "result": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"embedding_versions\": [\"gemma:google/embeddinggemma-2:768:float32:l2:query:914f7f89142e33e77833254d9c9b90c3cef7303b\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\\\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\\\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\\\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg || 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\\\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg || 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\\\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm |\\n\\n - | 5.2 A | - / 29.8 kg || 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\\\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg || 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\\\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg || 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\\\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg || 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\\\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg || 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\\\" | 16 m \", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::45\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格\\\", \\\"規格數據表 (50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 45, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::45\\\", \\\"char_count\\\": 1125, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_score\": 1.0, \"_distance\": 0.4243224263191223, \"_rrf_score\": 0.01639344262295082, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 19 頁：ALLIGATOR 沉水研磨絞碎型污水泵機構 > 2. ALLIGATOR 規格數據表 (50Hz / 2850rpm)\\n內容：| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\\\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg || 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\\\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg || 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\\\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg || 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\\\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg || 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\\\" | \\n\\n36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::78\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 19 頁：ALLIGATOR 沉水研磨絞碎型污水泵機構\\\", \\\"2. ALLIGATOR 規格數據表 (50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 78, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::78\\\", \\\"char_count\\\": 699, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_score\": 0.8208369437789896, \"_distance\": 0.44355300068855286, \"_rrf_score\": 0.016129032258064516, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\\n內容：| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 || 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\\\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 || 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\\\" (3\\\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 || 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\\\" (3\\\") | 14.7 m @ 3\\n\\n60 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 || 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\\\" (4\\\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\\\" (4\\\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\\\" (4\\\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 \", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::71\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵\\\", \\\"1. 規格數據表 (50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 71, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::71\\\", \\\"char_count\\\": 1130, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.40633317828178406, \"_rrf_score\": 0.015873015873015872, \"_score\": 0.14185228604923802, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"trust_boundary\": \"untrusted_reference_data\"}], \"related\": [], \"citations\": [{\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\\\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\\\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\\\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg || 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\\\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg || 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\\\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm |\\n\\n - | 5.2 A | - / 29.8 kg || 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\\\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg || 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\\\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg || 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\\\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg || 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\\\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg || 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\\\" | 16 m \", \"distance\": 0.4243224263191223, \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}, {\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 19 頁：ALLIGATOR 沉水研磨絞碎型污水泵機構 > 2. ALLIGATOR 規格數據表 (50Hz / 2850rpm)\\n內容：| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\\\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg || 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\\\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg || 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\\\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg || 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\\\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg || 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\\\" | \\n\\n36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |\", \"distance\": 0.44355300068855286, \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}, {\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\\n內容：| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 || 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\\\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 || 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\\\" (3\\\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 || 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\\\" (3\\\") | 14.7 m @ 3\\n\\n60 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 || 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\\\" (4\\\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\\\" (4\\\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\\\" (4\\\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 \", \"distance\": 0.40633317828178406, \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}]}, \"error\": \"\"}",
+                "duration_s": 1.529,
+                "round": 0,
+                "parallel": false
+              },
+              {
+                "tool_call_id": "call_1473843",
+                "name": "filter_products",
+                "arguments": "{\"scenarios\":[{\"name\":\"3吋三相5HP以下最大流量600LPM以上\",\"conditions\":[{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"3\"},{\"value\":\"3\",\"op\":\"contains\",\"field\":\"phase\"},{\"op\":\"lte\",\"field\":\"hp\",\"value\":\"5\"},{\"value\":\"600\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}]}]}",
+                "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦全型錄（Vol.PIE-23121，50Hz）\", \"product_count\": 117, \"scenarios\": [{\"name\": \"3吋三相5HP以下最大流量600LPM以上\", \"match_count\": 17, \"matches\": [{\"values\": {\"model\": \"80DIVA-5.30\", \"series\": \"DIVA\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 550, \"max_head_m\": 12.7, \"max_flow_lpm\": 1250, \"solids_mm\": 12, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 78}, \"path\": \"knowledge/products/80DIVA-5.30.md\"}, {\"values\": {\"model\": \"80DIVA-5.50\", \"series\": \"DIVA\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 15, \"rated_flow_lpm\": 500, \"max_head_m\": 17.4, \"max_flow_lpm\": 1500, \"solids_mm\": 12, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.0, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 104}, \"path\": \"knowledge/products/80DIVA-5.50.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUS-5.20\", \"series\": \"EUS\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 16, \"rated_flow_lpm\": 315, \"max_head_m\": 21.5, \"max_flow_lpm\": 658, \"solids_mm\": 6, \"phase\": [1, 3], \"current_1ph_a\": 13, \"current_3ph_a\": 3.7, \"weight_1ph_kg\": 18.1, \"weight_3ph_kg\": 18.1}, \"path\": \"knowledge/products/80EUS-5.20.md\"}, {\"values\": {\"model\": \"80LEOPARD-5.30\", \"series\": \"LEOPARD\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 8, \"rated_flow_lpm\": 700, \"max_head_m\": 14, \"max_flow_lpm\": 1400, \"solids_mm\": 56, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 75}, \"path\": \"knowledge/products/80LEOPARD-5.30.md\"}, {\"values\": {\"model\": \"80STEEL-5.20\", \"series\": \"STEEL\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 12, \"rated_flow_lpm\": 375, \"max_head_m\": 19, \"max_flow_lpm\": 630, \"solids_mm\": 45, \"phase\": [1, 3], \"current_1ph_a\": 10.5, \"current_3ph_a\": 4.5, \"weight_1ph_kg\": 31.2, \"weight_3ph_kg\": 29.7}, \"path\": \"knowledge/products/80STEEL-5.20.md\"}, {\"values\": {\"model\": \"80STEEL-5.30\", \"series\": \"STEEL\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.7, \"rated_flow_lpm\": 360, \"max_head_m\": 21.5, \"max_flow_lpm\": 700, \"solids_mm\": 45, \"phase\": [1, 3], \"current_1ph_a\": 12.6, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 32.8, \"weight_3ph_kg\": 31.3}, \"path\": \"knowledge/products/80STEEL-5.30.md\"}, {\"values\": {\"model\": \"80STEEL-5.50\", \"series\": \"STEEL\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 13, \"rated_flow_lpm\": 500, \"max_head_m\": 22, \"max_flow_lpm\": 1000, \"solids_mm\": 45, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 48}, \"path\": \"knowledge/products/80STEEL-5.50.md\"}, {\"values\": {\"model\": \"HIPPO-150 DN80\", \"series\": \"HIPPO DN\", \"hp\": 1.5, \"kw\": 1.1, \"outlet_inch\": 3, \"rated_head_m\": 4.4, \"rated_flow_lpm\": 415, \"max_head_m\": 7, \"max_flow_lpm\": 630, \"solids_mm\": 76, \"phase\": [1, 3], \"current_1ph_a\": 10, \"current_3ph_a\": 3, \"weight_1ph_kg\": 40.4, \"weight_3ph_kg\": 40.4}, \"path\": \"knowledge/products/HIPPO-150-DN80.md\"}, {\"values\": {\"model\": \"HIPPO-200 DN80\", \"series\": \"HIPPO DN\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 5, \"rated_flow_lpm\": 460, \"max_head_m\": 9, \"max_flow_lpm\": 780, \"solids_mm\": 76, \"phase\": [1, 3], \"current_1ph_a\": 12, \"current_3ph_a\": 3.9, \"weight_1ph_kg\": 42.6, \"weight_3ph_kg\": 42.6}, \"path\": \"knowledge/products/HIPPO-200-DN80.md\"}, {\"values\": {\"model\": \"HIPPO-300 DN80\", \"series\": \"HIPPO DN\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 400, \"max_head_m\": 13, \"max_flow_lpm\": 1100, \"solids_mm\": 76, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 6, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 43.7}, \"path\": \"knowledge/products/HIPPO-300-DN80.md\"}, {\"values\": {\"model\": \"HIPPO-400 DN80\", \"series\": \"HIPPO DN\", \"hp\": 4, \"kw\": 3, \"outlet_inch\": 3, \"rated_head_m\": 8, \"rated_flow_lpm\": 600, \"max_head_m\": 15.5, \"max_flow_lpm\": 1200, \"solids_mm\": 76, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 6.7, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.9}, \"path\": \"knowledge/products/HIPPO-400-DN80.md\"}], \"unknown\": [], \"excluded_count\": 100}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}",
+                "duration_s": 0.18,
+                "round": 1,
+                "parallel": false
+              }
+            ],
+            "response_time_s": 7.5929,
+            "citations": [
+              {
+                "uri": "knowledge/EVAK_CATALOG.md",
+                "title": "EVAK_CATALOG",
+                "text": "主題：EVAK_CATALOG\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\n內容：| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 || 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 || 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 || 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 3\n\n60 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 || 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 ",
+                "distance": 0.40633317828178406,
+                "matched_queries": [
+                  "我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。"
+                ]
+              }
+            ]
+          }
+        ],
+        "pii_pending": false,
+        "citations": [
+          {
+            "uri": "knowledge/EVAK_CATALOG.md",
+            "title": "EVAK_CATALOG",
+            "text": "主題：EVAK_CATALOG\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\n內容：| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 || 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 || 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\" (3\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 || 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\" (3\") | 14.7 m @ 3\n\n60 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 || 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\" (4\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\" (4\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\" (4\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 ",
+            "distance": 0.40633317828178406,
+            "matched_queries": [
+              "我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。"
+            ]
+          }
+        ]
+      },
+      "tool_steps": [
+        {
+          "tool_call_id": "prefetch-search-knowledge",
+          "name": "search_knowledge",
+          "arguments": "{\"queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}",
+          "result": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"embedding_versions\": [\"gemma:google/embeddinggemma-2:768:float32:l2:query:914f7f89142e33e77833254d9c9b90c3cef7303b\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\\\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\\\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\\\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg || 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\\\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg || 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\\\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm |\\n\\n - | 5.2 A | - / 29.8 kg || 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\\\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg || 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\\\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg || 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\\\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg || 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\\\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg || 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\\\" | 16 m \", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::45\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格\\\", \\\"規格數據表 (50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 45, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::45\\\", \\\"char_count\\\": 1125, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_score\": 1.0, \"_distance\": 0.4243224263191223, \"_rrf_score\": 0.01639344262295082, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 19 頁：ALLIGATOR 沉水研磨絞碎型污水泵機構 > 2. ALLIGATOR 規格數據表 (50Hz / 2850rpm)\\n內容：| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\\\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg || 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\\\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg || 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\\\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg || 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\\\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg || 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\\\" | \\n\\n36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::78\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 19 頁：ALLIGATOR 沉水研磨絞碎型污水泵機構\\\", \\\"2. ALLIGATOR 規格數據表 (50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 78, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::78\\\", \\\"char_count\\\": 699, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_score\": 0.8208369437789896, \"_distance\": 0.44355300068855286, \"_rrf_score\": 0.016129032258064516, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\\n內容：| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 || 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\\\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 || 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\\\" (3\\\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 || 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\\\" (3\\\") | 14.7 m @ 3\\n\\n60 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 || 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\\\" (4\\\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\\\" (4\\\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\\\" (4\\\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 \", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::71\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵\\\", \\\"1. 規格數據表 (50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 71, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::71\\\", \\\"char_count\\\": 1130, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.40633317828178406, \"_rrf_score\": 0.015873015873015872, \"_score\": 0.14185228604923802, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"], \"trust_boundary\": \"untrusted_reference_data\"}], \"related\": [], \"citations\": [{\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\\\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\\\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - || 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\\\" | 13 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg || 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\\\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg || 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\\\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm |\\n\\n - | 5.2 A | - / 29.8 kg || 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\\\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg || 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\\\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg || 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\\\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg || 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\\\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg || 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\\\" | 16 m \", \"distance\": 0.4243224263191223, \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}, {\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 19 頁：ALLIGATOR 沉水研磨絞碎型污水泵機構 > 2. ALLIGATOR 規格數據表 (50Hz / 2850rpm)\\n內容：| 32ALLIGATOR-5.15 | 1.5 HP / 1.1 kW | 1-1/4\\\" | 15.5 m @ 90 LPM | 21.0 m @ 160 LPM | 9.4 A | 3.3 A | 29.4 kg / 29.4 kg || 32ALLIGATOR-5.20 | 2.0 HP / 1.5 kW | 1-1/4\\\" | 23.0 m @ 100 LPM | 28.5 m @ 160 LPM | 11.5 A | 4.5 A | 32 kg / 32 kg || 32ALLIGATOR-5.30 | 3.0 HP / 2.2 kW | 1-1/4\\\" | 25.0 m @ 120 LPM | 31.0 m @ 160 LPM | - | 4.7 A | - / 33.6 kg || 50ALLIGATOR-5.50 | 5.0 HP / 3.7 kW | 2\\\" | 26.0 m @ 250 LPM | 37.0 m @ 300 LPM | - | 8.7 A | - / 41.2 kg || 50ALLIGATOR-5.75 | 7.5 HP / 5.5 kW | 2\\\" | \\n\\n36.0 m @ 250 LPM | 46.0 m @ 300 LPM | - | 12.5 A | - / 46.2 kg |\", \"distance\": 0.44355300068855286, \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}, {\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\\n內容：| 50STEEL-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 5.4 m @ 200 LPM | 9.5 m @ 360 LPM | 35 mm | 3.5 A | 1.4 A | 13 kg / 12.4 kg | 法蘭型 (Flange) | SQS-50 || 50STEEL-5.10 | 1.0 HP / 0.75 kW | 2\\\" | 9.0 m @ 250 LPM | 14.0 m @ 470 LPM | 35 mm | 6.0 A | 2.5 A | 15.4 kg / 15.7 kg | 法蘭型 (Flange) | SQS-50 || 50(80)STEEL-5.20 | 2.0 HP / 1.5 kW | 2\\\" (3\\\") | 12.0 m @ 375 LPM | 19.0 m @ 630 LPM | 45 mm | 10.5 A | 4.5 A | 31.2 kg / 29.7 kg | 彎頭型 (Elbow) | SQM-80 || 50(80)STEEL-5.30 | 3.0 HP / 2.2 kW | 2\\\" (3\\\") | 14.7 m @ 3\\n\\n60 LPM | 21.5 m @ 700 LPM | 45 mm | 12.6 A | 5.7 A | 32.8 kg / 31.3 kg | 彎頭型 (Elbow) | SQM-80 || 80(100)STEEL-5.50| 5.0 HP / 3.7 kW | 3\\\" (4\\\") | 13.0 m @ 500 LPM | 22.0 m @ 1000 LPM | 45 mm | - | 7.2 A | - / 48 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.75| 7.5 HP / 5.5 kW | 3\\\" (4\\\") | 18.0 m @ 595 LPM | 27.0 m @ 1110 LPM | 45 mm | - | 10.8 A | - / 53.8 kg | 彎頭型 (Elbow) | SQM-100 || 80(100)STEEL-5.100| 10 HP / 7.5 kW | 3\\\" (4\\\") | 25.0 m @ 600 LPM | 33.0 m @ 1300 LPM | 34 mm | - | 15 A | - / 71.5 \", \"distance\": 0.40633317828178406, \"matched_queries\": [\"我要接3吋管、用三相，馬力最多5HP，而且最大流量至少600 LPM。全型錄有哪些符合？請完整列出，每款的HP和最大流量也給我，不要只挑幾款。\"]}]}, \"error\": \"\"}",
+          "duration_s": 1.529,
+          "round": 0,
+          "parallel": false
+        },
+        {
+          "tool_call_id": "call_1473843",
+          "name": "filter_products",
+          "arguments": "{\"scenarios\":[{\"name\":\"3吋三相5HP以下最大流量600LPM以上\",\"conditions\":[{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"3\"},{\"value\":\"3\",\"op\":\"contains\",\"field\":\"phase\"},{\"op\":\"lte\",\"field\":\"hp\",\"value\":\"5\"},{\"value\":\"600\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}]}]}",
+          "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦全型錄（Vol.PIE-23121，50Hz）\", \"product_count\": 117, \"scenarios\": [{\"name\": \"3吋三相5HP以下最大流量600LPM以上\", \"match_count\": 17, \"matches\": [{\"values\": {\"model\": \"80DIVA-5.30\", \"series\": \"DIVA\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 550, \"max_head_m\": 12.7, \"max_flow_lpm\": 1250, \"solids_mm\": 12, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 78}, \"path\": \"knowledge/products/80DIVA-5.30.md\"}, {\"values\": {\"model\": \"80DIVA-5.50\", \"series\": \"DIVA\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 15, \"rated_flow_lpm\": 500, \"max_head_m\": 17.4, \"max_flow_lpm\": 1500, \"solids_mm\": 12, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.0, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 104}, \"path\": \"knowledge/products/80DIVA-5.50.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUS-5.20\", \"series\": \"EUS\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 16, \"rated_flow_lpm\": 315, \"max_head_m\": 21.5, \"max_flow_lpm\": 658, \"solids_mm\": 6, \"phase\": [1, 3], \"current_1ph_a\": 13, \"current_3ph_a\": 3.7, \"weight_1ph_kg\": 18.1, \"weight_3ph_kg\": 18.1}, \"path\": \"knowledge/products/80EUS-5.20.md\"}, {\"values\": {\"model\": \"80LEOPARD-5.30\", \"series\": \"LEOPARD\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 8, \"rated_flow_lpm\": 700, \"max_head_m\": 14, \"max_flow_lpm\": 1400, \"solids_mm\": 56, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 75}, \"path\": \"knowledge/products/80LEOPARD-5.30.md\"}, {\"values\": {\"model\": \"80STEEL-5.20\", \"series\": \"STEEL\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 12, \"rated_flow_lpm\": 375, \"max_head_m\": 19, \"max_flow_lpm\": 630, \"solids_mm\": 45, \"phase\": [1, 3], \"current_1ph_a\": 10.5, \"current_3ph_a\": 4.5, \"weight_1ph_kg\": 31.2, \"weight_3ph_kg\": 29.7}, \"path\": \"knowledge/products/80STEEL-5.20.md\"}, {\"values\": {\"model\": \"80STEEL-5.30\", \"series\": \"STEEL\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.7, \"rated_flow_lpm\": 360, \"max_head_m\": 21.5, \"max_flow_lpm\": 700, \"solids_mm\": 45, \"phase\": [1, 3], \"current_1ph_a\": 12.6, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 32.8, \"weight_3ph_kg\": 31.3}, \"path\": \"knowledge/products/80STEEL-5.30.md\"}, {\"values\": {\"model\": \"80STEEL-5.50\", \"series\": \"STEEL\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 13, \"rated_flow_lpm\": 500, \"max_head_m\": 22, \"max_flow_lpm\": 1000, \"solids_mm\": 45, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 48}, \"path\": \"knowledge/products/80STEEL-5.50.md\"}, {\"values\": {\"model\": \"HIPPO-150 DN80\", \"series\": \"HIPPO DN\", \"hp\": 1.5, \"kw\": 1.1, \"outlet_inch\": 3, \"rated_head_m\": 4.4, \"rated_flow_lpm\": 415, \"max_head_m\": 7, \"max_flow_lpm\": 630, \"solids_mm\": 76, \"phase\": [1, 3], \"current_1ph_a\": 10, \"current_3ph_a\": 3, \"weight_1ph_kg\": 40.4, \"weight_3ph_kg\": 40.4}, \"path\": \"knowledge/products/HIPPO-150-DN80.md\"}, {\"values\": {\"model\": \"HIPPO-200 DN80\", \"series\": \"HIPPO DN\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 5, \"rated_flow_lpm\": 460, \"max_head_m\": 9, \"max_flow_lpm\": 780, \"solids_mm\": 76, \"phase\": [1, 3], \"current_1ph_a\": 12, \"current_3ph_a\": 3.9, \"weight_1ph_kg\": 42.6, \"weight_3ph_kg\": 42.6}, \"path\": \"knowledge/products/HIPPO-200-DN80.md\"}, {\"values\": {\"model\": \"HIPPO-300 DN80\", \"series\": \"HIPPO DN\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 400, \"max_head_m\": 13, \"max_flow_lpm\": 1100, \"solids_mm\": 76, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 6, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 43.7}, \"path\": \"knowledge/products/HIPPO-300-DN80.md\"}, {\"values\": {\"model\": \"HIPPO-400 DN80\", \"series\": \"HIPPO DN\", \"hp\": 4, \"kw\": 3, \"outlet_inch\": 3, \"rated_head_m\": 8, \"rated_flow_lpm\": 600, \"max_head_m\": 15.5, \"max_flow_lpm\": 1200, \"solids_mm\": 76, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 6.7, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.9}, \"path\": \"knowledge/products/HIPPO-400-DN80.md\"}], \"unknown\": [], \"excluded_count\": 100}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}",
+          "duration_s": 0.18,
+          "round": 1,
+          "parallel": false
+        }
+      ],
+      "decision": {
+        "turn_id": "accept117-R1-F01",
+        "status": "available",
+        "provider": "clef",
+        "hop_id": "clef-primary",
+        "model": "clef-flash",
+        "elapsed_ms": 674.0,
+        "signals": [
+          {
+            "id": "needs_knowledge",
+            "type": "noul",
+            "probability_true": 0.7939034062163145,
+            "resolved": true,
+            "accepted": true
+          },
+          {
+            "id": "needs_web",
+            "type": "noul",
+            "probability_true": 0.06629838384783655,
+            "resolved": false,
+            "accepted": true
+          },
+          {
+            "id": "needs_memory",
+            "type": "noul",
+            "probability_true": 0.016920623258754586,
+            "resolved": false,
+            "accepted": true
+          },
+          {
+            "id": "requested_response_language",
+            "type": "choice",
+            "value": "zh",
+            "confidence": 0.7542022452338968,
+            "probabilities": {
+              "en": 0.008253309004489095,
+              "es": 0.003866844649031273,
+              "ja": 0.003445036754934075,
+              "ko": 0.003227697561392915,
+              "nan": 0.009340454235873227,
+              "none": 0.16067895708255966,
+              "other": 0.026260736132059995,
+              "zh": 0.7849269645796597
+            },
+            "accepted": false
+          },
+          {
+            "id": "tone",
+            "type": "choice",
+            "value": "neutral",
+            "confidence": 0.8491448890250397,
+            "probabilities": {
+              "confused": 0.01866793948466207,
+              "frustrated": 0.03428102849598634,
+              "lighthearted": 0.004396734406773103,
+              "neutral": 0.8793159112200318,
+              "urgent": 0.06333838639254653
+            },
+            "accepted": true
+          }
+        ],
+        "policy": {
+          "needs_knowledge": true,
+          "needs_web": false,
+          "needs_memory": false,
+          "input_languages": [],
+          "dominant_language": null,
+          "mixed_languages": null,
+          "requested_response_language": null,
+          "retrieval_language": "zh",
+          "response_language": null,
+          "turn_intent": null,
+          "tone": null
+        }
+      },
+      "decision_debug": {
+        "turn_id": "accept117-R1-F01",
+        "status": "available",
+        "provider": "clef",
+        "hop_id": "clef-primary",
+        "model": "clef-flash",
+        "elapsed_ms": 674.0,
+        "signals": [
+          {
+            "id": "needs_knowledge",
+            "type": "noul",
+            "probability_true": 0.7939034062163145,
+            "resolved": true,
+            "accepted": true
+          },
+          {
+            "id": "needs_web",
+            "type": "noul",
+            "probability_true": 0.06629838384783655,
+            "resolved": false,
+            "accepted": true
+          },
+          {
+            "id": "needs_memory",
+            "type": "noul",
+            "probability_true": 0.016920623258754586,
+            "resolved": false,
+            "accepted": true
+          },
+          {
+            "id": "requested_response_language",
+            "type": "choice",
+            "value": "zh",
+            "confidence": 0.7542022452338968,
+            "probabilities": {
+              "en": 0.008253309004489095,
+              "es": 0.003866844649031273,
+              "ja": 0.003445036754934075,
+              "ko": 0.003227697561392915,
+              "nan": 0.009340454235873227,
+              "none": 0.16067895708255966,
+              "other": 0.026260736132059995,
+              "zh": 0.7849269645796597
+            },
+            "accepted": false
+          },
+          {
+            "id": "tone",
+            "type": "choice",
+            "value": "neutral",
+            "confidence": 0.8491448890250397,
+            "probabilities": {
+              "confused": 0.01866793948466207,
+              "frustrated": 0.03428102849598634,
+              "lighthearted": 0.004396734406773103,
+              "neutral": 0.8793159112200318,
+              "urgent": 0.06333838639254653
+            },
+            "accepted": true
+          }
+        ],
+        "policy": {
+          "needs_knowledge": true,
+          "needs_web": false,
+          "needs_memory": false,
+          "input_languages": [],
+          "dominant_language": null,
+          "mixed_languages": null,
+          "requested_response_language": null,
+          "retrieval_language": "zh",
+          "response_language": null,
+          "turn_intent": null,
+          "tone": null
+        }
+      },
+      "calls": [
+        {
+          "label": "R1-F01",
+          "system_sha256": "98faae8172e395b5f6da66311604bd2ad1485a9f867b7353a5c37abf6f31da18",
+          "message_count": 4,
+          "max_tokens": null,
+          "requested_model": null,
+          "transport": "stream",
+          "content": "",
+          "model": "gemini-3.5-flash-lite",
+          "tool_calls": [
+            {
+              "id": "call_1473843",
+              "name": "filter_products",
+              "arguments": "{\"scenarios\":[{\"name\":\"3吋三相5HP以下最大流量600LPM以上\",\"conditions\":[{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"3\"},{\"value\":\"3\",\"op\":\"contains\",\"field\":\"phase\"},{\"op\":\"lte\",\"field\":\"hp\",\"value\":\"5\"},{\"value\":\"600\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}]}]}",
+              "extra_content": {
+                "thought_signature": "EmAKXgFpFH0TYfUS7YvVDIerIw1K6h+/65DqH3fCAkXiQb2tQteou7uI7TZU6Vjv/RX7u7iYcGV8DwDXEUjeRcGaxt7OoZYmepZNJ1OYJrN5wi1+FsroCsWZLlYEuQEO7/A="
+              }
+            }
+          ],
+          "usage": {
+            "input_tokens": 13379,
+            "output_tokens": 118,
+            "total_tokens": 13497,
+            "cached_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "status": "ok",
+          "elapsed_seconds": 2.4629,
+          "route_attempts": [
+            {
+              "trace_id": "78ddab9f6ad9",
+              "provider": "gemini",
+              "model": "gemini-3.5-flash-lite",
+              "hop_index": 0,
+              "result": "success",
+              "latency_ms": 1427.6678295135498,
+              "chain_length": 4
+            }
+          ],
+          "provider": "gemini"
+        },
+        {
+          "label": "R1-F01",
+          "system_sha256": "98faae8172e395b5f6da66311604bd2ad1485a9f867b7353a5c37abf6f31da18",
+          "message_count": 6,
+          "max_tokens": null,
+          "requested_model": null,
+          "transport": "stream",
+          "content": "符合三吋管、三相、五馬力以下且最大流量六百公升以上的型號有：八十帝華五點三零三馬力、八十帝華五點五零五馬力、八十歐德烏五點二零二馬力、八十歐德烏五點三零三馬力、八十歐德烏五點五零五馬力、八十伊優比姆五點二零二馬力、八十伊優比姆五點三零三馬力、八十伊優比姆五點五零五馬力、八十伊優愛斯五點二零二馬力、八十豹牌五點三零三馬力、八十鋼鐵五點二零二馬力、八十鋼鐵五點三零三馬力、八十鋼鐵五點五零五馬力、河馬一百五十點八十口徑一點五馬力、河馬二百點八十口徑二馬力、河馬三百點八十口徑三馬力、河馬四百點八十口徑四馬力。",
+          "model": "gemini-3.5-flash-lite",
+          "tool_calls": [],
+          "usage": {
+            "input_tokens": 13266,
+            "output_tokens": 242,
+            "total_tokens": 13508,
+            "cached_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "status": "ok",
+          "elapsed_seconds": 2.3576,
+          "route_attempts": [
+            {
+              "trace_id": "c08026f07ce6",
+              "provider": "gemini",
+              "model": "gemini-3.5-flash-lite",
+              "hop_index": 0,
+              "result": "success",
+              "latency_ms": 2258.671579360962,
+              "chain_length": 4
+            }
+          ],
+          "provider": "gemini"
+        }
+      ],
+      "route": {
+        "path": "tool",
+        "skip_rag": false,
+        "skip_tools": false,
+        "forced_tool_name": null
+      },
+      "elapsed_seconds": 7.5929
+    },
+    {
+      "id": "F02",
+      "repeat": 1,
+      "question": "只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。",
+      "answer": "符合的有：50EUB-M-5.20S (2 HP, 500 LPM)、50EUS-5.20 (2 HP, 658 LPM)、50EUS-5.20C (2 HP, 500 LPM)、50STEEL-5.20 (2 HP, 630 LPM)、HIPPO-100/100Q (1 HP, 500 LPM)、HIPPO-150/150Q (1.5 HP, 580 LPM)、HIPPO-200/200Q (2 HP, 660 LPM)。",
+      "final": {
+        "status": "ok",
+        "trace_id": "accept117-R1-F02",
+        "session_id": "accept117-R1-F02",
+        "request_context": {
+          "trace_id": "accept117-R1-F02",
+          "session_id": "accept117-R1-F02",
+          "message_type": "user",
+          "channel": "web",
+          "locale": "zh-TW",
+          "persona_id": "default",
+          "project_id": "dev-c0c8fdff34",
+          "client_ip": "",
+          "metadata": {}
+        },
+        "reply": "符合的有：50EUB-M-5.20S (2 HP, 500 LPM)、50EUS-5.20 (2 HP, 658 LPM)、50EUS-5.20C (2 HP, 500 LPM)、50STEEL-5.20 (2 HP, 630 LPM)、HIPPO-100/100Q (1 HP, 500 LPM)、HIPPO-150/150Q (1.5 HP, 580 LPM)、HIPPO-200/200Q (2 HP, 660 LPM)。",
+        "history": [
+          {
+            "role": "user",
+            "content": "只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。"
+          },
+          {
+            "role": "assistant",
+            "content": "符合的有：50EUB-M-5.20S (2 HP, 500 LPM)、50EUS-5.20 (2 HP, 658 LPM)、50EUS-5.20C (2 HP, 500 LPM)、50STEEL-5.20 (2 HP, 630 LPM)、HIPPO-100/100Q (1 HP, 500 LPM)、HIPPO-150/150Q (1.5 HP, 580 LPM)、HIPPO-200/200Q (2 HP, 660 LPM)。",
+            "tool_steps": [
+              {
+                "tool_call_id": "call_1267058",
+                "name": "filter_products",
+                "arguments": "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"op\":\"in\",\"value\":\"1,1,3\"},{\"value\":\"2\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"value\":\"2\",\"op\":\"lte\",\"field\":\"hp\"},{\"value\":\"500\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}],\"name\":\"single_phase_2inch_max2hp_flow500\"}]}",
+                "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦全型錄（Vol.PIE-23121，50Hz）\", \"product_count\": 117, \"scenarios\": [{\"name\": \"single_phase_2inch_max2hp_flow500\", \"match_count\": 10, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUS-5.20\", \"series\": \"EUS\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 16, \"rated_flow_lpm\": 315, \"max_head_m\": 21.5, \"max_flow_lpm\": 658, \"solids_mm\": 6, \"phase\": [1, 3], \"current_1ph_a\": 13, \"current_3ph_a\": 3.7, \"weight_1ph_kg\": 18.1, \"weight_3ph_kg\": 18.1}, \"path\": \"knowledge/products/50EUS-5.20.md\"}, {\"values\": {\"model\": \"50EUS-5.20C\", \"series\": \"EUS\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 13, \"rated_flow_lpm\": 250, \"max_head_m\": 19, \"max_flow_lpm\": 500, \"solids_mm\": 6, \"phase\": [1, 3], \"current_1ph_a\": 9.5, \"current_3ph_a\": 2.9, \"weight_1ph_kg\": 18, \"weight_3ph_kg\": 18}, \"path\": \"knowledge/products/50EUS-5.20C.md\"}, {\"values\": {\"model\": \"50STEEL-5.20\", \"series\": \"STEEL\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 12, \"rated_flow_lpm\": 375, \"max_head_m\": 19, \"max_flow_lpm\": 630, \"solids_mm\": 45, \"phase\": [1, 3], \"current_1ph_a\": 10.5, \"current_3ph_a\": 4.5, \"weight_1ph_kg\": 31.2, \"weight_3ph_kg\": 29.7}, \"path\": \"knowledge/products/50STEEL-5.20.md\"}, {\"values\": {\"model\": \"HIPPO-100\", \"series\": \"HIPPO\", \"hp\": 1, \"kw\": 0.75, \"outlet_inch\": 2, \"rated_head_m\": 7.7, \"rated_flow_lpm\": 300, \"max_head_m\": 11.3, \"max_flow_lpm\": 500, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 7.2, \"current_3ph_a\": 2.5, \"weight_1ph_kg\": 15.4, \"weight_3ph_kg\": 15.4}, \"path\": \"knowledge/products/HIPPO-100.md\"}, {\"values\": {\"model\": \"HIPPO-100Q\", \"series\": \"HIPPO\", \"hp\": 1, \"kw\": 0.75, \"outlet_inch\": 2, \"rated_head_m\": 7.7, \"rated_flow_lpm\": 300, \"max_head_m\": 11.3, \"max_flow_lpm\": 500, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 7.2, \"current_3ph_a\": 2.5, \"weight_1ph_kg\": 16.8, \"weight_3ph_kg\": 16.8}, \"path\": \"knowledge/products/HIPPO-100Q.md\"}, {\"values\": {\"model\": \"HIPPO-150\", \"series\": \"HIPPO\", \"hp\": 1.5, \"kw\": 1.1, \"outlet_inch\": 2, \"rated_head_m\": 8, \"rated_flow_lpm\": 390, \"max_head_m\": 12.5, \"max_flow_lpm\": 580, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 9, \"current_3ph_a\": 2.8, \"weight_1ph_kg\": 24.2, \"weight_3ph_kg\": 24.2}, \"path\": \"knowledge/products/HIPPO-150.md\"}, {\"values\": {\"model\": \"HIPPO-150Q\", \"series\": \"HIPPO\", \"hp\": 1.5, \"kw\": 1.1, \"outlet_inch\": 2, \"rated_head_m\": 8, \"rated_flow_lpm\": 390, \"max_head_m\": 12.5, \"max_flow_lpm\": 580, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 9, \"current_3ph_a\": 2.8, \"weight_1ph_kg\": 26.2, \"weight_3ph_kg\": 26.2}, \"path\": \"knowledge/products/HIPPO-150Q.md\"}, {\"values\": {\"model\": \"HIPPO-200\", \"series\": \"HIPPO\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 10, \"rated_flow_lpm\": 420, \"max_head_m\": 15.5, \"max_flow_lpm\": 660, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 12, \"current_3ph_a\": 3.9, \"weight_1ph_kg\": 25.2, \"weight_3ph_kg\": 25.2}, \"path\": \"knowledge/products/HIPPO-200.md\"}, {\"values\": {\"model\": \"HIPPO-200Q\", \"series\": \"HIPPO\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 10, \"rated_flow_lpm\": 420, \"max_head_m\": 15.5, \"max_flow_lpm\": 660, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 12, \"current_3ph_a\": 3.9, \"weight_1ph_kg\": 27.2, \"weight_3ph_kg\": 27.2}, \"path\": \"knowledge/products/HIPPO-200Q.md\"}], \"unknown\": [], \"excluded_count\": 107}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}",
+                "duration_s": 0.223,
+                "round": 0,
+                "parallel": true
+              },
+              {
+                "tool_call_id": "call_1267059",
+                "name": "search_knowledge",
+                "arguments": "{\"queries\":[\"單相電 2吋 2HP 500 LPM\",\"EVAK 沉水泵浦 單相 2吋 500LPM\"]}",
+                "result": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"單相電 2吋 2HP 500 LPM\", \"EVAK 沉水泵浦 單相 2吋 500LPM\", \"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"], \"embedding_versions\": [\"gemma:google/embeddinggemma-2:768:float32:l2:query:914f7f89142e33e77833254d9c9b90c3cef7303b\"], \"results\": [{\"text\": \"主題：HIPPO-200Q\\n內容：---model: HIPPO-200Qseries: HIPPOhp: 2kw: 1.5outlet_inch: 2rated_head_m: 10rated_flow_lpm: 420max_head_m: 15.5max_flow_lpm: 660solids_mm: 50phase: [1,3]current_1ph_a: 12current_3ph_a: 3.9weight_1ph_kg: 27.2weight_3ph_kg: 27.2source:path: knowledge/EVAK_CATALOG.mdpage: 16---\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/products/HIPPO-200Q.md\", \"chunk_id\": \"knowledge/products/HIPPO-200Q.md::0\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/products/HIPPO-200Q.md\\\", \\\"title\\\": \\\"HIPPO-200Q\\\", \\\"heading_path\\\": [], \\\"chunk_index\\\": 0, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"675f33e2ba6a4af1c3b0a882f8fc9cc35b48a85064dca3b30445970299a2e731\\\", \\\"chunk_id\\\": \\\"knowledge/products/HIPPO-200Q.md::0\\\", \\\"char_count\\\": 291, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.46841010451316833, \"_rrf_score\": 0.03252247488101534, \"_score\": 1.0, \"title\": \"HIPPO-200Q\", \"matched_queries\": [\"單相電 2吋 2HP 500 LPM\", \"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\\n內容：| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg || 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\\\" (3\\\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg || 80EUS-5.10L | 1 HP / 0.75 kW | 3\\\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg || 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\\\" (3\\\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg || 50(80)EUS-5.20 | 2 HP / 1.5 kW \\n\\n| 2\\\" (3\\\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::23\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 4 頁：50EUS 沉水排水泵結構剖面與零件分解\\\", \\\"4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 23, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::23\\\", \\\"char_count\\\": 724, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.390367716550827, \"_rrf_score\": 0.01639344262295082, \"_score\": 1.0, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"EVAK 沉水泵浦 單相 2吋 500LPM\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"檔案：knowledge/products/_catalog.yaml\\n  kw: {label: 功率, type: number, unit: kW}\\n  outlet_inch: {label: 出水口徑, type: number, unit: 吋}\\n  rated_head_m: {label: 額定揚程, type: number, unit: m}\\n  rated_flow_lpm: {label: 額定流量, type: number, unit: LPM}\\n  max_head_m: {label: 最大揚程, type: number, unit: m}\\n  max_flow_lpm: {label: 最大流量, type: number, unit: LPM}\\n  solids_mm: {label: 通過粒徑, type: number, unit: mm}\\n  phase: {label: 電源相數, type: number_set, description: \\\"1 是單相、3 是三相；同一列單三相合併時是 [1, 3]\\\"}\\n\\n\\n  current_1ph_a: {label: 單相電流, type: number, unit: A}\\n  current_3ph_a: {label: 三相電流, type: number, unit: A}\\n  weight_1ph_kg: {label: 單相重量, type: number, unit: kg}\\n  weight_3ph_kg: {label: 三相重量, type: number, unit: kg}\\nnotes: >-\\n  額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。  問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。  流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/products/_catalog.yaml\", \"chunk_id\": \"knowledge/products/_catalog.yaml::2\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/products/_catalog.yaml\\\", \\\"title\\\": \\\"_catalog\\\", \\\"heading_path\\\": [], \\\"chunk_index\\\": 2, \\\"kind\\\": \\\"code\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"233d6a27fa8e77aa918db99b43f5e7c6dacc9557f3f6b13771401a06d7d08020\\\", \\\"chunk_id\\\": \\\"knowledge/products/_catalog.yaml::2\\\", \\\"char_count\\\": 864, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.3718368113040924, \"_score\": 1.0, \"title\": \"_catalog\", \"_rrf_score\": 0.01639344262295082, \"matched_queries\": [\"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"], \"trust_boundary\": \"untrusted_reference_data\"}], \"related\": [], \"citations\": [{\"uri\": \"knowledge/products/HIPPO-200Q.md\", \"title\": \"HIPPO-200Q\", \"text\": \"主題：HIPPO-200Q\\n內容：---model: HIPPO-200Qseries: HIPPOhp: 2kw: 1.5outlet_inch: 2rated_head_m: 10rated_flow_lpm: 420max_head_m: 15.5max_flow_lpm: 660solids_mm: 50phase: [1,3]current_1ph_a: 12current_3ph_a: 3.9weight_1ph_kg: 27.2weight_3ph_kg: 27.2source:path: knowledge/EVAK_CATALOG.mdpage: 16---\", \"distance\": 0.46841010451316833, \"matched_queries\": [\"單相電 2吋 2HP 500 LPM\", \"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"]}, {\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\\n內容：| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg || 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\\\" (3\\\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg || 80EUS-5.10L | 1 HP / 0.75 kW | 3\\\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg || 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\\\" (3\\\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg || 50(80)EUS-5.20 | 2 HP / 1.5 kW \\n\\n| 2\\\" (3\\\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |\", \"distance\": 0.390367716550827, \"matched_queries\": [\"EVAK 沉水泵浦 單相 2吋 500LPM\"]}, {\"uri\": \"knowledge/products/_catalog.yaml\", \"title\": \"_catalog\", \"text\": \"檔案：knowledge/products/_catalog.yaml\\n  kw: {label: 功率, type: number, unit: kW}\\n  outlet_inch: {label: 出水口徑, type: number, unit: 吋}\\n  rated_head_m: {label: 額定揚程, type: number, unit: m}\\n  rated_flow_lpm: {label: 額定流量, type: number, unit: LPM}\\n  max_head_m: {label: 最大揚程, type: number, unit: m}\\n  max_flow_lpm: {label: 最大流量, type: number, unit: LPM}\\n  solids_mm: {label: 通過粒徑, type: number, unit: mm}\\n  phase: {label: 電源相數, type: number_set, description: \\\"1 是單相、3 是三相；同一列單三相合併時是 [1, 3]\\\"}\\n\\n\\n  current_1ph_a: {label: 單相電流, type: number, unit: A}\\n  current_3ph_a: {label: 三相電流, type: number, unit: A}\\n  weight_1ph_kg: {label: 單相重量, type: number, unit: kg}\\n  weight_3ph_kg: {label: 三相重量, type: number, unit: kg}\\nnotes: >-\\n  額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。  問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。  流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\", \"distance\": 0.3718368113040924, \"matched_queries\": [\"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"]}]}, \"error\": \"\"}",
+                "duration_s": 0.62,
+                "round": 0,
+                "parallel": true
+              }
+            ],
+            "response_time_s": 4.38,
+            "citations": [
+              {
+                "uri": "knowledge/products/_catalog.yaml",
+                "title": "_catalog",
+                "text": "檔案：knowledge/products/_catalog.yaml\n  kw: {label: 功率, type: number, unit: kW}\n  outlet_inch: {label: 出水口徑, type: number, unit: 吋}\n  rated_head_m: {label: 額定揚程, type: number, unit: m}\n  rated_flow_lpm: {label: 額定流量, type: number, unit: LPM}\n  max_head_m: {label: 最大揚程, type: number, unit: m}\n  max_flow_lpm: {label: 最大流量, type: number, unit: LPM}\n  solids_mm: {label: 通過粒徑, type: number, unit: mm}\n  phase: {label: 電源相數, type: number_set, description: \"1 是單相、3 是三相；同一列單三相合併時是 [1, 3]\"}\n\n\n  current_1ph_a: {label: 單相電流, type: number, unit: A}\n  current_3ph_a: {label: 三相電流, type: number, unit: A}\n  weight_1ph_kg: {label: 單相重量, type: number, unit: kg}\n  weight_3ph_kg: {label: 三相重量, type: number, unit: kg}\nnotes: >-\n  額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。  問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。  流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。",
+                "distance": 0.3718368113040924,
+                "matched_queries": [
+                  "只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。"
+                ]
+              },
+              {
+                "uri": "knowledge/EVAK_CATALOG.md",
+                "title": "EVAK_CATALOG",
+                "text": "主題：EVAK_CATALOG\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\n內容：| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg || 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg || 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg || 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg || 50(80)EUS-5.20 | 2 HP / 1.5 kW \n\n| 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |",
+                "distance": 0.390367716550827,
+                "matched_queries": [
+                  "EVAK 沉水泵浦 單相 2吋 500LPM"
+                ]
+              },
+              {
+                "uri": "knowledge/products/HIPPO-200Q.md",
+                "title": "HIPPO-200Q",
+                "text": "主題：HIPPO-200Q\n內容：---model: HIPPO-200Qseries: HIPPOhp: 2kw: 1.5outlet_inch: 2rated_head_m: 10rated_flow_lpm: 420max_head_m: 15.5max_flow_lpm: 660solids_mm: 50phase: [1,3]current_1ph_a: 12current_3ph_a: 3.9weight_1ph_kg: 27.2weight_3ph_kg: 27.2source:path: knowledge/EVAK_CATALOG.mdpage: 16---",
+                "distance": 0.46841010451316833,
+                "matched_queries": [
+                  "單相電 2吋 2HP 500 LPM",
+                  "只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。"
+                ]
+              }
+            ]
+          }
+        ],
+        "pii_pending": false,
+        "citations": [
+          {
+            "uri": "knowledge/products/_catalog.yaml",
+            "title": "_catalog",
+            "text": "檔案：knowledge/products/_catalog.yaml\n  kw: {label: 功率, type: number, unit: kW}\n  outlet_inch: {label: 出水口徑, type: number, unit: 吋}\n  rated_head_m: {label: 額定揚程, type: number, unit: m}\n  rated_flow_lpm: {label: 額定流量, type: number, unit: LPM}\n  max_head_m: {label: 最大揚程, type: number, unit: m}\n  max_flow_lpm: {label: 最大流量, type: number, unit: LPM}\n  solids_mm: {label: 通過粒徑, type: number, unit: mm}\n  phase: {label: 電源相數, type: number_set, description: \"1 是單相、3 是三相；同一列單三相合併時是 [1, 3]\"}\n\n\n  current_1ph_a: {label: 單相電流, type: number, unit: A}\n  current_3ph_a: {label: 三相電流, type: number, unit: A}\n  weight_1ph_kg: {label: 單相重量, type: number, unit: kg}\n  weight_3ph_kg: {label: 三相重量, type: number, unit: kg}\nnotes: >-\n  額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。  問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。  流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。",
+            "distance": 0.3718368113040924,
+            "matched_queries": [
+              "只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。"
+            ]
+          },
+          {
+            "uri": "knowledge/EVAK_CATALOG.md",
+            "title": "EVAK_CATALOG",
+            "text": "主題：EVAK_CATALOG\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\n內容：| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg || 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\" (3\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg || 80EUS-5.10L | 1 HP / 0.75 kW | 3\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg || 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\" (3\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg || 50(80)EUS-5.20 | 2 HP / 1.5 kW \n\n| 2\" (3\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |",
+            "distance": 0.390367716550827,
+            "matched_queries": [
+              "EVAK 沉水泵浦 單相 2吋 500LPM"
+            ]
+          },
+          {
+            "uri": "knowledge/products/HIPPO-200Q.md",
+            "title": "HIPPO-200Q",
+            "text": "主題：HIPPO-200Q\n內容：---model: HIPPO-200Qseries: HIPPOhp: 2kw: 1.5outlet_inch: 2rated_head_m: 10rated_flow_lpm: 420max_head_m: 15.5max_flow_lpm: 660solids_mm: 50phase: [1,3]current_1ph_a: 12current_3ph_a: 3.9weight_1ph_kg: 27.2weight_3ph_kg: 27.2source:path: knowledge/EVAK_CATALOG.mdpage: 16---",
+            "distance": 0.46841010451316833,
+            "matched_queries": [
+              "單相電 2吋 2HP 500 LPM",
+              "只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。"
+            ]
+          }
+        ]
+      },
+      "tool_steps": [
+        {
+          "tool_call_id": "call_1267058",
+          "name": "filter_products",
+          "arguments": "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"op\":\"in\",\"value\":\"1,1,3\"},{\"value\":\"2\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"value\":\"2\",\"op\":\"lte\",\"field\":\"hp\"},{\"value\":\"500\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}],\"name\":\"single_phase_2inch_max2hp_flow500\"}]}",
+          "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦全型錄（Vol.PIE-23121，50Hz）\", \"product_count\": 117, \"scenarios\": [{\"name\": \"single_phase_2inch_max2hp_flow500\", \"match_count\": 10, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUS-5.20\", \"series\": \"EUS\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 16, \"rated_flow_lpm\": 315, \"max_head_m\": 21.5, \"max_flow_lpm\": 658, \"solids_mm\": 6, \"phase\": [1, 3], \"current_1ph_a\": 13, \"current_3ph_a\": 3.7, \"weight_1ph_kg\": 18.1, \"weight_3ph_kg\": 18.1}, \"path\": \"knowledge/products/50EUS-5.20.md\"}, {\"values\": {\"model\": \"50EUS-5.20C\", \"series\": \"EUS\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 13, \"rated_flow_lpm\": 250, \"max_head_m\": 19, \"max_flow_lpm\": 500, \"solids_mm\": 6, \"phase\": [1, 3], \"current_1ph_a\": 9.5, \"current_3ph_a\": 2.9, \"weight_1ph_kg\": 18, \"weight_3ph_kg\": 18}, \"path\": \"knowledge/products/50EUS-5.20C.md\"}, {\"values\": {\"model\": \"50STEEL-5.20\", \"series\": \"STEEL\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 12, \"rated_flow_lpm\": 375, \"max_head_m\": 19, \"max_flow_lpm\": 630, \"solids_mm\": 45, \"phase\": [1, 3], \"current_1ph_a\": 10.5, \"current_3ph_a\": 4.5, \"weight_1ph_kg\": 31.2, \"weight_3ph_kg\": 29.7}, \"path\": \"knowledge/products/50STEEL-5.20.md\"}, {\"values\": {\"model\": \"HIPPO-100\", \"series\": \"HIPPO\", \"hp\": 1, \"kw\": 0.75, \"outlet_inch\": 2, \"rated_head_m\": 7.7, \"rated_flow_lpm\": 300, \"max_head_m\": 11.3, \"max_flow_lpm\": 500, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 7.2, \"current_3ph_a\": 2.5, \"weight_1ph_kg\": 15.4, \"weight_3ph_kg\": 15.4}, \"path\": \"knowledge/products/HIPPO-100.md\"}, {\"values\": {\"model\": \"HIPPO-100Q\", \"series\": \"HIPPO\", \"hp\": 1, \"kw\": 0.75, \"outlet_inch\": 2, \"rated_head_m\": 7.7, \"rated_flow_lpm\": 300, \"max_head_m\": 11.3, \"max_flow_lpm\": 500, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 7.2, \"current_3ph_a\": 2.5, \"weight_1ph_kg\": 16.8, \"weight_3ph_kg\": 16.8}, \"path\": \"knowledge/products/HIPPO-100Q.md\"}, {\"values\": {\"model\": \"HIPPO-150\", \"series\": \"HIPPO\", \"hp\": 1.5, \"kw\": 1.1, \"outlet_inch\": 2, \"rated_head_m\": 8, \"rated_flow_lpm\": 390, \"max_head_m\": 12.5, \"max_flow_lpm\": 580, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 9, \"current_3ph_a\": 2.8, \"weight_1ph_kg\": 24.2, \"weight_3ph_kg\": 24.2}, \"path\": \"knowledge/products/HIPPO-150.md\"}, {\"values\": {\"model\": \"HIPPO-150Q\", \"series\": \"HIPPO\", \"hp\": 1.5, \"kw\": 1.1, \"outlet_inch\": 2, \"rated_head_m\": 8, \"rated_flow_lpm\": 390, \"max_head_m\": 12.5, \"max_flow_lpm\": 580, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 9, \"current_3ph_a\": 2.8, \"weight_1ph_kg\": 26.2, \"weight_3ph_kg\": 26.2}, \"path\": \"knowledge/products/HIPPO-150Q.md\"}, {\"values\": {\"model\": \"HIPPO-200\", \"series\": \"HIPPO\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 10, \"rated_flow_lpm\": 420, \"max_head_m\": 15.5, \"max_flow_lpm\": 660, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 12, \"current_3ph_a\": 3.9, \"weight_1ph_kg\": 25.2, \"weight_3ph_kg\": 25.2}, \"path\": \"knowledge/products/HIPPO-200.md\"}, {\"values\": {\"model\": \"HIPPO-200Q\", \"series\": \"HIPPO\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 10, \"rated_flow_lpm\": 420, \"max_head_m\": 15.5, \"max_flow_lpm\": 660, \"solids_mm\": 50, \"phase\": [1, 3], \"current_1ph_a\": 12, \"current_3ph_a\": 3.9, \"weight_1ph_kg\": 27.2, \"weight_3ph_kg\": 27.2}, \"path\": \"knowledge/products/HIPPO-200Q.md\"}], \"unknown\": [], \"excluded_count\": 107}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}",
+          "duration_s": 0.223,
+          "round": 0,
+          "parallel": true
+        },
+        {
+          "tool_call_id": "call_1267059",
+          "name": "search_knowledge",
+          "arguments": "{\"queries\":[\"單相電 2吋 2HP 500 LPM\",\"EVAK 沉水泵浦 單相 2吋 500LPM\"]}",
+          "result": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"單相電 2吋 2HP 500 LPM\", \"EVAK 沉水泵浦 單相 2吋 500LPM\", \"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"], \"embedding_versions\": [\"gemma:google/embeddinggemma-2:768:float32:l2:query:914f7f89142e33e77833254d9c9b90c3cef7303b\"], \"results\": [{\"text\": \"主題：HIPPO-200Q\\n內容：---model: HIPPO-200Qseries: HIPPOhp: 2kw: 1.5outlet_inch: 2rated_head_m: 10rated_flow_lpm: 420max_head_m: 15.5max_flow_lpm: 660solids_mm: 50phase: [1,3]current_1ph_a: 12current_3ph_a: 3.9weight_1ph_kg: 27.2weight_3ph_kg: 27.2source:path: knowledge/EVAK_CATALOG.mdpage: 16---\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/products/HIPPO-200Q.md\", \"chunk_id\": \"knowledge/products/HIPPO-200Q.md::0\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/products/HIPPO-200Q.md\\\", \\\"title\\\": \\\"HIPPO-200Q\\\", \\\"heading_path\\\": [], \\\"chunk_index\\\": 0, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"675f33e2ba6a4af1c3b0a882f8fc9cc35b48a85064dca3b30445970299a2e731\\\", \\\"chunk_id\\\": \\\"knowledge/products/HIPPO-200Q.md::0\\\", \\\"char_count\\\": 291, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.46841010451316833, \"_rrf_score\": 0.03252247488101534, \"_score\": 1.0, \"title\": \"HIPPO-200Q\", \"matched_queries\": [\"單相電 2吋 2HP 500 LPM\", \"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\\n內容：| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg || 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\\\" (3\\\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg || 80EUS-5.10L | 1 HP / 0.75 kW | 3\\\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg || 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\\\" (3\\\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg || 50(80)EUS-5.20 | 2 HP / 1.5 kW \\n\\n| 2\\\" (3\\\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/EVAK_CATALOG.md\", \"chunk_id\": \"knowledge/EVAK_CATALOG.md::23\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATALOG\\\", \\\"heading_path\\\": [\\\"EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121）\\\", \\\"第 4 頁：50EUS 沉水排水泵結構剖面與零件分解\\\", \\\"4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\\\"], \\\"chunk_index\\\": 23, \\\"kind\\\": \\\"freeform_markdown\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"b50609f4b912c9a7e4c12b733fba9edcc874b1fd0d6d2330ec6171e56237e6b7\\\", \\\"chunk_id\\\": \\\"knowledge/EVAK_CATALOG.md::23\\\", \\\"char_count\\\": 724, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.390367716550827, \"_rrf_score\": 0.01639344262295082, \"_score\": 1.0, \"title\": \"EVAK_CATALOG\", \"matched_queries\": [\"EVAK 沉水泵浦 單相 2吋 500LPM\"], \"trust_boundary\": \"untrusted_reference_data\"}, {\"text\": \"檔案：knowledge/products/_catalog.yaml\\n  kw: {label: 功率, type: number, unit: kW}\\n  outlet_inch: {label: 出水口徑, type: number, unit: 吋}\\n  rated_head_m: {label: 額定揚程, type: number, unit: m}\\n  rated_flow_lpm: {label: 額定流量, type: number, unit: LPM}\\n  max_head_m: {label: 最大揚程, type: number, unit: m}\\n  max_flow_lpm: {label: 最大流量, type: number, unit: LPM}\\n  solids_mm: {label: 通過粒徑, type: number, unit: mm}\\n  phase: {label: 電源相數, type: number_set, description: \\\"1 是單相、3 是三相；同一列單三相合併時是 [1, 3]\\\"}\\n\\n\\n  current_1ph_a: {label: 單相電流, type: number, unit: A}\\n  current_3ph_a: {label: 三相電流, type: number, unit: A}\\n  weight_1ph_kg: {label: 單相重量, type: number, unit: kg}\\n  weight_3ph_kg: {label: 三相重量, type: number, unit: kg}\\nnotes: >-\\n  額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。  問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。  流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\", \"source\": \"workspace\", \"date\": \"2026-10-07\", \"path\": \"knowledge/products/_catalog.yaml\", \"chunk_id\": \"knowledge/products/_catalog.yaml::2\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/products/_catalog.yaml\\\", \\\"title\\\": \\\"_catalog\\\", \\\"heading_path\\\": [], \\\"chunk_index\\\": 2, \\\"kind\\\": \\\"code\\\", \\\"persona_id\\\": \\\"global\\\", \\\"fingerprint\\\": \\\"233d6a27fa8e77aa918db99b43f5e7c6dacc9557f3f6b13771401a06d7d08020\\\", \\\"chunk_id\\\": \\\"knowledge/products/_catalog.yaml::2\\\", \\\"char_count\\\": 864, \\\"embedding_identity\\\": \\\"gemma:google/embeddinggemma-2:768:float32:l2:document:914f7f89142e33e77833254d9c9b90c3cef7303b\\\"}\", \"_distance\": 0.3718368113040924, \"_score\": 1.0, \"title\": \"_catalog\", \"_rrf_score\": 0.01639344262295082, \"matched_queries\": [\"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"], \"trust_boundary\": \"untrusted_reference_data\"}], \"related\": [], \"citations\": [{\"uri\": \"knowledge/products/HIPPO-200Q.md\", \"title\": \"HIPPO-200Q\", \"text\": \"主題：HIPPO-200Q\\n內容：---model: HIPPO-200Qseries: HIPPOhp: 2kw: 1.5outlet_inch: 2rated_head_m: 10rated_flow_lpm: 420max_head_m: 15.5max_flow_lpm: 660solids_mm: 50phase: [1,3]current_1ph_a: 12current_3ph_a: 3.9weight_1ph_kg: 27.2weight_3ph_kg: 27.2source:path: knowledge/EVAK_CATALOG.mdpage: 16---\", \"distance\": 0.46841010451316833, \"matched_queries\": [\"單相電 2吋 2HP 500 LPM\", \"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"]}, {\"uri\": \"knowledge/EVAK_CATALOG.md\", \"title\": \"EVAK_CATALOG\", \"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 4. 規格數據表 (Data Chart - 50Hz / 2850rpm)\\n內容：| 50EUS-5.05 | 0.5 HP / 0.37 kW | 2\\\" | 3 A | 1.1 A | 9.6 m @ 110 LPM | 12 m @ 240 LPM | 6 mm | 11.3 kg / 11.3 kg || 50(80)EUS-5.10 | 1 HP / 0.75 kW | 2\\\" (3\\\") | 5.8 A | 1.9 A | 12 m @ 190 LPM | 18 m @ 375 LPM | 6 mm | 13.9 kg / 13.9 kg || 80EUS-5.10L | 1 HP / 0.75 kW | 3\\\" | 5.8 A | 1.9 A | 6 m @ 290 LPM | 10 m @ 560 LPM | 6 mm | 17.5 kg / 17.5 kg || 50(80)EUS-5.20C | 2 HP / 1.5 kW | 2\\\" (3\\\") | 9.5 A | 2.9 A | 13 m @ 250 LPM | 19 m @ 500 LPM | 6 mm | 18 kg / 18 kg || 50(80)EUS-5.20 | 2 HP / 1.5 kW \\n\\n| 2\\\" (3\\\") | 13 A | 3.7 A | 16 m @ 315 LPM | 21.5 m @ 658 LPM | 6 mm | 18.1 kg / 18.1 kg |\", \"distance\": 0.390367716550827, \"matched_queries\": [\"EVAK 沉水泵浦 單相 2吋 500LPM\"]}, {\"uri\": \"knowledge/products/_catalog.yaml\", \"title\": \"_catalog\", \"text\": \"檔案：knowledge/products/_catalog.yaml\\n  kw: {label: 功率, type: number, unit: kW}\\n  outlet_inch: {label: 出水口徑, type: number, unit: 吋}\\n  rated_head_m: {label: 額定揚程, type: number, unit: m}\\n  rated_flow_lpm: {label: 額定流量, type: number, unit: LPM}\\n  max_head_m: {label: 最大揚程, type: number, unit: m}\\n  max_flow_lpm: {label: 最大流量, type: number, unit: LPM}\\n  solids_mm: {label: 通過粒徑, type: number, unit: mm}\\n  phase: {label: 電源相數, type: number_set, description: \\\"1 是單相、3 是三相；同一列單三相合併時是 [1, 3]\\\"}\\n\\n\\n  current_1ph_a: {label: 單相電流, type: number, unit: A}\\n  current_3ph_a: {label: 三相電流, type: number, unit: A}\\n  weight_1ph_kg: {label: 單相重量, type: number, unit: kg}\\n  weight_3ph_kg: {label: 三相重量, type: number, unit: kg}\\nnotes: >-\\n  額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。  問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。  流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\", \"distance\": 0.3718368113040924, \"matched_queries\": [\"只有單相電，2吋出水口，最多2HP，最大流量要500 LPM以上。全部有哪些？把HP和最大流量寫上，表上單三相寫一起的款式也別漏掉。\"]}]}, \"error\": \"\"}",
+          "duration_s": 0.62,
+          "round": 0,
+          "parallel": true
+        }
+      ],
+      "decision": {
+        "turn_id": "accept117-R1-F02",
+        "status": "available",
+        "provider": "clef",
+        "hop_id": "clef-primary",
+        "model": "clef-flash",
+        "elapsed_ms": 404.7,
+        "signals": [
+          {
+            "id": "needs_knowledge",
+            "type": "noul",
+            "probability_true": 0.6658680439556227,
+            "resolved": null,
+            "accepted": false
+          },
+          {
+            "id": "needs_web",
+            "type": "noul",
+            "probability_true": 0.14014735238066586,
+            "resolved": null,
+            "accepted": false
+          },
+          {
+            "id": "needs_memory",
+            "type": "noul",
+            "probability_true": 0.017974380542921362,
+            "resolved": false,
+            "accepted": true
+          },
+          {
+            "id": "requested_response_language",
+            "type": "choice",
+            "value": "zh",
+            "confidence": 0.6577045652569814,
+            "probabilities": {
+              "en": 0.013480395381060498,
+              "es": 0.0037719117751400725,
+              "ja": 0.0033594340909364646,
+              "ko": 0.002946061589833874,
+              "nan": 0.012778772230640233,
+              "none": 0.2379927716969154,
+              "other": 0.025179158635614728,
+              "zh": 0.7004914945998587
+            },
+            "accepted": false
+          },
+          {
+            "id": "tone",
+            "type": "choice",
+            "value": "neutral",
+            "confidence": 0.9293708659314495,
+            "probabilities": {
+              "confused": 0.010881651064632228,
+              "frustrated": 0.011313109036770243,
+              "lighthearted": 0.002702443961253051,
+              "neutral": 0.9434966927451596,
+              "urgent": 0.03160610319218483
+            },
+            "accepted": true
+          }
+        ],
+        "policy": {
+          "needs_knowledge": null,
+          "needs_web": null,
+          "needs_memory": false,
+          "input_languages": [],
+          "dominant_language": null,
+          "mixed_languages": null,
+          "requested_response_language": null,
+          "retrieval_language": "zh",
+          "response_language": null,
+          "turn_intent": null,
+          "tone": null
+        }
+      },
+      "decision_debug": {
+        "turn_id": "accept117-R1-F02",
+        "status": "available",
+        "provider": "clef",
+        "hop_id": "clef-primary",
+        "model": "clef-flash",
+        "elapsed_ms": 404.7,
+        "signals": [
+          {
+            "id": "needs_knowledge",
+            "type": "noul",
+            "probability_true": 0.6658680439556227,
+            "resolved": null,
+            "accepted": false
+          },
+          {
+            "id": "needs_web",
+            "type": "noul",
+            "probability_true": 0.14014735238066586,
+            "resolved": null,
+            "accepted": false
+          },
+          {
+            "id": "needs_memory",
+            "type": "noul",
+            "probability_true": 0.017974380542921362,
+            "resolved": false,
+            "accepted": true
+          },
+          {
+            "id": "requested_response_language",
+            "type": "choice",
+            "value": "zh",
+            "confidence": 0.6577045652569814,
+            "probabilities": {
+              "en": 0.013480395381060498,
+              "es": 0.0037719117751400725,
+              "ja": 0.0033594340909364646,
+              "ko": 0.002946061589833874,
+              "nan": 0.012778772230640233,
+              "none": 0.2379927716969154,
+              "other": 0.025179158635614728,
+              "zh": 0.7004914945998587
+            },
+            "accepted": false
+          },
+          {
+            "id": "tone",
+            "type": "choice",
+            "value": "neutral",
+            "confidence": 0.9293708659314495,
+            "probabilities": {
+              "confused": 0.010881651064632228,
+              "frustrated": 0.011313109036770243,
+              "lighthearted": 0.002702443961253051,
+              "neutral": 0.9434966927451596,
+              "urgent": 0.03160610319218483
+            },
+            "accepted": true
+          }
+        ],
+        "policy": {
+          "needs_knowledge": null,
+          "needs_web": null,
+          "needs_memory": false,
+          "input_languages": [],
+          "dominant_language": null,
+          "mixed_languages": null,
+          "requested_response_language": null,
+          "retrieval_language": "zh",
+          "response_language": null,
+          "turn_intent": null,
+          "tone": null
+        }
+      },
+      "calls": [
+        {
+          "label": "R1-F02",
+          "system_sha256": "8158a189fdde756aa07ae6f355d6c9b1fce4e00cd86321593c8eff6f86a1d467",
+          "message_count": 2,
+          "max_tokens": 400,
+          "requested_model": null,
+          "transport": "sync",
+          "content": "",
+          "model": "gemini-3.5-flash-lite",
+          "tool_calls": [
+            {
+              "id": "call_1267058",
+              "name": "filter_products",
+              "arguments": "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"op\":\"in\",\"value\":\"1,1,3\"},{\"value\":\"2\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"value\":\"2\",\"op\":\"lte\",\"field\":\"hp\"},{\"value\":\"500\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}],\"name\":\"single_phase_2inch_max2hp_flow500\"}]}",
+              "extra_content": {
+                "thought_signature": "EmAKXgFpFH0TE9NioTPcBKlE+n8hnrV4Kl8Z1OKWjh9TaSvufjo+dIwvWiotEnHwe96N1idr/khQVeP2XRIO+udAklnSHZVukIAeS3B74tS/cokZtgaa6VE2LpxbU/xGSsM="
+              }
+            },
+            {
+              "id": "call_1267059",
+              "name": "search_knowledge",
+              "arguments": "{\"queries\":[\"單相電 2吋 2HP 500 LPM\",\"EVAK 沉水泵浦 單相 2吋 500LPM\"]}",
+              "extra_content": null
+            }
+          ],
+          "usage": {
+            "input_tokens": 7402,
+            "output_tokens": 172,
+            "total_tokens": 7574,
+            "cached_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "status": "ok",
+          "elapsed_seconds": 1.2352,
+          "route_attempts": [
+            {
+              "trace_id": "c233d39be48e",
+              "provider": "gemini",
+              "model": "gemini-3.5-flash-lite",
+              "hop_index": 0,
+              "result": "success",
+              "latency_ms": 1137.0931301116943,
+              "chain_length": 4
+            }
+          ],
+          "provider": "gemini"
+        },
+        {
+          "label": "R1-F02",
+          "system_sha256": "8158a189fdde756aa07ae6f355d6c9b1fce4e00cd86321593c8eff6f86a1d467",
+          "message_count": 5,
+          "max_tokens": null,
+          "requested_model": null,
+          "transport": "stream",
+          "content": "符合的有：50EUB-M-5.20S (2 HP, 500 LPM)、50EUS-5.20 (2 HP, 658 LPM)、50EUS-5.20C (2 HP, 500 LPM)、50STEEL-5.20 (2 HP, 630 LPM)、HIPPO-100/100Q (1 HP, 500 LPM)、HIPPO-150/150Q (1.5 HP, 580 LPM)、HIPPO-200/200Q (2 HP, 660 LPM)。",
+          "model": "gemini-3.5-flash-lite",
+          "tool_calls": [],
+          "usage": {
+            "input_tokens": 9840,
+            "output_tokens": 148,
+            "total_tokens": 9988,
+            "cached_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "status": "ok",
+          "elapsed_seconds": 1.7807,
+          "route_attempts": [
+            {
+              "trace_id": "810feab3fcbd",
+              "provider": "gemini",
+              "model": "gemini-3.5-flash-lite",
+              "hop_index": 0,
+              "result": "success",
+              "latency_ms": 1683.2521057128906,
+              "chain_length": 4
+            }
+          ],
+          "provider": "gemini"
+        }
+      ],
+      "route": {
+        "path": "tool",
+        "skip_rag": false,
+        "skip_tools": false,
+        "forced_tool_name": null
+      },
+      "elapsed_seconds": 4.38
+    }
+  ],
+  "calls": [
+    {
+      "label": "R1-F01",
+      "system_sha256": "98faae8172e395b5f6da66311604bd2ad1485a9f867b7353a5c37abf6f31da18",
+      "message_count": 4,
+      "max_tokens": null,
+      "requested_model": null,
+      "transport": "stream",
+      "content": "",
+      "model": "gemini-3.5-flash-lite",
+      "tool_calls": [
+        {
+          "id": "call_1473843",
+          "name": "filter_products",
+          "arguments": "{\"scenarios\":[{\"name\":\"3吋三相5HP以下最大流量600LPM以上\",\"conditions\":[{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"3\"},{\"value\":\"3\",\"op\":\"contains\",\"field\":\"phase\"},{\"op\":\"lte\",\"field\":\"hp\",\"value\":\"5\"},{\"value\":\"600\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}]}]}",
+          "extra_content": {
+            "thought_signature": "EmAKXgFpFH0TYfUS7YvVDIerIw1K6h+/65DqH3fCAkXiQb2tQteou7uI7TZU6Vjv/RX7u7iYcGV8DwDXEUjeRcGaxt7OoZYmepZNJ1OYJrN5wi1+FsroCsWZLlYEuQEO7/A="
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 13379,
+        "output_tokens": 118,
+        "total_tokens": 13497,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "status": "ok",
+      "elapsed_seconds": 2.4629,
+      "route_attempts": [
+        {
+          "trace_id": "78ddab9f6ad9",
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "hop_index": 0,
+          "result": "success",
+          "latency_ms": 1427.6678295135498,
+          "chain_length": 4
+        }
+      ],
+      "provider": "gemini"
+    },
+    {
+      "label": "R1-F01",
+      "system_sha256": "98faae8172e395b5f6da66311604bd2ad1485a9f867b7353a5c37abf6f31da18",
+      "message_count": 6,
+      "max_tokens": null,
+      "requested_model": null,
+      "transport": "stream",
+      "content": "符合三吋管、三相、五馬力以下且最大流量六百公升以上的型號有：八十帝華五點三零三馬力、八十帝華五點五零五馬力、八十歐德烏五點二零二馬力、八十歐德烏五點三零三馬力、八十歐德烏五點五零五馬力、八十伊優比姆五點二零二馬力、八十伊優比姆五點三零三馬力、八十伊優比姆五點五零五馬力、八十伊優愛斯五點二零二馬力、八十豹牌五點三零三馬力、八十鋼鐵五點二零二馬力、八十鋼鐵五點三零三馬力、八十鋼鐵五點五零五馬力、河馬一百五十點八十口徑一點五馬力、河馬二百點八十口徑二馬力、河馬三百點八十口徑三馬力、河馬四百點八十口徑四馬力。",
+      "model": "gemini-3.5-flash-lite",
+      "tool_calls": [],
+      "usage": {
+        "input_tokens": 13266,
+        "output_tokens": 242,
+        "total_tokens": 13508,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "status": "ok",
+      "elapsed_seconds": 2.3576,
+      "route_attempts": [
+        {
+          "trace_id": "c08026f07ce6",
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "hop_index": 0,
+          "result": "success",
+          "latency_ms": 2258.671579360962,
+          "chain_length": 4
+        }
+      ],
+      "provider": "gemini"
+    },
+    {
+      "label": "R1-F02",
+      "system_sha256": "8158a189fdde756aa07ae6f355d6c9b1fce4e00cd86321593c8eff6f86a1d467",
+      "message_count": 2,
+      "max_tokens": 400,
+      "requested_model": null,
+      "transport": "sync",
+      "content": "",
+      "model": "gemini-3.5-flash-lite",
+      "tool_calls": [
+        {
+          "id": "call_1267058",
+          "name": "filter_products",
+          "arguments": "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"op\":\"in\",\"value\":\"1,1,3\"},{\"value\":\"2\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"value\":\"2\",\"op\":\"lte\",\"field\":\"hp\"},{\"value\":\"500\",\"op\":\"gte\",\"field\":\"max_flow_lpm\"}],\"name\":\"single_phase_2inch_max2hp_flow500\"}]}",
+          "extra_content": {
+            "thought_signature": "EmAKXgFpFH0TE9NioTPcBKlE+n8hnrV4Kl8Z1OKWjh9TaSvufjo+dIwvWiotEnHwe96N1idr/khQVeP2XRIO+udAklnSHZVukIAeS3B74tS/cokZtgaa6VE2LpxbU/xGSsM="
+          }
+        },
+        {
+          "id": "call_1267059",
+          "name": "search_knowledge",
+          "arguments": "{\"queries\":[\"單相電 2吋 2HP 500 LPM\",\"EVAK 沉水泵浦 單相 2吋 500LPM\"]}",
+          "extra_content": null
+        }
+      ],
+      "usage": {
+        "input_tokens": 7402,
+        "output_tokens": 172,
+        "total_tokens": 7574,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "status": "ok",
+      "elapsed_seconds": 1.2352,
+      "route_attempts": [
+        {
+          "trace_id": "c233d39be48e",
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "hop_index": 0,
+          "result": "success",
+          "latency_ms": 1137.0931301116943,
+          "chain_length": 4
+        }
+      ],
+      "provider": "gemini"
+    },
+    {
+      "label": "R1-F02",
+      "system_sha256": "8158a189fdde756aa07ae6f355d6c9b1fce4e00cd86321593c8eff6f86a1d467",
+      "message_count": 5,
+      "max_tokens": null,
+      "requested_model": null,
+      "transport": "stream",
+      "content": "符合的有：50EUB-M-5.20S (2 HP, 500 LPM)、50EUS-5.20 (2 HP, 658 LPM)、50EUS-5.20C (2 HP, 500 LPM)、50STEEL-5.20 (2 HP, 630 LPM)、HIPPO-100/100Q (1 HP, 500 LPM)、HIPPO-150/150Q (1.5 HP, 580 LPM)、HIPPO-200/200Q (2 HP, 660 LPM)。",
+      "model": "gemini-3.5-flash-lite",
+      "tool_calls": [],
+      "usage": {
+        "input_tokens": 9840,
+        "output_tokens": 148,
+        "total_tokens": 9988,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "status": "ok",
+      "elapsed_seconds": 1.7807,
+      "route_attempts": [
+        {
+          "trace_id": "810feab3fcbd",
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "hop_index": 0,
+          "result": "success",
+          "latency_ms": 1683.2521057128906,
+          "chain_length": 4
+        }
+      ],
+      "provider": "gemini"
+    }
+  ],
+  "route_attempts": [
+    {
+      "trace_id": "78ddab9f6ad9",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1427.6678295135498,
+      "chain_length": 4
+    },
+    {
+      "trace_id": "c08026f07ce6",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 2258.671579360962,
+      "chain_length": 4
+    },
+    {
+      "trace_id": "c233d39be48e",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1137.0931301116943,
+      "chain_length": 4
+    },
+    {
+      "trace_id": "810feab3fcbd",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1683.2521057128906,
+      "chain_length": 4
+    }
+  ],
+  "config": {
+    "project": "dev-c0c8fdff34",
+    "persona": "default",
+    "reply_mode": "fast",
+    "llm_provider": "gemini",
+    "llm_model": "gemini-3.5-flash-lite",
+    "llm_temperature": 0.3,
+    "agent_loop_max_rounds": 6,
+    "forced_tool_max_tokens": 400,
+    "turn_decisions_enabled": true,
+    "turn_decisions_timeout_seconds": 2.0
+  },
+  "decision_calls": [
+    {
+      "provider": "clef",
+      "hop_id": "clef-primary",
+      "model": "clef-flash",
+      "purpose": "decision_turn",
+      "elapsed_ms": 443.7915636226535,
+      "status": "ok",
+      "usage": {
+        "input_tokens": 763,
+        "output_tokens": 0
+      },
+      "label": "R1-F01"
+    },
+    {
+      "provider": "clef",
+      "hop_id": "clef-primary",
+      "model": "clef-flash",
+      "purpose": "decision_turn",
+      "elapsed_ms": 404.24842946231365,
+      "status": "ok",
+      "usage": {
+        "input_tokens": 761,
+        "output_tokens": 0
+      },
+      "label": "R1-F02"
+    }
+  ],
+  "integrity": {
+    "file_count_before": 967,
+    "file_count_after": 967,
+    "sha256_before": "8bb0326ea3c2230ceed721d7e02eda3be87737c96b8d8d75d8ec237ade9b7e56",
+    "sha256_after": "8bb0326ea3c2230ceed721d7e02eda3be87737c96b8d8d75d8ec237ade9b7e56",
+    "changed": []
+  },
+  "checkout": {
+    "commit": "0759f4f4ab1080fb1cc4ffd0dc8b44bb5a940087",
+    "source_manifest": {
+      "brain/api/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/config.py": "cfbe716803be2e67d954dc3eb980698d066ad289e95a4381b50128bd516b9aa9",
+      "brain/api/core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/core/agent_loop.py": "d96a25f64c592d811c956b076cbc25566cde68eab0218e08dfd0f023aac43e26",
+      "brain/api/core/asr_glossary.py": "0359031c886ffbbdf1c2a6a34ccf3a68b6cde46b77f2a9942799af5e8ec6962f",
+      "brain/api/core/chat_service.py": "84a53e66574c6a57b88bf403ff7981329afb0ce8999671896cb9619442504009",
+      "brain/api/core/chat_shortcut.py": "b6c5394d3919bb46fb4f0db902797b07759cdcb7288e29c359067127a52a4b69",
+      "brain/api/core/chat_turns.py": "717cb922d6600df7c64966f708349782532fe5bd2e982d8ed8e6675452ce0e5e",
+      "brain/api/core/decision_router.py": "20eed9c92dde59e5e13641ef2702e0bde6bdd71018e062a52d33b2bea33d4ce1",
+      "brain/api/core/fallback_chain.py": "11b5b804da9dd87e5ea7d80ef27a4d051741d811e0eb90fcfbfbe1a23fcb4df3",
+      "brain/api/core/jev_client.py": "637631a9c76da5f044b2f7fb392b65c7daa2c20dca1e6b0f05d92148ed7916a0",
+      "brain/api/core/key_pool.py": "9685c66c19239e04db6e610cc3c6b9fe9b513831b6c7006fb78f6de8762aca1b",
+      "brain/api/core/llm_client.py": "6ab574388b2eaa6eec9ad84e3e994b72fd042dfc83ab9420b7a7a7ce81b90224",
+      "brain/api/core/model_discovery.py": "326a13600c8c531c6c72e65f5cb8c34349c61d5d7bfd802472f636fed3406b2e",
+      "brain/api/core/models_config.py": "bb3eb3936aef23e231668fa7715502a3fe531a73837c5c04b2f5619dc4f1691f",
+      "brain/api/core/pipeline.py": "3ac2c16ce4028e6492a9a09918fb853b15898e6f8dd9409fd444ae826a90e84d",
+      "brain/api/core/prompt_builder.py": "96343512c49db57f49182a8a6a876dc3c0859cc30f047cc3998b767ded107ae4",
+      "brain/api/core/prompt_templates.py": "f6956d601073edb30dcc0663f4048b820a06769de5793a2d8f85b426499c43f0",
+      "brain/api/core/provider_router.py": "caecb9a7850504b58b735549ada4f2dad2e0b40562e121833bc6120aa29ae802",
+      "brain/api/core/reply_modes.py": "1317780735e5001877f30244d0267244eef32b7f68514428c716dbb708f93022",
+      "brain/api/core/retrieval_service.py": "ddbe4b25129d94446349a6b48d4c6690af252b76d12b2fb7e3dcb929a9ea6467",
+      "brain/api/core/slash_command.py": "c8a967a023c6b1651677ce8fca8551b44a59bdb08b9c47a9134ced0084ac595c",
+      "brain/api/core/sse_events.py": "c269edc1194eda30bc720cc001584d7c891159adcc15833e32eeda27e7b30a30",
+      "brain/api/core/turn_decisions.py": "8fb383beb6c951a26f96aeb224dc0c59664ca7ae646c88ac78055c3b4c7be90e",
+      "brain/api/core/two_md.py": "25cb79d4db8eaf41479879a37fa3bb7326422ede366be9c00235f8e4c9c5b4c5",
+      "brain/api/core/two_md_defaults.py": "7d87d5428ff4c944e3a4290ea94b8a7dbe43d98eeb9420e68534a7887dcdb38f",
+      "brain/api/core/usage.py": "e44ba906f1b294bc588e2f85904c7c620de37fd386317ccd5f6c510fd1a6bfef",
+      "brain/api/health_payload.py": "c9f5f51fd6af3790dbb0fa1690f89166f223935be2aac5c18235b9107a2e92d9",
+      "brain/api/infra/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/infra/datetime_utils.py": "301c64d5ed8ddc0b2403b52f1c3cfdc1bbb90c5296feec8c6a592b9a499a1815",
+      "brain/api/infra/db.py": "694ff2cffd95ed31fdfbb460c72ecb99c5251d0964301226e6424cceba20aacd",
+      "brain/api/infra/learnings.py": "1673a1096fa5b886cb9a9a7d1b3f256e12e4cb75758ae9c73e5e68cf530e4d25",
+      "brain/api/infra/pipeline.py": "c6dddc784b91807f7da40ead0cf663c3574b688f65d5e8039856ada2b32e2bc2",
+      "brain/api/infra/project_admin.py": "7098fd4e784be69cbfe83e674b2e6b4f9e5dfbd3b4755c3c594d79dd6f9ab306",
+      "brain/api/infra/project_context.py": "6251cffbac7579dc40c1dac693dfdadb17d8d4f72b7a0153de3c311a94aa9d45",
+      "brain/api/infra/reflection.py": "2747d51c5046a2a62cd78dac88c96d05c85725b3f64e02633541639dab058edd",
+      "brain/api/infra/two_md_coordination.py": "ee0cdd2b093b7b086ef63217ee737de1eea80121c4a851f95682daf7da4acd5d",
+      "brain/api/infra/two_md_transport.py": "c4a8826903484acdf4715af3e98ad66fddf590af1f276f3fce6ad359b15feea9",
+      "brain/api/infra/usage_ledger.py": "b6225d493dee7ca1754a37c8ecb82c4e6a42e71b5e5ac803db2dd674010ecfbe",
+      "brain/api/internal_routes.py": "aa8dab744f2e0f593aa31d8ba1611eccf62331db139e7ee79c3ec85feb3dd614",
+      "brain/api/knowledge/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/knowledge/chunking.py": "9deca91f0a990e54be3cb91aeebfc92405cce63a1b9cd51747d28cd34bcab31f",
+      "brain/api/knowledge/commit_jobs.py": "445c8fcdce0cc6581473810a23b84483ea6d7b840a319a3600681a492e95414e",
+      "brain/api/knowledge/converters.py": "7547705757fe31145d804c06f32da1a380619ff88fd0fe1132126505efa3f472",
+      "brain/api/knowledge/doc_meta.py": "62c45aaf846ca6fff8849a10c1165b3eb17ec3674e4720f3cf0c411d2e490d17",
+      "brain/api/knowledge/fingerprint.py": "f37102c71d7a4beb1fc65e2d0c99c05ff6042b7a9db0a4a80ea5667c7e60fc5b",
+      "brain/api/knowledge/graph.py": "2777fd3f8b94b7f248cb20f7df706a00f48797b83090a59ed98ce076598e515f",
+      "brain/api/knowledge/graph_extractor.py": "af9a14e11fdd501fec73de98594c91ce58ae86aaae884c7f06ed9109009c76e2",
+      "brain/api/knowledge/graph_rag.py": "223da9c8e73c88c2224d11ccd41c70a58fb8a9cc1d3553d479eb95c11c5c507b",
+      "brain/api/knowledge/indexer.py": "15db2bd4391d52a2d7ec308cec6f55090998f3af0fd2383e4b1aabde4629a3b3",
+      "brain/api/knowledge/kb_settings.py": "83244ad941f8018febe570752da047edabef38e4babd47648c71e6fc5c6fa731",
+      "brain/api/knowledge/knowledge_admin.py": "099b2d26c5ca9e4d228896848fd38ae9441c2d22e627ca4095da1e69f5b1aa84",
+      "brain/api/knowledge/normalizer.py": "0f50720ad7260ca87bf407f519888a095e79312b15848de1789c22e0ea27c3bd",
+      "brain/api/knowledge/product_catalog.py": "f94de938f6197322634586c2c906643b7ae1e60ca304508456cac7caf97a1956",
+      "brain/api/knowledge/product_filter.py": "384b6ed169e3cb1a3e30e7f95ac2b1005458629a9ea4052c510cbd8c7007a185",
+      "brain/api/knowledge/qa_csv.py": "65e2a8c6327350551c0d300fae219dc66e6d35c9b8e01c7979f4094a1b3349d2",
+      "brain/api/knowledge/qa_nodes.py": "0aea25030f913e8f0d763a8b29623728cfb0942db98d8ccfa1e02bcb53fb07f8",
+      "brain/api/knowledge/workspace.py": "9a289436033e66a84bd6d033111b7d787ac04c0d84bff857396d26b400aca212",
+      "brain/api/live/__init__.py": "3420a06e35bcc8344e495e543078940d12dc4be105f9d94b69226c03de8153d4",
+      "brain/api/live/gemini_audio.py": "9a2767e50ea89bbf1b942b4c01ad7ec4e318dfd1b6d653293ea93172cad5de84",
+      "brain/api/live/gemini_live.py": "abef9991d576cccd87b661d7fb29b59f8d8438a2958fba0a0e36399fbbf973e1",
+      "brain/api/live/gemini_payloads.py": "26f86de2d278a37cd5e372ba6897a2618c3e8651a8662500a6723de4dec10205",
+      "brain/api/live/gemini_tool_execution.py": "8e69649e0968bfc3e9136f27ca62d67ce0fbcd990407609d5db24325ac3417f9",
+      "brain/api/live/gemini_tools.py": "22ed1f46b6888af0b47d56e8716a1abe71e43389e0a3d976927e9a3a0107f0a6",
+      "brain/api/live/gemini_transcripts.py": "01d3e58a45b7f4712b87da9ed7dc1ee30e53cd06cf151aef17e6fc39b3a5dfbb",
+      "brain/api/live/gemini_transport.py": "bffef6f34f23686a7da38cc8d66c299e1178d8c770ef3a40cbf282cef74a62dd",
+      "brain/api/live/gemini_turns.py": "d9337edd7c633a415af73ee3fc51780de80ab0ecfd42eff7411de349099edc7e",
+      "brain/api/main.py": "7e7fe082bae4299fdc86cb9ba87c992786dc98ac9788787e1333443133bf00e7",
+      "brain/api/memory/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/memory/asr_judge.py": "9b15eb0c00173e987357b44664958c4d25771891acadb58095f65d2b76edffeb",
+      "brain/api/memory/auto_recall.py": "c6a519a08a544871f1cc4562a3bcc696d03f1e61508abffb72dec8834121fbdb",
+      "brain/api/memory/dreaming/__init__.py": "f9903b789d4e9645ff67f6989b80814978ee329106ed35c7d8d266674ab3e388",
+      "brain/api/memory/dreaming/deep_phase.py": "4c45d485224e83d2dba5e296ac7cfdf8abd0ecf059783eea06f83419fafa2df6",
+      "brain/api/memory/dreaming/light_phase.py": "f9ed04fea87d53746e5ae2a5022fdfa099d4ded2c63c3f643a4b71896d014940",
+      "brain/api/memory/dreaming/paths.py": "0566dd2f35d170fd07ab38e54f0a0e6feded31fa864dc4dff6bdbeb5a0913c0b",
+      "brain/api/memory/dreaming/recall_tracker.py": "09e97e5f9103d76cfb7a8c71f5a28511f365fe239b8cced949d27be8caac742a",
+      "brain/api/memory/dreaming/rem_phase.py": "97c470a601624042415c9244a635ff24ca3564876d3c6287f74c04814faafa74",
+      "brain/api/memory/dreaming/scheduler.py": "21069d153b58aa92595632e718505becca33f1b67d97ee3de5eb6c129efd4a49",
+      "brain/api/memory/dreaming/scoring.py": "9459ca6e55dab85040b6129fb83cc2eddbb15504e964ec38a55aa1a6fa7d63ae",
+      "brain/api/memory/embedder.py": "aa0a12408b1c1f0053f0a59874908e4b4f9eb8b77ca7983491a2a4fc9273268d",
+      "brain/api/memory/fusion.py": "3f6504f4bc4f8b362b89c1c7af960b37b3a5129816a36d160bba6c9976630f3e",
+      "brain/api/memory/identity.py": "e5c1f2b806c707c0dba4eed9960054d1d638864bf84de3c42b315904640c716c",
+      "brain/api/memory/importance.py": "c8dc08b0a313d97e716d237a8c6d7ed578b65bcc96bdfa6771d2218dc9688ff6",
+      "brain/api/memory/language_detect.py": "1af9cee1ca8b683ad11d9b4238c2d448ee0eac27c29afc949b9ed636a852cdc1",
+      "brain/api/memory/memory.py": "15ca4832a0ae112027e9068231755da326439441d25c52f8a787a7f07daa456e",
+      "brain/api/memory/memory_governance.py": "02f64c437aa1bfdc29fc7321b95e6b485dc3f40e6314e78f3a2c12e1e57fa577",
+      "brain/api/memory/query_expansion.py": "561d1eb333baeeb2f16e4077b114d3db7a27e47d3cd6e2b66d85250007d1686b",
+      "brain/api/memory/recall_cache.py": "fbbd959e5019580ae6cb8e2be686bf16458ebac1831a0beb6cd39eaeb3881173",
+      "brain/api/memory/retrieval.py": "3f012b3903e9586bcdee3d6f70a510919eaf46390747d42948516c7a36434399",
+      "brain/api/memory/session_backup.py": "6aef162f6f761d843c39c2b0695a662f5a96c10bf5e4c145c6d1c65f2acb27c3",
+      "brain/api/memory/session_store.py": "7d9757e9203ac1b4ce9ae66453356e7e0ea4997ca3e62052f29a0faf4f949e0c",
+      "brain/api/memory/thresholds.py": "a360de90e34660294be43e16ca37e3031cdde34be4422a4ddd60933a07fc145f",
+      "brain/api/personas/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/personas/personas.py": "e246354e7a3a4a72d8b3b075afdaeb339a37d6148ee0a6264b38fb1ce8ae64ae",
+      "brain/api/privacy/__init__.py": "8d89c0da07bd3c1fe6c604da211c50c84627ee963f423e7754c9a48299e8769b",
+      "brain/api/privacy/audit.py": "0e5bf2302a1f2bcff330662fa32841623fd8a7b452f178f9368ceea79bb5fbb3",
+      "brain/api/privacy/cache.py": "ff56087cd0572564e99490f784a194b298792300caf2e11dedbf0198b97a5dcc",
+      "brain/api/privacy/exceptions.py": "d7e7b0dcdf9a4fa918b2e1703a9787321f0983bd26979e42552dbee1ed097114",
+      "brain/api/privacy/filter.py": "55768796d09e4ecb2fa7ced58f3dc84eabf75d5bd7fb62a18f249aa580e897cc",
+      "brain/api/privacy/model.py": "54359f848f36ddfe097160188a50430d0d421abff91956d74a574551ec1e17c8",
+      "brain/api/protocol/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/protocol/history.py": "293b046a14c60967661064e93f39dcb537bbd75c67912eab8e49e3c77caaec23",
+      "brain/api/protocol/message_envelope.py": "d9edffb541b91016a1f836f26e04a241d881f2101d6e3d3dcec4e825cfeff1e8",
+      "brain/api/protocol/protocol_events.py": "c448020353ff4d2c21d3a7947e3b58103413976c242753d5efe0bbb1183f9535",
+      "brain/api/protocol/schemas.py": "587d2fd16a84f73ac02b9785078ed20c4ee9a4b71e0e60994db5893b350fd668",
+      "brain/api/pytest.ini": "67183186c35a76f1815e570bda107a8cc668d35217aead0f04c2d9f9d3d2fae8",
+      "brain/api/routes/__init__.py": "adc1d33d2f42edf690cc1e2f6b44af21372192a2d849e2774b3bdd434cfa72c9",
+      "brain/api/routes/backups.py": "7e95fae2e3c79020f0a77e294f643fcda81a265c0347c97b226252877f0fe993",
+      "brain/api/routes/chat.py": "f89ec47e223092048d17140a686b64afb06506c6d6df47e5ac1cc121cb80d37b",
+      "brain/api/routes/health.py": "4e43ca0ce78c53b50c3f9f3baca0121795861e2556c2ed0e23c67c6b0eb0b6ae",
+      "brain/api/routes/knowledge.py": "3c0aa212b8cde08f7eb180c683827acfcffbb170cc42f3cb8771e1b05cb912f4",
+      "brain/api/routes/knowledge_qa.py": "97ccdcdc74c3181a07a8811aed67b0d5be24ae0f83994f3a42fe7fc86823b931",
+      "brain/api/routes/memory.py": "0eddaaae061197f8295ccae27529849a608c56b7e75cdad2553de153aef3f9af",
+      "brain/api/routes/personas.py": "2e66856e9621b70523cb6b41b1046c815103658c9a563ebda209185342f2eaff",
+      "brain/api/routes/projects.py": "9c86174e1a2b4a59736817863f760c6bc33bb638520580ba5f758bf308e108f1",
+      "brain/api/routes/protocol.py": "e9c3983cbdac77052ebf7f2917f7d8d2202d236adc88dbce7c524f6a1c9900cd",
+      "brain/api/routes/search.py": "bdb626b33d13c96a27582aaa860f22e6de70d09130d4af3f2e188c3abc47f522",
+      "brain/api/routes/sessions.py": "5807b92db3c63e7238dfb8aa16fd5bef94faed763343d8369ce87f20faf5a252",
+      "brain/api/routes/tools.py": "e44753aac8e6d68673b968bbcdf5fed1fa27433a571a9cf552a165b58acc0e2f",
+      "brain/api/routes/usage.py": "ca75ea39187db24e58be2c10da8a37617f8780b09e91b7fbf6f11c2adf566cf2",
+      "brain/api/routes/workspace.py": "85d20653d22b4ad29426a12e9ffa1770c531732e9193a121e93fdda609911168",
+      "brain/api/safety/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/safety/guardrails.py": "ed096111556a456f97985c9e09986eaa489966b495d7ff69cb1681ff2b4e89de",
+      "brain/api/safety/http_filters.py": "4ebf07f10460a5e2d07dd78059bb625d553ab4a144fab50ee8561b7685a8871c",
+      "brain/api/safety/internal_auth.py": "08acbe347e3779d7853b9862449aec2607abe334e3c1d661bf4c82760b14cce8",
+      "brain/api/safety/observability.py": "c2775015d829f9e2eae07de09959ec643a2f906baf9a7b1691cf1064b25be356",
+      "brain/api/safety/server_http.py": "9684e159d1ca0cbb374f0ee29d720381c0c85ad53c5bcd611a05e6bdd7048ec8",
+      "brain/api/safety/url_policy.py": "db98a1755091cbe95fd942d93cb7934ec95f283af1c39c6e6d9200e81b0124d1",
+      "brain/api/scripts/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/scripts/backfill_message_language.py": "4e0eeb00c2f9e6609564bc71c0b91eac4fc105acdf8ad378cb85f6d1d1de7a45",
+      "brain/api/scripts/migrate_qa_paths.py": "ac5efa101f07eae0061a14da9191e72296d3a8b37d35c457092beac05e4518bd",
+      "brain/api/scripts/migrate_to_projects.py": "ea1505508640a2566a3d82ff52df6e57856848e3ec8f44d97137949b9261cf11",
+      "brain/api/scripts/reindex_knowledge.py": "fc28a8236783e36d14fe241fdc6d68952ab9f5c6bb3f088185198468653a5aaa",
+      "brain/api/scripts/seed_esg_quick_replies.py": "5c8b27f1e386c36cb302f472559639f111b31b38eaf10c2996e7ee38d5fc93b0",
+      "brain/api/startup.py": "cc93a8f4b44e6df0a2439d83ec37df302a7515f267107eade0f0240e7632f5df",
+      "brain/api/tests/conftest.py": "9d4ad4f7ccc17d7aa10c2af1be27f9d5122b9b4d7048f8b5c32fb8b03d6f4b72",
+      "brain/api/tests/contracts/test_decision_debug_contract.py": "79289746e6a414684b86158d458bd5f85b12395ca6cbe3a6e2f9adaf7b0fe3c2",
+      "brain/api/tests/contracts/test_protocol_events.py": "b4beecb23e0980bc14d7b1523c3e5e3df07e039faaa0837f7a140b79221abb5d",
+      "brain/api/tests/core/test_asr_glossary.py": "2c1ba369195a40762f8dffbbc63fbccc98e5a13c6448edca598a21f556709564",
+      "brain/api/tests/core/test_decision_router.py": "67cacfade843712d89801cb5b2c2c788c6372ba0ec69ee1c3b92539cc19f0a66",
+      "brain/api/tests/core/test_jev_client.py": "bc4a705b910ae99e26fdc4a4c4aae1604641c5f48509d44930ad1414e292e0d1",
+      "brain/api/tests/core/test_reply_language.py": "b954ca40a3129ceb48cfeb4032e477f774aef451020f7d1c8c3b13a27bbd62db",
+      "brain/api/tests/core/test_turn_decisions.py": "bbe24012dcb0533577811074456bc2645462c123de4e6f40ff3e571037a609e4",
+      "brain/api/tests/infra/test_pipeline.py": "88ebf665f644b249f06465fd4112308d04e900ddc47c63aaacb1517c9c9521f5",
+      "brain/api/tests/knowledge/test_commit_jobs.py": "eb924e393a125792e2074f93284abc81aee5446344dab3feba0a26d15c2905e4",
+      "brain/api/tests/knowledge/test_converters.py": "c82df109c42d3b5754f5d62a9bbafb2d6ed9da234e770595969882e5e8ea25b2",
+      "brain/api/tests/knowledge/test_doc_language.py": "630229cc644eec23f690bd11aadbd20ad9088b4d5bd8943666518bfa45f87038",
+      "brain/api/tests/knowledge/test_embedder.py": "bfe000df7aeedcf7705c71b9a16df7fd6dac45a986bb39efb6514c990100f8e6",
+      "brain/api/tests/knowledge/test_embedding_config.py": "77a5e2609ac402fea8daa104f1951917d2417adbc354574a9d83c2fb9b726be3",
+      "brain/api/tests/knowledge/test_graph_empty.py": "0f01f1d6e7eafd07c3dd61b55b1012a0859d90cd2fe03f812b181870033e4bf3",
+      "brain/api/tests/knowledge/test_graph_neighbor_retrieval.py": "f1f77afa192061ae376412d3b4752c895b07d87176e80a74521f5747cab2d11f",
+      "brain/api/tests/knowledge/test_graph_pipeline.py": "baa164b0b90c8ac8429c60dad2819a4935e0a424d1350c5ce5750fe4d2924e1e",
+      "brain/api/tests/knowledge/test_graph_status_stale.py": "e41f3058fe4b9151a9db9e892ef21a6a130a57f03ccdfefd6ea8343728442ac5",
+      "brain/api/tests/knowledge/test_indexer.py": "eea3a8e1554f3c2f64f9e474732d592f27235bba9b101f1ac1106ecbc2c93f0c",
+      "brain/api/tests/knowledge/test_indexer_pipeline.py": "79c83d82213a35d06c8dc4795d59d3ef2abd9c3f62bd9b4d1b45370b5f3a9e50",
+      "brain/api/tests/knowledge/test_kb_settings.py": "448a5524652999f7613018069b7960a3bd53b480f22d9f87dd69577349a8f392",
+      "brain/api/tests/knowledge/test_knowledge_commit.py": "bdc121569f8dc188694a23015a351896d10d6cd2dd3ab200aa3689d9e4576c0e",
+      "brain/api/tests/knowledge/test_knowledge_doc_meta.py": "bd1b9394c80cc0777e01f73fa8f4c0fec460092c23dbc43e6fcfc3640392a2b6",
+      "brain/api/tests/knowledge/test_knowledge_normalization_admin.py": "4aee5076ad9c6d31df28db215ed3750b4e98169920df53c4884c89339729da04",
+      "brain/api/tests/knowledge/test_knowledge_qa_entries.py": "2ebc5507539782782014b53c7a59e99fc8bebc4ea07cd282e116ea54999fc0ba",
+      "brain/api/tests/knowledge/test_knowledge_qa_routes.py": "48992a42a9b8d1dbc83bf8c71d9789c6161c6aaccb4bad747ed7a900ea51972e",
+      "brain/api/tests/knowledge/test_knowledge_save_route.py": "83b3e82fff64cb0f2fa1f464445505c54af84eba8227a740eabd095b7a7c24a8",
+      "brain/api/tests/knowledge/test_migration.py": "922567f0a0165229cb1a0bb8b2c4021fa3cc6ae8cc7414877e202f8f4ea9c00b",
+      "brain/api/tests/knowledge/test_normalizer.py": "e9d08c2e76d499e8fc33a092e09a45622cf79648625485eaf035df661f8d1414",
+      "brain/api/tests/knowledge/test_note_graph_weights.py": "5ffdbd3311976ffd1d140825381ad3e55d680c10ffaa2f0273628cf3f0c96904",
+      "brain/api/tests/knowledge/test_product_filter.py": "4796e36c4a18416381e0a4d34002e2d2a601e92cc0a5c7d366e4195161e97c4f",
+      "brain/api/tests/knowledge/test_qa_csv.py": "c76cb01c31c5771062b1d7d63f4c71fe431d0c8d4ea252695ea5007f847010fa",
+      "brain/api/tests/knowledge/test_qa_nodes.py": "347cb4767c4859207acd3454141b4bdc467d79c3ef7281944b01e2e89344252f",
+      "brain/api/tests/knowledge/test_reindex_coalescing.py": "83001f37efd1cfd79aaba4f5e6bf585cf62beb57ed4b85b1f899537c3104b6cf",
+      "brain/api/tests/knowledge/test_retrieval_service.py": "bb48a2aacf4e9be467033dc10448ba9611869e5272d92f9e3e8cba37e86c4038",
+      "brain/api/tests/knowledge/test_seed_esg_quick_replies.py": "6d3bde1cdc9eb95ce63aff9ee50d38bb5d29120b092cc931692d3b34de5be05c",
+      "brain/api/tests/knowledge/test_vector_store_routing.py": "38ae7f6777dad121c8353dcb5e0b3985395fd662de2165b49304cff8ebe943fa",
+      "brain/api/tests/memory/test_asr_judge.py": "5e9c50dc1f64cf7cccf46ca3bc96b8b215cb404949e099ca36eb555f4bc5b419",
+      "brain/api/tests/memory/test_auto_recall.py": "2c17b9518496fd2f8461edd613aa4c0c4821155f40a8d9ae2d0bd8bf52198151",
+      "brain/api/tests/memory/test_fusion.py": "965c11dacb72019fdb95f15c1c6e7aee744b815cc9835ac7aab25e3e7e0f81af",
+      "brain/api/tests/memory/test_importance.py": "82e990c3950ec4a6fe7de390f50f2629e1b90faa6e246d9bd0fb0c34720ae975",
+      "brain/api/tests/memory/test_language_detect.py": "89fb8bfa7dc7dbe95948db5df0429de40c10330a0791c7467ddecd5985dda31a",
+      "brain/api/tests/memory/test_memory_delete_security.py": "d3ade0baca8b1dde05a7c0c331edb34c8f5f8842a707d46ac1cf2c7845d97715",
+      "brain/api/tests/memory/test_memory_governance.py": "32081e919103fa3aa4f72e20c6899ab412768d0ff76be85003df3a22abe08898",
+      "brain/api/tests/memory/test_memory_listing.py": "78f0f9125c7a808605350e693f57e9bc80e1cf23275bbeee6ba1655e34767fee",
+      "brain/api/tests/memory/test_prompt_recall.py": "8802749bef07597d8259d3609760a7f32d20ccc92f5dee5cede58fbffdd2b4d7",
+      "brain/api/tests/memory/test_query_expansion.py": "553dfa328c002d8ef3dc21d1e998ff79e3558761df1640b5c5bfcf80ed2d9c05",
+      "brain/api/tests/memory/test_recall_cache.py": "d8e7e30f820122600539409f14731eeb8978071c6f1dde5b31e49b2194a4746a",
+      "brain/api/tests/memory/test_recall_tracker.py": "aaa791abb555a1d8f6395f3f378fca894cb8c6af28665db9996d88f71acf41b0",
+      "brain/api/tests/memory/test_remote_embedding_adapter.py": "8e98d53746e268fb19ef92e484818c3277ff102818519d32f3c7c5f0387a4363",
+      "brain/api/tests/memory/test_retrieval_hybrid.py": "44f8a5bf845861ee949732b9f17cec39ee7f697f4152aea09e51dcda7cc220d0",
+      "brain/api/tests/memory/test_session_backup.py": "e16e0d698170a3baac6659e1f266e4292b4129e8f45f9124d3305695e604258b",
+      "brain/api/tests/memory/test_thresholds.py": "548a9094b834bc083e6071ba4a1fef20e86637d1d5c827411f5557773a2830e1",
+      "brain/api/tests/phases/test_deep_phase.py": "236876c9b70dff030810e9360f7cbb0c088f344e1a03c3f175e9915ec2f1846c",
+      "brain/api/tests/phases/test_light_phase.py": "201f685f971fda59190c8eafaaa1c852261fb805dce152831e34662f6f8d0379",
+      "brain/api/tests/phases/test_rem_phase.py": "16f47874bcf57e644fc431d31ef10e71326670fc1f0c2acf04208a9a3b5654fe",
+      "brain/api/tests/privacy/test_privacy_audit.py": "b69903c5474ab912cf8b7f415d63265c1bd46152c8c661d8c925168f51824b6c",
+      "brain/api/tests/privacy/test_privacy_cache.py": "65330d9ac12d9ff361badf9f0ad29bdef0ec3ffda8a9a45f8e722e437abe338b",
+      "brain/api/tests/privacy/test_privacy_filter.py": "d0ab7b3a10b811804fdba3cb98e579b25f9dc38bccca8be2c3d44ce798d67c15",
+      "brain/api/tests/privacy/test_privacy_llm_integration.py": "dcb50ce0adc008412677770143d15ba88a1c6af9792e73fb31da94f09973a9ad",
+      "brain/api/tests/privacy/test_privacy_model.py": "52b279d901f5df043af7c175c92aa36eae3db5287dd7869e3a1fc82c3169dcc7",
+      "brain/api/tests/privacy/test_privacy_opf_integration.py": "ae9d0857c6f88d7205092d23fdedf0cb4af9a6b0cb88bd7807edbeda5cf909f6",
+      "brain/api/tests/privacy/test_privacy_startup.py": "9d4ef314440a5aab8e168061d4c14e9dd8e52b3bd77209ee2d98c20d98ef24f0",
+      "brain/api/tests/routes/test_generation_error_status.py": "0c29e692849541f469057dec0004c8cf7a248d14812892d83fdd8dacdc9a5367",
+      "brain/api/tests/routes/test_session_date_limits.py": "abc6e2fc7a20b2a836be4202ee515a9680fc9c6e831eb4d65d5b9660268dd8f7",
+      "brain/api/tests/safety/test_internal_auth.py": "cdda0481a06f55d3d021d32dc9e47ad539124eed1cc865674647baa87b69b022",
+      "brain/api/tests/safety/test_internal_route_protection.py": "29ce5d14eb0202699d265a9bf791cb5941cb2218914fb02bf144aa4e608e5290",
+      "brain/api/tests/services/test_health_payload.py": "067ba333c2022585c791db86e96fd3789a87d15ece2d8950617707c712d0cb28",
+      "brain/api/tests/services/test_internal_decision.py": "3a45386577c9519cf9b7a38bd395246d87a341a0e9cca1f9201c138d786f3432",
+      "brain/api/tests/services/test_internal_enrich.py": "bbb080b07419dd633d89075b0d1b33029f57897278ec8e30adef18339fe41ed6",
+      "brain/api/tests/services/test_internal_live_bridge.py": "7ee75b04664a1d64693e21ced9c517c61d7830470bb7a69f666a5a06a9ca5a0f",
+      "brain/api/tests/services/test_llm_fallback_chain.py": "693aa2d9125ac7a223de4d215194d672f3619c4e58cc68ee022efbc9fd1f088e",
+      "brain/api/tests/services/test_llm_usage.py": "718c277325e013976696abb50d4584311d650fbee555af22f1c14f8048b1a5e3",
+      "brain/api/tests/services/test_message_envelope.py": "826e9e8b496ac1c10e98096ae4d13a46dd43bd38ba97ce988b3330f8c681f6ed",
+      "brain/api/tests/services/test_metrics_export.py": "110b14cc831e42ef2a5fd1d11368e8e633ad224f8f1d222dbec7d6697339fd49",
+      "brain/api/tests/services/test_nen_provider_config.py": "370a7eebebab404df74adae5d9b309e8fe242ab61fbd1c609e9c816e6487a43e",
+      "brain/api/tests/services/test_provider_router.py": "c91f1713994293cf959c29f58efb7cd04122f849c6839642dcf99869d3df5131",
+      "brain/api/tests/services/test_routing_observability.py": "82ad4f6f9121c61717568a635cebcac19e149666cdf14fba90e99c4d89cf7581",
+      "brain/api/tests/services/test_scoring.py": "29b7f725fa2ecc5d1cc103e77630f39ee261f40961004e0175fe6703ac711399",
+      "brain/api/tests/services/test_stream_chat_turn.py": "8a1414893d4e980de2334659946a65aeaaf980140b980efdd511bf34559807c0",
+      "brain/api/tests/services/test_usage_ledger.py": "e56444d9e73d6a685d7110bfe4c7eb84c01d5affec38e368c5211f05a5708b25",
+      "brain/api/tests/services/test_usage_routes.py": "c5c3acef2aae74c300bee21f370001f94649915a4d9b79e1ae3f44cd82f2d2c0",
+      "brain/api/tests/session/test_backup_api.py": "7e7a5a17b18121808265b7b9c8846d9b41c1f85f082ec4de9e62c6894679ce02",
+      "brain/api/tests/session/test_chat_turn_delivery.py": "014f52781414a5804088d9a59818a7e6077cb64922ae1a323a36e8f151c871a5",
+      "brain/api/tests/session/test_dreaming_timezone.py": "84da8bba71f702f3b48b2597e0d99a071ff1fb6f386e90f40a59432f681b27df",
+      "brain/api/tests/session/test_ephemeral_chat.py": "a44e3a9544be4e9ec9b1009ffe27788d293c4df09658ee341c42a64b09d7f2ac",
+      "brain/api/tests/session/test_gemini_live_session.py": "15d060854b3741b6e5a9c58627b67c9730aa5db679797a76963a4eaedd12e708",
+      "brain/api/tests/session/test_identity.py": "539b26b1b3f9428ce9290c47ed4219d5d7b169915729a7195a71c5315d9b1f1b",
+      "brain/api/tests/session/test_persona_avatar.py": "d030655a1535f2fc3c0df9b85850d77b530dc6c2c692cb9529a8030ca98795d4",
+      "brain/api/tests/session/test_personas.py": "175ed4fa68ccbbde3e33df4400f7dbce2ede805518ae7f4515288c98110a6ce7",
+      "brain/api/tests/session/test_project_admin.py": "5025ed52985e94d676c1cd5d3b32a37c1fa46d5c60df1076ffe1f0ede41676c8",
+      "brain/api/tests/session/test_project_context.py": "18550f6f693e6d62e19d1447b3d514a628790cdaac4fc035680c68be869dde61",
+      "brain/api/tests/session/test_recall_toggle_api.py": "9ddd0a33e8ca5abf50fadbfe8675c82162a538ccf369af1700ff7d447d632a13",
+      "brain/api/tests/session/test_scheduler.py": "b9830a9815467dcab7bba15e9145433671a310cdfed456b437a66aeb34bfa674",
+      "brain/api/tests/session/test_session_export_api.py": "a0c6717c9ef168850518a676c4651a2f4ffabbec5723fffdba06a043e87e3189",
+      "brain/api/tests/session/test_session_store.py": "bb33925d84f4769c6e2dd721c8b913576de99a941b7690634e4e6a649839ac3a",
+      "brain/api/tests/test_a2a_skill.py": "81d871bb2a0cffcc48cb29df6448d0ab229071cee761b63eb5112c6178e9a0f0",
+      "brain/api/tests/test_business_tools.py": "6c2108ac3f4b355216fef060d95c8188db7fdb555910586191c0b1943b4ec8ac",
+      "brain/api/tests/test_chat_pipeline.py": "86e8aec50fe8d5b3551a78cc9bc6b4dcf64d74efaa230e2f8135eb9f7a4ba4bd",
+      "brain/api/tests/test_error_rotation.py": "1a28245cd6c19cb68bd8802f38ff0e4cc4ab60e49d5d4f2bdb7b2dfe9aefd15c",
+      "brain/api/tests/test_forced_knowledge_search.py": "88cd0adf8dc80be90130183328cc88283ba9aeb35cdb9f9ed663aff9a97607b8",
+      "brain/api/tests/test_knowledge_language_routing.py": "0f77b29647bd704a12647a99f3ca5badecf1d0169160b774adb97e63a619a103",
+      "brain/api/tests/test_memory_tool_authorization.py": "94d3cec63dbc6b4d189783106b374a63b7763251719d7c0f721082455f288cb3",
+      "brain/api/tests/test_reply_modes.py": "0d4ac3e017122041d20dc1589e254e84b71d783566526d43e416349168b6251a",
+      "brain/api/tests/test_runtime_dependencies.py": "b7d63a70cf58ecd67597cdab2a912c4076dff404312955f26dbaaa400ae33003",
+      "brain/api/tests/test_search_helpers.py": "d64d060d1b3378f21dfe07feeda7b4159232882773ea8cd614460d6d8f4dc1b3",
+      "brain/api/tests/test_settings_attribute_guard.py": "48bfd9e66e8745d29b0d2d9151abe2a1662d5c8cb66995bb160ab8c51896a919",
+      "brain/api/tests/test_skill_manager.py": "dd56edb87d2e4b2267bd5fff89da02c09307fd21bf707859285ccacdc8964a9d",
+      "brain/api/tests/test_startup_warmup.py": "1a9c0ba4d30f482174fbb3e6404e2de3319cf5f027b4a7fe0d6fd7815e7fa147",
+      "brain/api/tests/test_tool_error_handling.py": "146875dac8f456630a17ac1ca5601dcd4ba4c9aa48e1e6969d115d3023a9151e",
+      "brain/api/tests/test_tools.py": "c3372d304fa310f97d29d5d49475a92bd9a9a35f14b9b5387585dc28cdd914d7",
+      "brain/api/tests/test_two_md_coordination.py": "9843968972c3afc5dc5b28ce948348c961f00330db7e118d961e4a43dda2aed6",
+      "brain/api/tests/test_web_tools.py": "d1584245637bd13e3ccbc050cc3658a2c44f2a259dc87a510a050be129b86fd7",
+      "brain/api/tests/test_wiki_tools.py": "b6b2148e29969b22c64d2055a3b9270114b94ee879baf40f1b362a7a748d9a00",
+      "brain/api/tools/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "brain/api/tools/actions.py": "4b00b956e1a0ec3a2093b5be754779c641cef3ca9f3a0ccf3c3a0bc277a2c834",
+      "brain/api/tools/builtin/__init__.py": "339927f42a9690e0e31bdf64f6f9e22f6738a58688bfbbabfe83facf493f15f1",
+      "brain/api/tools/builtin/actions_tools.py": "e7576649556e0b2a3d316c45aa0d1d521b3560249d778ce2d2abc7eb33692d26",
+      "brain/api/tools/builtin/business_tools.py": "60f230e21f1d1a04ca739786754383f2fcc57febc511d8ad6190864b25811e70",
+      "brain/api/tools/builtin/graph_tools.py": "ee381d6c43d6394c8b56155d281ff95f4397d3e75e5202130fe5664e46cc9ed2",
+      "brain/api/tools/builtin/knowledge_tools.py": "e41d249e0e660eb35d0ecd5303863e32bec74d82ab298a795d148769ac2db472",
+      "brain/api/tools/builtin/memory_tools.py": "127aa7ce6cab55bcfba7ed2c76d868ea29545f2756a5168c255d87ffbdfabbc3",
+      "brain/api/tools/builtin/product_tools.py": "4062409f60ee7bbc42ca8c1b1b766c5031d9b1926261a193f703ce087e75f0af",
+      "brain/api/tools/builtin/web_tools.py": "362ab6e580fbb900a4481dd4ee3834982e9a8ef8288717efecd778ab4ad5b818",
+      "brain/api/tools/builtin/wiki_tools.py": "4381799ce0b8af13834576d4c07abdbf7da1fdb97c1e9830683998aa51ffd810",
+      "brain/api/tools/context.py": "a26fd8d24b7d1312f3c3cd872ea82052f003752d4369d6b67138ce378f38ffd5",
+      "brain/api/tools/mock_data.py": "b216d300b0238103169ffc58d9faef84c6eeb6492ef3c7b5398447301f457ba8",
+      "brain/api/tools/search_helpers.py": "5129a6eb223b73ce0316a44ea1c24aa09937625a3ac7997289dab13aaf7afbc4",
+      "brain/api/tools/skill.py": "3eef89b46e96ef3c3ed35c139a88c7be6d92170259a5efd5bbb9031f60a67cbc",
+      "brain/api/tools/skill_manager.py": "947ad6dbd9fd222d960bbf5e1928ddf1003a90ffeae989b6bf8556ad4279c88d",
+      "brain/api/tools/tool_executor.py": "4f3f6a87d93b86dd7241d26f7e7fb74790caf40b66b9d63741d7caa3cd708919",
+      "brain/api/tools/tool_registry.py": "e9f4aa28d30ea0de6ce8eeccc4c98f3b6e3dbd0e62316c590ec14070aa743cd0",
+      "brain/api/warmup_state.py": "395a5eda3e28e2fc246b57b8c2c939e425d07b36bfd6a08b563e6c3c84799b42",
+      "contracts/generated/python/openvman_contracts/__init__.py": "0fe68430e72892d53ac33b8d582aa7ebbc505a7b9465e005a2ff13113f99f512",
+      "contracts/generated/python/openvman_contracts/protocol_contracts.py": "45a12fc0b1840c087bdea3f96af700bac1f85a0f9f14945a5bff44b2406a2965",
+      "contracts/schemas/v1/client_audio_chunk.schema.json": "c1af74f3fe9c15f8dd70f347b389c4a6aac131bcd0c9bf498b140a0b5445ab04",
+      "contracts/schemas/v1/client_audio_end.schema.json": "b0cb93f8aab43f8e232717cad10f896b296f84b4c9fcfcd2a41faf20ce39481e",
+      "contracts/schemas/v1/client_init.schema.json": "ccf13f0f441266fb4622ed7ca46ea57bfd7425d64a110975a9ca11cee7ab2aa0",
+      "contracts/schemas/v1/client_interrupt.schema.json": "d0f0739c6903f5ee369c4fa3797c369531198514bd08d5ce2406386a47592c53",
+      "contracts/schemas/v1/client_video_frame.schema.json": "9a47620accb445d6789f54e77a55e22f277b881411f63f60ed1429c47a7db7f9",
+      "contracts/schemas/v1/manifest.json": "c0ac67786851a9ff20a81e129a290b2d61c9220b85a676e32d8491f38d4d7808",
+      "contracts/schemas/v1/server_camera_frame_status.schema.json": "fd5a51e639d694c0598339d6744c4dccf03d2c694f9ab5e51bb236e890b415bd",
+      "contracts/schemas/v1/server_decision_debug.schema.json": "bd239cb96d23d5d018856bb7bb9bedf8fbdc279560bf29a8e8f7def0404fa2c7",
+      "contracts/schemas/v1/server_error.schema.json": "df66fdecda0930951a1e02bde494b8a944151869979fd0fc524e90c61be46ef1",
+      "contracts/schemas/v1/server_init_ack.schema.json": "96d5d01c8045ec9ba87022d44ee7e9b631d4c22d9a0508a5a7d1ae5b3455b99c",
+      "contracts/schemas/v1/server_stop_audio.schema.json": "54004187b7b1493437642bccad514ed3cfa6d7622b8ac6da0d04bd73665f8293",
+      "contracts/schemas/v1/server_stream_chunk.schema.json": "b3a85693aeae4ae2b742449023f857eabdd7e5da3a89dee03a0b9409eb75dba2",
+      "contracts/schemas/v1/set_decision_debug.schema.json": "0756258e8fe541aeabdcccb7ceb679b3777ee7326b06fb83e71875495ba79d90",
+      "contracts/schemas/v1/set_lip_sync_mode.schema.json": "53121fecded4bec4d2b380cc0d4f14e16cc6f3e84f61b912acc24ba892e7c842",
+      "contracts/schemas/v1/user_speak.schema.json": "830f3bd57a91248a4549b65eb876b99984e0d042bae92bc38bba29b59f4b7c23",
+      "contracts/schemas/v1/user_transcription.schema.json": "a3ce5382abb9100fde6a1ab57f7961c102a903951e6e21da41e1f36efb9255c2",
+      "contracts/scripts/generate_protocol_contracts.py": "56d7cd9dd603e947ca03ed0b480ace04f17bb6cc377f6790702864955d51b519",
+      "contracts/scripts/generate_two_md_endpoints.py": "87b07547fda8d1fbcd6045fa22362ac040d697a687a412113ec6326031c469cc",
+      "contracts/two-md-endpoints.json": "260a97fed20af62a7aab6cbe2cde56a2368211ffa6ca13871f94f52a92992ee2",
+      "acceptance/runtime.py": "6fdf7b174e8c176b025ad970a36b2c4c5bbd86f4bd190bf6b563311d81fc9e0a"
+    },
+    "snapshot_at": "2026-10-12T03:27:18.369194+00:00"
+  },
+  "bundle_sha256": "333e59fe09173deed1079b349ada0acea1986ba502f28f4c9677d153b45930df",
+  "questions_sha256": "0a1d03598d113a9460fb397ebb83e2a3d8f4776592bc7b0d83807f2ba3c19e9f",
+  "questions_frozen_at": "2026-10-12T03:26:21.609588+00:00",
+  "behavior_parity": {
+    "raw_metadata_equal": false,
+    "resolved_metadata_equal": true,
+    "document_entries": 129,
+    "production_project": "proj-0cc5c610b4",
+    "test_project": "dev-c0c8fdff34",
+    "normalization": "Only infer missing language/language_source using the production resolver; no keys discarded and no data written",
+    "raw_metadata_sha256": [
+      "814180475e2bef1ade75ea721bac80f60b3684fa4102a955f54326f07f36c136",
+      "8654dac0de728750be89f179d02c35243367b290ce67b2c9786de74482aec58b"
+    ]
+  },
+  "limitations": [
+    "Current host checkout imported from private /tmp copy; /app untouched",
+    "Direct prepare_generation/execute_generation/finalize_generation, not HTTP endpoint",
+    "Fast reply mode and production speech/plain-text policies unchanged",
+    "Normal user metadata; turn decision, prompts, tools and provider fallback unchanged",
+    "New session per question/repeat; history empty, limits skipped, persist=False",
+    "PII detector, usage, recall trace and route-audit file writes suppressed only in this process",
+    "Auto document language writeback retained in process-local metadata shadow cache",
+    "Raw mirror check may exit 1 for 99 language-cache differences; resolved parity separately recorded",
+    "Python write audit plus LanceDB mutation proxy; native external writers detectable by final hashes"
+  ]
+}
