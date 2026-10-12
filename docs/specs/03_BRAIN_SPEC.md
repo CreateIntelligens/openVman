@@ -449,6 +449,8 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、延遲及 request scope 寫入 `/data/usage.db`。每個 fallback hop 都有自己的 provider、用途和狀態記錄，不保存判斷原文或 API key。
 
+帳號 API key 請求由 Backend 注入 `principal_type=api_key`、`principal_id=<key_id>`，`user_id` 仍為所屬正式帳號。Brain 不驗證或接收完整 key；帳本及篩選保留 key ID，讓同帳號不同整合的用量可分開統計。
+
 | `unit_type` | 來源 | `units` 的意義 |
 |---|---|---|
 | `tokens`（預設） | LLM 呼叫 | 0；數字在 `input_tokens`／`output_tokens`／`total_tokens` |

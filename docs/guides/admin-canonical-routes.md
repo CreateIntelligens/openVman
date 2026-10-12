@@ -33,9 +33,11 @@
 | 知識庫 | 文件：`/admin/knowledge` | 圖譜：`/admin/knowledge/graph` |
 | Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds`；小助理：`/admin/avatar/mascots` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
-| 帳號 | 正式建立：`/admin/accounts` | 臨時建立：`/admin/accounts/temporary`；編輯／管理：`/admin/accounts/manage` |
+| 帳號 | 正式建立：`/admin/accounts` | 臨時建立：`/admin/accounts/temporary`；編輯／管理：`/admin/accounts/manage`；API 金鑰：`/admin/accounts/api-keys` |
 
 公開子路徑部署時加上 `/openvman`，例如 `/openvman/admin/knowledge/graph?project=demo`。`publicAdminPath()` 依目前網址保留此部署前綴。
+
+API 金鑰子頁在既有後台門禁內開放正式帳號管理本人 key，入口位於桌面頁首及手機導覽；管理員另可由帳號頁前往。其他帳號管理子頁仍需 admin／root，不因新增子頁而放寬。
 
 ## 正規化與導覽
 

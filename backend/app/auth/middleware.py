@@ -64,6 +64,18 @@ class FailClosedAuthMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        response = await self._dispatch_authenticated(request, call_next)
+        if request.url.path == "/api/v1/api-keys" or request.url.path.startswith(
+            "/api/v1/api-keys/"
+        ):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    async def _dispatch_authenticated(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         # X-Embed-Key 一律先驗，連公開路徑也不例外：金鑰的來源白名單、
         # 額度與角色限制必須套用在它能觸及的每一條路徑上。
         runtime = self._runtime or get_auth_runtime()

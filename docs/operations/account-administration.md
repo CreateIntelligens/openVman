@@ -19,6 +19,8 @@
 
 ## 權限階層
 
+正式帳號可在「帳號 → API 金鑰」建立與撤銷獨立串接憑證；管理其他帳號沿用下方階層。key 繼承帳號權限，不另建立管理者身分。停用、撤銷帳號憑證或變更角色會使原 key 失效；來源資料的資源授權則每次依新權限判斷。完整 key 只顯示一次，備份 Auth DB 亦不能還原明文，遺失需重發。API、期限與用量說明見 [整合指南](../guides/account-api-keys.md)。
+
 正式帳號依序為 `ROOT > admin > user`，持久化值皆為小寫，只有介面將 `root` 顯示成 `ROOT`。
 
 - 唯一 ROOT 是正規化 username 為 `ai360` 的正式帳號。ROOT 繼承所有 admin 能力，並可建立及管理 admin／user／temporary。

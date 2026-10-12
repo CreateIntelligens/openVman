@@ -27,6 +27,7 @@
 
 ## 整合指南
 
+- [帳號 API key 與 ASR 整合](guides/account-api-keys.md)
 - [後台 Canonical Routes 現況](guides/admin-canonical-routes.md)
 - [前台費茨法則評估](guides/frontend-fitts-law-audit.md)
 - [紅色供應鏈與替代方案評估](guides/red-supply-chain-assessment.md)
@@ -37,6 +38,8 @@
 ## 計畫與實驗
 
 計畫保留原始狀態；Draft 不表示已確認完成。實驗腳本與逐筆資料維持在原目錄，避免報告與重現工具分離。
+
+- [帳號 API 金鑰](plans/account-api-keys.md)（Draft）：沿用帳號權限的服務串接憑證、後台管理與每把 key 的用量歸屬。
 
 - [Embedding 意圖影子模式計畫](plans/embedding-intent-shadow.md)（已退場，改用 Jev）
 - [入口與大型模組職責拆分](plans/thin-entry-refactor.md)（Done）：保留行為、拆分前台／Backend／Brain 入口與 Gemini Live。

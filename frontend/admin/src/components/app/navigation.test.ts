@@ -29,6 +29,13 @@ describe("admin navigation routes", () => {
     });
   });
 
+  it("round-trips account API key routes including the public prefix", () => {
+    expect(parseAdminRoute("/admin/accounts/api-keys")).toEqual({ tab: "Accounts", subView: "api-keys" });
+    window.history.replaceState(null, "", "/openvman/admin/chat");
+    expect(buildAdminPath("Accounts", "default", "api-keys")).toBe("/openvman/admin/accounts/api-keys");
+    expect(parseAdminRoute("/openvman/admin/accounts/api-keys")).toEqual({ tab: "Accounts", subView: "api-keys" });
+  });
+
   it("rejects unknown paths", () => {
     expect(parseAdminRoute("/admin/not-a-page")).toBeNull();
   });

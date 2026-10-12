@@ -4,16 +4,69 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from copy import deepcopy
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
+from app.auth.embed import is_allowlisted
+from app.auth.middleware import is_auth_bypass_path
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
 
 logger = logging.getLogger("backend")
 _health_http = SharedAsyncClient()
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
+
+
+def _with_account_authentication(schema: dict) -> dict:
+    """Describe middleware auth after merging internal Brain contracts."""
+    schema = deepcopy(schema)
+    schemes = schema.setdefault("components", {}).setdefault(
+        "securitySchemes", {},
+    )
+    schemes.update({
+        "AccountBearer": {
+            "type": "http", "scheme": "bearer",
+            "bearerFormat": "JWT or ovk_<key_id>.<secret>",
+            "description": "登入 token 或帳號 API key，沿用帳號權限。",
+        },
+        "SessionBearer": {
+            "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
+            "description": "管理 API key 需要登入 token；不接受 API key。",
+        },
+        "AccountCookie": {
+            "type": "apiKey", "in": "cookie", "name": "openvman_session",
+            "description": "登入 session；寫入操作需要同來源 Origin。",
+        },
+        "EmbedKey": {
+            "type": "apiKey", "in": "header", "name": "X-Embed-Key",
+            "description": "網站嵌入專用，限制來源與可用路徑。",
+        },
+    })
+    methods = {"get", "post", "put", "patch", "delete", "head", "options"}
+    for path, operations in schema.get("paths", {}).items():
+        for method, operation in operations.items():
+            if method not in methods or not isinstance(operation, dict):
+                continue
+            if is_auth_bypass_path(path):
+                # Public routes stay callable without Swagger's auth header;
+                # internal routes retain their dedicated security contract.
+                continue
+            scheme = (
+                "SessionBearer" if path.startswith("/api/v1/api-keys")
+                else "AccountBearer"
+            )
+            operation["security"] = [{scheme: []}, {"AccountCookie": []}]
+            if is_allowlisted(method, path):
+                operation["security"].append({"EmbedKey": []})
+            operation.setdefault("responses", {}).setdefault(
+                "401", {"description": "憑證無效、過期、撤銷或帳號已停用"},
+            )
+            operation["responses"].setdefault(
+                "403", {"description": "帳號／資源權限不足或驗證方式不允許"},
+            )
+    return schema
 
 
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
@@ -86,9 +139,11 @@ class BackendOpenAPI:
             brain_schema = await _fetch_brain_openapi()
             self._built = True
             if brain_schema is not None:
-                app.openapi_schema = _merge_brain_openapi(local_schema, brain_schema)
+                app.openapi_schema = _with_account_authentication(
+                    _merge_brain_openapi(local_schema, brain_schema),
+                )
                 return app.openapi_schema
-        app.openapi_schema = local_schema
+        app.openapi_schema = _with_account_authentication(local_schema)
         return app.openapi_schema
 
     def schema(self) -> dict:
@@ -104,5 +159,5 @@ class BackendOpenAPI:
                 title=app.title, version=app.version, routes=app.routes,
             )
             loop.create_task(self.build())
-            return local_schema
+            return _with_account_authentication(local_schema)
         return asyncio.run(self.build())

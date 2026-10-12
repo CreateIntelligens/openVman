@@ -45,6 +45,9 @@ vi.mock("./api/auth", () => ({
 vi.mock("./pages/Avatar", () => ({
   default: () => <div data-testid="tab-avatar">Avatar tab</div>,
 }));
+vi.mock("./pages/ApiKeys", () => ({
+  default: () => <div data-testid="tab-api-keys">API keys tab</div>,
+}));
 vi.mock("./pages/Accounts", () => ({
   default: () => <div data-testid="tab-accounts">Accounts tab</div>,
 }));
@@ -127,6 +130,41 @@ describe("App tab mounting", () => {
     render(<App />);
     await screen.findByTestId("tab-chat");
     expect(window.location.search).toBe("?session=s1&persona=p1");
+  });
+
+  it("opens account API keys directly for a formal account with existing portal access", async () => {
+    vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", kind: "formal", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
+    window.history.replaceState(null, "", "/openvman/admin/accounts/api-keys");
+    render(<App />);
+    expect(await screen.findByTestId("tab-api-keys")).toBeTruthy();
+    expect(window.location.pathname).toBe("/openvman/admin/accounts/api-keys");
+    expect(screen.queryByTestId("tab-accounts")).toBeNull();
+  });
+
+  it("keeps other account management pages forbidden to ordinary users", async () => {
+    vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
+    window.history.replaceState(null, "", "/admin/accounts/manage");
+    render(<App />);
+    await waitFor(() => expect(screen.queryByText("正在載入可用專案…")).toBeNull());
+    expect(screen.queryByTestId("tab-accounts")).toBeNull();
+    expect(screen.queryByTestId("tab-api-keys")).toBeNull();
+  });
+
+  it("opens API key management from the mobile drawer", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "開啟導覽" }));
+    const drawer = screen.getByRole("dialog", { name: "主要導覽" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "API 金鑰" }));
+    expect(await screen.findByTestId("tab-api-keys")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "主要導覽" })).toBeNull();
+    expect(window.location.pathname).toBe("/admin/accounts/api-keys");
+  });
+
+  it("opens API key management from the global account entry", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "管理帳號 API 金鑰" }));
+    expect(await screen.findByTestId("tab-api-keys")).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/accounts/api-keys");
   });
 
   it("uses the URL default project instead of a saved project for direct links", async () => {

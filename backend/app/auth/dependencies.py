@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from fastapi import Depends, HTTPException, Request, WebSocket, status
 from starlette.requests import HTTPConnection
 
+from .api_keys_repository import InvalidApiKeyError
 from .embed import (
     EMBED_KEY_HEADER,
     authorize_embed_request,
@@ -18,6 +19,7 @@ from .embed import (
 from .models import (
     AccountRole,
     AccountType,
+    ApiKeyRecord,
     EmbedKeyRecord,
     TemporaryCredentialRecord,
     UserRecord,
@@ -36,6 +38,7 @@ class AuthTransport(StrEnum):
     BEARER = "bearer"
     COOKIE = "cookie"
     EMBED_KEY = "embed_key"
+    API_KEY = "api_key"
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +47,7 @@ class CurrentAccount:
     transport: AuthTransport
     temporary_credential: TemporaryCredentialRecord | None = None
     embed_key: EmbedKeyRecord | None = None
+    api_key: ApiKeyRecord | None = None
 
 
 def _unauthorized() -> HTTPException:
@@ -124,6 +128,16 @@ def _authenticate_connection(
     if bearer is not None:
         token = bearer
         transport = AuthTransport.BEARER
+        if token.startswith("ovk_"):
+            try:
+                user, api_key = runtime.api_keys.authenticate(token)
+            except InvalidApiKeyError as exc:
+                raise _unauthorized() from exc
+            current = CurrentAccount(
+                user=user, transport=AuthTransport.API_KEY, api_key=api_key
+            )
+            connection.state.current_account = current
+            return current
     else:
         token = connection.cookies.get(_SESSION_COOKIE_NAME, "")
         transport = AuthTransport.COOKIE

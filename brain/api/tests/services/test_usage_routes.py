@@ -52,6 +52,62 @@ def test_usage_summary_and_events(client: TestClient):
     assert bad.status_code == 400
 
 
+def test_api_key_usage_is_separate_per_key_and_rolls_up_to_owner(client):
+    headers = {"X-Internal-Token": "test-internal-token"}
+    for key_id, seconds in [("key-a", 1.5), ("key-b", 2.5)]:
+        response = client.post(
+            "/brain/usage/events", headers=headers,
+            json={
+                "provider": "breeze", "kind": "asr",
+                "unit_type": "seconds", "units": seconds,
+                "user_id": "owner-1", "role": "admin",
+                "principal_type": "api_key", "principal_id": key_id,
+            },
+        )
+        assert response.status_code == 201
+    with usage_scope(
+        user_id="owner-1", principal_type="user", principal_id="owner-1",
+    ):
+        usage_ledger.record_usage_event(
+            provider="g", model="m", usage=LLMUsage(2, 3, 5),
+        )
+
+    owner = client.get(
+        "/brain/usage/summary", headers=headers,
+        params={"user_id": "owner-1", "group_by": "principal"},
+    ).json()
+    assert owner["totals"]["calls"] == 3
+    assert owner["totals"]["seconds"] == 4
+    assert {
+        (row["principal_type"], row["principal_id"])
+        for row in owner["groups"]
+    } == {("api_key", "key-a"), ("api_key", "key-b"), ("user", "owner-1")}
+
+    filters = {
+        "user_id": "owner-1", "principal_type": "api_key",
+        "principal_id": "key-b",
+    }
+    summary = client.get(
+        "/brain/usage/summary", headers=headers, params=filters,
+    ).json()
+    assert summary["totals"]["calls"] == 1
+    assert summary["totals"]["seconds"] == 2.5
+    events = client.get(
+        "/brain/usage/events", headers=headers, params=filters,
+    ).json()
+    assert events["count"] == 1
+    assert events["events"][0]["user_id"] == "owner-1"
+    assert events["events"][0]["principal_id"] == "key-b"
+    series = client.get(
+        "/brain/usage/timeseries", headers=headers, params=filters,
+    ).json()
+    assert sum(point["calls"] for point in series["points"]) == 1
+    assert client.get(
+        "/brain/usage/events", headers=headers,
+        params={**filters, "user_id": "different-owner"},
+    ).json()["count"] == 0
+
+
 @pytest.mark.parametrize("group_by", ["", "project"])
 def test_timeseries_report_timezone_and_range(client, monkeypatch, group_by):
     headers = {"X-Internal-Token": "test-internal-token"}

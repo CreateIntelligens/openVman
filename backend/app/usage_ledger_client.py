@@ -27,6 +27,7 @@ UNIT_CHARS = "chars"
 UNIT_SECONDS = "seconds"
 
 _EMBED_PRINCIPAL_TYPE = "embed_key"
+_API_KEY_PRINCIPAL_TYPE = "api_key"
 _SESSION_PRINCIPAL_TYPE = "user"
 
 
@@ -39,8 +40,8 @@ def usage_scope_for(
 ) -> dict[str, Any]:
     """Build the ledger attribution fields for an authenticated caller.
 
-    主體判定與 `brain_proxy._trusted_upstream_headers()` 一致：有 embed key 就
-    記成金鑰主體，否則記成帳號主體。這樣 TTS 的用量才跟 LLM 的用量用同一套
+    主體判定與 `brain_proxy._trusted_upstream_headers()` 一致：金鑰請求
+    記成對應的金鑰主體，否則記成帳號主體。這樣 TTS 的用量才跟 LLM 的用量用同一套
     維度彙總，Usage 頁面的「主體」篩選對兩者都成立。
 
     `current` 為 None（系統自己觸發、沒有帳號脈絡）時回傳空 dict，事件仍會
@@ -51,9 +52,13 @@ def usage_scope_for(
 
     user = current.user
     embed_key = getattr(current, "embed_key", None)
+    api_key = getattr(current, "api_key", None)
     if embed_key is not None:
         principal_type = _EMBED_PRINCIPAL_TYPE
         principal_id = embed_key.key_id
+    elif api_key is not None:
+        principal_type = _API_KEY_PRINCIPAL_TYPE
+        principal_id = api_key.key_id
     else:
         principal_type = _SESSION_PRINCIPAL_TYPE
         principal_id = user.id

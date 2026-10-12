@@ -214,6 +214,21 @@ UNSCOPED_ADMIN = AdminScope(
 
 
 @dataclass(frozen=True, slots=True)
+class ApiKeyRecord:
+    """Public key metadata; the credential digest never leaves its repository."""
+
+    key_id: str
+    user_id: str
+    label: str
+    created_at: str
+    expires_at: str | None
+    revoked_at: str | None
+    last_used_at: str | None
+    request_count: int
+    token_prefix: str
+
+
+@dataclass(frozen=True, slots=True)
 class AuthAuditEventRecord:
     id: str
     action: str

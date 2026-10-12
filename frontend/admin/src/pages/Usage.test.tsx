@@ -292,6 +292,26 @@ describe("Usage page", () => {
     });
   });
 
+  it("filters API keys by key ID and shows their principal type", async () => {
+    vi.mocked(fetchUsageEvents).mockResolvedValue({
+      events: [event({ principal_type: "api_key", principal_id: "key-a" })],
+      count: 1,
+    });
+    render(<Usage />);
+    await screen.findByText("api_key:key-a");
+    fireEvent.click(screen.getByRole("combobox", { name: "主體類型" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "API 金鑰" }));
+    await waitFor(() => expect(fetchUsageEvents).toHaveBeenLastCalledWith(
+      100, expect.objectContaining({ principalType: "api_key", principalId: "" }),
+    ));
+    fireEvent.change(screen.getByLabelText("主體 ID"), {
+      target: { value: "key-a" },
+    });
+    await waitFor(() => expect(fetchUsageEvents).toHaveBeenLastCalledWith(
+      100, expect.objectContaining({ principalType: "api_key", principalId: "key-a" }),
+    ));
+  });
+
   it("refetches when the project filter changes", async () => {
     render(<Usage />);
 

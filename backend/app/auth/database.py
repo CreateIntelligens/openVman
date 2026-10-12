@@ -357,6 +357,32 @@ _MIGRATIONS = (
         ),
     ),
     (17, "decision_provider_settings", _DECISION_PROVIDER_SETTINGS_STATEMENTS),
+    (
+        18,
+        "account_api_keys",
+        (
+            """
+            CREATE TABLE IF NOT EXISTS account_api_keys (
+                key_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                label TEXT NOT NULL,
+                credential_digest TEXT NOT NULL,
+                issued_role TEXT NOT NULL,
+                issued_token_version INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT,
+                revoked_at TEXT,
+                last_used_at TEXT,
+                request_count INTEGER NOT NULL DEFAULT 0
+                    CHECK (request_count >= 0)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_account_api_keys_user
+            ON account_api_keys(user_id, created_at)
+            """,
+        ),
+    ),
 )
 
 

@@ -9,6 +9,7 @@ from app.config import TTSRouterConfig, get_tts_config
 
 from .account_access_repository import AccountAccessRepository
 from .admin_scopes_repository import AdminScopeRepository
+from .api_keys_repository import ApiKeyRepository
 from .attempt_limiter import FailedAttemptLimiter
 from .auth_audit_repository import AuthAuditRepository
 from .database import AuthDatabase
@@ -33,6 +34,7 @@ class AuthRuntime:
     auth_audit: AuthAuditRepository
     temporary_accounts: TemporaryAccountRepository
     embed_keys: EmbedKeyRepository
+    api_keys: ApiKeyRepository
     tokens: SessionTokenService
     settings: SystemSettingsRepository
     decision_providers: DecisionProviderRepository
@@ -62,6 +64,7 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
         auth_audit=AuthAuditRepository(database),
         temporary_accounts=TemporaryAccountRepository(database),
         embed_keys=EmbedKeyRepository(database),
+        api_keys=ApiKeyRepository(database),
         settings=SystemSettingsRepository(database),
         decision_providers=DecisionProviderRepository(
             database,

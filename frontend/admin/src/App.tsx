@@ -1,5 +1,6 @@
 import {
   Suspense,
+  lazy,
   useCallback,
   useEffect,
   useRef,
@@ -41,6 +42,8 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { useNavigationGroups } from "./hooks/useNavigationGroups";
 import { readScoped, removeScoped, writeScoped } from "./utils/scopedStorage";
 
+const ApiKeys = lazy(() => import("./pages/ApiKeys"));
+
 function initialRoute(): AdminRoute {
   const route = parseAdminRoute(window.location.pathname, window.location.search);
   if (route) {
@@ -80,7 +83,8 @@ function AppContent() {
   const currentUrlRef = useRef(
     buildAdminPath(route.tab, projectId, route.subView),
   );
-  const ActiveComponent = pageComponents[route.tab];
+  const isApiKeys = route.tab === "Accounts" && route.subView === "api-keys";
+  const ActiveComponent = isApiKeys ? ApiKeys : pageComponents[route.tab];
   const isAdmin = account ? isAtLeastAdmin(account.role) : false;
   const canLoadPage = projects.some((project) => project.project_id === projectId)
     || route.tab === "Projects"
@@ -189,7 +193,9 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
-  if ((route.tab === "Accounts" || route.tab === "DecisionProviders") && !isAdmin) {
+  const requiresAdmin = (route.tab === "Accounts" && !isApiKeys)
+    || route.tab === "DecisionProviders";
+  if (requiresAdmin && !isAdmin) {
     return <ForbiddenState />;
   }
 
@@ -235,6 +241,7 @@ function AppContent() {
             onToggleTheme={toggleTheme}
             onOpenMobileNav={() => setMobileNavOpen(true)}
             onLogout={() => void logout()}
+            onOpenApiKeys={() => switchTab("Accounts", "api-keys")}
           />
 
           <MobileNavDrawer
@@ -244,6 +251,8 @@ function AppContent() {
             onClose={closeMobileNav}
             onSelectTab={switchTab}
             isAdmin={isAdmin}
+            canManageApiKeys={(account!.kind ?? account!.account_type ?? "formal") === "formal"}
+            onOpenApiKeys={() => switchTab("Accounts", "api-keys")}
             collapsedGroups={collapsedGroups}
             onToggleGroup={toggleGroup}
             username={account!.username}

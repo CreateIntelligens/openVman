@@ -425,7 +425,7 @@ def test_ledger_row_has_no_timeline_columns(ledger):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("principal_type,principal_id", [
-    ("user", "live-user"), ("embed_key", "live-key"),
+    ("user", "live-user"), ("embed_key", "live-key"), ("api_key", "api-key"),
 ])
 async def test_live_close_usage_visible_only_to_its_owner(
     ledger, monkeypatch, principal_type, principal_id,

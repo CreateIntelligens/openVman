@@ -96,7 +96,7 @@ export const adminSubViews: Partial<Record<Tab, readonly string[]>> = {
   KnowledgeBase: ["documents", "graph"],
   Avatar: ["characters", "backgrounds", "mascots"],
   Memory: ["browse", "add"],
-  Accounts: ["create", "temporary", "manage"],
+  Accounts: ["create", "temporary", "manage", "api-keys"],
 };
 
 export function normalizeAdminRoute(route: AdminRoute): AdminRoute {

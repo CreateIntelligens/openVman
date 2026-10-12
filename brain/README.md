@@ -260,6 +260,8 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 
 `brain/data/usage.db` 是跨專案共用的 append-only SQLite 帳本，由 Brain 單一擁有。每筆事件記錄 provider、model、延遲、token 數，以及 `user_id`、`principal_type`、`principal_id`、`project_id`、`session_id`、`trace_id` 與 `kind`。
 
+由帳號 API key 發起時，Backend 保留擁有者 `user_id`，另注入 `principal_type=api_key`、`principal_id=<key_id>`；同帳號的多把 key 可分別查詢用量。完整 key 不會傳入 Brain 或帳本，驗證與撤銷由 Backend 負責，見 [整合指南](../docs/guides/account-api-keys.md)。
+
 | `unit_type` | 來源 | `units` 的意義 |
 |---|---|---|
 | `tokens`（預設） | LLM 呼叫 | 0；數字在 `input_tokens`／`output_tokens`／`total_tokens` |

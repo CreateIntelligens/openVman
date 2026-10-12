@@ -24,6 +24,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   onOpenMobileNav: () => void;
   onLogout: () => void;
+  onOpenApiKeys: () => void;
 }
 
 export default function TopBar({
@@ -39,6 +40,7 @@ export default function TopBar({
   onToggleTheme,
   onOpenMobileNav,
   onLogout,
+  onOpenApiKeys,
 }: TopBarProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -180,6 +182,10 @@ export default function TopBar({
         )}
       </div>
 
+      {(account.kind ?? account.account_type ?? "formal") === "formal" && (
+        <button type="button" onClick={onOpenApiKeys} className="btn btn-ghost hidden shrink-0 text-xs md:inline-flex" aria-label="管理帳號 API 金鑰">API 金鑰</button>
+      )}
+
       <button
         onClick={onToggleTheme}
         title={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
@@ -201,6 +207,8 @@ interface MobileNavDrawerProps {
   onClose: () => void;
   onSelectTab: (tab: Tab) => void;
   isAdmin: boolean;
+  canManageApiKeys: boolean;
+  onOpenApiKeys: () => void;
   username: string;
   onLogout: () => void;
   collapsedGroups: CollapsedGroups;
@@ -214,6 +222,8 @@ export function MobileNavDrawer({
   onClose,
   onSelectTab,
   isAdmin,
+  canManageApiKeys,
+  onOpenApiKeys,
   username,
   onLogout,
   collapsedGroups,
@@ -301,6 +311,15 @@ export function MobileNavDrawer({
         </div>
         <div className="border-t border-border p-3">
           <div className="mb-2 truncate px-2 text-xs text-content-subtle">{username}</div>
+          {canManageApiKeys && (
+            <button
+              type="button"
+              className="btn btn-ghost mb-2 w-full"
+              onClick={() => { onOpenApiKeys(); onClose(); }}
+            >
+              API 金鑰
+            </button>
+          )}
           <button
             type="button"
             onClick={onLogout}

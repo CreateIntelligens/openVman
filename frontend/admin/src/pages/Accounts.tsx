@@ -18,6 +18,7 @@ import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
+import { useNavigation } from "../context/NavigationContext";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 
 const ACCOUNT_VIEWS = ["create", "temporary", "manage"] as const;
@@ -53,6 +54,7 @@ function getDeleteDisabledReason(account: Account, resourceCount: number): strin
 
 export default function Accounts() {
   const { account: currentAccount } = useAuth();
+  const { navigateTo } = useNavigation();
   const isRoot = currentAccount?.role === "root";
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [username, setUsername] = useState("");
@@ -151,6 +153,7 @@ export default function Accounts() {
     <div className="page-scroll p-6 lg:p-8">
       <header className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
         <h1 className="page-title whitespace-nowrap">帳號管理</h1>
+        <button type="button" className="btn btn-ghost" onClick={() => navigateTo("Accounts", "api-keys")}>API 金鑰</button>
         <nav
           className="flex"
           aria-label="帳號主要功能"

@@ -44,6 +44,12 @@ describe("buildUsageParams", () => {
     ).toEqual({});
   });
 
+  it("keeps an API key filter separate from its owner account", () => {
+    expect(buildUsageParams({
+      principalType: "api_key", principalId: "key-a",
+    })).toEqual({ principal_type: "api_key", principal_id: "key-a" });
+  });
+
   it("keeps an invalid end date untouched instead of producing NaN", () => {
     expect(buildUsageParams({ dateTo: "not-a-date" })).toEqual({
       until: "not-a-date",

@@ -63,10 +63,12 @@ Clef-Flash 決策 API 使用獨立網域 `https://clef.create360.ai`，由同一
 | | Avatar | 2D 角色、背景，以及嵌入網站右下角的小助理 |
 | | 工具與技能 | Brain 工具與 skills 狀態 |
 | System | 專案管理 | 建立與列出專案 |
-| | 帳號管理 | 正式帳號、臨時帳號批次、資源與引擎授權、展示機台旗標 |
+| | 帳號管理 | 正式帳號、臨時帳號批次、資源與引擎授權、展示機台旗標；帳號 API 金鑰（`/admin/accounts/api-keys`）可獨立設定期限、撤銷與查使用紀錄 |
 | | Embed 金鑰 | 外部網站嵌入 Avatar 用的金鑰 |
 | | 用量 | 依帳號、專案、session 彙總的模型與 token 用量 |
 | | 系統健康、系統監控 | 服務健康檢查與 Grafana 儀表板 |
+
+可信任的後端程式可使用帳號 API key，以 `Authorization: Bearer ovk_<key_id>.<secret>` 呼叫 ASR、TTS、Chat 與其他應用 API；權限沿用所屬帳號，root／admin 不需各套獨立 API。完整 key 只在建立時顯示一次，資料庫只存雜湊；管理 key 仍需登入 session。操作、契約與 ASR 範例見 [API key 整合指南](docs/guides/account-api-keys.md)。
 
 ### Brain
 

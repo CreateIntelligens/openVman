@@ -305,6 +305,7 @@ def test_usage_scope_distinguishes_embed_key_from_account():
     account.user.id = "u-1"
     account.user.role.value = "member"
     account.embed_key = None
+    account.api_key = None
     assert usage_scope_for(account, project_id="p-1") == {
         "user_id": "u-1",
         "role": "member",

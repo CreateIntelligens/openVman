@@ -48,7 +48,7 @@ class FakeLiveSession:
 
 
 @pytest.mark.parametrize("principal_type,principal_id", [
-    ("user", "account-1"), ("embed_key", "key-1"),
+    ("user", "account-1"), ("embed_key", "key-1"), ("api_key", "key-2"),
 ])
 def test_internal_live_bridge_routes_text_audio_and_close(principal_type, principal_id):
     fake_session = FakeLiveSession()

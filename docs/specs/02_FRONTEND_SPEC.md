@@ -366,6 +366,12 @@ ws.onclose = () => { reconnect(); };
 
 > **現況更新（2026-07-01）**：`/admin/chat` 的功能點（`SlashDropdown`、`useInputHistory`、`ActionRequestCard`、`NavigationContext`、`AppSidebar`、`ChatSidebar`）皆已實作且已接線，是本文件所有章節中與實作最貼近的一節。唯一落差：RGB channel 設計 token 只存在於 `frontend/admin`（有 `tailwind.config.js`）；`frontend/app`（虛擬人主前端）是純 CSS Vue app，沒有 Tailwind，兩個前端**不共用**設計系統，與規格暗示的統一 token 不符。
 
+### 12.6 帳號 API 金鑰
+
+`/admin/accounts/api-keys` 提供帳號 API key 的建立、列表及撤銷。桌面頂列、手機導覽及帳號管理頁皆有入口，沿用既有後台准入規則；已可進後台的正式一般帳號只管理自己的 key，root／admin 可選擇其管理範圍內的正式帳號。代發的權限上限由 Backend 驗證。
+
+建立表單包含名稱、到期時間（預設 90 天）及不設期限選項。完整 key 只在建立成功後顯示一次並可複製，關閉提示或離開頁面即清除，不寫入瀏覽器儲存空間或網址。列表顯示期限、撤銷狀態、最近驗證時間及請求次數；撤銷須確認。用量頁可依 `api_key` 主體與 key ID 篩選。契約及串接範例見[帳號 API 金鑰指南](../guides/account-api-keys.md)。
+
 ### 13. 媒體上傳工作流 (Media Upload Workflow)
 
 當使用者選取檔案（圖片/影片/文件）時，前端不透過 WebSocket 發送二進位資料，而是透過標準 HTTP POST 上傳至 Gateway：

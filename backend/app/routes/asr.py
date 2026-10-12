@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import os
+import subprocess
+import wave
 from time import monotonic
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app import asr_glossary as asr_glossary_mod
 from app import language_routes as language_routes_mod
@@ -19,6 +24,11 @@ from app.auth.dependencies import (
 )
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
+from app.usage_ledger_client import (
+    UNIT_SECONDS,
+    record_usage_event,
+    usage_scope_for,
+)
 from app.utils.upload import (
     UploadTooLargeError,
     cleanup_temp_path,
@@ -27,6 +37,76 @@ from app.utils.upload import (
 
 logger = logging.getLogger("backend")
 router = APIRouter()
+
+
+class AsrTranscription(BaseModel):
+    text: str
+    provider: str
+    elapsed_seconds: float
+    language: str | None
+    language_check: dict[str, Any] | None
+    language_routes: list[str]
+    glossary: str
+
+
+def _audio_seconds(file_path: str) -> float | None:
+    """Measure media duration; compressed bytes are not a duration estimate."""
+    try:
+        with wave.open(file_path, "rb") as audio:
+            return audio.getnframes() / audio.getframerate()
+    except (wave.Error, EOFError, OSError):
+        pass
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-show_entries",
+                "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
+                file_path,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        seconds = float(probe.stdout.strip())
+        return seconds if math.isfinite(seconds) and seconds > 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+async def _record_transcription_usage(
+    account: CurrentAccount,
+    file_path: str,
+    *,
+    project_id: str,
+    provider: str,
+    elapsed_seconds: float,
+) -> None:
+    if not provider:
+        return
+    try:
+        seconds = await asyncio.to_thread(_audio_seconds, file_path)
+        if seconds is None or seconds <= 0:
+            logger.warning("ASR duration unavailable; usage event skipped")
+            return
+        record_usage_event(
+            provider=provider,
+            kind="asr",
+            unit_type=UNIT_SECONDS,
+            units=seconds,
+            latency_ms=elapsed_seconds * 1000,
+            scope=usage_scope_for(
+                account,
+                project_id=language_routes_mod.resolve_project(
+                    account, project_id,
+                ) or "",
+                channel="http",
+            ),
+            raw={"streaming": False},
+        )
+    except Exception as exc:
+        # 記帳故障不能把已完成的辨識變成上傳失敗。
+        logger.warning("ASR usage recording failed: %s", type(exc).__name__)
 
 
 async def _transcribe_routed(
@@ -67,11 +147,18 @@ async def _transcribe_routed(
         result = await transcribe(
             tmp_path, trace_id, preferred, prompt=prompt, routes=routes,
         )
+    elapsed_seconds = round(monotonic() - started, 2)
+    await _record_transcription_usage(
+        account, tmp_path,
+        project_id=project_id,
+        provider=result.provider or "",
+        elapsed_seconds=elapsed_seconds,
+    )
     return {
         "text": result.content,
         # 實際辨識的引擎：指定的掛掉由備援接手時不是同一個；全掛時是空字串。
         "provider": result.provider or "",
-        "elapsed_seconds": round(monotonic() - started, 2),
+        "elapsed_seconds": elapsed_seconds,
         "language": speech_language,
         # 台語分流時才有：判斷結果（語言代碼、timeout、failed）與耗時。
         "language_check": language_check,
@@ -83,7 +170,8 @@ async def _transcribe_routed(
 
 @router.post(
     "/api/v1/asr/transcribe",
-    tags=["Settings"],
+    tags=["ASR"],
+    response_model=AsrTranscription,
     summary="以這個帳號選定的引擎轉寫一段語音",
 )
 async def transcribe_for_account(
@@ -173,6 +261,7 @@ async def list_asr_engines(
 @router.post(
     "/api/v1/asr/preview",
     tags=["ASR"],
+    response_model=AsrTranscription,
     summary="用指定的引擎試辨識一段語音",
 )
 async def preview_asr(

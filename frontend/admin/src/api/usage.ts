@@ -36,7 +36,7 @@ export type UsageGroupBy =
   | "session"
   | "principal";
 
-export type PrincipalTypeFilter = "" | "user" | "embed_key";
+export type PrincipalTypeFilter = "" | "user" | "embed_key" | "api_key";
 
 export interface UsageTokenTotals {
   calls: number;

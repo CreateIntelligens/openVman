@@ -123,6 +123,7 @@ _PRINCIPAL_HEADERS = frozenset(
     {_PRINCIPAL_TYPE_HEADER.lower(), _PRINCIPAL_ID_HEADER.lower()}
 )
 _EMBED_PRINCIPAL_TYPE = "embed_key"
+_API_KEY_PRINCIPAL_TYPE = "api_key"
 _SESSION_PRINCIPAL_TYPE = "user"
 _END_USER_AUTH_HEADERS = frozenset({"authorization", "cookie"})
 _PROJECT_SCOPED_PREFIXES = (
@@ -293,6 +294,9 @@ def _trusted_upstream_headers(
     if current.embed_key is not None:
         headers[_PRINCIPAL_TYPE_HEADER] = _EMBED_PRINCIPAL_TYPE
         headers[_PRINCIPAL_ID_HEADER] = current.embed_key.key_id
+    elif current.api_key is not None:
+        headers[_PRINCIPAL_TYPE_HEADER] = _API_KEY_PRINCIPAL_TYPE
+        headers[_PRINCIPAL_ID_HEADER] = current.api_key.key_id
     else:
         headers[_PRINCIPAL_TYPE_HEADER] = _SESSION_PRINCIPAL_TYPE
         headers[_PRINCIPAL_ID_HEADER] = current.user.id

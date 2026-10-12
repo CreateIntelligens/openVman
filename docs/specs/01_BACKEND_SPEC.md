@@ -14,6 +14,12 @@
 
 `app/main.py` 僅組裝 FastAPI、授權 middleware、HTTP metrics、lifespan、OpenAPI 及 router，並提供 server 執行入口。HTTP 業務處理由 `routes/tts.py`（同步／串流 TTS、授權、快取及備援）、`routes/asr.py`（帳號辨識、台語分流、語言路由及管理者試辨識）、`routes/documents.py`（文件轉換及暫存清理）承擔。基礎設施分為 `lifecycle.py`、`openapi.py`、`http_metrics.py`、`server_logging.py`。Brain proxy catch-all 必須最後註冊，否則遮蔽具體端點；入口邊界測試保護此順序與禁止 inline 業務端點。既有 R2T2 串流仍由 `gateway/asr_stream.py` 擁有，所有端點 URL、授權、用量與錯誤格式不變。
 
+### 帳號 API key（2026-10-12）
+
+Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 Cookie 共存，HTTP 與 WebSocket 使用同一帳號驗證。key 對應正式帳號並繼承當下資源授權；保存發行角色與 token version，角色或版本改變、帳號停用時拒絕。資料庫只存 SHA-256，明文只在建立時回傳；期限與撤銷在每次新驗證檢查。
+
+管理 API 為 `GET/POST /api/v1/api-keys` 與 `DELETE /api/v1/api-keys/{key_id}`，只接受登入 session，不接受 API key／Embed key。管理本人或其他帳號的規則、欄位及回應見 [完整契約](../guides/account-api-keys.md)。推論保留帳號 `user_id`，另帶 `principal_type=api_key` 與 key ID；管理列表保留每把 key 的驗證次數及最後使用時間。此機制不開放內部服務 token 路徑，也不自動開啟 CORS。
+
 ### 2. 連線與 Session 管理 (Session Management)
 伺服器必須在記憶體中維護一個 Session Map，管理所有活躍的機台連線。
 ```javascript

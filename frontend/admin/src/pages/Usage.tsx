@@ -66,6 +66,7 @@ const PRINCIPAL_TYPE_OPTIONS = [
   { value: "", label: "全部" },
   { value: "user", label: "帳號" },
   { value: "embed_key", label: "Embed 金鑰" },
+  { value: "api_key", label: "API 金鑰" },
 ];
 
 /** 數字欄位統一等寬，避免逐列跳動。 */
@@ -103,10 +104,13 @@ function formatPercent(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1)}%`;
 }
 
-/** 顯示用的主體名稱：Embed 金鑰要看得出來自外部嵌入。 */
+/** 金鑰的主體類型保留在顯示名稱，避免與其擁有者帳號混淆。 */
 function principalLabel(event: UsageEvent): string {
-  if (event.principal_type === "embed_key" && event.principal_id) {
-    return `embed_key:${event.principal_id}`;
+  if (
+    ["embed_key", "api_key"].includes(event.principal_type)
+    && event.principal_id
+  ) {
+    return `${event.principal_type}:${event.principal_id}`;
   }
   return event.principal_id || event.user_id || "—";
 }
