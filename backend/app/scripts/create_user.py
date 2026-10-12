@@ -12,7 +12,7 @@ import bcrypt
 from app.auth.models import UserRecord
 from app.auth.models import ROOT_USERNAME
 from app.auth.passwords import hash_password
-from app.auth.repositories import AdminAlreadyExistsError
+from app.auth.repository_errors import AdminAlreadyExistsError
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 
 

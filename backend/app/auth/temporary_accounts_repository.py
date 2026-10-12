@@ -25,13 +25,7 @@ from ._account_records import (
     _user_from_row,
     normalize_username,
 )
-from ._repository_base import (
-    InvalidResourceGrantError,
-    RepositoryError,
-    UserNotFoundError,
-    _as_utc,
-    now_iso,
-)
+from ._repository_base import _as_utc, now_iso
 from .database import AuthDatabase
 from .models import (
     AccountDefaultsRecord,
@@ -44,6 +38,11 @@ from .models import (
     UserRecord,
 )
 from .policy import ensure_account_manager
+from .repository_errors import (
+    InvalidResourceGrantError,
+    RepositoryError,
+    UserNotFoundError,
+)
 
 
 class TemporaryCredentialNotFoundError(RepositoryError):

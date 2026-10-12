@@ -8,7 +8,7 @@ import pytest
 
 from app.auth.models import AccountRole
 from app.auth.passwords import hash_password, verify_password
-from app.auth.repositories import (
+from app.auth.repository_errors import (
     AdminAlreadyExistsError,
     UsernameConflictError,
 )

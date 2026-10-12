@@ -5,13 +5,10 @@ from __future__ import annotations
 import json
 import sqlite3
 
-from ._repository_base import (
-    RepositoryError,
-    ResourceConflictError,
-    now_iso,
-)
+from ._repository_base import now_iso
 from .database import AuthDatabase
 from .models import ResourceRecord, ResourceType, ResourceVisibility
+from .repository_errors import RepositoryError, ResourceConflictError
 
 
 def _resource_from_row(row: sqlite3.Row) -> ResourceRecord:

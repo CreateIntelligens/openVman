@@ -394,7 +394,7 @@ def test_root_username_is_configurable(tmp_path):
 
         from app.auth.database import AuthDatabase
         from app.auth.models import ROOT_USERNAME, AccountRole
-        from app.auth.repositories import UserRepository
+        from app.auth.user_repository import UserRepository
 
         assert ROOT_USERNAME == "superadmin", ROOT_USERNAME
 

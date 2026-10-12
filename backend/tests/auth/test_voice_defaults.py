@@ -11,12 +11,10 @@ from fastapi.testclient import TestClient
 from app.auth.dependencies import AuthTransport, CurrentAccount
 from app.auth.models import AccountRole, ResourceType
 from app.auth.passwords import hash_password
-from app.auth.repositories import (
-    InvalidResourceGrantError,
-    TemporaryCredentialCreate,
-)
+from app.auth.repository_errors import InvalidResourceGrantError
 from app.auth.routes import auth_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
+from app.auth.temporary_accounts_repository import TemporaryCredentialCreate
 from app.config import TTSRouterConfig
 from app.routes.admin import resolve_tts_voice, router
 

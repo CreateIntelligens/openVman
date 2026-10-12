@@ -7,7 +7,7 @@ import sqlite3
 import unicodedata
 from uuid import uuid4
 
-from ._repository_base import UserNotFoundError, now_iso
+from ._repository_base import now_iso
 from .models import (
     ADMIN_OR_ABOVE_VALUES,
     AccountDefaultsRecord,
@@ -17,6 +17,7 @@ from .models import (
     ResourceType,
     UserRecord,
 )
+from .repository_errors import UserNotFoundError
 
 
 def normalize_username(username: str) -> str:

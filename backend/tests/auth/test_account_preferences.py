@@ -8,14 +8,15 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.auth.account_access_repository import AccountAccessRepository
 from app.auth.database import AuthDatabase
 from app.auth.models import AccountRole
-from app.auth.repositories import AccountAccessRepository, UserRepository
 from app.auth.settings_routes import (
     MyPreferences,
     get_my_preferences,
     update_my_preferences,
 )
+from app.auth.user_repository import UserRepository
 
 
 @pytest.fixture()

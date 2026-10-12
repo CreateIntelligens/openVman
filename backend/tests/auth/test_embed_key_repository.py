@@ -8,7 +8,7 @@ import pytest
 
 from app.auth.database import AuthDatabase
 from app.auth.embed import SlidingWindowRateLimiter
-from app.auth.repositories import (
+from app.auth.embed_keys_repository import (
     EmbedKeyNotFoundError,
     EmbedKeyRepository,
     generate_embed_key_id,

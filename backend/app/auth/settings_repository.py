@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 
-from ._repository_base import RepositoryError, now_iso
+from ._repository_base import now_iso
 from .database import AuthDatabase
+from .repository_errors import RepositoryError
 
 
 class UnknownSettingError(RepositoryError):

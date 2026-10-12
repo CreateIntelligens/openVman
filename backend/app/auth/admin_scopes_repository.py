@@ -15,14 +15,11 @@ from ._admin_scope_rules import (
     _narrow_subordinate_scopes,
     _revoke_grants_outside_scope,
 )
-from ._repository_base import (
-    InvalidResourceGrantError,
-    UserNotFoundError,
-    now_iso,
-)
+from ._repository_base import now_iso
 from .database import AuthDatabase
 from .models import AccountRole, AdminScope, ResourceType
 from .policy import ensure_can_manage_account
+from .repository_errors import InvalidResourceGrantError, UserNotFoundError
 
 
 class AdminScopeRepository:

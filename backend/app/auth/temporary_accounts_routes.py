@@ -14,14 +14,7 @@ from .dependencies import CurrentAccount, require_admin
 from .models import AccountRole
 from .passwords import hash_password
 from .policy import AccountPolicyError
-from .repositories import (
-    InvalidResourceGrantError,
-    TemporaryBatch,
-    TemporaryBatchAccount,
-    TemporaryCredentialCreate,
-    TemporaryCredentialNotFoundError,
-    UserNotFoundError,
-)
+from .repository_errors import InvalidResourceGrantError, UserNotFoundError
 from .routes import (
     AccountDefaultsProfile,
     AccountResourceGrants,
@@ -31,6 +24,12 @@ from .routes import (
     _resource_grants,
 )
 from .runtime import AuthRuntime, get_auth_runtime
+from .temporary_accounts_repository import (
+    TemporaryBatch,
+    TemporaryBatchAccount,
+    TemporaryCredentialCreate,
+    TemporaryCredentialNotFoundError,
+)
 from .temporary_passwords import TemporaryPasswordCipher
 
 _TEMPORARY_DURATION_SECONDS = 72 * 60 * 60

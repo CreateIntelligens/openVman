@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from .admin_scopes_repository import AdminScopeRepository
 from .models import (
     UNSCOPED_ADMIN,
     AccountRole,
@@ -14,7 +15,7 @@ from .models import (
     UserRecord,
     is_at_least_admin,
 )
-from .repositories import AdminScopeRepository, ResourceRepository
+from .resource_repository import ResourceRepository
 
 _RESOURCE_NOT_FOUND = "Resource not found"
 

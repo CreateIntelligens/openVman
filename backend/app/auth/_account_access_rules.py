@@ -6,8 +6,8 @@ import sqlite3
 from collections.abc import Iterable, Sequence
 
 from ._admin_scope_rules import _load_admin_scope, _voice_provider_of
-from ._repository_base import InvalidResourceGrantError
 from .models import AccountRole, ResourceType
+from .repository_errors import InvalidResourceGrantError
 
 
 def _normalize_account_access(

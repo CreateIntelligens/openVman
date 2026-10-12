@@ -7,14 +7,14 @@ import json
 import pytest
 
 from app.auth.database import AuthDatabase
-from app.auth.models import AccountRole
-from app.auth.passwords import hash_password
-from app.auth.repositories import UserRepository
 from app.auth.decision_provider_repository import (
     DEFAULT_DECISION_ORDER,
     DecisionProviderRepository,
     InvalidDecisionProviderSettings,
 )
+from app.auth.models import AccountRole
+from app.auth.passwords import hash_password
+from app.auth.user_repository import UserRepository
 
 
 @pytest.fixture()

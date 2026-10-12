@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
+from app.auth._account_access_rules import _normalize_account_access
 from app.auth.database import AuthDatabase
 from app.auth.models import AccountRole, ResourceType, ResourceVisibility
-from app.auth.repositories import (
+from app.auth.repository_errors import (
     InvalidResourceGrantError,
     ResourceConflictError,
-    ResourceRepository,
-    UserRepository,
     UsernameConflictError,
-    _normalize_account_access,
 )
+from app.auth.resource_repository import ResourceRepository
+from app.auth.user_repository import UserRepository
 
 
 @pytest.fixture()

@@ -7,21 +7,19 @@ from functools import lru_cache
 
 from app.config import TTSRouterConfig, get_tts_config
 
+from .account_access_repository import AccountAccessRepository
+from .admin_scopes_repository import AdminScopeRepository
 from .attempt_limiter import FailedAttemptLimiter
+from .auth_audit_repository import AuthAuditRepository
 from .database import AuthDatabase
 from .decision_provider_repository import DecisionProviderRepository
-from .repositories import (
-    AccountAccessRepository,
-    AdminScopeRepository,
-    AuthAuditRepository,
-    EmbedKeyRepository,
-    ResourceRepository,
-    TemporaryAccountRepository,
-    UserRepository,
-)
+from .embed_keys_repository import EmbedKeyRepository
+from .resource_repository import ResourceRepository
 from .settings_repository import SystemSettingsRepository
+from .temporary_accounts_repository import TemporaryAccountRepository
 from .temporary_passwords import TemporaryPasswordCipher
 from .tokens import SessionTokenService
+from .user_repository import UserRepository
 
 
 @dataclass(frozen=True, slots=True)

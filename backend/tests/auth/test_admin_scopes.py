@@ -7,25 +7,23 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from app.auth.account_access_repository import AccountAccessRepository
+from app.auth.admin_scopes_repository import AdminScopeRepository
 from app.auth.database import AuthDatabase
 from app.auth.models import (
     AccountRole,
     ResourceType,
 )
 from app.auth.policy import AccountPolicyError
-from app.auth.repositories import (
-    AccountAccessRepository,
-    AdminScopeRepository,
-    InvalidResourceGrantError,
-    ResourceRepository,
-    UserRepository,
-)
+from app.auth.repository_errors import InvalidResourceGrantError
+from app.auth.resource_repository import ResourceRepository
 from app.auth.resources import (
     ResourceNotFoundError,
     list_accessible_resources,
     resolve_admin_scope,
     resolve_resource,
 )
+from app.auth.user_repository import UserRepository
 
 
 @pytest.fixture()

@@ -19,11 +19,9 @@ from app.auth.models import (
     UserRecord,
     is_at_least_admin,
 )
-from app.auth.repositories import (
-    ResourceConflictError,
-    ResourceRepository,
-    UserRepository,
-)
+from app.auth.repository_errors import ResourceConflictError
+from app.auth.resource_repository import ResourceRepository
+from app.auth.user_repository import UserRepository
 from app.config import get_tts_config
 
 _MIGRATION_VERSION = 100

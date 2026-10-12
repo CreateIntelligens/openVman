@@ -15,12 +15,12 @@ from app.auth.passwords import (
     hash_password,
     verify_password,
 )
-from app.auth.repositories import UserRepository
 from app.auth.tokens import (
     AuthConfigurationError,
     InvalidSessionTokenError,
     SessionTokenService,
 )
+from app.auth.user_repository import UserRepository
 
 
 def _user(tmp_path: Path):

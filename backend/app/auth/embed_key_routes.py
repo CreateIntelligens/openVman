@@ -12,12 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from .dependencies import CurrentAccount, require_admin
-from .models import EmbedKeyRecord, ResourceType
-from .repositories import (
+from .embed_keys_repository import (
     DEFAULT_DAILY_REQUEST_QUOTA,
     DEFAULT_RATE_LIMIT_PER_MINUTE,
     EmbedKeyNotFoundError,
 )
+from .models import EmbedKeyRecord, ResourceType
 from .runtime import AuthRuntime, get_auth_runtime
 
 router = APIRouter(prefix="/api/v1/embed-keys", tags=["Embed Keys"])

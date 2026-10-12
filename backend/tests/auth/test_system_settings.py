@@ -9,13 +9,13 @@ import pytest
 from app.auth.database import AuthDatabase
 from app.auth.models import AccountRole
 from app.auth.passwords import hash_password
-from app.auth.repositories import UserRepository
 from app.auth.settings_repository import (
     ASR_USER_CHOICES_KEY,
     InvalidSettingValueError,
     SystemSettingsRepository,
     UnknownSettingError,
 )
+from app.auth.user_repository import UserRepository
 
 
 @pytest.fixture()
@@ -109,8 +109,9 @@ def test_root_may_pick_any_asr_engine_without_grants(env):
     """
     from types import SimpleNamespace
 
+    from app.auth.account_access_repository import AccountAccessRepository
     from app.auth.models import ResourceType, ResourceVisibility
-    from app.auth.repositories import AccountAccessRepository, ResourceRepository
+    from app.auth.resource_repository import ResourceRepository
     from app.auth.settings_routes import _asr_user_choices
 
     resources = ResourceRepository(env["database"])

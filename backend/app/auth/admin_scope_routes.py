@@ -8,7 +8,7 @@ from pydantic import Field
 from .dependencies import CurrentAccount, require_admin
 from .models import AccountRole, AdminScope, ResourceType
 from .policy import AccountPolicyError, ensure_can_manage_account
-from .repositories import InvalidResourceGrantError, UserNotFoundError
+from .repository_errors import InvalidResourceGrantError, UserNotFoundError
 from .routes import _StrictModel, users_router
 from .runtime import AuthRuntime, get_auth_runtime
 

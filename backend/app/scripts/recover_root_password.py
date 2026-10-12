@@ -8,7 +8,7 @@ import os
 import sys
 
 from app.auth.passwords import PasswordValidationError, hash_password
-from app.auth.repositories import RepositoryError
+from app.auth.repository_errors import RepositoryError
 from app.auth.runtime import get_auth_runtime
 
 

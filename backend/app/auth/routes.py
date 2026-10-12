@@ -34,14 +34,12 @@ from .models import (
 )
 from .passwords import PasswordValidationError, hash_password, verify_password
 from .policy import AccountPolicyError
-from .repositories import (
+from .repository_errors import (
     AccountEnabledError,
     InvalidResourceGrantError,
     LastAdminError,
     OwnedResourcesError,
     SelfProtectionError,
-    TemporaryCredentialExpiredError,
-    TemporaryCredentialNotFoundError,
     UserNotFoundError,
     UsernameConflictError,
 )
@@ -53,6 +51,10 @@ from .settings_repository import (
     SERVER_ASR_PROVIDERS,
     InvalidSettingValueError,
     UnknownSettingError,
+)
+from .temporary_accounts_repository import (
+    TemporaryCredentialExpiredError,
+    TemporaryCredentialNotFoundError,
 )
 
 _SESSION_COOKIE_NAME = "openvman_session"

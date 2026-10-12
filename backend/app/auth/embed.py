@@ -16,8 +16,8 @@ from threading import Lock
 
 from fastapi import HTTPException, status
 
+from .embed_keys_repository import utc_day
 from .models import AccountRole, AccountType, EmbedKeyRecord, UserRecord
-from .repositories import utc_day
 
 EMBED_KEY_HEADER = "X-Embed-Key"
 EMBED_USER_ID_PREFIX = "embed:"

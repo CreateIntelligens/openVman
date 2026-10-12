@@ -7,15 +7,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.auth.account_access_repository import AccountAccessRepository
 from app.auth.database import AuthDatabase
 from app.auth.models import AccountRole, ResourceType
 from app.auth.passwords import hash_password
-from app.auth.repositories import (
-    AccountAccessRepository,
-    ResourceRepository,
-    UserRepository,
-)
+from app.auth.resource_repository import ResourceRepository
 from app.auth.settings_routes import get_my_asr_provider
+from app.auth.user_repository import UserRepository
 from app.routes import admin as admin_routes
 
 _NOW = "2026-09-01T00:00:00Z"

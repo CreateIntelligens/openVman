@@ -16,12 +16,7 @@ from ._account_records import (
     _grant_from_row,
     _user_from_row,
 )
-from ._repository_base import (
-    InvalidResourceGrantError,
-    RepositoryError,
-    UserNotFoundError,
-    now_iso,
-)
+from ._repository_base import now_iso
 from .database import AuthDatabase
 from .models import (
     AccountDefaultsRecord,
@@ -30,6 +25,11 @@ from .models import (
     ResourceType,
 )
 from .policy import ensure_can_manage_account
+from .repository_errors import (
+    InvalidResourceGrantError,
+    RepositoryError,
+    UserNotFoundError,
+)
 
 
 class AccountAccessRepository:

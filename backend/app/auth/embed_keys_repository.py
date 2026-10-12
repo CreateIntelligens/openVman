@@ -9,9 +9,10 @@ import sqlite3
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
 
-from ._repository_base import RepositoryError, now_iso
+from ._repository_base import now_iso
 from .database import AuthDatabase
 from .models import EmbedKeyRecord
+from .repository_errors import RepositoryError
 
 EMBED_KEY_PREFIX = "ovk_"
 EMBED_KEY_RANDOM_CHARS = 24

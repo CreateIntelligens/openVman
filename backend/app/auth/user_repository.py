@@ -20,18 +20,7 @@ from ._account_records import (
     normalize_username,
 )
 from ._admin_scope_rules import _inherit_admin_scope
-from ._repository_base import (
-    AccountEnabledError,
-    AdminAlreadyExistsError,
-    InvalidResourceGrantError,
-    LastAdminError,
-    OwnedResourcesError,
-    RepositoryError,
-    SelfProtectionError,
-    UserNotFoundError,
-    UsernameConflictError,
-    now_iso,
-)
+from ._repository_base import now_iso
 from .database import AuthDatabase
 from .models import (
     ADMIN_OR_ABOVE_VALUES,
@@ -49,6 +38,17 @@ from .policy import (
     ensure_can_create_role,
     ensure_can_manage_account,
     ensure_can_reset_password,
+)
+from .repository_errors import (
+    AccountEnabledError,
+    AdminAlreadyExistsError,
+    InvalidResourceGrantError,
+    LastAdminError,
+    OwnedResourcesError,
+    RepositoryError,
+    SelfProtectionError,
+    UserNotFoundError,
+    UsernameConflictError,
 )
 
 

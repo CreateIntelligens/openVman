@@ -13,7 +13,7 @@ from starlette.responses import Response
 
 from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
 from app.auth.models import ResourceType, ResourceVisibility
-from app.auth.repositories import ResourceConflictError
+from app.auth.repository_errors import ResourceConflictError
 from app.auth.resources import (
     ResourceAccess,
     ResourceNotFoundError,

@@ -12,9 +12,9 @@ from app.auth.attempt_limiter import FailedAttemptLimiter
 from app.auth.database import AuthDatabase
 from app.auth.models import AccountRole, ResourceType, ResourceVisibility
 from app.auth.passwords import hash_password
-from app.auth.repositories import UserRepository
 from app.auth.routes import auth_router, temporary_accounts_router, users_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
+from app.auth.user_repository import UserRepository
 from app.config import TTSRouterConfig
 
 _ADMIN_PASSWORD = "admin-password"
