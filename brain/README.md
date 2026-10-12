@@ -115,6 +115,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 3. 執行 agent loop（`core/agent_loop.py`）。
 4. 寫入對話與每日日誌，背景執行記憶治理與回覆的 PII 掃描。
 5. 回應附上 `tool_steps`、citations、`response_time_s` 與本輪 `usage` 彙總。
+   回答附圖：查完知識庫就在背景請決策鏈從前 5 筆附圖結果選最能回答的一筆，都不相關就不附圖；決策關閉（`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`）、逾時或失敗時照舊附第一筆引用的圖。
 
 ### Agent loop
 

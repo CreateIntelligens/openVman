@@ -1069,6 +1069,29 @@ class TestKnowledgePrefetch:
         assert [s["round"] for s in result.tool_steps] == [0]
         assert "prefetch-search-knowledge" not in [s["tool_call_id"] for s in result.tool_steps]
 
+    def test_tool_rounds_are_reported_while_the_answer_is_still_pending(self, monkeypatch):
+        """選圖等旁支工作靠這個在模型寫回答時就開始；回呼出錯不能中斷回答。"""
+        seen_rounds: list[list[str]] = []
+
+        def on_round(steps):
+            seen_rounds.append([s["name"] for s in steps])
+            raise RuntimeError("side work failed")
+
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            tools=[_SEARCH_TOOL_SPEC, _FILTER_TOOL_SPEC],
+            replies=lambda al: [
+                _tool_turn(al, name="filter_products"),
+                al.LLMReply(content="符合的有三款", tool_calls=[], model="m1"),
+            ],
+            reply_mode="fast",
+            force_knowledge_search=True,
+            on_tool_round=on_round,
+        )
+
+        assert result.reply == "符合的有三款"
+        assert seen_rounds == [["search_knowledge"], ["search_knowledge", "filter_products"]]
+
     def test_follow_up_also_searches_with_the_previous_question(self, monkeypatch):
         agent_loop, result, calls, executed, seen = self._run(
             monkeypatch,

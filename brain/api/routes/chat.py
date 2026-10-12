@@ -12,6 +12,7 @@ from core.chat_service import (
     finalize_generation,
     prepare_generation,
     record_generation_failure,
+    reply_media,
 )
 from core.chat_turns import accept_turn, register_turn, stage_turn
 from core.llm_client import LLMEmptyReplyError
@@ -135,15 +136,17 @@ async def chat(request: Request, payload: ChatRequest):
             scope.trace_id = context.trace_id
             scope.channel = str(context.request_context.get("channel", ""))
             result = await asyncio.to_thread(execute_generation, context)
+            media = await asyncio.to_thread(reply_media, context, result.tool_steps)
         response_time_s = round(time.monotonic() - t0, 2)
         if payload.turn_id is not None:
             response = await asyncio.to_thread(
                 stage_turn, request, payload, context,
-                result.reply, result.tool_steps, response_time_s,
+                result.reply, result.tool_steps, response_time_s, media,
             )
         else:
             response = finalize_generation(
                 context, result.reply, result.tool_steps, response_time_s,
+                media=media,
             )
         if payload.decision_debug and context.turn_decision is not None:
             # Added after stage_turn: never persist emotional diagnostics in the delivery payload.

@@ -24,6 +24,7 @@ from core.turn_decisions import (
     run_turn_decision,
     turn_decision_config,
 )
+from core.reference_media import ReplyMediaChoice, choose_reference_media
 from core.turn_reads import without_disabled_recall
 from infra.learnings import record_error_event
 from memory.memory import (
@@ -73,6 +74,7 @@ class GenerationContext:
     reply_mode: str = ""
     turn_decision: TurnDecision | None = None
     input_language: str | None = None
+    media_choice: ReplyMediaChoice | None = None
 
 
 def prepare_generation(
@@ -282,6 +284,13 @@ def _collect_citations_from_tool_steps(tool_steps: list[dict[str, Any]]) -> list
     return sorted(by_uri.values(), key=lambda c: float(c.get("distance", 999.0)))
 
 
+def reply_media(context: GenerationContext, tool_steps: list[dict[str, Any]]) -> dict[str, str] | None:
+    """The picture this turn should show; None keeps the closest citation's picture."""
+    if context.media_choice is not None:
+        return context.media_choice.result(tool_steps)
+    return choose_reference_media(context.user_message, tool_steps)
+
+
 def _primary_media(citations: list[dict[str, Any]]) -> dict[str, str]:
     """Project the first citation's media into the JTAI-compatible envelope."""
     if not citations:
@@ -306,8 +315,13 @@ def finalize_generation(
     *,
     persist: bool = True,
     persisted_message_ids: tuple[int, int] | None = None,
+    media: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Persist the assistant reply and return the standard API payload.
+
+    *media* is the picture the decision chain chose (``{}`` for none); None keeps the
+    closest citation's picture. Callers decide once per turn with ``reply_media`` so an
+    accepted replaceable turn shows the same picture it was staged with.
 
     Memory governance (summary/reindex/maintenance) is dispatched to a background
     thread so it does not block the response.
@@ -357,7 +371,15 @@ def finalize_generation(
         user_pii_future = None
 
     citations = _collect_citations_from_tool_steps(tool_steps or [])
-    primary_media = _primary_media(citations)
+    if media is None:
+        primary_media = _primary_media(citations)
+    else:
+        # 前台沒拿到 image_id 會退回第一筆引用的圖，所以選了別張或不顯示時要一起拿掉。
+        citations = [
+            {key: value for key, value in cite.items() if key not in ("image_id", "image")}
+            for cite in citations
+        ]
+        primary_media = dict(media)
     meta: dict[str, Any] = {}
     if tool_steps:
         meta["tool_steps"] = tool_steps
@@ -480,6 +502,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     unavailable_token = active_turn_decision_unavailable.set(bool(
         context.turn_decision and context.turn_decision.dependency_unavailable
     ))
+    context.media_choice = ReplyMediaChoice(context.user_message)
     try:
         return run_agent_loop(
             context.prompt_messages,
@@ -508,6 +531,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
                 context.turn_decision
                 and context.turn_decision.policy.needs_knowledge is True
             ),
+            on_tool_round=context.media_choice.on_tool_round,
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)

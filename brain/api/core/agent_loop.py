@@ -9,7 +9,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Callable
 
 from config import get_settings
 from core.llm_client import (
@@ -119,8 +119,14 @@ def run_agent_loop(
     force_web_search: bool = False,
     force_memory_search: bool = False,
     force_knowledge_search: bool = False,
+    on_tool_round: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> AgentLoopResult:
-    """Run a bounded think -> tool -> observe loop until the model returns text."""
+    """Run a bounded think -> tool -> observe loop until the model returns text.
+
+    *on_tool_round* sees all tool steps after each round, so callers can start work
+    that only needs retrieval results (picking the reply picture) while the model
+    is still writing the answer.
+    """
     working_messages, tool_steps, final_turn = _run_tool_phase(
         messages,
         persona_id,
@@ -131,6 +137,7 @@ def run_agent_loop(
         force_web_search=force_web_search,
         force_memory_search=force_memory_search,
         force_knowledge_search=force_knowledge_search,
+        on_tool_round=on_tool_round,
     )
     if final_turn is None:
         raise ToolPhaseError(
@@ -302,6 +309,7 @@ def _run_tool_phase(
     force_web_search: bool = False,
     force_memory_search: bool = False,
     force_knowledge_search: bool = False,
+    on_tool_round: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
     """Execute tool call rounds until the LLM returns a text turn or rounds are exhausted.
 
@@ -379,6 +387,7 @@ def _run_tool_phase(
             _append_tool_turns(
                 working_messages, tool_steps, _prefetched_knowledge_turn(reads[0][1]), round_index=0,
             )
+            _notify_tool_round(on_tool_round, tool_steps)
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             current_forced = first_forced if iteration == 0 else None
             if iteration == 0:
@@ -420,6 +429,7 @@ def _run_tool_phase(
                     _append_tool_turns(
                         working_messages, tool_steps, turn, round_index=iteration + round_offset,
                     )
+                    _notify_tool_round(on_tool_round, tool_steps)
                     continue
                 if not turn.content.strip():
                     if (
@@ -499,6 +509,18 @@ def _serialize_tool_call(tool_call: LLMToolCall) -> dict[str, Any]:
             if k != "thought_signature":
                 payload[k] = v
     return payload
+
+
+def _notify_tool_round(
+    callback: Callable[[list[dict[str, Any]]], None] | None,
+    tool_steps: list[dict[str, Any]],
+) -> None:
+    if callback is None:
+        return
+    try:
+        callback(list(tool_steps))
+    except Exception:  # 旁支工作出錯不能中斷回答
+        logger.warning("tool round callback failed", exc_info=True)
 
 
 def _append_tool_turns(

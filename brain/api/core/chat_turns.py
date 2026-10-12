@@ -47,13 +47,14 @@ def register_turn(request: Request, payload: ChatRequest) -> None:
 def stage_turn(
     request: Request, payload: ChatRequest, context: GenerationContext,
     reply: str, tool_steps: list[dict[str, Any]], response_time_s: float,
+    media: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     from memory.memory import get_session_store
 
     assert payload.turn_id is not None
     assert payload.turn_revision is not None
     response = finalize_generation(
-        context, reply, tool_steps, response_time_s, persist=False,
+        context, reply, tool_steps, response_time_s, persist=False, media=media,
     )
     response["turn_id"] = payload.turn_id
     response["turn_revision"] = payload.turn_revision
@@ -72,6 +73,7 @@ def stage_turn(
         "response": response,
         "tool_steps": tool_steps,
         "response_time_s": response_time_s,
+        "media": media,
     }
     if not get_session_store(context.project_id).stage_chat_turn(
         context.session_id, _owner(request), payload.turn_id,
@@ -104,6 +106,7 @@ async def accept_turn(
         response = finalize_generation(
             context, response["reply"], saved["tool_steps"],
             saved["response_time_s"], persisted_message_ids=message_ids,
+            media=saved.get("media"),
         )
     return {
         **response,

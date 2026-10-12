@@ -191,6 +191,11 @@ class BrainSettings(BaseSettings):
     turn_decisions_noul_negative_threshold: float = Field(default=0.1, ge=0, le=1, validation_alias="TURN_DECISIONS_NOUL_NEGATIVE_THRESHOLD")
     turn_decisions_choice_confidence_threshold: float = Field(default=0.8, ge=0.5, le=1, validation_alias="TURN_DECISIONS_CHOICE_CONFIDENCE_THRESHOLD")
     turn_decisions_choice_margin_threshold: float = Field(default=0.2, ge=0, le=1, validation_alias="TURN_DECISIONS_CHOICE_MARGIN_THRESHOLD")
+    # 回答附圖改由決策鏈從前 5 筆附圖檢索結果選最能回答的一筆（或都不選）；關閉、逾時、失敗時
+    # 照原本顯示距離最近那筆。Clef 沒把握時仍會硬選，選對的信心多在 0.6 以上（2026-10-12）。
+    chat_reference_media_decision_enabled: bool = Field(default=True, validation_alias="CHAT_REFERENCE_MEDIA_DECISION_ENABLED")
+    chat_reference_media_timeout_seconds: float = Field(default=1.0, gt=0, le=5, validation_alias="CHAT_REFERENCE_MEDIA_TIMEOUT_SECONDS")
+    chat_reference_media_min_confidence: float = Field(default=0.6, ge=0, le=1, validation_alias="CHAT_REFERENCE_MEDIA_MIN_CONFIDENCE")
 
     @model_validator(mode="after")
     def validate_turn_decision_thresholds(self) -> "BrainSettings":
