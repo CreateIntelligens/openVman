@@ -61,6 +61,7 @@ def _install_loop_stubs(
     tools: list[dict[str, Any]] | None = None,
     force: bool = True,
     exclude_knowledge: bool = True,
+    prefetch: bool = True,
 ) -> list[dict[str, Any]]:
     """Patch registry / settings and record every LLM call the loop makes."""
     calls: list[dict[str, Any]] = []
@@ -87,6 +88,7 @@ def _install_loop_stubs(
     fake_cfg.agent_loop_max_rounds = 4
     fake_cfg.chat_force_knowledge_search = force
     fake_cfg.chat_answer_pass_excludes_knowledge_search = exclude_knowledge
+    fake_cfg.chat_prefetch_knowledge_search = prefetch
     fake_cfg.forced_tool_model_override = ""
     fake_cfg.chat_max_followup_tool_rounds = 1
     fake_cfg.forced_tool_max_tokens = 200
@@ -847,3 +849,216 @@ class TestSyntheticCallSignature:
 
         assert turn.tool_calls[0].extra_content == {"thought_signature": "real"}
         assert turn.tool_calls[1].extra_content is None
+
+
+_FILTER_TOOL_SPEC = {
+    "type": "function",
+    "function": {"name": "filter_products", "description": "catalog", "parameters": {}},
+}
+
+
+class TestKnowledgePrefetch:
+    """決策高信心判定需要知識庫時，伺服器先查好，第一次 LLM 呼叫就能直接作答。"""
+
+    def _run(
+        self, monkeypatch, *, replies, messages=None, tools=None, prefetch=True,
+        **loop_kwargs,
+    ):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(monkeypatch, agent_loop, tools=tools, prefetch=prefetch)
+        # filter_products 依專案規格表調整說明，這裡沒有規格表，原樣提供。
+        monkeypatch.setattr(agent_loop, "_tools_for_project", lambda tools, project_id: tools)
+        executed: list[tuple[str, str]] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call",
+            lambda name, args: executed.append((name, args)) or '{"status":"ok","data":{"results":["EUBL 揚程 12 m"]}}',
+        )
+        seen: list[list[dict]] = []
+        # 兩個入口共用同一串回覆，依呼叫順序取用
+        seq = list(replies(agent_loop))
+
+        def make(kind):
+            def _fn(msgs, tools=None, **kw):
+                calls.append({"kind": kind, "tools": tools, **kw})
+                seen.append([dict(m) for m in msgs])
+                return seq.pop(0) if len(seq) > 1 else seq[0]
+
+            return _fn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", make("stream"))
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", make("generate"))
+        result = agent_loop.run_agent_loop(
+            messages or [{"role": "user", "content": "EUBL 揚程多少？"}],
+            allow_forced_knowledge_search=True,
+            **loop_kwargs,
+        )
+        return agent_loop, result, calls, executed, seen
+
+    def test_confident_knowledge_turn_answers_in_one_call_with_results_already_present(
+        self, monkeypatch,
+    ):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [al.LLMReply(content="最大揚程 12 m", tool_calls=[], model="m1")],
+            force_knowledge_search=True,
+        )
+
+        assert result.reply == "最大揚程 12 m"
+        assert len(calls) == 1
+        assert calls[0]["kind"] == "stream"
+        assert "forced_tool_name" not in calls[0]
+        assert [name for name, _ in executed] == ["search_knowledge"]
+        assert "EUBL 揚程多少？" in executed[0][1]
+        # 第一次呼叫前，對話裡已經有完成的 search_knowledge 呼叫與結果
+        first = seen[0]
+        assert first[-2]["role"] == "assistant"
+        assert first[-2]["tool_calls"][0]["function"]["name"] == "search_knowledge"
+        # Gemini 3 要求本輪工具呼叫帶 thought_signature，伺服器補的呼叫用略過值
+        assert first[-2]["tool_calls"][0]["extra_content"] == {
+            "google": {"thought_signature": "skip_thought_signature_validator"},
+        }
+        assert first[-1]["role"] == "tool" and "EUBL 揚程 12 m" in first[-1]["content"]
+        assert [(s["name"], s["round"]) for s in result.tool_steps] == [("search_knowledge", 0)]
+
+    @pytest.mark.parametrize("prefetch", [True, False])
+    def test_uncertain_or_disabled_keeps_the_forced_tool_round(self, monkeypatch, prefetch):
+        """needs_knowledge 為 None 時 chat_service 傳 force_knowledge_search=False，行為不變。"""
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [
+                _tool_turn(al),
+                al.LLMReply(content="答案", tool_calls=[], model="m1"),
+            ],
+            prefetch=prefetch,
+            force_knowledge_search=not prefetch,
+        )
+
+        assert result.reply == "答案"
+        assert len(calls) == 2
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
+        assert seen[0][-1]["role"] == "user"
+
+    def test_negative_decision_neither_forces_nor_prefetches(self, monkeypatch):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(monkeypatch, agent_loop)
+        executed: list[str] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call", lambda name, args: executed.append(name) or "{}",
+        )
+        _record_turns(
+            monkeypatch, agent_loop, calls,
+            stream_reply=[agent_loop.LLMReply(content="你好", tool_calls=[], model="m1")],
+            generate_reply=[agent_loop.LLMReply(content="你好", tool_calls=[], model="m1")],
+        )
+
+        # needs_knowledge=False：chat_service 不允許強制，也不會要求查知識庫
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "早安"}], allow_forced_knowledge_search=False,
+        )
+
+        assert result.reply == "你好"
+        assert executed == []
+        assert len(calls) == 1 and "forced_tool_name" not in calls[0]
+
+    def test_choice_question_still_calls_filter_products_in_fast_mode(self, monkeypatch):
+        """fast 模式只准一輪模型自選的工具：先查不佔那一輪，選型題照樣能叫 filter_products。"""
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            tools=[_SEARCH_TOOL_SPEC, _FILTER_TOOL_SPEC],
+            replies=lambda al: [
+                _tool_turn(al, name="filter_products"),
+                al.LLMReply(content="符合的有三款", tool_calls=[], model="m1"),
+            ],
+            reply_mode="fast",
+            force_knowledge_search=True,
+        )
+
+        assert result.reply == "符合的有三款"
+        assert [name for name, _ in executed] == ["search_knowledge", "filter_products"]
+        # 已經查過知識庫，第一次呼叫只給其他工具，模型不會拿唯一的工具輪去重查
+        assert calls[0]["tools"] == [_FILTER_TOOL_SPEC]
+        assert "forced_tool_name" not in calls[0]
+        # 用掉那一輪之後只能作答，跟原本「查＋篩選一輪、再作答」一樣是兩次呼叫
+        assert calls[1]["tools"] is None
+        assert [c["kind"] for c in calls] == ["stream", "stream"]
+        assert [(s["name"], s["round"]) for s in result.tool_steps] == [
+            ("search_knowledge", 0), ("filter_products", 1),
+        ]
+
+    def test_asking_for_the_withdrawn_search_does_not_use_up_the_filter_round(self, monkeypatch):
+        """已先查過模型仍叫 search_knowledge：不算那一輪，下一次照樣能叫 filter_products。"""
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            tools=[_SEARCH_TOOL_SPEC, _FILTER_TOOL_SPEC],
+            replies=lambda al: [
+                _tool_turn(al, name="search_knowledge"),
+                _tool_turn(al, name="filter_products"),
+                al.LLMReply(content="符合的有三款", tool_calls=[], model="m1"),
+            ],
+            reply_mode="fast",
+            force_knowledge_search=True,
+        )
+
+        assert result.reply == "符合的有三款"
+        assert [name for name, _ in executed] == ["search_knowledge", "filter_products"]
+        assert calls[0]["tools"] == [_FILTER_TOOL_SPEC]
+        assert calls[1]["tools"] == [_FILTER_TOOL_SPEC]
+        assert "filter_products" in seen[1][-1]["content"]
+        assert "不用再查" in seen[1][-1]["content"]
+        assert calls[2]["tools"] is None
+        assert [(s["name"], s["round"]) for s in result.tool_steps] == [
+            ("search_knowledge", 0), ("filter_products", 2),
+        ]
+
+    def test_withdrawn_search_retry_happens_only_once(self, monkeypatch):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            tools=[_SEARCH_TOOL_SPEC, _FILTER_TOOL_SPEC],
+            replies=lambda al: [
+                _tool_turn(al, name="search_knowledge"),
+                _tool_turn(al, name="search_knowledge"),
+                al.LLMReply(content="答案", tool_calls=[], model="m1"),
+            ],
+            reply_mode="fast",
+            force_knowledge_search=True,
+        )
+
+        assert result.reply == "答案"
+        assert [name for name, _ in executed] == ["search_knowledge"]
+        assert "不能使用 search_knowledge" in seen[2][-1]["content"]
+        assert len(calls) == 3
+
+    def test_follow_up_also_searches_with_the_previous_question(self, monkeypatch):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [al.LLMReply(content="額定 8 m", tool_calls=[], model="m1")],
+            messages=[
+                {"role": "system", "content": "sys"},
+                {"role": "user", "content": "50EUBL 是什麼樣的泵？"},
+                {"role": "assistant", "content": "固體污泥沉水排水泵。"},
+                {"role": "user", "content": "那它的揚程呢？"},
+            ],
+            force_knowledge_search=True,
+        )
+
+        import json
+
+        queries = json.loads(executed[0][1])["queries"]
+        assert queries == ["那它的揚程呢？", "50EUBL 是什麼樣的泵？\n那它的揚程呢？"]
+
+    @pytest.mark.parametrize("extra", [{"force_web_search": True}, {"force_memory_search": True}])
+    def test_other_forced_reads_keep_the_tool_round(self, monkeypatch, extra):
+        """還要上網或查記憶時第一次呼叫本來就得寫參數，先查省不到，維持原本流程。"""
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC, _MEMORY_TOOL_SPEC],
+            replies=lambda al: [
+                _tool_turn(al),
+                al.LLMReply(content="答案", tool_calls=[], model="m1"),
+            ],
+            force_knowledge_search=True,
+            **extra,
+        )
+
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
+        assert seen[0][-1]["role"] == "user"

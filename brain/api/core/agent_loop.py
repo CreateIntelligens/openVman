@@ -214,6 +214,71 @@ def _ensure_memory_search(turn: LLMReply, user_message: str) -> LLMReply:
     return _append_synthetic_call(turn, "auto-search-memory", "search_memory", {"queries": [user_message]})
 
 
+# 追問句（「那價格呢？」）自己查不到東西，把上一句問題接在前面當第二條查詢；
+# 上一句只取開頭，太長會把這一句的意思稀釋掉。
+_PREFETCH_CONTEXT_CHARS = 200
+
+
+def _should_prefetch_knowledge(
+    cfg: Any,
+    tools: list[dict[str, Any]],
+    *,
+    first_forced: str | None,
+    forced_tool_name: str | None,
+    allow_forced_knowledge_search: bool,
+    force_knowledge_search: bool,
+    force_web_search: bool,
+    force_memory_search: bool,
+) -> bool:
+    """Whether to run search_knowledge before the first LLM call instead of forcing a tool round.
+
+    只在每輪決策高信心判定需要知識庫、而且這一輪只為了查知識庫才強制工具時才先查：
+    還要上網或查記憶時第一次呼叫本來就得替那些工具寫參數，先查省不到那一次。
+    """
+    if not getattr(cfg, "chat_prefetch_knowledge_search", True):
+        return False
+    names = {tool.get("function", {}).get("name") for tool in tools}
+    return (
+        first_forced == REQUIRE_ANY_TOOL
+        and not forced_tool_name
+        and allow_forced_knowledge_search
+        and force_knowledge_search
+        and not force_web_search
+        and not force_memory_search
+        and KNOWLEDGE_SEARCH_TOOL in names
+    )
+
+
+def _prefetched_knowledge_turn(messages: list[dict[str, Any]]) -> LLMReply:
+    """A finished search_knowledge call on the user's own words, plus the previous question.
+
+    第一條是這一句原句；第二條是「上一句＋這一句」：追問時補回主詞，
+    換話題時兩條查詢都會命中新主題（鶴記dev 換題對照答案不受上一句影響）。
+    """
+    user_texts = [
+        str(m.get("content", "")).strip()
+        for m in messages
+        if m.get("role") == "user" and isinstance(m.get("content"), str)
+    ]
+    current = user_texts[-1] if user_texts else ""
+    queries = [current]
+    previous = next((text for text in reversed(user_texts[:-1]) if text), "")
+    if previous and current:
+        queries.append(f"{previous[:_PREFETCH_CONTEXT_CHARS]}\n{current}")
+    return LLMReply(
+        content="",
+        tool_calls=[
+            LLMToolCall(
+                id="prefetch-search-knowledge",
+                name=KNOWLEDGE_SEARCH_TOOL,
+                arguments=json.dumps({"queries": queries}, ensure_ascii=False),
+                extra_content={"thought_signature": _SKIP_THOUGHT_SIGNATURE},
+            )
+        ],
+        model="",
+    )
+
+
 _WEB_TOOLS = frozenset({"search_web", "read_web_page"})
 
 
@@ -299,6 +364,26 @@ def _run_tool_phase(
         else None
     )
 
+    prefetch = _should_prefetch_knowledge(
+        cfg, tools,
+        first_forced=first_forced,
+        forced_tool_name=forced_tool_name,
+        allow_forced_knowledge_search=allow_forced_knowledge_search,
+        force_knowledge_search=force_knowledge_search,
+        force_web_search=force_web_search,
+        force_memory_search=force_memory_search,
+    )
+    # 先查好的知識庫結果佔掉第 0 輪工具，模型的呼叫從第 1 輪算起。
+    round_offset = 1 if prefetch else 0
+    if prefetch:
+        # 先查只取代「叫 search_knowledge」那一次，不取代模型挑工具的那一輪：第一次呼叫
+        # 不強制、給查完知識庫後的工具（later_tools），選型題仍能在這一輪叫
+        # filter_products，之後的輪數規則（answer_only_from）照舊。fast 模式因此仍是
+        # 「最多一輪模型自選的工具、然後只能作答」，只是不需要工具時一次就答完。
+        # 不再給 search_knowledge：鶴記dev 實測給了之後模型會重查一次知識庫、用掉
+        # fast 唯一的工具輪而沒叫 filter_products，選型題答成「型錄未提及」。
+        first_forced = None
+
     last_user_message = next(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
         "",
@@ -306,10 +391,14 @@ def _run_tool_phase(
     with bind_tool_context(
         persona_id, project_id, user_message=last_user_message, reply_mode=mode.name
     ):
+        if prefetch:
+            _append_tool_turns(
+                working_messages, tool_steps, _prefetched_knowledge_turn(messages), round_index=0,
+            )
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             current_forced = first_forced if iteration == 0 else None
             if iteration == 0:
-                current_tools = tools
+                current_tools = (later_tools or None) if prefetch else tools
             elif answer_only_from is not None and iteration >= answer_only_from:
                 current_tools = None
             else:
@@ -317,7 +406,8 @@ def _run_tool_phase(
             # stream_chat_turn 只是把 provider 串流即時消化成完整 LLMReply（沒有 token
             # 外送給用戶端），所以串流純粹是 TTFB 最佳化：強制搜尋那一回合只會吐
             # tool_call，不需要串流；之後每一回合都可能是長文答案，都串流。
-            should_stream = iteration >= 1 if first_forced else iteration == 0
+            # 先查過的回合每次呼叫都可能直接是答案。
+            should_stream = iteration >= 1 if first_forced else (prefetch or iteration == 0)
             turn_fn = _stream_turn if should_stream else _generate_turn
             turn = turn_fn(
                 working_messages,
@@ -343,9 +433,25 @@ def _run_tool_phase(
                     if force_memory_search:
                         turn = _ensure_memory_search(turn, last_user_message)
                 if turn.tool_calls:
-                    _append_tool_turns(working_messages, tool_steps, turn, round_index=iteration)
+                    _append_tool_turns(
+                        working_messages, tool_steps, turn, round_index=iteration + round_offset,
+                    )
                     continue
                 if not turn.content.strip():
+                    if (
+                        prefetch and iteration == 0 and answer_only_from is not None
+                        and set(dropped) == {KNOWLEDGE_SEARCH_TOOL}
+                    ):
+                        # 已先查過還想再查：原本的「請直接以文字回答」加上這一輪算掉，fast 模式
+                        # 就沒有機會叫 filter_products，鶴記dev 69 輪有 2 次選型題因此答錯。
+                        # 告訴它結果已在上面、這一輪不算，下一次照樣給 filter_products。
+                        answer_only_from += 1
+                        working_messages.append(
+                            {"role": "user", "content": _with_reply_rules(
+                                _PREFETCHED_KNOWLEDGE_RETRY_MSG, messages,
+                            )}
+                        )
+                        continue
                     working_messages.append(
                         {"role": "user", "content": _with_reply_rules(
                             _UNOFFERED_TOOL_RETRY_MSG.format(tools="、".join(dropped)), messages,
@@ -483,6 +589,10 @@ def _build_hallucination_pattern(tools: list[dict[str, Any]]) -> re.Pattern[str]
     return re.compile(r"^(" + "|".join(re.escape(n) for n in names) + r")\s*\(.*\)\s*$", re.DOTALL)
 _EMPTY_REPLY_RETRY_MSG = (
     "請直接以文字回答上一個問題；查不到的部分合併成一句帶過，不要逐項說明，也不要留空。"
+)
+_PREFETCHED_KNOWLEDGE_RETRY_MSG = (
+    "知識庫已經用這一句查過了，結果就在上面，不用再查。"
+    "要依規格篩選、比較或推薦型號時呼叫 filter_products；不需要就直接以文字回答。"
 )
 _UNOFFERED_TOOL_RETRY_MSG = (
     "這一輪不能使用 {tools}。請直接以文字回答上一個問題；"

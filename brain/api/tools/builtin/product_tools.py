@@ -112,10 +112,13 @@ def fit_product_tool(function: dict[str, Any], project_id: str) -> dict[str, Any
 
 # 只寫在工具說明裡時，正式聊天路徑（fast）20 題只有 7 題會叫；系統提示的工具規則寫著
 # 「search_knowledge 一定要叫」，模型就只叫它，靠檢索片段列款式常常漏。
+# 括號那句給伺服器先查知識庫的回合（agent_loop 的 prefetch）：沒寫時模型叫完
+# filter_products、到只能作答的那一輪還想補叫 search_knowledge，被擋下後多一次呼叫。
 _PROMPT_LINE = (
     "本專案有產品規格表（filter_products 工具）。使用者問選型、哪幾款符合、有哪些、最大／最小／最高、"
     "排序、比較兩款、X 以上／以下這類要完整清單或數值比較的問題時，第一輪必須同時呼叫 filter_products 與 "
-    "search_knowledge；回答列出的產品以 filter_products 的 matches 為準，search_knowledge 的片段常不完整，"
+    "search_knowledge（對話裡已經有這一句的 search_knowledge 結果時只叫 filter_products）；"
+    "回答列出的產品以 filter_products 的 matches 為準，search_knowledge 的片段常不完整，"
     "不能只憑片段列款式或說其他款沒有資料。"
 )
 # 規格表常常只收了一部分產品（鶴記只有 EDW、EUB-M），沒講範圍時模型把 matches 當成全部，

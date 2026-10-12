@@ -174,6 +174,9 @@ class BrainSettings(BaseSettings):
     # 強制查完知識庫後的回合不再提供 search_knowledge（避免重複翻書），
     # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
     chat_answer_pass_excludes_knowledge_search: bool = True
+    # 每輪決策高信心判定需要知識庫時，伺服器先用使用者原句（加上一句問題）查好再叫 LLM，
+    # 省掉只為了產生 search_knowledge 呼叫的那一次（約 1.2 秒）。
+    chat_prefetch_knowledge_search: bool = True
 
     # Per-turn typed decisions use the shared Brain provider chain. Group switches
     # allow operational rollback without changing provider configuration.

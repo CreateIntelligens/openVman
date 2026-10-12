@@ -119,6 +119,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 ### Agent loop
 
 - 第一次 LLM 呼叫必須使用工具（`CHAT_FORCE_KNOWLEDGE_SEARCH`，僅在 `search_knowledge` 有註冊時生效）。模型一次決定要查哪些，沒叫 `search_knowledge` 就自動補一筆；同一輪的工具平行執行。slash command 指定的工具優先。
+- 每輪決策高信心判定需要知識庫（`needs_knowledge=True`）、而且不必同時強制上網或查記憶時，改由伺服器先跑 `search_knowledge`（`CHAT_PREFETCH_KNOWLEDGE_SEARCH`，預設開啟）：查詢是使用者原句，加上「上一句問題＋這一句」一條（追問句「那價格呢？」靠它補回主詞），走跟工具同一個實作。結果以一筆已完成的 `search_knowledge` 呼叫（id `prefetch-search-knowledge`，`tool_steps` 第 0 輪）放進對話，第一次 LLM 呼叫不強制工具、提供查完知識庫後的工具（不含 `search_knowledge`），不需要其他工具時一次就答完，省掉只產生工具呼叫的那一次。這次先查不算模型自選的工具輪：選型題仍在第一次呼叫叫 `filter_products`，之後照下一條的輪數規則，fast 模式仍是最多一輪工具、然後只能作答。模型仍去叫已收回的 `search_knowledge` 時，伺服器提示結果已在上面、要篩選就叫 `filter_products`，這一輪不算（每回合一次），選型題不會因此沒篩選就作答。判定為否或不確定時流程不變。
 - 之後的回合拿掉 `search_knowledge`（`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`），其他工具照常；最多再追加 `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS` 輪，之後不給工具、只能作答。總回合數受 `AGENT_LOOP_MAX_ROUNDS` 限制。
 - 模型呼叫本輪沒提供的工具時，該呼叫不執行並記 warning，要求模型直接用文字回答，避免繞過回覆模式的限制。
 - provider 忽略強制 tool_choice 直接回文字時，該文字當作答案。空回覆或把工具呼叫寫成文字時各重試一次。
@@ -174,7 +175,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - `unknown`：用到的欄位是 null，不能視為不符合。
 - `excluded_count`：確定不符合的數量。
 
-工具說明會帶入該專案的欄位與單位；有規格表的專案，系統提示另有一條規則，要求選型、比較、極值類問題在第一輪同時呼叫 `filter_products` 與 `search_knowledge`，並以 `matches` 為準列產品，所以 `fast` 模式（不准追加工具）也用得到。規則同時寫明規格表只收錄 `title` 所列的範圍，問題不限這些產品時，範圍外的款式依檢索片段補列；規格表沒收齊全部產品時，`title` 要寫清楚涵蓋哪些系列。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
+工具說明會帶入該專案的欄位與單位；有規格表的專案，系統提示另有一條規則，要求選型、比較、極值類問題在第一輪同時呼叫 `filter_products` 與 `search_knowledge`（伺服器已先查好知識庫時只叫 `filter_products`，見「Agent loop」），並以 `matches` 為準列產品，所以 `fast` 模式（不准追加工具）也用得到。規則同時寫明規格表只收錄 `title` 所列的範圍，問題不限這些產品時，範圍外的款式依檢索片段補列；規格表沒收齊全部產品時，`title` 要寫清楚涵蓋哪些系列。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
 
 ### 網路工具（2md）
 

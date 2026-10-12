@@ -284,6 +284,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 1. **Direct Route**：role 為 `system`、`assistant`、`control` 的訊息不帶工具，直接呼叫一次 LLM。
 2. **Tool-Enabled Route**：一般 `user` 訊息走 agent loop（`core/agent_loop.py`）的兩段式流程，避免模型憑記憶亂答：
    - **第一次呼叫（必須用工具，平行檢索）**：帶完整 tool schema，`tool_choice=required`，模型一次決定要查哪些。`search_knowledge` 一定執行（模型漏叫時系統以使用者原句補上），問題涉及公開或即時資訊時同一輪一併叫 `search_web`；同一輪的工具平行執行（`CHAT_FORCE_KNOWLEDGE_SEARCH`，預設開啟；只在 `search_knowledge` 有註冊時生效）。此回合套用 `FORCED_TOOL_MODEL_OVERRIDE`／`FORCED_TOOL_MAX_TOKENS`（預設 400）。
+   - **先查知識庫（決策高信心需要時）**：每輪決策判定 `needs_knowledge=True`、且不必同時強制 `search_web`／`search_memory` 時，伺服器在第一次呼叫前以使用者原句與「上一句問題＋這一句」執行 `search_knowledge`（同一個工具實作，語言分流與圖譜擴充一致），結果以已完成的工具呼叫（帶 Gemini 要求的 thought_signature 略過值）與工具結果放進對話；第一次呼叫改為 `tool_choice=auto`、提供排除 `search_knowledge` 後的工具，模型可直接作答，或在這一輪叫 `filter_products` 等其他工具。這次先查不計入模型自選的工具輪；模型仍叫已收回的 `search_knowledge`（且沒有其他工具呼叫、沒有文字）時，伺服器丟掉該呼叫並提示「已查過，要篩選就叫 `filter_products`」，這一輪也不計入（每回合只一次），之後的輪數規則同下（`CHAT_PREFETCH_KNOWLEDGE_SEARCH`，預設開啟）。產品規格表的系統提示規則補一句「對話裡已經有這一句的 `search_knowledge` 結果時只叫 `filter_products`」。判定為否或不確定時維持強制工具的第一次呼叫。
    - **第二次呼叫起（排除知識庫）**：工具結果回填後不再提供 `search_knowledge`，其他工具（`search_web`、wiki、技能）照常，最多再追加 `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS` 輪（依回覆模式），之後不給工具、只能以文字作答（`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`，預設開啟）。總回合數受 `AGENT_LOOP_MAX_ROUNDS`（預設 6）限制。
    - **產品規格篩選**：專案有 `knowledge/products/_catalog.yaml` 時才提供 `filter_products`（說明帶該專案欄位與單位），system prompt 要求選型、比較、極值類問題在第一輪與 `search_knowledge` 平行呼叫，並寫明規格表收錄的範圍（`_catalog.yaml` 的 `title`），範圍外的產品依檢索片段補列。參數是結構化的情境與條件，回傳各情境的 `matches`／`unknown`／`excluded_count`；null 是未知、不算不符合。格式見 `brain/README.md`「產品規格篩選」。
    - **例外處理**：provider 忽略 `tool_choice` 直接回文字時，第一回合的文字即視為答案並記一筆 warning；模型呼叫本輪沒提供的工具時，該呼叫不執行，改要求直接用文字回答；空回覆或把工具呼叫寫成文字時各重試一次，重試訊息後面會再附上本輪的回答語言與長度規則（`agent_loop._with_reply_rules`）。工具階段超出輪次或失敗時，以已取得的工具結果加提示再生成一次。
@@ -297,7 +298,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 一般 HTTP user turn 在載入近期歷史後、建立 prompt 前執行一次 `core.turn_decisions` batch，結果只存於伺服器端 `GenerationContext`。固定 5 題 typed questions：knowledge、web、memory 需求、明確回覆語言與當輪 tone；輸入語言不問供應商，由 `memory.language_detect` 規則判斷。題數影響延遲：Clef 包裝層每題固定約 60～80 tokens，延遲與 tokens 成正比，5 題約 0.39～0.52 秒。evidence 僅含當輪原句、最多 6 則 user／assistant 歷史（每則 600 字元）、語音語言、專案主要語言和允許的 read-tool 名稱，總字元上限 6,000。Noul 門檻為 positive 0.7、negative 0.1；choice confidence 0.8 且領先 0.2 才採用。信號逐項棄權，整體 2 秒、每 hop 0.6 秒（`TURN_DECISIONS_HOP_TIMEOUT_SECONDS`）。全部 hops、設定讀取或 timeout 失敗時使用 baseline policy；auto recall 會跳過本回合的 Jev filter，改走原有 LLM／formatted 摘要路徑。
 
-高信心 `needs_knowledge=false` 會略過強制知識檢索，但仍保留 knowledge tool 供 agent 補查；正向 web／memory 會在合法工具第一輪以原句補上缺失 read call。Live finalized text 會在送出 generation 前並行執行必要 read-only prefetch，並以 bounded envelope 提供結果；結果明確標為不可信參考資料，已完成來源不重複呼叫，帶 citations 的結果照一般工具呼叫送出 `server_search_results`。預取總時限為 `LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`（預設 1 秒），逾時的那項取消並改列 `required_reads` 由模型自己查。`[視覺事件]` 回合不跑決策與預取。Mode、工具 registry、URL2MD 開關與 session recall 開關仍由既有程式決定。memory positive 使用 `search_memory` 並略過同回合 auto-recall；session recall 關閉時不會強制 memory read。memory write 仍由原本明確使用者意圖閘門控制。語言解析把 input、retrieval 與 response 分開；明確回覆語言優先於 ASR，response language 不會改寫訊息標籤或 TTS speech-language。Tone 只加當輪 delivery hint，不持久化。
+高信心 `needs_knowledge=false` 會略過強制知識檢索，但仍保留 knowledge tool 供 agent 補查；HTTP Chat 的高信心 `needs_knowledge=true` 由伺服器在第一次 LLM 呼叫前先執行 `search_knowledge`（見 9.1「先查知識庫」）；正向 web／memory 會在合法工具第一輪以原句補上缺失 read call。Live finalized text 會在送出 generation 前並行執行必要 read-only prefetch，並以 bounded envelope 提供結果；結果明確標為不可信參考資料，已完成來源不重複呼叫，帶 citations 的結果照一般工具呼叫送出 `server_search_results`。預取總時限為 `LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`（預設 1 秒），逾時的那項取消並改列 `required_reads` 由模型自己查。`[視覺事件]` 回合不跑決策與預取。Mode、工具 registry、URL2MD 開關與 session recall 開關仍由既有程式決定。memory positive 使用 `search_memory` 並略過同回合 auto-recall；session recall 關閉時不會強制 memory read。memory write 仍由原本明確使用者意圖閘門控制。語言解析把 input、retrieval 與 response 分開；明確回覆語言優先於 ASR，response language 不會改寫訊息標籤或 TTS speech-language。Tone 只加當輪 delivery hint，不持久化。
 
 | 模式 | 追加工具輪 | 知識融合筆數 | 網路搜尋 | `read_web_page` 網址上限 |
 |---|---|---|---|---|
@@ -519,6 +520,7 @@ RAG_RRF_K=60
 KNOWLEDGE_SEARCH_MERGE_LIMIT=5
 AGENT_LOOP_MAX_ROUNDS=6
 CHAT_FORCE_KNOWLEDGE_SEARCH=true
+CHAT_PREFETCH_KNOWLEDGE_SEARCH=true
 CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH=true
 CHAT_MAX_FOLLOWUP_TOOL_ROUNDS=1
 FORCED_TOOL_MODEL_OVERRIDE=
