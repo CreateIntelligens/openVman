@@ -1,44 +1,80 @@
-"""2md-backed live web search and URL reading tools."""
+"""2md-backed live web search and URL reading tools.
+
+Endpoint coordination lives in ``infra.two_md_coordination``, the HTTP
+transport and telemetry in ``infra.two_md_transport``, and the SSRF policy in
+``safety.url_policy``; the names below stay importable from here.
+"""
 
 from __future__ import annotations
 
-import ipaddress
 import logging
-import socket
 import time
-from threading import Lock
 from typing import Any
 from urllib.parse import quote, urlparse
 
 import httpx
 
-from core.two_md import (
+from core.two_md import (  # noqa: F401 (RedisCoordination, SingleFlight, full_jitter_delay re-exported)
     RedisCoordination,
     SingleFlight,
     build_operation_key,
     full_jitter_delay,
     resolve_base_urls,
 )
-from safety.observability import get_metrics_store, log_event
-from tools.context import active_project_id, active_reply_mode, active_user_message, mode_settings
+from infra import two_md_coordination
+from infra.two_md_coordination import (  # noqa: F401 (private aliases re-exported)
+    Budget as _Budget,
+    claim_endpoint as _claim_endpoint,
+    close_coordination,
+    coalesce,
+    get_coordination as _get_coordination,
+    is_circuit_open as _is_circuit_open,
+    iter_endpoints,
+    note_endpoint_failure as _note_endpoint_failure,
+    note_endpoint_success as _note_endpoint_success,
+    note_failure as _note_failure,
+    note_success as _note_success,
+    release_endpoint_probe as _release_endpoint_probe,
+    reset_circuits as reset_url2md_circuits,
+    single_flight as _single_flight,
+    wait_before_fallback as _wait_before_fallback,
+)
+from infra.two_md_transport import (  # noqa: F401 (private aliases re-exported)
+    Url2mdUpstreamError,
+    record_attempt as _record_attempt,
+    record_operation as _record_operation,
+    request_json,
+    run_fallback_chain,
+)
+from safety.observability import get_metrics_store, log_event  # noqa: F401
+from safety.url_policy import validate_public_url as _validate_url
+from tools.context import (
+    active_project_id,
+    active_reply_mode,
+    active_user_message,
+    mode_settings,
+)
 
 logger = logging.getLogger("brain.tools.builtin.web")
 
 _url2md_client: httpx.Client | None = None
 _HTTP_TIMEOUT = httpx.Timeout(connect=5, read=25, write=10, pool=5)
-_single_flight = SingleFlight()
-_coordination: RedisCoordination | None = None
-_coordination_signature: tuple[str, str] | None = None
+
+# Module-level state that moved to infra.two_md_coordination. Forwarding keeps
+# old imports reading the live value instead of a stale copy.
+_MOVED_STATE = frozenset({
+    "_circuit_lock",
+    "_circuit_opened_at",
+    "_circuit_probe_claimed",
+    "_coordination",
+    "_coordination_signature",
+})
 
 
-class Url2mdUpstreamError(ValueError):
-    """Classified upstream failure used to decide whether failover is safe."""
-
-    def __init__(self, message: str, *, retryable: bool, reason: str, status_code: int = 0):
-        super().__init__(message)
-        self.retryable = retryable
-        self.reason = reason
-        self.status_code = status_code
+def __getattr__(name: str) -> Any:
+    if name in _MOVED_STATE:
+        return getattr(two_md_coordination, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _get_url2md_client() -> httpx.Client:
@@ -49,156 +85,15 @@ def _get_url2md_client() -> httpx.Client:
 
 
 def close_url2md_client() -> None:
-    global _url2md_client, _coordination, _coordination_signature
+    global _url2md_client
     if _url2md_client is not None:
         _url2md_client.close()
         _url2md_client = None
-    if _coordination is not None:
-        _coordination.close()
-        _coordination = None
-        _coordination_signature = None
+    close_coordination()
 
 
 # Kept as a compatibility alias for the old Gateway client shutdown hook.
 close_gateway_client = close_url2md_client
-
-
-# 最近一次失敗的時間戳，用來在冷卻期內跳過掛掉的主機。行程內共用，所以要鎖。
-#
-# 這份狀態是行程本地的。Brain 目前是單一 uvicorn 行程、單一容器，所以「行程
-# 本地」等同「全域」，足以擋掉逾時風暴。之後若真的橫向擴展成多 worker／多
-# pod，每個實例會各自學一次哪台掛了——屆時才值得把 host 健康狀態下沉到共用
-# 快取（Redis），現在做只是徒增依賴。
-_circuit_lock = Lock()
-_circuit_opened_at: dict[str, float] = {}
-_circuit_probe_claimed: set[str] = set()
-
-
-def _note_failure(base: str) -> None:
-    with _circuit_lock:
-        _circuit_opened_at[base] = time.monotonic()
-        _circuit_probe_claimed.discard(base)
-
-
-def _note_success(base: str) -> None:
-    with _circuit_lock:
-        _circuit_opened_at.pop(base, None)
-        _circuit_probe_claimed.discard(base)
-
-
-def _is_circuit_open(base: str, cooldown_s: float) -> bool:
-    """True while *base* is still inside its cooldown after a recent failure."""
-    if cooldown_s <= 0:
-        return False
-    with _circuit_lock:
-        opened_at = _circuit_opened_at.get(base)
-    return opened_at is not None and (time.monotonic() - opened_at) < cooldown_s
-
-
-def reset_url2md_circuits() -> None:
-    """Clear the breaker state (tests, and after a config change)."""
-    with _circuit_lock:
-        _circuit_opened_at.clear()
-        _circuit_probe_claimed.clear()
-
-
-def _claim_endpoint(base: str, cooldown_s: float) -> bool:
-    """Return whether this request may use an endpoint.
-
-    A cooled-down endpoint gets one local half-open probe. Other callers skip it
-    until that probe succeeds or fails, preventing synchronized recovery probes.
-    """
-    with _circuit_lock:
-        opened_at = _circuit_opened_at.get(base)
-        if opened_at is None:
-            return True
-        if cooldown_s > 0 and time.monotonic() - opened_at < cooldown_s:
-            return False
-        if base in _circuit_probe_claimed:
-            return False
-        _circuit_probe_claimed.add(base)
-        return True
-
-
-def _release_endpoint_probe(base: str) -> None:
-    with _circuit_lock:
-        _circuit_probe_claimed.discard(base)
-
-
-class _Budget:
-    """A shared deadline across the whole fallback chain.
-
-    逾時是每台各自計算的，三台串起來會遠超過一次對話能等的時間。這個預算讓
-    整條鏈有一個總上限：用完就不再試下一台，直接把最後的錯誤丟出去。
-    """
-
-    __slots__ = ("_deadline",)
-
-    def __init__(self, total_s: float) -> None:
-        self._deadline = time.monotonic() + total_s if total_s > 0 else None
-
-    def remaining(self) -> float | None:
-        if self._deadline is None:
-            return None
-        return max(0.0, self._deadline - time.monotonic())
-
-    def exhausted(self) -> bool:
-        remaining = self.remaining()
-        return remaining is not None and remaining <= 0
-
-
-def _iter_bases(cfg: Any) -> Any:
-    """Yield (base, budget) for each host worth trying, freshest first.
-
-    冷卻中的主機先跳過；冷卻結束後只允許受控的 half-open probe。
-    """
-    bases = _url2md_bases()
-    cooldown = float(getattr(cfg, "url2md_circuit_cooldown_s", 0) or 0)
-    budget = _Budget(float(getattr(cfg, "url2md_total_budget_s", 0) or 0))
-    max_attempts = max(1, int(getattr(cfg, "url2md_max_attempts", len(bases)) or len(bases)))
-    coordination = _get_coordination(cfg)
-    if coordination is not None and not coordination.configured:
-        get_metrics_store().increment("url2md_coordination_degraded_total", reason="unavailable")
-    lease_s = float(getattr(cfg, "url2md_half_open_lease_s", 5.0) or 5.0)
-    attempted = 0
-    for base in bases:
-        if attempted >= min(max_attempts, len(bases)):
-            return
-        if not _claim_endpoint(base, cooldown):
-            logger.info("2md endpoint skipped by circuit provider=%s", base)
-            get_metrics_store().increment("url2md_circuit_skips_total", provider=base)
-            continue
-        if coordination is not None and not coordination.endpoint_allowed(
-            base, cooldown_s=cooldown, lease_s=lease_s
-        ):
-            _release_endpoint_probe(base)
-            logger.info("2md endpoint skipped by shared circuit provider=%s", base)
-            get_metrics_store().increment("url2md_shared_circuit_skips_total", provider=base)
-            continue
-        if budget.exhausted():
-            logger.warning("2md fallback budget exhausted before trying %s", base)
-            return
-        attempted += 1
-        yield base, budget
-
-
-def _note_endpoint_failure(base: str, cfg: Any) -> None:
-    _note_failure(base)
-    get_metrics_store().increment("url2md_circuit_open_total", provider=base)
-    coordination = _get_coordination(cfg)
-    if coordination is not None:
-        coordination.mark_failure(
-            base,
-            cooldown_s=float(getattr(cfg, "url2md_circuit_cooldown_s", 60.0) or 60.0),
-        )
-
-
-def _note_endpoint_success(base: str, cfg: Any) -> None:
-    _note_success(base)
-    get_metrics_store().increment("url2md_circuit_recovered_total", provider=base)
-    coordination = _get_coordination(cfg)
-    if coordination is not None:
-        coordination.mark_success(base)
 
 
 def _url2md_bases() -> list[str]:
@@ -206,27 +101,20 @@ def _url2md_bases() -> list[str]:
     return list(resolve_base_urls(cfg))
 
 
-def _get_coordination(cfg: Any) -> RedisCoordination | None:
-    global _coordination, _coordination_signature
-    if not getattr(cfg, "url2md_coordination_enabled", True):
-        return None
-    redis_url = str(
-        getattr(cfg, "url2md_coordination_redis_url", "")
-        or getattr(cfg, "redis_url", "")
-        or ""
-    ).strip()
-    if not redis_url:
-        return None
-    namespace = str(getattr(cfg, "url2md_coordination_namespace", "brain:url2md") or "brain:url2md")
-    signature = (redis_url, namespace)
-    if _coordination is None or _coordination_signature != signature:
-        if _coordination is not None:
-            _coordination.close()
-        _coordination = RedisCoordination(redis_url, namespace=namespace)
-        _coordination_signature = signature
-        if not _coordination.configured:
-            get_metrics_store().increment("url2md_coordination_degraded_total", reason="unavailable")
-    return _coordination
+def _iter_bases(cfg: Any) -> Any:
+    yield from iter_endpoints(cfg, _url2md_bases())
+
+
+def _request_json(
+    method: str, endpoint: str, *, budget: _Budget | None = None, **kwargs: Any
+) -> dict[str, Any]:
+    return request_json(
+        _get_url2md_client(), method, endpoint, budget=budget, **kwargs
+    )
+
+
+def _privacy_scope() -> str:
+    return f"{active_project_id.get()}:{active_reply_mode.get() or 'standard'}"
 
 
 def _validate_query(raw_query: Any) -> str:
@@ -236,167 +124,6 @@ def _validate_query(raw_query: Any) -> str:
     if len(query) > 1000:
         raise ValueError("query 不可超過 1000 字")
     return query
-
-
-def _validate_url(raw_url: Any) -> str:
-    url = str(raw_url or "").strip()
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError("無效的網址：只支援 http/https URL")
-    if parsed.username or parsed.password:
-        raise ValueError("無效的網址：不支援嵌入帳號密碼")
-    try:
-        addresses = {
-            info[4][0]
-            for info in socket.getaddrinfo(parsed.hostname, None, type=socket.SOCK_STREAM)
-        }
-    except socket.gaierror as exc:
-        raise ValueError("無法解析該網址的網域") from exc
-    if not addresses or any(
-        (
-            (ip := ipaddress.ip_address(address)).is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_reserved
-            or ip.is_multicast
-            or ip.is_unspecified
-        )
-        for address in addresses
-    ):
-        raise ValueError("不允許讀取內部或特殊網路位址")
-    if len(url) > 4096:
-        raise ValueError("網址過長")
-    return url
-
-
-def _request_json(
-    method: str, endpoint: str, *, budget: _Budget | None = None, **kwargs: Any
-) -> dict[str, Any]:
-    # 這一台最多只能用掉剩餘預算，否則單台逾時就能吃掉整條鏈的時間。
-    if budget is not None and (remaining := budget.remaining()) is not None:
-        kwargs["timeout"] = httpx.Timeout(
-            connect=min(5.0, remaining), read=remaining, write=min(10.0, remaining), pool=5,
-        )
-    try:
-        response = _get_url2md_client().request(method, endpoint, **kwargs)
-        response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        status_code = exc.response.status_code
-        retryable = status_code in {408, 425, 429} or status_code >= 500
-        raise Url2mdUpstreamError(
-            f"2md HTTP error status={status_code}",
-            retryable=retryable,
-            reason=f"http_{status_code}",
-            status_code=status_code,
-        ) from exc
-    except httpx.RequestError as exc:
-        raise Url2mdUpstreamError(
-            f"2md network error: {type(exc).__name__}",
-            retryable=True,
-            reason="network_error",
-        ) from exc
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise Url2mdUpstreamError(
-            "2md 回傳不是有效 JSON",
-            retryable=True,
-            reason="invalid_json",
-        ) from exc
-    if not isinstance(payload, dict):
-        raise Url2mdUpstreamError(
-            "2md 回傳格式無效", retryable=True, reason="invalid_response"
-        )
-    code = payload.get("code")
-    if isinstance(code, int) and code >= 400:
-        retryable = code in {408, 425, 429} or code >= 500
-        raise Url2mdUpstreamError(
-            f"2md 回傳錯誤（code={code}）",
-            retryable=retryable,
-            reason=f"upstream_code_{code}",
-            status_code=code,
-        )
-    return payload
-
-
-def _record_attempt(
-    operation: str,
-    base: str,
-    attempt: int,
-    *,
-    result: str,
-    reason: str = "",
-    latency_ms: float = 0.0,
-) -> None:
-    get_metrics_store().increment(
-        "url2md_attempts_total",
-        operation=operation,
-        provider=base,
-        result=result,
-    )
-    get_metrics_store().observe(
-        "url2md_latency_ms",
-        latency_ms,
-        operation=operation,
-        provider=base,
-        result=result,
-    )
-    log_event(
-        "url2md_attempt",
-        operation=operation,
-        provider=base,
-        attempt=attempt,
-        result=result,
-        reason=reason,
-        latency_ms=round(latency_ms, 2),
-    )
-
-
-def _record_operation(
-    operation: str,
-    *,
-    result: str,
-    attempts: int,
-    provider: str = "",
-    reason: str = "",
-    result_count: int = 0,
-    content_chars: int = 0,
-    truncated: bool = False,
-    usage_tokens: int | float | None = None,
-) -> None:
-    get_metrics_store().increment(
-        "url2md_operations_total",
-        operation=operation,
-        result=result,
-    )
-    log_event(
-        "url2md_operation",
-        operation=operation,
-        result=result,
-        attempts=attempts,
-        provider=provider,
-        reason=reason,
-        result_count=result_count,
-        content_chars=content_chars,
-        truncated=truncated,
-        usage_tokens=usage_tokens,
-    )
-
-
-def _wait_before_fallback(cfg: Any, budget: _Budget, attempt: int) -> bool:
-    remaining = budget.remaining()
-    if remaining is not None and remaining <= 0:
-        return False
-    delay = full_jitter_delay(
-        attempt,
-        base_s=float(getattr(cfg, "url2md_retry_base_delay_s", 0.25) or 0),
-        max_s=float(getattr(cfg, "url2md_retry_max_delay_s", 2.0) or 0),
-        remaining_s=remaining,
-    )
-    if delay <= 0:
-        return True
-    time.sleep(delay)
-    return not budget.exhausted()
 
 
 def _normalize_read_urls(args: dict[str, Any]) -> list[str]:
@@ -516,44 +243,14 @@ def _read_batch(
 
 
 def _read_web_page_uncached(urls: list[str], cfg: Any, max_chars: int) -> dict[str, Any]:
-    last_error: Exception | None = None
-    attempts = 0
-    for attempt, (base, budget) in enumerate(_iter_bases(cfg), start=1):
-        attempts = attempt
-        started_at = time.monotonic()
-        try:
-            if len(urls) == 1:
-                pages = [_read_single(base, urls[0], max_chars, budget)]
-            else:
-                pages = _read_batch(base, urls, max_chars, budget)
-        except Url2mdUpstreamError as exc:
-            last_error = exc
-            _note_endpoint_failure(base, cfg)
-            _record_attempt(
-                "read",
-                base,
-                attempt,
-                result="failure",
-                reason=exc.reason,
-                latency_ms=(time.monotonic() - started_at) * 1000,
-            )
-            if not exc.retryable or not _wait_before_fallback(cfg, budget, attempt):
-                break
-            continue
-        except Exception as exc:  # noqa: BLE001 - malformed upstream data may be endpoint-local
-            last_error = exc
-            _note_endpoint_failure(base, cfg)
-            _record_attempt(
-                "read",
-                base,
-                attempt,
-                result="failure",
-                reason="invalid_response",
-                latency_ms=(time.monotonic() - started_at) * 1000,
-            )
-            if not _wait_before_fallback(cfg, budget, attempt):
-                break
-            continue
+    def fetch(base: str, budget: _Budget, attempt: int, started_at: float) -> list[dict[str, Any]]:
+        if len(urls) == 1:
+            return [_read_single(base, urls[0], max_chars, budget)]
+        return _read_batch(base, urls, max_chars, budget)
+
+    def finish(
+        base: str, attempt: int, started_at: float, pages: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         _note_endpoint_success(base, cfg)
         _record_attempt(
             "read",
@@ -585,13 +282,14 @@ def _read_web_page_uncached(urls: list[str], cfg: Any, max_chars: int) -> dict[s
             return pages[0]
         return {"pages": pages, "count": len(pages), "provider": base}
 
-    _record_operation(
+    return run_fallback_chain(
         "read",
-        result="failure",
-        attempts=attempts,
-        reason=getattr(last_error, "reason", "no_eligible_endpoint"),
+        _iter_bases(cfg),
+        cfg,
+        fetch,
+        failure_message="無法讀取網址，2md fallback chain 皆失敗",
+        on_success=finish,
     )
-    raise ValueError(f"無法讀取網址，2md fallback chain 皆失敗：{last_error}") from last_error
 
 
 def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
@@ -602,15 +300,10 @@ def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
         "read",
         {"urls": urls},
         response_policy=f"json:{max_chars}",
-        privacy_scope=f"{active_project_id.get()}:{active_reply_mode.get() or 'standard'}",
+        privacy_scope=_privacy_scope(),
     )
-    return _single_flight.run(
-        key,
-        lambda: _read_web_page_uncached(urls, cfg, max_chars),
-        timeout_s=float(getattr(cfg, "url2md_total_budget_s", 20.0) or 20.0),
-        on_coalesced=lambda: get_metrics_store().increment(
-            "url2md_singleflight_coalesced_total", operation="read"
-        ),
+    return coalesce(
+        "read", key, cfg, lambda: _read_web_page_uncached(urls, cfg, max_chars)
     )
 
 
@@ -674,112 +367,80 @@ def _rerank_web_results(
 
 
 def _search_web_uncached(query: str, cfg: Any, max_results: int) -> dict[str, Any]:
-    last_error: Exception | None = None
-    attempts = 0
+    def attempt_search(
+        base: str, budget: _Budget, attempt: int, started_at: float
+    ) -> dict[str, Any]:
+        payload = _request_json(
+            "GET",
+            f"{base}/search",
+            params={"q": query},
+            headers={"Accept": "application/json", "X-Preset": "agent"},
+            budget=budget,
+        )
+        raw_results = payload.get("data")
+        if not isinstance(raw_results, list):
+            raise ValueError("2md 搜尋回傳格式無效")
 
-    for attempt, (base, budget) in enumerate(_iter_bases(cfg), start=1):
-        attempts = attempt
-        started_at = time.monotonic()
-        try:
-            payload = _request_json(
-                "GET",
-                f"{base}/search",
-                params={"q": query},
-                headers={"Accept": "application/json", "X-Preset": "agent"},
-                budget=budget,
-            )
-            raw_results = payload.get("data")
-            if not isinstance(raw_results, list):
-                raise ValueError("2md 搜尋回傳格式無效")
+        blocked = _blocked_domains(cfg)
+        candidates: list[dict[str, Any]] = []
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            url = str(item.get("url") or "")
+            if _is_blocked_url(url, blocked):
+                continue
+            candidates.append({
+                "title": str(item.get("title") or ""),
+                "url": url,
+                "description": str(item.get("description") or ""),
+                "content": str(item.get("content") or ""),
+            })
 
-            blocked = _blocked_domains(cfg)
-            candidates: list[dict[str, Any]] = []
-            for item in raw_results:
-                if not isinstance(item, dict):
-                    continue
-                url = str(item.get("url") or "")
-                if _is_blocked_url(url, blocked):
-                    continue
-                candidates.append({
-                    "title": str(item.get("title") or ""),
-                    "url": url,
-                    "description": str(item.get("description") or ""),
-                    "content": str(item.get("content") or ""),
-                })
+        _note_endpoint_success(base, cfg)
+        anchor = (active_user_message.get() or "").strip()
+        results = _rerank_web_results(
+            candidates, f"{anchor}\n{query}" if anchor else query, cfg
+        )[:max_results]
+        citations = [
+            {"title": r["title"], "url": r["url"]} for r in results if r["url"]
+        ]
+        _record_attempt(
+            "search",
+            base,
+            attempt,
+            result="success",
+            latency_ms=(time.monotonic() - started_at) * 1000,
+        )
+        meta = payload.get("meta")
+        usage = meta.get("usage") if isinstance(meta, dict) else None
+        usage_tokens = usage.get("tokens") if isinstance(usage, dict) else None
+        _record_operation(
+            "search",
+            result="success",
+            attempts=attempt,
+            provider=base,
+            result_count=len(results),
+            usage_tokens=usage_tokens if isinstance(usage_tokens, int | float) else None,
+        )
+        response: dict[str, Any] = {
+            "query": query,
+            "results": results,
+            "citations": citations,
+            "provider": base,
+        }
+        if isinstance(usage, dict):
+            tokens = usage.get("tokens")
+            if isinstance(tokens, int | float) and tokens >= 0:
+                response["usage"] = {"tokens": tokens}
+        return response
 
-            _note_endpoint_success(base, cfg)
-            anchor = (active_user_message.get() or "").strip()
-            results = _rerank_web_results(
-                candidates, f"{anchor}\n{query}" if anchor else query, cfg
-            )[:max_results]
-            citations = [
-                {"title": r["title"], "url": r["url"]} for r in results if r["url"]
-            ]
-            _record_attempt(
-                "search",
-                base,
-                attempt,
-                result="success",
-                latency_ms=(time.monotonic() - started_at) * 1000,
-            )
-            meta = payload.get("meta")
-            usage = meta.get("usage") if isinstance(meta, dict) else None
-            usage_tokens = usage.get("tokens") if isinstance(usage, dict) else None
-            _record_operation(
-                "search",
-                result="success",
-                attempts=attempt,
-                provider=base,
-                result_count=len(results),
-                usage_tokens=usage_tokens if isinstance(usage_tokens, int | float) else None,
-            )
-            response: dict[str, Any] = {
-                "query": query,
-                "results": results,
-                "citations": citations,
-                "provider": base,
-            }
-            if isinstance(usage, dict):
-                tokens = usage.get("tokens")
-                if isinstance(tokens, int | float) and tokens >= 0:
-                    response["usage"] = {"tokens": tokens}
-            return response
-        except Url2mdUpstreamError as exc:
-            last_error = exc
-            _note_endpoint_failure(base, cfg)
-            _record_attempt(
-                "search",
-                base,
-                attempt,
-                result="failure",
-                reason=exc.reason,
-                latency_ms=(time.monotonic() - started_at) * 1000,
-            )
-            if not exc.retryable or not _wait_before_fallback(cfg, budget, attempt):
-                break
-            continue
-        except Exception as exc:  # noqa: BLE001 - malformed upstream data may be endpoint-local
-            last_error = exc
-            _note_endpoint_failure(base, cfg)
-            _record_attempt(
-                "search",
-                base,
-                attempt,
-                result="failure",
-                reason="invalid_response",
-                latency_ms=(time.monotonic() - started_at) * 1000,
-            )
-            if not _wait_before_fallback(cfg, budget, attempt):
-                break
-            continue
-
-    _record_operation(
+    return run_fallback_chain(
         "search",
-        result="failure",
-        attempts=attempts,
-        reason=getattr(last_error, "reason", "no_eligible_endpoint"),
+        _iter_bases(cfg),
+        cfg,
+        attempt_search,
+        failure_message="無法搜尋網路，2md fallback chain 皆失敗",
     )
-    raise ValueError(f"無法搜尋網路，2md fallback chain 皆失敗：{last_error}") from last_error
 
 
 def _search_web(args: dict[str, Any]) -> dict[str, Any]:
@@ -790,15 +451,10 @@ def _search_web(args: dict[str, Any]) -> dict[str, Any]:
         "search",
         {"query": query, "top_k": max_results},
         response_policy="json:search",
-        privacy_scope=f"{active_project_id.get()}:{active_reply_mode.get() or 'standard'}",
+        privacy_scope=_privacy_scope(),
     )
-    return _single_flight.run(
-        key,
-        lambda: _search_web_uncached(query, cfg, max_results),
-        timeout_s=float(getattr(cfg, "url2md_total_budget_s", 20.0) or 20.0),
-        on_coalesced=lambda: get_metrics_store().increment(
-            "url2md_singleflight_coalesced_total", operation="search"
-        ),
+    return coalesce(
+        "search", key, cfg, lambda: _search_web_uncached(query, cfg, max_results)
     )
 
 

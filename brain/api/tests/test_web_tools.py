@@ -141,10 +141,11 @@ def test_read_web_page_rejects_unsafe_final_source_url(monkeypatch: pytest.Monke
 
 
 def test_url2md_telemetry_does_not_log_query_or_fetched_content(monkeypatch: pytest.MonkeyPatch):
+    from infra import two_md_transport
     from tools.builtin import web_tools
 
     events: list[tuple[str, dict]] = []
-    monkeypatch.setattr(web_tools, "log_event", lambda name, **fields: events.append((name, fields)))
+    monkeypatch.setattr(two_md_transport, "log_event", lambda name, **fields: events.append((name, fields)))
 
     web_tools._record_attempt(
         "search", "https://2md.aiurl.tw", 1, result="failure", reason="http_503"
