@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -24,6 +24,7 @@ from core.turn_decisions import (
     run_turn_decision,
     turn_decision_config,
 )
+from core.turn_reads import without_disabled_recall
 from infra.learnings import record_error_event
 from memory.memory import (
     append_session_message_with_id,
@@ -127,18 +128,7 @@ def prepare_generation(
             turn_id=envelope.context.trace_id,
             capture_debug=decision_debug,
         )
-        if turn_decision.policy.needs_memory is True:
-            from memory.memory import is_session_recall_disabled
-
-            if is_session_recall_disabled(session.session_id, project_id):
-                turn_decision = replace(
-                    turn_decision,
-                    policy=replace(
-                        turn_decision.policy,
-                        needs_memory=None,
-                        auto_recall=False,
-                    ),
-                )
+        turn_decision = without_disabled_recall(turn_decision, session.session_id, project_id)
 
     request_ctx = serialize_context(envelope.context)
     input_language = None

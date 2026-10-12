@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **[2026-10-12]** **HTTP 聊天與 Gemini Live 共用「這一輪先查什麼」**：每輪決策之後要先查哪些、知識庫用什麼查詢、關閉 session recall 時取消記憶查詢，原本 `core/agent_loop.py` 與 `live/gemini_turns.py`／`core/chat_service.py` 各寫一份，現在集中在 `core/turn_reads.py`，兩個入口只負責執行與把結果放回各自的協定。行為差異只有一項：Live 先查知識庫原本只用這一句，追問句（「那價格呢？」）查不到上一句講的型號；現在跟 HTTP 一樣另加「上一句＋這一句」一條查詢。多模態訊息的文字欄位不是字串時忽略，不再變成 "None"。
 - **[2026-10-12]** **拆分接近千行上限的六個模組（行為不變）**：`backend/app/auth/repositories.py` 999 → 79 行（各 repository 與共用規則拆成獨立模組，順便消掉既有 repository 反向 import 的循環）、`frontend/admin/src/pages/KnowledgeBase.tsx` 993 → 446 行（拖放、批次選取、QA 節點對話框改成 hook 與子元件）、`brain/api/live/gemini_live.py` 968 → 452 行（每輪決策與工具、音訊、轉錄改成 mixin，37 個方法內容逐一比對未變）、`frontend/app/src/composables/useAvatarChat.ts` 950 → 478 行（WebSocket、文字回合、視覺輸入分出；回傳 API 不變）、`backend/app/routes/admin.py` 936 → 357 行（音色目錄、音色授權、ASR 引擎與資源同步移出路由）、`brain/api/tools/builtin/web_tools.py` 861 → 517 行（SSRF 檢查移到 `safety/url_policy.py`，2md 斷路器、預算與 fallback 迴圈移到 `infra/`）。原模組保留轉出口，既有 import 不用改；測試只調整幾處 patch 路徑，以後 patch `detect_audio_language`、`run_turn_decision_async` 要指向 `live.gemini_audio`、`live.gemini_turns`，patch `admin._excluded_voices` 不再影響 `/api/v1/tts/providers`。backend 1,171、Brain 1,235、後台 581、前台 297 個測試通過。
 
 ### Fixed

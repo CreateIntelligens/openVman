@@ -1595,6 +1595,43 @@ async def test_text_turn_cancellation_still_cancels_its_decision(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_live_follow_up_prefetch_searches_with_the_previous_question(monkeypatch):
+    """跟 HTTP 共用 core.turn_reads：追問句另加「上一句＋這一句」一條查詢。"""
+    module, fake_config = _load_module()
+    transport = FakeTransport()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-follow-up",
+        client_id="client-follow-up",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+    )
+    # 轉錄在決策前已寫進歷史，最後一筆就是這一句
+    monkeypatch.setitem(sys.modules, "memory.memory", types.SimpleNamespace(
+        list_session_messages=lambda *args, **kwargs: [
+            {"role": "user", "content": "50EUBL 的揚程多少？"},
+            {"role": "assistant", "content": "最大 12 m"},
+            {"role": "user", "content": "那價格呢？"},
+        ],
+        is_session_recall_disabled=lambda *args, **kwargs: False,
+    ))
+    calls = []
+
+    async def fake_decide(*args, **kwargs):
+        return _decision("live:follow-up:1", needs_knowledge=True)
+
+    async def fake_execute(call, **kwargs):
+        calls.append(call)
+        return {"id": call["id"], "name": call["name"], "response": {"ok": True}}
+
+    monkeypatch.setattr(session, "_decide_live_turn", fake_decide)
+    monkeypatch.setattr(session._tools, "execute", fake_execute)
+    await asyncio.wait_for(session.send_text_turn("那價格呢？"), timeout=1.0)
+
+    assert [c["name"] for c in calls] == ["search_knowledge"]
+    assert calls[0]["args"]["queries"] == ["那價格呢？", "50EUBL 的揚程多少？\n那價格呢？"]
+
+
+@pytest.mark.asyncio
 async def test_live_prefetch_over_budget_is_left_to_the_model(monkeypatch):
     """search_web 可能卡 20 秒；超過預取時限的那項改列 required_reads，回合照送。"""
     module, fake_config = _load_module()

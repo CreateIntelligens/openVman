@@ -12,6 +12,7 @@ from core.turn_decisions import (
     run_turn_decision_async,
     turn_decision_config,
 )
+from core.turn_reads import planned_reads, previous_user_text, without_disabled_recall
 
 
 # 沿用 session 的 logger 名稱，拆檔前後的日誌路由與篩選不變。
@@ -49,20 +50,7 @@ class GeminiLiveTurnMixin:
                 turn_id=f"live:{self.relay_session_id}:{self._turn_revision}",
                 capture_debug=self.decision_debug_enabled and not text.startswith("[視覺事件]"),
             )
-            if decision.policy.needs_memory is True:
-                from dataclasses import replace
-                from memory.memory import is_session_recall_disabled
-
-                if is_session_recall_disabled(self.session_id, self.project_id):
-                    decision = replace(
-                        decision,
-                        policy=replace(
-                            decision.policy,
-                            needs_memory=None,
-                            auto_recall=False,
-                        ),
-                    )
-            return decision
+            return without_disabled_recall(decision, self.session_id, self.project_id)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # The model session uses its existing behavior on decision failure.
@@ -117,19 +105,22 @@ class GeminiLiveTurnMixin:
         ):
             return {}
         policy = decision.policy
-        requested = [
-            ("search_knowledge", policy.needs_knowledge is True, {"queries": [user_text]}),
-            ("search_web", policy.needs_web is True, {"query": user_text}),
-            ("search_memory", policy.needs_memory is True, {"queries": [user_text]}),
-        ]
-        reads = [
-            (name, args) for name, required, args in requested
-            if required
-            and not (
-                name == "search_web"
-                and not getattr(self.config, "url2md_search_enabled", True)
+        previous_text = ""
+        if policy.needs_knowledge is True:
+            from memory.memory import list_session_messages
+
+            history = await asyncio.to_thread(
+                list_session_messages, self.session_id, self.persona_id,
+                project_id=self.project_id,
             )
-        ]
+            previous_text = previous_user_text(history, user_text)
+        reads = planned_reads(
+            current_text=user_text,
+            previous_text=previous_text,
+            knowledge=policy.needs_knowledge is True,
+            web=policy.needs_web is True and getattr(self.config, "url2md_search_enabled", True),
+            memory=policy.needs_memory is True,
+        )
         if not reads:
             return {}
 
