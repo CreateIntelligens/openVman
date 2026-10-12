@@ -1,49 +1,31 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type SetStateAction,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUnsavedChanges } from "../context/NavigationGuardContext";
-import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
-import BatchActionBar, { type BatchActionKind } from "../components/kb/BatchActionBar";
-import FileView from "../components/kb/FileView";
+import BatchActionBar from "../components/kb/BatchActionBar";
 import GraphView from "../components/kb/GraphView";
-import MoveModal from "../components/kb/MoveModal";
-import NoteComposer from "../components/kb/NoteComposer";
-import NormalizationPreviewModal from "../components/kb/NormalizationPreviewModal";
+import KnowledgeContentPane from "../components/kb/KnowledgeContentPane";
+import KnowledgeModals from "../components/kb/KnowledgeModals";
 import SourcePanel from "../components/kb/SourcePanel";
 import type { TreeNode } from "../components/kb/helpers";
 import {
   collectFolderPaths,
-  findNodeReferencingSource,
-  findQaNode,
-  getFileParentPaths,
-  getQaNodeAncestors,
-  isQaNodeDescendant,
-  isUploadDerivedKnowledgeFile,
   mergeQaNodesIntoTree,
-  parseQaEntryDragPath,
-  parseQaNodeDragPath,
-  qaEntryDragPath,
-  qaNodeDragPath,
   qaTreeNodePath,
-  QUICK_QA_TREE_PATH,
 } from "../components/kb/helpers";
 import KnowledgeHeader from "../components/kb/KnowledgeHeader";
 import KnowledgeTreeSidebar from "../components/kb/KnowledgeTreeSidebar";
-import MergedCsvPane from "../components/kb/qa/MergedCsvPane";
-import QaNodeModals, { type QaNodeDialog } from "../components/kb/qa/QaNodeModals";
-import VisibilityOrderModal from "../components/kb/qa/VisibilityOrderModal";
+import UploadDropOverlay from "../components/kb/UploadDropOverlay";
+import QaNodeModals from "../components/kb/qa/QaNodeModals";
 import type { KnowledgeNoteFormat } from "../api";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
 import { useAdminSubView } from "../hooks/useAdminSubView";
-import { type QaNode, useQaNodes } from "../hooks/useQaNodes";
-import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
+import { useKnowledgeBatchSelection } from "../hooks/useKnowledgeBatchSelection";
+import { useKnowledgeTreeDragDrop } from "../hooks/useKnowledgeTreeDragDrop";
+import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
+import { useQaNodeModals } from "../hooks/useQaNodeModals";
+import { useQaNodeSelection } from "../hooks/useQaNodeSelection";
+import { useQaNodes } from "../hooks/useQaNodes";
+import { removeScoped, writeScoped } from "../utils/scopedStorage";
 
 const KNOWLEDGE_TABS = ["documents", "graph"] as const;
 type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number];
@@ -124,14 +106,6 @@ export default function KnowledgeBase() {
     loadDocuments,
   } = useKnowledgeBase();
 
-  const [draggingPath, setDraggingPath] = useState<string | null>(null);
-  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
-  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
-  const [multiSelect, setMultiSelect] = useState(false);
-  const [checkedFilePaths, setCheckedFilePaths] = useState<string[]>([]);
-  const [batchRunning, setBatchRunning] = useState(false);
-  const mobileTreeOpenerRef = useRef<HTMLButtonElement | null>(null);
-  const mobileTreePanelRef = useRef<HTMLElement | null>(null);
   const [activeTab, setActiveTab] = useAdminSubView<KnowledgeTab>(
     "KnowledgeBase", "documents", KNOWLEDGE_TABS,
   );
@@ -153,193 +127,56 @@ export default function KnowledgeBase() {
     ingestSource,
   } = useQaNodes(projectId);
 
-  const [qaSelection, setQaSelection] = useState(() => ({
-    projectId,
-    nodeId: readScoped(`kb-selected-qa-node-id:${projectId}`),
-  }));
-
-  const selectedQaNodeId =
-    qaSelection.projectId === projectId ? qaSelection.nodeId : null;
-
-  const setSelectedQaNodeId = useCallback(
-    (next: SetStateAction<string | null>) => {
-      setQaSelection((current) => {
-        const currentNodeId =
-          current.projectId === projectId ? current.nodeId : null;
-        return {
-          projectId,
-          nodeId: typeof next === "function" ? next(currentNodeId) : next,
-        };
-      });
-    },
-    [projectId],
-  );
-
-  const [qaNodeDialog, setQaNodeDialog] = useState<QaNodeDialog | null>(null);
   const [mergedRefreshKey, setMergedRefreshKey] = useState(0);
-  const [orderModalOpen, setOrderModalOpen] = useState(false);
-  const [orderModalParentNode, setOrderModalParentNode] = useState<QaNode | null>(null);
 
   useEffect(() => {
     void fetchQaTree().catch(() => undefined);
   }, [fetchQaTree, projectId]);
 
-  useEffect(() => {
-    setMultiSelect(false);
-    setCheckedFilePaths([]);
-  }, [projectId]);
+  const batch = useKnowledgeBatchSelection({
+    projectId,
+    documents,
+    openDocument,
+    loadDocuments,
+    closeFileView,
+    handleTreeSelect,
+    fetchQaTree,
+  });
 
-  // 已被移走或刪掉的路徑不再算選取，避免「已選 N 個」數字與樹上勾選不一致。
-  const batchSelectedPaths = useMemo(() => {
-    const existing = new Set(documents.map((document) => document.path));
-    return checkedFilePaths.filter((path) => existing.has(path));
-  }, [checkedFilePaths, documents]);
+  const { selectedQaNodeId, setSelectedQaNodeId, selectedQaNode } =
+    useQaNodeSelection({
+      projectId,
+      nodesTree,
+      qaTreeLoading,
+      selectedPath,
+      setExpandedDirs,
+    });
 
-  const checkedPathSet = useMemo(
-    () => new Set(batchSelectedPaths),
-    [batchSelectedPaths],
-  );
+  const qaModals = useQaNodeModals({
+    nodesTree,
+    createNode,
+    updateNode,
+    deleteNode,
+    setSelectedQaNodeId,
+  });
 
-  const handleToggleMultiSelect = useCallback(() => {
-    if (batchRunning) return;
-    setMultiSelect((current) => !current);
-    setCheckedFilePaths([]);
-  }, [batchRunning]);
+  const treeDrag = useKnowledgeTreeDragDrop({
+    nodesTree,
+    selectedQaNodeId,
+    moveNode,
+    reorderNode,
+    fetchMergedQa,
+    saveMergedQa,
+    adoptSource,
+    ingestSource,
+    fetchQaTree,
+    loadDocuments,
+    handleMove,
+    setMergedRefreshKey,
+  });
 
-  const handleToggleChecked = useCallback(
-    (paths: string[], checked: boolean) => {
-      if (batchRunning) return;
-      setCheckedFilePaths((current) => {
-        if (checked) return [...new Set([...current, ...paths])];
-        const removed = new Set(paths);
-        return current.filter((path) => !removed.has(path));
-      });
-    },
-    [batchRunning],
-  );
-
-  const handleBatchFinished = useCallback(
-    async (
-      action: BatchActionKind,
-      succeeded: string[],
-      targetPathOf: (path: string) => string,
-    ) => {
-      await loadDocuments();
-      const openPath = openDocument?.path;
-      if (openPath && succeeded.includes(openPath)) {
-        if (action === "delete") {
-          closeFileView();
-        } else {
-          handleTreeSelect({ type: "file", path: targetPathOf(openPath) });
-        }
-      }
-      // 搬移與刪除都可能改到 QA 文件，後端會同步改問答樹的來源。
-      if (action !== "language") {
-        await fetchQaTree().catch(() => undefined);
-      }
-    },
-    [closeFileView, fetchQaTree, handleTreeSelect, loadDocuments, openDocument],
-  );
-
-  useEffect(() => {
-    setSelectedQaNodeId(readScoped(`kb-selected-qa-node-id:${projectId}`));
-  }, [projectId]);
-
-  useEffect(() => {
-    if (
-      qaTreeLoading ||
-      !selectedQaNodeId ||
-      findQaNode(nodesTree, selectedQaNodeId)
-    )
-      return;
-    removeScoped(`kb-selected-qa-node-id:${projectId}`);
-    setSelectedQaNodeId(null);
-  }, [nodesTree, projectId, qaTreeLoading, selectedQaNodeId]);
-
-  useEffect(() => {
-    if (selectedQaNodeId && nodesTree.length > 0) {
-      const ancestors = getQaNodeAncestors(nodesTree, selectedQaNodeId);
-      if (ancestors) {
-        const pathsToExpand = ["quick_qa_tree_root"];
-        let currentPath = "quick_qa_tree_root";
-        for (const id of ancestors) {
-          currentPath = `${currentPath}/${encodeURIComponent(id)}`;
-          pathsToExpand.push(currentPath);
-        }
-        setExpandedDirs((prev) => {
-          const next = new Set(prev);
-          let changed = false;
-          for (const path of pathsToExpand) {
-            if (!next.has(path)) {
-              next.add(path);
-              changed = true;
-            }
-          }
-          return changed ? next : prev;
-        });
-      }
-    } else if (selectedPath && selectedPath !== "knowledge") {
-      const pathsToExpand = getFileParentPaths(selectedPath);
-      setExpandedDirs((prev) => {
-        const next = new Set(prev);
-        let changed = false;
-        for (const path of pathsToExpand) {
-          if (!next.has(path)) {
-            next.add(path);
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    }
-  }, [selectedQaNodeId, selectedPath, nodesTree, setExpandedDirs]);
-
-  const selectedQaNode = useMemo(() => {
-    if (!selectedQaNodeId) return null;
-    return findQaNode(nodesTree, selectedQaNodeId) ?? null;
-  }, [nodesTree, selectedQaNodeId]);
-
-  const handleOpenOrderModal = useCallback(
-    (parentNodeId: string | null) => {
-      if (parentNodeId === null) {
-        setOrderModalParentNode(null);
-      } else {
-        const node = findQaNode(nodesTree, parentNodeId);
-        if (node) {
-          setOrderModalParentNode(node);
-        } else {
-          return;
-        }
-      }
-      setOrderModalOpen(true);
-    },
-    [nodesTree],
-  );
-
-  const canDropQaNode = useCallback(
-    (draggedPath: string, targetPath: string) => {
-      const draggedNodeId = parseQaNodeDragPath(draggedPath);
-      const targetNodeId = parseQaNodeDragPath(targetPath);
-      if (!draggedNodeId || !targetNodeId) return false;
-      if (draggedNodeId === targetNodeId) return false;
-
-      const draggedNode = findQaNode(nodesTree, draggedNodeId);
-      const targetNode = findQaNode(nodesTree, targetNodeId);
-      if (!draggedNode || !targetNode) return false;
-
-      // 同父層 = 排序; 跨父層 = 換父層(re-parent), 但不能移進自己的子孫
-      return !isQaNodeDescendant(draggedNode, targetNodeId);
-    },
-    [nodesTree],
-  );
-
-  const canDropQaEntry = useCallback((draggedPath: string, targetPath: string) => {
-    const draggedEntry = parseQaEntryDragPath(draggedPath);
-    const targetEntry = parseQaEntryDragPath(targetPath);
-    if (!draggedEntry || !targetEntry) return false;
-    if (draggedEntry.nodeId !== targetEntry.nodeId) return false;
-    return draggedEntry.question !== targetEntry.question;
-  }, []);
+  const mobileTree = useMobileTreeDrawer();
+  const { setMobileTreeOpen, openMobileTree } = mobileTree;
 
   const displayTree = useMemo(
     () => mergeQaNodesIntoTree(filteredTree, nodesTree, search),
@@ -378,123 +215,6 @@ export default function KnowledgeBase() {
     [handleTreeSelect, projectId],
   );
 
-  const openMobileTree = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
-      mobileTreeOpenerRef.current = event.currentTarget;
-      setMobileTreeOpen(true);
-    },
-    [],
-  );
-
-  const closeMobileTree = useCallback(() => {
-    setMobileTreeOpen(false);
-    mobileTreeOpenerRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    if (!mobileTreeOpen) return;
-
-    mobileTreePanelRef.current
-      ?.querySelector<HTMLButtonElement>('button[aria-label="關閉檔案樹"]')
-      ?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      closeMobileTree();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeMobileTree, mobileTreeOpen]);
-
-  const openCreateQaNodeDialog = useCallback(
-    (parentNodeId: string | null) => {
-      if (!parentNodeId) {
-        setQaNodeDialog({ type: "add-root" });
-        return;
-      }
-
-      const parent = findQaNode(nodesTree, parentNodeId);
-      if (!parent) return;
-      setQaNodeDialog({
-        type: "add-child",
-        parentNodeId,
-        parentLabel: parent.label,
-      });
-    },
-    [nodesTree],
-  );
-
-  const openRenameQaNodeDialog = useCallback(
-    (nodeId: string) => {
-      const node = findQaNode(nodesTree, nodeId);
-      if (!node) return;
-      setQaNodeDialog({ type: "rename", node });
-    },
-    [nodesTree],
-  );
-
-  const openDeleteQaNodeDialog = useCallback(
-    (nodeId: string) => {
-      const node = findQaNode(nodesTree, nodeId);
-      if (!node) return;
-      setQaNodeDialog({ type: "delete", node });
-    },
-    [nodesTree],
-  );
-
-  const closeQaNodeDialog = useCallback(() => {
-    setQaNodeDialog(null);
-  }, []);
-
-  const handleCreateQaNodeSubmit = useCallback(
-    (values: Record<string, string>) => {
-      const parentIds =
-        qaNodeDialog?.type === "add-child" ? [qaNodeDialog.parentNodeId] : [];
-      const nodeId = values.node_id || `node_${Date.now()}`;
-      void createNode(nodeId, values.label, parentIds, [], 1.0, false);
-      closeQaNodeDialog();
-    },
-    [closeQaNodeDialog, createNode, qaNodeDialog],
-  );
-
-  const handleRenameQaNodeSubmit = useCallback(
-    (values: Record<string, string>) => {
-      if (
-        qaNodeDialog?.type === "rename" &&
-        values.label !== qaNodeDialog.node.label
-      ) {
-        void updateNode(qaNodeDialog.node.node_id, { label: values.label });
-      }
-      closeQaNodeDialog();
-    },
-    [closeQaNodeDialog, qaNodeDialog, updateNode],
-  );
-
-  const handleToggleQaNodeHidden = useCallback(
-    (nodeId: string, hidden: boolean) => {
-      void updateNode(nodeId, { hidden });
-    },
-    [updateNode],
-  );
-
-  const handleDeleteQaNode = useCallback(
-    async (id: string) => {
-      const res = await deleteNode(id);
-      setSelectedQaNodeId((current) => (current === id ? null : current));
-      return res;
-    },
-    [deleteNode],
-  );
-
-  const handleDeleteQaNodeConfirm = useCallback(() => {
-    if (qaNodeDialog?.type === "delete") {
-      void handleDeleteQaNode(qaNodeDialog.node.node_id);
-    }
-    closeQaNodeDialog();
-  }, [closeQaNodeDialog, handleDeleteQaNode, qaNodeDialog]);
-
   const handleQaMutationSuccess = useCallback(() => {
     fetchQaTree();
   }, [fetchQaTree]);
@@ -519,210 +239,8 @@ export default function KnowledgeBase() {
     [fetchQaTree, handleCreateNote, handleSelectQaNode],
   );
 
-  const attachedNodeForOpenDocument = useMemo(() => {
-    if (!openDocument || openDocument.source_type !== "qa") return null;
-    return findNodeReferencingSource(nodesTree, openDocument.path) ?? null;
-  }, [openDocument, nodesTree]);
-
-  const sourceDragDir = useMemo(() => {
-    if (
-      !draggingPath ||
-      parseQaNodeDragPath(draggingPath) ||
-      parseQaEntryDragPath(draggingPath)
-    ) {
-      return "";
-    }
-    return draggingPath.split("/").slice(0, -1).join("/");
-  }, [draggingPath]);
-
   const hasMatchingTreeNodes = displayTree.children.length > 0;
   const showSearchEmptyState = hasActiveSearch && !hasMatchingTreeNodes;
-  const deleteTargetDocument = useMemo(
-    () =>
-      deleteTarget?.type === "file"
-        ? documents.find((document) => document.path === deleteTarget.value) ?? null
-        : null,
-    [deleteTarget, documents],
-  );
-  const isUploadDerived =
-    !!deleteTargetDocument && isUploadDerivedKnowledgeFile(deleteTargetDocument);
-  const isQaAttachedTarget =
-    deleteTargetDocument?.source_type === "qa" &&
-    deleteTargetDocument?.qa_attached === true;
-  const deleteMessage =
-    deleteTarget?.type === "dir"
-      ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？目錄內仍有檔案時不會刪除。`
-      : isQaAttachedTarget
-      ? `確定要刪除 ${deleteTarget?.value} 嗎？快速問答樹上對應的節點與題目會一併移除。`
-      : isUploadDerived
-      ? `確定要刪除 ${deleteTarget?.value} 嗎？這只會移除知識文件與索引；原始上傳檔仍保留在 raw/。`
-      : `確定要刪除 ${deleteTarget?.value} 嗎？`;
-
-  const handleTreeDragStart = useCallback((node: TreeNode) => {
-    if (node.treeKind === "qa-node" && node.qaNodeId) {
-      setDraggingPath(qaNodeDragPath(node.qaNodeId));
-      return;
-    }
-    if (node.treeKind === "qa-entry" && node.qaNodeId) {
-      setDraggingPath(
-        qaEntryDragPath(node.qaNodeId, node.qaEntryQuestion ?? node.name),
-      );
-      return;
-    }
-    setDraggingPath(node.path);
-  }, []);
-
-  const handleTreeDragEnd = useCallback(() => {
-    setDraggingPath(null);
-    setDropTargetPath(null);
-  }, []);
-
-  const handleTreeDrop = useCallback(
-    async (targetDir: string) => {
-      if (!draggingPath) return;
-      setDropTargetPath(targetDir);
-
-      const isQaRootDrop = targetDir === QUICK_QA_TREE_PATH;
-      const isQaNodeDrop = targetDir.startsWith(`${QUICK_QA_TREE_PATH}/`);
-      const draggedQaNodeId = parseQaNodeDragPath(draggingPath);
-      const targetQaNodeId = parseQaNodeDragPath(targetDir);
-      const draggedQaEntry = parseQaEntryDragPath(draggingPath);
-      const targetQaEntry = parseQaEntryDragPath(targetDir);
-
-      const cleanup = () => {
-        setDraggingPath(null);
-        setDropTargetPath(null);
-      };
-
-      try {
-        if (draggedQaEntry && targetQaEntry) {
-          if (
-            draggedQaEntry.nodeId === targetQaEntry.nodeId &&
-            draggedQaEntry.question !== targetQaEntry.question
-          ) {
-            const mergedRows = await fetchMergedQa(draggedQaEntry.nodeId);
-            const dragIdx = mergedRows.findIndex(
-              (row) => row.q === draggedQaEntry.question,
-            );
-            const targetIdx = mergedRows.findIndex(
-              (row) => row.q === targetQaEntry.question,
-            );
-
-            if (dragIdx !== -1 && targetIdx !== -1) {
-              const reorderedRows = [...mergedRows];
-              const [draggedRow] = reorderedRows.splice(dragIdx, 1);
-              const insertIdx = reorderedRows.findIndex(
-                (row) => row.q === targetQaEntry.question,
-              );
-              reorderedRows.splice(insertIdx, 0, draggedRow);
-              await saveMergedQa(draggedQaEntry.nodeId, reorderedRows);
-              if (selectedQaNodeId === draggedQaEntry.nodeId) {
-                setMergedRefreshKey((key) => key + 1);
-              }
-            }
-          }
-          cleanup();
-          return;
-        }
-
-        if (draggedQaNodeId && isQaRootDrop) {
-          const draggedNode = findQaNode(nodesTree, draggedQaNodeId);
-          if (draggedNode && (draggedNode.parent_ids?.length ?? 0) > 0) {
-            await moveNode(draggedQaNodeId, []);
-            await fetchQaTree();
-          }
-          cleanup();
-          return;
-        }
-
-        if (draggedQaNodeId && targetQaNodeId) {
-          const draggedNodeId = draggedQaNodeId;
-          const targetNodeId = targetQaNodeId;
-          if (draggedNodeId !== targetNodeId) {
-            const draggedNode = findQaNode(nodesTree, draggedNodeId);
-            const targetNode = findQaNode(nodesTree, targetNodeId);
-            const draggingParentId = draggedNode?.parent_ids?.[0] || null;
-            const targetParentId = targetNode?.parent_ids?.[0] || null;
-
-            if (draggingParentId === targetParentId) {
-              const siblings =
-                draggingParentId === null
-                  ? nodesTree
-                  : findQaNode(nodesTree, draggingParentId)?.children || [];
-
-              const siblingIds = siblings.map((s) => s.node_id);
-              const dragIdx = siblingIds.indexOf(draggedNodeId);
-              const targetIdx = siblingIds.indexOf(targetNodeId);
-
-              if (dragIdx !== -1 && targetIdx !== -1) {
-                const newOrdered = [...siblingIds];
-                newOrdered.splice(dragIdx, 1);
-                const insertIdx = newOrdered.indexOf(targetNodeId);
-                newOrdered.splice(insertIdx, 0, draggedNodeId);
-                await reorderNode(draggedNodeId, newOrdered);
-                await fetchQaTree();
-              }
-            } else {
-              await moveNode(draggedNodeId, [targetNodeId]);
-              await fetchQaTree();
-            }
-          }
-          cleanup();
-          return;
-        }
-
-        const attachSourceToNode = async (nodeId: string) => {
-          const targetNode = findQaNode(nodesTree, nodeId);
-          const isDirectoryNode =
-            targetNode &&
-            (!targetNode.qa_entries || targetNode.qa_entries.length === 0);
-          if (isDirectoryNode) {
-            await adoptSource(draggingPath, nodeId);
-          } else {
-            await ingestSource(nodeId, draggingPath);
-          }
-          loadDocuments();
-          if (selectedQaNodeId === nodeId) {
-            setMergedRefreshKey((key) => key + 1);
-          }
-        };
-
-        if (isQaRootDrop) {
-          await adoptSource(draggingPath);
-          loadDocuments();
-        } else if (targetQaNodeId) {
-          await attachSourceToNode(targetQaNodeId);
-        } else if (isQaNodeDrop) {
-          const encodedNodeId = targetDir.substring(
-            QUICK_QA_TREE_PATH.length + 1,
-          );
-          await attachSourceToNode(decodeURIComponent(encodedNodeId));
-        } else if (targetDir === "" && selectedQaNodeId) {
-          await attachSourceToNode(selectedQaNodeId);
-        } else {
-          await handleMove(draggingPath, targetDir);
-        }
-      } catch (error) {
-        // Handled by service notifications/hooks
-      } finally {
-        cleanup();
-      }
-    },
-    [
-      draggingPath,
-      handleMove,
-      adoptSource,
-      ingestSource,
-      loadDocuments,
-      selectedQaNodeId,
-      nodesTree,
-      reorderNode,
-      fetchQaTree,
-      fetchMergedQa,
-      saveMergedQa,
-      moveNode,
-    ],
-  );
 
   const handleToggleSourcePanel = useCallback(() => {
     if (!showSourcePanel && activeSourceMode === "manual") {
@@ -740,25 +258,14 @@ export default function KnowledgeBase() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {dragOver && (
-        <div className="fixed inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-surface-raised px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary text-3xl">
-              upload_file
-            </span>
-            <span className="text-xl font-bold text-content ">
-              拖放檔案以上傳到 {currentDir}
-            </span>
-          </div>
-        </div>
-      )}
+      {dragOver && <UploadDropOverlay currentDir={currentDir} />}
 
       <KnowledgeHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         documentCount={documents.length}
         indexedCount={indexedCount}
-        mobileTreeOpen={mobileTreeOpen}
+        mobileTreeOpen={mobileTree.mobileTreeOpen}
         onOpenMobileTree={openMobileTree}
         onToggleSourcePanel={handleToggleSourcePanel}
         onCommit={handleCommit}
@@ -812,9 +319,9 @@ export default function KnowledgeBase() {
 
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <KnowledgeTreeSidebar
-              mobileTreeOpen={mobileTreeOpen}
-              onCloseMobileTree={closeMobileTree}
-              mobileTreePanelRef={mobileTreePanelRef}
+              mobileTreeOpen={mobileTree.mobileTreeOpen}
+              onCloseMobileTree={mobileTree.closeMobileTree}
+              mobileTreePanelRef={mobileTree.mobileTreePanelRef}
               qaTreeLoading={qaTreeLoading}
               qaTreeError={qaTreeError}
               showNewFolder={showNewFolder}
@@ -838,156 +345,102 @@ export default function KnowledgeBase() {
               displayExpandedDirs={displayExpandedDirs}
               onSelectTreeFile={handleSelectTreeFile}
               onToggleExpand={toggleExpand}
-              draggingPath={draggingPath}
-              sourceDragDir={sourceDragDir}
-              dropTargetPath={dropTargetPath}
-              onTreeDragStart={handleTreeDragStart}
-              onTreeDragEnd={handleTreeDragEnd}
-              onDropTargetPathChange={setDropTargetPath}
-              onTreeDrop={handleTreeDrop}
+              draggingPath={treeDrag.draggingPath}
+              sourceDragDir={treeDrag.sourceDragDir}
+              dropTargetPath={treeDrag.dropTargetPath}
+              onTreeDragStart={treeDrag.handleTreeDragStart}
+              onTreeDragEnd={treeDrag.handleTreeDragEnd}
+              onDropTargetPathChange={treeDrag.setDropTargetPath}
+              onTreeDrop={treeDrag.handleTreeDrop}
               onDeleteFolder={(path) => setDeleteTarget({ type: "dir", value: path })}
               onSelectQaNode={handleSelectQaNode}
-              onCreateQaNode={openCreateQaNodeDialog}
-              onRenameQaNode={openRenameQaNodeDialog}
-              onToggleQaNodeHidden={handleToggleQaNodeHidden}
-              onDeleteQaNode={openDeleteQaNodeDialog}
-              onOrderQaNode={handleOpenOrderModal}
-              canDropQaNode={canDropQaNode}
-              canDropQaEntry={canDropQaEntry}
-              multiSelect={multiSelect}
-              onToggleMultiSelect={handleToggleMultiSelect}
-              multiSelectDisabled={batchRunning}
-              checkedPaths={checkedPathSet}
-              onToggleChecked={handleToggleChecked}
+              onCreateQaNode={qaModals.openCreateQaNodeDialog}
+              onRenameQaNode={qaModals.openRenameQaNodeDialog}
+              onToggleQaNodeHidden={qaModals.handleToggleQaNodeHidden}
+              onDeleteQaNode={qaModals.openDeleteQaNodeDialog}
+              onOrderQaNode={qaModals.handleOpenOrderModal}
+              canDropQaNode={treeDrag.canDropQaNode}
+              canDropQaEntry={treeDrag.canDropQaEntry}
+              multiSelect={batch.multiSelect}
+              onToggleMultiSelect={batch.handleToggleMultiSelect}
+              multiSelectDisabled={batch.batchRunning}
+              checkedPaths={batch.checkedPathSet}
+              onToggleChecked={batch.handleToggleChecked}
               batchBar={
                 <BatchActionBar
-                  selectedPaths={batchSelectedPaths}
+                  selectedPaths={batch.batchSelectedPaths}
                   documents={documents}
                   serverDirs={serverDirs}
-                  onClearSelection={() => setCheckedFilePaths([])}
-                  onSelectionChange={setCheckedFilePaths}
-                  onFinished={handleBatchFinished}
+                  onClearSelection={() => batch.setCheckedFilePaths([])}
+                  onSelectionChange={batch.setCheckedFilePaths}
+                  onFinished={batch.handleBatchFinished}
                   onStatus={setStatus}
-                  onRunningChange={setBatchRunning}
+                  onRunningChange={batch.setBatchRunning}
                 />
               }
             />
 
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-              {showNoteComposer ? (
-                <NoteComposer
-                  creating={creatingNote}
-                  onClose={closeNoteComposer}
-                  onCreate={handleComposerCreate}
-                />
-              ) : selectedQaNodeId ? (
-                <main className="flex-1 min-w-0 p-4 overflow-auto">
-                  <MergedCsvPane
-                    nodeId={selectedQaNodeId}
-                    nodeLabel={selectedQaNode?.label}
-                    refreshKey={mergedRefreshKey}
-                    onSuccess={handleQaMutationSuccess}
-                  />
-                </main>
-              ) : rightPane === "file" && openDocument ? (
-                <FileView
-                  document={openDocument}
-                  editContent={editContent}
-                  setEditContent={updateEditContent}
-                  loading={editLoading}
-                  saving={saving}
-                  dirty={editorDirty}
-                  onSave={handleSave}
-                  onClose={closeFileView}
-                  onDelete={(path) =>
-                    setDeleteTarget({ type: "file", value: path })
-                  }
-                  onMove={(path) => setMovingPath(path)}
-                  onToggleEnabled={handleToggleEnabled}
-                  onChangeLanguage={handleChangeLanguage}
-                  onRenormalize={handleRenormalize}
-                  onOpenQaTree={
-                    attachedNodeForOpenDocument
-                      ? () =>
-                          handleSelectQaNode(
-                            attachedNodeForOpenDocument.node_id,
-                          )
-                      : undefined
-                  }
-                  renormalizing={renormalizing || previewingNormalization}
-                />
-              ) : (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-content-muted">
-                  <span className="material-symbols-outlined text-3xl text-content-subtle">
-                    description
-                  </span>
-                  <p>從檔案樹選擇文件或快速問答節點</p>
-                  <button
-                    type="button"
-                    onClick={openMobileTree}
-                    className="btn btn-ghost md:hidden"
-                  >
-                    開啟檔案樹
-                  </button>
-                </div>
-              )}
-            </div>
+            <KnowledgeContentPane
+              showNoteComposer={showNoteComposer}
+              creatingNote={creatingNote}
+              onCloseNoteComposer={closeNoteComposer}
+              onCreateNote={handleComposerCreate}
+              selectedQaNodeId={selectedQaNodeId}
+              selectedQaNodeLabel={selectedQaNode?.label}
+              mergedRefreshKey={mergedRefreshKey}
+              onQaMutationSuccess={handleQaMutationSuccess}
+              nodesTree={nodesTree}
+              onSelectQaNode={handleSelectQaNode}
+              rightPane={rightPane}
+              openDocument={openDocument}
+              editContent={editContent}
+              onEditContentChange={updateEditContent}
+              editLoading={editLoading}
+              saving={saving}
+              editorDirty={editorDirty}
+              onSave={handleSave}
+              onCloseFileView={closeFileView}
+              onDeleteFile={(path) => setDeleteTarget({ type: "file", value: path })}
+              onMoveFile={(path) => setMovingPath(path)}
+              onToggleEnabled={handleToggleEnabled}
+              onChangeLanguage={handleChangeLanguage}
+              onRenormalize={handleRenormalize}
+              renormalizing={renormalizing || previewingNormalization}
+              onOpenMobileTree={openMobileTree}
+            />
           </div>
 
           <QaNodeModals
-            dialog={qaNodeDialog}
-            onClose={closeQaNodeDialog}
-            onCreateSubmit={handleCreateQaNodeSubmit}
-            onRenameSubmit={handleRenameQaNodeSubmit}
-            onDeleteConfirm={handleDeleteQaNodeConfirm}
+            dialog={qaModals.qaNodeDialog}
+            onClose={qaModals.closeQaNodeDialog}
+            onCreateSubmit={qaModals.handleCreateQaNodeSubmit}
+            onRenameSubmit={qaModals.handleRenameQaNodeSubmit}
+            onDeleteConfirm={qaModals.handleDeleteQaNodeConfirm}
           />
         </>
       )}
 
-      {movingPath && (
-        <MoveModal
-          sourcePaths={[movingPath]}
-          allDocuments={documents}
-          serverDirs={serverDirs}
-          onMove={(targetDir) => handleMove(movingPath, targetDir)}
-          onClose={() => setMovingPath(null)}
-        />
-      )}
-
-      <ConfirmModal
-        open={!!deleteTarget}
-        title={deleteTarget?.type === "dir" ? "刪除資料夾" : "刪除文件"}
-        message={deleteMessage}
-        confirmLabel="刪除"
-        danger
-        onConfirm={handleDeleteConfirmAndRefreshQa}
-        onCancel={() => setDeleteTarget(null)}
+      <KnowledgeModals
+        documents={documents}
+        serverDirs={serverDirs}
+        movingPath={movingPath}
+        onMove={handleMove}
+        onCloseMove={() => setMovingPath(null)}
+        deleteTarget={deleteTarget}
+        onDeleteConfirm={handleDeleteConfirmAndRefreshQa}
+        onCancelDelete={() => setDeleteTarget(null)}
+        normalizationPreview={normalizationPreview}
+        renormalizing={renormalizing}
+        onApplyNormalizationPreview={handleApplyNormalizationPreview}
+        onCloseNormalizationPreview={closeNormalizationPreview}
+        orderModalOpen={qaModals.orderModalOpen}
+        orderModalParentNode={qaModals.orderModalParentNode}
+        onCloseOrderModal={qaModals.closeOrderModal}
+        nodesTree={nodesTree}
+        onUpdateNode={updateNode}
+        onReorderNode={reorderNode}
+        onRefreshQaTree={fetchQaTree}
       />
-
-      {normalizationPreview && (
-        <NormalizationPreviewModal
-          path={normalizationPreview.path}
-          content={normalizationPreview.content}
-          applying={renormalizing}
-          onApply={handleApplyNormalizationPreview}
-          onClose={closeNormalizationPreview}
-        />
-      )}
-
-      {orderModalOpen && (
-        <VisibilityOrderModal
-          isOpen={orderModalOpen}
-          onClose={() => {
-            setOrderModalOpen(false);
-            setOrderModalParentNode(null);
-          }}
-          parentNode={orderModalParentNode}
-          nodesTree={nodesTree}
-          onUpdateNode={updateNode}
-          onReorderNode={reorderNode}
-          onRefresh={fetchQaTree}
-        />
-      )}
     </div>
   );
 }
