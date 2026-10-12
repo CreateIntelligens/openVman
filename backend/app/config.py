@@ -280,7 +280,9 @@ class TTSRouterConfig(BaseSettings):
         repr=False,
         validation_alias="AUTH_TEMPORARY_PASSWORD_SECRET",
     )
-    decision_provider_encryption_secret: str = Field(
+    # 加密後台設定的所有模型供應商金鑰。環境變數名稱沿用最早只有決策時的命名：
+    # ensure-runtime-secrets.sh 已在各部署產生過這個值，改名等於讓已存的金鑰解不開。
+    model_provider_encryption_secret: str = Field(
         default="",
         repr=False,
         validation_alias="DECISION_PROVIDER_ENCRYPTION_SECRET",
@@ -311,7 +313,15 @@ class TTSRouterConfig(BaseSettings):
     typesafe_api_key: str = Field(default="", repr=False, validation_alias="TYPESAFE_API_KEY")
     jev_base_url: str = Field(default="https://api.typesafe.ai", validation_alias="JEV_BASE_URL")
     clef_api_key: str = Field(default="", repr=False, validation_alias="CLEF_API_KEY")
-    decision_openai_api_key: str = Field(default="", repr=False, validation_alias="OPENAI_API_KEY")
+    openai_api_key: str = Field(default="", repr=False, validation_alias="OPENAI_API_KEY")
+    # --- 主對話 LLM（Brain 實際呼叫；這裡只是後台「模型供應商」頁的部署預設值）---
+    gemini_api_key: str = Field(default="", repr=False, validation_alias="GEMINI_API_KEY")
+    groq_api_key: str = Field(default="", repr=False, validation_alias="GROQ_API_KEY")
+    nen_api_key: str = Field(default="", repr=False, validation_alias="NEN_API_KEY")
+    nen_base_url: str = Field(default="", validation_alias="NEN_BASE_URL")
+    llm_provider: str = Field(default="gemini", validation_alias="LLM_PROVIDER")
+    llm_model: str = Field(default="gemini-3.5-flash-lite", validation_alias="LLM_MODEL")
+    llm_fallback_chain: str = Field(default="", validation_alias="LLM_FALLBACK_CHAIN")
     # 語音打斷：規則判不出來、原本「超過 5 字就當打斷」的那一段改問 Jev。自寫 30 題規則
     # 23/30、Jev 29/30（附和、對旁人說話不再誤停），2026-10-02 改預設開。只有這段長句會
     # 多等最多 timeout；沒有 TYPESAFE_API_KEY、失敗或逾時都維持 STOP。

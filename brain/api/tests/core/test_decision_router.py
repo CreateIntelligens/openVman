@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from core import decision_router as router
+from core import model_provider_config
 
 
 def _config(providers):
@@ -251,7 +252,7 @@ def test_expired_configuration_uses_last_known_good_after_backend_failure(monkey
     last_good = _config([_hop("openai")])
     monkeypatch.setattr(router, "_fetch_provider_configuration", lambda **_: last_good)
     assert router._provider_configuration(timeout=0.1) == last_good
-    router._CONFIG_CACHE_AT = 0
+    monkeypatch.setattr(router._CONFIG, "ttl", 0)
     monkeypatch.setattr(
         router, "_fetch_provider_configuration",
         lambda **_: (_ for _ in ()).throw(httpx.ConnectError("backend offline")),
@@ -339,15 +340,16 @@ def test_clef_request_uses_fixed_endpoint_model_and_bearer_key(monkeypatch):
 
 
 def test_runtime_config_fetch_uses_internal_auth_and_preserves_endpoint_order(monkeypatch):
-    body = {"order": ["openai", "jev"], "providers": [
+    decision = {"order": ["openai", "jev"], "providers": [
         {"id": "openai", "provider": "openai", "endpoint": _hop("openai").endpoint,
          "model": "gpt-6-luna", "api_key": "key", "credential_required": True},
         {"id": "jev", "provider": "jev", "endpoint": "https://jev.example/v1/systemone",
          "model": "jev-latest", "api_key": "jev-key", "credential_required": True},
     ]}
+    body = {"decision": decision, "chat_llm": {"configured": False}}
     response = httpx.Response(200, request=httpx.Request("GET", "http://backend"), json=body)
     captured = {}
-    monkeypatch.setattr(router, "get_settings", lambda: type("Settings", (), {
+    monkeypatch.setattr(model_provider_config, "get_settings", lambda: type("Settings", (), {
         "gateway_internal_token": "internal-secret", "gateway_base_url": "http://backend:8200",
     })())
 
@@ -361,7 +363,7 @@ def test_runtime_config_fetch_uses_internal_auth_and_preserves_endpoint_order(mo
 
     assert [hop.id for hop in result.providers] == ["openai", "jev"]
     assert result.providers[1].endpoint == "https://jev.example/v1/systemone"
-    assert captured["url"] == "http://backend:8200/api/v1/internal/decision-providers"
+    assert captured["url"] == "http://backend:8200/api/v1/internal/model-providers"
     assert captured["headers"]["X-Internal-Token"] == "internal-secret"
 
 
@@ -394,7 +396,7 @@ def test_runtime_order_and_provider_fallback_work_end_to_end_with_mocked_service
     def handle(request: httpx.Request) -> httpx.Response:
         if request.url.host == "backend":
             assert request.headers["X-Internal-Token"] == "internal-secret"
-            return httpx.Response(200, json=runtime_config)
+            return httpx.Response(200, json={"decision": runtime_config})
         attempts.append(str(request.url))
         if request.url.host == "clef.create360.ai":
             return httpx.Response(503, json={"detail": "unavailable"})
@@ -406,7 +408,7 @@ def test_runtime_order_and_provider_fallback_work_end_to_end_with_mocked_service
             })
         raise AssertionError(f"unexpected endpoint: {request.url}")
 
-    monkeypatch.setattr(router, "get_settings", lambda: type("Settings", (), {
+    monkeypatch.setattr(model_provider_config, "get_settings", lambda: type("Settings", (), {
         "gateway_internal_token": "internal-secret", "gateway_base_url": "http://backend:8200",
     })())
     monkeypatch.setattr(router, "_HTTP", httpx.Client(transport=httpx.MockTransport(handle)))
@@ -420,3 +422,26 @@ def test_runtime_order_and_provider_fallback_work_end_to_end_with_mocked_service
     assert result.answers["q"]["noul"] == 0.91
     assert [url.split("/")[2] for url in attempts] == ["clef.create360.ai", "clef.aiurl.tw"]
     assert [event["raw"]["hop_id"] for event in usage] == ["clef-primary", "clef-backup"]
+
+
+def test_failing_hop_is_tried_last_on_the_next_decision(monkeypatch):
+    hops = [_hop("clef-primary"), _hop("jev")]
+    monkeypatch.setattr(router, "_provider_configuration", lambda **_: _config(hops))
+    monkeypatch.setattr(router, "_record_hop", lambda **_: None)
+    calls = []
+
+    def call(hop, *_args, **_kwargs):
+        calls.append(hop.id)
+        if hop.id == "clef-primary":
+            raise httpx.HTTPStatusError(
+                "unauthorized", request=httpx.Request("POST", hop.endpoint),
+                response=httpx.Response(401),
+            )
+        return {"answers": {"q": {"type": "noul", "noul": 0.9}}}
+
+    monkeypatch.setattr(router, "_call_provider", call)
+
+    router.decide("s", {"q": {"type": "noul"}}, timeout=1, purpose="test")
+    router.decide("s", {"q": {"type": "noul"}}, timeout=1, purpose="test")
+
+    assert calls == ["clef-primary", "jev", "jev"]

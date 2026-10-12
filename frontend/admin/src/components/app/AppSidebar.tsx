@@ -1,13 +1,13 @@
 import { useState } from "react";
 import type { CollapsedGroups } from "../../hooks/useNavigationGroups";
 import TabGroup from "./TabGroup";
-import { isTabVisible, tabGroups, type NavigationGroup, type Tab } from "./navigation";
+import { isTabVisible, tabGroups, type NavigationGroup, type Tab, type TabAccess } from "./navigation";
 
 interface AppSidebarProps {
   active: Tab;
   projectId: string;
   isPinned: boolean;
-  isAdmin: boolean;
+  access: TabAccess;
   onSelectTab: (tab: Tab) => void;
   onTogglePin: () => void;
   collapsedGroups: CollapsedGroups;
@@ -18,7 +18,7 @@ export default function AppSidebar({
   active,
   projectId,
   isPinned,
-  isAdmin,
+  access,
   onSelectTab,
   onTogglePin,
   collapsedGroups,
@@ -61,7 +61,7 @@ export default function AppSidebar({
             <TabGroup
               key={group.label}
               label={group.label}
-              tabs={group.tabs.filter((tab) => isTabVisible(tab, isAdmin))}
+              tabs={group.tabs.filter((tab) => isTabVisible(tab, access))}
               active={active}
               projectId={projectId}
               onSelect={onSelectTab}

@@ -59,3 +59,15 @@ async def test_lifespan_closes_resources_after_application_failure(
     else:
         daemon.start.assert_not_called()
         daemon.stop.assert_not_awaited()
+
+
+def test_unreadable_model_keys_are_logged_without_blocking_startup(caplog):
+    runtime = SimpleNamespace(model_providers=SimpleNamespace(
+        unreadable_credentials=lambda: ["gemini", "openai"],
+    ))
+
+    lifecycle._warn_unreadable_model_keys(runtime)
+    lifecycle._warn_unreadable_model_keys(object())
+
+    errors = [record for record in caplog.records if record.levelname == "ERROR"]
+    assert len(errors) == 1 and "gemini, openai" in errors[0].getMessage()

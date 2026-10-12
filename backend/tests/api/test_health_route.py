@@ -126,3 +126,19 @@ class TestHealthzDegraded:
         assert body["status"] == "degraded"
         assert body["dependencies"]["brain"]["status"] == "unreachable"
         assert body["dependencies"]["docling-serve"]["status"] == "unreachable"
+
+
+def test_healthz_degrades_when_saved_model_keys_cannot_be_decrypted(health_env):
+    runtime = MagicMock()
+    runtime.model_providers.unreadable_credentials.return_value = ["gemini"]
+    with (
+        _mock_health_client(),
+        patch("app.routes.admin.redis_available", AsyncMock(return_value=True)),
+        patch("app.routes.admin.get_auth_runtime", return_value=runtime),
+    ):
+        payload = _call_healthz()
+
+    assert payload["status"] == "degraded"
+    assert payload["dependencies"]["model_provider_keys"] == {
+        "status": "error", "unreadable": ["gemini"],
+    }

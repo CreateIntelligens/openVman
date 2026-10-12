@@ -21,6 +21,7 @@
 | 專案管理 | `/admin/projects` |
 | 帳號管理 | `/admin/accounts` |
 | Embed 金鑰 | `/admin/embed-keys` |
+| 模型供應商（僅 ROOT） | `/admin/model-providers` |
 | 用量 | `/admin/usage` |
 | 系統健康 | `/admin/health` |
 | 系統監控 | `/admin/monitoring` |

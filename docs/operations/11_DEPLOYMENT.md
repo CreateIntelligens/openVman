@@ -37,12 +37,20 @@ cp .env.example .env
 
 `GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`DECISION_PROVIDER_ENCRYPTION_SECRET`、
 `GRAFANA_PASSWORD` 留空即可，啟動時會自動產生高熵值。`DECISION_PROVIDER_ENCRYPTION_SECRET`
-用來加密 Auth DB 中由後台輸入的決策供應商 key；備份與還原必須保留同一個值。若更換此 secret，
-既有決策 key 會變成不可解密，需在後台重新輸入。Grafana 預設不開放匿名瀏覽，每個部署都必須有唯一密碼。
+用來加密 Auth DB 中由後台輸入的模型供應商 key（決策與主對話共用）；備份與還原必須保留同一個值。
+若更換此 secret，既有 key 會解不開：這時各家改用部署環境的 key 繼續運作，後台頁面標示「無法解密」，需重新輸入；
+Backend 啟動時記一筆 ERROR，`/healthz` 的 `dependencies.model_provider_keys` 列出解不開的家並把整體狀態標成 `degraded`。
+`scripts/ensure-runtime-secrets.sh`（`scripts/up.sh` 每次都會跑）在 `data/auth/accounts.db` 已存在、這個 secret 卻是空的時會停下來報錯，
+不會自動產生新值；請從 `.env` 備份找回原值。repo 內沒有備份 `.env` 與 `data/auth/` 的排程，兩者必須由主機層一起備份、一起還原。
+主對話若套用後台設定後沒有任何一家有可用 key，Brain 也會改照 `LLM_FALLBACK_CHAIN` 跑，不會整個停掉。Grafana 預設不開放匿名瀏覽，每個部署都必須有唯一密碼。
 
-決策供應商可以透過 Admin「System → 決策模型」管理；若改用部署預設，Jev 讀
-`TYPESAFE_API_KEY`，OpenAI Decisions 讀 `OPENAI_API_KEY`，Clef 可選讀 `CLEF_API_KEY`。
-Admin 設定覆寫環境預設，清除 Admin key 會停用該 provider key，「使用部署預設」會移除覆寫。
+模型供應商由 ROOT 在 Admin「System → 模型供應商」管理。key 每家一把：Clef 讀 `CLEF_API_KEY`（可選）、
+Jev 讀 `TYPESAFE_API_KEY`、OpenAI 讀 `OPENAI_API_KEY`（決策與主對話共用）、Gemini／Groq／NEN 讀
+`GEMINI_API_KEY`／`GROQ_API_KEY`／`NEN_API_KEY`。Admin 設定覆寫環境預設，清除 Admin key 會停用該 key，
+「使用部署預設」會移除覆寫。每個類別只在 ROOT 實際改了那一區並儲存後才改照後台設定（只改決策時主對話不受影響）；
+還沒存過的主對話照 `LLM_FALLBACK_CHAIN` 運作，但後台存過的 key 仍會蓋過 `.env` 同一家的 key。
+各區的「改回部署設定」會刪掉那一類的後台設定。
+Brain 每 10 秒向 Backend 取一次設定，Backend 暫時連不上時沿用上一次取得的設定，從未取得過就照環境變數。
 
 LLM 的 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<model>` 加入
 鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，

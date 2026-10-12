@@ -46,6 +46,19 @@ replace_or_append() {
   mv "$temporary" "$ENV_FILE"
 }
 
+# 後台存的模型供應商金鑰是用 DECISION_PROVIDER_ENCRYPTION_SECRET 加密的。資料庫已經在、
+# 這個值卻不見時（.env 被覆蓋、還原了舊版），自動補一個新的會讓那些金鑰全部解不開，
+# 而且沒有人會發現。這種情況停下來，讓人把原本的值找回來。
+auth_database_path() {
+  local configured
+  configured="$(awk -F= '$1 == "AUTH_DATABASE_PATH" { sub(/^[^=]*=/, ""); sub(/[[:space:]]+#.*$/, ""); gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; exit }' "$ENV_FILE")"
+  configured="${configured:-/data/auth/accounts.db}"
+  # compose 把 ./data 掛到容器的 /data；其他位置從主機這邊看不到，就不檢查。
+  case "$configured" in
+    /data/*) printf 'data/%s\n' "${configured#/data/}" ;;
+  esac
+}
+
 generated=()
 for key in "${REQUIRED_SECRETS[@]}"; do
   current="$(awk -F= -v key="$key" '
@@ -59,6 +72,16 @@ for key in "${REQUIRED_SECRETS[@]}"; do
   ' "$ENV_FILE")"
   if [ -n "$current" ]; then
     continue
+  fi
+
+  if [ "$key" = "DECISION_PROVIDER_ENCRYPTION_SECRET" ]; then
+    database="$(auth_database_path)"
+    if [ -n "$database" ] && [ -f "$database" ]; then
+      printf '%s is missing but %s already exists.\n' "$key" "$database" >&2
+      printf 'Restore the original value from your .env backup; a new one would make every API key saved in the Admin unreadable.\n' >&2
+      printf 'If no key was ever saved in the Admin, set it yourself: %s=$(openssl rand -hex 32)\n' "$key" >&2
+      exit 1
+    fi
   fi
 
   replace_or_append "$key" "$(openssl rand -hex 32)"

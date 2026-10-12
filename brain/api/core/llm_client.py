@@ -13,8 +13,19 @@ from typing import Any, cast
 from openai import OpenAI
 
 from config import get_settings
-from core.fallback_chain import RouteHop, build_fallback_chain
-from core.key_pool import classify_failure
+from core.fallback_chain import (
+    RouteHop,
+    build_fallback_chain,
+    has_admin_api_key,
+    health_id,
+)
+from core.key_pool import (
+    FAILURE_AUTH_FORBIDDEN,
+    FAILURE_AUTH_INVALID,
+    FAILURE_QUOTA_EXHAUSTED,
+    classify_failure,
+)
+from core.provider_health import FailureKind, provider_health
 from core.provider_router import LLMRoute, get_provider_router
 from core.usage import LLMUsage, usage_from_response
 from infra.usage_ledger import record_usage_event
@@ -51,10 +62,20 @@ def _get_sync_client(api_key: str, base_url: str | None) -> OpenAI:
         return client
 
 
+_HEALTH_KINDS: dict[str, FailureKind] = {
+    FAILURE_AUTH_INVALID: "auth",
+    FAILURE_AUTH_FORBIDDEN: "auth",
+    FAILURE_QUOTA_EXHAUSTED: "quota",
+}
+
+
 def _require_api_key() -> None:
-    """Raise early if the LLM API key is not configured."""
-    if not get_settings().resolved_llm_api_keys:
-        raise ValueError("BRAIN_LLM_API_KEY / BRAIN_LLM_API_KEYS 尚未設定")
+    """Raise early if neither the deployment nor the Admin configured an LLM key."""
+    if get_settings().resolved_llm_api_keys:
+        return
+    if has_admin_api_key():
+        return
+    raise ValueError("BRAIN_LLM_API_KEY / BRAIN_LLM_API_KEYS 尚未設定")
 
 
 # forced_tool_name 的哨兵值：第一輪必須用工具，但不指定是哪一個。
@@ -223,6 +244,7 @@ def stream_chat_turn(
                 model=hop.model,
             )
             router.mark_success(hop.api_key)
+            provider_health().record_success(health_id(hop.provider, hop.model, hop.api_key))
             _record_llm_usage(hop.provider, hop.model, reply.usage, _now_ms() - t0)
             record_route_attempt(
                 trace_id=tid,
@@ -287,6 +309,9 @@ def _record_hop_failure(
     reason = classify_failure(exc)
     router = get_provider_router()
     router.mark_failure(hop.api_key, hop.model, exc)
+    provider_health().record_failure(
+        health_id(hop.provider, hop.model, hop.api_key), _HEALTH_KINDS.get(reason, "transient"), reason,
+    )
 
     record_route_attempt(
         trace_id=trace_id,
@@ -379,6 +404,7 @@ def _create_sync_completion(
                 **create_kwargs,
             )
             router.mark_success(hop.api_key)
+            provider_health().record_success(health_id(hop.provider, hop.model, hop.api_key))
             _record_llm_usage(
                 hop.provider,
                 hop.model,

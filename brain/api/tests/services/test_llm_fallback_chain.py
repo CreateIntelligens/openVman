@@ -197,6 +197,150 @@ class TestBuildFallbackChain:
         assert hops[0].provider == "gemini"
 
 
+def _admin_section(*providers, configured=True):
+    return {"configured": configured, "providers": [
+        {"id": provider, "provider": provider, "endpoint": f"https://{provider}.example/v1",
+         "model": model, "api_key": key, "credential_source": source}
+        for provider, model, key, source in providers
+    ]}
+
+
+class TestAdminSavedChain:
+    def test_admin_order_models_and_keys_replace_the_environment_chain(self, monkeypatch):
+        fc, _, events = _stub_deps(monkeypatch)
+        _stub_config(
+            monkeypatch, chain="gemini:g-env,groq:q-env", gemini_key="gk", groq_key="grk",
+            disable_discovery=True,
+        )
+        monkeypatch.setattr(fc, "fetch_section", lambda section, **_: _admin_section(
+            ("groq", "q-admin", "admin-groq", "admin"),
+            ("openai", "o-admin", "admin-openai", "admin"),
+        ))
+
+        hops = fc.build_fallback_chain("trace-admin")
+
+        assert [(h.provider, h.model, h.api_key) for h in hops] == [
+            ("groq", "q-admin", "admin-groq"), ("openai", "o-admin", "admin-openai"),
+        ]
+        assert hops[0].base_url == "https://groq.example/v1"
+        assert events[-1]["source"] == "admin"
+
+    def test_unsaved_admin_settings_keep_the_environment_chain(self, monkeypatch):
+        fc, _, events = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, chain="gemini:g-env", gemini_key="gk", disable_discovery=True)
+        monkeypatch.setattr(
+            fc, "fetch_section", lambda section, **_: _admin_section(configured=False),
+        )
+
+        hops = fc.build_fallback_chain("trace-env")
+
+        assert [(h.provider, h.model) for h in hops] == [("gemini", "g-env")]
+        assert events[-1]["source"] == "environment"
+
+    def test_backend_failure_falls_back_to_environment_and_is_not_retried_every_call(self, monkeypatch):
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, chain="gemini:g-env", gemini_key="gk", disable_discovery=True)
+        calls = []
+
+        def offline(section, **_):
+            calls.append(section)
+            raise ConnectionError("backend offline")
+
+        monkeypatch.setattr(fc, "fetch_section", offline)
+
+        first = fc.build_fallback_chain("t1")
+        second = fc.build_fallback_chain("t2")
+
+        assert [h.model for h in first] == [h.model for h in second] == ["g-env"]
+        assert calls == ["chat_llm"]
+
+    def test_missing_backend_key_uses_brain_env_but_admin_cleared_key_skips(self, monkeypatch):
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(
+            monkeypatch, chain="gemini:g", gemini_key="brain-gemini", groq_key="brain-groq",
+            disable_discovery=True,
+        )
+        monkeypatch.setattr(fc, "fetch_section", lambda section, **_: _admin_section(
+            ("gemini", "g", "", "none"),
+            ("groq", "q", "", "admin"),
+        ))
+
+        hops = fc.build_fallback_chain("trace-keys")
+
+        assert [(h.provider, h.api_key) for h in hops] == [("gemini", "brain-gemini")]
+
+    def test_admin_chain_without_any_usable_key_falls_back_to_environment(self, monkeypatch):
+        fc, _, events = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, chain="gemini:g-env", gemini_key="gk", disable_discovery=True)
+        monkeypatch.setattr(fc, "fetch_section", lambda section, **_: _admin_section(
+            ("groq", "q", "", "admin"),
+        ))
+
+        hops = fc.build_fallback_chain("trace-empty")
+
+        assert [(h.provider, h.model) for h in hops] == [("gemini", "g-env")]
+        assert events[-1]["source"] == "environment"
+
+    def test_hop_with_invalid_key_moves_to_the_end_of_later_chains(self, monkeypatch):
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(
+            monkeypatch, chain="gemini:g,groq:q", gemini_key="gk", groq_key="grk",
+            disable_discovery=True,
+        )
+        from core.provider_health import provider_health
+
+        provider_health().record_failure(fc.health_id("gemini", "g", "gk"), "auth", "auth_invalid")
+
+        assert [h.provider for h in fc.build_fallback_chain("t")] == ["groq", "gemini"]
+        assert [h.hop_index for h in fc.build_fallback_chain("t")] == [0, 1]
+
+    def test_unsaved_chat_settings_keep_env_chain_but_use_admin_saved_keys(self, monkeypatch):
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(
+            monkeypatch, chain="gemini:g-env,openai:o-env", gemini_key="env-gemini",
+            openai_key="env-openai", disable_discovery=True,
+        )
+        monkeypatch.setattr(fc, "fetch_section", lambda section, **_: {
+            "configured": False, "credential_overrides": {"openai": "admin-openai"},
+        })
+
+        hops = fc.build_fallback_chain("trace-override")
+
+        assert [(h.provider, h.model, h.api_key) for h in hops] == [
+            ("gemini", "g-env", "env-gemini"), ("openai", "o-env", "admin-openai"),
+        ]
+
+    def test_admin_cleared_key_drops_that_provider_from_the_env_chain(self, monkeypatch):
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(
+            monkeypatch, chain="gemini:g,openai:o", gemini_key="env-gemini",
+            openai_key="env-openai", disable_discovery=True,
+        )
+        monkeypatch.setattr(fc, "fetch_section", lambda section, **_: {
+            "configured": False, "credential_overrides": {"gemini": ""},
+        })
+
+        assert [h.provider for h in fc.build_fallback_chain("t")] == ["openai"]
+
+    def test_overrides_that_clear_every_key_fall_back_to_plain_env(self, monkeypatch):
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, chain="gemini:g", gemini_key="env-gemini", disable_discovery=True)
+        monkeypatch.setattr(fc, "fetch_section", lambda section, **_: {
+            "configured": False, "credential_overrides": {"gemini": ""},
+        })
+
+        assert [h.api_key for h in fc.build_fallback_chain("t")] == ["env-gemini"]
+
+    def test_unknown_provider_from_backend_keeps_environment_chain(self, monkeypatch):
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, chain="gemini:g-env", gemini_key="gk", disable_discovery=True)
+        monkeypatch.setattr(fc, "fetch_section", lambda section, **_: _admin_section(
+            ("azure", "a", "k", "admin"),
+        ))
+
+        assert [h.model for h in fc.build_fallback_chain("trace-bad")] == ["g-env"]
+
+
 # ---------------------------------------------------------------------------
 # Fallback execution tests
 # ---------------------------------------------------------------------------
@@ -492,3 +636,25 @@ class TestDynamicModelDiscoveryAndFallback:
         ]
         mock_client.models.list.assert_not_called()
 
+
+
+def test_llm_hop_failure_feeds_the_provider_circuit_breaker(monkeypatch):
+    import httpx
+    import openai
+
+    fc, _, _ = _stub_deps(monkeypatch)
+    _stub_config(monkeypatch, chain="gemini:g", gemini_key="gk", disable_discovery=True)
+    llm_client = importlib.import_module("core.llm_client")
+    from core.provider_health import provider_health
+
+    hop = fc.RouteHop("gemini", "g", "gk", "", 0, "t")
+    error = openai.AuthenticationError(
+        "bad key",
+        response=httpx.Response(401, request=httpx.Request("POST", "https://example.test")),
+        body=None,
+    )
+
+    llm_client._record_hop_failure(hop, error, 5.0, [hop], [], "t")
+
+    [entry] = provider_health().snapshot()
+    assert (entry["hop"], entry["status"], entry["reason"]) == ("gemini", "blocked", "auth_invalid")

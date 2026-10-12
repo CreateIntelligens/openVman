@@ -16,12 +16,11 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from config import get_settings
+from core.model_provider_config import RefreshingValue, fetch_section
+from core.provider_health import FailureKind, HopId, provider_health
 
 logger = logging.getLogger("core.decision_router")
 
-_INTERNAL_TOKEN_HEADER: Final = "X-Internal-Token"
-_CONFIG_TTL_SECONDS = 10.0
 _CONFIG_TIMEOUT_SECONDS = 0.5
 _MAX_QUESTIONS = 32
 _MAX_DECISION_INPUT_BYTES = 64 * 1024
@@ -65,9 +64,7 @@ class _ProviderConfiguration:
     providers: tuple[DecisionProvider, ...]
 
 
-_CONFIG_LOCK = threading.Lock()
-_CONFIG_CACHE: _ProviderConfiguration | None = None
-_CONFIG_CACHE_AT = 0.0
+_CONFIG: RefreshingValue[_ProviderConfiguration] = RefreshingValue()
 
 
 class _WallClockHttpClient:
@@ -192,7 +189,9 @@ def decide(
         raise DecisionProviderError("decision provider configuration unavailable") from exc
 
     failures: list[str] = []
-    for hop in configuration.providers:
+    full_hop_budget = min(timeout, per_hop_timeout) if per_hop_timeout is not None else timeout
+    health = provider_health()
+    for hop in health.order(configuration.providers, _health_id):
         if cancel_event is not None and cancel_event.is_set():
             raise DecisionProviderCancelled("decision turn was cancelled")
         remaining = deadline - monotonic()
@@ -210,8 +209,8 @@ def decide(
         hop_started = monotonic()
         usage_obj: Any = None
         status = "error"
+        hop_budget = min(remaining, per_hop_timeout) if per_hop_timeout is not None else remaining
         try:
-            hop_budget = min(remaining, per_hop_timeout) if per_hop_timeout is not None else remaining
             request_options: dict[str, Any] = {"timeout": hop_budget}
             if cancel_event is not None:
                 request_options["cancel_event"] = cancel_event
@@ -219,6 +218,7 @@ def decide(
             usage_obj = body.get("usage")
             answers = _parse_answers(hop.provider, body, normalized)
             status = "ok"
+            health.record_success(_health_id(hop))
             _record_hop(
                 provider=hop.provider, hop_id=hop.id, model=hop.model,
                 purpose=purpose, elapsed_ms=(monotonic() - hop_started) * 1000,
@@ -235,6 +235,9 @@ def decide(
         except Exception as exc:  # Provider errors are isolated to this hop.
             status = _failure_status(exc)
             failures.append(f"{hop.id}:{status}")
+            # 只剩一點點時間就逾時，是前面的站把時間用掉了，不算這一站的錯。
+            if status != "timeout" or hop_budget >= full_hop_budget / 2:
+                health.record_failure(_health_id(hop), _failure_kind(status), status)
             _record_hop(
                 provider=hop.provider, hop_id=hop.id, model=hop.model,
                 purpose=purpose, elapsed_ms=(monotonic() - hop_started) * 1000,
@@ -276,45 +279,26 @@ def decide_noul(
 def _provider_configuration(
     *, timeout: float, cancel_event: threading.Event | None = None,
 ) -> _ProviderConfiguration:
-    global _CONFIG_CACHE, _CONFIG_CACHE_AT
-    now = monotonic()
-    with _CONFIG_LOCK:
-        if _CONFIG_CACHE is not None and now - _CONFIG_CACHE_AT < _CONFIG_TTL_SECONDS:
-            return _CONFIG_CACHE
     try:
-        loaded = _fetch_provider_configuration(timeout=timeout, cancel_event=cancel_event)
+        return _CONFIG.get(
+            lambda: _fetch_provider_configuration(timeout=timeout, cancel_event=cancel_event),
+            propagate=(DecisionProviderCancelled,),
+        )
     except DecisionProviderCancelled:
         raise
-    except Exception:
-        with _CONFIG_LOCK:
-            if _CONFIG_CACHE is not None:
-                _CONFIG_CACHE_AT = monotonic()
-                return _CONFIG_CACHE
-        raise DecisionProviderError("decision provider configuration unavailable")
-    with _CONFIG_LOCK:
-        _CONFIG_CACHE = loaded
-        _CONFIG_CACHE_AT = monotonic()
-    return loaded
+    except Exception as exc:
+        raise DecisionProviderError("decision provider configuration unavailable") from exc
 
 
 def _fetch_provider_configuration(
     *, timeout: float, cancel_event: threading.Event | None = None,
 ) -> _ProviderConfiguration:
-    cfg = get_settings()
-    if not cfg.gateway_internal_token or not cfg.gateway_base_url:
-        raise DecisionProviderError("internal decision configuration is unavailable")
-    request: dict[str, Any] = {
-        "headers": {_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
-        "timeout": timeout,
-    }
+    request: dict[str, Any] = {}
     if cancel_event is not None:
         request["cancel_event"] = cancel_event
-    response = _HTTP.get(
-        f"{cfg.gateway_base_url.rstrip('/')}/api/v1/internal/decision-providers",
-        **request,
+    return _parse_runtime_configuration(
+        fetch_section("decision", timeout=timeout, get=_HTTP.get, **request),
     )
-    response.raise_for_status()
-    return _parse_runtime_configuration(response.json())
 
 
 def _parse_runtime_configuration(body: Any) -> _ProviderConfiguration:
@@ -599,6 +583,18 @@ def _openai_probability_map(value: Any) -> dict[str, float]:
     return result
 
 
+def _health_id(hop: DecisionProvider) -> HopId:
+    return HopId.of("decision", hop.id, hop.model, hop.api_key)
+
+
+def _failure_kind(status: str) -> FailureKind:
+    if status in {"http_401", "http_403"}:
+        return "auth"
+    if status == "http_429":
+        return "quota"
+    return "transient"
+
+
 def _failure_status(exc: Exception) -> str:
     if isinstance(exc, httpx.TimeoutException):
         return "timeout"
@@ -655,10 +651,7 @@ def _usage_int(usage: Any, key: str) -> int:
 
 def clear_provider_configuration_cache() -> None:
     """Clear process-local runtime configuration cache (tests and admin refresh)."""
-    global _CONFIG_CACHE, _CONFIG_CACHE_AT
-    with _CONFIG_LOCK:
-        _CONFIG_CACHE = None
-        _CONFIG_CACHE_AT = 0.0
+    _CONFIG.clear()
 
 
 __all__ = [

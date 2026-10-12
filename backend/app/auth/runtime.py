@@ -13,7 +13,7 @@ from .api_keys_repository import ApiKeyRepository
 from .attempt_limiter import FailedAttemptLimiter
 from .auth_audit_repository import AuthAuditRepository
 from .database import AuthDatabase
-from .decision_provider_repository import DecisionProviderRepository
+from .model_provider_repository import ModelProviderRepository
 from .embed_keys_repository import EmbedKeyRepository
 from .resource_repository import ResourceRepository
 from .settings_repository import SystemSettingsRepository
@@ -37,7 +37,7 @@ class AuthRuntime:
     api_keys: ApiKeyRepository
     tokens: SessionTokenService
     settings: SystemSettingsRepository
-    decision_providers: DecisionProviderRepository
+    model_providers: ModelProviderRepository
     temporary_passwords: TemporaryPasswordCipher
     # 每個 runtime 各自一份，測試與重建 runtime 時不會共用失敗次數。
     password_verify_attempts: FailedAttemptLimiter = field(
@@ -66,9 +66,9 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
         embed_keys=EmbedKeyRepository(database),
         api_keys=ApiKeyRepository(database),
         settings=SystemSettingsRepository(database),
-        decision_providers=DecisionProviderRepository(
+        model_providers=ModelProviderRepository(
             database,
-            encryption_secret=config.decision_provider_encryption_secret,
+            encryption_secret=config.model_provider_encryption_secret,
         ),
         tokens=tokens,
         temporary_passwords=TemporaryPasswordCipher(

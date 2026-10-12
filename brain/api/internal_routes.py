@@ -249,6 +249,17 @@ def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, An
 
 
 @router.get(
+    "/brain/internal/provider-health",
+    summary="正在失敗的模型供應商（給後台模型供應商頁）",
+    description="只列有失敗紀錄的站：blocked（key 無效，換 key 或重開才再試）、cooling（冷卻中）、degraded（冷卻結束、下一輪會再試）。金鑰只給 sha256 前 12 碼指紋。",
+)
+async def internal_provider_health():
+    from core.provider_health import provider_health
+
+    return {"hops": provider_health().snapshot()}
+
+
+@router.get(
     "/brain/internal/asr-glossary",
     summary="專案的語音專有名詞（給辨識引擎當前文）",
     description="Backend 送音檔給 Breeze／OpenAI／R2T2 辨識前呼叫；只回正確的詞，「常見誤聽：A→B」對照行不回（會把錯字也教給引擎）。`terms` 是一整串前文，`vocabulary` 是逐詞清單（最多 100 個，給 Gemini 串流的 customVocabulary）。",

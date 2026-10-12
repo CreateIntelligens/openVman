@@ -305,6 +305,43 @@ _DECISION_PROVIDER_SETTINGS_STATEMENTS = (
     """,
 )
 
+# 決策以外的模型（主對話 LLM…）也要能在後台排順序、存金鑰，改成每類一列設定。
+# 金鑰改按廠商存而不是按決策 hop：同一把 OpenAI key 同時給決策與主對話用。
+# 舊的 decision_provider_* 兩張表只複製、不刪，見 _MIGRATIONS 之前的說明。
+_MODEL_PROVIDER_SETTINGS_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS model_provider_settings (
+        category TEXT PRIMARY KEY,
+        order_json TEXT NOT NULL,
+        enabled_json TEXT NOT NULL,
+        models_json TEXT NOT NULL DEFAULT '{}',
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS model_provider_secrets (
+        credential_id TEXT PRIMARY KEY,
+        ciphertext TEXT NOT NULL,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    INSERT OR IGNORE INTO model_provider_settings(
+        category, order_json, enabled_json, models_json, updated_by, updated_at
+    )
+    SELECT 'decision', order_json, enabled_json, '{}', updated_by, updated_at
+    FROM decision_provider_settings
+    """,
+    """
+    INSERT OR IGNORE INTO model_provider_secrets(credential_id, ciphertext, updated_by, updated_at)
+    SELECT provider_id, ciphertext, updated_by, updated_at FROM decision_provider_secrets
+    """,
+)
+# 舊的兩張決策表刻意保留（只複製不刪）：部署後若把程式退回舊版，舊版還讀得到
+# 升級當下的決策設定。新版確定不會退回後，再用之後的 migration 刪掉。
+
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
     (2, "temporary_accounts_grants_and_defaults", _TEMPORARY_ACCOUNT_STATEMENTS),
@@ -383,6 +420,7 @@ _MIGRATIONS = (
             """,
         ),
     ),
+    (19, "model_provider_settings", _MODEL_PROVIDER_SETTINGS_STATEMENTS),
 )
 
 

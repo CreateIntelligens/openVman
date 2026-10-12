@@ -78,7 +78,8 @@ def test_internal_enrich_brain_timeout_is_shorter_than_gateway_forward_timeout()
     assert internal_routes._http._timeout.read < forward._http._timeout.read
 
 
-def test_internal_decision_provider_route_requires_token_and_returns_enabled_hops(tmp_path):
+def test_internal_model_provider_route_requires_token_and_returns_enabled_hops(tmp_path):
+    from app.auth.model_provider_repository import CategoryUpdate
     from app.auth.runtime import build_auth_runtime
     from app.config import TTSRouterConfig
 
@@ -86,13 +87,15 @@ def test_internal_decision_provider_route_requires_token_and_returns_enabled_hop
         _env_file=None,
         env="dev",
         session_jwt_secret="test-only-session-secret-for-tests-32",
-        decision_provider_encryption_secret="provider-encryption-secret-for-test-32-bytes",
+        model_provider_encryption_secret="provider-encryption-secret-for-test-32-bytes",
         auth_database_path=str(tmp_path / "accounts.db"),
     ))
     actor = runtime.users.create_root(username="ai360", password_hash="hash")
-    runtime.decision_providers.update(
-        ("openai", "jev", "clef-backup", "clef-primary"),
-        ("openai", "clef-primary"),
+    runtime.model_providers.update(
+        {"decision": CategoryUpdate(
+            ("openai", "jev", "clef-backup", "clef-primary"),
+            ("openai", "clef-primary"),
+        )},
         credentials={"openai": "openai-secret"},
         actor_id=actor.id,
     )
@@ -113,20 +116,25 @@ def test_internal_decision_provider_route_requires_token_and_returns_enabled_hop
         patch.object(auth_runtime, "get_auth_runtime", return_value=runtime),
         TestClient(app, raise_server_exceptions=False) as client,
     ):
-        rejected = client.get("/api/v1/internal/decision-providers")
+        rejected = client.get("/api/v1/internal/model-providers")
         response = client.get(
-            "/api/v1/internal/decision-providers",
+            "/api/v1/internal/model-providers",
             headers={internal_routes.INTERNAL_TOKEN_HEADER: "test-token"},
         )
 
     assert rejected.status_code == 403
     assert response.status_code == 200
-    assert response.json()["order"] == ["openai", "clef-primary"]
-    assert [hop["id"] for hop in response.json()["providers"]] == ["openai", "clef-primary"]
-    assert response.json()["providers"][0]["api_key"] == "openai-secret"
+    decision = response.json()["decision"]
+    assert decision["order"] == ["openai", "clef-primary"]
+    assert [hop["id"] for hop in decision["providers"]] == ["openai", "clef-primary"]
+    assert decision["providers"][0]["api_key"] == "openai-secret"
+    # 只存了決策：主對話仍照 .env，但後台存的 OpenAI key 要一起生效。
+    assert response.json()["chat_llm"] == {
+        "configured": False, "credential_overrides": {"openai": "openai-secret"},
+    }
 
 
-def test_decision_provider_runtime_route_bypasses_user_auth_but_keeps_internal_auth():
+def test_model_provider_runtime_route_bypasses_user_auth_but_keeps_internal_auth():
     from app.auth.middleware import is_auth_bypass_path
 
-    assert is_auth_bypass_path("/api/v1/internal/decision-providers") is True
+    assert is_auth_bypass_path("/api/v1/internal/model-providers") is True

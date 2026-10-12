@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -37,12 +37,27 @@ async def close_http() -> None:
 async def healthz() -> dict:
     storage = get_temp_storage()
     quota = storage.check_quota()
-    return await build_backend_health_payload(
+    payload = await build_backend_health_payload(
         service="tts-router",
         redis_available=await redis_available(),
         quota=quota,
         client=_health_http.get(),
     )
+    dependencies = cast(dict[str, Any], payload["dependencies"])
+    try:
+        unreadable = get_auth_runtime().model_providers.unreadable_credentials()
+    except Exception as exc:  # noqa: BLE001 - 健康檢查本身不能因為這項掛掉
+        logger.warning("model provider key check failed: %s", exc)
+        dependencies["model_provider_keys"] = {"status": "unknown"}
+        return payload
+    # 加密 secret 換掉時這些 key 解不開、暫用 .env；標 degraded 讓監控看得到。
+    dependencies["model_provider_keys"] = {
+        "status": "error" if unreadable else "ok",
+        "unreadable": unreadable,
+    }
+    if unreadable:
+        payload["status"] = "degraded"
+    return payload
 
 
 UsageEndpoint = Literal["summary", "timeseries", "events"]

@@ -207,3 +207,13 @@ def load_tool_modules(monkeypatch: pytest.MonkeyPatch):
     tool_executor = importlib.import_module("tools.tool_executor")
     tool_registry._registry = None
     return tool_registry, tool_executor
+
+
+@pytest.fixture(autouse=True)
+def fresh_provider_health():
+    """每個測試從沒有失敗紀錄開始；斷路器是 process 全域狀態，不清會讓前一個測試的失敗改掉下一個的順序。"""
+    from core.provider_health import provider_health
+
+    provider_health().clear()
+    yield
+    provider_health().clear()

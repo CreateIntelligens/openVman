@@ -28,6 +28,7 @@ import {
   publicAdminPath,
   type AdminRoute,
   type Tab,
+  type TabAccess,
 } from "./components/app/navigation";
 import { BackendHealthProvider } from "./context/BackendHealthContext";
 import { MascotProvider } from "./context/MascotContext";
@@ -86,10 +87,11 @@ function AppContent() {
   const isApiKeys = route.tab === "Accounts" && route.subView === "api-keys";
   const ActiveComponent = isApiKeys ? ApiKeys : pageComponents[route.tab];
   const isAdmin = account ? isAtLeastAdmin(account.role) : false;
+  const access: TabAccess = account?.role ?? "user";
   const canLoadPage = projects.some((project) => project.project_id === projectId)
     || route.tab === "Projects"
     || route.tab === "Accounts"
-    || route.tab === "DecisionProviders";
+    || route.tab === "ModelProviders";
 
   const applyRoute = useCallback(
     (
@@ -193,9 +195,8 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
-  const requiresAdmin = (route.tab === "Accounts" && !isApiKeys)
-    || route.tab === "DecisionProviders";
-  if (requiresAdmin && !isAdmin) {
+  const requiresAdmin = (route.tab === "Accounts" && !isApiKeys);
+  if ((requiresAdmin && !isAdmin) || (route.tab === "ModelProviders" && access !== "root")) {
     return <ForbiddenState />;
   }
 
@@ -210,7 +211,7 @@ function AppContent() {
           active={route.tab}
           projectId={projectId}
           isPinned={isPinned}
-          isAdmin={isAdmin}
+          access={access}
           collapsedGroups={collapsedGroups}
           onToggleGroup={toggleGroup}
           onSelectTab={switchTab}
@@ -250,7 +251,7 @@ function AppContent() {
             projectId={projectId}
             onClose={closeMobileNav}
             onSelectTab={switchTab}
-            isAdmin={isAdmin}
+            access={access}
             canManageApiKeys={(account!.kind ?? account!.account_type ?? "formal") === "formal"}
             onOpenApiKeys={() => switchTab("Accounts", "api-keys")}
             collapsedGroups={collapsedGroups}

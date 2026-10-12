@@ -270,8 +270,8 @@ describe("App tab mounting", () => {
     const embedKeysTab = allTabs.find((tab) => String(tab.key) === "EmbedKeys");
 
     expect(embedKeysTab).toBeTruthy();
-    expect(isTabVisible(embedKeysTab!, true)).toBe(true);
-    expect(isTabVisible(embedKeysTab!, false)).toBe(false);
+    expect(isTabVisible(embedKeysTab!, "admin")).toBe(true);
+    expect(isTabVisible(embedKeysTab!, "user")).toBe(false);
   });
 
   it("restores a deep-linked tab and keeps tab changes in the URL", async () => {
@@ -404,12 +404,12 @@ describe("App tab mounting", () => {
     expect(screen.queryByText("權限不足")).toBeNull();
   });
 
-  it("blocks normal users from the decision-provider settings deep link", async () => {
-    window.history.replaceState(null, "", "/admin/decision-providers");
+  it("blocks project administrators from the model-provider settings deep link", async () => {
+    window.history.replaceState(null, "", "/admin/model-providers");
     vi.mocked(getCurrentAccount).mockResolvedValue({
-      id: "user-1",
-      username: "regular",
-      role: "user",
+      id: "admin-1",
+      username: "project-admin",
+      role: "admin",
       disabled: false,
       created_at: "2026-08-24T00:00:00Z",
     });
@@ -417,7 +417,7 @@ describe("App tab mounting", () => {
     render(<App />);
 
     expect(await screen.findByText("權限不足")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /決策模型/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /模型供應商/ })).toBeNull();
   });
 
   it("keeps the mascot from covering account administration controls", async () => {

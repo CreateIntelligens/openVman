@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.auth.runtime import get_auth_runtime
+from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.brain_proxy import _http as _brain_proxy_http
 from app.config import get_tts_config
 from app.gateway.a2a_bridge import get_a2a_bridge_daemon
@@ -54,12 +54,28 @@ async def _shutdown_gateway_resources() -> None:
     reset_plugins()
 
 
+def _warn_unreadable_model_keys(runtime: AuthRuntime) -> None:
+    try:
+        unreadable = runtime.model_providers.unreadable_credentials()
+    except Exception as exc:  # noqa: BLE001 - 診斷不能擋住啟動
+        logger.warning("model provider key check failed: %s", exc)
+        return
+    if unreadable:
+        # 多半是 DECISION_PROVIDER_ENCRYPTION_SECRET 被換掉；這些家暫用 .env 的 key 運作。
+        logger.error(
+            "model provider keys cannot be decrypted (encryption secret changed?): %s; "
+            "falling back to environment keys until re-entered in the Admin",
+            ", ".join(unreadable),
+        )
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     runtime = get_auth_runtime()
     await _startup_gateway_resources()
     await _app.state.openapi_builder.build()
     sync_asr_engines(runtime)
+    _warn_unreadable_model_keys(runtime)
     await sync_system_resources(runtime, get_tts_config())
     a2a_daemon = get_a2a_bridge_daemon() if get_tts_config().a2a_enabled else None
     if a2a_daemon:

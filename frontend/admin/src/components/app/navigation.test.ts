@@ -108,13 +108,15 @@ describe("canonical subpage routes", () => {
   });
 });
 
-describe("decision-provider administration route", () => {
-  it("is reachable by route and visible only to administrators", () => {
-    const tab = allTabs.find((item) => item.key === "DecisionProviders");
+describe("model-provider administration route", () => {
+  it("is reachable by route and visible only to ROOT", () => {
+    const tab = allTabs.find((item) => item.key === "ModelProviders");
     expect(tab).toBeTruthy();
-    expect(buildAdminPath("DecisionProviders")).toBe("/admin/decision-providers");
-    expect(parseAdminRoute("/admin/decision-providers")).toEqual({ tab: "DecisionProviders" });
-    expect(isTabVisible(tab!, true)).toBe(true);
-    expect(isTabVisible(tab!, false)).toBe(false);
+    expect(buildAdminPath("ModelProviders")).toBe("/admin/model-providers");
+    expect(parseAdminRoute("/admin/model-providers")).toEqual({ tab: "ModelProviders" });
+    expect(parseAdminRoute("/admin/decision-providers")).toBeNull();
+    expect(isTabVisible(tab!, "root")).toBe(true);
+    expect(isTabVisible(tab!, "admin")).toBe(false);
+    expect(isTabVisible(tab!, "user")).toBe(false);
   });
 });

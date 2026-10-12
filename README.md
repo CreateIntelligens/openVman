@@ -75,8 +75,9 @@ Clef-Flash 決策 API 使用獨立網域 `https://clef.create360.ai`，由同一
 - RAG：知識文件轉為 Markdown 後以 EmbeddingGemma 2 向量化，存於 LanceDB；問答節點與 CSV 轉換的 QA 同樣索引。
 - 記憶：workspace 核心文件（`SOUL.md`、`MEMORY.md` 等）直接進 prompt，對話歸檔與夜間記憶整理（dreaming）。
 - 工具：知識檢索、圖譜、記憶、網路搜尋與網頁轉 Markdown（2md）、Wiki 發布，以及依專案 `knowledge/products/_catalog.yaml` 啟用的產品規格篩選 `filter_products`。
-- 模型路由：`LLM_PROVIDER` 指定主要供應商（目前為 Gemini），失敗時依 `LLM_FALLBACK_CHAIN` 依序切換。
-- 決策輔助：本地 Guard Agent 規則先判；規則無法判斷時依後台順序呼叫 Clef 主／備援、Jev、OpenAI Decisions。ROOT／admin 可在「System → 決策模型」調整順序並管理 API key。
+- 模型路由：主對話依序嘗試 Gemini、OpenAI、Groq、NEN 中啟用的供應商；後台沒存過設定時照 `LLM_PROVIDER`／`LLM_FALLBACK_CHAIN`。
+- 決策輔助：本地 Guard Agent 規則先判；規則無法判斷時依後台順序呼叫 Clef 主／備援、Jev、OpenAI Decisions。
+- 模型供應商：ROOT 在後台「System → 模型供應商」調整主對話與決策的順序、啟用狀態、主對話模型名稱，以及各家 API key（加密存放，每家一把、各類共用），約 10 秒內生效。
 - 前台決策 Debug：虛擬人舞台可開啟當輪判讀面板，直接查看情緒／語氣、檢索、語言、供應商及信心度；預設關閉，診斷不持久化。
 - 每輪決策：文字回合以一個 batch 評估檢索來源、多語言、回覆語言與當輪語氣；全部決策服務失效時沿用既有對話流程。門檻、資料邊界與 Live 限制見 [Brain 文件](brain/README.md#每輪對話決策)。
 - 隱私：送給 LLM 的訊息先偵測個資，記錄稽核事件並在後台對話顯示提醒，不改寫內容（`PRIVACY_FILTER_ENABLED`）。

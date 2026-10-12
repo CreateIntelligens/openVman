@@ -211,7 +211,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ## 決策供應鏈
 
-Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設 hop 是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions。ROOT／admin 在 Admin「System → 決策模型」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 取得 10 秒快取的 runtime 設定。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「使用部署預設」會清除後台覆寫。
+Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設 hop 是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions。ROOT 在 Admin「System → 模型供應商」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 向 `GET /api/v1/internal/model-providers` 取 `decision` 段，10 秒快取（`core/model_provider_config.py`）。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「使用部署預設」會清除後台覆寫。
 
 | Hop | 端點／model | 驗證與 contract |
 |---|---|---|
@@ -329,7 +329,9 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 
 注意事項：
 
-- `LLM_FALLBACK_CHAIN` 有值時，其順序就是實際呼叫順序。NEN 是獨立的 `nen` provider（沿用 OpenAI 相容傳輸），不可用 `LLM_PROVIDER=openai` 或 `OPENAI_API_KEY` 代替，否則 metrics 與用量帳本會把它記成 OpenAI。
+- 主對話鏈的來源：ROOT 在後台「模型供應商」改過主對話那一區並儲存後，`core/fallback_chain.py` 改用 Backend `GET /api/v1/internal/model-providers` 的 `chat_llm` 段（Gemini／OpenAI／Groq／NEN 的順序、啟用、模型、端點與 key；Backend 沒有某家 key 而來源不是後台時，補用 Brain 自己的環境變數），10 秒快取；Backend 暫時失敗沿用上一次設定，從未取得或後台沒存過則照環境變數。Gemini 模型探索、`LLM_MAX_FALLBACK_HOPS` 與缺 key 略過在兩種來源下相同。
+- 主對話那一區沒存過（或按了「改回部署設定」）時，`LLM_FALLBACK_CHAIN` 有值就是實際呼叫順序；後台存過的 key（`chat_llm.credential_overrides`，含刻意清除）仍會取代同一家的環境變數 key。
+- 失敗的站會往後排（`core/provider_health.py`，主對話與決策共用）：401／403 視為 key 無效，換 key 或重開前都排到最後；配額用完（429）冷卻 5 分鐘；逾時、5xx、連線或回應錯誤連續 2 次冷卻 60 秒，時間到再試一次，成功即恢復。站不會被拿掉：健康的站都失敗後仍會試冷卻中與 key 無效的站。決策的逾時若是因為前面的站把時間用掉（剩不到一半），不算這一站失敗。狀態以 key 的 sha256 前 12 碼區分，後台換新 key 立即重試；`GET /brain/internal/provider-health` 列出正在失敗的站，後台「模型供應商」頁據此顯示每站狀態。NEN 是獨立的 `nen` provider（沿用 OpenAI 相容傳輸），不可用 `LLM_PROVIDER=openai` 或 `OPENAI_API_KEY` 代替，否則 metrics 與用量帳本會把它記成 OpenAI。
 - 未設定外部 `EMBEDDING_SERVICE_URL` 時，`COMPOSE_PROFILES` 必須包含 `embedding`。Gateway 的模型、revision、批次大小等預設值都寫在 `brain/embedding/app.py`，compose 只傳 token 與雲端 API key；要覆寫再在 compose 的 embedding 服務加環境變數。
 - Embedding gateway 沒有 Bearer token 時 fail closed；預設不允許瀏覽器跨來源呼叫（目前所有呼叫端都是後端）。
 

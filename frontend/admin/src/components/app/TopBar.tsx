@@ -9,6 +9,7 @@ import {
   type NavigationGroup,
   type ProjectSummary,
   type Tab,
+  type TabAccess,
 } from "./navigation";
 
 interface TopBarProps {
@@ -206,7 +207,7 @@ interface MobileNavDrawerProps {
   projectId: string;
   onClose: () => void;
   onSelectTab: (tab: Tab) => void;
-  isAdmin: boolean;
+  access: TabAccess;
   canManageApiKeys: boolean;
   onOpenApiKeys: () => void;
   username: string;
@@ -221,7 +222,7 @@ export function MobileNavDrawer({
   projectId,
   onClose,
   onSelectTab,
-  isAdmin,
+  access,
   canManageApiKeys,
   onOpenApiKeys,
   username,
@@ -296,7 +297,7 @@ export function MobileNavDrawer({
             <TabGroup
               key={group.label}
               label={group.label}
-              tabs={group.tabs.filter((tab) => isTabVisible(tab, isAdmin))}
+              tabs={group.tabs.filter((tab) => isTabVisible(tab, access))}
               active={active}
               projectId={projectId}
               isExpanded
