@@ -229,6 +229,7 @@ def _should_prefetch_knowledge(
     force_knowledge_search: bool,
     force_web_search: bool,
     force_memory_search: bool,
+    current_text: str,
 ) -> bool:
     """Whether to run search_knowledge before the first LLM call instead of forcing a tool round.
 
@@ -246,7 +247,28 @@ def _should_prefetch_knowledge(
         and not force_web_search
         and not force_memory_search
         and KNOWLEDGE_SEARCH_TOOL in names
+        # 這一句沒有文字（只有圖片）就沒得查，照原本強制工具的流程讓模型自己寫查詢。
+        and bool(current_text)
     )
+
+
+def _message_text(content: Any) -> str:
+    """Text of a plain or multimodal (``[{"type": "text", ...}, {"type": "image_url", ...}]``) message."""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        return "\n".join(
+            str(part.get("text", "")).strip()
+            for part in content
+            if isinstance(part, dict) and part.get("type") == "text"
+        ).strip()
+    return ""
+
+
+def _user_texts(messages: list[dict[str, Any]]) -> list[str]:
+    # 每個 user 訊息都留一筆（沒文字的是空字串），最後一筆才一定是這一句：
+    # 只收純文字訊息時，這一句若是圖文混合，會把上一句當成這一句去查。
+    return [_message_text(m.get("content")) for m in messages if m.get("role") == "user"]
 
 
 def _prefetched_knowledge_turn(messages: list[dict[str, Any]]) -> LLMReply:
@@ -255,11 +277,7 @@ def _prefetched_knowledge_turn(messages: list[dict[str, Any]]) -> LLMReply:
     第一條是這一句原句；第二條是「上一句＋這一句」：追問時補回主詞，
     換話題時兩條查詢都會命中新主題（鶴記dev 換題對照答案不受上一句影響）。
     """
-    user_texts = [
-        str(m.get("content", "")).strip()
-        for m in messages
-        if m.get("role") == "user" and isinstance(m.get("content"), str)
-    ]
+    user_texts = _user_texts(messages)
     current = user_texts[-1] if user_texts else ""
     queries = [current]
     previous = next((text for text in reversed(user_texts[:-1]) if text), "")
@@ -372,6 +390,7 @@ def _run_tool_phase(
         force_knowledge_search=force_knowledge_search,
         force_web_search=force_web_search,
         force_memory_search=force_memory_search,
+        current_text=(_user_texts(messages) or [""])[-1],
     )
     # 先查好的知識庫結果佔掉第 0 輪工具，模型的呼叫從第 1 輪算起。
     round_offset = 1 if prefetch else 0

@@ -8,6 +8,7 @@ tool rounds.
 
 from __future__ import annotations
 
+import json
 import sys
 import types
 from typing import Any
@@ -1027,6 +1028,46 @@ class TestKnowledgePrefetch:
         assert [name for name, _ in executed] == ["search_knowledge"]
         assert "不能使用 search_knowledge" in seen[2][-1]["content"]
         assert len(calls) == 3
+
+    def test_multimodal_turn_searches_its_own_text_not_the_previous_question(self, monkeypatch):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            messages=[
+                {"role": "user", "content": "EUBL 揚程多少？"},
+                {"role": "assistant", "content": "最大 12 m"},
+                {"role": "user", "content": [
+                    {"type": "text", "text": "這台的口徑呢？"},
+                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AA"}},
+                ]},
+            ],
+            replies=lambda al: [al.LLMReply(content="2 吋", tool_calls=[], model="m1")],
+            force_knowledge_search=True,
+        )
+
+        queries = json.loads(executed[0][1])["queries"]
+        assert queries == ["這台的口徑呢？", "EUBL 揚程多少？\n這台的口徑呢？"]
+
+    def test_turn_without_text_keeps_the_forced_tool_round(self, monkeypatch):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            messages=[
+                {"role": "user", "content": "EUBL 揚程多少？"},
+                {"role": "assistant", "content": "最大 12 m"},
+                {"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AA"}},
+                ]},
+            ],
+            replies=lambda al: [
+                _tool_turn(al),
+                al.LLMReply(content="這是 EUBL", tool_calls=[], model="m1"),
+            ],
+            force_knowledge_search=True,
+        )
+
+        # 沒有文字就不先查：不會拿上一句或空字串去查，第一次呼叫照舊強制工具
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
+        assert [s["round"] for s in result.tool_steps] == [0]
+        assert "prefetch-search-knowledge" not in [s["tool_call_id"] for s in result.tool_steps]
 
     def test_follow_up_also_searches_with_the_previous_question(self, monkeypatch):
         agent_loop, result, calls, executed, seen = self._run(
