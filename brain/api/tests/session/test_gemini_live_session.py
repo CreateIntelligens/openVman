@@ -975,7 +975,7 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
         update_session_message_language=lambda mid, lang, pid: languages.append((mid, lang, pid)),
     )
     heard: list[bytes] = []
-    monkeypatch.setattr(module, "detect_audio_language", lambda wav: heard.append(wav) or "nan")
+    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language", lambda wav: heard.append(wav) or "nan")
 
     session = module.GeminiLiveSession(
         relay_session_id="relay-tw",
@@ -999,7 +999,7 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
     # 英西看轉錄文字就分得出來，不送去聽；判斷不是台語也不覆寫。
     await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
     await session._handle_input_transcription({"text": "Which pump do you recommend?"})
-    monkeypatch.setattr(module, "detect_audio_language", lambda wav: heard.append(wav) or "zh")
+    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language", lambda wav: heard.append(wav) or "zh")
     await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
     await session._handle_input_transcription({"text": "請問急診在哪裡"})
     await _wait_for(lambda: len(heard) == 2)
@@ -1012,7 +1012,7 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
 async def test_live_skips_audio_language_without_taiwanese_route(monkeypatch):
     module, fake_config = _load_module()
     monkeypatch.setattr(module, "project_has_taiwanese_route", lambda pid: pid == "proj-hospital")
-    monkeypatch.setattr(module, "detect_audio_language", lambda wav: pytest.fail("should not classify"))
+    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language", lambda wav: pytest.fail("should not classify"))
     _stub_memory()
 
     session = module.GeminiLiveSession(
@@ -1307,7 +1307,7 @@ async def test_live_positive_memory_respects_session_recall_toggle(monkeypatch):
         list_session_messages=lambda *args, **kwargs: [],
         is_session_recall_disabled=lambda *args, **kwargs: True,
     ))
-    monkeypatch.setattr(module, "run_turn_decision_async", lambda **kwargs: _resolved(decision))
+    monkeypatch.setattr(importlib.import_module("live.gemini_turns"), "run_turn_decision_async", lambda **kwargs: _resolved(decision))
 
     resolved = await session._decide_live_turn("上次討論的產品如何？", "")
 
