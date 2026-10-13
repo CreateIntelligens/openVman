@@ -50,7 +50,7 @@ Jev 讀 `TYPESAFE_API_KEY`、OpenAI 讀 `OPENAI_API_KEY`（決策與主對話共
 「移除後台金鑰，改用 .env」會移除覆寫。每個類別只在 ROOT 實際改了那一區並儲存後才改照後台設定（只改決策時主對話不受影響）；
 還沒存過的主對話照 `LLM_FALLBACK_CHAIN` 運作，但後台存過的 key 仍會蓋過 `.env` 同一家的 key。
 各區的「改回部署設定」會刪掉那一類的後台設定。
-Brain 每 10 秒向 Backend 取一次設定，Backend 暫時連不上時沿用上一次取得的設定，從未取得過就照環境變數。
+內部 API（`/api/v1/internal/*`，含模型金鑰明文）只給容器之間呼叫，對外的 admin nginx 一律回 404，跟 `/brain/` 一樣。Brain 每 10 秒向 Backend 取一次設定，Backend 暫時連不上時沿用上一次取得的設定，從未取得過就照環境變數。
 
 LLM 的 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<model>` 加入
 鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，

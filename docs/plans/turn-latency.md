@@ -54,7 +54,7 @@ Brain 這段（`usage.db`，近 4 天 112 輪）：每輪呼叫 LLM 2 次（96 �
 - Live 預先查詢不送 `server_search_results`，判定需要知識庫的回合前台看不到引用與圖片（功能退化）。
 - Live 決策還沒回來時停止錄音或改打字，`CancelledError` 沒接住，可能讓 relay 連線斷掉、這輪回答遺失。
 - Live 預先查詢沒有總時限（上網查詢最多約 20 秒），使用者講完到模型開口之間全部串行等待；視覺事件也跑完整決策。
-- `/api/v1/internal/model-providers` 回傳所有模型供應商金鑰明文，邊緣 nginx 沒擋 `/api/v1/internal/`，只靠 `GATEWAY_INTERNAL_TOKEN`（這個 token 也會送給外部 TTS 節點）。
+- ~~`/api/v1/internal/model-providers` 回傳所有模型供應商金鑰明文，邊緣 nginx 沒擋 `/api/v1/internal/`~~：2026-10-13 邊緣 nginx 對 `/api/v1/internal/` 一律回 404（容器之間直接打 `backend:8200`）。同一個 `GATEWAY_INTERNAL_TOKEN` 仍以明文 HTTP 送到 IndexTTS 節點（`TTS_INDEXTTS_URL`），之後應改用獨立的節點 token。
 - ~~只管一個專案的 admin 能改整站決策設定~~：2026-10-12 改為只有 ROOT 能看能改（模型供應商頁）。
 - 插話判斷呼叫決策鏈時沒帶每站時限，第一站慢就用完 0.6 秒，Jev 輪不到，一律判 STOP。
 - 判定需要知識庫／記憶時無視 `CHAT_FORCE_KNOWLEDGE_SEARCH`、`AUTO_RECALL_ENABLED`，與設計文件不符。

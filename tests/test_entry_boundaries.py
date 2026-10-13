@@ -92,3 +92,18 @@ def test_owned_production_sources_stay_under_one_thousand_lines():
             if count > 1000:
                 oversized.append(f"{path.relative_to(ROOT)}: {count}")
     assert not oversized, "Split by responsibility:\n" + "\n".join(oversized)
+
+
+def test_edge_nginx_never_forwards_internal_routes():
+    """/api/v1/internal/model-providers 回傳全部模型金鑰明文，只靠 GATEWAY_INTERNAL_TOKEN 擋；
+    那個 token 也會用明文 HTTP 送到別台機器的 TTS 節點。容器之間直接打 backend:8200，
+    對外的 nginx 沒有理由轉送 /api/v1/internal/ 或 /brain/。"""
+    import re
+
+    conf = (ROOT / "frontend/admin/nginx/http.d/default.conf").read_text(encoding="utf-8")
+    for prefix in ("/api/v1/internal/", "/brain/"):
+        block = re.search(r"location (?:\^~ )?" + re.escape(prefix) + r" \{([^}]*)\}", conf)
+        assert block, f"edge nginx must have its own location for {prefix}"
+        assert "return 404;" in block.group(1) and "proxy_pass" not in block.group(1)
+    # 擋的位置要在通用的 /api/ 之前才看得懂；^~ 讓它優先於後面的正規表示式 location。
+    assert conf.index("location ^~ /api/v1/internal/") < conf.index("location /api/ {")
