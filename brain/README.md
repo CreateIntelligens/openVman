@@ -115,7 +115,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 3. 執行 agent loop（`core/agent_loop.py`）。
 4. 寫入對話與每日日誌，背景執行記憶治理與回覆的 PII 掃描。
 5. 回應附上 `tool_steps`、citations、`response_time_s` 與本輪 `usage` 彙總。
-   回答附圖：查完知識庫就在背景請決策鏈從前 5 筆附圖結果選最能回答的一筆，都不相關就不附圖；決策關閉（`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`）、逾時或失敗時照舊附第一筆引用的圖。使用者要求再看之前的圖（「再給我看看剛剛那張圖」，每輪決策的 `wants_previous_picture`）時，這段對話最近顯示過的 3 張圖連同當時的問題排在候選最前面，不必等查知識庫就開始選；判定否或不確定時流程不變（`TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED=false` 可關掉這一題）。判定為是時 system prompt 加一行當輪提示：圖會附在回答旁邊，只說這是先前的圖、不猜是哪一張也不描述內容（選圖與回答並行，模型看不到結果）、不要呼叫 `request_action` 切換頁面（對話還沒顯示過圖時改提示照實說明）。目前只接 HTTP 聊天，Live 還沒有。
+   回答附圖：查完知識庫就在背景請決策鏈從前 5 筆附圖結果選最能回答的一筆，都不相關就不附圖；決策關閉（`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`）、逾時或失敗時照舊附第一筆引用的圖。使用者要求再看之前的圖（「再給我看看剛剛那張圖」，每輪決策的 `wants_previous_picture`，只在對話顯示過圖時才問）時，這段對話最近顯示過的 3 張圖連同當時的問題排在候選最前面，不必等查知識庫就開始選；判定否或不確定時流程不變（`TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED=false` 可關掉這一題）。判定為是時 system prompt 加一行當輪提示：圖會附在回答旁邊，只說這是先前的圖、不猜是哪一張也不描述內容（選圖與回答並行，模型看不到結果）、不要呼叫 `request_action` 切換頁面（對話還沒顯示過圖時改提示照實說明）。目前只接 HTTP 聊天，Live 還沒有。
 
 ### Agent loop
 

@@ -187,7 +187,10 @@ class BrainSettings(BaseSettings):
     turn_decisions_previous_picture_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED")
     turn_decisions_timeout_seconds: float = Field(default=2.0, gt=0, le=10, validation_alias="TURN_DECISIONS_TIMEOUT_SECONDS")
     # Clef（本機 llama.cpp）整批 5 題約 0.39～0.52 秒（隨歷史長度），0.4 秒會在帶歷史時逾時。
-    turn_decisions_hop_timeout_seconds: float = Field(default=0.6, gt=0, le=5, validation_alias="TURN_DECISIONS_HOP_TIMEOUT_SECONDS")
+    # Clef 單次約 450～800 ms（約每 1,000 tokens 0.5 秒，跟其他決策同時跑會再慢），0.6 秒時
+    # 2026-10-13 有六成逾時轉 Jev：逾時要先等滿 0.6 秒再加 Jev 約 0.35 秒，比讓 Clef 跑完還慢。
+    # 調到 0.8；Clef 真的掛掉時有斷路器（core/provider_health）連續失敗兩次就先跳過 60 秒。
+    turn_decisions_hop_timeout_seconds: float = Field(default=0.8, gt=0, le=5, validation_alias="TURN_DECISIONS_HOP_TIMEOUT_SECONDS")
     turn_decisions_noul_positive_threshold: float = Field(default=0.7, ge=0, le=1, validation_alias="TURN_DECISIONS_NOUL_POSITIVE_THRESHOLD")
     turn_decisions_noul_negative_threshold: float = Field(default=0.1, ge=0, le=1, validation_alias="TURN_DECISIONS_NOUL_NEGATIVE_THRESHOLD")
     turn_decisions_choice_confidence_threshold: float = Field(default=0.8, ge=0.5, le=1, validation_alias="TURN_DECISIONS_CHOICE_CONFIDENCE_THRESHOLD")

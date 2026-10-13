@@ -126,7 +126,7 @@ def choose_reference_media(
             {"user_question": user_text[:500]},
             questions,
             timeout=float(getattr(settings, "chat_reference_media_timeout_seconds", 1.0)),
-            per_hop_timeout=float(getattr(settings, "turn_decisions_hop_timeout_seconds", 0.6)),
+            per_hop_timeout=float(getattr(settings, "turn_decisions_hop_timeout_seconds", 0.8)),
             purpose="reference_media",
         ).answers["pick"]
     except Exception as exc:  # 決策掛掉不影響回答，照原本顯示最近那筆

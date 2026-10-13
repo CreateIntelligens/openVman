@@ -81,7 +81,7 @@ class TurnDecisionConfig:
     tone_enabled: bool = True
     previous_picture_enabled: bool = True
     timeout_seconds: float = 2.0
-    per_hop_timeout_seconds: float = 0.6
+    per_hop_timeout_seconds: float = 0.8
     noul_positive_threshold: float = 0.7
     noul_negative_threshold: float = 0.1
     choice_confidence_threshold: float = 0.8
@@ -169,7 +169,7 @@ def turn_decision_config(settings: Any) -> TurnDecisionConfig:
         tone_enabled=bool(getattr(settings, "turn_decisions_tone_enabled", True)),
         previous_picture_enabled=bool(getattr(settings, "turn_decisions_previous_picture_enabled", True)),
         timeout_seconds=float(getattr(settings, "turn_decisions_timeout_seconds", 2.0)),
-        per_hop_timeout_seconds=float(getattr(settings, "turn_decisions_hop_timeout_seconds", 0.6)),
+        per_hop_timeout_seconds=float(getattr(settings, "turn_decisions_hop_timeout_seconds", 0.8)),
         noul_positive_threshold=float(getattr(settings, "turn_decisions_noul_positive_threshold", 0.7)),
         noul_negative_threshold=float(getattr(settings, "turn_decisions_noul_negative_threshold", 0.1)),
         choice_confidence_threshold=float(getattr(settings, "turn_decisions_choice_confidence_threshold", 0.8)),
@@ -265,6 +265,15 @@ def _history_content(message: dict[str, Any]) -> str:
     return content
 
 
+def _has_shown_picture(history: list[dict[str, Any]]) -> bool:
+    return any(
+        message.get("role") == "assistant"
+        and isinstance(message.get("metadata"), dict)
+        and message["metadata"].get("image_id")
+        for message in history
+    )
+
+
 def resolve_turn_policy(
     answers: dict[str, dict[str, Any]],
     *,
@@ -358,7 +367,8 @@ def run_turn_decision(
         "retrieval_enabled": config.retrieval_enabled,
         "language_enabled": config.language_enabled,
         "tone_enabled": config.tone_enabled,
-        "previous_picture_enabled": config.previous_picture_enabled,
+        # 這一題只有對話真的顯示過圖才問：Clef 的耗時跟 tokens 成正比，沒有圖可再看時白花約 50 tokens。
+        "previous_picture_enabled": config.previous_picture_enabled and _has_shown_picture(history),
     }
     questions = build_turn_questions(**groups)
     if not config.enabled or not questions:

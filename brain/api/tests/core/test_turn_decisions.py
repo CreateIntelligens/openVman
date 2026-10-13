@@ -415,3 +415,37 @@ def test_previous_picture_hint_tells_the_model_the_picture_is_attached():
     assert "還沒有顯示過圖片" in _previous_picture_line(wants, shown[:1])
     assert _previous_picture_line(turn_decisions.TurnPolicy(wants_previous_picture=None), shown) == ""
     assert _previous_picture_line(None, shown) == ""
+
+
+def test_previous_picture_question_is_skipped_until_a_picture_was_shown(monkeypatch):
+    """Clef 的耗時跟 tokens 成正比，沒有圖可再看時不送這一題。"""
+    sent = {}
+
+    def fake_decide(state, questions, **kwargs):
+        sent.update(questions=questions)
+        return DecisionResult({}, "clef", "clef-primary", "clef-flash")
+
+    monkeypatch.setattr(turn_decisions, "decide", fake_decide)
+    history = [
+        {"role": "user", "content": "你好"},
+        {"role": "assistant", "content": "您好", "metadata": {}},
+    ]
+
+    run_turn_decision(
+        user_text="再給我看看剛剛那張圖",
+        history=history,
+        project_id="p1",
+        project_language="zh",
+        speech_language="zh",
+        available_tools=(),
+        config=TurnDecisionConfig(),
+        turn_id="t1",
+    )
+
+    assert "wants_previous_picture" not in sent["questions"]
+    assert "tone" in sent["questions"]
+
+
+def test_decision_hop_budget_leaves_room_for_clef():
+    assert TurnDecisionConfig().per_hop_timeout_seconds == 0.8
+    assert BrainSettings(_env_file=None).turn_decisions_hop_timeout_seconds == 0.8
