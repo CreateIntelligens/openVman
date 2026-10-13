@@ -382,7 +382,7 @@ def test_scope_events_carry_timeline_offsets(ledger):
             provider="gemini",
             model="gemini-2.5-flash",
             usage=LLMUsage(input_tokens=10, output_tokens=5, total_tokens=15),
-            latency_ms=250.0,
+            latency_ms=600_000.0,
         )
         summary = summarize_collected(scope)
 
@@ -390,10 +390,11 @@ def test_scope_events_carry_timeline_offsets(ledger):
     assert len(timeline) == 1
     entry = timeline[0]
     assert entry["model"] == "gemini-2.5-flash"
-    # 這次呼叫的延遲（250ms）比 scope 已經歷的時間還長，起點應被釘在 0
-    # 而不是變成負數。
+    # 這次呼叫的延遲（10 分鐘）比 scope 已經歷的時間還長，起點應被釘在 0
+    # 而不是變成負數。結束點在寫完帳本後才量，冷的 SQLite 第一次寫入可能
+    # 就要好幾秒，所以延遲要遠大於寫入時間，不能只給 250ms。
     assert entry["started_at_ms"] == 0.0
-    assert 0 < entry["ended_at_ms"] < 250.0
+    assert 0 < entry["ended_at_ms"] < 600_000.0
 
 
 def test_timeline_offsets_reflect_latency_when_it_fits(ledger):
