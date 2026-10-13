@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import StatusAlert from "../components/StatusAlert";
+import { useAdminSubView } from "../hooks/useAdminSubView";
 import {
   fetchModelProviderSettings,
   saveModelProviderSettings,
@@ -25,6 +26,21 @@ function healthLabel(health: HopHealth): string | null {
   }
   if (health.status === "degraded") return "剛失敗過，下一輪會再試";
   return null;
+}
+
+// 網址子頁 → 頁面內容；第一個是預設（/admin/model-providers）。
+const PAGE_TABS = ["chat", "decision", "keys"] as const;
+type PageTab = (typeof PAGE_TABS)[number];
+const TAB_CATEGORY: Record<PageTab, string | null> = { chat: "chat_llm", decision: "decision", keys: null };
+const TAB_LABELS: Record<PageTab, string> = { chat: "主對話模型", decision: "決策模型", keys: "API 金鑰" };
+
+function tabClassName(active: boolean): string {
+  return [
+    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+    active
+      ? "border border-border/60 bg-surface-raised text-content shadow-sm"
+      : "text-content-muted hover:bg-surface-sunken hover:text-content",
+  ].join(" ");
 }
 
 type PageNotice = { type: "success" | "error"; message: string } | null;
@@ -64,6 +80,7 @@ const quietButton =
   "min-h-9 rounded-md px-3 text-xs text-content-muted transition-colors hover:bg-surface-sunken hover:text-content disabled:cursor-not-allowed disabled:opacity-40";
 
 export default function ModelProviders() {
+  const [activeTab, setActiveTab] = useAdminSubView<PageTab>("ModelProviders", "chat", PAGE_TABS);
   const [settings, setSettings] = useState<ModelProviderSettings | null>(null);
   const [drafts, setDrafts] = useState<Record<string, CategoryDraft>>({});
   const [keys, setKeys] = useState<Record<string, string>>({});
@@ -204,6 +221,17 @@ export default function ModelProviders() {
 
   const busy = loading || saving;
 
+  function tabHasPendingChanges(tab: PageTab): boolean {
+    const categoryId = TAB_CATEGORY[tab];
+    if (categoryId === null) {
+      return clearKeys.size > 0 || useEnvironmentKeys.size > 0
+        || Object.values(keys).some((value) => value.trim());
+    }
+    const category = settings?.categories.find((item) => item.id === categoryId);
+    const draft = drafts[categoryId];
+    return resetCategories.has(categoryId) || Boolean(category && draft && draftChanged(draft, category));
+  }
+
   return (
     <div className="page-scroll">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-surface-raised/90 px-8 py-4 backdrop-blur-md">
@@ -224,6 +252,24 @@ export default function ModelProviders() {
       <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
         {notice && <StatusAlert type={notice.type} message={notice.message} />}
 
+        <div role="tablist" aria-label="模型供應商分類" className="flex w-fit flex-wrap rounded-lg border border-border/50 bg-surface-sunken p-1">
+          {PAGE_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+              className={tabClassName(activeTab === tab)}
+            >
+              {TAB_LABELS[tab]}
+              {tabHasPendingChanges(tab) && (
+                <span className="size-1.5 rounded-full bg-primary" aria-label="有未儲存的修改" />
+              )}
+            </button>
+          ))}
+        </div>
+
         {loading && !settings ? (
           <div className="space-y-3" aria-label="正在載入供應商設定">
             {[0, 1, 2, 3].map((row) => (
@@ -236,7 +282,7 @@ export default function ModelProviders() {
           </div>
         ) : (
           <>
-            {settings.categories.map((category) => {
+            {settings.categories.filter((category) => category.id === TAB_CATEGORY[activeTab]).map((category) => {
               const draft = drafts[category.id];
               if (!draft) return null;
               const hops = new Map(category.providers.map((provider) => [provider.id, provider]));
@@ -373,7 +419,7 @@ export default function ModelProviders() {
               );
             })}
 
-            <section className="rounded-xl border border-border bg-surface-raised p-5 md:p-6">
+            {activeTab === "keys" && <section className="rounded-xl border border-border bg-surface-raised p-5 md:p-6">
               <div>
                 <h2 className="text-base font-semibold text-content">API 金鑰</h2>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-content-muted">
@@ -448,7 +494,7 @@ export default function ModelProviders() {
                   </div>
                 ))}
               </div>
-            </section>
+            </section>}
           </>
         )}
 

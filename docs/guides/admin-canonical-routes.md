@@ -35,6 +35,7 @@
 | Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds`；小助理：`/admin/avatar/mascots` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
 | 帳號 | 正式建立：`/admin/accounts` | 臨時建立：`/admin/accounts/temporary`；編輯／管理：`/admin/accounts/manage`；API 金鑰：`/admin/accounts/api-keys` |
+| 模型供應商 | 主對話模型：`/admin/model-providers` | 決策模型：`/admin/model-providers/decision`；API 金鑰：`/admin/model-providers/keys` |
 
 公開子路徑部署時加上 `/openvman`，例如 `/openvman/admin/knowledge/graph?project=demo`。`publicAdminPath()` 依目前網址保留此部署前綴。
 
