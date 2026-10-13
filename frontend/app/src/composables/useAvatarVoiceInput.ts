@@ -277,15 +277,22 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
     asrError.value = "";
     asrInterim.value = "";
     const active = activeAsr.value;
-    if (active.isListening.value) {
+    // 啟動中的按鈕已經顯示成收音中，再按一次要能關掉，不是再啟動一次。
+    if (active.isListening.value || asrStarting.value) {
       clearAsrIdleTimer();
       // 使用者自己關掉麥克風：講完不要又自動打開。
       resumeAsrAfterReply = false;
       active.stop();
-    } else {
-      scheduleAsrIdleTimer();
-      void active.start();
+      return;
     }
+    // 虛擬人出聲時按麥克風是要插話：先停掉這輪回答再開麥。不停的話開麥會立刻被
+    // 「出聲時關麥」關掉，變成排隊到講完才開（2026-10-13 現場回報按了沒反應）。
+    if (avatarSpeaking.value) {
+      resumeAsrAfterReply = false;
+      conversation.handleStopResponse();
+    }
+    scheduleAsrIdleTimer();
+    void active.start();
   }
   watch(() => chat.state.value, (newState) => {
     if (newState === 'THINKING') {

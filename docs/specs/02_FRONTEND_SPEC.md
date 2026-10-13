@@ -174,7 +174,7 @@ VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 
 >    按鈕狀態與 placeholder 引導文案統一取自 `ASR_UI_LABELS` 與 `ASR_PROMPT_LABELS`，保證兩端同狀態下文案與視覺體驗一致。
 >    continuous 閒置倒數在說話結束後重設為 10 秒；說話中或啟動中不能因閒置計時停錄。VAD 啟動失敗後切換按鍵錄音時，舊啟動流程不得覆寫新收音狀態或清除 60 秒停止計時器。
 >
-> 3. **思考中補一句（2026-10-02）**：前台麥克風只在虛擬人出聲時暫停——`useAvatarConversation` 的 `avatarSpeaking`（`state === 'SPEAKING'`、TTS 合成中、播放中或字幕還在跑），串流辨識正常關閉、其他引擎暫停（講話中插話的開關 `INTERRUPT_WHILE_SPEAKING` 預設關，打開時串流辨識保持收音並經 `/api/v1/voice/interrupt` 分類），出聲結束後自動恢復並倒數 6 秒。思考中（文字模式請求還沒回來）麥克風照開、不倒數閒置；這時再送一句，`useAvatarChat.sendMessage()` 中止舊請求，把等待中的那句與新的一句以換行接起來重送，`messages` 改寫原本那則使用者訊息而不新增，回傳 `merged: true`；延遲量測把前一輪記為 `merged`。回答一到（`state` 離開 `THINKING`）就不再合併。帶 `sourcePath` 的快速問答不合併；`speechLanguage` 取後一句。瀏覽器內建辨識一次只收一句，不支援；Live（WebSocket）模式未開放，未處理。思考中沒出聲就結束（出錯、按停止）時，從那時開始倒數閒置。
+> 3. **思考中補一句（2026-10-02）**：前台麥克風只在虛擬人出聲時暫停——`useAvatarConversation` 的 `avatarSpeaking`（`state === 'SPEAKING'`、TTS 合成中、播放中或字幕還在跑），串流辨識正常關閉、其他引擎暫停（講話中插話的開關 `INTERRUPT_WHILE_SPEAKING` 預設關，打開時串流辨識保持收音並經 `/api/v1/voice/interrupt` 分類），出聲結束後自動恢復並倒數 6 秒。出聲時按麥克風鍵等於插話：先 `handleStopResponse()` 停掉這輪回答再開麥（2026-10-13 起；之前開麥會立刻被暫停規則關掉、排到講完才開）；麥克風啟動中（按鈕已顯示收音中）再按一次是關掉。思考中（文字模式請求還沒回來）麥克風照開、不倒數閒置；這時再送一句，`useAvatarChat.sendMessage()` 中止舊請求，把等待中的那句與新的一句以換行接起來重送，`messages` 改寫原本那則使用者訊息而不新增，回傳 `merged: true`；延遲量測把前一輪記為 `merged`。回答一到（`state` 離開 `THINKING`）就不再合併。帶 `sourcePath` 的快速問答不合併；`speechLanguage` 取後一句。瀏覽器內建辨識一次只收一句，不支援；Live（WebSocket）模式未開放，未處理。思考中沒出聲就結束（出錯、按停止）時，從那時開始倒數閒置。
 >
 > 4. **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
 > 顯示（app 在 `App.vue`、admin 在 `useVisionAvailable.ts`）。三態：問到之前與

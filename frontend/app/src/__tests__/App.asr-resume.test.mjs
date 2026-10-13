@@ -117,3 +117,44 @@ test("a reply that never speaks starts the idle countdown on the open microphone
     scope.stop();
   }
 });
+
+// 2026-10-13 現場回報：虛擬人講話時按麥克風沒反應（開麥立刻被「出聲時關麥」關掉，排到講完才開）。
+function runToggle({ listening = false, starting = false, speaking = false } = {}) {
+  const calls = [];
+  const active = {
+    isListening: ref(listening),
+    stop() { calls.push('stop'); },
+    start() { calls.push('start'); },
+  };
+  const voice = readAppModule('useAvatarVoiceInput');
+  const body = voice.match(/function handleAsrToggle\(\): void \{([\s\S]*?)\n  \}\n/);
+  assert.ok(body, 'handleAsrToggle missing');
+  const state = { resumeAsrAfterReply: true };
+  const run = new Function(
+    'activeAsr', 'asrStarting', 'avatarSpeaking', 'conversation', 'asrError', 'asrInterim',
+    'clearAsrIdleTimer', 'scheduleAsrIdleTimer', 'state',
+    `let interruptionRevision = 0; let resumeAsrAfterReply = state.resumeAsrAfterReply;
+     (() => {${body[1]}})();
+     state.resumeAsrAfterReply = resumeAsrAfterReply;`,
+  );
+  run({ value: active }, ref(starting), ref(speaking),
+    { handleStopResponse: () => calls.push('interrupt') }, ref(''), ref(''),
+    () => calls.push('clear'), () => calls.push('schedule'), state);
+  return { calls, resume: state.resumeAsrAfterReply };
+}
+
+test("tapping the microphone while the avatar speaks interrupts and listens", () => {
+  const { calls, resume } = runToggle({ speaking: true });
+  assert.deepEqual(calls, ['interrupt', 'schedule', 'start']);
+  assert.equal(resume, false);
+});
+
+test("tapping while the microphone is still starting turns it off", () => {
+  const { calls, resume } = runToggle({ starting: true });
+  assert.deepEqual(calls, ['clear', 'stop']);
+  assert.equal(resume, false);
+});
+
+test("tapping while idle or thinking only opens the microphone", () => {
+  assert.deepEqual(runToggle().calls, ['schedule', 'start']);
+});
