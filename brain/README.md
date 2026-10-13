@@ -211,7 +211,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ## 決策供應鏈
 
-Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設 hop 是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions。ROOT 在 Admin「System → 模型供應商」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 向 `GET /api/v1/internal/model-providers` 取 `decision` 段，10 秒快取（`core/model_provider_config.py`）。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「移除後台金鑰，改用 .env」會清除後台覆寫。
+Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設順序是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions，其中 Clef 備援（CPU 機器，達不到每站時限）預設不啟用。ROOT 在 Admin「System → 模型供應商」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 向 `GET /api/v1/internal/model-providers` 取 `decision` 段，10 秒快取（`core/model_provider_config.py`）。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「移除後台金鑰，改用 .env」會清除後台覆寫。
 
 以下自架端點使用匿名示例域名；請依管理者設定替換。
 

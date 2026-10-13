@@ -30,6 +30,7 @@ class ProviderHop:
     endpoint: str
     model: str
     credential_required: bool
+    enabled_by_default: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,9 +71,12 @@ DECISION: Final = ModelCategory(
             "clef-primary", "clef", "Clef 主端點",
             "https://clef.create360.ai/v1/systemone", "clef-flash", False,
         ),
+        # 備援端點是 CPU 機器，一次判斷要好幾秒，必定超過每站時限、還吃掉後面 Jev 的時間；
+        # 2026-10-13 測試者按「改回部署設定」把它打開後，每輪判斷都退回 baseline。預設不啟用。
         ProviderHop(
             "clef-backup", "clef", "Clef 備援端點",
             "https://clef.aiurl.tw/v1/systemone", "clef-flash", False,
+            enabled_by_default=False,
         ),
         ProviderHop(
             "jev", "jev", "Jev",
@@ -147,7 +151,8 @@ def hop_endpoint(config: TTSRouterConfig, category: ModelCategory, hop: Provider
 def category_defaults(config: TTSRouterConfig, category: ModelCategory) -> CategoryDefaults:
     """What the category does before anyone saves settings in the Admin."""
     if category is not CHAT_LLM:
-        return CategoryDefaults(category.hop_ids, category.hop_ids, {})
+        enabled = tuple(hop.id for hop in category.hops if hop.enabled_by_default)
+        return CategoryDefaults(category.hop_ids, enabled, {})
     chain = _parse_llm_chain(config)
     models: dict[str, str] = {}
     for provider, model in chain:
