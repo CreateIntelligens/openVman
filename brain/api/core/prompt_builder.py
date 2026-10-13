@@ -115,6 +115,7 @@ def build_chat_messages(
                 resolved_language=turn_policy.response_language if turn_policy else None,
             ),
             _tone_delivery_line(turn_policy.tone if turn_policy else None),
+            _previous_picture_line(turn_policy, session_messages),
             _turn_retrieval_line(turn_policy),
         ]
         if block
@@ -180,6 +181,21 @@ def _tone_delivery_line(tone: str | None) -> str:
         "lighthearted": "當輪語氣提示：可自然輕鬆地回應，仍保持資訊準確。",
     }
     return lines.get(tone or "", "")
+
+
+def _previous_picture_line(policy: TurnPolicy | None, session_messages: list[dict[str, Any]]) -> str:
+    # 沒有這句時模型以為要它自己「打開」圖，叫 request_action 切到知識圖譜頁，
+    # 回答說「已為你切換頁面」，實際上圖是 reference_media 附在回答旁邊的（2026-10-13 正式機實測）。
+    if not policy or policy.wants_previous_picture is not True:
+        return ""
+    from core.reference_media import earlier_pictures
+
+    if not earlier_pictures(session_messages):
+        return "當輪提示：使用者想再看之前的圖片，但這段對話還沒有顯示過圖片；直接說明，不要切換頁面。"
+    return (
+        "當輪提示：使用者想再看剛剛顯示過的圖片，系統會把那張圖附在這則回答旁邊。"
+        "用一兩句說明這就是先前那張圖並簡述內容，不要呼叫 request_action 切換頁面。"
+    )
 
 
 def _turn_retrieval_line(policy: TurnPolicy | None) -> str:

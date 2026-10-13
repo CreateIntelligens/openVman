@@ -395,3 +395,21 @@ def test_previous_picture_question_is_sent_and_resolved(monkeypatch):
 def test_previous_picture_question_is_opt_in_for_direct_callers():
     assert "wants_previous_picture" not in build_turn_questions()
     assert "wants_previous_picture" in build_turn_questions(previous_picture_enabled=True)
+
+
+def test_previous_picture_hint_tells_the_model_the_picture_is_attached():
+    from core.prompt_builder import _previous_picture_line
+
+    shown = [
+        {"role": "user", "content": "沉水泵最深多深？"},
+        {"role": "assistant", "content": "65 公尺", "metadata": {"image_id": "page_12.png"}},
+    ]
+    wants = turn_decisions.TurnPolicy(wants_previous_picture=True)
+
+    line = _previous_picture_line(wants, shown)
+
+    # 模型以為要自己打開圖，會叫 request_action 切頁面、回答「已為你切換頁面」。
+    assert "附在這則回答旁邊" in line and "request_action" in line
+    assert "還沒有顯示過圖片" in _previous_picture_line(wants, shown[:1])
+    assert _previous_picture_line(turn_decisions.TurnPolicy(wants_previous_picture=None), shown) == ""
+    assert _previous_picture_line(None, shown) == ""
