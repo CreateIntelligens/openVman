@@ -476,7 +476,7 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 * 工具與檢索結果一律視為不可信資料（`trust_boundary: untrusted_reference_data`）。
 
 **16.3 個資偵測**
-* `PRIVACY_FILTER_ENABLED`（預設開）時，使用者每句話在背景問 Clef 有沒有個資（`privacy/detector.py`：姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有）。只問 Clef（`decide(providers={"clef"})`），失敗也不退到 Jev 或 OpenAI：這兩家是外部服務，為了查個資把個資送出去正好相反。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
+* `PRIVACY_FILTER_ENABLED`（預設關）設為 true 時，使用者每句話在背景問 Clef 有沒有個資（`privacy/detector.py`）：先問一題「有沒有任何個資」（約 0.11 秒），有才再問是哪幾類（姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有；總判斷說有、細項都沒過時記 `unclassified`）。只問 Clef（`decide(providers={"clef"})`），失敗也不退到 Jev 或 OpenAI：這兩家是外部服務，為了查個資把個資送出去正好相反。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
 
 **16.4 對話限制**
 * 單 Session 最大對話輪次：`MAX_SESSION_ROUNDS`（預設 100），達上限回 400。
@@ -560,7 +560,7 @@ ENABLE_CONTENT_FILTER=true
 BLOCK_PROMPT_INJECTION=true
 REQUEST_RATE_LIMIT_PER_MINUTE=90
 ALLOWED_CHANNELS=web,api,kiosk,admin,system
-PRIVACY_FILTER_ENABLED=true
+PRIVACY_FILTER_ENABLED=false
 
 # === Live ===
 LIVE_GEMINI_MODEL=gemini-3.8-live

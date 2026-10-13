@@ -84,7 +84,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 - 模型供應商：ROOT 在後台「System → 模型供應商」調整主對話與決策的順序、啟用狀態、主對話模型名稱，以及各家 API key（加密存放，每家一把、各類共用），約 10 秒內生效。
 - 前台決策 Debug：admin／root 的正式登入可在虛擬人舞台開啟當輪判讀面板（一般、臨時帳號與 embed 金鑰看不到，伺服器端也不回傳），預設只顯示一行摘要（供應商・耗時・語氣），按「詳細」才展開情緒／語氣、檢索、語言及信心度；預設關閉，診斷不持久化。
 - 每輪決策：文字回合以一個 batch 評估檢索來源、多語言、回覆語言與當輪語氣；全部決策服務失效時沿用既有對話流程。門檻、資料邊界與 Live 限制見 [Brain 文件](brain/README.md#每輪對話決策)。
-- 隱私：使用者每句話在背景問 Clef 有沒有個資（只問自家的 Clef，不送外部服務），記錄稽核事件並在後台對話顯示提醒，不改寫內容（`PRIVACY_FILTER_ENABLED`）。
+- 隱私：使用者每句話在背景問 Clef 有沒有個資（只問自家的 Clef，不送外部服務），記錄稽核事件並在後台對話顯示提醒，不改寫內容（`PRIVACY_FILTER_ENABLED`，預設關）。
 - 用量帳本：每次模型呼叫記錄 token 與歸屬，供後台用量頁查詢。
 
 工具清單、API 與環境變數見 [Brain 文件](brain/README.md) 與 [Brain 規格](docs/specs/03_BRAIN_SPEC.md)。

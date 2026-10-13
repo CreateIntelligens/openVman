@@ -97,3 +97,10 @@ def test_blocked_category_logs_without_raw_text(detector, caplog: pytest.LogCapt
 
     assert "category=secret" in caplog.text
     assert "Abc12345" not in caplog.text
+
+
+def test_privacy_check_is_off_unless_the_deployment_turns_it_on() -> None:
+    # 只偵測、只寫稽核與後台提醒，卻會占用 Clef；需要的部署才打開。
+    from config import BrainSettings
+
+    assert BrainSettings.model_fields["privacy_filter_enabled"].default is False

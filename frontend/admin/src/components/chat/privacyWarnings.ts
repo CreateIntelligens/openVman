@@ -9,6 +9,7 @@ export const PII_LABELS: Record<string, string> = {
   private_email: "Email",
   private_phone: "電話",
   private_url: "網址/IP",
+  unclassified: "個資",
   private_date: "日期",
   account_number: "帳號",
   secret: "密碼/金鑰",

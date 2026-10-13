@@ -134,7 +134,8 @@ class BrainSettings(BaseSettings):
     auto_recall_llm_model: str = ""
 
     # === Privacy Filter 設定 ===
-    privacy_filter_enabled: bool = True
+    # 預設關：只偵測、只寫稽核與後台提醒，又占用 Clef；需要的部署再打開。
+    privacy_filter_enabled: bool = False
     # 使用者每句話背景問 Clef 有沒有個資；實測每句約 0.85 秒，逾時就當沒掃。
     privacy_clef_timeout_seconds: float = 3.0
     # 同時在掃的上限，滿了就跳過這句，不跟每輪決策搶 Clef。
