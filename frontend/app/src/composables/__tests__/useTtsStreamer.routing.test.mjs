@@ -199,6 +199,31 @@ test("non-streaming providers continue to use the full speech endpoint", async (
   }
 });
 
+test("full-file speech carries only the project, so the project voice policy applies", async () => {
+  const fetchMock = installFetch(() => fullSpeechResponse());
+  try {
+    const streamer = useTtsStreamer({
+      onPcmChunk: () => undefined,
+    });
+
+    await streamer.speak("測試", {
+      provider: "edge-tts",
+      voice: "zh-TW-HsiaoChenNeural",
+      extraBody: { project_id: "proj-1", language_routes: "zh,nan", speech_language: "" },
+    });
+
+    assert.equal(fetchMock.calls[0].url, "/v1/audio/speech");
+    assert.deepEqual(fetchMock.calls[0].body, {
+      input: "測試",
+      provider: "edge-tts",
+      voice: "zh-TW-HsiaoChenNeural",
+      project_id: "proj-1",
+    });
+  } finally {
+    fetchMock.restore();
+  }
+});
+
 test("gemini-tts's 24kHz raw PCM stream is resampled to 16kHz across chunk boundaries", async () => {
   // 24kHz PCM ramp, split into two raw chunks (no WAV header) to exercise
   // the streaming resampler's cross-chunk continuity.

@@ -173,7 +173,11 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
           body: JSON.stringify(
             useStream
               ? { ...buildStreamBody(trimmed, opts), ...(opts.extraBody ?? {}) }
-              : buildSpeechBody(trimmed, opts, provider),
+              // 整檔合成也要帶專案，後端才能套用專案的聲音限制。
+              : {
+                ...buildSpeechBody(trimmed, opts, provider),
+                ...(opts.extraBody?.project_id ? { project_id: opts.extraBody.project_id } : {}),
+              },
           ),
           signal: abort.signal,
         },
