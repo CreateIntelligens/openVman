@@ -57,12 +57,29 @@ _RETRIEVAL_QUESTIONS: Final[dict[str, dict[str, Any]]] = {
 }
 
 
+# 「再給我看剛剛那張圖」：這類問句通常不會查知識庫，附圖候選只看這一輪的檢索結果就選不到。
+# 30 句標註（2026-10-13，Clef）：該判是的 10/10 信心 0.79～0.98，不該判的 20/20 低於 0.7
+# （最接近的「可以換一張比較清楚的圖嗎」0.69）；其他題 tone／語言／web 全部不變，每輪多約 50 ms。
+_PREVIOUS_PICTURE_QUESTION: Final[dict[str, dict[str, Any]]] = {
+    "wants_previous_picture": {
+        "type": "noul",
+        "instructions": (
+            "Does the latest user message ask to see again a picture that was already shown "
+            "earlier in this conversation? Asking for a new or different picture does not count."
+        ),
+    },
+}
+# 對話紀錄裡附了圖的回答加上這句，決策模型才知道前面確實有圖可以「再看一次」。
+PICTURE_SHOWN_MARKER: Final[str] = " [A picture was shown with this reply.]"
+
+
 @dataclass(frozen=True, slots=True)
 class TurnDecisionConfig:
     enabled: bool = True
     retrieval_enabled: bool = True
     language_enabled: bool = True
     tone_enabled: bool = True
+    previous_picture_enabled: bool = True
     timeout_seconds: float = 2.0
     per_hop_timeout_seconds: float = 0.6
     noul_positive_threshold: float = 0.7
@@ -98,6 +115,7 @@ class TurnPolicy:
     response_language: str | None = None
     turn_intent: str | None = None
     tone: str | None = None
+    wants_previous_picture: bool | None = None
 
     def to_prompt_fields(self) -> dict[str, Any]:
         """Return fixed server-owned policy codes, never the source text."""
@@ -113,6 +131,7 @@ class TurnPolicy:
             "response_language": self.response_language,
             "turn_intent": self.turn_intent,
             "tone": self.tone,
+            "wants_previous_picture": self.wants_previous_picture,
         }
 
 
@@ -148,6 +167,7 @@ def turn_decision_config(settings: Any) -> TurnDecisionConfig:
         retrieval_enabled=bool(getattr(settings, "turn_decisions_retrieval_enabled", True)),
         language_enabled=bool(getattr(settings, "turn_decisions_language_enabled", True)),
         tone_enabled=bool(getattr(settings, "turn_decisions_tone_enabled", True)),
+        previous_picture_enabled=bool(getattr(settings, "turn_decisions_previous_picture_enabled", True)),
         timeout_seconds=float(getattr(settings, "turn_decisions_timeout_seconds", 2.0)),
         per_hop_timeout_seconds=float(getattr(settings, "turn_decisions_hop_timeout_seconds", 0.6)),
         noul_positive_threshold=float(getattr(settings, "turn_decisions_noul_positive_threshold", 0.7)),
@@ -164,6 +184,7 @@ def build_turn_questions(
     retrieval_enabled: bool = True,
     language_enabled: bool = True,
     tone_enabled: bool = True,
+    previous_picture_enabled: bool = False,
 ) -> dict[str, dict[str, Any]]:
     questions: dict[str, dict[str, Any]] = {}
     if retrieval_enabled:
@@ -199,6 +220,8 @@ def build_turn_questions(
                 "lighthearted": "Joking, teasing or playful small talk.",
             },
         }
+    if previous_picture_enabled:
+        questions.update(_PREVIOUS_PICTURE_QUESTION)
     return questions
 
 
@@ -211,7 +234,7 @@ def build_turn_evidence(
     available_tools: tuple[str, ...] | list[str],
 ) -> dict[str, Any]:
     eligible_history = [
-        {"role": str(message["role"]), "content": str(message["content"])[:MAX_HISTORY_MESSAGE_CHARS]}
+        {"role": str(message["role"]), "content": _history_content(message)}
         for message in history
         if message.get("role") in {"user", "assistant"}
         and isinstance(message.get("content"), str)
@@ -232,6 +255,14 @@ def build_turn_evidence(
         "project_primary_language": safe_project_language,
         "available_read_tools": sorted(set(available_tools) & ALLOWED_TOOL_HINTS),
     }
+
+
+def _history_content(message: dict[str, Any]) -> str:
+    content = str(message["content"])[:MAX_HISTORY_MESSAGE_CHARS]
+    metadata = message.get("metadata")
+    if message.get("role") == "assistant" and isinstance(metadata, dict) and metadata.get("image_id"):
+        content += PICTURE_SHOWN_MARKER
+    return content
 
 
 def resolve_turn_policy(
@@ -262,6 +293,7 @@ def resolve_turn_policy(
     tone = _choice_signal("tone", answers, TONES, config)
     if tone == "neutral":
         tone = None
+    wants_previous_picture = _noul_signal("wants_previous_picture", answers, config)
     # A confident negative source need can skip only that source. Uncertainty
     # preserves the existing forced-knowledge and auto-recall behavior.
     force_knowledge_search = False if needs_knowledge is False else True if needs_knowledge is True else None
@@ -279,6 +311,7 @@ def resolve_turn_policy(
         retrieval_language=retrieval_language,
         response_language=response_language,
         tone=tone,
+        wants_previous_picture=wants_previous_picture,
     )
 
 
@@ -325,6 +358,7 @@ def run_turn_decision(
         "retrieval_enabled": config.retrieval_enabled,
         "language_enabled": config.language_enabled,
         "tone_enabled": config.tone_enabled,
+        "previous_picture_enabled": config.previous_picture_enabled,
     }
     questions = build_turn_questions(**groups)
     if not config.enabled or not questions:

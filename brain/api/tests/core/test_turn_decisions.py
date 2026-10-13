@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from config import BrainSettings
 from core import decision_router
 from core import turn_decisions
-from core.decision_router import DecisionProviderCancelled
+from core.decision_router import DecisionProviderCancelled, DecisionResult
 from core.turn_decisions import (
     TurnDecisionConfig,
     build_turn_evidence,
@@ -316,7 +316,9 @@ async def test_cancelled_async_turn_propagates_cancellation_to_provider_worker(m
 def test_disabled_groups_do_not_send_questions(monkeypatch):
     calls = []
     monkeypatch.setattr(decision_router, "decide", lambda *args, **kwargs: calls.append(args))
-    config = TurnDecisionConfig(retrieval_enabled=False, language_enabled=False, tone_enabled=False)
+    config = TurnDecisionConfig(
+        retrieval_enabled=False, language_enabled=False, tone_enabled=False, previous_picture_enabled=False,
+    )
 
     result = run_turn_decision(
         user_text="hello",
@@ -354,3 +356,42 @@ def test_opt_in_debug_reports_normalized_signals_without_evidence(monkeypatch):
     assert 'private user text' not in serialized
     assert 'private-id' not in serialized
     assert 'secret free-form text' not in serialized
+
+
+def test_previous_picture_question_is_sent_and_resolved(monkeypatch):
+    sent = {}
+
+    def fake_decide(state, questions, **kwargs):
+        sent.update(state=state, questions=questions)
+        return DecisionResult({"wants_previous_picture": {"type": "noul", "noul": 0.97}}, "clef", "clef-primary", "clef-flash")
+
+    monkeypatch.setattr(turn_decisions, "decide", fake_decide)
+    history = [
+        {"role": "user", "content": "沉水泵最深多深？"},
+        {"role": "assistant", "content": "最大揚程 65 公尺。", "metadata": {"image_id": "page_12.png"}},
+        {"role": "assistant", "content": "沒有附圖的回答", "metadata": {}},
+    ]
+
+    result = run_turn_decision(
+        user_text="再給我看看剛剛那張圖",
+        history=history,
+        project_id="p1",
+        project_language="zh",
+        speech_language="zh",
+        available_tools=(),
+        config=TurnDecisionConfig(retrieval_enabled=False, language_enabled=False, tone_enabled=False),
+        turn_id="t1",
+    )
+
+    assert set(sent["questions"]) == {"wants_previous_picture"}
+    contents = [item["content"] for item in sent["state"]["history"]]
+    # 決策模型要知道前面哪則回答附了圖，才判得出「再看一次」。
+    assert contents[1].endswith("[A picture was shown with this reply.]")
+    assert "picture" not in contents[2]
+    assert result.policy.wants_previous_picture is True
+    assert result.policy.to_prompt_fields()["wants_previous_picture"] is True
+
+
+def test_previous_picture_question_is_opt_in_for_direct_callers():
+    assert "wants_previous_picture" not in build_turn_questions()
+    assert "wants_previous_picture" in build_turn_questions(previous_picture_enabled=True)

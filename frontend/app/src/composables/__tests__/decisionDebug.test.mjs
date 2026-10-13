@@ -13,3 +13,17 @@ test('parser rejects malformed diagnostics before rendering',()=>{
  assert.equal(parseDecisionDebug(valid).signals[0].value,'frustrated')
  assert.equal(labelValue('frustrated'),'挫折／不耐煩')
 })
+test('every question Brain sends has a label, so the panel never rejects a whole report',async()=>{
+ // Brain 每多一題，前台不認得的 id 會讓整份報告被丟掉、面板不顯示；兩邊各改各的就會發生。
+ const { readFile } = await import('node:fs/promises')
+ const source = await readFile(new URL('../../../../../brain/api/core/turn_decisions.py', import.meta.url), 'utf8')
+ const ids = new Set([
+  ...[...source.matchAll(/^\s+"(\w+)": \{\n\s+"type": "(?:noul|choice)"/gm)].map(m => m[1]),
+  ...[...source.matchAll(/questions\["(\w+)"\] = \{/g)].map(m => m[1]),
+ ])
+ assert.ok(ids.has('wants_previous_picture') && ids.has('tone') && ids.has('needs_knowledge'))
+ for (const id of ids) {
+  const report = {...valid, signals:[{id, type:'noul', probability_true:.9, resolved:true, accepted:true}], policy:{}}
+  assert.notEqual(parseDecisionDebug(report), null, `Brain question ${id} has no label in decisionDebug.ts`)
+ }
+})

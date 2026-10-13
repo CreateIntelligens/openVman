@@ -184,6 +184,7 @@ class BrainSettings(BaseSettings):
     turn_decisions_retrieval_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_RETRIEVAL_ENABLED")
     turn_decisions_language_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_LANGUAGE_ENABLED")
     turn_decisions_tone_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_TONE_ENABLED")
+    turn_decisions_previous_picture_enabled: bool = Field(default=True, validation_alias="TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED")
     turn_decisions_timeout_seconds: float = Field(default=2.0, gt=0, le=10, validation_alias="TURN_DECISIONS_TIMEOUT_SECONDS")
     # Clef（本機 llama.cpp）整批 5 題約 0.39～0.52 秒（隨歷史長度），0.4 秒會在帶歷史時逾時。
     turn_decisions_hop_timeout_seconds: float = Field(default=0.6, gt=0, le=5, validation_alias="TURN_DECISIONS_HOP_TIMEOUT_SECONDS")

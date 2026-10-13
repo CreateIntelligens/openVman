@@ -139,3 +139,62 @@ def test_finalize_hides_citation_pictures_when_the_choice_differs(monkeypatch):
     assert picked["image_id"] == "page_05.png"
     assert all("image_id" not in c for c in picked["citations"])
     assert kept["image_id"] == "page_01.png"
+
+
+def _history(*turns: tuple[str, str | None]) -> list[dict]:
+    messages: list[dict] = []
+    for question, image in turns:
+        messages.append({"role": "user", "content": question})
+        metadata = {"image_id": image, "url": f"/media/{image}"} if image else {}
+        messages.append({"role": "assistant", "content": "回答", "metadata": metadata})
+    return messages
+
+
+def test_earlier_pictures_are_newest_first_unique_with_their_question_at_most_three():
+    history = _history(
+        ("Q1", "p1.png"), ("Q2", None), ("Q3", "p3.png"), ("Q4", "p1.png"), ("Q5", "p5.png"), ("Q6", "p6.png"),
+    )
+
+    pictures = reference_media.earlier_pictures(history)
+
+    assert [p["image_id"] for p in pictures] == ["p6.png", "p5.png", "p1.png"]
+    assert pictures[0]["url"] == "/media/p6.png"
+    assert pictures[0]["text"].startswith("Picture shown most recently")
+    assert pictures[0]["text"].endswith("Q6")
+    assert pictures[2]["text"].endswith("Q4")
+    assert reference_media.earlier_pictures(_history(("Q", None))) == []
+
+
+def test_earlier_picture_is_chosen_without_any_retrieval(monkeypatch):
+    calls = []
+    _answer(monkeypatch, "c0", calls=calls)
+    earlier = reference_media.earlier_pictures(_history(("沉水泵最深多深？", "page_12.png")))
+
+    choice = reference_media.ReplyMediaChoice("再給我看看剛剛那張圖", earlier=earlier)
+
+    assert choice.result([]) == {"image_id": "page_12.png", "url": "/media/page_12.png"}
+    # 建構時就開始選，收尾不再重問。
+    assert len(calls) == 1
+    assert "沉水泵最深多深？" in calls[0][1]["pick"]["criteria"]["c0"]
+
+
+def test_earlier_pictures_come_first_and_retrieved_duplicates_are_dropped(monkeypatch):
+    calls = []
+    _answer(monkeypatch, "c1", calls=calls)
+    earlier = reference_media.earlier_pictures(_history(("舊問題", "old.png")))
+    steps = _steps(_row("新", "new.png", 0.2), _row("同一張", "old.png", 0.1))
+
+    media = reference_media.choose_reference_media("剛剛那張和新的", steps, earlier)
+
+    assert media == {"image_id": "new.png"}
+    assert set(calls[0][1]["pick"]["criteria"]) == {"c0", "c1", "none"}
+
+
+def test_without_earlier_pictures_nothing_changes(monkeypatch):
+    calls = []
+    _answer(monkeypatch, "c0", calls=calls)
+
+    choice = reference_media.ReplyMediaChoice("問題")
+
+    assert calls == []
+    assert choice.result([]) is None

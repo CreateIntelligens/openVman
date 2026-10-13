@@ -20,6 +20,7 @@ export interface DecisionDebug {
 }
 export const signalLabels: Record<string, string> = {
   needs_knowledge: '需要專案知識', needs_web: '需要網路資訊', needs_memory: '需要過去記憶',
+  wants_previous_picture: '要再看之前的圖',
   turn_intent: '對話意圖', dominant_language: '主要輸入語言',
   requested_response_language: '指定回覆語言', tone: '情緒／語氣',
   uses_zh: '使用中文', uses_en: '使用英文', uses_es: '使用西文', uses_nan: '使用台語',
@@ -65,7 +66,8 @@ export function parseDecisionDebug(value: unknown): DecisionDebug | null {
   }
   const policy: DecisionDebug['policy'] = {}
   for (const key of ['needs_knowledge','needs_web','needs_memory','mixed_languages','input_languages',
-    'dominant_language','requested_response_language','retrieval_language','response_language','turn_intent','tone']) {
+    'dominant_language','requested_response_language','retrieval_language','response_language','turn_intent','tone',
+    'wants_previous_picture']) {
     const item = data.policy[key]
     if (item == null || typeof item === 'boolean' || (typeof item === 'string' && owns(valueLabels, item))) {
       policy[key] = item ?? null

@@ -24,7 +24,7 @@ from core.turn_decisions import (
     run_turn_decision,
     turn_decision_config,
 )
-from core.reference_media import ReplyMediaChoice, choose_reference_media
+from core.reference_media import ReplyMediaChoice, choose_reference_media, earlier_pictures
 from core.turn_reads import without_disabled_recall
 from infra.learnings import record_error_event
 from memory.memory import (
@@ -502,7 +502,13 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     unavailable_token = active_turn_decision_unavailable.set(bool(
         context.turn_decision and context.turn_decision.dependency_unavailable
     ))
-    context.media_choice = ReplyMediaChoice(context.user_message)
+    wants_previous_picture = bool(
+        context.turn_decision and context.turn_decision.policy.wants_previous_picture,
+    )
+    context.media_choice = ReplyMediaChoice(
+        context.user_message,
+        earlier=earlier_pictures(context.prior_messages) if wants_previous_picture else None,
+    )
     try:
         return run_agent_loop(
             context.prompt_messages,

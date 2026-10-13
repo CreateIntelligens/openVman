@@ -48,6 +48,7 @@ const appliedRows = computed(() => {
   return [
     ['needs_knowledge', '專案知識'], ['needs_web', '網路資訊'], ['needs_memory', '記憶'],
     ['input_languages', '輸入語言'], ['retrieval_language', '檢索語言'], ['response_language', '回答語言'], ['tone', '套用語氣'],
+    ['wants_previous_picture', '再看之前的圖'],
   ].map(([key, label]) => ({ label, value: labelValue(policy[key!]) }))
 })
 </script>
