@@ -4,6 +4,7 @@ import StatusAlert from "../components/StatusAlert";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 import {
   fetchModelProviderSettings,
+  resetModelProviderHealth,
   saveModelProviderSettings,
   type HopHealth,
   type ModelCategory,
@@ -14,6 +15,14 @@ import {
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   decision: "本地規則無法判斷時，依序詢問的決策供應商。每個有效答案會立即返回；連線、逾時、驗證或回應錯誤時才換下一個。",
   chat_llm: "產生回答的主對話模型。依序嘗試啟用的供應商；模型名稱留空時沿用部署設定的 LLM_FALLBACK_CHAIN。",
+};
+
+// 遮罩長得一樣（都是 ••••末四碼），要一眼看出這把 key 是 .env 的還是後台加密存的。
+const SOURCE_BADGES: Record<ProviderCredential["source"], { label: string; className: string }> = {
+  environment: { label: "來自 .env", className: "rounded bg-surface-sunken px-2 py-0.5 text-xs text-content-muted" },
+  admin: { label: "後台已存（加密）", className: "rounded bg-primary/10 px-2 py-0.5 text-xs text-primary" },
+  unreadable: { label: "無法解密", className: "rounded bg-danger/10 px-2 py-0.5 text-xs text-danger" },
+  none: { label: "未設定", className: "rounded bg-surface-sunken px-2 py-0.5 text-xs text-content-subtle" },
 };
 
 // Brain 依用途分開記失敗（reason 後面帶「（decision_turn）」這類標註），標在狀態後面。
@@ -103,6 +112,7 @@ export default function ModelProviders() {
   const [resetCategories, setResetCategories] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState<string | null>(null);
   const [notice, setNotice] = useState<PageNotice>(null);
 
   const apply = useCallback((result: ModelProviderSettings) => {
@@ -191,7 +201,12 @@ export default function ModelProviders() {
         use_environment_credentials: [...useEnvironmentKeys],
       });
       apply(result);
-      setNotice({ type: "success", message: "模型供應商設定已儲存，約 10 秒內生效。" });
+      setNotice({
+        type: "success",
+        message: result.runtime_refreshed
+          ? "模型供應商設定已儲存並立即生效。"
+          : "模型供應商設定已儲存；Brain 暫時沒回應，約 10 秒內生效。",
+      });
     } catch (error) {
       setNotice({
         type: "error",
@@ -233,7 +248,24 @@ export default function ModelProviders() {
     return credential.required ? "尚未設定；用到它的供應商會略過。" : "未設定；可不帶 key 呼叫。";
   }
 
-  const busy = loading || saving;
+  const busy = loading || saving || resetting !== null;
+
+  async function resetHealth(category: string, hop: string) {
+    setResetting(`${category}:${hop}`);
+    setNotice(null);
+    try {
+      // 只換狀態，不套用到草稿：重置不該把還沒存的修改洗掉。
+      setSettings(await resetModelProviderHealth({ category, hop }));
+      setNotice({ type: "success", message: "已重置，下一輪會照順序重新嘗試這一站。" });
+    } catch (error) {
+      setNotice({
+        type: "error",
+        message: error instanceof Error ? error.message : "重置失敗。",
+      });
+    } finally {
+      setResetting(null);
+    }
+  }
 
   function tabHasPendingChanges(tab: PageTab): boolean {
     const categoryId = TAB_CATEGORY[tab];
@@ -362,12 +394,23 @@ export default function ModelProviders() {
                               <h3 className="font-medium text-content">{hop.label}</h3>
                               {!active && <span className="rounded bg-surface-sunken px-2 py-0.5 text-xs text-content-subtle">已停用</span>}
                               {active && healthLabel(hop.health) && (
-                                <span
-                                  role="status"
-                                  className="rounded bg-danger/10 px-2 py-0.5 text-xs text-danger"
-                                >
-                                  {healthLabel(hop.health)}
-                                </span>
+                                <>
+                                  <span
+                                    role="status"
+                                    className="rounded bg-danger/10 px-2 py-0.5 text-xs text-danger"
+                                  >
+                                    {healthLabel(hop.health)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => void resetHealth(category.id, hop.id)}
+                                    disabled={busy}
+                                    aria-label={`重置 ${category.label} ${hop.label} 的失敗紀錄`}
+                                    className={quietButton}
+                                  >
+                                    {resetting === `${category.id}:${hop.id}` ? "重置中…" : "重置"}
+                                  </button>
+                                </>
                               )}
                             </div>
                             <p className="mt-1 break-all font-mono text-xs text-content-muted">{hop.endpoint}</p>
@@ -449,9 +492,14 @@ export default function ModelProviders() {
                     className="grid gap-4 py-4 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] md:items-center"
                   >
                     <div>
-                      <label htmlFor={`provider-key-${credential.id}`} className="text-sm font-medium text-content">
-                        {credential.label} API key
-                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label htmlFor={`provider-key-${credential.id}`} className="text-sm font-medium text-content">
+                          {credential.label} API key
+                        </label>
+                        <span className={SOURCE_BADGES[credential.source].className}>
+                          {SOURCE_BADGES[credential.source].label}
+                        </span>
+                      </div>
                       <p className="mt-1 text-xs leading-5 text-content-subtle">
                         用於{credential.used_by.join("、")}；未填時沿用部署環境的 {credential.environment_variable}。
                       </p>

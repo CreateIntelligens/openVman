@@ -127,6 +127,17 @@ class ProviderHealth:
             })
         return result
 
+    def reset(self, *, category: str | None = None, hop: str | None = None) -> int:
+        """Forget failures (all, one category, or one hop) so the next turn tries it in order again."""
+        with self._lock:
+            matching = [
+                key for key in self._states
+                if (category is None or key.category == category) and (hop is None or key.hop == hop)
+            ]
+            for key in matching:
+                del self._states[key]
+        return len(matching)
+
     def clear(self) -> None:
         with self._lock:
             self._states.clear()

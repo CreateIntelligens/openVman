@@ -22,6 +22,10 @@ from core.provider_health import FailureKind, HopId, provider_health
 logger = logging.getLogger("core.decision_router")
 
 _CONFIG_TIMEOUT_SECONDS = 0.5
+# 跨公網的供應商每站至少給這麼久（仍受整次請求的期限限制）。OpenAI Decisions 2026-10-08 起
+# 正式機 0 次成功、3 次在 0.6～1.5 秒逾時：握手加傳輸加首字就超過本機 Clef 用的每站時限。
+# Jev p90 325 ms，不需要另外放寬。
+_MIN_HOP_SECONDS: Final[dict[str, float]] = {"openai": 1.5}
 _MAX_QUESTIONS = 32
 _MAX_DECISION_INPUT_BYTES = 64 * 1024
 _EXPECTED_HOPS: Final[dict[str, tuple[str, str, str, bool]]] = {
@@ -189,7 +193,6 @@ def decide(
         raise DecisionProviderError("decision provider configuration unavailable") from exc
 
     failures: list[str] = []
-    full_hop_budget = min(timeout, per_hop_timeout) if per_hop_timeout is not None else timeout
     health = provider_health()
     for hop in health.order(configuration.providers, lambda hop: _health_id(hop, purpose)):
         if cancel_event is not None and cancel_event.is_set():
@@ -209,7 +212,8 @@ def decide(
         hop_started = monotonic()
         usage_obj: Any = None
         status = "error"
-        hop_budget = min(remaining, per_hop_timeout) if per_hop_timeout is not None else remaining
+        hop_cap = _hop_cap(hop, per_hop_timeout)
+        hop_budget = min(remaining, hop_cap) if hop_cap is not None else remaining
         try:
             request_options: dict[str, Any] = {"timeout": hop_budget}
             if cancel_event is not None:
@@ -236,7 +240,7 @@ def decide(
             status = _failure_status(exc)
             failures.append(f"{hop.id}:{status}")
             # 只剩一點點時間就逾時，是前面的站把時間用掉了，不算這一站的錯。
-            if status != "timeout" or hop_budget >= full_hop_budget / 2:
+            if status != "timeout" or hop_budget >= min(timeout, hop_cap or timeout) / 2:
                 health.record_failure(_health_id(hop, purpose), _failure_kind(status), status)
             _record_hop(
                 provider=hop.provider, hop_id=hop.id, model=hop.model,
@@ -581,6 +585,12 @@ def _openai_probability_map(value: Any) -> dict[str, float]:
             raise ValueError("invalid OpenAI probability entry")
         result[str(item["value"])] = _probability(item.get("probability"))
     return result
+
+
+def _hop_cap(hop: DecisionProvider, per_hop_timeout: float | None) -> float | None:
+    if per_hop_timeout is None:
+        return None
+    return max(per_hop_timeout, _MIN_HOP_SECONDS.get(hop.provider, 0.0))
 
 
 def _health_id(hop: DecisionProvider, purpose: str) -> HopId:

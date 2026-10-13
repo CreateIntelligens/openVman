@@ -19,6 +19,12 @@ DECISION_ORDER = ["clef-primary", "clef-backup", "jev", "openai"]
 
 
 @pytest.fixture(autouse=True)
+def no_brain_calls(monkeypatch):
+    """測試環境沒有 Brain：存檔後的重讀通知預設當作連不上。"""
+    monkeypatch.setattr(model_provider_routes, "_brain_post", lambda *_a, **_k: None)
+
+
+@pytest.fixture(autouse=True)
 def brain_health(monkeypatch):
     """Brain 不在測試環境裡；預設回「沒有失敗紀錄」，個別測試再換。"""
     hops: list[dict] = []
@@ -259,3 +265,42 @@ def test_hop_shows_the_most_severe_state_across_purposes(tmp_path, brain_health)
 
     jev = next(provider for provider in decision["providers"] if provider["id"] == "jev")
     assert jev["health"] == {"status": "cooling", "reason": "timeout（decision_turn）", "retry_in_seconds": 40}
+
+
+def test_saving_asks_brain_to_reload_and_reports_whether_it_did(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        model_provider_routes, "_brain_post",
+        lambda _runtime, path, body=None: calls.append(path) or {"refreshed": True},
+    )
+    runtime = _runtime(tmp_path)
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+
+    response = client.put(PATH, headers=headers, json=_save_body())
+
+    assert response.json()["runtime_refreshed"] is True
+    assert calls == ["/brain/internal/model-providers/refresh"]
+    monkeypatch.setattr(model_provider_routes, "_brain_post", lambda *_a, **_k: None)
+    assert client.put(PATH, headers=headers, json=_save_body()).json()["runtime_refreshed"] is False
+
+
+def test_root_can_reset_one_hop_breaker_through_brain(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        model_provider_routes, "_brain_post",
+        lambda _runtime, path, body=None: calls.append((path, body)) or {"cleared": 1},
+    )
+    runtime = _runtime(tmp_path)
+    client = _client(runtime)
+    root = _login(client, runtime, AccountRole.ROOT)
+    admin = _login(client, runtime, AccountRole.ADMIN)
+
+    response = client.post(f"{PATH}/health/reset", headers=root, json={"category": "decision", "hop": "jev"})
+
+    assert response.status_code == 200
+    assert calls == [("/brain/internal/provider-health/reset", {"category": "decision", "hop": "jev"})]
+    assert client.post(f"{PATH}/health/reset", headers=admin, json={}).status_code == 403
+    assert client.post(f"{PATH}/health/reset", headers=root, json={"category": "vision"}).status_code == 422
+    monkeypatch.setattr(model_provider_routes, "_brain_post", lambda *_a, **_k: None)
+    assert client.post(f"{PATH}/health/reset", headers=root, json={}).status_code == 503

@@ -6,6 +6,7 @@ import { NavigationProvider } from "../context/NavigationContext";
 import ModelProviders from "./ModelProviders";
 import {
   fetchModelProviderSettings,
+  resetModelProviderHealth,
   saveModelProviderSettings,
   type ModelProviderSettings,
   type ProviderHop,
@@ -14,6 +15,7 @@ import {
 vi.mock("../api/modelProviders", () => ({
   fetchModelProviderSettings: vi.fn(),
   saveModelProviderSettings: vi.fn(),
+  resetModelProviderHealth: vi.fn(),
 }));
 
 const hop = (id: string, credential: string, label: string, model: string, enabled = true): ProviderHop => ({
@@ -224,5 +226,42 @@ describe("ModelProviders", () => {
     expect(vi.mocked(saveModelProviderSettings).mock.calls[0][0]).toMatchObject({
       clear_credentials: ["jev"],
     });
+  });
+
+  it("labels where each key comes from so .env and saved keys do not look the same", async () => {
+    const result = settings();
+    result.credentials[1] = { ...result.credentials[1], configured: true, source: "admin", masked: "••••abcd" };
+    vi.mocked(fetchModelProviderSettings).mockResolvedValue(result);
+    render(<ModelProviders />);
+
+    await openTab("API 金鑰");
+    expect(within(await screen.findByTestId("credential-jev")).getByText("來自 .env")).toBeTruthy();
+    expect(within(screen.getByTestId("credential-openai")).getByText("後台已存（加密）")).toBeTruthy();
+  });
+
+  it("says whether Brain picked the change up right away", async () => {
+    vi.mocked(saveModelProviderSettings).mockResolvedValue({ ...settings(), runtime_refreshed: true });
+    render(<ModelProviders />);
+
+    await screen.findByTestId("category-chat_llm");
+    fireEvent.click(screen.getByRole("button", { name: "儲存設定" }));
+
+    expect(await screen.findByText("模型供應商設定已儲存並立即生效。")).toBeTruthy();
+  });
+
+  it("resets one failing hop without dropping unsaved edits", async () => {
+    const failing = settings();
+    failing.categories[1].providers[0].health = { status: "cooling", reason: "timeout（decision_turn）", retry_in_seconds: 30 };
+    vi.mocked(fetchModelProviderSettings).mockResolvedValue(failing);
+    vi.mocked(resetModelProviderHealth).mockResolvedValue(settings());
+    render(<ModelProviders />);
+
+    const openAiRow = await screen.findByTestId("provider-chat_llm-openai");
+    fireEvent.click(within(openAiRow).getByLabelText("啟用 主對話模型 OpenAI"));
+    fireEvent.click(within(screen.getByTestId("provider-chat_llm-gemini")).getByRole("button", { name: "重置 主對話模型 Gemini 的失敗紀錄" }));
+
+    await waitFor(() => expect(resetModelProviderHealth).toHaveBeenCalledWith({ category: "chat_llm", hop: "gemini" }));
+    await waitFor(() => expect(within(screen.getByTestId("provider-chat_llm-gemini")).queryByRole("status")).toBeNull());
+    expect((within(screen.getByTestId("provider-chat_llm-openai")).getByLabelText("啟用 主對話模型 OpenAI") as HTMLInputElement).checked).toBe(true);
   });
 });

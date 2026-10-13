@@ -50,6 +50,8 @@ export interface ModelCategory {
 export interface ModelProviderSettings {
   credentials: ProviderCredential[];
   categories: ModelCategory[];
+  /** 只有存檔回應帶：Brain 是否已經立即重讀設定（否則 10 秒內生效）。 */
+  runtime_refreshed?: boolean;
 }
 
 export interface CategoryChange {
@@ -80,6 +82,18 @@ export async function saveModelProviderSettings(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(settings),
+  });
+  if (!response.ok) throw new Error(await parseErrorMessage(response));
+  return (await response.json()) as ModelProviderSettings;
+}
+
+export async function resetModelProviderHealth(
+  target: { category?: string; hop?: string } = {},
+): Promise<ModelProviderSettings> {
+  const response = await apiFetch(apiUrl(`${MODEL_PROVIDERS_PATH}/health/reset`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(target),
   });
   if (!response.ok) throw new Error(await parseErrorMessage(response));
   return (await response.json()) as ModelProviderSettings;

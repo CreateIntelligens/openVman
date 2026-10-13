@@ -248,6 +248,36 @@ def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, An
     return "\n".join(lines)
 
 
+class InternalProviderHealthReset(BaseModel):
+    category: str | None = Field(default=None, max_length=32)
+    hop: str | None = Field(default=None, max_length=64)
+
+
+@router.post(
+    "/brain/internal/provider-health/reset",
+    summary="清掉斷路器的失敗紀錄",
+    description="後台「模型供應商」頁的重置按鈕。可只清某一類（decision／chat_llm）或某一站；不帶參數清全部。",
+)
+async def internal_provider_health_reset(payload: InternalProviderHealthReset):
+    from core.provider_health import provider_health
+
+    return {"cleared": provider_health().reset(category=payload.category, hop=payload.hop)}
+
+
+@router.post(
+    "/brain/internal/model-providers/refresh",
+    summary="立即重讀模型供應商設定",
+    description="Backend 存完後台設定後呼叫，不必等 10 秒快取到期；失敗時照常 10 秒內生效。",
+)
+async def internal_model_providers_refresh():
+    from core.decision_router import clear_provider_configuration_cache
+    from core.fallback_chain import clear_admin_chain_cache
+
+    clear_provider_configuration_cache()
+    clear_admin_chain_cache()
+    return {"refreshed": True}
+
+
 @router.get(
     "/brain/internal/provider-health",
     summary="正在失敗的模型供應商（給後台模型供應商頁）",

@@ -69,3 +69,14 @@ def test_snapshot_reports_failing_hops_without_the_key():
     assert entry["status"] == "blocked"
     assert entry["key_fingerprint"] == key_fingerprint("secret-key")
     assert "secret-key" not in str(entry)
+
+
+def test_reset_clears_one_hop_or_everything():
+    health = ProviderHealth(clock=Clock())
+    health.record_failure(_hop("gemini"), "auth", "auth_invalid")
+    health.record_failure(_hop("groq"), "quota", "quota_exhausted")
+
+    assert health.reset(category="chat_llm", hop="gemini") == 1
+    assert [entry["hop"] for entry in health.snapshot()] == ["groq"]
+    assert health.reset() == 1
+    assert health.snapshot() == []

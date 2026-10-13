@@ -471,3 +471,23 @@ def test_small_successful_decisions_do_not_reset_failures_of_another_purpose(mon
 
     # 每輪決策先問 Jev；附圖選擇照常先問 Clef。
     assert calls == [("jev", "big"), ("clef-primary", "small")]
+
+
+def test_remote_openai_hop_gets_more_time_than_the_local_per_hop_cap(monkeypatch):
+    hops = [_hop("clef-primary"), _hop("openai")]
+    monkeypatch.setattr(router, "_provider_configuration", lambda **_: _config(hops))
+    monkeypatch.setattr(router, "_record_hop", lambda **_: None)
+    budgets = {}
+
+    def call(hop, *_args, timeout, **_kwargs):
+        budgets[hop.id] = timeout
+        if hop.id == "clef-primary":
+            raise httpx.ReadTimeout("slow")
+        return {"answers": [{"type": "predicate", "name": "q", "probability": 0.9}]}
+
+    monkeypatch.setattr(router, "_call_provider", call)
+
+    router.decide("s", {"q": {"type": "noul"}}, timeout=5, per_hop_timeout=0.8, purpose="test")
+
+    assert budgets["clef-primary"] == pytest.approx(0.8, abs=0.05)
+    assert budgets["openai"] == pytest.approx(1.5, abs=0.05)

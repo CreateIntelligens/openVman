@@ -78,6 +78,29 @@ def _credential_value(runtime: AuthRuntime, credential_id: str) -> str:
     )
 
 
+class ResetProviderHealth(_StrictModel):
+    category: str | None = Field(default=None, max_length=32)
+    hop: str | None = Field(default=None, max_length=64)
+
+
+def _brain_post(runtime: AuthRuntime, path: str, body: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Best-effort internal call to Brain; None when Brain cannot be reached."""
+    config = runtime.config
+    try:
+        response = httpx.post(
+            f"{config.brain_url.rstrip('/')}{path}",
+            json=body or {},
+            headers={"X-Internal-Token": config.gateway_internal_token},
+            timeout=_HEALTH_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        result = response.json()
+    except Exception as exc:  # noqa: BLE001 - Brain 暫時連不上時設定照常存，10 秒內自己會讀到
+        logger.warning("Brain internal call %s failed: %s", path, exc)
+        return None
+    return result if isinstance(result, dict) else {}
+
+
 def _key_fingerprint(api_key: str) -> str:
     # 與 Brain core/provider_health.key_fingerprint 相同算法，用來對上「這把 key」的失敗紀錄。
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:12]
@@ -246,6 +269,25 @@ def update_model_provider_settings(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="model credential encryption is unavailable") from exc
+    # Brain 每 10 秒才重讀一次設定；存完主動叫它清快取，改完馬上到前台測就看得到。
+    refreshed = _brain_post(runtime, "/brain/internal/model-providers/refresh") is not None
+    return {**_admin_view(runtime), "runtime_refreshed": refreshed}
+
+
+@router.post("/health/reset")
+def reset_model_provider_health(
+    body: ResetProviderHealth,
+    _actor: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> dict[str, Any]:
+    if body.category is not None and body.category not in CATEGORIES:
+        raise HTTPException(status_code=422, detail="unknown model category")
+    result = _brain_post(
+        runtime, "/brain/internal/provider-health/reset",
+        {"category": body.category, "hop": body.hop},
+    )
+    if result is None:
+        raise HTTPException(status_code=503, detail="Brain is unavailable; provider health was not reset")
     return _admin_view(runtime)
 
 
