@@ -24,6 +24,7 @@ data/avatar/
 data/backgrounds/
 data/mascots/
 data/auth/
+data/backups/
 
 # Catalog & QA extraction temporary/generated data
 /Sewage and Dewatering Pump-50HZ-Vol.PIE-23121.pdf

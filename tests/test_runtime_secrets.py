@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import sqlite3
 import subprocess
 from pathlib import Path
 
@@ -40,30 +41,64 @@ def test_fresh_deployment_generates_every_secret(tmp_path):
     assert len(_value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET")) == 64
 
 
-def test_missing_encryption_secret_with_existing_database_stops(tmp_path):
+def _database(path: Path, *, secrets: int, table: str = "model_provider_secrets") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path)
+    connection.execute(f"CREATE TABLE {table} (credential_id TEXT, ciphertext TEXT)")
+    connection.executemany(
+        f"INSERT INTO {table} VALUES (?, 'x')", [(f"k{index}",) for index in range(secrets)],
+    )
+    connection.commit()
+    connection.close()
+
+
+def test_missing_secret_with_saved_keys_stops(tmp_path):
     deployment = _deployment(tmp_path, "SESSION_JWT_SECRET=keep\n")
-    (deployment / "data" / "auth").mkdir(parents=True)
-    (deployment / "data" / "auth" / "accounts.db").write_bytes(b"")
+    _database(deployment / "data" / "auth" / "accounts.db", secrets=2)
 
     result = _run(deployment)
 
     assert result.returncode == 1
-    assert "accounts.db already exists" in result.stderr
+    assert "already holds 2 encrypted API key(s)" in result.stderr
     assert _value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET") == ""
+
+
+def test_keys_saved_by_the_previous_release_also_stop(tmp_path):
+    deployment = _deployment(tmp_path, "")
+    _database(deployment / "data" / "auth" / "accounts.db", secrets=1, table="decision_provider_secrets")
+
+    assert _run(deployment).returncode == 1
+
+
+def test_database_without_saved_keys_still_gets_a_secret(tmp_path):
+    """只靠 watchtower 部署、從沒跑過這支腳本的機器：DB 在但沒存過金鑰，照常產生。"""
+    deployment = _deployment(tmp_path, "")
+    _database(deployment / "data" / "auth" / "accounts.db", secrets=0)
+
+    result = _run(deployment)
+
+    assert result.returncode == 0, result.stderr
+    assert len(_value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET")) == 64
+
+
+def test_unreadable_database_is_treated_as_holding_keys(tmp_path):
+    deployment = _deployment(tmp_path, "")
+    (deployment / "data" / "auth").mkdir(parents=True)
+    (deployment / "data" / "auth" / "accounts.db").write_bytes(b"not a database")
+
+    assert _run(deployment).returncode == 1
 
 
 def test_custom_database_path_is_honoured(tmp_path):
     deployment = _deployment(tmp_path, "AUTH_DATABASE_PATH=/data/custom/auth.db\n")
-    (deployment / "data" / "custom").mkdir(parents=True)
-    (deployment / "data" / "custom" / "auth.db").write_bytes(b"")
+    _database(deployment / "data" / "custom" / "auth.db", secrets=1)
 
     assert _run(deployment).returncode == 1
 
 
 def test_existing_secret_is_left_alone_even_with_a_database(tmp_path):
     deployment = _deployment(tmp_path, "DECISION_PROVIDER_ENCRYPTION_SECRET=original\n")
-    (deployment / "data" / "auth").mkdir(parents=True)
-    (deployment / "data" / "auth" / "accounts.db").write_bytes(b"")
+    _database(deployment / "data" / "auth" / "accounts.db", secrets=1)
 
     assert _run(deployment).returncode == 0
     assert _value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET") == "original"

@@ -40,8 +40,8 @@ cp .env.example .env
 用來加密 Auth DB 中由後台輸入的模型供應商 key（決策與主對話共用）；備份與還原必須保留同一個值。
 若更換此 secret，既有 key 會解不開：這時各家改用部署環境的 key 繼續運作，後台頁面標示「無法解密」，需重新輸入；
 Backend 啟動時記一筆 ERROR，`/healthz` 的 `dependencies.model_provider_keys` 列出解不開的家並把整體狀態標成 `degraded`。
-`scripts/ensure-runtime-secrets.sh`（`scripts/up.sh` 每次都會跑）在 `data/auth/accounts.db` 已存在、這個 secret 卻是空的時會停下來報錯，
-不會自動產生新值；請從 `.env` 備份找回原值。repo 內沒有備份 `.env` 與 `data/auth/` 的排程，兩者必須由主機層一起備份、一起還原。
+`scripts/ensure-runtime-secrets.sh`（`scripts/up.sh` 每次都會跑）在 `data/auth/accounts.db` 已經存有加密金鑰、這個 secret 卻是空的時會停下來報錯，
+不會自動產生新值；請從 `.env` 備份找回原值。只靠 watchtower 部署的機器不會跑這支腳本，新部署要手動跑一次確認 `.env` 有這個值。repo 內沒有備份 `.env` 與 `data/auth/` 的排程，兩者必須由主機層一起備份、一起還原。
 主對話若套用後台設定後沒有任何一家有可用 key，Brain 也會改照 `LLM_FALLBACK_CHAIN` 跑，不會整個停掉。Grafana 預設不開放匿名瀏覽，每個部署都必須有唯一密碼。
 
 模型供應商由 ROOT 在 Admin「System → 模型供應商」管理。key 每家一把：Clef 讀 `CLEF_API_KEY`（可選）、
