@@ -101,6 +101,7 @@ export function useProjectsAdmin() {
     projects,
     setDeleteTargetId,
     setNewProjectLabel,
+    setStatus,
     status,
   };
 }

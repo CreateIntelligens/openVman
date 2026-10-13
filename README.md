@@ -100,7 +100,8 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語分流改用 VoxCPM 或 CosyVoice） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
 
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
-- 專案可設定語言分流與 ASR 詞表；未明確指定單次 ASR provider 時，開啟台語分流的專案改用 Breeze 批次辨識並判斷是否為台語，明確指定則保留該引擎。
+- 專案可在「專案管理 → 語音設定」限制能用的 ASR 引擎與聲音、指定預設值與台語分流引擎；實際能用的是帳號授權與專案限制的交集，備援也不會超出範圍。沒設定的專案不受影響。規則見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
+- 專案可設定語言分流與 ASR 詞表；未明確指定單次 ASR provider 時，開啟台語分流的專案改用 Breeze（或專案指定的台語引擎）批次辨識並判斷是否為台語，明確指定則保留該引擎。
 - TTS 依帳號授權選擇供應商與聲音，主要節點失敗時自動改用下一家。
 
 語音輸入與串流細節見 [前端規格](docs/specs/02_FRONTEND_SPEC.md)，TTS 與中斷處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。

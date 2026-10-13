@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from app import voice_policy
 from app.auth.dependencies import (
     CurrentAccount,
     get_current_account,
@@ -270,14 +271,21 @@ async def metrics_prometheus():
 async def get_tts_providers(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
+    project_id: str = "",
 ) -> JSONResponse:
+    """帶 project_id 時只列這個專案允許的聲音（Embed key 一律用金鑰綁定的專案）。"""
+    _project, policy = voice_policy.request_policy(runtime, current, project_id)
     if current.embed_key is not None:
-        return JSONResponse(content=embed_tts_providers(current))
+        return JSONResponse(content=embed_tts_providers(current, runtime, policy))
     if not (
         current.user.account_type is AccountType.FORMAL
         and is_at_least_admin(current.user.role)
-    ) or resolve_admin_scope(current.user, runtime.admin_scopes).scoped:
-        return JSONResponse(content=scoped_tts_providers(current, runtime))
+    ) or resolve_admin_scope(current.user, runtime.admin_scopes).scoped or (
+        # 完整型錄列的是上游的所有聲音，不是已註冊的資源，沒辦法套專案清單；
+        # 專案有限制時改列已註冊且允許的聲音。
+        policy is not None and policy.restricts_tts
+    ):
+        return JSONResponse(content=scoped_tts_providers(current, runtime, policy))
 
     providers = await build_tts_provider_catalog(get_tts_config())
     return JSONResponse(content=providers)

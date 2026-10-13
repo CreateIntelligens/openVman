@@ -29,9 +29,17 @@ class CachedTTSEntry:
     sample_rate: int
 
 
-def make_cache_key(text: str, voice_hint: str, provider: str) -> str:
-    """Return the Redis key for a TTS payload."""
+def make_cache_key(
+    text: str, voice_hint: str, provider: str, *, scope: str = "",
+) -> str:
+    """Return the Redis key for a TTS payload.
+
+    ``scope`` separates entries whose fallback rules differ (a restricted
+    project); empty keeps the historical key so existing entries still hit.
+    """
     raw = f"{text}|{voice_hint}|{provider}"
+    if scope:
+        raw = f"{raw}|{scope}"
     digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
     return f"tts:v1:{digest}"
 

@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from app import asr_glossary as asr_glossary_mod
 from app import language_routes as language_routes_mod
-from app.auth.asr_selection import asr_user_choices
+from app import voice_policy
 from app.auth.dependencies import (
     CurrentAccount,
     get_current_account,
@@ -120,7 +120,7 @@ async def _transcribe_routed(
     language_routes: str | None,
     preferred: str | None,
     trace_id: str,
-    taiwanese_uses_breeze: bool,
+    taiwanese_engine: str | None,
     allowed_providers: set[str] | None = None,
     strict_provider: bool = False,
 ) -> dict:
@@ -141,11 +141,11 @@ async def _transcribe_routed(
     speech_language: str | None = None
     language_check: dict | None = None
     if language_routes_mod.TAIWANESE in routes:
-        # 台語分流：Breeze 把台語直接翻成華語（華語也準），同時請 Brain 聽是不是台語，
-        # 轉錄出來的華語文字看不出原本講的是台語。後台試辨識照操作者選的引擎跑，
-        # 才比得出各家聽台語的差別。
-        if taiwanese_uses_breeze:
-            preferred = language_routes_mod.TAIWANESE_ASR_ENGINE
+        # 台語分流：Breeze（或專案指定的台語引擎）把台語直接翻成華語（華語也準），同時
+        # 請 Brain 聽是不是台語，轉錄出來的華語文字看不出原本講的是台語。後台試辨識與
+        # 明確指定 provider 的請求傳 None，照選的引擎跑，才比得出各家聽台語的差別。
+        if taiwanese_engine:
+            preferred = taiwanese_engine
         result, heard = await asyncio.gather(
             transcribe(
                 tmp_path, trace_id, preferred, prompt=prompt, routes=routes,
@@ -207,34 +207,35 @@ async def transcribe_for_account(
     明確指定時先驗證批次模式、授權與部署設定，只執行該引擎，不修改帳號偏好。
     省略時保留帳號偏好與部署預設；備援限於授權引擎及既有部署預設。
     """
-    from app.gateway.worker import _account_asr_provider
-
     suffix = os.path.splitext(file.filename or "")[1] or ".wav"
     tmp_path: str | None = None
     cfg = get_tts_config()
     try:
         requested = provider.strip()
-        allowed = (
-            set(asr_user_choices(runtime, account.user))
-            if account.embed_key is None else set()
+        _project, policy = voice_policy.request_policy(runtime, account, project_id)
+        scope = voice_policy.batch_asr_scope(
+            runtime, account.user, policy, embed=account.embed_key is not None,
         )
         if requested:
             from app.gateway.ingestion_audio import configured_providers
 
             if requested not in SERVER_ASR_PROVIDERS:
                 raise HTTPException(status_code=422, detail="Invalid batch ASR provider")
-            if account.embed_key is not None or requested not in allowed:
+            if account.embed_key is not None or requested not in scope.explicit:
                 raise HTTPException(status_code=403, detail="ASR provider not allowed")
             if requested not in configured_providers():
                 raise HTTPException(status_code=503, detail="ASR provider not configured")
-        preferred = requested or _account_asr_provider(
-            {"owner_user_id": account.user.id},
-        )
+        elif (
+            policy is not None and policy.restricts_asr
+            and not scope.allowed & SERVER_ASR_PROVIDERS
+        ):
+            # 專案把批次引擎全關了（例如只開串流）：直接說不行，不要回「轉錄失敗」。
+            raise HTTPException(status_code=403, detail="ASR provider not allowed")
+        preferred = requested or scope.preferred
         # The deployment default remains an implicit choice for existing clients
-        # without explicit grants. A fallback must not expose other engines.
-        providers = (
-            {requested} if requested else allowed | {cfg.asr_provider}
-        )
+        # without explicit grants, unless the project policy excludes it. A
+        # fallback must not expose other engines.
+        providers = {requested} if requested else set(scope.allowed)
         tmp_path, _ = await persist_upload_to_tempfile(
             file,
             suffix=suffix,
@@ -246,7 +247,7 @@ async def transcribe_for_account(
             language_routes=language_routes,
             preferred=preferred,
             trace_id="asr-chat",
-            taiwanese_uses_breeze=not bool(requested),
+            taiwanese_engine=None if requested else scope.taiwanese,
             allowed_providers=providers,
             strict_provider=bool(requested),
         ))
@@ -347,7 +348,7 @@ async def preview_asr(
             language_routes=language_routes,
             preferred=provider or None,
             trace_id="asr-preview",
-            taiwanese_uses_breeze=False,
+            taiwanese_engine=None,
         ))
     except UploadTooLargeError as exc:
         limit_mb = exc.limit_bytes / (1024 * 1024)

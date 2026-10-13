@@ -182,7 +182,34 @@ ws.send(JSON.stringify(payload));
 
 `asr` 回傳 `value`（保存選擇）、`effective`（生效引擎）、`allowed`（授權 ID 陣列），及 `batch`／`stream`／`browser` 清單。前兩者項目為 `{id, configured: bool}`，browser 為 `{id, configured: null}`。`configured` 僅表必要設定是否齊全，不能用作上游健康檢查；能力清單也不保證下一次請求授權仍有效。
 
+選填 query `project_id`（須能讀取，否則 404）時，`asr.allowed`／`batch`／`stream`／`browser` 與 `tts.providers` 改為帳號授權 ∩ 專案限制，`asr.effective` 改為這個專案實際會先用的引擎（`value` 仍是帳號保存的選擇），並多一個 `project_policy`：`{project_id, allowed_asr_engines, default_asr_engine, taiwanese_asr_engine, allowed_tts_voices, default_tts_voice, effective_tts_voice}`，`effective_tts_voice` 是省略聲音時會用的聲音（沒有可用聲音時為空字串）。不帶 `project_id` 時回應欄位與以前完全相同。
+
 一般帳號的 TTS 清單包含跨 provider 的已授權聲音；合成時以聲音 metadata 驗證 provider，省略 provider 時由 voice 推導，省略 voice 時使用帳號預設。metadata 缺漏的舊聲音僅沿用管理員設定的預設 provider，不接受 provider／voice 不匹配；Embed key 維持綁定聲音限制。TTS 回應依實際 `Content-Type` 處理 WAV／MP3／raw PCM，不能從端點名稱推測檔案格式。完整欄位位置、狀態碼及標準庫範例見 [串接指南](../guides/integration-quickstart.md)。Brain 無新增對外契約，既有前台／後台呼叫可沿用，不需要 UI 改版。
+
+### 專案語音限制（`GET/PUT /api/v1/projects/{project_id}/policy`）
+
+帳號授權決定「這個人能用什麼」，專案限制決定「這個專案肯用什麼」；每次語音請求實際能用的是兩者交集。存在 Auth DB 的 `project_policies`（migration 20，主鍵 `project_id`，以 `(resource_type='project', project_id)` 外鍵指向 `resources`，刪專案時一併刪除）。欄位：
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `allowed_asr_engines` | `string[]` | 允許的 ASR 引擎（批次、串流、browser 都可列）；空陣列＝不限制 |
+| `default_asr_engine` | `string \| null` | 專案預設引擎 |
+| `taiwanese_asr_engine` | `string \| null` | 台語分流使用的批次引擎；`null` 沿用 Breeze |
+| `allowed_tts_voices` | `string[]` | 允許的聲音資源 ID（provider 由聲音 metadata 決定）；空陣列＝不限制 |
+| `default_tts_voice` | `string \| null` | 專案預設聲音 |
+
+- `GET`：能編輯專案內容（`ResourceAccess.EDIT`：管理者，或有該專案授權且可進後台的帳號）即可讀；沒有設定時回全空的「不限制」。
+- `PUT`：需 admin 以上並通過專案 `MUTATE` 解析；整份取代，全部留空等於移除限制。受限 admin 只能放入自己權限上限內的引擎與聲音（403 列出超出的項目）。引擎與聲音必須是已註冊資源、有清單時預設值必須在清單內、台語引擎必須是批次引擎，否則 422。
+- 引擎下架或聲音刪除不會把清單清空（JSON 不隨外鍵連動），讀取端照原樣當作限制：寧可擋下，也不因清單變空而變成「不限制」。
+
+套用位置（沒有專案、專案讀不到、或限制為空時，行為與改版前完全相同）：
+
+- 批次 ASR（`/api/v1/asr/transcribe`）：明確指定 `provider` 須同時在帳號授權與專案清單內（否則 403，推論前就拒絕）。省略時依序取帳號偏好 → 專案預設 → 部署預設 `ASR_PROVIDER`，每一個都要在「（帳號授權 ∪ 部署預設）∩ 專案清單」內，備援鏈也限於此集合；專案把批次引擎全部排除時回 403。台語分流改用 `taiwanese_asr_engine`（須在允許集合內，否則不換引擎）。
+- 上傳媒體（`POST /api/v1/uploads` 的 `project_id`，Embed key 一律用金鑰的專案）：背景 `process_media` 在專案有 ASR 限制時套用同一個交集；沒有限制時維持原本不設限的內部備援。
+- 串流 ASR（`/api/v1/asr/stream` 的 `project_id`）：query `engine` 不在專案清單內回 `not_allowed`，管理員的「可試任何串流引擎」例外也受專案限制。未指定 `engine` 時先用帳號偏好（被專案擋掉才看專案預設；偏好是批次引擎時不會被換成串流）。
+- TTS（`/v1/audio/speech` 新增選填 `project_id`、`/api/v1/tts/stream`）：`resolve_tts_voice` 帶專案；聲音不在清單回 403（帳號本身看不到仍回 404），管理員一樣受限。省略聲音時依序取專案預設 → 帳號預設 → 清單第一個可用聲音。台語分流換 VoxCPM／CosyVoice 時，專案有限制就只換到清單內該 provider 的聲音，找不到就不換。合成失敗退回 Edge-TTS 只在專案不限制、或清單內有 Edge 聲音（改用該聲音）時發生，否則回 502，不默默換引擎；有聲音限制的專案在 `/v1/audio/speech` 快取 key 加上專案範圍，避免拿到別的專案備援出來的音訊。
+- Embed key：沒有帳號授權，專案有限制時以專案清單代替帳號授權（批次備援、串流預設引擎、聲音）；仍不可明確指定 ASR provider 或串流 `engine`。金鑰設定的聲音不在清單內時回 403，`/api/v1/tts/providers` 也不列。
+- `/api/v1/tts/providers` 與 `/api/v1/me/capabilities` 接受選填 `project_id`，見下節。
 
 ### 後台試辨識（`POST /api/v1/asr/preview`，管理員）
 

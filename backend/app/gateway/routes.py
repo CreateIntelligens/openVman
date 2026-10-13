@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
+from app import language_routes as language_routes_mod
 from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
 from app.auth.models import ResourceType, is_at_least_admin
 from app.auth.resources import ResourceAccess, ResourceNotFoundError, resolve_resource
@@ -229,11 +230,12 @@ def _error_response(status_code: int, error: str, **extra: Any) -> JSONResponse:
     "/api/v1/uploads",
     tags=["Uploads"],
     summary="上傳檔案",
-    description="上傳圖文、語音等檔案至暫存區，並排入背景處理隊列。\n\n**所需欄位**：\n- `file` (Form, UploadFile): 欲上傳的檔案\n- `session_id` (Query, str): 指派歸屬的 Session ID",
+    description="上傳圖文、語音等檔案至暫存區，並排入背景處理隊列。\n\n**所需欄位**：\n- `file` (Form, UploadFile): 欲上傳的檔案\n- `session_id` (Query, str): 指派歸屬的 Session ID\n- `project_id` (Query, str, 選填): 語音轉寫套用這個專案的 ASR 限制；Embed key 一律用金鑰綁定的專案",
 )
 async def upload(
     file: UploadFile = File(...),
     session_id: str = Query(...),
+    project_id: str = Query(""),
     current: CurrentAccount = Depends(get_current_account),
 ) -> JSONResponse:
     cfg = get_tts_config()
@@ -269,6 +271,12 @@ async def upload(
         "trace_id": trace_id,
         "owner_user_id": current.user.id,
     }
+    # 背景工作只拿得到 job 資料，專案在這裡先依呼叫者權限解析好（讀不到就當沒帶）。
+    resolved_project = language_routes_mod.resolve_project(current, project_id)
+    if resolved_project:
+        job_data["project_id"] = resolved_project
+    if current.embed_key is not None:
+        job_data["embed_key_id"] = current.embed_key.key_id
 
     await set_job_status(
         job_id,

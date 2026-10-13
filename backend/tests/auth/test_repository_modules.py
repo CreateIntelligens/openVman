@@ -24,6 +24,7 @@ _REPOSITORY_MODULES = [
     "admin_scopes_repository",
     "auth_audit_repository",
     "embed_keys_repository",
+    "project_policy_repository",
     "repository_errors",
     "resource_repository",
     "temporary_accounts_repository",
@@ -43,7 +44,7 @@ def test_repository_errors_share_one_exception_hierarchy():
         for value in vars(repository_errors).values()
         if inspect.isclass(value) and issubclass(value, Exception)
     ]
-    assert len(shared) == 10
+    assert len(shared) == 11
     owned_elsewhere = [
         embed_keys_repository.EmbedKeyNotFoundError,
         settings_repository.UnknownSettingError,

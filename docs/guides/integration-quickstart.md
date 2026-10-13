@@ -38,6 +38,26 @@
 
 資源清單沿用對應端點的項目格式：專案以 `project_id` 識別，角色以 `char_id` 識別，聲音從 `tts.providers` 取供應商及其聲音。預設值可能空缺或因撤權不在目前清單，應先確認可用清單再呼叫。專案 `label` 只是顯示名稱，`project_id` 是 opaque ID，必須原樣傳遞，不能自行從名稱轉換。
 
+### 帶專案查詢
+
+專案可以在後台「專案管理 → 語音設定」限制能用的 ASR 引擎與聲音；實際能用的是帳號授權與專案限制的交集。呼叫 `GET /api/v1/me/capabilities?project_id=<project_id>` 時，`asr` 與 `tts.providers` 會改成這個專案能用的範圍，`asr.effective` 是這個專案會先用的引擎，並多一個 `project_policy`：
+
+```json
+{
+  "project_policy": {
+    "project_id": "<opaque-project-id>",
+    "allowed_asr_engines": [],
+    "default_asr_engine": null,
+    "taiwanese_asr_engine": null,
+    "allowed_tts_voices": [],
+    "default_tts_voice": null,
+    "effective_tts_voice": "<voice-id>"
+  }
+}
+```
+
+空陣列代表專案不限制。不帶 `project_id` 時沒有 `project_policy`，其他欄位與上例相同；專案讀不到回 404。之後的 ASR、TTS 請求記得帶同一個 `project_id`，限制才會套用：超出專案範圍的 ASR `provider` 回 403、聲音回 403。
+
 需要個別重新整理時可呼叫：
 
 | 資源 | 帳號授權清單 |
@@ -46,7 +66,7 @@
 | 角色 | `GET /api/v1/avatar` |
 | 吉祥物／小助理 | `GET /api/v1/avatar/mascots` |
 | 背景 | `GET /api/v1/backgrounds` |
-| TTS 供應商及聲音 | `GET /api/v1/tts/providers` |
+| TTS 供應商及聲音 | `GET /api/v1/tts/providers`（選填 `project_id`） |
 
 `GET /api/v1/characters` 是公開 SDK 清單；取得角色授權以 `/avatar` 或 capabilities 為準。
 

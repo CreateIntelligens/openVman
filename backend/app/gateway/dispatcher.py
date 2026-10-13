@@ -24,6 +24,7 @@ def _route_mime(mime_type: str) -> str:
 
 async def _process(
     category: str, file_path: str, trace_id: str, asr_provider: str | None = None,
+    asr_allowed: frozenset[str] | None = None,
 ) -> IngestionResult:
     """Call the appropriate ingestion function.
 
@@ -38,7 +39,12 @@ async def _process(
 
     if category == "audio":
         from app.gateway.ingestion_audio import transcribe as transcribe_audio
-        return await transcribe_audio(file_path, trace_id, asr_provider)
+        # 只有專案限制 ASR 時才帶白名單；沒帶就是改版前的不設限備援。
+        if asr_allowed is None:
+            return await transcribe_audio(file_path, trace_id, asr_provider)
+        return await transcribe_audio(
+            file_path, trace_id, asr_provider, allowed_providers=set(asr_allowed),
+        )
 
     if category == "video":
         from app.gateway.ingestion_video import describe as describe_video
@@ -62,6 +68,8 @@ def _build_result(result: IngestionResult, mime_type: str) -> dict[str, Any]:
 
 async def dispatch(
     file_path: str, mime_type: str, trace_id: str, asr_provider: str | None = None,
+    *,
+    asr_allowed: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """Route media to the appropriate ingestion handler.
 
@@ -83,7 +91,7 @@ async def dispatch(
 
     try:
         result = await asyncio.wait_for(
-            _process(category, file_path, trace_id, asr_provider),
+            _process(category, file_path, trace_id, asr_provider, asr_allowed),
             timeout=timeout_sec,
         )
         return _build_result(result, mime_type)

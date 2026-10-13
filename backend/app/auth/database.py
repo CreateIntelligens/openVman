@@ -342,6 +342,32 @@ _MODEL_PROVIDER_SETTINGS_STATEMENTS = (
 # 舊的兩張決策表刻意保留（只複製不刪）：部署後若把程式退回舊版，舊版還讀得到
 # 升級當下的決策設定。新版確定不會退回後，再用之後的 migration 刪掉。
 
+# 專案層的語音限制：帳號授權決定「這個人能用什麼」，這張表決定「這個專案肯用什麼」，
+# 請求實際能用的是兩者交集。另開一張表而不是塞進 resources.metadata_json：那份
+# metadata 是專案的顯示資訊，沒有欄位型別也沒有變更紀錄；限制要記錄誰改的、何時
+# 改的，也要能被外鍵跟著專案一起刪掉。resource_type 固定是 'project'，只為了能用複合外鍵
+# 指向 resources。清單存 JSON：引擎與聲音被移除時不會連動刪掉，讀取端照原樣當作
+# 限制（寧可擋下也不要因為清單變空而變成「不限制」）。
+_PROJECT_POLICY_SCHEMA_VERSION = 20
+_PROJECT_POLICY_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS project_policies (
+        project_id TEXT PRIMARY KEY,
+        resource_type TEXT NOT NULL DEFAULT 'project'
+            CHECK (resource_type = 'project'),
+        allowed_asr_engines_json TEXT NOT NULL DEFAULT '[]',
+        default_asr_engine TEXT,
+        taiwanese_asr_engine TEXT,
+        allowed_tts_voices_json TEXT NOT NULL DEFAULT '[]',
+        default_tts_voice TEXT,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (resource_type, project_id)
+            REFERENCES resources(resource_type, resource_id) ON DELETE CASCADE
+    )
+    """,
+)
+
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
     (2, "temporary_accounts_grants_and_defaults", _TEMPORARY_ACCOUNT_STATEMENTS),
@@ -421,6 +447,11 @@ _MIGRATIONS = (
         ),
     ),
     (19, "model_provider_settings", _MODEL_PROVIDER_SETTINGS_STATEMENTS),
+    (
+        _PROJECT_POLICY_SCHEMA_VERSION,
+        "project_policies",
+        _PROJECT_POLICY_STATEMENTS,
+    ),
 )
 
 

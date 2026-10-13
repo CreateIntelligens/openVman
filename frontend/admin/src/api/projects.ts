@@ -38,3 +38,34 @@ export function deleteProject(projectId: string) {
     { project_id: projectId },
   );
 }
+
+/** 專案層的語音限制；空清單代表「不限制」，實際可用的是帳號授權與這份清單的交集。 */
+export interface ProjectPolicyInput {
+  allowed_asr_engines: string[];
+  default_asr_engine: string | null;
+  taiwanese_asr_engine: string | null;
+  allowed_tts_voices: string[];
+  default_tts_voice: string | null;
+}
+
+export interface ProjectPolicy extends ProjectPolicyInput {
+  project_id: string;
+  updated_by: string | null;
+  updated_at: string | null;
+}
+
+function projectPolicyPath(projectId: string) {
+  return `${projectPath(projectId)}/policy`;
+}
+
+export async function fetchProjectPolicy(projectId: string) {
+  return fetchJson<ProjectPolicy>(apiUrl(projectPolicyPath(projectId)));
+}
+
+export function saveProjectPolicy(projectId: string, policy: ProjectPolicyInput) {
+  return jsonRequest<ProjectPolicy>(
+    "PUT",
+    projectPolicyPath(projectId),
+    { ...policy },
+  );
+}

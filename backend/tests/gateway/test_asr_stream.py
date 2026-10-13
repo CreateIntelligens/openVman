@@ -55,7 +55,7 @@ def tmp_log(monkeypatch):
 
 def _client(monkeypatch, *, allowed=True, embed=False, judge=None):
     account = types.SimpleNamespace(
-        user=types.SimpleNamespace(id="u1"), embed_key=object() if embed else None,
+        user=types.SimpleNamespace(id="u1"), embed_key=types.SimpleNamespace(project_id="") if embed else None,
     )
     monkeypatch.setattr(asr_stream, "authenticate_websocket", lambda ws, runtime: account)
     monkeypatch.setattr(asr_stream, "get_auth_runtime", lambda: types.SimpleNamespace(

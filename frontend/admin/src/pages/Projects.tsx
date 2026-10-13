@@ -1,5 +1,9 @@
+import { useState } from "react";
+
 import { isAtLeastAdmin } from "../api/auth";
+import type { ProjectSummary } from "../api/projects";
 import ConfirmModal from "../components/ConfirmModal";
+import ProjectPolicyDialog from "../components/projects/ProjectPolicyDialog";
 import StatusAlert from "../components/StatusAlert";
 import { useAuth } from "../context/AuthContext";
 import { useProjectsAdmin } from "../hooks/useProjectsAdmin";
@@ -21,8 +25,10 @@ export default function Projects() {
     projects,
     setDeleteTargetId,
     setNewProjectLabel,
+    setStatus,
     status,
   } = useProjectsAdmin();
+  const [policyTarget, setPolicyTarget] = useState<ProjectSummary | null>(null);
 
   return (
     <div className="page-scroll">
@@ -134,14 +140,25 @@ export default function Projects() {
                   </div>
                 </div>
 
-                {canManageProjects && project.project_id !== "default" && (
-                  <button
-                    onClick={() => setDeleteTargetId(project.project_id)}
-                    disabled={!!deletingId}
-                    className="mt-auto rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-colors disabled:opacity-50"
-                  >
-                    {deletingId === project.project_id ? "Deleting..." : "Delete Project"}
-                  </button>
+                {canManageProjects && (
+                  <div className="mt-auto flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPolicyTarget(project)}
+                      className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
+                    >
+                      語音設定
+                    </button>
+                    {project.project_id !== "default" && (
+                      <button
+                        onClick={() => setDeleteTargetId(project.project_id)}
+                        disabled={!!deletingId}
+                        className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-colors disabled:opacity-50"
+                      >
+                        {deletingId === project.project_id ? "Deleting..." : "Delete Project"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -156,6 +173,18 @@ export default function Projects() {
           </div>
         </section>
       </div>
+
+      {canManageProjects && policyTarget && (
+        <ProjectPolicyDialog
+          projectId={policyTarget.project_id}
+          projectLabel={policyTarget.label || policyTarget.project_id}
+          onClose={() => setPolicyTarget(null)}
+          onSaved={(message) => {
+            setPolicyTarget(null);
+            setStatus({ type: "success", message });
+          }}
+        />
+      )}
 
       <ConfirmModal
         open={canManageProjects && deleteTargetId !== ""}

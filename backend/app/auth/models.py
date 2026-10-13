@@ -128,6 +128,43 @@ class AccountDefaultsRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class ProjectPolicyRecord:
+    """Per-project voice limits layered on top of account grants.
+
+    空清單代表「專案不另外限制」，所以沒有設定的專案行為與以前完全一樣；
+    請求實際能用的是帳號授權與這份清單的交集。
+    """
+
+    project_id: str
+    allowed_asr_engines: tuple[str, ...] = ()
+    default_asr_engine: str | None = None
+    taiwanese_asr_engine: str | None = None
+    allowed_tts_voices: tuple[str, ...] = ()
+    default_tts_voice: str | None = None
+    updated_by: str | None = None
+    updated_at: str | None = None
+
+    @property
+    def restricts_asr(self) -> bool:
+        return bool(self.allowed_asr_engines)
+
+    @property
+    def restricts_tts(self) -> bool:
+        return bool(self.allowed_tts_voices)
+
+    def allows_asr(self, engine: str) -> bool:
+        return not self.allowed_asr_engines or engine in self.allowed_asr_engines
+
+    def allows_voice(self, voice_id: str) -> bool:
+        return not self.allowed_tts_voices or voice_id in self.allowed_tts_voices
+
+    def narrow_asr(self, engines: set[str]) -> set[str]:
+        if not self.allowed_asr_engines:
+            return set(engines)
+        return {engine for engine in engines if engine in self.allowed_asr_engines}
+
+
+@dataclass(frozen=True, slots=True)
 class TemporaryBatchRecord:
     id: str
     created_by: str | None

@@ -12,8 +12,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app import language_routes as language_routes_mod
+from app import voice_policy
 from app.auth import voice_access
 from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.models import ProjectPolicyRecord
 from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
@@ -76,6 +78,22 @@ class SpeechRequest(BaseModel):
     provider: str = ""
     response_format: str = "wav"
     speed: float = 1.0
+    # 選填：套用這個專案的聲音限制（Embed key 一律用金鑰綁定的專案）。
+    project_id: str = ""
+
+
+def _cache_scope(project_id: str | None, policy: ProjectPolicyRecord | None) -> str:
+    """Cache namespace for a request.
+
+    同一段文字、同一個聲音在每個專案合成出來都一樣，key 本來就含聲音；但快取存的
+    可能是 Edge 備援的結果。有聲音限制的專案備援規則不同（可能禁止 Edge 或指定別
+    的 Edge 聲音），所以各自一份，避免拿到別的專案備援出來的聲音。沒限制的專案
+    共用原本的 key，命中率不變。
+    """
+    if project_id and policy is not None and policy.restricts_tts:
+        return f"project:{project_id}"
+    return ""
+
 
 @router.post("/v1/audio/speech", tags=["TTS"], summary="文字轉語音")
 async def create_speech(
@@ -83,12 +101,16 @@ async def create_speech(
     current: CurrentAccount = Depends(get_current_account),
 ) -> Response:
     cfg = get_tts_config()
+    runtime = get_auth_runtime()
+    project_id, policy = voice_policy.request_policy(runtime, current, body.project_id)
     authorized = voice_access.resolve_tts_voice(
         current,
-        get_auth_runtime(),
+        runtime,
         requested_provider=body.provider,
         requested_voice=body.voice,
+        project_id=project_id,
     )
+    edge_fallback_voice = voice_access.tts_fallback_voice(runtime, policy)
     provider = authorized.provider if authorized else body.provider
     voice = authorized.runtime_key if authorized else body.voice
     svc = _get_service()
@@ -101,13 +123,17 @@ async def create_speech(
     cache_key: str | None = None
 
     if cfg.tts_cache_enabled:
-        cache_key = make_cache_key(cleaned_text, voice, provider)
+        cache_key = make_cache_key(
+            cleaned_text, voice, provider, scope=_cache_scope(project_id, policy),
+        )
         cached = await cache_get(cache_key)
         if cached is not None:
             return _cached_speech_response(cached)
 
     try:
-        output = svc.synthesize(request, provider=provider)
+        output = svc.synthesize(
+            request, provider=provider, edge_fallback_voice=edge_fallback_voice,
+        )
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
@@ -198,25 +224,37 @@ async def tts_stream_endpoint(
     current: CurrentAccount = Depends(get_current_account),
 ) -> Response:
     cfg = get_tts_config()
+    runtime = get_auth_runtime()
     routes = await language_routes_mod.effective_routes(
         current, body.project_id, language_routes_mod.parse_requested(body.language_routes),
     )
+    project_id, policy = voice_policy.request_policy(runtime, current, body.project_id)
+    edge_fallback_voice = voice_access.tts_fallback_voice(runtime, policy)
     override = (
         language_routes_mod.taiwanese_tts_provider(body.provider)
         if language_routes_mod.TAIWANESE in routes
         and body.speech_language == language_routes_mod.TAIWANESE
         else None
     )
+    override_voice = ""
+    if override and policy is not None and policy.restricts_tts:
+        # 專案限制了聲音：台語只能換到清單裡 VoxCPM／CosyVoice 的聲音；清單裡沒有
+        # 就不換，照一般流程用專案允許的聲音唸。
+        picked = voice_access.project_voice_for_providers(
+            runtime, policy, language_routes_mod.TAIWANESE_TTS_PROVIDERS,
+        )
+        override, override_voice = picked if picked else (None, "")
     if override:
         # 台語分流：原本不是 VoxCPM／CosyVoice 就改用 VoxCPM 的部署預設聲音。先於帳號的
         # 聲音授權判斷，否則只開了別家聲音的帳號會在換家前就被擋下。
-        provider, voice, character = override, "", ""
+        provider, voice, character = override, override_voice, override_voice
     else:
         authorized = voice_access.resolve_tts_voice(
             current,
-            get_auth_runtime(),
+            runtime,
             requested_provider=body.provider,
             requested_voice=body.voice or body.character,
+            project_id=project_id,
         )
         provider = authorized.provider if authorized else body.provider
         character = authorized.runtime_key if authorized else (body.character or cfg.tts_indextts_default_character)
@@ -289,6 +327,7 @@ async def tts_stream_endpoint(
                     text=cleaned, voice_hint=voice or character, usage_scope=scope,
                 ),
                 provider=provider,
+                edge_fallback_voice=edge_fallback_voice,
             )
         except RuntimeError as exc:
             return JSONResponse(status_code=502, content={"error": str(exc)})
@@ -315,10 +354,13 @@ async def tts_stream_endpoint(
     # Fallback streaming: Edge-TTS 邊合成邊吐，避免等整句。
     # voice 已經過 resolve_tts_voice 授權；Edge adapter 會把非 Edge 格式的
     # 名稱（例如 IndexTTS 角色名）退回自身預設 voice，這裡不需再清掉。
+    # 專案限制了聲音又沒開 Edge 時不能在這裡默默換成 Edge（edge_fallback_voice 是 None）。
     edge = svc.edge_adapter
-    if edge.enabled:
+    is_edge = provider == voice_access.EDGE_TTS_PROVIDER
+    if edge.enabled and (is_edge or edge_fallback_voice is not None):
+        edge_voice = voice if is_edge or not edge_fallback_voice else edge_fallback_voice
         stream = edge.synthesize_stream(
-            SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope)
+            SynthesizeRequest(text=cleaned, voice_hint=edge_voice, usage_scope=scope)
         )
         _meter_stream("edge-tts")
         return StreamingResponse(stream, media_type="audio/mpeg")
@@ -330,6 +372,7 @@ async def tts_stream_endpoint(
                 text=cleaned, voice_hint=voice or character, usage_scope=scope,
             ),
             provider=provider,
+            edge_fallback_voice=edge_fallback_voice,
         )
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})

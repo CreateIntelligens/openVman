@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-10-13]** **專案層的語音限制**：每個專案可設定允許的 ASR 引擎、預設引擎、台語分流引擎，以及允許的聲音與預設聲音（Auth DB 新表 `project_policies`，migration 20；`GET/PUT /api/v1/projects/{project_id}/policy`，改設定需 admin，受限 admin 只能放自己範圍內的資源）。實際能用的是帳號授權 ∩ 專案限制，套用在批次 ASR（明確指定、預設順序、備援、台語分流）、上傳媒體轉寫（`/api/v1/uploads` 新增 `project_id`）、串流 ASR（管理員也受限）、TTS（含台語換引擎；專案沒開 Edge 聲音時合成失敗直接回錯誤，不默默換成 Edge）與 Embed key。`/api/v1/me/capabilities`、`/api/v1/tts/providers`、`/v1/audio/speech` 新增選填 `project_id`。後台專案管理頁新增「語音設定」視窗。沒設定的專案行為不變。
+
 - **[2026-10-13]** **正式語音串接驗證紀錄**：以既有帳號 API key 經正式 HTTPS 入口實測 5 個批次及 3 個串流 ASR、兩專案 RAG、標準庫 CLI 與 5 家 TTS；記錄通過結果及尚未修復的過期 VoxCPM 聲音、Edge 空音訊假成功、IP 憑證不匹配問題。詳見 `docs/plans/integration-capabilities-asr.md`。
 
 - **[2026-10-13]** **帳號串接能力探索與單次語音選擇**：新增 `GET /api/v1/me/capabilities`，彙整帳號可用專案、角色、吉祥物、背景、TTS 聲音及 ASR batch／stream／browser 模式、部署設定與預設值；不接受 Embed key，`configured` 不代表即時健康。批次 ASR 可用 form `provider` 指定已授權、已設定的單次引擎，失敗回 502 且不暗中備援；一般帳號可在串流 ASR query `engine` 選擇已授權引擎，TTS 可選跨 provider 的已授權聲音並驗證 metadata，均不修改偏好。提供完整串接指南及 Python 標準庫 CLI，依 Content-Type 保存 WAV／MP3／PCM，TLS 預設驗證，搭配隔離 HTTP 測試。

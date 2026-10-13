@@ -47,3 +47,7 @@ class OwnedResourcesError(RepositoryError):
 
 class InvalidResourceGrantError(RepositoryError):
     pass
+
+
+class InvalidProjectPolicyError(RepositoryError):
+    pass

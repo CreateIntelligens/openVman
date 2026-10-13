@@ -7,10 +7,17 @@ from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from app import project_routes
+from app import project_routes, voice_policy
 from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.models import ResourceType
+from app.auth.resources import (
+    ResourceAccess,
+    ResourceNotFoundError,
+    resolve_resource,
+)
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.settings_repository import (
     BROWSER_ASR_PROVIDER,
@@ -18,6 +25,7 @@ from app.auth.settings_repository import (
     STREAM_ASR_PROVIDERS,
 )
 from app.auth.settings_routes import get_my_asr_provider
+from app.auth.voice_access import resolve_tts_voice
 from app.gateway.asr_stream import configured_stream_engines
 from app.gateway.ingestion_audio import configured_providers
 from app.routes import admin, avatar, backgrounds, mascots
@@ -63,6 +71,20 @@ class TtsCapabilities(BaseModel):
     providers: list[dict[str, Any]]
 
 
+class ProjectPolicyCapability(BaseModel):
+    """The project's own limits plus what they leave this account."""
+
+    project_id: str
+    # 專案設定本身；空清單代表不限制。
+    allowed_asr_engines: list[str]
+    default_asr_engine: str | None
+    taiwanese_asr_engine: str | None
+    allowed_tts_voices: list[str]
+    default_tts_voice: str | None
+    # 這個帳號在這個專案沒指定聲音時會用的聲音（""：交給下游預設）。
+    effective_tts_voice: str
+
+
 class AccountCapabilities(BaseModel):
     schema_version: Literal[1] = 1
     account: CapabilityAccount
@@ -73,6 +95,8 @@ class AccountCapabilities(BaseModel):
     backgrounds: list[dict[str, Any]]
     tts: TtsCapabilities
     asr: AsrCapabilities
+    # 只有帶 project_id 查詢時才出現；沒帶時回應跟以前一模一樣。
+    project_policy: ProjectPolicyCapability | None = None
 
 
 @router.get(
@@ -80,6 +104,7 @@ class AccountCapabilities(BaseModel):
     response_model=AccountCapabilities,
     responses={
         403: {"description": "不接受 Embed key"},
+        404: {"description": "帶了 project_id 但查無此專案或沒有權限"},
         502: {"description": "專案服務回應失敗或格式無效"},
         503: {"description": "專案服務暫時無法連線"},
     },
@@ -87,15 +112,31 @@ class AccountCapabilities(BaseModel):
 )
 async def get_capabilities(
     request: Request,
+    project_id: str = "",
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
-) -> AccountCapabilities:
+) -> Response:
+    """帶 ``project_id`` 時，ASR 與 TTS 清單改成「帳號授權 ∩ 專案限制」。"""
     if current.embed_key is not None:
         # Embed keys bind a narrower set than their owner's account grants.
         raise HTTPException(
             status_code=403,
             detail="Account capabilities are unavailable to embed keys",
         )
+    project_id = project_id.strip()
+    policy = None
+    if project_id:
+        try:
+            resolve_resource(
+                runtime.resources,
+                current.user,
+                ResourceType.PROJECT,
+                project_id,
+                access=ResourceAccess.READ,
+            )
+        except ResourceNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="Resource not found") from exc
+        policy = runtime.project_policies.get(project_id)
 
     try:
         projects = await project_routes.list_projects(
@@ -123,13 +164,23 @@ async def get_capabilities(
     characters = await avatar.list_characters(current, runtime)
     mascot_list = await mascots.list_mascots(current, runtime)
     background_list = await backgrounds.list_backgrounds(current, runtime)
-    tts_providers = await admin.get_tts_providers(current, runtime)
+    tts_providers = await admin.get_tts_providers(
+        current, runtime, project_id=project_id,
+    )
     asr = get_my_asr_provider(current, runtime)
+    asr_allowed = (
+        [engine for engine in asr.allowed if policy.allows_asr(engine)]
+        if policy is not None else asr.allowed
+    )
+    asr_effective = (
+        voice_policy.effective_asr_engine(runtime, current.user, policy)
+        if policy is not None else asr.effective
+    )
     batch_configured = set(configured_providers())
     stream_configured = set(configured_stream_engines())
     defaults = runtime.account_access.get_defaults(current.user.id)
 
-    return AccountCapabilities(
+    capabilities = AccountCapabilities(
         account=CapabilityAccount(
             id=current.user.id,
             username=current.user.username,
@@ -146,23 +197,53 @@ async def get_capabilities(
         tts=TtsCapabilities(providers=json.loads(tts_providers.body)),
         asr=AsrCapabilities(
             value=asr.value,
-            effective=asr.effective,
-            allowed=asr.allowed,
+            effective=asr_effective,
+            allowed=asr_allowed,
             batch=[
                 ServerAsrCapability(
                     id=engine, configured=engine in batch_configured,
                 )
-                for engine in asr.allowed if engine in SERVER_ASR_PROVIDERS
+                for engine in asr_allowed if engine in SERVER_ASR_PROVIDERS
             ],
             stream=[
                 ServerAsrCapability(
                     id=engine, configured=engine in stream_configured,
                 )
-                for engine in asr.allowed if engine in STREAM_ASR_PROVIDERS
+                for engine in asr_allowed if engine in STREAM_ASR_PROVIDERS
             ],
             browser=[
                 BrowserAsrCapability(id=BROWSER_ASR_PROVIDER)
-                for engine in asr.allowed if engine == BROWSER_ASR_PROVIDER
+                for engine in asr_allowed if engine == BROWSER_ASR_PROVIDER
             ],
         ),
     )
+    payload = capabilities.model_dump(mode="json")
+    if policy is None:
+        payload.pop("project_policy")
+        return JSONResponse(content=payload)
+    payload["project_policy"] = ProjectPolicyCapability(
+        project_id=project_id,
+        allowed_asr_engines=list(policy.allowed_asr_engines),
+        default_asr_engine=policy.default_asr_engine,
+        taiwanese_asr_engine=policy.taiwanese_asr_engine,
+        allowed_tts_voices=list(policy.allowed_tts_voices),
+        default_tts_voice=policy.default_tts_voice,
+        effective_tts_voice=_effective_voice(current, runtime, project_id),
+    ).model_dump(mode="json")
+    return JSONResponse(content=payload)
+
+
+def _effective_voice(
+    current: CurrentAccount,
+    runtime: AuthRuntime,
+    project_id: str,
+) -> str:
+    try:
+        authorized = resolve_tts_voice(
+            current, runtime,
+            requested_provider="", requested_voice="", project_id=project_id,
+        )
+    except HTTPException:
+        # 專案限制與帳號授權沒有交集：沒有能用的聲音。
+        return ""
+    return authorized.resource_id if authorized else ""

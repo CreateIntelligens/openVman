@@ -113,6 +113,33 @@ def _account_asr_provider(data: dict[str, Any]) -> str | None:
         return None
 
 
+def _media_asr_scope(data: dict[str, Any]) -> tuple[str | None, frozenset[str] | None]:
+    """Preferred engine and allowed set for a queued upload.
+
+    沒帶專案、或專案沒限制 ASR 時照舊：只看帳號偏好，備援不設限（內部轉檔用）。
+    專案有限制時套用跟 /api/v1/asr/transcribe 一樣的交集，備援也不能跑出去。
+    讀不到專案限制就拒絕轉寫，而不是當作沒限制。
+    """
+    preferred = _account_asr_provider(data)
+    project_id = data.get("project_id") or ""
+    if not project_id:
+        return preferred, None
+    from app.auth.runtime import get_auth_runtime
+    from app.voice_policy import batch_asr_scope, project_policy
+
+    runtime = get_auth_runtime()
+    policy = project_policy(runtime, project_id)
+    if policy is None or not (policy.restricts_asr or policy.default_asr_engine):
+        return preferred, None
+    user = runtime.users.get_by_id(data.get("owner_user_id") or "")
+    scope = batch_asr_scope(
+        runtime, user, policy, embed=bool(data.get("embed_key_id")),
+    )
+    if not policy.restricts_asr:
+        return scope.preferred or preferred, None
+    return scope.preferred, scope.allowed
+
+
 async def process_media(ctx: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
     """Process uploaded media through the dispatcher, then forward to brain."""
     file_path = data.get("file_path", "")
@@ -127,8 +154,10 @@ async def process_media(ctx: dict[str, Any], data: dict[str, Any]) -> dict[str, 
         if job_id:
             await set_job_status(job_id, "processing")
 
+        asr_provider, asr_allowed = _media_asr_scope(data)
         result = await dispatch(
-            file_path, mime_type, trace_id, _account_asr_provider(data),
+            file_path, mime_type, trace_id, asr_provider,
+            asr_allowed=asr_allowed,
         )
 
         if result.get("type") == "processing_error":

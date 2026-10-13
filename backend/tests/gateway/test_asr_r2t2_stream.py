@@ -88,7 +88,7 @@ def _environment(
 ):
     account = SimpleNamespace(
         user=SimpleNamespace(id="stream-test", role=AccountRole.ADMIN),
-        embed_key=object() if embed else None,
+        embed_key=SimpleNamespace(project_id="") if embed else None,
     )
     state = {
         "stored": stored,

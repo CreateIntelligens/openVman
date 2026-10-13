@@ -362,3 +362,59 @@ def test_authorization_repository_failure_cannot_return_empty_success(env):
     with env.runtime.database.transaction(write=True) as connection:
         connection.execute("DROP TABLE resource_grants")
     assert env.client.get(_PATH, headers=_headers(env)).status_code == 500
+
+
+def test_project_id_narrows_asr_and_tts_to_the_project_policy(env):
+    env.runtime.project_policies.replace(
+        project_id="project-a",
+        allowed_asr_engines=["r2t2", "browser"],
+        default_asr_engine="r2t2",
+        taiwanese_asr_engine="r2t2",
+        allowed_tts_voices=["voice-b"],
+        default_tts_voice="voice-b",
+        updated_by=env.root.id,
+    )
+    response = env.client.get(
+        _PATH, params={"project_id": "project-a"}, headers=_headers(env),
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["asr"]["allowed"] == ["browser", "r2t2"]
+    # 偏好 r2t2-live 被專案擋掉，改用專案預設。
+    assert payload["asr"]["value"] == "r2t2-live"
+    assert payload["asr"]["effective"] == "r2t2"
+    assert payload["asr"]["batch"] == [{"id": "r2t2", "configured": False}]
+    assert payload["asr"]["stream"] == []
+    assert {
+        provider["id"]: provider["voices"]
+        for provider in payload["tts"]["providers"]
+    } == {"cosyvoice": ["voice-b"]}
+    assert payload["project_policy"] == {
+        "project_id": "project-a",
+        "allowed_asr_engines": ["r2t2", "browser"],
+        "default_asr_engine": "r2t2",
+        "taiwanese_asr_engine": "r2t2",
+        "allowed_tts_voices": ["voice-b"],
+        "default_tts_voice": "voice-b",
+        "effective_tts_voice": "voice-b",
+    }
+    # 不帶 project_id 時回應一個欄位都沒變。
+    _assert_scoped(env.client.get(_PATH, headers=_headers(env)).json())
+
+
+def test_project_id_without_policy_reports_unrestricted_lists(env):
+    plain = env.client.get(_PATH, headers=_headers(env)).json()
+    scoped = env.client.get(
+        _PATH, params={"project_id": "project-a"}, headers=_headers(env),
+    ).json()
+    assert scoped["asr"] == plain["asr"]
+    assert scoped["tts"] == plain["tts"]
+    assert scoped["project_policy"]["allowed_asr_engines"] == []
+    assert scoped["project_policy"]["effective_tts_voice"] == "voice-a"
+
+
+def test_project_id_outside_grants_is_404(env):
+    response = env.client.get(
+        _PATH, params={"project_id": "project-other"}, headers=_headers(env),
+    )
+    assert response.status_code == 404

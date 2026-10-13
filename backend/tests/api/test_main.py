@@ -471,7 +471,7 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
         tts_cache_enabled=True,
         tts_cache_ttl_seconds=86400,
     ))
-    module.tts_routes.make_cache_key = lambda text, voice_hint, provider: "tts:v1:test"
+    module.tts_routes.make_cache_key = lambda text, voice_hint, provider, **_: "tts:v1:test"
 
     async def _fake_cache_get(key: str):
         assert key == "tts:v1:test"
@@ -485,7 +485,7 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
         raise AssertionError("cache_put should not be called on cache hit")
 
     class BrokenService:
-        def synthesize(self, request, provider=""):
+        def synthesize(self, request, provider="", edge_fallback_voice=""):
             raise AssertionError("synthesize should not run on cache hit")
 
     module.tts_routes.cache_get = _fake_cache_get
@@ -550,7 +550,7 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
             # Edge disabled → fallback 走 buffered service chain（本測試的情境）。
             self.edge_adapter = types.SimpleNamespace(enabled=False)
 
-        def synthesize(self, request, provider=""):
+        def synthesize(self, request, provider="", edge_fallback_voice=""):
             self.requests.append(request)
             return types.SimpleNamespace(
                 result=types.SimpleNamespace(
@@ -637,7 +637,7 @@ def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
                 )[1],
             )
 
-        def synthesize(self, request, provider=""):
+        def synthesize(self, request, provider="", edge_fallback_voice=""):
             self.synthesize_called = True
             raise AssertionError("buffered synthesize 不應被呼叫")
 
@@ -1019,7 +1019,7 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
         def __init__(self):
             self.edge_adapter = types.SimpleNamespace(enabled=True)
 
-        def synthesize(self, request, provider=""):
+        def synthesize(self, request, provider="", edge_fallback_voice=""):
             captured["provider"] = provider
             return types.SimpleNamespace(
                 result=types.SimpleNamespace(

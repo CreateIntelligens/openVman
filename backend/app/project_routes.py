@@ -12,12 +12,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.responses import Response
 
 from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
-from app.auth.models import ResourceType, ResourceVisibility
-from app.auth.repository_errors import ResourceConflictError
+from app.auth.models import ProjectPolicyRecord, ResourceType, ResourceVisibility
+from app.auth.repository_errors import (
+    InvalidProjectPolicyError,
+    ResourceConflictError,
+)
 from app.auth.resources import (
     ResourceAccess,
     ResourceNotFoundError,
     list_accessible_resources,
+    resolve_admin_scope,
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
@@ -297,3 +301,121 @@ async def get_project(
         current=current,
         project_id=project_id,
     )
+
+
+class ProjectPolicyPayload(_StrictModel):
+    """A project's voice limits; empty lists mean no project restriction."""
+
+    allowed_asr_engines: list[str] = Field(default_factory=list)
+    default_asr_engine: str | None = None
+    taiwanese_asr_engine: str | None = None
+    allowed_tts_voices: list[str] = Field(default_factory=list)
+    default_tts_voice: str | None = None
+
+
+class ProjectPolicyProfile(ProjectPolicyPayload):
+    project_id: str
+    updated_by: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_record(cls, record: ProjectPolicyRecord) -> ProjectPolicyProfile:
+        return cls(
+            project_id=record.project_id,
+            allowed_asr_engines=list(record.allowed_asr_engines),
+            default_asr_engine=record.default_asr_engine,
+            taiwanese_asr_engine=record.taiwanese_asr_engine,
+            allowed_tts_voices=list(record.allowed_tts_voices),
+            default_tts_voice=record.default_tts_voice,
+            updated_by=record.updated_by,
+            updated_at=record.updated_at,
+        )
+
+
+@router.get(
+    "/api/v1/projects/{project_id}/policy",
+    response_model=ProjectPolicyProfile,
+    responses={404: {"description": "查無此專案或沒有編輯權限"}},
+    summary="Get Project Voice Policy",
+)
+def get_project_policy(
+    project_id: str,
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> ProjectPolicyProfile:
+    """能編輯專案內容的人都能看；改設定只有管理者。"""
+    _resolve_project(runtime, current, project_id, access=ResourceAccess.EDIT)
+    return ProjectPolicyProfile.from_record(runtime.project_policies.get(project_id))
+
+
+@router.put(
+    "/api/v1/projects/{project_id}/policy",
+    response_model=ProjectPolicyProfile,
+    responses={
+        403: {"description": "需要管理者，或選了超出自己可指派範圍的引擎／聲音"},
+        404: {"description": "查無此專案或不在管理範圍內"},
+        422: {"description": "引擎或聲音不存在，或預設值不在允許清單內"},
+    },
+    summary="Replace Project Voice Policy",
+)
+def put_project_policy(
+    project_id: str,
+    body: ProjectPolicyPayload,
+    current: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> ProjectPolicyProfile:
+    """整份取代；全部留空等於移除專案限制。"""
+    _resolve_project(runtime, current, project_id, access=ResourceAccess.MUTATE)
+    # 受限 admin 跟發帳號授權一樣，只能放進自己被指派的引擎與聲音，
+    # 否則可以借專案設定把範圍外的資源開給別人。
+    scope = resolve_admin_scope(current.user, runtime.admin_scopes)
+    requested = [
+        *(
+            (ResourceType.ASR_ENGINE, engine)
+            for engine in (
+                *body.allowed_asr_engines,
+                body.default_asr_engine,
+                body.taiwanese_asr_engine,
+            )
+            if engine and engine.strip()
+        ),
+        *(
+            (ResourceType.CUSTOM_VOICE, voice)
+            for voice in (*body.allowed_tts_voices, body.default_tts_voice)
+            if voice and voice.strip()
+        ),
+    ]
+    outside = sorted({
+        f"{resource_type.value}/{resource_id.strip()}"
+        for resource_type, resource_id in requested
+        if not scope.allows(resource_type, resource_id.strip())
+    })
+    if outside:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="cannot use resources outside your assigned scope: "
+            + ", ".join(outside),
+        )
+    try:
+        record = runtime.project_policies.replace(
+            project_id=project_id,
+            allowed_asr_engines=body.allowed_asr_engines,
+            default_asr_engine=body.default_asr_engine,
+            taiwanese_asr_engine=body.taiwanese_asr_engine,
+            allowed_tts_voices=body.allowed_tts_voices,
+            default_tts_voice=body.default_tts_voice,
+            updated_by=current.user.id,
+        )
+    except InvalidProjectPolicyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    logger.info(
+        "project policy updated project_id=%s by=%s asr=%s tts=%s",
+        project_id,
+        current.user.id,
+        ",".join(record.allowed_asr_engines) or "-",
+        ",".join(record.allowed_tts_voices) or "-",
+    )
+    return ProjectPolicyProfile.from_record(record)

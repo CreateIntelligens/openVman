@@ -97,13 +97,19 @@ class TTSRouterService:
         ]
 
     def synthesize(
-        self, request: SynthesizeRequest, *, provider: str = "",
+        self,
+        request: SynthesizeRequest,
+        *,
+        provider: str = "",
+        edge_fallback_voice: str | None = "",
     ) -> SynthesisOutput:
         """Run the fallback chain and return the first successful result.
 
         When *provider* is given (not "" or "auto"), only that provider is
-        attempted first.  On failure it falls back to Edge-TTS and marks the
-        output with ``fallback=True``.
+        attempted first.  On failure it falls back to Edge-TTS with
+        *edge_fallback_voice* ("" = Edge's own default) and marks the output
+        with ``fallback=True``. ``None`` forbids that fallback (the project
+        policy does not allow Edge), so the provider's failure is raised.
 
         Raises RuntimeError if all attempts fail.
         """
@@ -112,7 +118,9 @@ class TTSRouterService:
             raise RuntimeError("TTS fallback chain 為空：無可用的 provider")
 
         if provider and provider != "auto":
-            return self._synthesize_targeted(request, provider, chain)
+            return self._synthesize_targeted(
+                request, provider, chain, edge_fallback_voice,
+            )
 
         return self._synthesize_chain(request, chain)
 
@@ -196,6 +204,7 @@ class TTSRouterService:
         request: SynthesizeRequest,
         provider: str,
         chain: list[RouteTarget],
+        edge_fallback_voice: str | None = "",
     ) -> SynthesisOutput:
         """Try a specific provider, fall back to Edge-TTS on failure."""
         target = next(
@@ -214,12 +223,16 @@ class TTSRouterService:
         )
         if edge is None or edge.adapter.provider_name == provider:
             raise RuntimeError(f"TTS provider 失敗且無法 fallback: {primary_error}")
+        if edge_fallback_voice is None:
+            raise RuntimeError(
+                f"TTS provider 失敗，專案不允許改用 Edge-TTS: {primary_error}"
+            )
 
         record_fallback_hop(
             from_target=target.target, to_target=edge.target, reason=reason,
         )
 
-        edge_request = replace(request, voice_hint="")
+        edge_request = replace(request, voice_hint=edge_fallback_voice)
         edge_result, _, edge_error = self._try_synthesize(edge, edge_request)
         if edge_result is not None:
             return SynthesisOutput(
