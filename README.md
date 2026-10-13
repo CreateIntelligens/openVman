@@ -70,6 +70,8 @@ Clef-Flash 決策 API 使用獨立網域 `https://clef.create360.ai`，由同一
 
 可信任的後端程式可使用帳號 API key，以 `Authorization: Bearer ovk_<key_id>.<secret>` 呼叫 ASR、TTS、Chat 與其他應用 API；權限沿用所屬帳號，root／admin 不需各套獨立 API。完整 key 只在建立時顯示一次，資料庫只存雜湊；管理 key 仍需登入 session。操作、契約與 ASR 範例見 [API key 整合指南](docs/guides/account-api-keys.md)。
 
+先以 `GET /api/v1/me/capabilities` 取得帳號已授權資源、ASR 模式／部署設定與預設值，再指定單次辨識 `provider`、串流連線 `engine` 或 TTS 聲音，不必改帳號偏好。`configured` 代表必要設定齊全，不保證上游健康；專案以原始 `project_id` 傳遞，`label` 只供顯示。可執行的 Python 標準庫 CLI 與音訊格式處理見 [串接快速開始](docs/guides/integration-quickstart.md) 及 [integration_client.py](scripts/integration_client.py)。
+
 ### Brain
 
 - RAG：知識文件轉為 Markdown 後以 EmbeddingGemma 2 向量化，存於 LanceDB；問答節點與 CSV 轉換的 QA 同樣索引。
@@ -96,7 +98,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://clef.create360.ai`，由同一
 | TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語分流改用 VoxCPM 或 CosyVoice） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
 
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
-- 專案可設定語言分流與 ASR 詞表；開啟台語分流的專案一律改用 Breeze 批次辨識並判斷是否為台語。
+- 專案可設定語言分流與 ASR 詞表；未明確指定單次 ASR provider 時，開啟台語分流的專案改用 Breeze 批次辨識並判斷是否為台語，明確指定則保留該引擎。
 - TTS 依帳號授權選擇供應商與聲音，主要節點失敗時自動改用下一家。
 
 語音輸入與串流細節見 [前端規格](docs/specs/02_FRONTEND_SPEC.md)，TTS 與中斷處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
@@ -213,7 +215,7 @@ python contracts/scripts/generate_protocol_contracts.py --check  # CI 檢查
 | 各層規格 | [Backend](docs/specs/01_BACKEND_SPEC.md)、[Frontend](docs/specs/02_FRONTEND_SPEC.md)、[Brain](docs/specs/03_BRAIN_SPEC.md)、[Gateway](docs/specs/04_GATEWAY_SPEC.md) |
 | 部署與維運 | [部署手冊](docs/operations/11_DEPLOYMENT.md)、[帳號管理](docs/operations/account-administration.md)、[GPU 服務共用](docs/operations/gpu-service-sharing.md) |
 | 文件匯入與 QA | [文件解析手冊](docs/operations/05_DOCLING_RUNBOOK.md)、[型錄 PDF 轉 QA SOP](docs/guides/PDF_CATALOG_TO_QA_SOP.md) |
-| 外部整合 | [Avatar JavaScript SDK](docs/guides/avatar-embed/README.md) |
+| 外部整合 | [帳號 API key](docs/guides/account-api-keys.md)、[能力探索與語音串接](docs/guides/integration-quickstart.md)、[Avatar JavaScript SDK](docs/guides/avatar-embed/README.md) |
 | Brain | [brain/README.md](brain/README.md) |
 | 版本變更 | [CHANGELOG.md](CHANGELOG.md) |
 

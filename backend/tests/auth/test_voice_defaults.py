@@ -151,13 +151,19 @@ def test_scope_repair_login_and_tts(
                     requested_provider=provider, requested_voice=voice,
                 )
             assert error.value.status_code == 404
-        # Registry refreshes must not silently undo the requirement to assign
-        # defaults again after the previous selection was revoked.
+        # A registry refresh restores explicit voice selection without silently
+        # choosing that voice as the account's default.
         _metadata(runtime, '{"provider": "indextts"}')
+        authorized = resolve_tts_voice(
+            current, runtime,
+            requested_provider="", requested_voice="voice-a",
+        )
+        assert authorized is not None
+        assert authorized.provider == "indextts"
         with pytest.raises(HTTPException) as error:
             resolve_tts_voice(
                 current, runtime,
-                requested_provider="", requested_voice="voice-a",
+                requested_provider="", requested_voice="",
             )
         assert error.value.status_code == 404
 

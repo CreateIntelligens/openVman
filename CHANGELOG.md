@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-10-13]** **帳號串接能力探索與單次語音選擇**：新增 `GET /api/v1/me/capabilities`，彙整帳號可用專案、角色、吉祥物、背景、TTS 聲音及 ASR batch／stream／browser 模式、部署設定與預設值；不接受 Embed key，`configured` 不代表即時健康。批次 ASR 可用 form `provider` 指定已授權、已設定的單次引擎，失敗回 502 且不暗中備援；一般帳號可在串流 ASR query `engine` 選擇已授權引擎，TTS 可選跨 provider 的已授權聲音並驗證 metadata，均不修改偏好。提供完整串接指南及 Python 標準庫 CLI，依 Content-Type 保存 WAV／MP3／PCM，TLS 預設驗證，搭配隔離 HTTP 測試。
+
 - **[2026-10-12]** **帳號 API 金鑰**：正式帳號可建立多把具期限、獨立撤銷與使用紀錄的 key，以 Bearer 呼叫既有 HTTP／WebSocket 應用 API。權限沿用帳號與即時資源授權；金鑰只顯示一次、資料庫只存雜湊，管理 key 需登入 session。後台新增 `/admin/accounts/api-keys`，用量依 key ID 歸屬，OpenAPI 標示 Bearer／Cookie／Embed 驗證方式，並提供 ASR 整合文件。
 
 ### Changed
@@ -17,6 +19,8 @@
 - **[2026-10-12]** **拆分接近千行上限的六個模組（行為不變）**：`backend/app/auth/repositories.py` 999 → 79 行（各 repository 與共用規則拆成獨立模組，順便消掉既有 repository 反向 import 的循環）、`frontend/admin/src/pages/KnowledgeBase.tsx` 993 → 446 行（拖放、批次選取、QA 節點對話框改成 hook 與子元件）、`brain/api/live/gemini_live.py` 968 → 452 行（每輪決策與工具、音訊、轉錄改成 mixin，37 個方法內容逐一比對未變）、`frontend/app/src/composables/useAvatarChat.ts` 950 → 478 行（WebSocket、文字回合、視覺輸入分出；回傳 API 不變）、`backend/app/routes/admin.py` 936 → 357 行（音色目錄、音色授權、ASR 引擎與資源同步移出路由）、`brain/api/tools/builtin/web_tools.py` 861 → 517 行（SSRF 檢查移到 `safety/url_policy.py`，2md 斷路器、預算與 fallback 迴圈移到 `infra/`）。原模組保留轉出口，既有 import 不用改；測試只調整幾處 patch 路徑，以後 patch `detect_audio_language`、`run_turn_decision_async` 要指向 `live.gemini_audio`、`live.gemini_turns`，patch `admin._excluded_voices` 不再影響 `/api/v1/tts/providers`。backend 1,171、Brain 1,235、後台 581、前台 297 個測試通過。
 
 ### Fixed
+
+- **[2026-10-13]** **受限管理者的聲音清單沿用權限上限**：`GET /api/v1/tts/providers` 與能力探索只列可存取聲音，避免清單出現實際合成時會被拒絕的範圍外音色；聲音解析與清單明確沿用同一個授權 runtime。
 
 - **[2026-10-13]** **用量時間軸測試不再看機器快慢**：`test_scope_events_carry_timeline_offsets` 假設寫一筆帳本一定少於 250ms，冷的 SQLite 第一次寫入就超過，起點不會被釘在 0；改用遠大於寫入時間的延遲，驗的仍是「延遲比 scope 長時起點不為負」。
 - **[2026-10-12]** **「我聽不懂，請一步一步說明」判不出困惑**：每輪決策的語氣選項只寫一個英文字（"Confused."），Clef 只能猜字面，這句的困惑信心 0.49～0.74，過不了 0.8 門檻，前台 Debug 顯示「未確定」。五個語氣選項改寫成可觀察的線索（困惑：說聽不懂、問某個詞的意思、要求更簡單或一步一步說明；挫折：抱怨、不耐煩、問題一直沒解決；急迫：現在就要或有截止時間；輕鬆：開玩笑、閒聊）。20 句標註：語氣套用正確 14 → 17、有情緒的 12 句套用 6 → 9、套錯 0 → 0，這句信心 0.98；30 句舊題組語氣欄 30 → 29（「講個笑話」改判輕鬆）。每輪約多 56 tokens、27 ms。

@@ -102,8 +102,8 @@ def resolve_tts_voice(
 ) -> AuthorizedVoice | None:
     """Resolve a voice before cache or provider access.
 
-    Administrators retain unrestricted provider access. Other accounts must use
-    their configured provider and an explicitly granted voice.
+    Administrators retain unrestricted provider access. Other accounts may use
+    any accessible voice, with its registered provider as the authority.
     """
     provider = requested_provider.strip()
     voice_id = requested_voice.strip()
@@ -118,16 +118,8 @@ def resolve_tts_voice(
     )
     if not is_unrestricted_admin:
         defaults = runtime.account_access.get_defaults(current.user.id)
-        if (
-            defaults is None
-            or not defaults.voice_provider
-            or not defaults.voice_id
-        ):
-            raise _not_found()
-        provider = provider or defaults.voice_provider
-        voice_id = voice_id or defaults.voice_id
-        if provider != defaults.voice_provider:
-            raise _not_found()
+        if not voice_id and defaults is not None:
+            voice_id = defaults.voice_id
     elif not voice_id:
         return None
 
@@ -140,6 +132,7 @@ def resolve_tts_voice(
             current.user,
             ResourceType.CUSTOM_VOICE,
             voice_id,
+            admin_scopes=runtime.admin_scopes,
         )
     except ResourceNotFoundError as exc:
         raise _not_found() from exc
@@ -150,10 +143,13 @@ def resolve_tts_voice(
         if provider and provider != "auto" and provider != registered_provider:
             raise _not_found()
         provider = registered_provider
-    elif defaults is not None:
+    elif not is_unrestricted_admin:
         # Account defaults are administrator-selected with the grants, so they
-        # remain authoritative for migrated rows that predate provider metadata.
-        provider = defaults.voice_provider
+        # remain authoritative for rows that predate provider metadata.
+        trusted_provider = defaults.voice_provider if defaults else ""
+        if provider and provider != "auto" and provider != trusted_provider:
+            raise _not_found()
+        provider = trusted_provider
 
     if not provider or provider == "auto":
         raise _not_found()
@@ -190,41 +186,35 @@ def scoped_tts_providers(
     current: CurrentAccount,
     runtime: AuthRuntime,
 ) -> list[dict[str, object]]:
-    """A non-admin account sees its default provider and its granted voices."""
+    """Group every accessible voice by its authoritative provider."""
     defaults = runtime.account_access.get_defaults(current.user.id)
-    if defaults is None or not defaults.voice_provider or not defaults.voice_id:
-        return []
-
-    voices: list[str] = []
+    fallback_provider = defaults.voice_provider if defaults else ""
+    voices_by_provider: dict[str, list[str]] = {}
     for record in list_accessible_resources(
         runtime.resources,
         current.user,
         ResourceType.CUSTOM_VOICE,
+        admin_scopes=runtime.admin_scopes,
     ):
         registered_provider = _metadata_string(
             _voice_metadata(record),
             "provider",
         )
-        if (
-            registered_provider
-            and registered_provider != defaults.voice_provider
-        ):
+        provider = registered_provider or fallback_provider
+        if not provider or provider == "auto":
             continue
-        voices.append(record.resource_id)
+        voices_by_provider.setdefault(provider, []).append(record.resource_id)
 
-    if not voices:
-        return []
-    default_voice = (
-        defaults.voice_id if defaults.voice_id in voices else voices[0]
-    )
     return [
         {
-            "id": defaults.voice_provider,
-            "name": PROVIDER_NAMES.get(
-                defaults.voice_provider,
-                defaults.voice_provider,
+            "id": provider,
+            "name": PROVIDER_NAMES.get(provider, provider),
+            "default_voice": (
+                defaults.voice_id
+                if defaults and defaults.voice_id in voices
+                else voices[0]
             ),
-            "default_voice": default_voice,
             "voices": voices,
         }
+        for provider, voices in voices_by_provider.items()
     ]

@@ -30,6 +30,8 @@ metadata 欄位為 `key_id`、`user_id`、`label`、`token_prefix`、`created_at
 Authorization: Bearer ovk_<key_id>.<secret>
 ```
 
+建議先呼叫 `GET /api/v1/me/capabilities`，取得這把 key 所屬帳號目前可用的資源與預設值，再選擇本次請求使用的專案、ASR 與聲音。完整能力契約、各欄位放置位置及可執行 Python 範例見 [串接快速開始](integration-quickstart.md)。此端點需要帳號 session 或 API key；Embed key 回 403。
+
 以音檔上傳為例，先在自己的程式環境安全設定 `OPENVMAN_API_KEY`：
 
 ```bash
@@ -37,10 +39,13 @@ curl --fail-with-body \
   'https://146.5gao.ai/openvman/api/v1/asr/transcribe' \
   -H "Authorization: Bearer $OPENVMAN_API_KEY" \
   -F 'file=@sample.wav' \
-  -F 'project_id=<已授權的專案ID>'
+  -F 'project_id=<已授權的專案ID>' \
+  -F 'provider=<已授權且已設定的批次引擎ID>'
 ```
 
-`file` 必填，`project_id` 與逗號分隔的 `language_routes` 選填。辨識引擎沿用帳號選擇與授權；不能藉由 key 任意指定引擎。回應包含 `text`、實際 `provider`、`elapsed_seconds`、`language`、`language_check`、`language_routes` 與 `glossary`。所有上游失敗時，既有批次路徑可能仍回 HTTP 200、`provider` 為空、文字為「（音訊轉錄失敗）」；整合者須一併判斷，不能只看 HTTP 成功。
+`file` 必填，`project_id`、逗號分隔的 `language_routes`、`provider` 選填，皆為 multipart form。`project_id` 是能力清單中的原始識別值，`label` 只供顯示；不可把專案名稱當 ID。指定非批次引擎回 422、未授權回 403、部署未設定回 503；明確指定時僅呼叫該引擎，台語分流不覆蓋選擇，上游失敗回 502，不暗中備援，也不寫入帳號偏好。
+
+省略或只送空白 `provider` 時沿用帳號偏好、部署預設與既有備援；候選限帳號授權，保留原部署預設的相容例外。回應包含 `text`、實際 `provider`、`elapsed_seconds`、`language`、`language_check`、`language_routes` 與 `glossary`。這條既有路徑所有上游失敗時可能仍回 HTTP 200、`provider` 為空、文字為「（音訊轉錄失敗）」；整合者須一併判斷，不能只看 HTTP 成功。
 
 Chat、TTS 與其他應用 API 也帶相同標頭，請求／回應契約維持各端點定義。可由部署的 `/openapi.json` 與 `/docs` 查詢，Swagger 的 AccountBearer 可填 JWT 或完整 API key；管理 key 的端點使用 SessionBearer。
 
@@ -48,7 +53,9 @@ Chat、TTS 與其他應用 API 也帶相同標頭，請求／回應契約維持�
 
 ## 串流 ASR
 
-可信任的後端 WebSocket client 可連到 `wss://146.5gao.ai/openvman/api/v1/asr/stream?project_id=<已授權的專案ID>`，握手標頭帶同一個 `Authorization: Bearer ...`。帳號必須有串流引擎授權，並選擇可用的串流引擎。等待 `{"type":"ready"}` 後傳 16 kHz、單聲道、16-bit little-endian PCM binary frames；接收 `interim` 暫定文字與 `final` 定稿文字。結束音訊送 `{"type":"end"}`，等待尾句後關閉。連線錯誤可能回 `error` 事件或在握手時拒絕。
+可信任的後端 WebSocket client 可連到 `wss://146.5gao.ai/openvman/api/v1/asr/stream?project_id=<已授權的專案ID>&engine=<已授權的串流引擎ID>`，握手標頭帶同一個 `Authorization: Bearer ...`。一般帳號也可用 query `engine` 選擇已授權的串流引擎，僅影響該連線，不修改偏好；省略時沿用帳號串流偏好。批次 `r2t2` 與串流 `r2t2-live` 分別授權。未授權或不合法的引擎回 `not_allowed`；未設定回 `not_configured`、上游失敗回 `upstream_failed`，Embed key 維持拒絕。
+
+等待 `{"type":"ready"}` 後傳 16 kHz、單聲道、16-bit little-endian PCM binary frames；接收 `interim` 暫定文字與 `final` 定稿文字。結束音訊送 `{"type":"end"}`，等待尾句後關閉。連線錯誤可能回 `error` 事件或在握手時拒絕。
 
 API key 不接受 query 參數；不要把 key 放進網址。瀏覽器原生 WebSocket 無法自行設定 Authorization 標頭，這種串流 key 接法供後端 client 使用。既有瀏覽器串流仍使用同來源登入 Cookie；本功能沒有自動開啟跨網域 CORS，也沒有把 root／admin key 加入 Avatar SDK。
 

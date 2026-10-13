@@ -332,6 +332,8 @@ def _provider_ready(cfg, name: str) -> bool:
 async def transcribe(
     file_path: str, trace_id: str, preferred: str | None = None, prompt: str = "",
     routes: list[str] | None = None,
+    *,
+    allowed_providers: set[str] | None = None,
 ) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
 
@@ -339,10 +341,15 @@ async def transcribe(
     SenseVoice 忽略。``routes`` 是專案生效的語言分流，R2T2 照它決定解碼語言；
     沒給（例如聊天附件）就當華語。
 
+    ``allowed_providers`` constrains every attempt, including fallback. Internal
+    ingestion callers may omit it; account-facing routes supply their scope.
+
     Returns IngestionResult with content_type="audio_transcription".
     """
     cfg = get_tts_config()
     configured = _resolve_chain(cfg, preferred)
+    if allowed_providers is not None:
+        configured = [name for name in configured if name in allowed_providers]
     chain = _skip_unreachable(configured)
     logger.info(
         "transcribe trace_id=%s provider=%s preferred=%s chain=%s skipped=%s",

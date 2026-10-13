@@ -12,6 +12,7 @@ from app.auth.dependencies import (
     require_root,
 )
 from app.auth.models import AccountType, is_at_least_admin
+from app.auth.resources import resolve_admin_scope
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.voice_access import embed_tts_providers, scoped_tts_providers
 from app.config import get_tts_config
@@ -275,7 +276,7 @@ async def get_tts_providers(
     if not (
         current.user.account_type is AccountType.FORMAL
         and is_at_least_admin(current.user.role)
-    ):
+    ) or resolve_admin_scope(current.user, runtime.admin_scopes).scoped:
         return JSONResponse(content=scoped_tts_providers(current, runtime))
 
     providers = await build_tts_provider_catalog(get_tts_config())

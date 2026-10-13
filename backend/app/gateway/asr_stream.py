@@ -176,16 +176,16 @@ def _allowed(current) -> str:
 
 
 def _engine_for(current, requested: str | None) -> str:
-    """後台試聽可以指定串流引擎（engine 參數）；只有管理員能用，其他人照帳號偏好與授權。"""
+    """Resolve a connection-local engine without mutating the account choice."""
     if not requested:
         return _allowed(current)
-    if (
-        current.embed_key is None
-        and is_at_least_admin(current.user.role)
-        and requested in _STREAM_ENGINES
-    ):
+    if current.embed_key is not None or requested not in _STREAM_ENGINES:
+        return ""
+    if is_at_least_admin(current.user.role):
         return requested
-    return ""
+    return permitted_asr_preference(
+        get_auth_runtime(), current.user, requested,
+    )
 
 
 def configured_stream_engines() -> list[str]:

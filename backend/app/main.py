@@ -28,6 +28,7 @@ from app.routes import admin as admin_routes
 from app.routes import asr as asr_routes
 from app.routes import avatar as avatar_routes
 from app.routes import backgrounds as background_routes
+from app.routes import capabilities as capabilities_routes
 from app.routes import documents as document_routes
 from app.routes import interrupt as interrupt_routes
 from app.routes import mascots as mascot_routes
@@ -67,6 +68,7 @@ app.include_router(interrupt_routes.router)
 app.include_router(tts_routes.router)
 app.include_router(document_routes.router)
 app.include_router(asr_routes.router)
+app.include_router(capabilities_routes.router)
 
 # The Brain proxy owns the `/api/v1/{path:path}` catch-all, so it must be the
 # last router registered — Starlette matches routes in declaration order and

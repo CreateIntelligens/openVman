@@ -41,6 +41,7 @@ def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
         "tts_cache_enabled": False,
         "tts_cache_ttl_seconds": 86400,
         "session_jwt_secret": "x" * 32,
+        "asr_provider": "breeze",
     }
     base.update(overrides)
     return types.SimpleNamespace(**base)
@@ -1427,10 +1428,13 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
     """一般使用者要能在聊天室用語音，後台那個端點限 admin。"""
     module, _ = _load_main(monkeypatch)
 
-    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
-        # 偏好的引擎掛了、由 sensevoice 接手。
+    async def _transcribe(
+        path, trace_id, preferred=None, prompt="", routes=None,
+        *, allowed_providers=None,
+    ):
+        assert allowed_providers == {"breeze"}
         return types.SimpleNamespace(
-            content_type="audio_transcription", content="你好", provider="sensevoice",
+            content_type="audio_transcription", content="你好", provider="breeze",
         )
 
     import app.gateway.ingestion_audio as ingestion_audio
@@ -1449,27 +1453,17 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["text"] == "你好"
-    # 回報實際辨識的引擎，不是一開始偏好的那個。
-    assert response.json()["provider"] == "sensevoice"
+    assert response.json()["provider"] == "breeze"
 
 
-def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
-    """引擎由後端依帳號查，不接受呼叫端指定。
-
-    否則使用者改一個請求就能繞過管理者的開放清單，關閉某個引擎形同虛設。
-    """
+def test_chat_transcribe_rejects_an_ungranted_client_supplied_engine(monkeypatch):
+    """單次請求可指定引擎，但仍必須在帳號授權清單內。"""
     module, _ = _load_main(monkeypatch)
-    seen: dict[str, object] = {}
-
-    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
-        seen["preferred"] = preferred
-        return types.SimpleNamespace(
-            content_type="audio_transcription", content="你好", provider="breeze",
-        )
+    transcribe = AsyncMock()
 
     import app.gateway.ingestion_audio as ingestion_audio
 
-    monkeypatch.setattr(ingestion_audio, "transcribe", _transcribe)
+    monkeypatch.setattr(ingestion_audio, "transcribe", transcribe)
     monkeypatch.setattr(
         module, "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=1024 * 1024),
@@ -1482,16 +1476,18 @@ def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
         files={"file": ("speech.webm", b"fake-audio-bytes", "audio/webm")},
     )
 
-    assert response.status_code == 200
-    # 請求裡塞的 provider 不該被採用：這個帳號沒選過，preferred 就是 None。
-    assert seen["preferred"] is None
+    assert response.status_code == 403
+    transcribe.assert_not_awaited()
 
 
 def _routed_asr_fixture(monkeypatch, module, routes):
     """Fake transcribe, project routes, glossary and Taiwanese check for the routed ASR paths."""
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
+    async def _transcribe(
+        path, trace_id, preferred=None, prompt="", routes=None,
+        *, allowed_providers=None,
+    ):
         seen.update(preferred=preferred, prompt=prompt, trace_id=trace_id)
         return types.SimpleNamespace(
             content_type="audio_transcription", content="今仔日天氣真好", provider=preferred or "breeze",
@@ -1643,13 +1639,20 @@ def test_session_backup_forwards_dry_run_to_brain(monkeypatch):
 def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp_path):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024 * 1024)
     import app.gateway.ingestion_audio as ingestion_audio
-    import app.gateway.worker as worker
+
+    from app.auth.dependencies import AuthTransport, CurrentAccount
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
 
     calls: dict[str, object] = {}
 
-    async def fake_transcribe(path, trace_id, preferred=None, prompt="", routes=None):
+    async def fake_transcribe(
+        path, trace_id, preferred=None, prompt="", routes=None,
+        *, allowed_providers=None,
+    ):
         calls["preferred"] = preferred
         calls["prompt"] = prompt
+        calls["allowed_providers"] = allowed_providers
         return types.SimpleNamespace(content="我現在頭很痛", provider="breeze")
 
     async def fake_routes(current, project_id, requested):
@@ -1664,7 +1667,6 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
         return "沉水泵、污泥泵"
 
     monkeypatch.setattr(ingestion_audio, "transcribe", fake_transcribe)
-    monkeypatch.setattr(worker, "_account_asr_provider", lambda _: "sensevoice")
     monkeypatch.setattr(module.asr_routes.language_routes_mod, "effective_routes", fake_routes)
     monkeypatch.setattr(module.asr_routes.language_routes_mod, "detect_taiwanese", fake_detect)
     monkeypatch.setattr(module.asr_routes.asr_glossary_mod, "project_asr_prompt", fake_prompt)
@@ -1672,13 +1674,22 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
     from starlette.datastructures import UploadFile
 
     upload = UploadFile(filename="clip.webm", file=__import__("io").BytesIO(b"fake-audio"))
-    account = types.SimpleNamespace(user=types.SimpleNamespace(id="u1"), embed_key=None)
+    runtime = get_auth_runtime()
+    user = runtime.users.create_root(username="ai360", password_hash="unused")
+    for engine in ("sensevoice", "breeze"):
+        runtime.resources.upsert_system_resource(
+            resource_type=ResourceType.ASR_ENGINE, resource_id=engine,
+        )
+    runtime.account_access.set_asr_provider(user.id, "sensevoice")
+    account = CurrentAccount(user=user, transport=AuthTransport.BEARER)
     response = asyncio.run(module.asr_routes.transcribe_for_account(
-        account=account, file=upload, project_id="proj-hospital", language_routes="zh,nan",
+        account=account, file=upload, project_id="proj-hospital",
+        language_routes="zh,nan", runtime=runtime,
     ))
 
     body = json.loads(response.body)
     assert calls["preferred"] == "breeze"
+    assert calls["allowed_providers"] == {"breeze", "sensevoice"}
     # 專案詞表帶給 Breeze 當前文。
     assert calls["prompt"] == "沉水泵、污泥泵" and calls["prompt_project"] == "proj-hospital"
     assert calls["routes_args"] == ("proj-hospital", ["zh", "nan"])

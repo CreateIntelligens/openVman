@@ -172,7 +172,17 @@ ws.send(JSON.stringify(payload));
 
 ### 批次 ASR 備援（`transcribe()`）
 
-依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、r2t2、sensevoice、openai；r2t2-dev 只在被選或設成 `ASR_PROVIDER` 時排入）。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後暫停 60 秒不排入，時間到由下一個請求再試，成功就解除；HTTP 錯誤碼代表機器還在回應，不暫停。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。
+`POST /api/v1/asr/transcribe` 的 multipart 欄位為必填 `file`、選填 `project_id`、`language_routes`、`provider`。明確指定非批次引擎回 422、未授權回 403、未設定回 503；指定時僅呼叫該引擎，台語分流不覆蓋選擇，失敗回 502，不暗中備援，不修改帳號偏好。`project_id` 保留原始 opaque ID，不接受以顯示 label 取代。
+
+省略或空白 `provider` 時，依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、r2t2、sensevoice、openai；r2t2-dev 只在被選或設成 `ASR_PROVIDER` 時排入），並限於帳號授權候選，保留原部署預設的相容例外；既有台語 Breeze 分流維持。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後暫停 60 秒不排入，時間到由下一個請求再試，成功就解除；HTTP 錯誤碼代表機器還在回應，不暫停。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。此既有路徑全部失敗可能仍回 HTTP 200、空 `provider` 及「（音訊轉錄失敗）」；client 必須檢查結果。
+
+### 帳號能力探索（`GET /api/v1/me/capabilities`）
+
+接受帳號 session 或 API key，未登入回 401、Embed key 回 403。回傳 `schema_version: 1`、`account: {id, username, role}`、`defaults: {project_id, character_id, voice_provider, voice_id, mascot_id, background_id}`，以及當下授權清單 `projects`、`characters`、`mascots`、`backgrounds`、`tts: {providers: [...]}`。角色來源與 `/api/v1/avatar` 一致，公開 `/api/v1/characters` 僅供 SDK，不作帳號授權判斷。
+
+`asr` 回傳 `value`（保存選擇）、`effective`（生效引擎）、`allowed`（授權 ID 陣列），及 `batch`／`stream`／`browser` 清單。前兩者項目為 `{id, configured: bool}`，browser 為 `{id, configured: null}`。`configured` 僅表必要設定是否齊全，不能用作上游健康檢查；能力清單也不保證下一次請求授權仍有效。
+
+一般帳號的 TTS 清單包含跨 provider 的已授權聲音；合成時以聲音 metadata 驗證 provider，省略 provider 時由 voice 推導，省略 voice 時使用帳號預設。metadata 缺漏的舊聲音僅沿用管理員設定的預設 provider，不接受 provider／voice 不匹配；Embed key 維持綁定聲音限制。TTS 回應依實際 `Content-Type` 處理 WAV／MP3／raw PCM，不能從端點名稱推測檔案格式。完整欄位位置、狀態碼及標準庫範例見 [串接指南](../guides/integration-quickstart.md)。Brain 無新增對外契約，既有前台／後台呼叫可沿用，不需要 UI 改版。
 
 ### 後台試辨識（`POST /api/v1/asr/preview`，管理員）
 
@@ -180,7 +190,7 @@ multipart：`file`、`provider`（`SERVER_ASR_PROVIDERS` 之一，空白用部�
 
 ### 串流 ASR（`GET /api/v1/asr/stream`，WebSocket）
 
-端點依帳號保存的偏好選擇 `gemini-live` 或 `r2t2-live`，並驗證所選引擎的目前授權；嵌入金鑰不可使用。批次 `r2t2` 與串流 `r2t2-live` 分開授權，兩個串流引擎均不進 `transcribe()` 備援鏈。沒選串流或授權被撤銷回 `not_allowed`。
+端點預設依帳號保存的串流偏好選擇引擎，也接受 query `engine`，一般帳號可指定目前已授權的 `STREAM_ASR_ENGINES`，管理員保留後台試聽能力；不改帳號偏好。嵌入金鑰不可使用。批次 `r2t2` 與串流 `r2t2-live` 分開授權，串流引擎均不進 `transcribe()` 備援鏈。沒選串流、指定非串流引擎或授權被撤銷回 `not_allowed`。
 
 R2T2 使用 `ASR_R2T2_STREAM_URL`（部署值 `ws://10.9.0.35:8040/asr_stream_api_v1`，2026-10-05 起 .35 為主機）與 `ASR_R2T2_SECRET_KEY`；另有獨立引擎 `r2t2-dev-live`／批次 `r2t2-dev` 接 .37（`ASR_R2T2_DEV_STREAM_URL`＋`ASR_R2T2_DEV_SECRET_KEY`、`ASR_R2T2_DEV_URL`），同一套握手；帳號自己選了才用，失敗不換台，也不排進其他引擎的備援順序。批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒）。設定不齊回 `not_configured`。握手送 `requestId`、`language`、`use_vad=true`、金鑰與 `project_asr_prompt(account, project_id)` 詞表作為 `system_prompt`；收到 `status=connected` 後才回前台 `ready`，握手或連線失敗回 `upstream_failed`。`language` 跟著這條連線生效的分流（不含台語）：只有一種語言時帶對應值（zh→`Chinese`、en→`English`、es→`Spanish`、ja→`Japanese`、ko→`Korean`），多種語言時送 `zhen` 交給 R2T2 自己判斷，沒有分流或只有台語時送 `Chinese`。批次 `/transcribe` 用同一套規則（`language_routes.r2t2_language`）。.37 不會判斷（`zhen` 也當中文，西日韓被當中文解碼會整句壞掉）；.35 的 `zhen` 能分中英西、日文不行。只有 `Chinese`／`zhen` 的輸出做簡轉繁，日韓英西原樣送出（轉換會把「学校」改成「學校」）。金鑰只由環境提供，不在錯誤或日誌輸出握手內容。
 
@@ -190,7 +200,7 @@ R2T2 使用 `ASR_R2T2_STREAM_URL`（部署值 `ws://10.9.0.35:8040/asr_stream_ap
 
 本次隔離驗證（2026-10-01）：使用本地新 Backend 串流轉接與真實 .37 上游，鶴記兩個 Edge 聲音各 10 題；單路及同時三路各 20 句，平均逐句錯字率皆為 6.91%，各 20 則定稿、無漏句或錯誤。題庫所有 `terms` 命中 19/24（此統計包含泛用詞，不與計畫的專有名詞 13/18 混算）。測試以隔離帳號與設定執行，未寫入正式偏好或部署設定；尚未驗證部署後前台與 Brain 回答命中率，需部署後按計畫以專用測試帳號跑 `scripts/voice_e2e/run.py`。
 
-前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES；前台帶 `project_id` 時另帶 `customVocabulary`，是 Brain `/brain/internal/asr-glossary` 回的專案詞表逐詞清單，最多 100 個，拿不到就不帶）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。查詢參數 `engine` 只有管理員能用（後台串流試聽），指定 `STREAM_ASR_ENGINES` 之一就不看帳號偏好；一般帳號或嵌入金鑰帶了回 `not_allowed`。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。
+前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES；前台帶 `project_id` 時另帶 `customVocabulary`，是 Brain `/brain/internal/asr-glossary` 回的專案詞表逐詞清單，最多 100 個，拿不到就不帶）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。查詢參數 `engine` 指定串流引擎時不看帳號偏好，一般帳號仍須有該引擎授權；管理員保留試聽權限，嵌入金鑰維持拒絕。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。
 
 前台連線時帶 `project_id`、`language_routes`（query string）：`languageCodes` 依該專案的語言分流產生（zh→zh-TW、en→en-US、es→es-ES、ja→ja-JP、ko→ko-KR），沒帶專案才用 `ASR_GEMINI_STREAM_LANGUAGES`。Gemini 的定稿偶爾比最後的暫定字幕還差（「who am i」定稿成「OMI」、定稿成韓文）：兩者不同時 Backend 呼叫 Brain `POST /brain/internal/asr-judge`，由決策供應鏈判斷（最多等 1.5 秒），回傳的文字當 `final` 送給前台；逾時或失敗照定稿。每次判斷在 `backend/logs/asr_final_judge.jsonl` 記一行（時間、專案、兩段文字、選擇、分數、毫秒），用來拿真實資料驗證準度。
 
