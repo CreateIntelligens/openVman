@@ -35,8 +35,8 @@ cp .env.example .env
 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、
 `INDEXTTS_*` 等）也讀這一份。
 
-`GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`DECISION_PROVIDER_ENCRYPTION_SECRET`、
-`GRAFANA_PASSWORD` 留空即可，啟動時會自動產生高熵值。`DECISION_PROVIDER_ENCRYPTION_SECRET`
+`GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`MODEL_PROVIDER_ENCRYPTION_SECRET`、
+`GRAFANA_PASSWORD` 留空即可，啟動時會自動產生高熵值。`MODEL_PROVIDER_ENCRYPTION_SECRET`
 用來加密 Auth DB 中由後台輸入的模型供應商 key（決策與主對話共用）；備份與還原必須保留同一個值。
 若更換此 secret，既有 key 會解不開：這時各家改用部署環境的 key 繼續運作，後台頁面標示「無法解密」，需重新輸入；
 Backend 啟動時記一筆 ERROR，`/healthz` 的 `dependencies.model_provider_keys` 列出解不開的家並把整體狀態標成 `degraded`。

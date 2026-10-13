@@ -38,7 +38,7 @@ def test_fresh_deployment_generates_every_secret(tmp_path):
     result = _run(deployment)
 
     assert result.returncode == 0, result.stderr
-    assert len(_value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET")) == 64
+    assert len(_value(deployment, "MODEL_PROVIDER_ENCRYPTION_SECRET")) == 64
 
 
 def _database(path: Path, *, secrets: int, table: str = "model_provider_secrets") -> None:
@@ -60,7 +60,7 @@ def test_missing_secret_with_saved_keys_stops(tmp_path):
 
     assert result.returncode == 1
     assert "already holds 2 encrypted API key(s)" in result.stderr
-    assert _value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET") == ""
+    assert _value(deployment, "MODEL_PROVIDER_ENCRYPTION_SECRET") == ""
 
 
 def test_keys_saved_by_the_previous_release_also_stop(tmp_path):
@@ -78,7 +78,7 @@ def test_database_without_saved_keys_still_gets_a_secret(tmp_path):
     result = _run(deployment)
 
     assert result.returncode == 0, result.stderr
-    assert len(_value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET")) == 64
+    assert len(_value(deployment, "MODEL_PROVIDER_ENCRYPTION_SECRET")) == 64
 
 
 def test_unreadable_database_is_treated_as_holding_keys(tmp_path):
@@ -97,8 +97,18 @@ def test_custom_database_path_is_honoured(tmp_path):
 
 
 def test_existing_secret_is_left_alone_even_with_a_database(tmp_path):
-    deployment = _deployment(tmp_path, "DECISION_PROVIDER_ENCRYPTION_SECRET=original\n")
+    deployment = _deployment(tmp_path, "MODEL_PROVIDER_ENCRYPTION_SECRET=original\n")
     _database(deployment / "data" / "auth" / "accounts.db", secrets=1)
 
     assert _run(deployment).returncode == 0
-    assert _value(deployment, "DECISION_PROVIDER_ENCRYPTION_SECRET") == "original"
+    assert _value(deployment, "MODEL_PROVIDER_ENCRYPTION_SECRET") == "original"
+
+
+def test_old_variable_name_is_pointed_out_instead_of_silently_replaced(tmp_path):
+    deployment = _deployment(tmp_path, "DECISION_PROVIDER_ENCRYPTION_SECRET=original\n")
+    _database(deployment / "data" / "auth" / "accounts.db", secrets=1)
+
+    result = _run(deployment)
+
+    assert result.returncode == 1
+    assert "rename that line to MODEL_PROVIDER_ENCRYPTION_SECRET" in result.stderr

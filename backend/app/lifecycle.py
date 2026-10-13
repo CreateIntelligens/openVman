@@ -61,7 +61,7 @@ def _warn_unreadable_model_keys(runtime: AuthRuntime) -> None:
         logger.warning("model provider key check failed: %s", exc)
         return
     if unreadable:
-        # 多半是 DECISION_PROVIDER_ENCRYPTION_SECRET 被換掉；這些家暫用 .env 的 key 運作。
+        # 多半是 MODEL_PROVIDER_ENCRYPTION_SECRET 被換掉；這些家暫用 .env 的 key 運作。
         logger.error(
             "model provider keys cannot be decrypted (encryption secret changed?): %s; "
             "falling back to environment keys until re-entered in the Admin",

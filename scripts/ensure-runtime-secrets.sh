@@ -7,7 +7,7 @@ ENV_FILE=".env"
 REQUIRED_SECRETS=(
   "GATEWAY_INTERNAL_TOKEN"
   "SESSION_JWT_SECRET"
-  "DECISION_PROVIDER_ENCRYPTION_SECRET"
+  "MODEL_PROVIDER_ENCRYPTION_SECRET"
   "GRAFANA_PASSWORD"
 )
 
@@ -46,7 +46,7 @@ replace_or_append() {
   mv "$temporary" "$ENV_FILE"
 }
 
-# 後台存的模型供應商金鑰是用 DECISION_PROVIDER_ENCRYPTION_SECRET 加密的。資料庫裡已經有
+# 後台存的模型供應商金鑰是用 MODEL_PROVIDER_ENCRYPTION_SECRET 加密的。資料庫裡已經有
 # 加密金鑰、這個值卻不見時（.env 被覆蓋、還原了舊版），自動補一個新的會讓那些金鑰全部
 # 解不開，而且沒有人會發現。這種情況停下來，讓人把原本的值找回來。
 # 資料庫在、但從沒存過金鑰（只靠 watchtower 部署、沒跑過這支腳本的機器）就照常產生。
@@ -88,13 +88,16 @@ for key in "${REQUIRED_SECRETS[@]}"; do
     continue
   fi
 
-  if [ "$key" = "DECISION_PROVIDER_ENCRYPTION_SECRET" ]; then
+  if [ "$key" = "MODEL_PROVIDER_ENCRYPTION_SECRET" ]; then
     database="$(auth_database_path)"
     if [ -n "$database" ] && [ -f "$database" ]; then
       stored="$(stored_credentials "$database")"
       if [ "$stored" != "0" ]; then
         printf '%s is missing but %s already holds %s encrypted API key(s).\n' "$key" "$database" "$stored" >&2
         printf 'Restore the original value from your .env backup; a new one would make every API key saved in the Admin unreadable.\n' >&2
+        if grep -q '^DECISION_PROVIDER_ENCRYPTION_SECRET=' "$ENV_FILE"; then
+          printf 'This .env still has the old name DECISION_PROVIDER_ENCRYPTION_SECRET; rename that line to %s.\n' "$key" >&2
+        fi
         exit 1
       fi
     fi

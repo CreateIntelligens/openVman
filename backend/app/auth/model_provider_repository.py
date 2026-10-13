@@ -60,7 +60,7 @@ class ModelProviderCipher:
     def _cipher(self, credential_id: str) -> Fernet:
         if len(self._secret) < 32:
             raise ModelProviderEncryptionUnavailable(
-                "DECISION_PROVIDER_ENCRYPTION_SECRET must contain at least 32 bytes",
+                "MODEL_PROVIDER_ENCRYPTION_SECRET must contain at least 32 bytes",
             )
         if credential_id not in CREDENTIAL_IDS:
             raise InvalidModelProviderSettings("unknown model provider credential")

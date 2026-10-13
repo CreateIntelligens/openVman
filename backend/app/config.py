@@ -280,12 +280,11 @@ class TTSRouterConfig(BaseSettings):
         repr=False,
         validation_alias="AUTH_TEMPORARY_PASSWORD_SECRET",
     )
-    # 加密後台設定的所有模型供應商金鑰。環境變數名稱沿用最早只有決策時的命名：
-    # ensure-runtime-secrets.sh 已在各部署產生過這個值，改名等於讓已存的金鑰解不開。
+    # 加密後台「模型供應商」頁存的所有金鑰（決策、主對話…各類共用）。
     model_provider_encryption_secret: str = Field(
         default="",
         repr=False,
-        validation_alias="DECISION_PROVIDER_ENCRYPTION_SECRET",
+        validation_alias="MODEL_PROVIDER_ENCRYPTION_SECRET",
     )
     auth_database_path: str = Field(
         default="/data/auth/accounts.db",
