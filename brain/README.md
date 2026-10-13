@@ -198,6 +198,10 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - Dreaming（`DREAMING_ENABLED`，預設關）：依 `DREAMING_CRON` 執行 Light → Deep → REM 記憶整合。以 `DREAMING_TIMEZONE` 判斷當天是否已執行，`force=true` 可強制重跑。
 - 對話備份：每天 `SESSION_BACKUP_HOUR` 點（台北時間）把所有專案的對話依語言分檔備份到 `/data/backups/sessions`，保留 `SESSION_BACKUP_KEEP` 份；也可由 `POST /brain/backups/sessions` 立即執行（`{"dry_run": true}` 只計數）。
 
+## 新專案範本
+
+新專案建立時，workspace 缺少的核心文件由 `knowledge/workspace.py` 的 `WORKSPACE_TEMPLATES` 補上；已存在的檔案不覆寫。`SOUL.md`、`AGENTS.md`、`TOOLS.md`、`MEMORY.md` 取自醫院衛教助理上線版本的共通規則並去除機構名稱：依知識庫回答、不做個人化專業判斷、緊急狀況提醒求助、婉拒無關問題、敏感議題先關懷、純文字輸出、資料沒寫的不自行補上、沒有串接的外部系統不宣稱能代辦。回答語言交給每輪系統提示，範本不寫死語言；`IDENTITY.md` 預設名稱為小V。範本不得列出不存在的工具或虛構的公司資料。
+
 ## 語言分流與回答長度
 
 - 支援語言：`zh`、`en`、`es`、`nan`（台語）、`ja`、`ko`。每個專案在 `.kb_settings.json` 設定 `language_routes`（至少一條，順序即優先序，第一條為主要語言），由 `GET/PUT /brain/knowledge/settings` 讀寫。
