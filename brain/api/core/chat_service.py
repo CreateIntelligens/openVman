@@ -38,7 +38,7 @@ from memory.memory_governance import (
     maybe_run_memory_maintenance,
     write_summary_and_reindex,
 )
-from privacy.filter import PiiDetectionReport, detect_llm_messages_pii
+from privacy.filter import PiiDetectionReport, scan_text_for_pii
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
     MessageEnvelope,
@@ -229,24 +229,19 @@ def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> N
         _work()
 
 
-def _scan_reply_pii(reply: str, trace_id: str) -> dict[str, Any] | None:
-    """Run OPF on a reply and return the warning dict (or None)."""
+def _scan_user_pii(message: str, trace_id: str) -> dict[str, Any] | None:
+    """Ask Clef about personal data in the user's message; None when none or skipped."""
     try:
-        report = detect_llm_messages_pii(
-            [{"role": "user", "content": reply}],
-            source="chat",
-            trace_id=trace_id,
-        )
-        return _pii_to_warning(report)
+        return _pii_to_warning(scan_text_for_pii(message, trace_id=trace_id))
     except Exception:
-        logger.exception("[privacy] reply PII scan failed")
+        logger.exception("[privacy] user PII scan failed")
         return None
 
 
-def _patch_reply_pii_metadata(
+def _patch_message_pii_metadata(
     future: Any, message_id: int, project_id: str,
 ) -> None:
-    """Background task: wait for PII scan and write the warning to DB."""
+    """Background task: wait for the PII scan and write the warning to the message."""
     try:
         warning = future.result()
         if warning:
@@ -337,13 +332,10 @@ def finalize_generation(
         context.request_context.get("metadata", {}).get("ephemeral_user_message")
     )
 
-    reply_pii_future = _pii_writeback_executor.submit(
-        _scan_reply_pii, cleaned_reply, context.trace_id,
-    ) if persist else None
-
     if persist and not ephemeral_user:
+        # 只掃使用者的話：回覆的內容來自知識庫與模型，不是訪客交出來的個資。
         user_pii_future = _pii_writeback_executor.submit(
-            _scan_reply_pii, context.user_message, context.trace_id,
+            _scan_user_pii, context.user_message, context.trace_id,
         )
         # 前台語音經 ASR 時會帶 speech_language（例如聽出是台語），轉錄文字看不出來。
         speech_language = context.request_context.get("metadata", {}).get("speech_language")
@@ -364,7 +356,7 @@ def finalize_generation(
                 ),
             )
         _pii_writeback_executor.submit(
-            _patch_reply_pii_metadata,
+            _patch_message_pii_metadata,
             user_pii_future, user_message_id, context.project_id,
         )
     else:
@@ -388,18 +380,11 @@ def finalize_generation(
     if citations:
         meta["citations"] = citations
     meta.update(primary_media)
-    if persist:
-        if persisted_message_ids is not None:
-            assistant_message_id = persisted_message_ids[1]
-        else:
-            _, assistant_message_id = append_session_message_with_id(
-                context.session_id, context.persona_id,
-                "assistant", cleaned_reply,
-                project_id=context.project_id, metadata=meta or None,
-            )
-        _pii_writeback_executor.submit(
-            _patch_reply_pii_metadata,
-            reply_pii_future, assistant_message_id, context.project_id,
+    if persist and persisted_message_ids is None:
+        append_session_message_with_id(
+            context.session_id, context.persona_id,
+            "assistant", cleaned_reply,
+            project_id=context.project_id, metadata=meta or None,
         )
     if persist and not ephemeral_user:
         archive_session_turn(
@@ -414,7 +399,7 @@ def finalize_generation(
 
     history = [_serialize_history_message(msg) for msg in context.prior_messages]
     user_entry: dict[str, Any] = {"role": "user", "content": context.user_message}
-    # Opportunistic: include user/reply warnings if scans finished in time.
+    # Opportunistic: include the user warning if the scan finished in time.
     pii_pending = False
     if user_pii_future is not None and user_pii_future.done():
         if (warning := user_pii_future.result()) is not None:
@@ -423,11 +408,6 @@ def finalize_generation(
         pii_pending = True
     history.append(user_entry)
     assistant_entry: dict[str, Any] = {"role": "assistant", "content": cleaned_reply}
-    if reply_pii_future is not None and reply_pii_future.done():
-        if (warning := reply_pii_future.result()) is not None:
-            assistant_entry["privacy_warning"] = warning
-    elif reply_pii_future is not None:
-        pii_pending = True
     if tool_steps:
         assistant_entry["tool_steps"] = tool_steps
     if response_time_s is not None:
@@ -485,7 +465,6 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     if context.route.skip_tools:
         turn = generate_chat_turn(
             context.prompt_messages,
-            privacy_source="chat",
             trace_id=trace_id,
         )
         return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=[])
@@ -543,7 +522,6 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
         turn = generate_chat_turn(
             fallback,
-            privacy_source="tool",
             trace_id=trace_id,
         )
         return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=exc.partial_steps)

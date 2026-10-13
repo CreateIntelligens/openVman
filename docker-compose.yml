@@ -48,7 +48,6 @@ services:
       - ./brain/skills:/skills:ro
       - ./contracts:/contracts:ro
       - hf-cache:/home/appuser/.cache/huggingface
-      - opf-cache:/home/appuser/.opf
       - triton-cache:/home/appuser/.triton
     env_file:
       - ./.env
@@ -312,7 +311,6 @@ services:
 
 volumes:
   hf-cache:
-  opf-cache:
   triton-cache:
   admin-node-modules:
   avatar-node-modules:

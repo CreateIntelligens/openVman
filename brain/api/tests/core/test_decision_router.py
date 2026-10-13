@@ -491,3 +491,35 @@ def test_remote_openai_hop_gets_more_time_than_the_local_per_hop_cap(monkeypatch
 
     assert budgets["clef-primary"] == pytest.approx(0.8, abs=0.05)
     assert budgets["openai"] == pytest.approx(1.5, abs=0.05)
+
+
+def test_provider_filter_never_falls_back_outside_it(monkeypatch):
+    # 個資偵測只准問 Clef：兩站 Clef 都失敗也不能退到 Jev／OpenAI。
+    hops = [_hop(name) for name in ("clef-primary", "clef-backup", "jev", "openai")]
+    monkeypatch.setattr(router, "_provider_configuration", lambda **_: _config(hops))
+    attempts = []
+
+    def call(hop, state, questions, *, timeout):
+        attempts.append(hop.id)
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(router, "_call_provider", call)
+    monkeypatch.setattr(router, "_record_hop", lambda **_: None)
+
+    with pytest.raises(router.DecisionProviderError):
+        router.decide(
+            "state", {"q": {"type": "noul"}}, timeout=2, purpose="privacy-test",
+            providers=frozenset({"clef"}),
+        )
+    assert attempts == ["clef-primary", "clef-backup"]
+
+
+def test_provider_filter_without_matching_hop_fails_fast(monkeypatch):
+    monkeypatch.setattr(router, "_provider_configuration", lambda **_: _config([_hop("jev")]))
+    monkeypatch.setattr(router, "_call_provider", lambda *a, **kw: pytest.fail("jev must not run"))
+
+    with pytest.raises(router.DecisionProviderError, match="no allowed decision provider"):
+        router.decide(
+            "state", {"q": {"type": "noul"}}, timeout=1, purpose="privacy-test",
+            providers=frozenset({"clef"}),
+        )

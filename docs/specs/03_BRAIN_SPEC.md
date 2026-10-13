@@ -475,8 +475,8 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 * 限流：同一 action、專案、client IP 與 channel 每分鐘最多 `REQUEST_RATE_LIMIT_PER_MINUTE`（預設 90）次。
 * 工具與檢索結果一律視為不可信資料（`trust_boundary: untrusted_reference_data`）。
 
-**16.3 隱私過濾 (Privacy Filter)**
-* `PRIVACY_FILTER_ENABLED`（預設開）時，以 OpenAI Privacy Filter 模型（`privacy/`）掃描送往 LLM 的 user 與 tool 訊息（`PRIVACY_FILTER_INCLUDE_SYSTEM` 可納入 system）及模型回覆。掃描在背景執行、不修改送出的內容：偵測結果寫入稽核事件，回覆的偵測結果另存到該訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成；命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。模型裝置由 `PRIVACY_FILTER_DEVICE` 指定，GPU 載入失敗改用 CPU，CPU 也失敗就停用過濾，不擋啟動。
+**16.3 個資偵測**
+* `PRIVACY_FILTER_ENABLED`（預設開）時，使用者每句話在背景問 Clef 有沒有個資（`privacy/detector.py`：姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有）。只問 Clef（`decide(providers={"clef"})`），失敗也不退到 Jev 或 OpenAI：這兩家是外部服務，為了查個資把個資送出去正好相反。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
 
 **16.4 對話限制**
 * 單 Session 最大對話輪次：`MAX_SESSION_ROUNDS`（預設 100），達上限回 400。
@@ -561,7 +561,6 @@ BLOCK_PROMPT_INJECTION=true
 REQUEST_RATE_LIMIT_PER_MINUTE=90
 ALLOWED_CHANNELS=web,api,kiosk,admin,system
 PRIVACY_FILTER_ENABLED=true
-PRIVACY_FILTER_DEVICE=cuda
 
 # === Live ===
 LIVE_GEMINI_MODEL=gemini-3.8-live
@@ -609,6 +608,6 @@ Content-Type: application/json
 ### 19. 程式入口與 Live 模組邊界 (Entry Points & Module Boundaries)
 
 * `brain/api/main.py` 只組裝 FastAPI app、路由與 middleware；啟動、預熱與排程器生命週期在 `startup.py`，HTTP tracing／metrics／logging 在 `safety/server_http.py`。HTTP 路由依資源拆在 `routes/`（`chat`、`knowledge`、`knowledge_qa`、`sessions`、`memory`、`personas`、`projects`、`tools`、`search`、`usage`、`backups`、`workspace`、`protocol`、`health`），內部端點與 Live WebSocket 在 `internal_routes.py`。
-* **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 載入 Privacy Filter → 背景預熱（先預熱台語判斷的 Gemini client，再對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索；預熱失敗只記 warning，不擋 readiness）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
+* **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 背景預熱（先預熱台語判斷的 Gemini client，再對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索；預熱失敗只記 warning，不擋 readiness）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
 * **Gemini Live**：`live/gemini_live.py` 的 `GeminiLiveSession` 負責連線、收訊、重連與保活，並把事件分派給三個各自持有狀態的元件：`gemini_turns.py` 的 `GeminiLiveTurns` 持有回合版本、決策與預取結果，負責每輪決策、預取（查什麼由 `core/turn_reads.py` 決定）與工具呼叫；`gemini_audio.py` 的 `GeminiLiveAudio` 持有語句暫存、台語判定與音訊秒數，負責輸出音訊與用量；`gemini_transcripts.py` 的 `GeminiLiveTranscripts` 持有串流中的回覆，負責轉錄與回覆的持久化。三者共用的身分、設定與事件送出由 `gemini_context.py` 的 `LiveSessionContext` 在建構時傳入；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 的系統指令由 IDENTITY、SOUL、近期對話、記憶、工具使用規則與預設語言（第 14.3 節）組成；宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選），`save_memory` 同樣只在使用者明確要求時執行。上下行音訊以秒數記入用量帳本。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
 * 根目錄 `tests/test_entry_boundaries.py` 禁止 inline 業務處理回到入口檔，並檢查自有正式程式碼每檔不超過 1000 實體行。

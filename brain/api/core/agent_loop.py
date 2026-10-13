@@ -72,7 +72,7 @@ def _build_turn_kwargs(
     ``tools=None`` is the text-only answer pass: llm_client omits both ``tools``
     and ``tool_choice``, so the provider cannot open another tool round.
     """
-    kwargs: dict[str, Any] = {"tools": tools, "privacy_source": "tool"}
+    kwargs: dict[str, Any] = {"tools": tools}
     if forced_tool_name:
         kwargs["forced_tool_name"] = forced_tool_name
         if cfg.forced_tool_model_override:

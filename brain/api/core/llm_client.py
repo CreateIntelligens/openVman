@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from threading import Lock
 from time import monotonic
@@ -29,14 +28,11 @@ from core.provider_health import FailureKind, provider_health
 from core.provider_router import LLMRoute, get_provider_router
 from core.usage import LLMUsage, usage_from_response
 from infra.usage_ledger import record_usage_event
-from privacy.filter import FilterSource, detect_llm_messages_pii
 from safety.observability import (
     record_chain_exhausted,
     record_fallback_hop,
     record_route_attempt,
 )
-
-_pii_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-scan")
 
 _CLIENT_CACHE_MAX = 32
 _SYNC_CLIENT_CACHE: "OrderedDict[tuple[str, str | None], OpenAI]" = OrderedDict()
@@ -134,14 +130,12 @@ def generate_chat_reply(
     *,
     model_override: str | None = None,
     trace_id: str = "",
-    privacy_source: FilterSource = "unknown",
 ) -> str:
     """Generate a chat reply using the configured provider."""
     return generate_chat_turn(
         messages,
         model_override=model_override,
         trace_id=trace_id,
-        privacy_source=privacy_source,
     ).content.strip()
 
 
@@ -151,16 +145,10 @@ def generate_chat_turn(
     *,
     trace_id: str = "",
     model_override: str | None = None,
-    privacy_source: FilterSource = "unknown",
     forced_tool_name: str | None = None,
     max_tokens: int | None = None,
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
-    # PII scan runs in the background purely for audit / block-on-secret side effects;
-    # the report is no longer consumed by the chat pipeline.
-    _pii_executor.submit(
-        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
-    )
     response = _create_sync_completion(
         messages,
         tools=tools,
@@ -197,7 +185,6 @@ def stream_chat_turn(
     *,
     trace_id: str = "",
     model_override: str | None = None,
-    privacy_source: FilterSource = "unknown",
     forced_tool_name: str | None = None,
     max_tokens: int | None = None,
 ) -> LLMReply:
@@ -206,9 +193,6 @@ def stream_chat_turn(
     Identical return type and signature to generate_chat_turn — callers need no changes.
     Reuses the provider fallback chain and key-pool infrastructure.
     """
-    _pii_executor.submit(
-        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
-    )
     _require_api_key()
     cfg = get_settings()
     router = get_provider_router()

@@ -143,11 +143,6 @@ def _stub_config(monkeypatch: pytest.MonkeyPatch, llm_client: Any, *, api_key: s
     import core.fallback_chain as fallback_chain_module
     monkeypatch.setattr(fallback_chain_module, "get_settings", lambda: fake_cfg)
 
-    fake_privacy = types.ModuleType("privacy.filter")
-    fake_privacy.detect_llm_messages_pii = lambda messages, source="unknown", trace_id="": None
-    fake_privacy.FilterSource = str
-    fake_privacy.PiiDetectionReport = None
-    monkeypatch.setitem(sys.modules, "privacy.filter", fake_privacy)
 
 
 # ---------------------------------------------------------------------------

@@ -53,7 +53,6 @@ def _normalize_segment(segment: str) -> str:
     try:
         cleaned = generate_chat_reply(
             [{"role": "user", "content": prompt}],
-            privacy_source="graph_extractor",
         )
         if not _passes_sanity_check(segment, cleaned):
             logger.warning(

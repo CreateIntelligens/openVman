@@ -1,4 +1,4 @@
-"""Tests for outbound LLM message sanitization."""
+"""Personal-data check on what the user typed."""
 
 from __future__ import annotations
 
@@ -6,121 +6,94 @@ import logging
 
 import pytest
 
-from privacy.exceptions import PrivacyViolationError
-from privacy.filter import detect_llm_messages_pii
-from privacy.model import enable_stub_detector_for_tests
+import privacy.filter as privacy_filter
+from privacy.cache import PrivacyFilterCache
 
 
 class _Settings:
     privacy_filter_enabled = True
-    privacy_filter_include_system = False
     privacy_filter_cache_size = 8
-    privacy_filter_block_categories = "secret"
-
-    @property
-    def resolved_privacy_filter_block_categories(self) -> list[str]:
-        return [item.strip() for item in self.privacy_filter_block_categories.split(",") if item.strip()]
+    resolved_privacy_filter_block_categories = ["secret"]
 
 
-def _patch_settings(monkeypatch: pytest.MonkeyPatch, **overrides: object) -> _Settings:
-    settings = _Settings()
-    for key, value in overrides.items():
-        setattr(settings, key, value)
+@pytest.fixture
+def detector(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    result: dict[str, object] = {"value": {}}
 
-    import privacy.filter as privacy_filter
+    def fake_detect(text: str):
+        calls.append(text)
+        return result["value"]
 
-    monkeypatch.setattr(privacy_filter, "get_settings", lambda: settings)
-    enable_stub_detector_for_tests()
-    return settings
+    monkeypatch.setattr(privacy_filter, "get_settings", lambda: _Settings())
+    monkeypatch.setattr(privacy_filter, "detect_pii", fake_detect)
+    cache = PrivacyFilterCache(8)
+    monkeypatch.setattr(privacy_filter, "get_privacy_filter_cache", lambda size: cache)
+    events: list[object] = []
+    monkeypatch.setattr(privacy_filter, "record_privacy_filter_event", events.append)
+    return calls, result, events
 
 
-def test_detect_reports_user_and_tool_roles_without_mutating_messages(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch)
-    messages = [
-        {"role": "user", "content": "Call 0912345678"},
-        {"role": "tool", "content": "owner jane@example.com"},
-    ]
+def test_reports_detected_categories_in_order(detector) -> None:
+    calls, result, events = detector
+    result["value"] = {"private_phone": 1, "private_email": 1}
 
-    report = detect_llm_messages_pii(
-        messages,
-        source="chat",
-        trace_id="t1",
-    )
+    report = privacy_filter.scan_text_for_pii("找我 0912345678 或 a@b.com", trace_id="t1")
 
     assert report is not None
-    assert messages == [
-        {"role": "user", "content": "Call 0912345678"},
-        {"role": "tool", "content": "owner jane@example.com"},
-    ]
     assert report.categories == ("private_email", "private_phone")
     assert report.counts == {"private_email": 1, "private_phone": 1}
-    assert report.per_message == (
-        {"private_phone": 1},
-        {"private_email": 1},
-    )
+    assert [event.action for event in events] == ["detected"]
+    assert events[0].trace_id == "t1"
 
 
-def test_detect_skips_system_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch)
-    message = {"role": "system", "content": "System phone 0912345678"}
+def test_same_text_is_asked_once(detector) -> None:
+    calls, result, _ = detector
+    result["value"] = {"private_person": 1}
 
-    report = detect_llm_messages_pii([message], source="chat", trace_id="t1")
+    privacy_filter.scan_text_for_pii("我叫王小明")
+    privacy_filter.scan_text_for_pii("我叫王小明")
 
-    assert report is not None
-    assert report.counts == {}
-    assert report.per_message == ({},)
-
-
-def test_detect_includes_system_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch, privacy_filter_include_system=True)
-
-    report = detect_llm_messages_pii(
-        [{"role": "system", "content": "System phone 0912345678"}],
-        source="chat",
-        trace_id="t1",
-    )
-
-    assert report is not None
-    assert report.counts == {"private_phone": 1}
-    assert report.per_message == ({"private_phone": 1},)
+    assert calls == ["我叫王小明"]
 
 
-@pytest.mark.skip(
-    reason="detect_llm_messages_pii only logs a warning for blocked categories "
-    "today; it does not raise PrivacyViolationError. Callers invoke it via a "
-    "background executor (see llm_client._pii_executor) whose exceptions are "
-    "never surfaced, so raising here would silently no-op in production. "
-    "Skipped pending a decision on whether block-on-secret should become a "
-    "synchronous, request-failing check."
-)
-def test_detect_blocks_configured_secret_category(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch)
+def test_skipped_scan_is_not_cached_and_reports_nothing(detector) -> None:
+    # Clef 忙或失敗時回 None：不能記成「沒有個資」，下次同一句要重問。
+    calls, result, events = detector
+    result["value"] = None
 
-    with pytest.raises(PrivacyViolationError):
-        detect_llm_messages_pii(
-            [{"role": "user", "content": "password=super-secret"}],
-            source="chat",
-            trace_id="t1",
-        )
+    assert privacy_filter.scan_text_for_pii("我叫王小明") is None
+    assert privacy_filter.scan_text_for_pii("我叫王小明") is None
+    assert len(calls) == 2
+    assert [event.action for event in events] == ["skipped", "skipped"]
 
 
-def test_detect_disabled_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch, privacy_filter_enabled=False)
-    messages = [{"role": "user", "content": "Call 0912345678"}]
+def test_clean_text_gives_an_empty_report(detector) -> None:
+    _, result, events = detector
+    result["value"] = {}
 
-    assert detect_llm_messages_pii(messages, source="chat", trace_id="t1") is None
+    report = privacy_filter.scan_text_for_pii("請問要怎麼掛號？")
+
+    assert report is not None and report.counts == {}
+    assert events == []
 
 
-def test_audit_log_never_contains_raw_pii(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    _patch_settings(monkeypatch)
-    caplog.set_level(logging.INFO, logger="brain")
+def test_disabled_filter_does_not_ask(detector, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls, _, _ = detector
+    settings = _Settings()
+    settings.privacy_filter_enabled = False
+    monkeypatch.setattr(privacy_filter, "get_settings", lambda: settings)
 
-    detect_llm_messages_pii(
-        [{"role": "user", "content": "Call 0912345678"}],
-        source="chat",
-        trace_id="t1",
-    )
+    assert privacy_filter.scan_text_for_pii("我叫王小明") is None
+    assert calls == []
 
-    log_output = "\n".join(record.getMessage() for record in caplog.records)
-    assert "0912345678" not in log_output
-    assert "Call [REDACTED:private_phone]" not in log_output
+
+def test_blocked_category_logs_without_raw_text(detector, caplog: pytest.LogCaptureFixture) -> None:
+    _, result, _ = detector
+    result["value"] = {"secret": 1}
+
+    with caplog.at_level(logging.WARNING):
+        privacy_filter.scan_text_for_pii("密碼是Abc12345")
+
+    assert "category=secret" in caplog.text
+    assert "Abc12345" not in caplog.text

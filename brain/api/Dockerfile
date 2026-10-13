@@ -57,7 +57,6 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 RUN groupadd -g 1000 appuser && useradd -u 1000 -g 1000 -m appuser \
     && mkdir -p /home/appuser/.cache/huggingface \
-    && mkdir -p /home/appuser/.opf \
     && mkdir -p /home/appuser/.triton \
     && chown -R 1000:1000 /home/appuser
 

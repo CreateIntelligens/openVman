@@ -135,8 +135,10 @@ class BrainSettings(BaseSettings):
 
     # === Privacy Filter 設定 ===
     privacy_filter_enabled: bool = True
-    privacy_filter_device: str = "cuda"          # cpu | cuda
-    privacy_filter_include_system: bool = False
+    # 使用者每句話背景問 Clef 有沒有個資；實測每句約 0.85 秒，逾時就當沒掃。
+    privacy_clef_timeout_seconds: float = 3.0
+    # 同時在掃的上限，滿了就跳過這句，不跟每輪決策搶 Clef。
+    privacy_max_inflight: int = 2
     privacy_filter_cache_size: int = 512
     privacy_filter_block_categories: str = "secret"
 

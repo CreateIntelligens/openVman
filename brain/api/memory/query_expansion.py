@@ -48,7 +48,6 @@ def expand_query(
             messages,
             model_override=model or None,
             trace_id=trace_id,
-            privacy_source="query_expansion",
         )
     except Exception as exc:
         logger.warning("query expansion LLM call failed: %s", exc)

@@ -28,9 +28,9 @@ def normalizer(monkeypatch):
     since its import bound symbols from the stub.
     """
     fake_llm = types.ModuleType("core.llm_client")
-    fake_llm.generate_chat_reply = lambda messages, privacy_source=None: ""
+    fake_llm.generate_chat_reply = lambda messages: ""
     # graph_extractor (imported for _split_text) needs this symbol too.
-    fake_llm.generate_chat_turn = lambda messages, privacy_source=None: None
+    fake_llm.generate_chat_turn = lambda messages: None
     monkeypatch.setitem(sys.modules, "core.llm_client", fake_llm)
 
     sys.modules.pop("knowledge.normalizer", None)
@@ -41,7 +41,7 @@ def normalizer(monkeypatch):
 def test_single_short_segment_calls_llm_once(normalizer, monkeypatch):
     calls: list[str] = []
 
-    def fake(messages, privacy_source=None):
+    def fake(messages):
         calls.append(messages[0]["content"])
         return "# 乾淨標題\n\n整理後內容。"
 
@@ -65,7 +65,7 @@ def test_long_input_splits_into_multiple_segments(normalizer, monkeypatch):
 
     seen_segments: list[str] = ["" for _ in segments]
 
-    def fake(messages, privacy_source=None):
+    def fake(messages):
         content = messages[0]["content"]
         # Extract the segment exactly
         prefix = "待整理文字：\n---\n"
@@ -108,7 +108,7 @@ def test_llm_failure_falls_back_to_original_segment(normalizer, monkeypatch):
 
     fail_index = 1
 
-    def fake(messages, privacy_source=None):
+    def fake(messages):
         content = messages[0]["content"]
         # Extract the segment exactly
         prefix = "待整理文字：\n---\n"
@@ -146,7 +146,7 @@ def test_llm_failure_falls_back_to_original_segment(normalizer, monkeypatch):
 
 
 def test_empty_input_returns_empty_without_calling_llm(normalizer, monkeypatch):
-    def fake(messages, privacy_source=None):
+    def fake(messages):
         raise AssertionError("LLM should not be called for empty input")
 
     monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", fake)
@@ -159,7 +159,7 @@ def test_sanity_check_falls_back_on_truncated_output(normalizer, monkeypatch):
     original = "內" * 1000
     monkeypatch.setattr(
         "knowledge.normalizer.generate_chat_reply",
-        lambda messages, privacy_source: "太短",
+        lambda messages: "太短",
     )
     assert normalizer.normalize_to_markdown(original) == original
 
@@ -168,7 +168,7 @@ def test_sanity_check_falls_back_on_bloated_output(normalizer, monkeypatch):
     original = "內" * 1000
     monkeypatch.setattr(
         "knowledge.normalizer.generate_chat_reply",
-        lambda messages, privacy_source: "灌" * 5000,
+        lambda messages: "灌" * 5000,
     )
     assert normalizer.normalize_to_markdown(original) == original
 
@@ -176,7 +176,7 @@ def test_sanity_check_falls_back_on_bloated_output(normalizer, monkeypatch):
 def test_sanity_check_skips_short_segments(normalizer, monkeypatch):
     monkeypatch.setattr(
         "knowledge.normalizer.generate_chat_reply",
-        lambda messages, privacy_source: "cleaned",
+        lambda messages: "cleaned",
     )
     assert normalizer.normalize_to_markdown("短文") == "cleaned"
 
@@ -185,7 +185,7 @@ def test_parallel_segments_preserve_order(normalizer, monkeypatch):
     text = "\n\n".join(f"SEG{tag} " + ("字" * 6500) for tag in ("A", "B", "C"))
     segments = normalizer._split_text(text, size=normalizer.SEGMENT_SIZE)
 
-    def echo_segment(messages, privacy_source):
+    def echo_segment(messages):
         content = messages[0]["content"]
         # Extract the segment exactly
         prefix = "待整理文字：\n---\n"

@@ -256,7 +256,6 @@ def _llm_extract(chunk: list[_Source], workspace_root: Path, feedback: str = "")
     )
     reply = generate_chat_turn(
         [{"role": "user", "content": prompt}],
-        privacy_source="graph_extractor",
     )
     parsed = _load_json_object(reply.content)
     if parsed is None:
@@ -389,7 +388,6 @@ def _resolve_synonyms(
     prompt = SYNONYM_PROMPT.replace("__LABELS__", "\n".join(f"- {l}" for l in labels))
     reply = generate_chat_turn(
         [{"role": "user", "content": prompt}],
-        privacy_source="graph_extractor",
     )
     parsed = _load_json_object(reply.content)
     if parsed is None:
@@ -463,7 +461,6 @@ def _link_global(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
         prompt = GLOBAL_LINK_PROMPT.replace("__NODES__", listing)
         reply = generate_chat_turn(
             [{"role": "user", "content": prompt}],
-            privacy_source="graph_extractor",
         )
         frag = _load_json_object(reply.content)
         if frag is None:

@@ -34,6 +34,7 @@ const PURPOSE_LABELS: Record<string, string> = {
   asr_final_judge: "辨識定稿",
   language: "語言判斷",
   interrupt: "插話判斷",
+  privacy: "個資偵測",
 };
 
 function healthLabel(health: HopHealth): string | null {

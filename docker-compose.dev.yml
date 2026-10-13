@@ -21,7 +21,6 @@ services:
       - ./brain/skills:/skills
       - ./contracts:/contracts:ro
       - hf-cache:/home/appuser/.cache/huggingface
-      - opf-cache:/home/appuser/.opf
       - triton-cache:/home/appuser/.triton
 
   embedding:

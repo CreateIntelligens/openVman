@@ -162,8 +162,13 @@ def decide(
     purpose: str,
     per_hop_timeout: float | None = None,
     cancel_event: threading.Event | None = None,
+    providers: frozenset[str] | None = None,
 ) -> DecisionResult:
-    """Evaluate typed questions in order, using one request-wide deadline."""
+    """Evaluate typed questions in order, using one request-wide deadline.
+
+    *providers* limits the chain to those provider kinds; hops of other kinds are
+    never called, not even as a fallback.
+    """
     normalized = _normalize_questions(questions)
     state_json = state if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
     questions_json = json.dumps(normalized, ensure_ascii=False)
@@ -192,9 +197,15 @@ def decide(
         )
         raise DecisionProviderError("decision provider configuration unavailable") from exc
 
+    candidates = tuple(
+        hop for hop in configuration.providers
+        if providers is None or hop.provider in providers
+    )
+    if providers is not None and not candidates:
+        raise DecisionProviderError("no allowed decision provider configured")
     failures: list[str] = []
     health = provider_health()
-    for hop in health.order(configuration.providers, lambda hop: _health_id(hop, purpose)):
+    for hop in health.order(candidates, lambda hop: _health_id(hop, purpose)):
         if cancel_event is not None and cancel_event.is_set():
             raise DecisionProviderCancelled("decision turn was cancelled")
         remaining = deadline - monotonic()

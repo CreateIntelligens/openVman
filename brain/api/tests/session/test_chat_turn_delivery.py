@@ -30,8 +30,8 @@ def delivery(tmp_path, monkeypatch):
     governance = Mock()
     monkeypatch.setattr(chat_service, "archive_session_turn", archive)
     monkeypatch.setattr(chat_service, "_schedule_memory_writes", governance)
-    monkeypatch.setattr(chat_service, "_scan_reply_pii", lambda *args: None)
-    monkeypatch.setattr(chat_service, "_patch_reply_pii_metadata", lambda *args: None)
+    monkeypatch.setattr(chat_service, "_scan_user_pii", lambda *args: None)
+    monkeypatch.setattr(chat_service, "_patch_message_pii_metadata", lambda *args: None)
 
     def prepare(request, payload):
         store.get_or_create_session(payload.session_id, payload.persona_id)

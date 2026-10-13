@@ -31,9 +31,8 @@ Edge nginx 對 `/brain/` 一律回 404。除了 `GET /brain/health` 與 `GET /br
 `startup.lifespan` 依序：
 
 1. 建立 default 專案 workspace scaffold，執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）。
-2. `PRIVACY_FILTER_ENABLED` 時載入 Privacy Filter 模型；GPU 失敗改用 CPU，CPU 也失敗就停用過濾，不擋啟動。
-3. 背景預熱：先預熱台語語音判斷的 Gemini client，再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning。
-4. `DREAMING_ENABLED` 時啟動 dreaming 排程；啟動每日對話備份排程。
+2. 背景預熱：先預熱台語語音判斷的 Gemini client，再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning。
+3. `DREAMING_ENABLED` 時啟動 dreaming 排程；啟動每日對話備份排程。
 
 Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符時，Brain fail closed，不會在 API process 內自行改用其他 provider。
 
@@ -46,7 +45,7 @@ Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符�
 | `api/memory/` | embedding client、檢索與融合、session store、記憶治理、auto recall、dreaming、語言判斷、對話備份、ASR 定稿判斷 |
 | `api/tools/` | 工具註冊、執行、技能管理；內建工具在 `tools/builtin/` |
 | `api/live/` | Gemini Live：會話協調、WebSocket 傳輸、payload 編碼、工具執行 |
-| `api/privacy/` | Privacy Filter 模型載入、偵測與稽核 |
+| `api/privacy/` | 以 Clef 偵測使用者訊息中的個資與稽核 |
 | `api/infra/` | LanceDB、專案路徑、用量帳本、錯誤紀錄 |
 | `api/routes/`、`api/internal_routes.py` | HTTP 與內部 WebSocket 路由 |
 | `api/safety/` | 內部驗證、guardrails、logging、metrics |
@@ -261,7 +260,7 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 
 ## 隱私過濾
 
-`PRIVACY_FILTER_ENABLED`（預設開）時，Brain 以 OpenAI Privacy Filter 模型（`privacy/`）掃描送往 LLM 的 user 與 tool 訊息（`PRIVACY_FILTER_INCLUDE_SYSTEM` 可納入 system）及模型回覆。掃描在背景執行、不修改送出的內容：偵測結果寫入稽核事件，回覆的偵測結果另存到該訊息的 `privacy_warning` 中繼資料；命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。模型裝置由 `PRIVACY_FILTER_DEVICE` 指定，載入失敗時依啟動流程降級。
+`PRIVACY_FILTER_ENABLED`（預設開）時，使用者每句話在背景問 Clef 有沒有個資（`privacy/detector.py`：姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有）。只問 Clef（`decide(providers={"clef"})`），失敗也不退到 Jev 或 OpenAI：這兩家是外部服務，為了查個資把個資送出去正好相反。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
 
 ## 用量帳本
 
@@ -330,7 +329,7 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 | 每輪決策 | `TURN_DECISIONS_ENABLED`、`TURN_DECISIONS_RETRIEVAL_ENABLED`、`TURN_DECISIONS_LANGUAGE_ENABLED`、`TURN_DECISIONS_TONE_ENABLED`、`TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED`、`TURN_DECISIONS_TIMEOUT_SECONDS`、`TURN_DECISIONS_HOP_TIMEOUT_SECONDS`、`TURN_DECISIONS_NOUL_*`、`TURN_DECISIONS_CHOICE_*` |
 | 網路工具 | `URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`URL2MD_BASE_URLS`、`URL2MD_TOTAL_BUDGET_S`、`URL2MD_CIRCUIT_COOLDOWN_S`、`REDIS_URL`、`WEB_SEARCH_BLOCKED_DOMAINS`（結果重排門檻在 `EMBEDDING_THRESHOLDS`） |
 | Wiki | `WIKI_PUBLISH_ENABLED`、`WIKI_API_BASE_URL`、`WIKI_PUBLISH_MAX_CHARS` |
-| 隱私 | `PRIVACY_FILTER_ENABLED`、`PRIVACY_FILTER_DEVICE`、`PRIVACY_FILTER_INCLUDE_SYSTEM`、`PRIVACY_FILTER_BLOCK_CATEGORIES` |
+| 隱私 | `PRIVACY_FILTER_ENABLED`、`PRIVACY_CLEF_TIMEOUT_SECONDS`、`PRIVACY_MAX_INFLIGHT`、`PRIVACY_FILTER_BLOCK_CATEGORIES` |
 | 安全 | `MAX_INPUT_LENGTH`、`ENABLE_CONTENT_FILTER`、`BLOCK_PROMPT_INJECTION`、`REQUEST_RATE_LIMIT_PER_MINUTE`、`ALLOWED_CHANNELS` |
 | Live | `LIVE_GEMINI_MODEL`、`LIVE_GEMINI_TOOLS_ENABLED`、`LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`、`LIVE_AUDIO_LANGUAGE_ID_MODEL`、`LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS` |
 
