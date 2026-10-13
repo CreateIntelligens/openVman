@@ -192,9 +192,12 @@ def _previous_picture_line(policy: TurnPolicy | None, session_messages: list[dic
 
     if not earlier_pictures(session_messages):
         return "當輪提示：使用者想再看之前的圖片，但這段對話還沒有顯示過圖片；直接說明，不要切換頁面。"
+    # 選哪一張是 reference_media 跟這次回答並行決定的，模型看不到結果；讓它描述內容時，
+    # 前面有兩張圖會講到另一張（正式機：附 page_12 沉水泵，回答卻說「先前介紹 EUSR」）。
     return (
         "當輪提示：使用者想再看剛剛顯示過的圖片，系統會把那張圖附在這則回答旁邊。"
-        "用一兩句說明這就是先前那張圖並簡述內容，不要呼叫 request_action 切換頁面。"
+        "用一句話說明這是先前顯示過的圖；不要猜是哪一張、不要描述圖片內容"
+        "（使用者自己指名的除外），也不要呼叫 request_action 切換頁面。"
     )
 
 

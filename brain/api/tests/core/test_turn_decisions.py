@@ -410,6 +410,8 @@ def test_previous_picture_hint_tells_the_model_the_picture_is_attached():
 
     # 模型以為要自己打開圖，會叫 request_action 切頁面、回答「已為你切換頁面」。
     assert "附在這則回答旁邊" in line and "request_action" in line
+    # 模型看不到選了哪張，描述內容會講錯張。
+    assert "不要描述圖片內容" in line
     assert "還沒有顯示過圖片" in _previous_picture_line(wants, shown[:1])
     assert _previous_picture_line(turn_decisions.TurnPolicy(wants_previous_picture=None), shown) == ""
     assert _previous_picture_line(None, shown) == ""
