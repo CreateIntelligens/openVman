@@ -1146,29 +1146,29 @@
   "set": "asr",
   "lang": "zh",
   "q": "我想找和記企業的業務問 EVAK 的報價。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。"
  },
  {
   "set": "asr",
   "lang": "zh",
   "q": "我想找賀記企業的業務問 EVK 的報價。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。"
  },
  {
   "set": "asr",
   "lang": "zh",
   "q": "我想要找最好的汽車業務員的報告。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。"
  },
  {
   "set": "asr",
   "lang": "zh",
   "q": "我想欲找合適去業界的業務部門的報告。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。"
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。"
  },
  {
   "set": "probe",

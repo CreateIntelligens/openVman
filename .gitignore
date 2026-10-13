@@ -97,6 +97,10 @@ infra/nginx/native/openvman.conf
 # Claude 工作日誌快取
 .remember/
 
+# Retired experiment debug output; keep cases and compact summaries instead.
+scripts/experiments/semif-evidence/results/**/predictions.jsonl
+scripts/experiments/intent-shadow/smoke.json
+
 # tsc -b 的增量建置快取
 *.tsbuildinfo
 

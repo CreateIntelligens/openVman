@@ -2,17 +2,17 @@
   "status": "verified",
   "method": "現有parser與engine離線逐值重跑；自然語言條件人工轉錄，與凍結獨立oracle另行比對，不修改回答grader。",
   "input_sha256": {
-    "results.json": "e6e53b99e8f334db9ae50193a47dbf0089e42a3590585ccf03cd52e8205b7bcf",
+    "results.json": "3c20fc6e54621057e05516083ca2604ed0b97e989c61925878d0947f40b53fe7",
     "questions.json": "0a1d03598d113a9460fb397ebb83e2a3d8f4776592bc7b0d83807f2ba3c19e9f",
-    "question_validation.json": "90e44f249965d8e5f83486d163666b0c368cc61de8ad73c25187bb4fbbccd8e1",
-    "source_snapshot.json": "64525ff3d348ec606f1471ddd4b3d49c71253c48abc0e3d78534780e2ffb9892"
+    "question_validation.json": "4b8b97606a10ae54c315eaab1eb6c0a2ccd69d6033be59b5ef98b85427e4aa3f",
+    "source_snapshot.json": "c4963cd2d43179eac259426e49ebf4bbe0e24727ee21ee1a2dc7b20643fe1a61"
   },
   "current_code_sha256": {
     "brain/api/knowledge/product_catalog.py": "f94de938f6197322634586c2c906643b7ae1e60ca304508456cac7caf97a1956",
     "brain/api/knowledge/product_filter.py": "384b6ed169e3cb1a3e30e7f95ac2b1005458629a9ea4052c510cbd8c7007a185",
     "brain/api/tools/builtin/product_tools.py": "4062409f60ee7bbc42ca8c1b1b766c5031d9b1926261a193f703ce087e75f0af"
   },
-  "results_sha256": "e6e53b99e8f334db9ae50193a47dbf0089e42a3590585ccf03cd52e8205b7bcf",
+  "results_sha256": "3c20fc6e54621057e05516083ca2604ed0b97e989c61925878d0947f40b53fe7",
   "code_matches_recorded_manifest": {
     "brain/api/knowledge/product_catalog.py": true,
     "brain/api/knowledge/product_filter.py": true,

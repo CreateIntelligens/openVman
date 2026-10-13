@@ -39,13 +39,15 @@
 
 先保留正式流程。若繼續研究，應先建立獨立保留集與順序穩定性驗收，分辨提示、量化及模型能力的影響，再決定是否投入常駐服務。現有 embedding 基線已能以較小的新增負擔做初步分流，值得與更完整的分類器一併比較。GuardAgent 的明確停止／否定規則可以另外修正，但本次沒有修改它。
 
-## 可重現證據
+## 封存摘要與來源
+
+此實驗已退場。2026-10-13 清理時移除四份冗長的逐筆推論 JSONL，保留凍結案例、環境、摘要及診斷；原始逐筆記錄可從 Git 歷史查閱。以下數字是原測量結果，現存摘要不足以重新核算每筆推論，不宣稱本目錄可獨立完整重現。
 
 - [案例政策](README.fixture.md)。執行方式與基線方式的說明隨可執行的實驗一起退場
   （2026-09-22，見 `docs/plans/jev-decision-layer.md` §4）；模型、revision、NF4 設定
   與載入時間保留在 [環境與驗證](results/environment.json) 與各 `metadata.json`。
-- [初始摘要](results/summary.json)、[初始逐筆結果](results/predictions.jsonl)
-- [提示診斷摘要](results/prompt-v2/summary.json)、[診斷逐筆結果](results/prompt-v2/predictions.jsonl)
+- [初始摘要](results/summary.json)
+- [提示診斷摘要](results/prompt-v2/summary.json)
 - [Guard／embedding 基線](results/baselines.json)、[環境與驗證](results/environment.json)
 
 來源：[SemIf](https://github.com/TheoLeeCJ/SemIf/tree/ca3ba65f142967030ecb453346e94d6f476a69df)。權重與上游程式暫存於測試容器，repository 不收錄模型。
@@ -89,7 +91,7 @@
 ### 證據及驗證
 
 - [完整排程與環境](results/stability/metadata.json)
-- [逐筆評分](results/stability/predictions.jsonl)、[統計摘要](results/stability/summary.json)
+- [統計摘要](results/stability/summary.json)
 - [同分排除、位置分布與前次比較](results/stability/diagnostics.json)
 - [推論時程式快照](results/stability/runner_used.py)——這是產生上述結果時實際執行的
   程式，可重現用它；原 `stability.py` 已隨實驗退場。

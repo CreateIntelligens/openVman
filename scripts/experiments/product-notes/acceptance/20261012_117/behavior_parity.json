@@ -2,8 +2,8 @@
   "raw_metadata_equal": false,
   "resolved_metadata_equal": true,
   "document_entries": 129,
-  "production_project": "proj-0cc5c610b4",
-  "test_project": "dev-c0c8fdff34",
+  "production_project": "example-industrial-production",
+  "test_project": "example-industrial-project",
   "normalization": "Only infer missing language/language_source using the production resolver; no keys discarded and no data written",
   "raw_metadata_sha256": [
     "814180475e2bef1ade75ea721bac80f60b3684fa4102a955f54326f07f36c136",

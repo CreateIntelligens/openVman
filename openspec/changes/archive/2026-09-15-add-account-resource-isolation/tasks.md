@@ -1,3 +1,7 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
+> `ROOT_USERNAME` 表示程式採用的 bootstrap 帳號名稱，由部署參數 `AUTH_ROOT_USERNAME` 決定；不是帳號名稱字面值。bootstrap 密碼透過 `BOOTSTRAP_ADMIN_PASSWORD` 環境變數提供，不在文件記錄原文。
+
 ## 1. Auth persistence and configuration
 
 - [x] 1.1 Add pinned PyJWT and bcrypt dependencies, `SESSION_JWT_SECRET`, auth database path, cookie security, issuer, audience, and lifetime settings to Backend config and environment examples.
@@ -16,7 +20,7 @@
 ## 3. Account administration
 
 - [x] 3.1 Add `POST /api/auth/login`, `POST /api/auth/logout`, and `GET /api/auth/me`, returning a CLI token while keeping browser auth in the HttpOnly cookie.
-- [x] 3.2 Add the container bootstrap CLI that creates exactly the initial `ai360`／`ai360` admin without logging credentials or replacing an existing administrator.
+- [x] 3.2 Add the container bootstrap CLI that creates exactly the initial `ROOT_USERNAME`／`BOOTSTRAP_ADMIN_PASSWORD` admin without logging credentials or replacing an existing administrator.
 - [x] 3.3 Add admin-only account list／create／enable／disable／revoke／delete APIs and enforce self-protection, last-admin, duplicate-username, and owned-resource deletion rules.
 - [x] 3.4 Add account administration tests covering normal-user denial, creator audit fields, immediate disable, revoke-all, resource-count 409, safe deletion, and last-admin invariants.
 
@@ -67,7 +71,7 @@
 - [x] 9.3 Add equivalent cookie session bootstrap, formal／temporary login modes, logout, remaining-time notice, and 401 handling to `frontend/app` without changing public Avatar SDK pages.
 - [x] 9.4 Add temporary batch generation to the existing Admin account page, including project／character／voice selection, an explicit five-password result, copy controls, and a warning that plaintext cannot be retrieved later.
 - [x] 9.5 Update project, persona, character, background, mascot, and voice selectors to consume only authenticated scoped list responses and reset inaccessible persisted selections.
-- [x] 9.6 Apply authorized defaults after login: `proj-b85afb8bb6`, character `0713`, provider `indextts`, and voice key `hayley`; if unavailable, select an authorized resource and visibly report the fallback.
+- [x] 9.6 Apply authorized defaults after login: `example-hospital-project`, character `0713`, provider `indextts`, and voice key `hayley`; if unavailable, select an authorized resource and visibly report the fallback.
 - [x] 9.7 Add frontend tests for session restore, both login modes, failed login, temporary expiry notice, logout, expired session redirect, role-gated batch UI, and selectors that never retain foreign resources.
 - [x] 9.8 Add formal-account resource editing and a shared registry-backed grant option source so unavailable providers cannot produce invalid temporary grants.
 
@@ -75,7 +79,7 @@
 
 - [x] 10.1 Add an idempotent migration command that assigns all existing Brain projects to the bootstrap admin and records versioned migration details.
 - [x] 10.2 Register complete existing Avatar characters, backgrounds, mascots, and IndexTTS `speaker.json` entries as system-public; emit a reconciliation report for ambiguous／orphaned entries.
-- [x] 10.3 Seed／upsert ESG Quick Reply content under `esg-7dea843a0d` with stable IDs, without deleting unrelated existing nodes, and ensure it is visible only when that project is authorized.
+- [x] 10.3 Seed／upsert ESG Quick Reply content under `example-esg-project` with stable IDs, without deleting unrelated existing nodes, and ensure it is visible only when that project is authorized.
 - [x] 10.4 Register the hospital／ESG-freckled／Hayley default tuple and validate every default against the account's grants before returning it.
 - [x] 10.5 Add a read-only reconciliation command that compares ownership rows with Brain projects, filesystem assets, and provider voices without deleting or auto-exposing mismatches.
 - [x] 10.6 Update `docker-compose.yml` volumes and environment so Backend persists `/data/auth` and private assets, IndexTTS reads the required private voice references, and Nginx keeps one public host port.

@@ -1,3 +1,7 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
+> `ROOT_USERNAME` 表示程式採用的 bootstrap 帳號名稱，由部署參數 `AUTH_ROOT_USERNAME` 決定；不是帳號名稱字面值。bootstrap 密碼透過 `BOOTSTRAP_ADMIN_PASSWORD` 環境變數提供，不在文件記錄原文。
+
 ## Context
 
 openVman 對外只有 Nginx 一個 host port，瀏覽器的 `/api/*`、TTS、HTTP chat 與 WebSocket 都先到 Backend；Backend 再把 Brain facade 路由轉送到內部 `api` service。這使 Backend 成為最適合驗證 session 的 trust boundary。
@@ -56,7 +60,7 @@ Backend 轉送 Brain 前 SHALL 移除外部提供的 `X-OpenVMan-*` 身分 heade
 
 ### 3. 沿用 JTAI session 形狀，但收緊 secret 與撤銷
 
-- Password 使用 bcrypt。一般帳號建立／變更密碼時接受 8 至 72 UTF-8 bytes，超過即拒絕，不以靜默截斷製造等價密碼；首次 bootstrap 明確允許部署預設的 `ai360`／`ai360`，驗證既有 bcrypt hash 時也允許短於 8 bytes 的密碼。
+- Password 使用 bcrypt。一般帳號建立／變更密碼時接受 8 至 72 UTF-8 bytes，超過即拒絕，不以靜默截斷製造等價密碼；首次 bootstrap 使用部署指定的 `ROOT_USERNAME` 與環境變數 `BOOTSTRAP_ADMIN_PASSWORD`，驗證既有 bcrypt hash 時也允許短於 8 bytes 的密碼。
 - JWT 使用 HS256，唯一 secret 為必要環境變數 `SESSION_JWT_SECRET`，不得 fallback 到 API key 或硬編碼預設值。
 - Claims 為 `sub`、`role`、`kind`、`ver`、`iat`、`exp`、`iss=openvman`、`aud=openvman-web`；正式帳號預設有效期 24 小時，臨時帳號的 JWT `exp` 不得晚於 credential 的 72 小時到期時間。
 - Browser login 設定 `openvman_session` cookie：`HttpOnly`、`SameSite=Lax`、`Path=/`，production 必須 `Secure`。Response body 同時回傳 token，供 CLI 使用；前端不得保存該 token。
@@ -68,7 +72,7 @@ Backend 轉送 Brain 前 SHALL 移除外部提供的 `X-OpenVMan-*` 身分 heade
 
 ### 4. 管理員 provision 正式與臨時帳號，不提供 public signup
 
-提供容器內 `python -m app.scripts.create_user --username ai360 --role admin` bootstrap CLI，以 `ai360`／`ai360` 建立初始管理員；只有在沒有 admin 時可建立第一位 admin。登入後的 admin 可 list、create、disable 與啟用帳號。一般 user 只能讀取自己的 `/api/auth/me`。
+提供容器內 `python -m app.scripts.create_user --role admin` bootstrap CLI，以 `ROOT_USERNAME`／`BOOTSTRAP_ADMIN_PASSWORD` 建立初始管理員；只有在沒有 admin 時可建立第一位 admin。登入後的 admin 可 list、create、disable 與啟用帳號。一般 user 只能讀取自己的 `/api/auth/me`。
 
 刪除帳號前若仍有 private resources SHALL 回 409，要求先刪除或轉移；一般停用不刪資料。Admin 不得停用或刪除自己，且系統不得移除最後一位啟用中的 admin。
 
@@ -114,9 +118,9 @@ Admin portal 存取是獨立於資源 grant 與帳號角色的 capability。ROOT
 
 ### 8. Default selection 與 Quick Reply 都由授權集合解析
 
-未設定個人 defaults 時，Backend 建議 `project_id=proj-b85afb8bb6`、`character_id=0713`、`voice_provider=indextts`、`voice_id=hayley`。Admin 設定正式非管理員或建立臨時帳號時預先選取這三項；若管理員改選，則把選取集合中的明確 primary choice 寫入 `account_defaults`。前端不得因 localStorage 殘值越過 server list；default 不可存取時改用 server 回傳的第一個可用資源並提示使用者。
+未設定個人 defaults 時，Backend 建議 `project_id=example-hospital-project`、`character_id=0713`、`voice_provider=indextts`、`voice_id=hayley`。Admin 設定正式非管理員或建立臨時帳號時預先選取這三項；若管理員改選，則把選取集合中的明確 primary choice 寫入 `account_defaults`。前端不得因 localStorage 殘值越過 server list；default 不可存取時改用 server 回傳的第一個可用資源並提示使用者。
 
-ESG project `esg-7dea843a0d` 的 Quick QA nodes 與 merged entries 是 project knowledge 的一部分。授予 ESG project 即同時允許讀取其 quick reply；未授予時所有 Quick QA tree、merged entry、image 與 mutation route 依同一 project resolver 拒絕。既有無關測試內容不自動刪除，seed／migration 只以穩定 ID upsert 使用者確認的 ESG quick reply。
+ESG project `example-esg-project` 的 Quick QA nodes 與 merged entries 是 project knowledge 的一部分。授予 ESG project 即同時允許讀取其 quick reply；未授予時所有 Quick QA tree、merged entry、image 與 mutation route 依同一 project resolver 拒絕。既有無關測試內容不自動刪除，seed／migration 只以穩定 ID upsert 使用者確認的 ESG quick reply。
 
 ### 9. Public route allowlist 採 fail-closed
 

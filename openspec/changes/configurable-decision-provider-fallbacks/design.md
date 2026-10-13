@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 # Design
 
 ## Context
@@ -41,8 +43,8 @@ Alternative: place provider keys in `.env` only. This protects secrets but does 
 
 The initial remote hop order is:
 
-1. Clef primary: `https://clef.create360.ai/v1/systemone`
-2. Clef backup: `https://clef.aiurl.tw/v1/systemone`
+1. Clef primary: `https://decision-primary.example.com/v1/systemone`
+2. Clef backup: `https://decision-fallback.example.com/v1/systemone`
 3. Jev System One, base URL `https://api.typesafe.ai`
 4. OpenAI Decisions, endpoint `https://api.openai.com/v1/decisions`
 

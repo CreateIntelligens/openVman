@@ -439,7 +439,7 @@
     "model": "gemini-3.5-flash-lite",
     "provider": "gemini",
     "temperature": 0.3,
-    "project": "dev-c0c8fdff34",
+    "project": "example-industrial-project",
     "persona": "default",
     "source_sha256": "9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa",
     "scope": "EDW第9頁五列與EUB-M第11頁十列，S/T合併列不拆分",

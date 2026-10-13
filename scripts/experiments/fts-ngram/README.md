@@ -1,8 +1,10 @@
 # 全文索引斷詞：simple 與 ngram
 
+> 資料去識別化：題庫與發布結果中的客戶專案名稱已改為示例別名；型號、命中判定、分數及耗時保留原測量值。重跑前須確認題庫與自身知識庫相符。
+
 knowledge 表的全文索引用 LanceDB 預設的 simple 斷詞，只切空白與標點：中文整段是一個詞，`50EUBL-5.10` 變成 `50eubl`，查「EUBL」對不到。這裡比較 ngram 斷詞能不能補上。
 
-在 api 容器內執行，把鶴記dev 的 knowledge 表複製到 `/tmp` 的 LanceDB 各建一種索引，不寫入專案資料：
+在 api 容器內執行，把工業示範專案（開發） 的 knowledge 表複製到 `/tmp` 的 LanceDB 各建一種索引，不寫入專案資料：
 
 ```bash
 docker cp scripts/experiments/fts-ngram/run.py openvman-api-1:/tmp/fts_run.py

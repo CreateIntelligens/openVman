@@ -1,7 +1,7 @@
 {
  "date": "2026-10-06",
  "commit": "7c15ec5",
- "path": "/api/v1/chat，fast，鶴記測試專案，20 題×1",
+ "path": "/api/v1/chat，fast，工業示範專案測試專案，20 題×1",
  "rubric": "scripts/experiments/product-notes/round3/questions.json（凍結題目、required_points、forbidden_claims、grading_rubric）",
  "grader": "獨立子代理逐份對照 required_points／forbidden_claims 評分",
  "verdict_counts": {
@@ -180,7 +180,7 @@
     "search_knowledge"
    ],
    "filter_calls": [],
-   "reply": "型錄資料未提及各系列 3HP 的詳細最大揚程對比，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+   "reply": "型錄資料未提及各系列 3HP 的詳細最大揚程對比，請洽詢工業示範專案企業或億發泵浦原廠工程業務團隊。",
    "usage": {
     "calls": 3,
     "latency_ms": 3937.87,
@@ -869,7 +869,7 @@
     "search_knowledge"
    ],
    "filter_calls": [],
-   "reply": "型錄資料未提及此規格，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+   "reply": "型錄資料未提及此規格，請洽詢工業示範專案企業或億發泵浦原廠工程業務團隊。",
    "usage": {
     "calls": 3,
     "latency_ms": 3912.45,

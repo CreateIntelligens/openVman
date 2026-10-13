@@ -2,7 +2,7 @@
   "grader": "Codex獨立代理逐份對照凍結規則與原文；重大規格錯誤判錯，純漏必要資訊判部分對，明確最終校正另列品質問題",
   "rubric_source": "questions.json grading_rubric（完全沿用round2）",
   "input_file": "answers_for_grading_R1_Q15_Q20.json",
-  "input_sha256": "1b30501bdd5bab3073a07385e988eed3af80dd950c21838bdc0e55d7b1dfe877",
+  "input_sha256": "d05e7b609cdfc350f957535597dfa9c1f38613ea6ccc73bc8dc8046f3b6fd589",
   "grades": [
     {
       "id": "Q15",
@@ -228,7 +228,7 @@
         234
       ],
       "quality_issues": [],
-      "answer_sha256": "bf41f3a42eede0889dc0ccadc4bc19b67622209c55942c10d72924131a08e0cc"
+      "answer_sha256": "dd302f7adc9b20e19b62b83306b5856470f28e4f1536030ea1229a2dcc3d0c45"
     },
     {
       "id": "Q16",
@@ -286,7 +286,7 @@
       "quality_issues": [
         "將檢索未取得EDW規格混稱型錄沒有EDW數據；L203、205確有重量"
       ],
-      "answer_sha256": "978449e33408f7ddaafe9abf80fc12e5223841c5b3efe0f14018ee27b471acdf"
+      "answer_sha256": "4be7f800f9383c9725d5175035e7421fe38e0eee1b5ce9fef06b5e6d5224aabb"
     },
     {
       "id": "Q17",
@@ -395,7 +395,7 @@
         "型號只寫QA中的100EDW-5.50，省略正式T字尾；此題未要求相數且額定點唯一對應，視為可識別同款名稱",
         "EUB-M規格未完整檢索，不等於原表沒有候選；回答已限定是在檢索資料中未完整列出"
       ],
-      "answer_sha256": "2d518cac6bfbaa478dde52125cdcadb5caf9e6104673f3e8081f49ded3831a66"
+      "answer_sha256": "031c04a9b19282775017af9a5f6a12d8b7aa49e7c84c84d276d9a91332427296"
     },
     {
       "id": "Q18",

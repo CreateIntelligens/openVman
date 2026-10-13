@@ -3608,7 +3608,7 @@
    "top": [
     "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2",
     "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
-    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：工業示範專案企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
    ]
   },
   "ngram24": {
@@ -3617,7 +3617,7 @@
    "top": [
     "主題：evak_qa 問題：LEOPARD 切割泵的切刀是什麼材質？ 回答：LEOPARD 採用 Tungsten Edge（鎢鋼刀刃），搭配 EN-GJL-2",
     "主題：EVAK_QA_en 章節：What is the cutter material of the LEOPARD cutter pump? 內容：LEOP",
-    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：工業示範專案企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
    ]
   }
  },
@@ -3947,7 +3947,7 @@
    "hit": true,
    "top": [
     "主題：EVAK_QA_en 章節：What is the solids free passage for each STEEL horsepower range",
-    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：工業示範專案企業、億發泵浦、EVAK、沉水泵、排水泵、污水",
     "主題：EVAK_QA_en 章節：What discharge connection does the STEEL 0.5~1HP have? 內容：50STE"
    ]
   },
@@ -4074,7 +4074,7 @@
    "hit": false,
    "top": [
     "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
-    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: dev-c0c8fdff34) > 🌀 REM S",
+    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: example-industrial-project) > 🌀 REM S",
     "主題：EVAK_QA_en 章節：What is the cutter material of the ALLIGATOR grinder pump? 內容：A"
    ]
   },
@@ -4084,7 +4084,7 @@
    "top": [
     "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
     "主題：evak_qa 問題：EUS 加裝底盤後，最低可抽水到幾 mm？ 回答：EUS 0.5HP 與 1HP 加裝選配底盤後，最低可抽水至 3 mm。  【工程",
-    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: dev-c0c8fdff34) > 🌀 REM S"
+    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: example-industrial-project) > 🌀 REM S"
    ]
   },
   "ngram24": {
@@ -4093,7 +4093,7 @@
    "top": [
     "主題：EVAK_CATALOG.en 章節：EVAK Submersible Dewatering and Sewage Pump Product Catalo",
     "主題：evak_qa 問題：EUS 加裝底盤後，最低可抽水到幾 mm？ 回答：EUS 0.5HP 與 1HP 加裝選配底盤後，最低可抽水至 3 mm。  【工程",
-    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: dev-c0c8fdff34) > 🌀 REM S"
+    "主題：DREAMS 章節：Dreams Diary > 2026-09-30 19:00 (project: example-industrial-project) > 🌀 REM S"
    ]
   }
  },
@@ -4577,8 +4577,8 @@
   "set": "asr",
   "lang": "zh",
   "q": "我想找和記企業的業務問 EVAK 的報價。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
   "simple": {
    "ms": 18.0,
    "hit": true,
@@ -4593,7 +4593,7 @@
    "hit": true,
    "top": [
     "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
-    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水",
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：工業示範專案企業、億發泵浦、EVAK、沉水泵、排水泵、污水",
     "主題：EVAK_QA_en 章節：What is EVAK's full company name? 內容：The publisher is EVAK PUMP"
    ]
   },
@@ -4603,7 +4603,7 @@
    "top": [
     "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
     "主題：EVAK_QA_en 章節：What is EVAK's full company name? 內容：The publisher is EVAK PUMP",
-    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：工業示範專案企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
    ]
   }
  },
@@ -4611,8 +4611,8 @@
   "set": "asr",
   "lang": "zh",
   "q": "我想找賀記企業的業務問 EVK 的報價。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
   "simple": {
    "ms": 14.4,
    "hit": true,
@@ -4628,7 +4628,7 @@
    "top": [
     "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
     "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
-    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：工業示範專案企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
    ]
   },
   "ngram24": {
@@ -4637,7 +4637,7 @@
    "top": [
     "主題：evak_qa 問題：EVAK 的公司全名是什麼？ 回答：發行公司為 EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技）。  【工程要點",
     "主題：evak_qa 問題：EVAK 總公司的聯絡電話是多少？ 回答：台灣國碼 +886，電話 +886-4-26233556，傳真 +886-4-262355",
-    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
+    "主題：ASR_PROMPT 章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。 內容：工業示範專案企業、億發泵浦、EVAK、沉水泵、排水泵、污水"
    ]
   }
  },
@@ -4645,8 +4645,8 @@
   "set": "asr",
   "lang": "zh",
   "q": "我想要找最好的汽車業務員的報告。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
   "simple": {
    "ms": 14.0,
    "hit": true,
@@ -4679,8 +4679,8 @@
   "set": "asr",
   "lang": "zh",
   "q": "我想欲找合適去業界的業務部門的報告。",
-  "expect": "鶴記企業|EVAK",
-  "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+  "expect": "工業示範專案企業|EVAK",
+  "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
   "simple": {
    "ms": 14.6,
    "hit": true,

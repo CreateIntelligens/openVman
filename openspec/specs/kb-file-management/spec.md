@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 # kb-file-management Specification
 
 ## Purpose
@@ -49,7 +51,7 @@ The system SHALL authenticate every knowledge operation and SHALL resolve the se
 - **THEN** conversion, raw storage, canonical Markdown, QA artifacts, indexing, and graph updates all use that same server-resolved project context
 
 #### Scenario: ESG quick replies are requested
-- **WHEN** an account with access to project `esg-7dea843a0d` opens quick reply
+- **WHEN** an account with access to project `example-esg-project` opens quick reply
 - **THEN** the response contains only that project's visible Quick QA nodes and entries
 
 #### Scenario: ESG project is not granted

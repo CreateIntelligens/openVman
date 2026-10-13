@@ -1,5 +1,7 @@
 # 語音對話模擬（voice_e2e）
 
+> 資料去識別化：發布題庫的 `project_id` 與客戶名稱已改成示例值；重跑時請用 `--project` 指定自己環境的測試專案，並用 `--user` 指定有權限的帳號。商品型號與測試情境保留。
+
 不用對著前台講話，也能測一輪完整的語音對話。腳本送出聲音，走的是前台用的同一組公開端點：
 
 | 步驟 | 端點 | 跟前台一樣的地方 |
@@ -21,24 +23,26 @@
 
 在 repo 根目錄、主機上執行。需要 `httpx`、`websockets`、`ffmpeg`，也要能 `docker compose exec backend`。
 
+本文帳號與專案名稱／ID 已去識別化，執行前請改成自己環境的值；檔案路徑維持既有名稱，以便對照腳本與題庫。
+
 ```bash
-# 鶴記全部題目 × 題庫裡的 4 種聲音，串流與批次都跑，辨識後問 Brain
-python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360
+# 工業示範專案全部題目 × 題庫裡的 4 種聲音，串流與批次都跑，辨識後問 Brain
+python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/industrial.json --user example-user
 
 # 只跑兩題、一種聲音，再加上 TTS
-python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 \
+python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/industrial.json --user example-user \
   --only diva eubl --voices edge-tts:zh-TW-HsiaoChenNeural --steps chat,tts
 
 # 只測辨識、不問 Brain；混入雜訊
-python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 --steps "" --noise 0.02
+python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/industrial.json --user example-user --steps "" --noise 0.02
 
-# 鶴記題庫預設就跑在鶴記dev；要打正式鶴記才加 --project proj-0cc5c610b4
-python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user voice-e2e-test
+# 工業示範專案題庫預設就跑在工業示範專案（開發）；要打正式工業示範專案才加 --project example-industrial-production
+python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/industrial.json --user example-user
 ```
 
 ### 測試專案
 
-要問 Brain 的測試請跑在測試專案（目前有「鶴記dev」`dev-c0c8fdff34`，鏡像正式「鶴記」`proj-0cc5c610b4`）。
+要問 Brain 的測試請跑在測試專案（目前有「工業示範專案（開發）」`example-industrial-project`，鏡像正式「工業示範專案」`example-industrial-production`）。
 `--project` 是測試專案時，腳本開跑前會比對兩邊的知識庫、原始資料、詞表、人設、文件設定與語言分流，
 不一樣就列出差異並停下：數字要能代表正式環境，兩邊就得一致。同步（正式 → 測試，先備份測試專案、
 沿用正式專案的知識圖譜、再重建索引）：
@@ -71,7 +75,7 @@ python3 scripts/project_mirror.py sync
 
 ```json
 {
- "project_id": "proj-0cc5c610b4",
+ "project_id": "example-industrial-production",
  "voices": ["edge-tts:zh-TW-HsiaoChenNeural", "voxcpm:voxcpm2-cosy-young-male-01"],
  "cases": [
   {"id": "diva-agitator", "text": "請問 DIVA 有攪拌器嗎？", "terms": ["DIVA"], "reply_any": ["DIVA"]},
@@ -90,7 +94,7 @@ python3 scripts/project_mirror.py sync
 
 | 題庫 | 內容 |
 |------|------|
-| `heji.json` | 鶴記型錄 10 題（型號、泵浦專有名詞、閒聊），合成語音 4 種聲音，串流與批次都跑；跑在鶴記dev，測試帳號 `voice-e2e-test` 也只開了鶴記dev |
+| `industrial.json` | 工業示範專案型錄 10 題（型號、泵浦專有名詞、閒聊），合成語音 4 種聲音，串流與批次都跑；跑在工業示範專案（開發），測試帳號 `example-user` 也只開了工業示範專案（開發） |
 | `taigi-drama.json` | 台語連續劇對白真人錄音 75 句（`/srv/818data`，只有這台機器有），`text` 是華語字幕（意譯，所以錯字率偏高），只跑批次。用來看 Breeze 轉寫和台語判斷；只測辨識時加 `--steps ""`。同時跑多句會讓台語判斷超過 2.5 秒逾時，要量判斷準度時加 `--concurrency 1` |
 
 ## 副作用與限制

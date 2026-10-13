@@ -11,6 +11,6 @@
   "resolved_metadata_sha256": "f3a652f596906e2335260fbc992fd76df08a747f8db0bc65b17344bd96ea99ad",
   "knowledge_contents_equal": true,
   "method": "Infer missing language/source only; preserve every other key; no writes",
-  "production_project": "proj-0cc5c610b4",
-  "test_project": "dev-c0c8fdff34"
+  "production_project": "example-industrial-production",
+  "test_project": "example-industrial-project"
 }

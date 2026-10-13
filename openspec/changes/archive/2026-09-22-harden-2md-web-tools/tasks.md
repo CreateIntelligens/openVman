@@ -1,6 +1,8 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## 1. Canonical endpoint contract
 
-- [x] 1.1 Add one canonical source for `TWO_MD_BASE_URLS` and language-specific immutable views, preserving the exact order `2md.aiurl.tw` → `2md.glsoft.ai` → `create360.ai`; verify the generated/runtime values are identical and no fallback module owns a second default list.
+- [x] 1.1 Add one canonical source for `TWO_MD_BASE_URLS` and language-specific immutable views, preserving the exact order `web-primary.example.com` → `web-fallback.example.com` → `web-tertiary.example.com`; verify the generated/runtime values are identical and no fallback module owns a second default list.
 - [x] 1.2 Add validated complete-list configuration with explicit precedence over legacy primary/fallback settings, deduplication, scheme/host validation, and feature-flag compatibility; verify invalid configuration fails closed and existing deployments retain the documented default order.
 - [x] 1.3 Update tool documentation and environment examples to describe the endpoint contract, precedence, limits, and the fact that 2MD content is public untrusted reference data; verify README and `.env.example` agree with the runtime defaults.
 

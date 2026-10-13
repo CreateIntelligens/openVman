@@ -1,6 +1,6 @@
 # ASR 多語實測（中／英／西）
 
-日期：2026-09-23。起因：鶴記會有中文、英文、西班牙文使用者。語音用 edge-tts 合成
+日期：2026-09-23。起因：工業示範專案會有中文、英文、西班牙文使用者。語音用 edge-tts 合成
 （zh-TW-HsiaoChenNeural、en-US-JennyNeural、es-ES-ElviraNeural），不是真人錄音，
 沒有口音與環境噪音，只能當下限參考。
 
@@ -41,7 +41,7 @@ Live 對話的 `inputAudioTranscription` 帶 `languageCodes: ["zh-TW"]` 後中�
 
 ## 結論
 
-- 鶴記不能用 SenseVoice、Breeze、Xiaomi 處理西語。
+- 工業示範專案不能用 SenseVoice、Breeze、Xiaomi 處理西語。
 - 整段上傳就用 gpt-4o-mini-transcribe；要低延遲就做串流，OpenAI（有即時字幕）或 Gemini
   （有自訂詞彙）二選一。
 - Jev 只吃文字，不能在 ASR 之前判語言；但它對亂碼轉錄的信心很低（「Aka Ana.」0.1），

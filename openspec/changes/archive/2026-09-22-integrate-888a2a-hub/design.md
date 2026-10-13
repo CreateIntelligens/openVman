@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## Context
 
 The Hub is currently `MULTI_CIRCLE`, uses the legacy `/hub/v1` custom transport for inbox/SSE/task operations, and advertises at-least-once delivery. Registration returns `identity.agentId` and `identity.agentToken`; ordinary authenticated calls require `X-Agent-ID` plus `Authorization: Bearer <agentToken>`, while `X-Hub-Key` is registration-only. The live system card currently reports limits of four concurrent tasks, 32 group fan-out, 1 MiB payloads, and 60 tasks per minute.
@@ -33,7 +35,7 @@ Alternative considered: let the Brain skill call the Hub directly. Rejected beca
 
 ### 2. Secret-only circle selection and credential protection
 
-`A2A_HUB_KEY` has no committed or code default. An empty key means A2A is disabled or, only if explicitly selected by policy, the public circle. Private-circle membership is determined by the deployment secret sent as `X-Hub-Key` only during registration or rotation. The bridge must not assume the alias `ai360`.
+`A2A_HUB_KEY` has no committed or code default. An empty key means A2A is disabled or, only if explicitly selected by policy, the public circle. Private-circle membership is determined by the deployment secret sent as `X-Hub-Key` only during registration or rotation. The bridge must not assume a hardcoded circle alias.
 
 The credential store uses an atomic temporary-file replace, mode `0600`, schema version, hub URL, agent identity, encrypted agent token, token expiry, circle scope, and a keyed fingerprint of the registration secret. The plaintext Hub key and plaintext agent token never enter logs or tool arguments. If the encryption key is unavailable or the file is corrupt, the bridge fails closed and re-registers only when safe configuration is present.
 

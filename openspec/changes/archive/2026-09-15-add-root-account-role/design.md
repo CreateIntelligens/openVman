@@ -1,15 +1,19 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
+> `ROOT_USERNAME` 表示程式採用的 bootstrap 帳號名稱，由部署參數 `AUTH_ROOT_USERNAME` 決定；不是帳號名稱字面值。bootstrap 密碼透過 `BOOTSTRAP_ADMIN_PASSWORD` 環境變數提供，不在文件記錄原文。
+
 ## Context
 
 目前 `AccountRole` 只有 `admin`／`user`，SQLite `users.role` 也以 CHECK constraint 固定這兩個值。`require_admin`、資源授權、Brain proxy headers 與 Admin frontend 多處直接比較 `role == admin`。正式帳號密碼使用 bcrypt，只能驗證候選密碼，無法也不應還原原密碼。
 
-現有 bootstrap 會在沒有管理員時建立 `ai360`，舊資料庫也已存在該正式帳號。本變更必須在不改帳號 ID、密碼雜湊、資源 ownership 與 grants 的前提下，將它提升成唯一 ROOT，並讓所有原本的管理能力繼續對 ROOT 生效。
+現有 bootstrap 會在沒有管理員時建立 `ROOT_USERNAME`，舊資料庫也已存在該正式帳號。本變更必須在不改帳號 ID、密碼雜湊、資源 ownership 與 grants 的前提下，將它提升成唯一 ROOT，並讓所有原本的管理能力繼續對 ROOT 生效。
 
 ## Goals / Non-Goals
 
 **Goals:**
 
 - 建立 `root > admin > user` 的明確且由 Backend 強制執行的角色階層。
-- 讓唯一 `ai360` ROOT 管理管理員及下級帳號，而管理員只能管理 user／temporary。
+- 讓唯一 `ROOT_USERNAME` ROOT 管理管理員及下級帳號，而管理員只能管理 user／temporary。
 - 讓 ROOT 安全重設密碼，但任何角色都不能查詢既有明文密碼或密碼雜湊。
 - 讓角色、密碼與停用變更立即撤銷受影響帳號的舊 session。
 - 保留 ROOT 對所有既有 admin routes 與所有已登錄資源的完整存取。
@@ -29,11 +33,11 @@ Backend enum、SQLite role、JWT claim 與內部身分 header 使用小寫 `root
 
 替代方案是新增 `is_superuser` boolean，但這會產生 `role=admin, is_superuser=true` 的雙重真相，且 JWT、frontend 與 Brain proxy 都要額外攜帶旗標，因此不採用。
 
-### 2. 資料庫 migration 重建 `users` role constraint 並原地提升 `ai360`
+### 2. 資料庫 migration 重建 `users` role constraint 並原地提升 `ROOT_USERNAME`
 
-SQLite 不能直接修改既有 CHECK constraint。migration 會以 transaction-safe table rebuild 將允許值改為 `root`／`admin`／`user`，完整複製既有欄位及資料，再建立只允許一列 `role='root'` 的 partial unique index。正規化 username 為 `ai360` 的既有正式帳號會改為 `root`、遞增 `token_version` 並更新時間；其 password hash、ID、created_by、ownership、grants 與 defaults 不變。
+SQLite 不能直接修改既有 CHECK constraint。migration 會以 transaction-safe table rebuild 將允許值改為 `root`／`admin`／`user`，完整複製既有欄位及資料，再建立只允許一列 `role='root'` 的 partial unique index。正規化 username 為 `ROOT_USERNAME` 的既有正式帳號會改為 `root`、遞增 `token_version` 並更新時間；其 password hash、ID、created_by、ownership、grants 與 defaults 不變。
 
-若資料庫已有 ROOT 或 `ai360` 狀態衝突，migration fail closed，不猜測要覆蓋哪個高權限帳號。空白資料庫由 bootstrap 建立唯一 `ai360` ROOT；bootstrap 不提供任意 ROOT username 或第二個 ROOT 的選項。
+若資料庫已有 ROOT 或 `ROOT_USERNAME` 狀態衝突，migration fail closed，不猜測要覆蓋哪個高權限帳號。空白資料庫由 bootstrap 建立唯一 `ROOT_USERNAME` ROOT；bootstrap 不提供任意 ROOT username 或第二個 ROOT 的選項。
 
 ### 3. 帳號管理採 actor／target 階層策略
 
@@ -66,7 +70,7 @@ Audit 寫入與帳號 mutation 使用同一 transaction，避免帳號已變更�
 
 ### 6. Frontend 依 server profile 與 target role 呈現操作
 
-`AccountRole` 擴充為 `root | admin | user`，App 的既有管理頁 gating 將 root 視為管理員。帳號頁以 `ROOT` chip 標示 ai360；ROOT 可看到建立 admin、重設下級密碼、變更 admin／user 角色與既有生命週期操作。admin 只看到 user／temporary 的允許操作，對 admin／ROOT 不顯示 mutation controls。
+`AccountRole` 擴充為 `root | admin | user`，App 的既有管理頁 gating 將 root 視為管理員。帳號頁以 `ROOT` chip 標示 ROOT_USERNAME；ROOT 可看到建立 admin、重設下級密碼、變更 admin／user 角色與既有生命週期操作。admin 只看到 user／temporary 的允許操作，對 admin／ROOT 不顯示 mutation controls。
 
 Frontend 不自行推導最終授權結果；Backend 的 403／409 仍是權威，避免舊頁面或手工 API request 繞過規則。
 
@@ -74,19 +78,19 @@ Frontend 不自行推導最終授權結果；Backend 的 403／409 仍是權威�
 
 - **SQLite table rebuild 可能破壞 foreign keys** → migration 前後執行 `foreign_key_check`，完整比對 row count／ROOT invariant，並用舊 schema fixture 做升級測試。
 - **漏改 `role is ADMIN` 會讓 ROOT 被錯誤拒絕** → 集中 role helper，掃描 Backend／Brain proxy／frontend 的直接比較並加入 ROOT 全路由回歸測試。
-- **預設 `ai360`／`ai360` 是弱密碼** → 保留使用者指定的相容 bootstrap，但不在 log／API 暴露；部署文件明確要求正式環境立即變更 ROOT 密碼。
+- **bootstrap 密碼若過弱會暴露管理權限** → 使用環境變數 `BOOTSTRAP_ADMIN_PASSWORD` 提供密碼，不在 log／API 暴露；部署文件要求正式環境使用強密碼並依需要變更 ROOT 密碼。
 - **唯一 ROOT 無法在 UI 轉移** → 降低誤操作與提權風險；帳號遺失時只能由有主機與資料庫權限的 operator 使用專用 recovery CLI。
 - **ROOT reset 密碼可接管帳號** → 限制為唯一 ROOT、立即撤銷舊 session、寫入 audit，且不提供原密碼讀取。
 
 ## Migration Plan
 
 1. 先加入 role helper、policy tests、schema migration fixture 與 ROOT API failure tests。
-2. 套用 SQLite migration，原地將既有正式 `ai360` 升為唯一 ROOT並撤銷舊 session。
+2. 套用 SQLite migration，原地將既有正式 `ROOT_USERNAME` 升為唯一 ROOT並撤銷舊 session。
 3. 更新 Backend enum、JWT、dependencies、account routes／repositories、資源 full-access 判斷及 audit。
 4. 更新 Admin auth types、route gating、帳號操作與密碼 reset UI。
 5. 執行舊資料庫 migration、ROOT／admin／user 權限矩陣、資源隔離、temporary account、frontend 與 live login 回歸測試。
 
-Rollback 需使用 migration 前資料庫備份及上一版程式；不可只把程式降版，因舊 schema 不接受 `role='root'`。回復時將 ai360 role 改回 admin 並再次遞增 token version。
+Rollback 需使用 migration 前資料庫備份及上一版程式；不可只把程式降版，因舊 schema 不接受 `role='root'`。回復時將 ROOT_USERNAME role 改回 admin 並再次遞增 token version。
 
 ## Open Questions
 

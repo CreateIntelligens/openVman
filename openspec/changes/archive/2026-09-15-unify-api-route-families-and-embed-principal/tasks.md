@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## 1. Backend Path Families
 
 - [x] 1.1 Prefix every application router with `/api/v1` (auth, users, temporary accounts, projects, avatar, mascots, backgrounds, vision, gateway uploads/jobs/dlq/documents/knowledge, usage, TTS providers and stream, WebSocket, internal enrich) and change the Brain proxy public prefix to `/api/v1`
@@ -9,7 +11,7 @@
 ## 2. Infrastructure
 
 - [x] 2.1 Rewrite `frontend/admin/nginx/http.d/default.conf` to the three families, serve the SDK bundle and runtime under `/static/sdk/`, delete the `410` embed stubs, and update `default-conf.test.mjs` to reject retired locations
-- [x] 2.2 Rewrite `infra/nginx/native/openvman.conf.template` and the generated `146-openvman.conf` to the same families
+- [x] 2.2 Rewrite `infra/nginx/native/openvman.conf.template` and the generated host vhost configuration to the same families
 - [x] 2.3 Update Prometheus scrape config, Compose health checks, and any script that references a retired path
 
 ## 3. Frontend Path Migration

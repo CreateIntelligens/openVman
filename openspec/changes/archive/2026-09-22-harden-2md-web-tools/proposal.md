@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## Why
 
 OpenVman already exposes 2MD-backed web search and URL reading as Brain tools, but the service contract is currently spread across Python defaults, environment variables, and fallback code. A shared, explicit endpoint order and a bounded failover policy are needed before treating 2MD as a default LLM web capability; otherwise a provider outage can make every Brain worker retry the same hosts at once and create a thundering-herd incident.
@@ -5,7 +7,7 @@ OpenVman already exposes 2MD-backed web search and URL reading as Brain tools, b
 ## What Changes
 
 - Define the canonical ordered 2MD endpoint set as `TWO_MD_BASE_URLS`:
-  `https://2md.aiurl.tw`, `https://2md.glsoft.ai`, and `https://create360.ai`.
+  `https://web-primary.example.com`, `https://web-fallback.example.com`, and `https://web-tertiary.example.com`.
 - Keep `search_web` and `read_web_page` as the supported synchronous Brain tools, with stable normalized response envelopes and source attribution.
 - Make fallback sequential and bounded by one request deadline; do not fan out requests to all 2MD endpoints for one operation.
 - Add jittered retry/backoff, per-endpoint circuit breaking, and single-flight/coalescing so repeated failures do not synchronize retries across requests, workers, or service instances.

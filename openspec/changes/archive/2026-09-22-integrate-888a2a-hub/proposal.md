@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## Why
 
 openVman can become an A2A participant, but the first draft of this change does not yet satisfy the Hub's at-least-once delivery contract or openVman's service boundaries. Before implementation, the integration must define durable inbox processing, secret-only circle access, a single active bridge instance, and an internal Backend-to-Brain path that cannot expose Hub credentials to Brain skills.
@@ -29,5 +31,5 @@ openVman can become an A2A participant, but the first draft of this change does 
 - Backend configuration, gateway client/bridge/store modules, SQLite data under `backend/data/`, Redis leader coordination, and application lifespan.
 - Internal Backend-to-Brain routing and A2A skill registration, without exposing a new public inbound port.
 - Brain and Backend test suites plus deployment and security documentation.
-- External dependency: `https://a2a.david888.com` legacy `/hub/v1` API. The optional standard A2A 1.0 surface remains out of scope until its source/CI gate is explicitly enabled.
+- External dependency: `https://a2a.example.com` legacy `/hub/v1` API. The optional standard A2A 1.0 surface remains out of scope until its source/CI gate is explicitly enabled.
 - No frontend rendering or arbitrary remote shell/file execution.

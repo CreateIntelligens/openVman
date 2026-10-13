@@ -98,7 +98,7 @@ Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-878
 4. **爬蟲網路邊界**：Web Crawler 在對 provider 發送請求前必須拒絕 private、loopback 與 link-local 目標，並將 DNS 解析限制在 5 秒內。
 
 ### 7. 888a2a-lite Agent 橋接 (A2A Bridge)
-* **協定規範**: 遵循 `888a2a-lite` Hub 協定 (`https://a2a.david888.com/llms.txt`)。
+* **協定規範**: 遵循 `888a2a-lite` Hub 協定 (`https://a2a.example.com/llms.txt`)。
 * **身分註冊與私有圈 (Circle)**:
   - 只有部署明確提供 `A2A_HUB_KEY` 時，首次註冊才帶入 registration-only `X-Hub-Key`；不可在程式碼或文件硬編碼私有圈金鑰。無 key 僅在 `A2A_ALLOW_PUBLIC_CIRCLE=true` 時允許加入 public circle。
   - 憑證持久化於 `A2A_CREDENTIALS_PATH`（預設 `/data/a2a/credentials.json`，檔案權限 0600）；`agentToken` 必須靜態加密，缺少 encryption key 時 fail closed。

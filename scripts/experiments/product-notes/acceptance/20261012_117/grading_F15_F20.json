@@ -1,7 +1,7 @@
 {
   "grader": "Codex獨立人工式逐份閱讀；對照凍結規則與117筆記／來源，不呼叫模型；工具結果不代替回答。缺資料拒答仍須保留required_points必要限制。",
   "rubric_source": "questions.json:grading_rubric＋F15–F20 required_points／forbidden_claims",
-  "input_sha256": "a09b63f4fdc4cd51bfbe5df2d686bca2ed1968f0fea658b7554429837c155cd2",
+  "input_sha256": "5ea10dcd6588fd4ad6dc372ec8491eef85ea882366f3a357a8653dc757ea000e",
   "grades": [
     {
       "id": "F15",

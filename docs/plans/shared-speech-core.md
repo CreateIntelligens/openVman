@@ -283,7 +283,7 @@ repo 目前沒有 workspace、沒有根 `package.json`，三個前端各有 lock
 
 - 不改後端 `/api/v1/asr/transcribe`、`/settings/my-asr-provider` 合約。
 - 不做小米 SSE 逐字串流的**後端**部分。那是後端新增端點（`/api/v1/asr/transcribe/stream`
-  代理 `10.9.0.19:8802/transcribe/stream`），前端這邊只要 `controller` 的
+  代理 `192.0.2.19:8802/transcribe/stream`），前端這邊只要 `controller` 的
   `onInterim` 事件已經就位（階段 4／5 做好），後端端點上線時接一個 recognizer 即可。
   另開一份 plan。
 - 不動 `frontend/avatar-sdk`。它是給第三方嵌入的，刻意不含 ASR／TTS。

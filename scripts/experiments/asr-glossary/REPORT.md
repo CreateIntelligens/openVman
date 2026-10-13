@@ -4,7 +4,7 @@
 
 ## 1. 餵背景知識給 Gemini 轉錄（`../ja-ko/context_probe.py`）
 
-setup 帶 `systemInstruction`（鶴記背景＋專有名詞）：9 句 × 2 次，給不給結果一字不差。
+setup 帶 `systemInstruction`（工業示範專案背景＋專有名詞）：9 句 × 2 次，給不給結果一字不差。
 轉錄模型接受這個欄位但不理它，此路不通。
 
 ## 2. 辨識後用快速模型校正（`../ja-ko/glossary_fix.py`）

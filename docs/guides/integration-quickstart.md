@@ -63,6 +63,8 @@
 
 一般帳號可選擇跨供應商的已授權聲音；TTS `provider` 與 `voice` 必須符合聲音資源 metadata。省略 provider 但提供 voice 時由 metadata 推導，舊 metadata 缺漏僅沿用管理員設定的預設 provider；省略 voice 時使用帳號預設，供應商不匹配仍拒絕。受限 admin 的 `/tts/providers` 與 capabilities 也僅列權限上限內的聲音。聲音 ID 的音質與可用性取決於部署及上游，不應把特定 ID 永久當成失效。Embed key 維持綁定聲音限制。
 
+2026-10-13 [正式環境實測](../plans/integration-capabilities-asr.md)已跑通 5 個批次及 3 個串流 ASR、兩專案知識庫對話，以及 IndexTTS／CosyVoice／Gemini／有效 VoxCPM 聲音。當時仍有過期聲音被列出、Edge 回 200 卻無音訊，以及 IP 入口憑證不匹配等問題；不能僅因 HTTP 200 或聲音在清單上便視為成功，仍需檢查非空音訊及可解碼性。此為當日狀態，排障時需重新驗證。
+
 ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。
 
 ## 可直接執行的標準庫範例
@@ -74,11 +76,11 @@ python scripts/integration_client.py --help
 
 # 只探索，不辨識、不呼叫 LLM、不建立對話或合成音訊
 python scripts/integration_client.py \
-  --base-url https://146.5gao.ai/openvman --discover-only
+  --base-url https://api.example.com/openvman --discover-only
 
 # 依剛取得的清單填入 ID；請求會建立一輪對話並使用推論服務
 python scripts/integration_client.py \
-  --base-url https://146.5gao.ai/openvman \
+  --base-url https://api.example.com/openvman \
   --project-id '<capabilities.projects 中的 project_id>' \
   --audio sample.wav \
   --asr-provider '<capabilities.asr.batch 中的 id>' \

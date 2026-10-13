@@ -23,7 +23,7 @@
 
 正式帳號依序為 `ROOT > admin > user`，持久化值皆為小寫，只有介面將 `root` 顯示成 `ROOT`。
 
-- 唯一 ROOT 是正規化 username 為 `ai360` 的正式帳號。ROOT 繼承所有 admin 能力，並可建立及管理 admin／user／temporary。
+- 唯一 ROOT 是正規化 username 符合程式常數 `ROOT_USERNAME` 的正式帳號；空白部署可透過 `AUTH_ROOT_USERNAME` 設定，資料庫已有 ROOT 後不可藉此改名。ROOT 繼承所有 admin 能力，並可建立及管理 admin／user／temporary。
 - admin 可管理 user／temporary 與專案生命週期，也可以建立 admin 並管理**自己直接建立**的帳號（含 admin），但不能對 ROOT 執行任何帳號管理操作，也不能管理自己的帳號。變更角色與重設密碼仍限定 ROOT。
 - user 與 temporary 沒有帳號管理或專案建立／刪除權限，資源存取仍依 ownership、grants 與 defaults 決定。
 - ROOT／admin 固定可進管理後台；user 與 temporary 只有在管理員明確開啟「允許進入管理後台」後才可進入，預設為不允許。這項權限不會提升帳號角色或擴大原有 grants，但會讓帳號可編輯已授權專案內的知識、Quick QA、Persona Prompt、記憶、Skills 與 Tools。
@@ -63,7 +63,7 @@ ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立�
 
 Schema migration 由 Backend 啟動流程管理。升級前應核對 [migration 程式](../../backend/app/auth/database.py) 與目標版本的變更，不把某次升級的版本號當成完整檢查清單。
 
-角色、密碼與後台權限變更可能透過 `token_version` 撤銷既有 session；操作後需重新登入。既有兩角色資料庫升級為 ROOT 階層時，`ai360` 帳號會原地升級，舊 session 失效。
+角色、密碼與後台權限變更可能透過 `token_version` 撤銷既有 session；操作後需重新登入。既有兩角色資料庫升級為 ROOT 階層時，符合 `ROOT_USERNAME` 的帳號會原地升級，舊 session 失效。
 
 ## 密碼規則與 reset
 
@@ -75,7 +75,7 @@ ROOT 自己變更密碼使用 `POST /api/auth/password`，提供 `current_passwo
 docker compose exec backend python -m app.scripts.recover_root_password
 ```
 
-CLI 會互動讀取新密碼且不回顯。不要把密碼放進 shell history；非互動部署才使用短生命週期的 `ROOT_RECOVERY_PASSWORD` 祕密注入。Recovery 只更新現有 `ai360` ROOT，不能 rename、replace 或建立另一個 ROOT。
+CLI 會互動讀取新密碼且不回顯。不要把密碼放進 shell history；非互動部署才使用短生命週期的 `ROOT_RECOVERY_PASSWORD` 祕密注入。Recovery 只更新現有 ROOT，不能 rename、replace 或建立另一個 ROOT。
 
 ## 臨時登入密碼保存與查閱
 
@@ -97,8 +97,8 @@ Migration 10 新增 nullable `temporary_credentials.password_ciphertext`。新�
 正式部署前必須先在 Backend 容器可見的 `/data/auth` 建立一致的 SQLite backup，並驗證備份能開啟、row count 與 `PRAGMA foreign_key_check`。升級後要確認：
 
 1. schema migration 已達目標程式版本要求，且 foreign-key check 為空。
-2. 只有 `ai360` 一列 ROOT，帳號與 owned-resource row count 未改變。
+2. 只有符合 `ROOT_USERNAME` 的一列 ROOT，帳號與 owned-resource row count 未改變。
 3. 驗證登入與 session 撤銷行為；若首次建立 ROOT，立即更換初始密碼。
 4. admin 無法管理 ROOT、自身或非直屬帳號；可管理自己直接建立的 admin，但角色變更與密碼重設仍限定 ROOT。成功操作須產生 audit event。
 
-若回退至不支援 ROOT 的舊版，不能只降版程式，因舊版 schema 不接受 `root`。必須停止 Backend、用 migration 前的完整 SQLite backup 取代資料庫，再啟動上一版程式。若需要手動轉回兩角色 schema，必須先在離線複本演練：將 `ai360` 改回 admin、再次遞增 token version、以舊 constraint 重建 `users`，最後確認 row count 與 foreign keys；完成前不可對 live database 操作。
+若回退至不支援 ROOT 的舊版，不能只降版程式，因舊版 schema 不接受 `root`。必須停止 Backend、用 migration 前的完整 SQLite backup 取代資料庫，再啟動上一版程式。若需要手動轉回兩角色 schema，必須先在離線複本演練：將現有 ROOT 改回 admin、再次遞增 token version、以舊 constraint 重建 `users`，最後確認 row count 與 foreign keys；完成前不可對 live database 操作。

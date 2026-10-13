@@ -1,5 +1,7 @@
 # 產品筆記實驗
 
+> 資料去識別化：發布的實驗 JSON 附件已將客戶專案名稱／ID 與隨機 trace ID 改為示例別名；純題號與重複次數組成的關聯 ID 保留。欄位結構、數字、評分、商品型號及原始商品型錄／產品筆記內容雜湊不變。附件一致性 checksum 已按匿名化後的發布內容更新；規格表索引的客戶名稱註解也已匿名並更新其 checksum。歷史回答中的專案自稱也已匿名，數據仍代表匿名化前的原測量；重播部署流程前須以自身專案 ID 覆寫示例值。
+
 AI 讀型錄、為每個型號產生 Obsidian 式筆記，看能不能改善跨產品選型問答。
 
 | 檔案 | 內容 |
@@ -74,7 +76,7 @@ Git 保存腳本、凍結題目、原始回答、獨立評分、來源快照與�
 ## 寫入邊界
 
 - 容器內唯讀：只讀既有 workspace／LanceDB，擋掉 Python 對 `/data` 的寫入，停用該子程序的用量／PII／recall 寫入。正式 api 行程與設定不改。
-- 鶴記dev 的 workspace 與 LanceDB 不改；前三輪前後 `scripts/project_mirror.py check` 為 exit 0。117 款新驗收保留實際 exit 1 與獨立語言快取解析證據，不把差異改標為成功。
+- 工業示範專案（開發） 的 workspace 與 LanceDB 不改；前三輪前後 `scripts/project_mirror.py check` 為 exit 0。117 款新驗收保留實際 exit 1 與獨立語言快取解析證據，不把差異改標為成功。
 - 筆記向量只在記憶體裡算，不建表、不 reindex。
 - 中途 checkpoint 與完整逐檔雜湊（`*_checkpoint.json`、`*_checkpoint.jsonl`、`*.full.json`）不進 git（`.gitignore`）；提交的結果把逐檔雜湊縮成檔案數與總雜湊。
 - 前三輪實驗沒有變更正式 Brain、Backend、前台、管理介面、SDK 或 API contract。117 款驗收載入固定 checkout 快照的 Brain 生成鏈；隔離 session／用量等寫入，停用該測量程序的 PII 偵測，不經 HTTP、Backend、前台、ASR 或 TTS，也沒有部署。另修正決策設定測試的 alias 傳參，不改正式設定載入行為。第一、二輪及這次驗收記在根目錄 `CHANGELOG.md`；第三輪依交辦範圍記在 `round3/CHANGELOG.md`。

@@ -1,19 +1,21 @@
 # A2A 真實 Hub 往返驗證
 
+> 資料去識別化：發布附件 `result.json` 已將私人 Hub 網址及實測 agent／circle／task／run ID 替換為示例別名；同一識別值的關聯仍保留。成功狀態、時序、耗時與原程式來源雜湊維持原測量值。
+
 日期：2026-09-20。使用者明確授權建立隔離測試圈及暫時 Agent。結果：[result.json](result.json)。
 
 **成功完成一筆真實往返，約 9.55 秒。** 測試訊息與回覆只包含連線測試要求及隨機識別碼；沒有送出正式用戶內容。
 
 ## 已驗證鏈路
 
-1. 以隨機私有圈金鑰向 https://a2a.david888.com 註冊兩個暫時身分，確認同圈、非 public，並能互相發現。
+1. 以隨機私有圈金鑰向 `https://a2a.example.com` 註冊兩個暫時身分，確認同圈、非 public，並能互相發現。
 2. 在既有 Backend 容器的獨立程序啟動只綁定 loopback 的 FastAPI facade，使用真正 internal_routes router、A2AClient 及內部驗證 token。僅該程序啟用 A2A 並指定 sender bridge；正式 Backend 設定與程序未更動。
 3. 從目前 Brain skill 程式呼叫 a2a_send_task，經真正 HTTP facade → 真實 Hub，取得 taskId 與 QUEUED 回應。
 4. 接收端使用既有 A2ABridgeDaemon._stream_inbox，透過真實 SSE 收到完全相同的訊息，先寫入 SQLite 工作佇列，再 ACK。
 5. 執行真正 bridge 工作處理，呼叫已部署 Brain 的 /brain/chat 產生回覆，工作記錄變成 COMPLETED，再透過 Hub 派回 sender。
-6. sender 經 SSE 收到 A2A_PONG a2a-smoke-60cdc55af1e6，寫入佇列並 ACK。此為終止測試回覆，不再觸發互相回信。
+6. sender 經 SSE 收到 A2A_PONG `a2a-smoke-example-success`，寫入佇列並 ACK。此為終止測試回覆，不再觸發互相回信。
 
-主要 taskId：2166e807-561c-4d20-a85e-42be3652784a；回覆 taskId：b695ff73-351b-4c5c-905e-f47eccbd30ab。Hub sequence 分別為 361、362。
+主要 taskId：`example-task-request`；回覆 taskId：`example-task-reply`。Hub sequence 分別為 361、362。
 
 ## 邊界與清理
 

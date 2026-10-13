@@ -2,5 +2,5 @@
   "command": "python3 scripts/project_mirror.py check",
   "exit_code": 1,
   "stdout": "",
-  "stderr": "dev-c0c8fdff34 跟 proj-0cc5c610b4 不一樣：\n  內容不同：.doc_meta.json\n同步：python3 scripts/project_mirror.py sync --target dev-c0c8fdff34\n"
+  "stderr": "example-industrial-project 跟 example-industrial-production 不一樣：\n  內容不同：.doc_meta.json\n同步：python3 scripts/project_mirror.py sync --target example-industrial-project\n"
 }

@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 # temporary-account-access Specification
 
 ## Purpose
@@ -37,8 +39,8 @@ The system SHALL begin the lifetime only on the first successful password verifi
 The system SHALL attach selected project／knowledge-base, character, and voice grants to every account in the generated batch, SHALL record an accessible default for each resource category, and SHALL obtain selectable grants from the same authoritative registry endpoint used by formal account administration.
 
 #### Scenario: Default selections are available
-- **WHEN** the selected grants include `proj-b85afb8bb6`, character `0713`, and IndexTTS voice `hayley`
-- **THEN** the account opens with 創造智能醫院衛教助理, ESG-AIKKA雀斑, and Hayley selected
+- **WHEN** the selected grants include `example-hospital-project`, character `0713`, and IndexTTS voice `hayley`
+- **THEN** the account opens with 醫院示範專案, 示範角色, and Hayley selected
 
 #### Scenario: Configured fallback is not granted
 - **WHEN** a temporary account lacks one of the system fallback resources

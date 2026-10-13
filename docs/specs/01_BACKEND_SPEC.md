@@ -192,13 +192,13 @@ multipart：`file`、`provider`（`SERVER_ASR_PROVIDERS` 之一，空白用部�
 
 端點預設依帳號保存的串流偏好選擇引擎，也接受 query `engine`，一般帳號可指定目前已授權的 `STREAM_ASR_ENGINES`，管理員保留後台試聽能力；不改帳號偏好。嵌入金鑰不可使用。批次 `r2t2` 與串流 `r2t2-live` 分開授權，串流引擎均不進 `transcribe()` 備援鏈。沒選串流、指定非串流引擎或授權被撤銷回 `not_allowed`。
 
-R2T2 使用 `ASR_R2T2_STREAM_URL`（部署值 `ws://10.9.0.35:8040/asr_stream_api_v1`，2026-10-05 起 .35 為主機）與 `ASR_R2T2_SECRET_KEY`；另有獨立引擎 `r2t2-dev-live`／批次 `r2t2-dev` 接 .37（`ASR_R2T2_DEV_STREAM_URL`＋`ASR_R2T2_DEV_SECRET_KEY`、`ASR_R2T2_DEV_URL`），同一套握手；帳號自己選了才用，失敗不換台，也不排進其他引擎的備援順序。批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒）。設定不齊回 `not_configured`。握手送 `requestId`、`language`、`use_vad=true`、金鑰與 `project_asr_prompt(account, project_id)` 詞表作為 `system_prompt`；收到 `status=connected` 後才回前台 `ready`，握手或連線失敗回 `upstream_failed`。`language` 跟著這條連線生效的分流（不含台語）：只有一種語言時帶對應值（zh→`Chinese`、en→`English`、es→`Spanish`、ja→`Japanese`、ko→`Korean`），多種語言時送 `zhen` 交給 R2T2 自己判斷，沒有分流或只有台語時送 `Chinese`。批次 `/transcribe` 用同一套規則（`language_routes.r2t2_language`）。.37 不會判斷（`zhen` 也當中文，西日韓被當中文解碼會整句壞掉）；.35 的 `zhen` 能分中英西、日文不行。只有 `Chinese`／`zhen` 的輸出做簡轉繁，日韓英西原樣送出（轉換會把「学校」改成「學校」）。金鑰只由環境提供，不在錯誤或日誌輸出握手內容。
+R2T2 使用 `ASR_R2T2_STREAM_URL`（設定示例 `ws://192.0.2.35:8040/asr_stream_api_v1`，2026-10-05 起 節點 A 為主機）與 `ASR_R2T2_SECRET_KEY`；另有獨立引擎 `r2t2-dev-live`／批次 `r2t2-dev` 接 節點 B（`ASR_R2T2_DEV_STREAM_URL`＋`ASR_R2T2_DEV_SECRET_KEY`、`ASR_R2T2_DEV_URL`），同一套握手；帳號自己選了才用，失敗不換台，也不排進其他引擎的備援順序。批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒）。設定不齊回 `not_configured`。握手送 `requestId`、`language`、`use_vad=true`、金鑰與 `project_asr_prompt(account, project_id)` 詞表作為 `system_prompt`；收到 `status=connected` 後才回前台 `ready`，握手或連線失敗回 `upstream_failed`。`language` 跟著這條連線生效的分流（不含台語）：只有一種語言時帶對應值（zh→`Chinese`、en→`English`、es→`Spanish`、ja→`Japanese`、ko→`Korean`），多種語言時送 `zhen` 交給 R2T2 自己判斷，沒有分流或只有台語時送 `Chinese`。批次 `/transcribe` 用同一套規則（`language_routes.r2t2_language`）。節點 B 不會判斷（`zhen` 也當中文，西日韓被當中文解碼會整句壞掉）；節點 A 的 `zhen` 能分中英西、日文不行。只有 `Chinese`／`zhen` 的輸出做簡轉繁，日韓英西原樣送出（轉換會把「学校」改成「學校」）。金鑰只由環境提供，不在錯誤或日誌輸出握手內容。
 
 前台送 16 kHz、PCM16 單聲道 binary（通常每 100 ms、3200 bytes），Backend 累積重切為每段 5120 bytes。收到 `{"type":"end"}` 時剩餘片段補靜音至 5120 bytes，再送文字 `YOUDAO_ONETIME_ASR_STREAM_EOS`，繼續等待最後定稿；上游正常 EOS 關閉不算故障，意外關閉會回錯誤。`msg.text` 是增量：累加後轉繁體送整句 `interim`；`reset=true` 以 `final_text` 定稿，缺少或空字串則用累加文字，轉繁體後送非空 `final` 並清空累加。靜音不產生空字幕；R2T2 定稿不問 Jev。用量記 `kind=asr`、provider `r2t2-live`、model `Confucius4-R2T2`，秒數僅算原始前台音訊，不含補齊靜音。台語分流維持 Breeze 批次。
 
 上游 `/healthz` 提供 `active_streams`、`inference.waiting`、`busy_seconds`、`last_success_seconds_ago`；`status=stalled` 表示推論卡住超過 60 秒，部署驗收需檢查。
 
-本次隔離驗證（2026-10-01）：使用本地新 Backend 串流轉接與真實 .37 上游，鶴記兩個 Edge 聲音各 10 題；單路及同時三路各 20 句，平均逐句錯字率皆為 6.91%，各 20 則定稿、無漏句或錯誤。題庫所有 `terms` 命中 19/24（此統計包含泛用詞，不與計畫的專有名詞 13/18 混算）。測試以隔離帳號與設定執行，未寫入正式偏好或部署設定；尚未驗證部署後前台與 Brain 回答命中率，需部署後按計畫以專用測試帳號跑 `scripts/voice_e2e/run.py`。
+本次隔離驗證（2026-10-01）：使用本地新 Backend 串流轉接與真實 節點 B 上游，工業示範專案兩個 Edge 聲音各 10 題；單路及同時三路各 20 句，平均逐句錯字率皆為 6.91%，各 20 則定稿、無漏句或錯誤。題庫所有 `terms` 命中 19/24（此統計包含泛用詞，不與計畫的專有名詞 13/18 混算）。測試以隔離帳號與設定執行，未寫入正式偏好或部署設定；尚未驗證部署後前台與 Brain 回答命中率，需部署後按計畫以專用測試帳號跑 `scripts/voice_e2e/run.py`。
 
 前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES；前台帶 `project_id` 時另帶 `customVocabulary`，是 Brain `/brain/internal/asr-glossary` 回的專案詞表逐詞清單，最多 100 個，拿不到就不帶）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。查詢參數 `engine` 指定串流引擎時不看帳號偏好，一般帳號仍須有該引擎授權；管理員保留試聽權限，嵌入金鑰維持拒絕。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。
 
@@ -239,7 +239,7 @@ TTS_INDEXTTS_DEFAULT_CHARACTER=hayley
 TTS_VOXCPM_URL=http://voxcpm-gateway:8800
 TTS_VOXCPM_API_KEY=***
 TTS_VOXCPM_DEFAULT_VOICE=voxcpm2-cosy-young-female-01
-TTS_COSYVOICE_URL=http://10.9.0.35:50010/v1
+TTS_COSYVOICE_URL=http://192.0.2.35:50010/v1
 TTS_COSYVOICE_API_KEY=***
 TTS_COSYVOICE_DEFAULT_VOICE=young-male-02
 TTS_AWS_ACCESS_KEY_ID=***

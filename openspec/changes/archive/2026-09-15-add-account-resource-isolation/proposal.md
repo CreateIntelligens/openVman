@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## Why
 
 openVman 目前以呼叫端提供的 `project_id`、`persona_id`、角色與聲音名稱直接選取資料，沒有帳號身分或伺服器端所有權檢查，因此不同使用者只要知道識別碼就可能讀寫同一份知識庫、人物、對話或媒體資產。系統需要先建立可撤銷的帳號與 JWT session，再讓每一條資源存取路徑以登入者身分強制套用所有權範圍。
@@ -12,8 +14,8 @@ openVman 目前以呼叫端提供的 `project_id`、`persona_id`、角色與聲�
 - 區分 system-public 與 account-private 資源：內建／既有公開 Avatar 與 provider voice 可維持共用唯讀，新的使用者上傳資產預設為私有；公開 Avatar SDK 只列出 system-public 角色。
 - 新增 Admin 與 Avatar 前端登入狀態、路由守衛、登出與 401 處理；JWT 不寫入 `localStorage`。
 - 新增獨立的 Admin portal 存取權限：ROOT／admin 固定可進後台，一般正式帳號與臨時帳號預設不可進，管理員可在帳號權限或臨時批次設定中明確開啟。
-- 登入後回傳並套用資源預設值；系統 fallback 為 `proj-b85afb8bb6`（創造智能醫院衛教助理）、`0713`（ESG-AIKKA雀斑）與 IndexTTS `hayley`。
-- ESG project `esg-7dea843a0d` 的 Quick QA／quick reply 內容納入知識庫授權與 migration，授權 ESG project 時一併授權其 quick reply，不建立旁路清單。
+- 登入後回傳並套用資源預設值；系統 fallback 為 `example-hospital-project`（醫院示範專案）、`0713`（示範角色）與 IndexTTS `hayley`。
+- ESG project `example-esg-project` 的 Quick QA／quick reply 內容納入知識庫授權與 migration，授權 ESG project 時一併授權其 quick reply，不建立旁路清單。
 - 新增既有資料 migration：現有 projects 指派給 bootstrap admin，既有公開角色／背景／吉祥物／IndexTTS voices 登記為 system-public，避免升級後遺失或意外跨帳號共享。
 - **BREAKING**：除登入、健康檢查、明確的 system-public 靜態資源與公開 Avatar SDK 合約外，現有管理、chat、TTS、knowledge、persona、session 與資產異動端點都必須帶有效 session；僅傳 `project_id` 不再構成授權。
 

@@ -1,6 +1,6 @@
 # R2T2 串流辨識接上前台
 
-狀態：Done（2026-10-05 使用者授權結案）。已於 `afb9d6c` 提交並部署，正式引擎 `r2t2-live`（.37）；.35 另列為 `r2t2-dev`／`r2t2-dev-live`（`dd20940`）。
+狀態：Done（2026-10-05 使用者授權結案）。已於 `afb9d6c` 提交並部署，正式引擎 `r2t2-live`（節點 B）；節點 A 另列為 `r2t2-dev`／`r2t2-dev-live`（`dd20940`）。
 
 ## 目標
 
@@ -8,20 +8,20 @@
 
 ## 為什麼做
 
-鶴記型錄 10 題，合成語音，各 20 句；R2T2 已轉成繁體再算錯字率。
+工業示範專案型錄 10 題，合成語音，各 20 句；R2T2 已轉成繁體再算錯字率。
 
 | 串流 | 錯字率 | 專有名詞聽對 | 講完到定稿 p50 |
 |---|---|---|---|
 | Gemini Live（現行） | 17.6% | 3/18 | 2.05 秒 |
-| R2T2 .37，帶專案詞表 | 6.9% | 13/18 | 1.10 秒 |
-| R2T2 .37，同時 3 路 | 6.9% | 13/18 | 1.59 秒，沒有漏掉斷句 |
+| R2T2 節點 B，帶專案詞表 | 6.9% | 13/18 | 1.10 秒 |
+| R2T2 節點 B，同時 3 路 | 6.9% | 13/18 | 1.59 秒，沒有漏掉斷句 |
 
 - 數據和腳本在 `scripts/experiments/r2t2/`：`run.py` 測批次，`stream.py` 測串流。
 - 延遲從音檔裡最後一個有聲音的取樣算起。
 
-## R2T2 串流協定（.37，以實測為準）
+## R2T2 串流協定（節點 B，以實測為準）
 
-- 位址：`ws://10.9.0.37:8803/asr_stream_api_v1`。
+- 位址：`ws://192.0.2.37:8803/asr_stream_api_v1`。
 - 連上後先送 JSON 握手：
   ```json
   {"requestId": "<uuid>", "language": "Chinese", "use_vad": true,
@@ -29,7 +29,7 @@
   ```
   - 金鑰放 `.env`（`ASR_R2T2_SECRET_KEY`），不要寫進程式碼或文件。
   - `system_prompt` 是熱詞，選填。
-  - `language`：.37 收到 `zhen` 也當 `Chinese`，不會自己判斷語言。2026-10-05 實測五種語言各 3 句：指定正確語言（English／Spanish／Japanese／Korean）全對；當中文解碼時中英沒問題，西日韓整句壞掉。正式程式照分流帶語言（見 `01_BACKEND_SPEC.md` 串流 ASR）。不要用 `auto`：自動判斷時，帶口音的華語曾被轉成葡萄牙文。
+  - `language`：節點 B 收到 `zhen` 也當 `Chinese`，不會自己判斷語言。2026-10-05 實測五種語言各 3 句：指定正確語言（English／Spanish／Japanese／Korean）全對；當中文解碼時中英沒問題，西日韓整句壞掉。正式程式照分流帶語言（見 `01_BACKEND_SPEC.md` 串流 ASR）。不要用 `auto`：自動判斷時，帶口音的華語曾被轉成葡萄牙文。
   - 伺服器會回一則 connected 訊息，裡面有實際使用的 language。
 - 之後每 0.16 秒送一段 binary：16 kHz、16-bit、單聲道 PCM，每段 **5120 bytes**。
 - 結束時送文字 `YOUDAO_ONETIME_ASR_STREAM_EOS`。
@@ -65,7 +65,7 @@
   - **用量記錄**：照 Gemini 那段 `record_usage_event` 記錄串流秒數。
   - 不需要 Jev 的定稿判斷（`_judge_final`）：R2T2 的 `final_text` 本身就是整句重新辨識的結果。
 - 設定放在 `backend/app/config.py`，並在 `.env.example` 加註解：
-  - `ASR_R2T2_STREAM_URL`，正式值是 `ws://10.9.0.37:8803/asr_stream_api_v1`。
+  - `ASR_R2T2_STREAM_URL`，設定示例為 `ws://192.0.2.37:8803/asr_stream_api_v1`。
   - `ASR_R2T2_SECRET_KEY`。
   - 沒設定網址時，這個引擎不能用，回 `not_configured`。
 - 引擎註冊：
@@ -101,8 +101,8 @@
    - `python contracts/scripts/generate_protocol_contracts.py --check`
    - `git diff --check`
 3. 部署後實測：用語音模擬工具 `scripts/voice_e2e/run.py`（說明見同目錄的 README.md）。
-   - `--asr stream` 走的是帳號偏好的引擎，所以要用一個偏好設成 `r2t2-live` 的測試帳號。**不要改 ai360 這類真人帳號的偏好**，或者先徵求使用者同意。
-   - 預期鶴記題庫（`cases/heji.json`）兩個 edge 聲音的串流結果：錯字率約 7%，專有名詞約 13/18，回答命中不低於 Gemini Live。
+   - `--asr stream` 走的是帳號偏好的引擎，所以要用一個偏好設成 `r2t2-live` 的測試帳號。**不要改正式使用者帳號的偏好**，或者先徵求使用者同意。
+   - 預期工業示範專案題庫（`cases/industrial.json`）兩個 edge 聲音的串流結果：錯字率約 7%，專有名詞約 13/18，回答命中不低於 Gemini Live。
    - 同時 3 路（`--concurrency 3`）不能有漏掉斷句。
 
 ## 文件（依 AGENTS.md，同一個變更裡一起更新）

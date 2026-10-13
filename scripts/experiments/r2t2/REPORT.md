@@ -15,7 +15,7 @@
 ## 方法
 
 - 音檔：
-  - 鶴記 10 題 × 4 種合成聲音：edge-tts 兩種清楚的聲音，加 VoxCPM 兩種帶口音的聲音。用的是 `scripts/voice_e2e/.cache` 裡的快取，要先跑過 voice_e2e 才有。
+  - 工業示範專案 10 題 × 4 種合成聲音：edge-tts 兩種清楚的聲音，加 VoxCPM 兩種帶口音的聲音。用的是 `scripts/voice_e2e/.cache` 裡的快取，要先跑過 voice_e2e 才有。
   - 台語連續劇真人錄音 75 句：`scripts/voice_e2e/cases/taigi-drama.json`。
 - 每一句都測「帶專案詞表」和「不帶詞表」兩種：R2T2 把詞表放在 `context`（批次）或 `system_prompt`（串流），Breeze 放在 `prompt`。
 - R2T2 輸出簡體，先轉成繁體才算錯字率（`app.utils.chinese.convert_to_traditional`，這也是正式整合時的做法）。
@@ -25,7 +25,7 @@
   - `stream.py`：串流，可用 `--url` 指定部署、`--parallel` 指定同時幾路。
   - .37 批次測試沒有獨立腳本，結果在 `results_37*.json`。
 
-## 結果：鶴記 10 題，清楚聲音（edge 兩種，20 句），帶詞表
+## 結果：工業示範專案 10 題，清楚聲音（edge 兩種，20 句），帶詞表
 
 | | 錯字率 | 專有名詞聽對 | 延遲 p50 |
 |---|---|---|---|
@@ -57,7 +57,7 @@
 
 ## 2026-10-05 複測：多語言與 Gemini 3.5
 
-腳本與逐句結果在 `multilang/`：`r2t2_lang.py 37|35`（R2T2 串流，三種 language 設定）、`heji_35_chinese.py`（正式 .35 `Chinese` 與 .37 新版 `zhen` 型號題）、`auto_37.py`（.37 新版自動判斷：連講與台語，並行）、`gemini_lang.py`（Gemini 串流）、`heji_terms.py`（鶴記型號題三家同時比）、`parallel_35.py N`（.35 同時 N 路）、`e2e_stream.py`（經過 backend，要先把測試帳號偏好設成要測的串流引擎）、`taigi_stream.py`（台語）。都直接連引擎，一次一路，不經過帳號偏好。Gemini 用部署設定的 `gemini-3.5-transcribe-live`。
+腳本與逐句結果在 `multilang/`：`r2t2_lang.py 37|35`（R2T2 串流，三種 language 設定）、`heji_35_chinese.py`（正式 .35 `Chinese` 與 .37 新版 `zhen` 型號題）、`auto_37.py`（.37 新版自動判斷：連講與台語，並行）、`gemini_lang.py`（Gemini 串流）、`heji_terms.py`（工業示範專案型號題三家同時比）、`parallel_35.py N`（.35 同時 N 路）、`e2e_stream.py`（經過 backend，要先把測試帳號偏好設成要測的串流引擎）、`taigi_stream.py`（台語）。都直接連引擎，一次一路，不經過帳號偏好。Gemini 用部署設定的 `gemini-3.5-transcribe-live`。
 
 ### 一般句子：中英西日韓各 3 句（edge-tts 合成，沒有型號）
 
@@ -74,7 +74,7 @@
 - .37 舊版不會自己判斷語言，新版（840bf72）送 `zhen` 會逐句判斷，定稿在 `final_text`、判出的語言在 `msg.language`。正式程式照分流帶語言（`backend/app/gateway/asr_stream.py`，見 `docs/specs/01_BACKEND_SPEC.md` 串流 ASR）。
 - Gemini 自己判斷得出語言，日常用語幾乎全對。
 
-### 鶴記型號題：10 題 × edge 兩種聲音（20 句），同一時間比三家
+### 工業示範專案型號題：10 題 × edge 兩種聲音（20 句），同一時間比三家
 
 | | 錯字率 | 專有名詞聽對 |
 |---|---|---|

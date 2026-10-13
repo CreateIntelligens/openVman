@@ -2,7 +2,7 @@
   "status": "passed",
   "checked_date": "2026-10-12",
   "chat_measurement_commit": "0759f4f4ab1080fb1cc4ffd0dc8b44bb5a940087",
-  "chat_results_sha256": "e6e53b99e8f334db9ae50193a47dbf0089e42a3590585ccf03cd52e8205b7bcf",
+  "chat_results_sha256": "3c20fc6e54621057e05516083ca2604ed0b97e989c61925878d0947f40b53fe7",
   "unit_test_checkout": "4b3debed5bda08ca8b471f85ed89015f6f973c0f",
   "brain_non_integration": {
     "command": "python3 -B -m pytest brain/api/tests -m 'not integration' -q -p no:cacheprovider",

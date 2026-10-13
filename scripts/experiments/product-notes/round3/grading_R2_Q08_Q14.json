@@ -1,7 +1,7 @@
 {
   "grader": "Codex independent source-based grading；獨立代理逐條原文核對，非人類驗收、無額外實驗模型自評或LLM API",
   "rubric_source": "round3/questions.json凍結grading_rubric、各題required_points與forbidden_claims；原文round3/source_catalog.md；答案answers_for_grading_R2_Q08_Q14.json。純漏列按部分對；明示錯誤排除理由、門檻方向或數值按錯；出處品質另列。",
-  "input_sha256": "90ed7ba997e872b9caa9414efdc5900eaa40c0ea9df3b83d1c57bf5ea6c38932",
+  "input_sha256": "89872de014c0fd8d23116059b14539f25f63d7831c26ff36c9fc0828d05a90d8",
   "grades": [
     {
       "id": "Q08",

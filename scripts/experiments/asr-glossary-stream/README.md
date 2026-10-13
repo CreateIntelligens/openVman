@@ -1,6 +1,8 @@
 # Gemini 串流辨識加專案詞表（2026-10-06）
 
-鶴記測試專案的詞表（31 詞）放進 Gemini transcribe-live 的 `customVocabulary`，比較專有名詞命中率、字錯率與定稿延遲。題目是 `scripts/voice_e2e/cases/heji.json` 的 10 題加 10 題專有名詞較密的句子，4 種合成聲音。
+> 資料去識別化：發布的 JSON 結果已將客戶專案名稱／ID 換成示例別名。分數與耗時保留原測量值；匿名後的轉寫／參考文字用於閱讀，不代表重新測量的 CER。
+
+工業示範專案測試專案的詞表（31 詞）放進 Gemini transcribe-live 的 `customVocabulary`，比較專有名詞命中率、字錯率與定稿延遲。題目是 `scripts/voice_e2e/cases/industrial.json` 的 10 題加 10 題專有名詞較密的句子，4 種合成聲音。
 
 | 檔案 | 內容 |
 |---|---|

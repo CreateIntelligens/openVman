@@ -1,6 +1,6 @@
 {
  "description": "台語連續劇對白真人錄音（/srv/818data，這台機器上才有），text 是華語字幕（意譯，錯字率會偏高）。只測批次辨識：台語分流時前台不走串流。看 Breeze 轉寫與台語判斷，不問 Brain 時加 --steps \"\"。",
- "project_id": "proj-b85afb8bb6",
+ "project_id": "example-hospital-project",
  "asr": [
   "batch"
  ],

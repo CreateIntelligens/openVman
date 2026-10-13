@@ -1,5 +1,8 @@
 # Nginx TLS Certificates
 
+Domain names below are anonymized examples; use the deployed domains when
+selecting certificate lineages.
+
 The admin/nginx container uses these filenames for HTTPS:
 
 - `openvman.crt`
@@ -21,10 +24,10 @@ standard `/etc/letsencrypt` path inside that container, so the renewal config
 stays portable while the host nginx reads the same files through their real
 path.
 
-The directory can hold multiple domain lineages. The `clef.create360.ai`
-API vhost stores its certificate in `letsencrypt/live/clef.create360.ai/`;
+The directory can hold multiple domain lineages. The `decision-primary.example.com`
+API vhost stores its certificate in `letsencrypt/live/decision-primary.example.com/`;
 the existing renewal script processes that lineage together with
-`146.5gao.ai`.
+`api.example.com`.
 
 `scripts/setup-public-https.sh` installs the renewal cron automatically during
 the initial public HTTPS setup. The marked cron block is replaced on rerun, so

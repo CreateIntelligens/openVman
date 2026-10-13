@@ -92,7 +92,7 @@ class CaseFilesTest(unittest.TestCase):
                     self.assertIn(":", voice)
 
     def test_only_filters_by_id_pattern(self):
-        cases, _ = load_cases(CASES_DIR / "heji.json", ["^diva", "eubl"])
+        cases, _ = load_cases(CASES_DIR / "industrial.json", ["^diva", "eubl"])
         self.assertEqual([c.id for c in cases], ["diva-agitator", "eubl-hp"])
 
 

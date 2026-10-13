@@ -49,7 +49,7 @@ def glossary(project_id: str) -> str:
 
 
 def clips() -> list[dict]:
-    heji = json.loads((CASES / "heji.json").read_text(encoding="utf-8"))
+    heji = json.loads((CASES / "industrial.json").read_text(encoding="utf-8"))
     items = []
     for voice in heji["voices"]:
         provider, _, voice_id = voice.partition(":")

@@ -243,7 +243,7 @@
   "model": "gemini-3.5-flash-lite",
   "provider": "gemini",
   "temperature": 0.3,
-  "project": "dev-c0c8fdff34",
+  "project": "example-industrial-project",
   "persona": "default",
   "source_sha256": "9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa",
   "scope": "第4頁五個原樣型號組；EUSR不包含；括號型號不展開",

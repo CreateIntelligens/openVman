@@ -1,7 +1,7 @@
 {
   "grader": "Codex獨立代理逐份完整最終回答及來源核對；非人類人工驗收、無額外LLM API或模型自評",
   "rubric_source": "answers_for_grading_F08_F14.json的凍結grading_rubric與required_points/forbidden_claims；21份最終answer全文，不能由tool_steps補足。sources逐字核對notes與source_catalog.md；清楚可辨識口述／兩個型號前綴可接受，純漏資料partial、實際假資訊或錯排序wrong。",
-  "input_sha256": "dc36cba22235f661bc05faaf2199a1929229c020851b4002ec2f98eda7f790bf",
+  "input_sha256": "ef2279085010c8ba6ab844c13ead4211e6ebdd17159a79556994c9559791a886",
   "grades": [
     {
       "id": "F08",

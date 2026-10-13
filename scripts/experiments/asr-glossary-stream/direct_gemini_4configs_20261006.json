@@ -3,7 +3,7 @@
  "path": "直接連 Gemini transcribe-live（語言 zh-TW,en-US,es-ES），同一批音檔比較 4 種設定",
  "configs": {
   "base": "只帶 languageCodes",
-  "vocab": "加 customVocabulary（鶴記詞表 31 詞）",
+  "vocab": "加 customVocabulary（工業示範專案詞表 31 詞）",
   "smart": "mode SMART",
   "vocab+smart": "兩者"
  },
@@ -5441,8 +5441,8 @@
    "cer": 0.125
   },
   {
-   "text": "鶴記企業泵適合用在哪裡？",
-   "last_interim": "鶴記企業泵適合用在哪裡？",
+   "text": "工業示範專案企業泵適合用在哪裡？",
+   "last_interim": "工業示範專案企業泵適合用在哪裡？",
    "ms": 264,
    "id": "leopard",
    "voice": "edge-tts:zh-TW-YunJheNeural",
@@ -5489,8 +5489,8 @@
    "cer": 0.625
   },
   {
-   "text": "鶴記企業的泵適合用在哪裡？",
-   "last_interim": "鶴記企業泵適合用在哪裡？",
+   "text": "工業示範專案企業的泵適合用在哪裡？",
+   "last_interim": "工業示範專案企業泵適合用在哪裡？",
    "ms": 306,
    "id": "leopard",
    "voice": "edge-tts:zh-TW-YunJheNeural",
@@ -6760,8 +6760,8 @@
    "cer": 0.0
   },
   {
-   "text": "STEEL 鶴記企業的抽風是什麼東西？",
-   "last_interim": "STEEL STEEL 鶴記企業 抽風是 什麼",
+   "text": "STEEL 工業示範專案企業的抽風是什麼東西？",
+   "last_interim": "STEEL STEEL 工業示範專案企業 抽風是 什麼",
    "ms": 1213,
    "id": "steel-seal",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
@@ -6795,7 +6795,7 @@
   },
   {
    "text": "STEEL 系列的機器型號是什麼東西？",
-   "last_interim": "STEEL STEEL 鶴記企業 抽風是 什麼東西?",
+   "last_interim": "STEEL STEEL 工業示範專案企業 抽風是 什麼東西?",
    "ms": 1133,
    "id": "steel-seal",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
@@ -6844,8 +6844,8 @@
    "cer": 0.47058823529411764
   },
   {
-   "text": "STEEL 鶴記企業的抽風是什麼東西？",
-   "last_interim": "STEEL STEEL 鶴記企業的 抽風是 什麼 產品?",
+   "text": "STEEL 工業示範專案企業的抽風是什麼東西？",
+   "last_interim": "STEEL STEEL 工業示範專案企業的 抽風是 什麼 產品?",
    "ms": 1318,
    "id": "steel-seal",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
@@ -8481,8 +8481,8 @@
    "cer": 2.4615384615384617
   },
   {
-   "text": "關於鶴記企業的沉水泵，要怎麼處理？",
-   "last_interim": "櫃檯 鶴記企業 吊 吊 仔 欲 按 怎 處 理 ?",
+   "text": "關於工業示範專案企業的沉水泵，要怎麼處理？",
+   "last_interim": "櫃檯 工業示範專案企業 吊 吊 仔 欲 按 怎 處 理 ?",
    "ms": 1268,
    "id": "overload",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
@@ -10238,9 +10238,9 @@
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
@@ -10256,9 +10256,9 @@
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
@@ -10274,32 +10274,32 @@
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
   },
   {
-   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "text": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "last_interim": "我 想 找 鶴 記 企 業 的 業 務 。問 EVAK 的 報 價 。",
    "ms": 527,
    "id": "heji",
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
@@ -10312,9 +10312,9 @@
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0.03",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
@@ -10330,9 +10330,9 @@
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0.03",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
@@ -10342,57 +10342,57 @@
   },
   {
    "text": "我 想 找 鶴 記 企 業 的 業 務 問 EVAK 的 報 價 。",
-   "last_interim": "我想找 鶴記企業 的業 務問 EVAK 的報價。",
+   "last_interim": "我想找 工業示範專案企業 的業 務問 EVAK 的報價。",
    "ms": 637,
    "id": "heji",
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0.03",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
   },
   {
-   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "text": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "last_interim": "我 想 找 鶴 記 企 業 的 業 務 。 問 EVAK 的 報 價 。",
    "ms": 687,
    "id": "heji",
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
    "noise": "0.03",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
   },
   {
-   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
-   "last_interim": "我想找 鶴記企業 的業務問。 EVAK 的報價。",
+   "text": "我想找工業示範專案企業的業務問 EVAK 的報價。",
+   "last_interim": "我想找 工業示範專案企業 的業務問。 EVAK 的報價。",
    "ms": 484,
    "id": "heji",
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
@@ -10405,29 +10405,29 @@
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
    "cer": 0.16666666666666666
   },
   {
-   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
-   "last_interim": "我想找 鶴記企業 的業務問。 EVAK 的報價。",
+   "text": "我想找工業示範專案企業的業務問 EVAK 的報價。",
+   "last_interim": "我想找 工業示範專案企業 的業務問。 EVAK 的報價。",
    "ms": 435,
    "id": "heji",
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
@@ -10440,9 +10440,9 @@
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
@@ -10456,29 +10456,29 @@
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0.03",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
    "cer": 0.16666666666666666
   },
   {
-   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
-   "last_interim": "我想找 鶴記企業 的業務部。 EVAK 的報價。",
+   "text": "我想找工業示範專案企業的業務問 EVAK 的報價。",
+   "last_interim": "我想找 工業示範專案企業 的業務部。 EVAK 的報價。",
    "ms": 361,
    "id": "heji",
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0.03",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
@@ -10491,29 +10491,29 @@
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0.03",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
    "cer": 0.2222222222222222
   },
   {
-   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
-   "last_interim": "我想找鶴記企業的業務部。 EVAK 的報價。",
+   "text": "我想找工業示範專案企業的業務問 EVAK 的報價。",
+   "last_interim": "我想找工業示範專案企業的業務部。 EVAK 的報價。",
    "ms": 503,
    "id": "heji",
    "voice": "edge-tts:zh-TW-YunJheNeural",
    "noise": "0.03",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
@@ -10526,48 +10526,48 @@
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
    "cer": 0.6666666666666666
   },
   {
-   "text": "我想找 鶴記企業 的 業務 問 EVAK 的 報價。",
+   "text": "我想找 工業示範專案企業 的 業務 問 EVAK 的 報價。",
    "last_interim": "我 想 把 廁 所 記 憶 的 業 務 問 EVAK 的 報 價 。",
    "ms": 1221,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
   },
   {
-   "text": "我想要找鶴記企業的業務問EVAK的報價。",
-   "last_interim": "我想把 鶴記 企業的 億發泵浦 和 EVAK 報給。",
+   "text": "我想要找工業示範專案企業的業務問EVAK的報價。",
+   "last_interim": "我想把 工業示範專案 企業的 億發泵浦 和 EVAK 報給。",
    "ms": 1332,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.05555555555555555
@@ -10580,9 +10580,9 @@
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
@@ -10596,48 +10596,48 @@
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0.03",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
    "cer": 0.5555555555555556
   },
   {
-   "text": "我想要找鶴記企業的業務問 EVAK 的報價。",
+   "text": "我想要找工業示範專案企業的業務問 EVAK 的報價。",
    "last_interim": "我要選 HIPPO， 最好是企業的 業務和 EVAK 的報告。",
    "ms": 1189,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0.03",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.05555555555555555
   },
   {
-   "text": "我想找鶴記企業的業務問EVAK的報價。",
-   "last_interim": "我想找 鶴記企業的 業務問 EVAK 的 報價。",
+   "text": "我想找工業示範專案企業的業務問EVAK的報價。",
+   "last_interim": "我想找 工業示範專案企業的 業務問 EVAK 的 報價。",
    "ms": 1215,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0.03",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0
@@ -10650,9 +10650,9 @@
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
    "noise": "0.03",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
@@ -10666,48 +10666,48 @@
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
    "cer": 0.6111111111111112
   },
   {
-   "text": "我想要找鶴記企業的泵浦 EVAK 的報價。",
-   "last_interim": "我想要找 鶴記企業 。 億發泵浦 。 EVAK 的泵浦。",
+   "text": "我想要找工業示範專案企業的泵浦 EVAK 的報價。",
+   "last_interim": "我想要找 工業示範專案企業 。 億發泵浦 。 EVAK 的泵浦。",
    "ms": 1374,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.2222222222222222
   },
   {
-   "text": "我想要找鶴記企業的業務問 EVAK 的報價。",
-   "last_interim": "我想要找鶴記企業。 我想要找鶴記企業的 億發泵浦的 泵浦。",
+   "text": "我想要找工業示範專案企業的業務問 EVAK 的報價。",
+   "last_interim": "我想要找工業示範專案企業。 我想要找工業示範專案企業的 億發泵浦的 泵浦。",
    "ms": 1184,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.05555555555555555
@@ -10720,9 +10720,9 @@
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
@@ -10736,48 +10736,48 @@
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0.03",
    "config": "base",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],
    "cer": 0.3888888888888889
   },
   {
-   "text": "我想要找鶴記企業的業務問 EVAK 的報價。",
-   "last_interim": "我想 要 找 鶴記 企業 。 億發 泵浦 的 EVAK 的 泵 蓋 。",
+   "text": "我想要找工業示範專案企業的業務問 EVAK 的報價。",
+   "last_interim": "我想 要 找 工業示範專案 企業 。 億發 泵浦 的 EVAK 的 泵 蓋 。",
    "ms": 1278,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0.03",
    "config": "vocab",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.05555555555555555
   },
   {
-   "text": "我想欲找鶴記企業的業務問 EVAK 的報價。",
-   "last_interim": "我想要找 鶴記企業 。 億發泵浦 的 EVAK 的 產品。",
+   "text": "我想欲找工業示範專案企業的業務問 EVAK 的報價。",
+   "last_interim": "我想要找 工業示範專案企業 。 億發泵浦 的 EVAK 的 產品。",
    "ms": 1178,
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0.03",
    "config": "vocab+smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.05555555555555555
@@ -10790,9 +10790,9 @@
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "noise": "0.03",
    "config": "smart",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [],

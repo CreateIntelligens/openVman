@@ -105,7 +105,7 @@ Brain 生成耗時中位數 4.21 秒、p90 5.47 秒，排除 HTTP／Backend／AS
 
 ### 來源與範圍
 
-測試專案為鶴記dev `dev-c0c8fdff34`，鏡像正式鶴記 `proj-0cc5c610b4`。原文是容器 `/data/projects/dev-c0c8fdff34/workspace/knowledge/EVAK_CATALOG.md`，快照保存在 [source_catalog.md](round1/source_catalog.md)，SHA-256 為 `9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa`。
+測試專案為工業示範專案（開發） `example-industrial-project`，鏡像正式工業示範專案 `example-industrial-production`。原文是容器 `/data/projects/example-industrial-project/workspace/knowledge/EVAK_CATALOG.md`，快照保存在 [source_catalog.md](round1/source_catalog.md)，SHA-256 為 `9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa`。
 
 保留第 4 頁尺寸表的五個原樣型號組：`50EUS-5.05`、`50(80)EUS-5.10`、`80EUS-5.10L`、`50(80)EUS-5.20C`、`50(80)EUS-5.20`。不展開括號、不納入 EUSR。這是 EUS 系列內跨型號比較，尚未涵蓋跨系列。
 
@@ -221,7 +221,7 @@ C 應先修多情境表示、能力與需求的比較方向、多欄排序，以
 
 ### 來源、筆記與凍結題目
 
-來源為鶴記dev `dev-c0c8fdff34` 的中文 `knowledge/EVAK_CATALOG.md`，對應正式鶴記 `proj-0cc5c610b4`。只使用 EDW 第9頁 L201–205 五列、EUB-M 2～7.5HP 第11頁 L233–242 十列。其他系列與 EUB-M 10～20HP 不納入評分。來源快照 SHA-256：`9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa`。
+來源為工業示範專案（開發） `example-industrial-project` 的中文 `knowledge/EVAK_CATALOG.md`，對應正式工業示範專案 `example-industrial-production`。只使用 EDW 第9頁 L201–205 五列、EUB-M 2～7.5HP 第11頁 L233–242 十列。其他系列與 EUB-M 10～20HP 不納入評分。來源快照 SHA-256：`9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa`。
 
 每列一篇，共15篇。EDW的三個 `S/T` 合併列保留原model，phase為 `[1,3]`；檔名用 `S-T` 避免斜線成為目錄，Obsidian連結使用alias。EUB-M單／三相不同列分開。馬力、kW、口徑、額定／最大揚程與流量、粒徑、兩相電流與重量皆分欄；缺少的一相資料保留null。沒有從型號猜規格。
 
@@ -474,7 +474,7 @@ C回答60次＋解析60次，歸C共120次，input 708,205、output 37,316、tot
 | 前置失敗 mirror_before | 0 |
 | 前置失敗 mirror_after | 0 |
 
-正式 `proj-0cc5c610b4` 與dev `dev-c0c8fdff34` 的workspace／LanceDB內容生成前後、評測前後雜湊均未變；生成結束到評測開始摘要相同。評測檔案數2921，前後digest `4672b4c7f057477ea2dfc2102bc11e91176218be72ca7df3477bd7dc7218b175`。完整逐檔列表在git忽略檔，交付的檢查產物只保留數量與摘要；未變更round1／round2，由previous_rounds_integrity與verification核對。
+正式 `example-industrial-production` 與dev `example-industrial-project` 的workspace／LanceDB內容生成前後、評測前後雜湊均未變；生成結束到評測開始摘要相同。評測檔案數2921，前後digest `4672b4c7f057477ea2dfc2102bc11e91176218be72ca7df3477bd7dc7218b175`。完整逐檔列表在git忽略檔，交付的檢查產物只保留數量與摘要；未變更round1／round2，由previous_rounds_integrity與verification核對。
 
 所有實驗只在既有API容器的唯讀子程序執行，筆記向量只在記憶體；沒有放進knowledge、建表、reindex、正式chat API、部署、重啟／重建、env或帳號修改，也沒有stage／commit／push。本輪只更新實驗腳本、產物與同一份報告，Brain／Backend／前台／管理介面／SDK／API contract不需介面修改。
 

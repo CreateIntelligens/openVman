@@ -34,7 +34,7 @@
 - **THEN** 系統通行
 
 #### Scenario: Origin 不在 allowlist
-- **WHEN** 請求 `Origin: https://malicious.com`，Key allowed_domains 為 `["example.com"]`
+- **WHEN** 請求 `Origin: https://malicious.example`，Key allowed_domains 為 `["example.com"]`
 - **THEN** 系統回 403
 
 #### Scenario: 缺少 Origin 與 Referer
@@ -49,8 +49,8 @@
 - **THEN** backend 回應包含 `Access-Control-Allow-Origin: https://example.com` 與 `Vary: Origin`
 
 #### Scenario: 不允許網域的 CORS response
-- **WHEN** 請求 `Origin: https://malicious.com`，Key allowed_domains 為 `["example.com"]`
-- **THEN** backend SHALL NOT 回傳 `Access-Control-Allow-Origin: https://malicious.com`
+- **WHEN** 請求 `Origin: https://malicious.example`，Key allowed_domains 為 `["example.com"]`
+- **THEN** backend SHALL NOT 回傳 `Access-Control-Allow-Origin: https://malicious.example`
 
 ### Requirement: 速率限制
 系統 SHALL 對每把 Key 設置請求速率上限（預設 60 req/min/key），超出 SHALL 回 429。

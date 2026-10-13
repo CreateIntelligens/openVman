@@ -1,10 +1,10 @@
 {
   "status": "frozen_before_answer_generation",
   "frozen_at_utc": "2026-10-12T03:26:21.609588+00:00",
-  "source_snapshot_sha256": "64525ff3d348ec606f1471ddd4b3d49c71253c48abc0e3d78534780e2ffb9892",
+  "source_snapshot_sha256": "c4963cd2d43179eac259426e49ebf4bbe0e24727ee21ee1a2dc7b20643fe1a61",
   "questions_sha256": "0a1d03598d113a9460fb397ebb83e2a3d8f4776592bc7b0d83807f2ba3c19e9f",
   "source_catalog_sha256": "27cc941b18ac91d2860a7e07ef9a171229106774ae7a09810f5b21e3831ed00e",
-  "catalog_sha256": "a5ef8f52fda6a30ec8c89be0c379e803e0b5ee70e85e63a0d6dfabc880bb09e9",
+  "catalog_sha256": "0c97c6e3383f10585fccecc0b8f7ee080be4a83f7e4af215ddefc9f0a0d5b550",
   "summary": {
     "question_count": 20,
     "raw_note_count": 117,

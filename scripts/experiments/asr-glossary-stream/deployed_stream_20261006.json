@@ -1,6 +1,6 @@
 {
  "date": "2026-10-06",
- "path": "部署後經正式 Backend /api/v1/asr/stream（engine=gemini-live、鶴記測試專案），含 Jev 定稿判斷",
+ "path": "部署後經正式 Backend /api/v1/asr/stream（engine=gemini-live、工業示範專案測試專案），含 Jev 定稿判斷",
  "commit": "d39d935",
  "rows": [
   {
@@ -781,7 +781,7 @@
    "id": "steel-seal",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
    "ref": "STEEL 系列的機械軸封是什麼材質？",
-   "text": "STEEL 鶴記企業的抽風是什麼東西？",
+   "text": "STEEL 工業示範專案企業的抽風是什麼東西？",
    "terms": [
     "STEEL",
     "機械軸封"
@@ -1174,14 +1174,14 @@
   {
    "id": "heji",
    "voice": "edge-tts:zh-TW-HsiaoChenNeural",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "text": "我 想 找 鶴 記 企 業 的 業 務 問 EVAK 的 報 價 。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0,
@@ -1191,14 +1191,14 @@
   {
    "id": "heji",
    "voice": "edge-tts:zh-TW-YunJheNeural",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
-   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
+   "text": "我想找工業示範專案企業的業務問 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0,
@@ -1208,14 +1208,14 @@
   {
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-young-male-01",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
-   "text": "我想找 鶴記企業 的 業務 問 EVAK 的 報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
+   "text": "我想找 工業示範專案企業 的 業務 問 EVAK 的 報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.0,
@@ -1225,14 +1225,14 @@
   {
    "id": "heji",
    "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
-   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
-   "text": "我想要找鶴記企業的泵浦 EVAK 的報價。",
+   "ref": "我想找工業示範專案企業的業務問 EVAK 的報價。",
+   "text": "我想要找工業示範專案企業的泵浦 EVAK 的報價。",
    "terms": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "heard": [
-    "鶴記企業",
+    "工業示範專案企業",
     "EVAK"
    ],
    "cer": 0.2222222222222222,

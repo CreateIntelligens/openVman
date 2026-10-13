@@ -93,7 +93,7 @@ RAG 段落（`eval_rag_passages.py`，EVAK 50 題，每題 top-5，段落含標�
 
 ### 端對端 A/B（2026-09-23，`ab_rag_screen.py`）
 
-正式環境 `dev-c0c8fdff34` 專案、EVAK 前 15 題、`/brain/chat` fast 模式，篩選關／開各一輪：
+正式環境 `example-industrial-project` 專案、EVAK 前 15 題、`/brain/chat` fast 模式，篩選關／開各一輪：
 
 | | 關 | 開 |
 |---|---|---|

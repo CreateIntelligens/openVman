@@ -2,7 +2,7 @@
   "grader": "Codex獨立代理逐份依凍結規則對照原文；錯序且無校正判錯，明確排除不當錯納，純漏必要限定判部分對",
   "rubric_source": "questions.json grading_rubric（完全沿用round2）",
   "input_file": "answers_for_grading_R3_Q15_Q20.json",
-  "input_sha256": "c1eea5fd2cf3d8b0d6a2ea773b6e030004596c9e61a64d43a3fc98c0e18414d8",
+  "input_sha256": "1c1a9d59e2b16ef37e70206dbe31adb8f10edf96c7ccb9e7ca73d318e83ba7be",
   "grades": [
     {
       "id": "Q15",
@@ -291,7 +291,7 @@
       "quality_issues": [
         "檢索缺EDW不等於型錄沒有EDW重量；原L203、205明列"
       ],
-      "answer_sha256": "b7427ba045c64a4f299b6da15ea29c17f61bbc292d2992ce30388c6dbe4acfd9"
+      "answer_sha256": "aa9e507ed54477c6030f84474226d8ad67301016879aecdfbe6957020e123bc0"
     },
     {
       "id": "Q17",
@@ -400,7 +400,7 @@
         "QA名省略T字尾，但此題有限範圍與精確點可識別同款；完整列名宜保留",
         "第11頁引用實際未展開候選資料，不能當候選不存在的證據"
       ],
-      "answer_sha256": "d5c3c74b6b56196b95862bdce828fef94753cfc167f21bbc4540a2fce2d22054"
+      "answer_sha256": "746e23d822ab5ba870f8e942af2a446993091215f7f0a2e258f7027aee0ee695"
     },
     {
       "id": "Q18",

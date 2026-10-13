@@ -2,6 +2,8 @@
 
 依用途查找文件。規格描述契約與設計；部署現況仍需核對程式、設定及實際服務。歷史筆記與實驗結果不代表正式功能已啟用。
 
+文件與實驗附件中的帳號、專案及自架部署資訊使用匿名示例；執行命令前須換成自己的設定。保留範圍與自動檢查見 [文件去識別化與保留原則](guides/document-privacy.md)。
+
 ## 架構與規格
 
 | 文件 | 內容 |
@@ -38,7 +40,7 @@
 
 ## 計畫與實驗
 
-計畫保留原始狀態；Draft 不表示已確認完成。實驗腳本與逐筆資料維持在原目錄，避免報告與重現工具分離。
+計畫保留原始狀態；Draft 不表示已確認完成。實驗保留支撐結論的最小資料集，重現工具與必要證據維持在原目錄；已退場實驗刪除逐筆 dump 時，在報告註明限制。
 
 - [帳號 API 金鑰](plans/account-api-keys.md)（Draft）：沿用帳號權限的服務串接憑證、後台管理與每把 key 的用量歸屬。
 - [串接能力探索與單次 ASR 選擇](plans/integration-capabilities-asr.md)（Draft）：能力探索契約、語音授權、單次引擎選擇與串接驗證。
@@ -47,11 +49,11 @@
 - [入口與大型模組職責拆分](plans/thin-entry-refactor.md)（Done）：保留行為、拆分前台／Backend／Brain 入口與 Gemini Live。
 - [兩個前端共用語音核心（ASR／VAD／TTS）](plans/shared-speech-core.md)
 - [Confucius4-R2T2 辨識實驗](../scripts/experiments/r2t2/REPORT.md)：批次準確度與 Breeze 相當、快約 3 倍；串流專有名詞 13/18 對 Gemini Live 3/18
-- [R2T2 串流辨識接上前台](plans/r2t2-streaming-asr.md)（Done）：Gemini Live 以外的串流引擎，鶴記實測專有名詞 13/18 對 3/18
+- [R2T2 串流辨識接上前台](plans/r2t2-streaming-asr.md)（Done）：Gemini Live 以外的串流引擎，工業示範專案實測專有名詞 13/18 對 3/18
 - [語音對話不再一問一答：插話與連續追問](plans/full-duplex-voice.md)（進行中）：思考中補一句合併回答已上線；講話中插話待現場回音實測
-- [產品規格篩選工具](plans/product-spec-filter.md)（Draft）：Brain `filter_products` 依專案規格表回答選型問題，已部署，鶴記dev 經正式聊天路徑 20 題×3 次 45／11／4
+- [產品規格篩選工具](plans/product-spec-filter.md)（Draft）：Brain `filter_products` 依專案規格表回答選型問題，已部署，工業示範專案（開發） 經正式聊天路徑 20 題×3 次 45／11／4
 - [每輪回應延遲](plans/turn-latency.md)（Draft）：講完到聽到聲音 p50 約 7 秒的拆解與待做（回答與 TTS 重疊、先查再叫 LLM、提示快取、決策功能審查待辦）
-- [OpenSpec 變更提案](../openspec/changes/)
+- [OpenSpec 變更提案（選用）](../openspec/changes/)
 - [Jev 決策層計畫](plans/jev-decision-layer.md)：意圖分流影子觀測 → RAG 證據判斷；SemIf 退場
 - [Jev API 分流／打斷評估](../scripts/experiments/jev/REPORT.md)：官方 Jev API 在 SemIf 同一份合成題庫上 96/96、零順序翻轉。
 - [Jev 意圖觀測操作](../scripts/experiments/jev/OPERATIONS.md)：預設關閉的旁路觀測功能。
@@ -62,7 +64,7 @@
 
 ## 歷史資料
 
-[歷史索引](archive/README.md)收納早期 TASK 計畫、八週規劃、技術研究與一次性對齊筆記。保留它們供追溯，不當成目前操作指令或完成證明。
+[歷史索引](archive/README.md)保留仍有參考價值的技術研究。過時的早期 TASK／八週規劃、重複研究與一次性對齊草稿已清除；需要原文時可查 Git 歷史。
 
 ## 文件放置方式
 

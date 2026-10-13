@@ -18,7 +18,7 @@
           "channel": "web",
           "locale": "zh-TW",
           "persona_id": "default",
-          "project_id": "dev-c0c8fdff34",
+          "project_id": "example-industrial-project",
           "client_ip": "",
           "metadata": {}
         },
@@ -279,7 +279,7 @@
           "elapsed_seconds": 2.4629,
           "route_attempts": [
             {
-              "trace_id": "78ddab9f6ad9",
+              "trace_id": "example-trace-054",
               "provider": "gemini",
               "model": "gemini-3.5-flash-lite",
               "hop_index": 0,
@@ -311,7 +311,7 @@
           "elapsed_seconds": 2.3576,
           "route_attempts": [
             {
-              "trace_id": "c08026f07ce6",
+              "trace_id": "example-trace-094",
               "provider": "gemini",
               "model": "gemini-3.5-flash-lite",
               "hop_index": 0,
@@ -347,7 +347,7 @@
           "channel": "web",
           "locale": "zh-TW",
           "persona_id": "default",
-          "project_id": "dev-c0c8fdff34",
+          "project_id": "example-industrial-project",
           "client_ip": "",
           "metadata": {}
         },
@@ -652,7 +652,7 @@
           "elapsed_seconds": 1.2352,
           "route_attempts": [
             {
-              "trace_id": "c233d39be48e",
+              "trace_id": "example-trace-095",
               "provider": "gemini",
               "model": "gemini-3.5-flash-lite",
               "hop_index": 0,
@@ -684,7 +684,7 @@
           "elapsed_seconds": 1.7807,
           "route_attempts": [
             {
-              "trace_id": "810feab3fcbd",
+              "trace_id": "example-trace-064",
               "provider": "gemini",
               "model": "gemini-3.5-flash-lite",
               "hop_index": 0,
@@ -736,7 +736,7 @@
       "elapsed_seconds": 2.4629,
       "route_attempts": [
         {
-          "trace_id": "78ddab9f6ad9",
+          "trace_id": "example-trace-054",
           "provider": "gemini",
           "model": "gemini-3.5-flash-lite",
           "hop_index": 0,
@@ -768,7 +768,7 @@
       "elapsed_seconds": 2.3576,
       "route_attempts": [
         {
-          "trace_id": "c08026f07ce6",
+          "trace_id": "example-trace-094",
           "provider": "gemini",
           "model": "gemini-3.5-flash-lite",
           "hop_index": 0,
@@ -815,7 +815,7 @@
       "elapsed_seconds": 1.2352,
       "route_attempts": [
         {
-          "trace_id": "c233d39be48e",
+          "trace_id": "example-trace-095",
           "provider": "gemini",
           "model": "gemini-3.5-flash-lite",
           "hop_index": 0,
@@ -847,7 +847,7 @@
       "elapsed_seconds": 1.7807,
       "route_attempts": [
         {
-          "trace_id": "810feab3fcbd",
+          "trace_id": "example-trace-064",
           "provider": "gemini",
           "model": "gemini-3.5-flash-lite",
           "hop_index": 0,
@@ -861,7 +861,7 @@
   ],
   "route_attempts": [
     {
-      "trace_id": "78ddab9f6ad9",
+      "trace_id": "example-trace-054",
       "provider": "gemini",
       "model": "gemini-3.5-flash-lite",
       "hop_index": 0,
@@ -870,7 +870,7 @@
       "chain_length": 4
     },
     {
-      "trace_id": "c08026f07ce6",
+      "trace_id": "example-trace-094",
       "provider": "gemini",
       "model": "gemini-3.5-flash-lite",
       "hop_index": 0,
@@ -879,7 +879,7 @@
       "chain_length": 4
     },
     {
-      "trace_id": "c233d39be48e",
+      "trace_id": "example-trace-095",
       "provider": "gemini",
       "model": "gemini-3.5-flash-lite",
       "hop_index": 0,
@@ -888,7 +888,7 @@
       "chain_length": 4
     },
     {
-      "trace_id": "810feab3fcbd",
+      "trace_id": "example-trace-064",
       "provider": "gemini",
       "model": "gemini-3.5-flash-lite",
       "hop_index": 0,
@@ -898,7 +898,7 @@
     }
   ],
   "config": {
-    "project": "dev-c0c8fdff34",
+    "project": "example-industrial-project",
     "persona": "default",
     "reply_mode": "fast",
     "llm_provider": "gemini",
@@ -1247,8 +1247,8 @@
     "raw_metadata_equal": false,
     "resolved_metadata_equal": true,
     "document_entries": 129,
-    "production_project": "proj-0cc5c610b4",
-    "test_project": "dev-c0c8fdff34",
+    "production_project": "example-industrial-production",
+    "test_project": "example-industrial-project",
     "normalization": "Only infer missing language/language_source using the production resolver; no keys discarded and no data written",
     "raw_metadata_sha256": [
       "814180475e2bef1ade75ea721bac80f60b3684fa4102a955f54326f07f36c136",

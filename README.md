@@ -2,6 +2,8 @@
 
 openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色進行語音與文字對話，後台管理知識庫、角色、語音與帳號，回答由 Brain 以 RAG、記憶與工具產生。
 
+文件中的帳號、專案 ID、自架網址及主機位址為匿名示例，使用前請換成自己的部署設定。文件與實驗附件的保留規則及 CI 檢查見 [去識別化原則](docs/guides/document-privacy.md)。
+
 ## 系統架構
 
 | 服務（compose） | 位置 | 技術 | 職責 |
@@ -27,7 +29,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
                              └── /grafana/    → grafana ──> prometheus
 ```
 
-Clef-Flash 決策 API 使用獨立網域 `https://clef.create360.ai`，由同一台主機 nginx 終止 TLS，再代理到主機本機的 API 門面 `127.0.0.1:18100`。公開文件為 `/docs`、`/redoc`、`/openapi.json`，健康檢查與推論分別為 `/health`、`POST /v1/systemone`；Nginx 設定及憑證流程見 [Native nginx vhost](infra/nginx/native/README.md)。
+Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`，由同一台主機 nginx 終止 TLS，再代理到主機本機的 API 門面 `127.0.0.1:18100`。公開文件為 `/docs`、`/redoc`、`/openapi.json`，健康檢查與推論分別為 `/health`、`POST /v1/systemone`；Nginx 設定及憑證流程見 [Native nginx vhost](infra/nginx/native/README.md)。
 
 前台有兩種對話模式。文字模式：辨識結果送 `POST /api/v1/chat`，Backend 轉給 Brain 產生回答，再經 TTS 串流（`/api/v1/tts/stream`）播放並驅動對嘴。Live 模式：前台經 `/api/v1/ws` 連線，由 Gemini Live 直接以語音回答，工具呼叫在 Brain 執行。Brain 不對外開放（`/brain/` 一律 404），公開 API 以 Backend 的 `/docs` 為準。
 
@@ -150,11 +152,11 @@ edge nginx 監聽 `PORT`（預設 8786，HTTP）與 `HTTPS_PORT`（預設 8787�
 
 ### 初始 ROOT
 
-空白安裝的唯一 ROOT 帳號固定為 `ai360`，服務啟動後執行一次：
+空白安裝只建立一個 ROOT。登入名稱由部署參數 `AUTH_ROOT_USERNAME` 與程式常數 `ROOT_USERNAME` 決定；先從 secret store 將初始密碼注入執行環境的 `BOOTSTRAP_ADMIN_PASSWORD`，服務啟動後執行一次：
 
 ```bash
-docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
-  python -m app.scripts.create_user --username ai360
+docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD backend \
+  python -m app.scripts.create_user
 ```
 
 正式部署須在首次登入後立即更換密碼。帳號層級、臨時帳號與備份方式見 [帳號管理手冊](docs/operations/account-administration.md)。

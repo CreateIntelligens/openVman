@@ -1,7 +1,7 @@
 {
   "grader": "independent_review_round3_note_validation",
   "rubric_source": "answers_for_grading_R1_Q01_Q07.json#grading_rubric",
-  "input_sha256": "a81e1594b92260a3a54f60e07d7bd4550d905f5dca690cb995b0f26653749a36",
+  "input_sha256": "4cddd661347c19a6d737af2033281c2e21f20555faaf020344ee09635452357f",
   "grading_method": "完整閱讀28份原回答，逐條核對同檔required_points及forbidden_claims；不以expected_answer附加要求扣分。頁行與公稱口徑說明列quality_issues。",
   "grades": [
     {

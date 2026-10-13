@@ -9,6 +9,16 @@ on:
       - "brain/skills/**"
       - "frontend/**"
       - "tests/test_entry_boundaries.py"
+      - "docs/**"
+      - "**/*.md"
+      - "**/*.rst"
+      - "**/*.adoc"
+      - "**/*.txt"
+      - "examples/**"
+      - "scripts/experiments/**"
+      - "scripts/voice_e2e/cases/**"
+      - "scripts/check_document_privacy.py"
+      - "tests/test_document_privacy.py"
       - "contracts/**"
       - "brain/api/protocol/**"
       - "brain/api/tests/contracts/**"
@@ -36,6 +46,12 @@ jobs:
 
       - name: Install backend test dependencies
         run: python3 -m pip install pytest "pydantic>=2.0.0,<3" "pydantic-settings>=2.0.0"
+
+      - name: Check owned documentation privacy
+        run: python3 scripts/check_document_privacy.py
+
+      - name: Test documentation privacy checks
+        run: python3 -m pytest tests/test_document_privacy.py -q
 
       - name: Run backend protocol tests
         run: python3 -m pytest brain/api/tests/contracts/test_protocol_events.py -v

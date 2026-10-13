@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## Purpose
 
 Provide the Brain with a dependable public-web and document-reading capability backed by 2MD, while bounding external dependency cost, preserving source trust boundaries, and preventing synchronized retries from overwhelming the 2MD endpoint pool.
@@ -8,21 +10,21 @@ Provide the Brain with a dependable public-web and document-reading capability b
 
 The integration MUST use one canonical ordered endpoint set named `TWO_MD_BASE_URLS`, containing exactly these URLs in this order:
 
-1. `https://2md.aiurl.tw`
-2. `https://2md.glsoft.ai`
-3. `https://create360.ai`
+1. `https://web-primary.example.com`
+2. `https://web-fallback.example.com`
+3. `https://web-tertiary.example.com`
 
 The endpoint order MUST be stable across `search_web`, `read_web_page`, HTTP Chat, and Gemini Live. Configuration MAY disable the capability, but MUST NOT silently reorder or fan out the canonical set.
 
 #### Scenario: Primary endpoint is selected first
 
 - **WHEN** a web tool request starts with all endpoints healthy
-- **THEN** the request is sent only to `https://2md.aiurl.tw` and no fallback endpoint is contacted
+- **THEN** the request is sent only to `https://web-primary.example.com` and no fallback endpoint is contacted
 
 #### Scenario: Fallback order is deterministic
 
 - **WHEN** the primary endpoint fails with a retryable network or upstream error
-- **THEN** the integration tries `https://2md.glsoft.ai` before `https://create360.ai`
+- **THEN** the integration tries `https://web-fallback.example.com` before `https://web-tertiary.example.com`
 
 ### Requirement: Synchronous web tool contract
 

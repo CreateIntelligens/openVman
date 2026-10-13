@@ -1,17 +1,17 @@
 {
-  "run_id": "a2a-smoke-60cdc55af1e6",
+  "run_id": "a2a-smoke-example-success",
   "steps": [
     {
       "step": "registered",
       "role": "sender",
-      "agent_id": "agent-4efcce0b1b5bf3b979793475",
-      "circle_id": "circle-1759ce38994bb2781d2d08674af4bb75"
+      "agent_id": "example-agent-004",
+      "circle_id": "example-circle-001"
     },
     {
       "step": "registered",
       "role": "receiver",
-      "agent_id": "agent-304708b54078282eb24c3c2f",
-      "circle_id": "circle-1759ce38994bb2781d2d08674af4bb75"
+      "agent_id": "example-agent-003",
+      "circle_id": "example-circle-001"
     },
     {
       "step": "private_peer_discovery",
@@ -21,20 +21,20 @@
       "step": "skill_facade_dispatch",
       "result": {
         "success": true,
-        "target": "agent-304708b54078282eb24c3c2f",
+        "target": "example-agent-003",
         "result": {
-          "contextId": "a2a-smoke-60cdc55af1e6",
+          "contextId": "a2a-smoke-example-success",
           "deliveryOutcome": "QUEUED",
           "sequence": 361,
           "state": "PENDING",
-          "targetAgentId": "agent-304708b54078282eb24c3c2f",
-          "taskId": "2166e807-561c-4d20-a85e-42be3652784a"
+          "targetAgentId": "example-agent-003",
+          "taskId": "example-task-request"
         }
       }
     },
     {
       "step": "receiver_durable_inbox",
-      "task_id": "2166e807-561c-4d20-a85e-42be3652784a",
+      "task_id": "example-task-request",
       "sequence": 361,
       "acked": true,
       "message_matches": true
@@ -43,14 +43,14 @@
       "step": "receiver_processing",
       "status": "COMPLETED",
       "error": null,
-      "reply": "A2A_PONG a2a-smoke-60cdc55af1e6"
+      "reply": "A2A_PONG a2a-smoke-example-success"
     },
     {
       "step": "sender_received_reply",
-      "task_id": "b695ff73-351b-4c5c-905e-f47eccbd30ab",
+      "task_id": "example-task-reply",
       "sequence": 362,
       "acked": true,
-      "message": "A2A_PONG a2a-smoke-60cdc55af1e6",
+      "message": "A2A_PONG a2a-smoke-example-success",
       "elapsed_ms": 9553.383185528219
     },
     {
@@ -63,19 +63,19 @@
   "production_a2a_enabled": false,
   "passed": true,
   "first_attempt": {
-    "run_id": "a2a-smoke-be7566d74ad1",
+    "run_id": "a2a-smoke-example-first-attempt",
     "steps": [
       {
         "step": "registered",
         "role": "sender",
-        "agent_id": "agent-0764848a6326a7dea703857c",
-        "circle_id": "circle-19bbfde0ff61e4914590fea6eff20407"
+        "agent_id": "example-agent-001",
+        "circle_id": "example-circle-002"
       },
       {
         "step": "registered",
         "role": "receiver",
-        "agent_id": "agent-1a082273051c3d18adbb9425",
-        "circle_id": "circle-19bbfde0ff61e4914590fea6eff20407"
+        "agent_id": "example-agent-002",
+        "circle_id": "example-circle-002"
       },
       {
         "step": "private_peer_discovery",
@@ -98,7 +98,7 @@
   },
   "skill_sha256": "0f54ed0cd76d3a428d3b07fec4dcd9900d26ae778138ba654b3a7697340b993d",
   "scope": {
-    "hub": "https://a2a.david888.com",
+    "hub": "https://a2a.example.com",
     "facade": "real router in isolated loopback server, not production listener",
     "brain": "deployed Brain /brain/chat",
     "sse": "real bridge _stream_inbox with durable queue and ACK",

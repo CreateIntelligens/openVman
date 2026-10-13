@@ -62,8 +62,8 @@ LLM 的 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<mod
 false。正式多 worker 部署必須保留 Redis，讓單一 leader 持有 A2A SSE listener；若 Redis
 不可用，A2A bridge 應保持停用，避免重複註冊與重複收件。
 
-2md Web Tools 預設使用固定順序 `https://2md.aiurl.tw` →
-`https://2md.glsoft.ai` → `https://create360.ai`。Brain 對單一搜尋／讀取操作只會
+2md Web Tools 依程式預設或部署設定依序嘗試端點；以下網址已去識別化，僅示意順序：`https://web-primary.example.com` →
+`https://web-fallback.example.com` → `https://web-tertiary.example.com`。Brain 對單一搜尋／讀取操作只會
 序列嘗試 endpoint，並由 `URL2MD_TOTAL_BUDGET_S` 限制整條 fallback chain；retryable
 錯誤才會進入下一站，等待時間含 bounded full-jitter。正式多 worker 部署應提供
 `REDIS_URL`，讓 circuit 與 half-open probe lease 跨 instance 協調；Redis 暫時不可用時
@@ -96,12 +96,12 @@ false。正式多 worker 部署必須保留 Redis，讓單一 leader 持有 A2A 
 ### 3. 建立 ROOT 帳號
 
 ```bash
-docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
-  python -m app.scripts.create_user --username ai360
+docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD backend \
+  python -m app.scripts.create_user
 ```
 
-空白安裝的唯一 ROOT 固定為 `ai360`，指令不接受其他名稱，也不會建立第二個 ROOT。
-`ai360` 僅適合開發環境，**正式部署必須在首次登入後立即更換密碼**。既有兩層帳號
+先從 secret store 將 `BOOTSTRAP_ADMIN_PASSWORD` 注入執行環境。空白安裝的唯一 ROOT 名稱由 `AUTH_ROOT_USERNAME` 決定，CLI 預設使用程式的 `ROOT_USERNAME`，不會建立第二個 ROOT。資料庫已有 ROOT 後，不能以修改部署參數的方式重新命名帳號。
+**正式部署必須使用獨立的強密碼**。既有兩層帳號
 資料庫會原地升級為 ROOT，保留帳號 ID、密碼 hash、ownership 與 grants，但會撤銷
 migration 前的 session。詳見 [帳號管理手冊](account-administration.md)。
 

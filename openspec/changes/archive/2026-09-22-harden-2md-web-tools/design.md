@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 ## Context
 
 The current Brain adapter already calls 2MD through `search_web` and `read_web_page`, uses the three configured hosts, and has a process-local cooldown and shared request budget. The endpoint literals are still distributed between configuration and adapter defaults, and the current circuit state does not coordinate multiple workers or instances. See `proposal.md` for the motivation and `specs/llm-web-tools/spec.md` for the externally observable contract.
@@ -35,9 +37,9 @@ Create one checked-in endpoint source and generate language-specific representat
 
 ```ts
 export const TWO_MD_BASE_URLS = [
-  'https://2md.aiurl.tw',
-  'https://2md.glsoft.ai',
-  'https://create360.ai',
+  'https://web-primary.example.com',
+  'https://web-fallback.example.com',
+  'https://web-tertiary.example.com',
 ] as const;
 ```
 

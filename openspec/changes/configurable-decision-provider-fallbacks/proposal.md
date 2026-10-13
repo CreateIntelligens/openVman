@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 # Proposal
 
 ## Why
@@ -29,4 +31,4 @@ Brain and Backend already use System One for narrow decisions, but provider endp
 - Brain decision client/provider adapters, decision call sites, runtime configuration, and usage ledger attribution.
 - Backend and Brain configuration, tests, changelog, and service documentation.
 - OpenAI Decisions uses its dedicated `/v1/decisions` API and typed response format; it will not use the chat-completion adapter. The current OpenAI documentation marks this API as public beta and identifies `gpt-6-luna` as the supported model.
-- Default configured hops: `https://clef.create360.ai/v1/systemone`, `https://clef.aiurl.tw/v1/systemone`, Jev System One, and OpenAI Decisions.
+- Default configured hops: `https://decision-primary.example.com/v1/systemone`, `https://decision-fallback.example.com/v1/systemone`, Jev System One, and OpenAI Decisions.

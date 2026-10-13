@@ -99,7 +99,7 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 
 ## Documentation
 
-Documentation index: `docs/README.md`. Architecture and protocol specs are in `docs/specs/`; runbooks in `docs/operations/`; integration guides in `docs/guides/`; plans in `docs/plans/`; historical notes and early TASK plans in `docs/archive/`. Archive status is historical, not proof of current completion. Feed specific spec pairs depending on the task:
+Documentation index: `docs/README.md`. Architecture and protocol specs are in `docs/specs/`; runbooks in `docs/operations/`; integration guides in `docs/guides/`; plans in `docs/plans/`; retained historical research in `docs/archive/`. Archive status is historical, not proof of current completion. Feed specific spec pairs depending on the task:
 
 | Task | Read |
 |------|------|
@@ -107,3 +107,11 @@ Documentation index: `docs/README.md`. Architecture and protocol specs are in `d
 | Brain RAG logic | `01` + `03` |
 | Frontend rendering | `00` + `02` |
 | Full-stack integration | `00` + `01` + `02` + `03` |
+
+## Planning workflow
+
+- No planning ceremony is required for routine changes: implement, test, and update relevant existing documentation. Write a plan only when it helps resolve scope, decisions, or coordination.
+- Keep one planning record per change. When needed, use ordinary Markdown in `docs/plans/` or the collaborator's chosen OpenSpec artifacts; do not duplicate the same proposal and tasks into both. Reading an existing OpenSpec task does not require creating a separate Markdown plan.
+- OpenSpec is optional. Use its skills, CLI, proposal, delta-spec, sync, or archive workflow only when the current user explicitly requests that workflow. A feature request or “continue” alone does not opt in.
+- Keep existing `openspec/` artifacts and project commands available for collaborators who choose them. Do not remove or convert another contributor's workflow merely because this session uses Markdown.
+- Update existing `docs/specs/` contracts or README when shared behavior changes, regardless of the planning tool. Do not create another document just to satisfy a workflow.

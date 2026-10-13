@@ -12,7 +12,7 @@
 
 Azure、D-ID、HeyGen 可以做真人虛擬人，但畫面由遠端伺服器計算，再持續傳給瀏覽器。改用這些服務，會增加按使用量計費的服務費、GPU 或影片傳輸支出。D-ID 企業自架則把這些費用改由自己的主機承擔。[^didself][^azureavatar][^liveavatar]
 
-**目前客戶願意付的價格與租用主機成本已經難以打平，增加遠端 Avatar 算圖會進一步提高營運成本。**因此報告保留各家做法供比較，現階段繼續採用 MatesX／DHLiveMini2 的瀏覽器本地運算架構。
+本報告保留各家做法供技術比較，現階段繼續採用 MatesX／DHLiveMini2 的瀏覽器本地運算架構，減少伺服器算圖負擔；不記錄個別客戶的商業條件。
 
 ## 先處理 DHLiveMini2
 
@@ -94,7 +94,7 @@ D-ID 企業自架可用官方角色或製作專屬角色，錄製規格由 D-ID 
 | 元件 | 專案目前怎麼用 | 來源與問題 | 可替換方案 |
 | --- | --- | --- | --- |
 | DHLiveMini2 | 真人虛擬人核心，瀏覽器本地算圖 | 上游 DH_live／MatesX；角色商用與模型授權要分開看 [^dh] | 目前保留 MatesX／DHLiveMini2；其他真人方案會改變架構與成本 |
-| BGE-M3、FlagEmbedding | 已移除（2026-10-07） | 北京智源，MIT 授權 [^bge] | 改用 Google EmbeddingGemma 2（Apache 2.0，自架），鶴記實測打平；雲端 embedding 備援一併拿掉 |
+| BGE-M3、FlagEmbedding | 已移除（2026-10-07） | 北京智源，MIT 授權 [^bge] | 改用 Google EmbeddingGemma 2（Apache 2.0，自架），工業示範專案實測打平；雲端 embedding 備援一併拿掉 |
 | Qwen VLM | 啟用 `vlm` profile 才使用 | 阿里巴巴，該模型標 Apache-2.0 [^qwen] | Google Gemma、Microsoft Phi，或雲端圖片理解服務 |
 | IndexTTS | 啟用服務後使用 | 專案內模型協議要求商用書面許可；官方模型頁標 Apache-2.0，兩份內容不同 [^index] | 已接 GCP TTS／Gemini TTS／AWS Polly |
 | VoxCPM、CosyVoice | 外部 TTS 服務，CosyVoice adapter 用於臺語 | OpenBMB／ModelBest／清華、阿里巴巴；聲音與客製模型授權要查 [^vox][^cosy] | 華語可改 GCP；臺語要先試聽替代服務 |

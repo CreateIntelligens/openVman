@@ -36,7 +36,7 @@ Authorization: Bearer ovk_<key_id>.<secret>
 
 ```bash
 curl --fail-with-body \
-  'https://146.5gao.ai/openvman/api/v1/asr/transcribe' \
+  'https://api.example.com/openvman/api/v1/asr/transcribe' \
   -H "Authorization: Bearer $OPENVMAN_API_KEY" \
   -F 'file=@sample.wav' \
   -F 'project_id=<已授權的專案ID>' \
@@ -53,7 +53,7 @@ Chat、TTS 與其他應用 API 也帶相同標頭，請求／回應契約維持�
 
 ## 串流 ASR
 
-可信任的後端 WebSocket client 可連到 `wss://146.5gao.ai/openvman/api/v1/asr/stream?project_id=<已授權的專案ID>&engine=<已授權的串流引擎ID>`，握手標頭帶同一個 `Authorization: Bearer ...`。一般帳號也可用 query `engine` 選擇已授權的串流引擎，僅影響該連線，不修改偏好；省略時沿用帳號串流偏好。批次 `r2t2` 與串流 `r2t2-live` 分別授權。未授權或不合法的引擎回 `not_allowed`；未設定回 `not_configured`、上游失敗回 `upstream_failed`，Embed key 維持拒絕。
+可信任的後端 WebSocket client 可連到 `wss://api.example.com/openvman/api/v1/asr/stream?project_id=<已授權的專案ID>&engine=<已授權的串流引擎ID>`，握手標頭帶同一個 `Authorization: Bearer ...`。一般帳號也可用 query `engine` 選擇已授權的串流引擎，僅影響該連線，不修改偏好；省略時沿用帳號串流偏好。批次 `r2t2` 與串流 `r2t2-live` 分別授權。未授權或不合法的引擎回 `not_allowed`；未設定回 `not_configured`、上游失敗回 `upstream_failed`，Embed key 維持拒絕。
 
 等待 `{"type":"ready"}` 後傳 16 kHz、單聲道、16-bit little-endian PCM binary frames；接收 `interim` 暫定文字與 `final` 定稿文字。結束音訊送 `{"type":"end"}`，等待尾句後關閉。連線錯誤可能回 `error` 事件或在握手時拒絕。
 

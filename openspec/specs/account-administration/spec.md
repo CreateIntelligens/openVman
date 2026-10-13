@@ -1,3 +1,7 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
+> `ROOT_USERNAME` 表示程式採用的 bootstrap 帳號名稱，由部署參數 `AUTH_ROOT_USERNAME` 決定；不是帳號名稱字面值。bootstrap 密碼透過 `BOOTSTRAP_ADMIN_PASSWORD` 環境變數提供，不在文件記錄原文。
+
 # account-administration Specification
 
 ## Purpose
@@ -6,10 +10,10 @@ TBD - created by archiving change add-account-resource-isolation. Update Purpose
 ## Requirements
 
 ### Requirement: The first administrator is created out of band
-The system SHALL provide an idempotent container CLI for creating the first administrator with username `ai360` and password `ai360`, and SHALL NOT expose public account registration.
+The system SHALL provide an idempotent container CLI for creating the first administrator with the configured `ROOT_USERNAME` and a deployment-supplied `BOOTSTRAP_ADMIN_PASSWORD`, and SHALL NOT expose public account registration.
 
 #### Scenario: Empty installation is bootstrapped
-- **WHEN** an operator runs the `ai360` bootstrap command against an account database with no administrator
+- **WHEN** an operator runs the supported container bootstrap command against an account database with no administrator
 - **THEN** the command creates one enabled admin with a bcrypt password hash
 - **THEN** the command never prints the plaintext password or JWT
 

@@ -1,5 +1,8 @@
 # Native nginx vhost
 
+Deployment domains, IP addresses, and operator home paths below are anonymized
+examples. Replace them with the target host settings before running commands.
+
 `docker compose up` only brings up the Docker edge nginx, which listens on
 `8786`/`8787` with a self-signed certificate. Public HTTPS is terminated one
 layer above by the **host's own nginx**, which proxies into that edge:
@@ -20,11 +23,11 @@ That layer is not managed by compose, so it has to be set up once per machine.
 | `deploy.sh` | Renders, backs up, validates and reloads the host vhost. |
 | `146-openvman.conf` | What currently runs on the production host, kept for reference and asserted against the template by `backend/tests/config/test_https_edge_proxy.py`. |
 | `openvman.conf` | Render output. Git-ignored — never edit by hand. |
-| `clef-api.conf` | Independent source vhost for `clef.create360.ai`; deployed to `/etc/nginx/conf.d/clef-api.conf`. |
+| `clef-api.conf` | Independent source vhost for `decision-primary.example.com`; deployed to `/etc/nginx/conf.d/clef-api.conf`. |
 
 ## Clef-Flash API domain
 
-`clef.create360.ai` resolves to `60.248.142.145`. The host nginx serves the
+In this example, `decision-primary.example.com` points to `203.0.113.10`. The host nginx serves the
 HTTP-01 challenge on port 80, redirects normal HTTP requests to HTTPS, and
 proxies TLS requests to the API facade on `127.0.0.1:18100`. The dedicated
 vhost in `clef-api.conf` is separate from `146-openvman.conf`.
@@ -34,7 +37,7 @@ and shared Let's Encrypt directory. With DNS already pointed at this host and
 port 80 reachable, install a temporary HTTP challenge vhost, issue the
 certificate, then deploy the final vhost:
 
-1. Install an HTTP-only server block for `clef.create360.ai` at
+1. Install an HTTP-only server block for `decision-primary.example.com` at
    `/etc/nginx/conf.d/clef-api.conf`. It must serve
    `/.well-known/acme-challenge/` from `/usr/share/nginx/html` and return 404
    for other paths. Run `sudo nginx -t && sudo systemctl reload nginx`.
@@ -48,7 +51,7 @@ certificate, then deploy the final vhost:
      -v "$PWD/infra/nginx/certs/letsencrypt:/etc/letsencrypt" \
      certbot/certbot@sha256:34ee91d2f43008eb78a007d22f23ed4b2eaa9a454cb27ca2c042b49527a695b4 \
      certonly --webroot -w /var/www/certbot \
-     -d clef.create360.ai -m "$LETSENCRYPT_EMAIL" --agree-tos --non-interactive
+     -d decision-primary.example.com -m "$LETSENCRYPT_EMAIL" --agree-tos --non-interactive
    ```
 
 3. Copy `infra/nginx/native/clef-api.conf` to
@@ -56,7 +59,7 @@ certificate, then deploy the final vhost:
    reload nginx`.
 
 The existing `scripts/renew-letsencrypt.sh` renews every lineage in the shared
-certificate directory, including `clef.create360.ai`, and reloads host nginx.
+certificate directory, including `decision-primary.example.com`, and reloads host nginx.
 The existing daily cron entry therefore manages renewal without a second job.
 
 ## Updating an already-deployed host
@@ -97,7 +100,7 @@ chains into the repo-local one, so both run.
 ### Why the installed file is a copy, not a symlink
 
 Symlinking `/etc/nginx/conf.d/` into the working tree looks tidier but couples
-the public vhost to a developer path: the config lives under `/home/human`,
+the public vhost to a developer path: the config lives under `/home/operator`,
 which is `drwxr-x---`, so anything but root loses the whole vhost, and a
 `git checkout` of another branch silently rewrites what production serves.
 nginx only reads these files on start and reload, so such a break surfaces at

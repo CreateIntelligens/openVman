@@ -1,3 +1,7 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
+> `ROOT_USERNAME` 表示程式採用的 bootstrap 帳號名稱，由部署參數 `AUTH_ROOT_USERNAME` 決定；不是帳號名稱字面值。bootstrap 密碼透過 `BOOTSTRAP_ADMIN_PASSWORD` 環境變數提供，不在文件記錄原文。
+
 # root-account-administration Specification
 
 ## Purpose
@@ -6,20 +10,20 @@ TBD - created by archiving change add-root-account-role. Update Purpose after ar
 ## Requirements
 
 ### Requirement: The installation has exactly one protected ROOT account
-The system SHALL persist `root` as a role above `admin` and `user`, SHALL display that role as `ROOT`, and SHALL reserve the single ROOT identity for the formal account whose normalized username is `ai360`.
+The system SHALL persist `root` as a role above `admin` and `user`, SHALL display that role as `ROOT`, and SHALL reserve the single ROOT identity for the formal account whose normalized username matches the configured `ROOT_USERNAME` value.
 
 #### Scenario: Existing installation is migrated
-- **WHEN** schema migration finds the existing formal `ai360` account and no conflicting ROOT
+- **WHEN** schema migration finds the existing formal `ROOT_USERNAME` account and no conflicting ROOT
 - **THEN** it changes that account role to `root` without changing its ID, password hash, ownership, grants, defaults, or creation metadata
 - **THEN** it increments token version so every pre-migration session is rejected
 
 #### Scenario: Empty installation is bootstrapped
 - **WHEN** the operator runs the supported bootstrap command against a database without ROOT
-- **THEN** it creates the enabled `ai360` ROOT with a bcrypt hash for the supplied bootstrap password
+- **THEN** it creates the enabled `ROOT_USERNAME` ROOT with a bcrypt hash for the supplied bootstrap password
 - **THEN** repeating bootstrap cannot create or replace another ROOT
 
 #### Scenario: Conflicting privileged state is detected
-- **WHEN** migration or bootstrap detects another ROOT or a conflicting `ai360` identity
+- **WHEN** migration or bootstrap detects another ROOT or a conflicting `ROOT_USERNAME` identity
 - **THEN** it fails without choosing, replacing, or silently demoting a privileged account
 
 ### Requirement: ROOT and administrator permissions follow a strict hierarchy
@@ -97,7 +101,7 @@ The system SHALL append an audit event in the same transaction as each privilege
 The Admin frontend SHALL recognize `root`, show it as `ROOT`, grant it every existing admin page, and render account mutation controls according to the authenticated actor and target hierarchy.
 
 #### Scenario: ROOT opens account management
-- **WHEN** authenticated `ai360` ROOT opens the account page
+- **WHEN** authenticated `ROOT_USERNAME` ROOT opens the account page
 - **THEN** it can create admins and users and can access role-change, password-reset, disable, session-revoke, and delete controls for permitted lower accounts
 - **THEN** its own protected operations remain unavailable
 

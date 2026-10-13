@@ -1,3 +1,5 @@
+> 文件中的部署網域、專案名稱與識別碼已去識別化；示例值不代表實際部署設定。技術路徑、授權規則與 fallback 順序保持原意。
+
 # Spec Delta
 
 ## Purpose
@@ -12,7 +14,7 @@ The system SHALL let an authorized administrator configure the enabled decision 
 #### Scenario: Initial decision chain
 - **WHEN** no decision-provider override exists
 - **THEN** the chain is Clef primary, Clef backup, Jev, then OpenAI Decisions
-- **THEN** the Clef endpoints are `https://clef.create360.ai/v1/systemone` and `https://clef.aiurl.tw/v1/systemone`
+- **THEN** the Clef endpoints are `https://decision-primary.example.com/v1/systemone` and `https://decision-fallback.example.com/v1/systemone`
 
 #### Scenario: Administrator changes the order
 - **WHEN** an administrator saves a valid reordered chain

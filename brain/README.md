@@ -182,7 +182,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ### 網路工具（2md）
 
-- 端點順序定義在 `core/two_md_defaults.TWO_MD_BASE_URLS`：`https://2md.aiurl.tw` → `https://2md.glsoft.ai` → `https://create360.ai`。`URL2MD_BASE_URLS` 可整份覆寫；未設定時才讀舊的 `URL2MD_PRIMARY_URL`、`URL2MD_FALLBACK_URLS`。
+- 端點順序定義在 `core/two_md_defaults.TWO_MD_BASE_URLS`；以下以匿名示例域名表示，部署時請核對實際設定：`https://web-primary.example.com` → `https://web-fallback.example.com` → `https://web-tertiary.example.com`。`URL2MD_BASE_URLS` 可整份覆寫；未設定時才讀舊的 `URL2MD_PRIMARY_URL`、`URL2MD_FALLBACK_URLS`。
 - 同一個請求依序嘗試端點，不平行呼叫；整條鏈共用 `URL2MD_TOTAL_BUDGET_S`。只有網路錯誤、逾時與 HTTP 408／425／429／5xx 才換下一台，其他 4xx 立即結束；重試間隔為 full-jitter。
 - 連續失敗的端點暫停 `URL2MD_CIRCUIT_COOLDOWN_S` 秒。設定 `REDIS_URL` 時多個 worker 共用 circuit 與 half-open lease；Redis 不可用時退回 process-local，不會把網頁正文寫進 Redis。
 - `read_web_page` 只接受解析到公開位址的 HTTP(S) URL，拒絕 private、loopback、link-local、reserved、multicast 與 unspecified 位址。
@@ -213,10 +213,12 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設 hop 是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions。ROOT 在 Admin「System → 模型供應商」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 向 `GET /api/v1/internal/model-providers` 取 `decision` 段，10 秒快取（`core/model_provider_config.py`）。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「移除後台金鑰，改用 .env」會清除後台覆寫。
 
+以下自架端點使用匿名示例域名；請依管理者設定替換。
+
 | Hop | 端點／model | 驗證與 contract |
 |---|---|---|
-| Clef 主 | `https://clef.create360.ai/v1/systemone`、`clef-flash` | 選填 Bearer key；System One JSON 的 `state`、`questions`，支援 `noul`／`choice`／`score`，回應為 `answers` 與 `usage` |
-| Clef 備援 | `https://clef.aiurl.tw/v1/systemone`、`clef-flash` | 與 Clef 主端點共用 key 與 contract |
+| Clef 主 | `https://decision-primary.example.com/v1/systemone`、`clef-flash` | 選填 Bearer key；System One JSON 的 `state`、`questions`，支援 `noul`／`choice`／`score`，回應為 `answers` 與 `usage` |
+| Clef 備援 | `https://decision-fallback.example.com/v1/systemone`、`clef-flash` | 與 Clef 主端點共用 key 與 contract |
 | Jev | `${JEV_BASE_URL}/v1/systemone`、`jev-latest` | `Authorization: Bearer TYPESAFE_API_KEY`；沿用 System One request／response |
 | OpenAI Decisions | `https://api.openai.com/v1/decisions`、`gpt-6-luna` | `Authorization: Bearer OPENAI_API_KEY`；`input` 加 `questions[]`，`noul` 轉成 `predicate`，支援 `choice`／`score`，解析 `answers[]`；[官方文件](https://developers.openai.com/api/docs/guides/decisions)目前標示 public beta |
 

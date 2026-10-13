@@ -2,7 +2,7 @@
 
 這份是最近一次（第三輪）的交辦；下一輪直接改這份。前兩輪的交辦見 git 歷史（第一輪 `git show 56e8357:scripts/experiments/product-notes/CODEX_TASK.md`，第二輪是這份檔案的上一版）。
 
-> 手動在 `/home/human/openVman` 開 Codex 執行（要用你 config 的 `danger-full-access` 才能存取 Docker）。從 Claude 外掛派出的 Codex 會被沙盒擋住 docker.sock。
+> 手動在 `/path/to/openVman` 開 Codex 執行（要用你 config 的 `danger-full-access` 才能存取 Docker）。從 Claude 外掛派出的 Codex 會被沙盒擋住 docker.sock。
 
 ## 為什麼要第三輪
 
@@ -41,7 +41,7 @@
 
 ## 限制（違反任何一條就停下來回報）
 
-- 正式專案 `proj-0cc5c610b4` 只讀。鶴記dev `dev-c0c8fdff34` 的 workspace 與 LanceDB 不改（不放進 knowledge/、不 reindex、不建表）；前後各跑 `python3 scripts/project_mirror.py check`，要 exit 0。
+- 正式專案 `example-industrial-production` 只讀。工業示範專案（開發） `example-industrial-project` 的 workspace 與 LanceDB 不改（不放進 knowledge/、不 reindex、不建表）；前後各跑 `python3 scripts/project_mirror.py check`，要 exit 0。
 - 產出只放 `scripts/experiments/product-notes/round3/`。大於 1MB 的中途檔加進同目錄 `.gitignore`；逐檔雜湊照前兩輪的做法摘要。
 - 不部署、不重啟或重建容器、不用 compose 覆寫、不 git add／commit／push、不改 `.env`、帳號設定、正式程式；不打 `/api/v1/chat`。
 - 文件只寫跟 openVman 有關的結論，不寫其他團隊服務的問題。
