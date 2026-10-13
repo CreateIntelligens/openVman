@@ -25,6 +25,7 @@ from .prompt_templates import (
     NO_TOOLS_ANSWER_RULES,
     NO_TOOLS_INSTRUCTIONS,
     reply_language_line,
+    supported_languages_line,
 )
 from .turn_decisions import TurnPolicy
 
@@ -106,6 +107,7 @@ def build_chat_messages(
             product_prompt_line(project_id) if allow_tools else "",
             *workspace_blocks,
             answer_rules,
+            supported_languages_line(project_id),
             glossary_line(project_id),
             recall_block,
             _format_request_context(request_context),

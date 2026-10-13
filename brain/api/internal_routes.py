@@ -169,8 +169,14 @@ def _build_live_system_instruction(persona_id: str, project_id: str, session_id:
         "8. 用使用者最新一句話的語言回答（中文用繁體、英文回英文、西班牙文回西班牙文），整段不要夾雜其他語言；無法判斷或只是很短的招呼或單字（例如 hi、ok、hola）時用最下方的預設語言。知識庫與人設裡的中文固定說法也要翻成回答語言，產品型號與專有名詞照原文。"
     )
     blocks.append(tool_rules)
-    from core.prompt_templates import primary_language_line
+    from core.prompt_templates import (
+        primary_language_line,
+        supported_languages_line,
+    )
 
+    supported = supported_languages_line(project_id)
+    if supported:
+        blocks.append(supported)
     blocks.append(primary_language_line(project_id))
     return (
         "你是 openVman Brain 的對話核心。以下是你的角色設定和上下文，請在即時語音對話中遵守。\n\n"

@@ -82,6 +82,47 @@ def primary_language_line(project_id: str) -> str:
     return f"使用者的語言判斷不出來（例如只打招呼）時，預設用{name}回答。"
 
 
+# 說得出口的語言名稱；台語跟國語分開列，否則模型只會說「主要用國語」。
+SPOKEN_LANGUAGE_NAMES = {
+    "zh": "國語",
+    "nan": "台語",
+    "en": "英文",
+    "es": "西班牙文",
+    "ja": "日文",
+    "ko": "韓文",
+}
+
+
+def _language_routes(project_id: str) -> list[str]:
+    try:
+        from knowledge.kb_settings import language_routes
+
+        return language_routes(project_id)
+    except Exception:  # noqa: BLE001 - 讀不到設定就當只有中文
+        return ["zh"]
+
+
+def supported_languages_line(project_id: str) -> str:
+    """Tell the model which languages the project is set up to speak.
+
+    人設與知識庫多半是中文，模型被問「你會說什麼語言」時只答「主要用國語」，
+    就算專案分流勾了台語（2026-10-13 創造智能醫院衛教助理實測）。只有一條分流
+    的專案不寫：列一種語言會讓模型拒絕用別的語言回答。
+    """
+    names = [
+        SPOKEN_LANGUAGE_NAMES[code]
+        for code in _language_routes(project_id)
+        if code in SPOKEN_LANGUAGE_NAMES
+    ]
+    if len(names) < 2:
+        return ""
+    joined = "、".join(names)
+    return (
+        f"你會說的語言：{joined}。使用者問你會說哪些語言時，這幾種都要講到，"
+        "不要說自己主要只用其中一種。"
+    )
+
+
 def reply_language_line(
     project_id: str, user_message: str, speech_language: str = "",
     *, resolved_language: str | None = None,

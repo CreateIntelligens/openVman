@@ -152,3 +152,31 @@ def test_zero_seconds_means_no_length_rule(monkeypatch):
     monkeypatch.setattr(prompt_templates, "_reply_seconds", lambda project_id: 0)
     line = prompt_templates.reply_language_line("p", "污泥泵有幾匹馬力？")
     assert line == "這一輪的回答語言：繁體中文。整段回答都用繁體中文，不要夾雜其他語言。"
+
+
+def test_supported_languages_lists_every_route(monkeypatch):
+    """創造智能醫院衛教助理實測（2026-10-13）：分流勾了國台語，被問會說什麼卻只答國語。"""
+    monkeypatch.setattr(prompt_templates, "_language_routes", lambda project_id: ["zh", "nan"])
+    line = prompt_templates.supported_languages_line("p")
+    assert line.startswith("你會說的語言：國語、台語。")
+
+
+def test_single_route_project_states_no_language_list(monkeypatch):
+    monkeypatch.setattr(prompt_templates, "_language_routes", lambda project_id: ["zh"])
+    assert prompt_templates.supported_languages_line("p") == ""
+
+
+def test_chat_prompt_lists_the_project_languages(monkeypatch):
+    from core import prompt_builder
+
+    monkeypatch.setattr(
+        prompt_builder, "load_core_workspace_context", lambda *a, **kw: defaultdict(str),
+    )
+    monkeypatch.setattr(prompt_builder, "_build_recall_block", lambda **kw: "")
+    monkeypatch.setattr(prompt_templates, "_language_routes", lambda project_id: ["zh", "nan"])
+    messages = prompt_builder.build_chat_messages(
+        user_message="你會說哪些語言？",
+        request_context={"project_id": "p", "metadata": {}},
+        session_messages=[],
+    )
+    assert "你會說的語言：國語、台語。" in messages[0]["content"]
