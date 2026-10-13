@@ -191,7 +191,7 @@ def decide(
     failures: list[str] = []
     full_hop_budget = min(timeout, per_hop_timeout) if per_hop_timeout is not None else timeout
     health = provider_health()
-    for hop in health.order(configuration.providers, _health_id):
+    for hop in health.order(configuration.providers, lambda hop: _health_id(hop, purpose)):
         if cancel_event is not None and cancel_event.is_set():
             raise DecisionProviderCancelled("decision turn was cancelled")
         remaining = deadline - monotonic()
@@ -218,7 +218,7 @@ def decide(
             usage_obj = body.get("usage")
             answers = _parse_answers(hop.provider, body, normalized)
             status = "ok"
-            health.record_success(_health_id(hop))
+            health.record_success(_health_id(hop, purpose))
             _record_hop(
                 provider=hop.provider, hop_id=hop.id, model=hop.model,
                 purpose=purpose, elapsed_ms=(monotonic() - hop_started) * 1000,
@@ -237,7 +237,7 @@ def decide(
             failures.append(f"{hop.id}:{status}")
             # 只剩一點點時間就逾時，是前面的站把時間用掉了，不算這一站的錯。
             if status != "timeout" or hop_budget >= full_hop_budget / 2:
-                health.record_failure(_health_id(hop), _failure_kind(status), status)
+                health.record_failure(_health_id(hop, purpose), _failure_kind(status), status)
             _record_hop(
                 provider=hop.provider, hop_id=hop.id, model=hop.model,
                 purpose=purpose, elapsed_ms=(monotonic() - hop_started) * 1000,
@@ -583,8 +583,8 @@ def _openai_probability_map(value: Any) -> dict[str, float]:
     return result
 
 
-def _health_id(hop: DecisionProvider) -> HopId:
-    return HopId.of("decision", hop.id, hop.model, hop.api_key)
+def _health_id(hop: DecisionProvider, purpose: str) -> HopId:
+    return HopId.of("decision", hop.id, hop.model, hop.api_key, purpose)
 
 
 def _failure_kind(status: str) -> FailureKind:

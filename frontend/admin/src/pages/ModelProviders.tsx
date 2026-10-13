@@ -16,15 +16,29 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   chat_llm: "產生回答的主對話模型。依序嘗試啟用的供應商；模型名稱留空時沿用部署設定的 LLM_FALLBACK_CHAIN。",
 };
 
+// Brain 依用途分開記失敗（reason 後面帶「（decision_turn）」這類標註），標在狀態後面。
+const PURPOSE_LABELS: Record<string, string> = {
+  decision_turn: "每輪判斷",
+  reference_media: "附圖選擇",
+  memory_gate: "記憶判斷",
+  recall_filter: "記憶篩選",
+  asr_final_judge: "辨識定稿",
+  language: "語言判斷",
+  interrupt: "插話判斷",
+};
+
 function healthLabel(health: HopHealth): string | null {
-  const auth = health.reason?.startsWith("auth") || health.reason === "http_401" || health.reason === "http_403";
+  const reason = health.reason ?? "";
+  const purpose = reason.match(/（(.+)）$/)?.[1];
+  const suffix = purpose ? `（${PURPOSE_LABELS[purpose] ?? purpose}）` : "";
+  const auth = /^(auth|http_401|http_403)/.test(reason);
   if (health.status === "blocked") {
-    return auth ? "已跳過：金鑰無效，換金鑰後立即重試" : "已跳過，重開後重試";
+    return (auth ? "已跳過：金鑰無效，換金鑰後立即重試" : "已跳過，重開後重試") + suffix;
   }
   if (health.status === "cooling") {
-    return `連續失敗，冷卻中，約 ${health.retry_in_seconds ?? 0} 秒後再試`;
+    return `連續失敗，冷卻中，約 ${health.retry_in_seconds ?? 0} 秒後再試${suffix}`;
   }
-  if (health.status === "degraded") return "剛失敗過，下一輪會再試";
+  if (health.status === "degraded") return `剛失敗過，下一輪會再試${suffix}`;
   return null;
 }
 

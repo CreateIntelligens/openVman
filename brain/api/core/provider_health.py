@@ -45,10 +45,13 @@ class HopId:
     hop: str
     model: str
     fingerprint: str
+    # 同一站不同用途分開記：Clef 只有大請求（每輪決策）逾時時，穿插成功的小請求（附圖選擇）
+    # 不能把每輪決策的失敗次數歸零，否則斷路器永遠不會跳過它（2026-10-13 正式機：連續 5 次逾時、狀態仍是空的）。
+    purpose: str = ""
 
     @classmethod
-    def of(cls, category: str, hop: str, model: str, api_key: str) -> HopId:
-        return cls(category, hop, model, key_fingerprint(api_key))
+    def of(cls, category: str, hop: str, model: str, api_key: str, purpose: str = "") -> HopId:
+        return cls(category, hop, model, key_fingerprint(api_key), purpose)
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +119,7 @@ class ProviderHealth:
                 "hop": hop.hop,
                 "model": hop.model,
                 "key_fingerprint": hop.fingerprint,
+                "purpose": hop.purpose,
                 "status": status,
                 "reason": state.reason,
                 "consecutive_failures": state.consecutive_failures,

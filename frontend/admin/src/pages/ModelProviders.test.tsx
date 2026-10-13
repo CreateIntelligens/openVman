@@ -190,7 +190,7 @@ describe("ModelProviders", () => {
   it("shows which hops Brain is skipping and why", async () => {
     const result = settings();
     result.categories[0].providers[0].health = { status: "blocked", reason: "http_401", retry_in_seconds: null };
-    result.categories[0].providers[1].health = { status: "cooling", reason: "timeout", retry_in_seconds: 42 };
+    result.categories[0].providers[1].health = { status: "cooling", reason: "timeout（decision_turn）", retry_in_seconds: 42 };
     vi.mocked(fetchModelProviderSettings).mockResolvedValue(result);
     render(<ModelProviders />);
 
@@ -199,7 +199,7 @@ describe("ModelProviders", () => {
     const jev = await screen.findByTestId("provider-decision-jev");
     expect(within(jev).getByRole("status").textContent).toBe("已跳過：金鑰無效，換金鑰後立即重試");
     const openai = screen.getByTestId("provider-decision-openai");
-    expect(within(openai).getByRole("status").textContent).toContain("約 42 秒後再試");
+    expect(within(openai).getByRole("status").textContent).toBe("連續失敗，冷卻中，約 42 秒後再試（每輪判斷）");
   });
 
   it("reports load failures and allows retry", async () => {

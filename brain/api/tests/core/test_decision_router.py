@@ -445,3 +445,29 @@ def test_failing_hop_is_tried_last_on_the_next_decision(monkeypatch):
     router.decide("s", {"q": {"type": "noul"}}, timeout=1, purpose="test")
 
     assert calls == ["clef-primary", "jev", "jev"]
+
+
+def test_small_successful_decisions_do_not_reset_failures_of_another_purpose(monkeypatch):
+    """附圖選擇（小請求）成功不能把每輪決策（大請求）的逾時次數歸零，否則斷路器永遠不跳過。"""
+    hops = [_hop("clef-primary"), _hop("jev")]
+    monkeypatch.setattr(router, "_provider_configuration", lambda **_: _config(hops))
+    monkeypatch.setattr(router, "_record_hop", lambda **_: None)
+    calls = []
+
+    def call(hop, state, questions, **_kwargs):
+        calls.append((hop.id, state))
+        if hop.id == "clef-primary" and state == "big":
+            raise httpx.ReadTimeout("slow")
+        return {"answers": {"q": {"type": "noul", "noul": 0.9}}}
+
+    monkeypatch.setattr(router, "_call_provider", call)
+    for _ in range(2):
+        router.decide("big", {"q": {"type": "noul"}}, timeout=1, purpose="decision_turn")
+        router.decide("small", {"q": {"type": "noul"}}, timeout=1, purpose="reference_media")
+    calls.clear()
+
+    router.decide("big", {"q": {"type": "noul"}}, timeout=1, purpose="decision_turn")
+    router.decide("small", {"q": {"type": "noul"}}, timeout=1, purpose="reference_media")
+
+    # 每輪決策先問 Jev；附圖選擇照常先問 Clef。
+    assert calls == [("jev", "big"), ("clef-primary", "small")]

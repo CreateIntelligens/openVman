@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/settings/model-providers", tags=["Settings"])
 
 _HEALTH_TIMEOUT_SECONDS = 1.5
+_STATUS_SEVERITY = {"degraded": 1, "cooling": 2, "blocked": 3}
 
 
 class _StrictModel(BaseModel):
@@ -110,20 +111,26 @@ def _hop_health(
     if health is None:
         return {"status": "unknown"}
     fingerprint = _key_fingerprint(api_key)
-    for entry in health:
-        if (
-            isinstance(entry, dict)
-            and entry.get("category") == category
-            and entry.get("hop") == hop_id
-            and entry.get("model") == model
-            and entry.get("key_fingerprint") == fingerprint
-        ):
-            return {
-                "status": entry.get("status", "unknown"),
-                "reason": entry.get("reason", ""),
-                "retry_in_seconds": entry.get("retry_in_seconds"),
-            }
-    return {"status": "ok"}
+    matches = [
+        entry for entry in health
+        if isinstance(entry, dict)
+        and entry.get("category") == category
+        and entry.get("hop") == hop_id
+        and entry.get("model") == model
+        and entry.get("key_fingerprint") == fingerprint
+    ]
+    if not matches:
+        return {"status": "ok"}
+    # Brain 依用途（每輪決策、附圖選擇…）分開記；頁面一站只顯示一個狀態，取最嚴重的那個。
+    worst = max(matches, key=lambda entry: _STATUS_SEVERITY.get(str(entry.get("status")), 0))
+    reason = str(worst.get("reason", ""))
+    if worst.get("purpose"):
+        reason = f"{reason}（{worst['purpose']}）" if reason else str(worst["purpose"])
+    return {
+        "status": worst.get("status", "unknown"),
+        "reason": reason,
+        "retry_in_seconds": worst.get("retry_in_seconds"),
+    }
 
 
 def _admin_view(runtime: AuthRuntime) -> dict[str, Any]:

@@ -242,3 +242,20 @@ def test_settings_page_still_loads_when_brain_cannot_report_health(tmp_path, mon
 
     assert response.status_code == 200
     assert _category(response.json(), "decision")["providers"][0]["health"] == {"status": "unknown"}
+
+
+def test_hop_shows_the_most_severe_state_across_purposes(tmp_path, brain_health):
+    runtime = _runtime(tmp_path)
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+    fingerprint = hashlib.sha256(b"env-jev-key").hexdigest()[:12]
+    base = {"category": "decision", "hop": "jev", "model": "jev-latest", "key_fingerprint": fingerprint}
+    brain_health.extend([
+        {**base, "purpose": "reference_media", "status": "degraded", "reason": "timeout", "retry_in_seconds": 0},
+        {**base, "purpose": "decision_turn", "status": "cooling", "reason": "timeout", "retry_in_seconds": 40},
+    ])
+
+    decision = _category(client.get(PATH, headers=headers).json(), "decision")
+
+    jev = next(provider for provider in decision["providers"] if provider["id"] == "jev")
+    assert jev["health"] == {"status": "cooling", "reason": "timeout（decision_turn）", "retry_in_seconds": 40}
