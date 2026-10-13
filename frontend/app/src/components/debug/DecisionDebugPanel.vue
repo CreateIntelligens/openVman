@@ -8,9 +8,12 @@
       決策 Debug <span>{{ enabled ? '開' : '關' }}</span>
     </button>
     <div v-if="enabled" id="decision-debug-content" class="debug-content">
-      <div class="debug-heading"><strong>這輪的機器判讀</strong><button @click="$emit('toggle', false)" aria-label="關閉決策 Debug">關閉</button></div>
-      <p v-if="!report" class="debug-empty" role="status">{{ waiting ? '等待本輪決策結果…' : '送出一則訊息，就能查看供應商的判讀結果。' }}</p>
-      <template v-else>
+      <div class="debug-heading">
+        <p class="debug-summary" role="status">{{ summary }}</p>
+        <button v-if="report" :aria-expanded="expanded" aria-controls="decision-debug-details" @click="expanded = !expanded">{{ expanded ? '收起' : '詳細' }}</button>
+        <button @click="$emit('toggle', false)" aria-label="關閉決策 Debug">關閉</button>
+      </div>
+      <div v-if="report && expanded" id="decision-debug-details" class="debug-details">
         <p class="debug-provider"><strong>{{ providerLabel }}</strong><span>{{ report.elapsed_ms.toFixed(0) }} ms</span></p>
         <p v-if="report.status !== 'available'" role="status" class="debug-notice">{{ report.status === 'fallback' ? '決策服務失效，本輪沿用原本對話規則。' : '本輪決策停用，沿用原本對話規則。' }}</p>
         <template v-else>
@@ -30,18 +33,26 @@
           <p v-if="report.scope === 'audio_retrieval_only'" class="debug-notice">Live 原始音訊：本輪判讀只影響後續檢索；已開始的回覆沿用 session 語言與語氣。</p>
           <p class="debug-caption">{{ report.model }} · {{ report.hop_id }}<br />只顯示最新一輪，關閉即清除。</p>
         </template>
-      </template>
+      </div>
     </div>
   </aside>
 </template>
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { labelValue, signalLabels, type DecisionDebug } from './decisionDebug'
 const props = defineProps<{ enabled: boolean; report: DecisionDebug | null; waiting: boolean }>()
 defineEmits<{ toggle: [enabled: boolean] }>()
+// 預設只露一行摘要：整張表約 20rem 高，一展開就蓋住虛擬人的臉，而且判讀一到高度會從一行跳成整張。
+const expanded = ref(false)
 const providerLabel = computed(() => ({ 'clef-primary': 'Clef 主端點', 'clef-backup': 'Clef 備援端點', jev: 'Jev', openai: 'OpenAI Decisions' }[props.report?.hop_id ?? ''] ?? props.report?.provider ?? '決策供應商'))
 const tone = computed(() => props.report?.signals.find(signal => signal.id === 'tone'))
 const toneLabel = computed(() => tone.value?.accepted ? labelValue(tone.value.value) : '未確定')
+const summary = computed(() => {
+  const report = props.report
+  if (!report) return props.waiting ? '等待本輪決策結果…' : '送出一則訊息，就能查看判讀結果。'
+  if (report.status !== 'available') return `${providerLabel.value} · 沿用原本規則`
+  return `${providerLabel.value} · ${report.elapsed_ms.toFixed(0)} ms · ${toneLabel.value}`
+})
 function percent(value: number | null | undefined) { return typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100)}%` : '—' }
 const appliedRows = computed(() => {
   const policy = props.report?.policy ?? {}
@@ -59,9 +70,13 @@ const appliedRows = computed(() => {
 .debug-toggle { display: flex; align-items: center; gap: .5rem; margin-left: auto; padding: .6rem .75rem; border: var(--hairline) solid var(--line); border-radius: .6rem; background: var(--bg-soft); color: inherit; cursor: pointer; box-shadow: var(--surface-shadow); }
 .debug-toggle svg { width: 1rem; height: 1rem; }
 .debug-toggle span { color: var(--primary); font-weight: 700; }
-.debug-content { width: 22.5rem; max-width: 100%; margin-top: .5rem; padding: 1rem; border: var(--hairline) solid var(--line); border-radius: .75rem; background: var(--bg-soft); box-shadow: 0 .5rem 1.5rem rgb(var(--ov-color-content) / .18); max-height: min(60svh, 30rem); overflow-y: auto; scrollbar-color: var(--line) transparent; }
+.debug-content { width: 22.5rem; max-width: 100%; margin-top: .5rem; padding: .6rem .75rem; border: var(--hairline) solid var(--line); border-radius: .75rem; background: var(--bg-soft); box-shadow: 0 .5rem 1.5rem rgb(var(--ov-color-content) / .18); max-height: min(60svh, 30rem); overflow-y: auto; scrollbar-color: var(--line) transparent; }
 .debug-heading, .debug-provider, .debug-tone { display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
-.debug-heading button { border: 0; background: transparent; color: var(--text-soft); cursor: pointer; }
+.debug-heading button { border: 0; background: transparent; color: var(--text-soft); cursor: pointer; white-space: nowrap; }
+.debug-summary { flex: 1; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.debug-details { animation: debug-reveal .18s ease-out; }
+@keyframes debug-reveal { from { opacity: 0; transform: translateY(-.25rem); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .debug-details { animation: none; } }
 .debug-provider { margin: 1rem 0 .65rem; color: var(--primary); }
 .debug-tone { flex-wrap: wrap; margin: .65rem 0; }
 .debug-caption, .debug-empty, .debug-notice { color: var(--text-soft); line-height: 1.5; }

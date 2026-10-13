@@ -235,7 +235,9 @@ export default function ModelProviders() {
 
   function credentialStatus(credential: ProviderCredential): string {
     if (clearKeys.has(credential.id)) return "將清除目前金鑰";
-    if (useEnvironmentKeys.has(credential.id)) return "將恢復使用部署環境金鑰";
+    if (useEnvironmentKeys.has(credential.id)) {
+      return `儲存後刪除後台金鑰，改用伺服器的 ${credential.environment_variable}`;
+    }
     if (credential.source === "unreadable") {
       return credential.configured
         ? `後台金鑰無法解密，暫用環境變數 · ${credential.masked}；請重新輸入`
@@ -547,9 +549,10 @@ export default function ModelProviders() {
                           type="button"
                           onClick={() => setCredentialAction(credential.id, "environment")}
                           disabled={busy}
+                          title={`儲存後刪除後台加密存的這把金鑰，改用伺服器部署設定的 ${credential.environment_variable}`}
                           className={quietButton}
                         >
-                          使用部署預設
+                          移除後台金鑰，改用 .env
                         </button>
                       )}
                     </div>
@@ -560,7 +563,8 @@ export default function ModelProviders() {
           </>
         )}
 
-        <div className="flex justify-end border-t border-border pt-5">
+        {/* 金鑰分頁有六組，存檔鈕放最底會被推出視窗；固定在捲動區底部。 */}
+        <div className="sticky bottom-0 z-10 -mx-6 flex justify-end border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-md md:-mx-8 md:px-8">
           <button
             type="button"
             onClick={() => void save()}

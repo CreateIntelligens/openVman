@@ -30,3 +30,10 @@ test("decision debug panel uses theme tokens and no fixed pixel sizes", () => {
   assert.doesNotMatch(style, /#[0-9a-fA-F]{3,8}\b/);
   assert.doesNotMatch(style, /\b(?!1px)\d+px\b/);
 });
+
+test("decision debug panel opens as a one-line summary and expands only on request", () => {
+  // 整張表一打開就蓋住虛擬人的臉，判讀一到高度又從一行跳成整張（2026-10-13 外部測試回報）。
+  assert.match(panel, /const expanded = ref\(false\)/);
+  assert.match(panel, /v-if="report && expanded"/);
+  assert.match(panel, /prefers-reduced-motion: reduce\) \{ \.debug-details \{ animation: none/);
+});

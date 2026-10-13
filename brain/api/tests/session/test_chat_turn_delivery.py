@@ -221,7 +221,8 @@ def test_debug_is_returned_on_opt_in_without_entering_staged_turn(delivery, monk
         context.turn_decision = TurnDecision('trace', TurnPolicy(tone='frustrated'), 'clef', provider='clef')
         return context
     monkeypatch.setattr(chat_routes, '_prepare_chat_context', prepare)
-    response = client.post('/brain/chat', json={**turn(), 'message': '請直接講重點', 'decision_debug': True})
+    admin = {'X-OpenVMan-Role': 'admin'}
+    response = client.post('/brain/chat', json={**turn(), 'message': '請直接講重點', 'decision_debug': True}, headers=admin)
     assert response.status_code == 200
     assert response.json()['decision_debug']['policy']['tone'] == 'frustrated'
     with store._connect() as conn:
@@ -231,3 +232,23 @@ def test_debug_is_returned_on_opt_in_without_entering_staged_turn(delivery, monk
     assert client.post('/brain/chat/accept', json=turn()).status_code == 200
     ordinary = client.post('/brain/chat', json={'message': 'hi', 'session_id': 's1'})
     assert 'decision_debug' not in ordinary.json()
+
+
+
+def test_debug_is_withheld_from_ordinary_accounts_and_embed_keys(delivery, monkeypatch):
+    """判讀面板含情緒機率與模型名稱：一般／臨時帳號（展場訪客）與 embed 金鑰都拿不到。"""
+    from core.turn_decisions import TurnDecision, TurnPolicy
+    client, _, _, _ = delivery
+    original_prepare = chat_routes._prepare_chat_context
+    def prepare(request, payload):
+        context = original_prepare(request, payload)
+        context.turn_decision = TurnDecision('trace', TurnPolicy(tone='frustrated'), 'clef', provider='clef')
+        return context
+    monkeypatch.setattr(chat_routes, '_prepare_chat_context', prepare)
+    for headers in (
+        {'X-OpenVMan-Role': 'user'},
+        {'X-OpenVMan-Role': 'admin', 'X-Principal-Type': 'embed_key'},
+    ):
+        response = client.post('/brain/chat', json={'message': 'hi', 'session_id': 's9', 'decision_debug': True}, headers=headers)
+        assert response.status_code == 200
+        assert 'decision_debug' not in response.json()

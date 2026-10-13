@@ -211,7 +211,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ## 決策供應鏈
 
-Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設 hop 是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions。ROOT 在 Admin「System → 模型供應商」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 向 `GET /api/v1/internal/model-providers` 取 `decision` 段，10 秒快取（`core/model_provider_config.py`）。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「使用部署預設」會清除後台覆寫。
+Brain 以 `core/decision_router.py` 將 typed decisions 送到管理者設定的順序。預設 hop 是 Clef 主端點、Clef 備援端點、Jev、OpenAI Decisions。ROOT 在 Admin「System → 模型供應商」頁可調整順序與啟用狀態，管理各供應商的 key；key 加密存在 Backend 資料庫，Brain 透過 `X-Internal-Token` 向 `GET /api/v1/internal/model-providers` 取 `decision` 段，10 秒快取（`core/model_provider_config.py`）。Clef key 可選；Jev 使用 `TYPESAFE_API_KEY`，OpenAI 使用 `OPENAI_API_KEY`。部署環境變數作為後台尚未覆寫時的預設值；「移除後台金鑰，改用 .env」會清除後台覆寫。
 
 | Hop | 端點／model | 驗證與 contract |
 |---|---|---|
@@ -236,7 +236,7 @@ Noul positive 門檻為 0.7、negative 門檻為 0.1；choice confidence 至少 
 
 ### 前台決策 Debug
 
-虛擬人舞台的「決策 Debug」預設關閉。開啟後下一輪會顯示真實供應商（Clef 主／備援、Jev、OpenAI 或 baseline）、耗時、14 個固定判讀項目、noul 成立機率、choice 信心度、是否達到採用門檻，以及實際套用策略。「挫折／不耐煩」對應現有 `frustrated` code；分類不確定時顯示棄權。
+虛擬人舞台的「決策 Debug」預設關閉，只有 admin／root 的正式登入看得到：Brain 只在 `X-OpenVMan-Role` 是 admin／root 且不是 embed／API 金鑰時才回傳判讀（HTTP 的 `decision_debug` 與 Live 的 `set_decision_debug` 都檢查，`safety/internal_auth.may_see_decision_debug`），展場用的一般與臨時帳號拿不到情緒機率與模型名稱。開啟後先顯示一行摘要（供應商・耗時・語氣），按「詳細」才展開；展開後會顯示真實供應商（Clef 主／備援、Jev、OpenAI 或 baseline）、耗時、14 個固定判讀項目、noul 成立機率、choice 信心度、是否達到採用門檻，以及實際套用策略。「挫折／不耐煩」對應現有 `frustrated` code；分類不確定時顯示棄權。
 
 HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 true 時才在回應頂層加入 `decision_debug`。欄位是 `turn_id/status/provider/hop_id/model/elapsed_ms/signals/policy`，只含固定代碼與數值，不含原句、帳號、prompt、工具資料或自由文字理由。診斷在 delivery 暫存完成後加入回應，接受回覆時不保存。Live 使用 `set_decision_debug {enabled}` 開關及 `server_decision_debug {session_id, scope, diagnostics, client_turn_id?}` 事件；scope 是 `text` 或 `audio_retrieval_only`。Live 文字輸入的 `user_speak.turn_id` 會由 `client_turn_id` 回傳配對，原始音訊以 `user_transcription.decision_turn_id` 與 diagnostic turn ID 配對；前台拒絕舊回合事件。所有資料僅供當輪前台記憶體檢視，關閉面板、換專案／session 或開始新回合即清除。
 

@@ -36,6 +36,7 @@ from safety.internal_auth import (
     PRINCIPAL_TYPE_HEADER,
     USER_ID_HEADER,
     USER_ROLE_HEADER,
+    may_see_decision_debug,
     require_internal_token,
 )
 from safety.observability import get_metrics_store, log_event, log_exception
@@ -66,10 +67,19 @@ def _maybe_rewrite_slash(payload: ChatRequest) -> dict[str, Any]:
     return raw
 
 
+def _decision_debug_requested(request: Request, payload: ChatRequest) -> bool:
+    return bool(payload.decision_debug) and may_see_decision_debug(
+        request.headers.get(USER_ROLE_HEADER, ""),
+        request.headers.get(PRINCIPAL_TYPE_HEADER, ""),
+    )
+
+
 def _prepare_chat_context(request: Request, payload: ChatRequest) -> Any:
     raw = _maybe_rewrite_slash(payload)
     envelope = build_message_envelope(request, raw, content_key="message")
-    return prepare_generation(envelope, reply_mode=payload.mode, decision_debug=payload.decision_debug)
+    return prepare_generation(
+        envelope, reply_mode=payload.mode, decision_debug=_decision_debug_requested(request, payload),
+    )
 
 
 def _log_generation_success(context: Any, tool_steps: int) -> None:
@@ -148,7 +158,7 @@ async def chat(request: Request, payload: ChatRequest):
                 context, result.reply, result.tool_steps, response_time_s,
                 media=media,
             )
-        if payload.decision_debug and context.turn_decision is not None:
+        if _decision_debug_requested(request, payload) and context.turn_decision is not None:
             # Added after stage_turn: never persist emotional diagnostics in the delivery payload.
             response["decision_debug"] = context.turn_decision.to_debug_payload()
         response["tool_steps"] = result.tool_steps

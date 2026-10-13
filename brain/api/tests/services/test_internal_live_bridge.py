@@ -349,9 +349,14 @@ def test_asr_judge_endpoint_returns_the_chosen_transcript(monkeypatch):
 async def test_live_debug_toggle_is_session_local(monkeypatch):
     import internal_routes
     fake = FakeLiveSession()
-    state = {'live_session': fake}
+    state = {'live_session': fake, 'args': {'role': 'admin', 'principal_type': ''}}
     monkeypatch.setattr(internal_routes, '_ensure_live_session', lambda *args: None)
     await internal_routes._dispatch_live_event(state, 'relay', None, {'event': 'set_decision_debug', 'enabled': True})
     assert fake.decision_debug_enabled is True
     await internal_routes._dispatch_live_event(state, 'relay', None, {'event': 'set_decision_debug', 'enabled': False})
     assert fake.decision_debug_enabled is False
+    # 一般帳號與 embed 金鑰開不了（情緒機率、模型名稱不給展場訪客看）。
+    for args in ({'role': 'user', 'principal_type': ''}, {'role': 'admin', 'principal_type': 'embed_key'}):
+        state['args'] = args
+        await internal_routes._dispatch_live_event(state, 'relay', None, {'event': 'set_decision_debug', 'enabled': True})
+        assert fake.decision_debug_enabled is False

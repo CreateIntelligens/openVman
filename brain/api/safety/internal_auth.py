@@ -63,3 +63,12 @@ def _header_value(value: object) -> str:
     呼叫這個函式時拿到的是 Header 物件本身，當成空值處理。
     """
     return value if isinstance(value, str) else ""
+
+
+def may_see_decision_debug(role: str, principal_type: str) -> bool:
+    """判讀面板（情緒機率、模型名稱、檢索判斷）只給管理者的正式登入。
+
+    Embed／API 金鑰帶的是擁有者的角色，公開嵌入的訪客不能因此看到；臨時與一般帳號
+    多半是展場訪客。前台照同一規則不顯示按鈕，這裡是不信任前端的那一道。
+    """
+    return role in {"admin", "root"} and (principal_type or "user") == "user"

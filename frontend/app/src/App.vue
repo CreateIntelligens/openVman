@@ -79,7 +79,7 @@
           </button>
 
           <DecisionDebugPanel
-            v-if="visitor.settingsVisible.value"
+            v-if="visitor.settingsVisible.value && canSeeDecisionDebug"
             :enabled="chat.decisionDebugEnabled.value"
             :report="chat.decisionDebug.value"
             :waiting="chat.state.value === 'THINKING'"
@@ -272,6 +272,12 @@ const { immersive, handleToggleImmersive } = useImmersiveView(
 );
 const visitor = useVisitorMode();
 const { account } = useAuth();
+// 判讀面板會顯示「模型判定你：挫折 97%」與模型名稱，展場訪客用的一般／臨時帳號不該看到。
+// 伺服器端（Brain）也只對 admin／root 回傳判讀，這裡只是不顯示用不到的按鈕。
+const canSeeDecisionDebug = computed(() => {
+  const role = account.value?.role;
+  return role === "admin" || role === "root";
+});
 const showUnlock = ref(false);
 const { level: micLevel } = useMicLevel(computed(() => activeAsr.value.isListening.value));
 const { suggestions } = useSuggestedQuestions(() => settings.projectId);

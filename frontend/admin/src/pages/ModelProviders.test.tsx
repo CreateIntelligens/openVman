@@ -186,7 +186,7 @@ describe("ModelProviders", () => {
     await openTab("API 金鑰");
     const openai = await screen.findByTestId("credential-openai");
     expect(within(openai).getByText(/無法解密，暫用環境變數/)).toBeTruthy();
-    expect(within(openai).getByRole("button", { name: "使用部署預設" })).toBeTruthy();
+    expect(within(openai).getByRole("button", { name: "移除後台金鑰，改用 .env" })).toBeTruthy();
   });
 
   it("shows which hops Brain is skipping and why", async () => {
