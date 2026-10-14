@@ -99,7 +99,7 @@
 
 要在知識庫沒有答案時改顯示固定拒答句，以 `no_answer: true` 判斷。沒查知識庫（例如打招呼、閒聊）時 `no_answer` 是 false、`answer_source` 是 `none`。網路搜尋與記憶的引用不算知識庫命中：專案開了網路搜尋時，只靠網路回答的一輪也是 `no_answer: true`。帶 `turn_id` 的可合併回合在 `POST /api/v1/chat/accept` 回應中有相同的值。
 
-`no_answer` 只在**完全沒檢索到任何段落**時為 true。知識庫檢索為了接住錯字與跨語言問法，門檻刻意放寬，沾到邊的段落也會被帶回來：例如在醫院專案問「火星上有幾座醫院？」會檢索到幾段院內服務的 QA（`answer_source: qa`、`no_answer: false`），但回答本身會說資料中沒有提到。2026-10-14 實測各 10 題相關／無關問題：天氣、股價、寫詩這類完全無關的都檢索不到（`no_answer: true`）；跟專案主題沾邊、但資料裡其實沒有答案的問題則可能是 false。要對這類情況也換成固定拒答句，請另外判斷回覆文字。
+`no_answer` 有兩種情況會是 true：完全沒檢索到任何段落；或檢索到了段落，但回覆本身在說資料裡沒有答案。知識庫檢索為了接住錯字與跨語言問法，門檻刻意放寬，沾到邊的段落也會被帶回來，例如在醫院專案問「火星上有幾座醫院？」會檢索到院內服務的 QA。所以有引用時，後端會再請決策模型看一次回覆，判斷它是不是在說查不到（每輪約多 0.1–0.2 秒；判斷逾時或失敗時只看有沒有引用）。2026-10-14 實測 10 句真實回覆（中英文、答出來與查不到各半）全對。這時 `answer_source` 仍照實標出檢索到的是 QA 或一般文件。
 
 ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。`PUT /settings/my-asr-provider` 改的是帳號偏好，共用同一把 key 的所有機台會一起變，機台各自要不同引擎時請每次帶 `provider`／`engine`。
 

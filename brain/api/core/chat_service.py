@@ -300,11 +300,56 @@ def _collect_citations_from_tool_steps(tool_steps: list[dict[str, Any]]) -> list
 _KNOWLEDGE_SEARCH_TOOL = "search_knowledge"
 
 
-def answer_source_fields(tool_steps: list[dict[str, Any]], project_id: str) -> dict[str, Any]:
+_NO_ANSWER_QUESTION = {
+    "reply_says_no_answer": {
+        "type": "noul",
+        "instructions": "助理這段回覆，是不是在說資料裡找不到、沒有提到，或無法回答使用者的問題？",
+        "criteria": {
+            "true": "回覆表示查不到、資料沒有提到、無法確認或請使用者改問其他窗口，沒有給出實際答案",
+            "false": "回覆給出了實際的答案或資訊，即使只是部分回答",
+        },
+    },
+}
+
+
+def _reply_says_no_answer(question: str, reply: str) -> bool | None:
+    """Ask the decision chain whether the reply admits the material has no answer.
+
+    知識庫檢索門檻刻意放寬（接住錯字、跨語言），沾邊卻沒有答案的問題也會帶回段落：
+    2026-10-14 醫院專案問「火星上有幾座醫院？」檢索到院內服務的 QA、回答說資料中
+    沒有提到，引用卻有，no_answer 是 false。相似度門檻切不乾淨（相關最低 0.711、
+    無關最高 0.719），改看回覆本身。None 表示沒判斷（關閉、逾時、失敗）。
+    """
+    cfg = get_settings()
+    if not cfg.no_answer_judge_enabled or not reply.strip():
+        return None
+    try:
+        from core.decision_router import decide_noul
+
+        probability = decide_noul(
+            {"user_question": question, "assistant_reply": reply},
+            _NO_ANSWER_QUESTION["reply_says_no_answer"],
+            timeout=cfg.no_answer_judge_timeout_seconds,
+            purpose="no_answer",
+        )
+    except Exception as exc:  # noqa: BLE001 - 判斷失敗就照引用規則，不影響回答
+        logger.warning("no_answer judge failed: %s", exc)
+        return None
+    return probability >= 0.5
+
+
+def answer_source_fields(
+    tool_steps: list[dict[str, Any]],
+    project_id: str,
+    *,
+    question: str = "",
+    reply: str = "",
+) -> dict[str, Any]:
     """Say whether this turn's answer came from the knowledge base, for integrators.
 
     只看 search_knowledge 的引用：網路、記憶的引用不是知識庫命中。整合方拿
-    ``no_answer`` 決定要不要把回答換成固定的拒答句。
+    ``no_answer`` 決定要不要把回答換成固定的拒答句。有引用時再問決策鏈回覆是否
+    其實在說查不到；判斷不了就只看引用。
     """
     knowledge_steps = [
         step for step in tool_steps
@@ -321,10 +366,13 @@ def answer_source_fields(tool_steps: list[dict[str, Any]], project_id: str) -> d
             meta.get(uri, {}).get("source_type") == "qa" for uri in uris
         ) else "knowledge"
     searched = bool(knowledge_steps)
+    no_answer = searched and not uris
+    if searched and uris and _reply_says_no_answer(question, reply):
+        no_answer = True
     return {
         "answer_source": source,
         "knowledge_searched": searched,
-        "no_answer": searched and not uris,
+        "no_answer": no_answer,
     }
 
 
@@ -474,7 +522,10 @@ def finalize_generation(
         "history": history,
         "pii_pending": pii_pending,
         "citations": citations,
-        **answer_source_fields(tool_steps or [], context.project_id),
+        **answer_source_fields(
+            tool_steps or [], context.project_id,
+            question=context.user_message, reply=cleaned_reply,
+        ),
     }
     response.update(primary_media)
     return response

@@ -78,3 +78,70 @@ def test_finalize_returns_the_fields(monkeypatch):
     assert response["answer_source"] == "qa"
     assert response["knowledge_searched"] is True
     assert response["no_answer"] is False
+
+
+def _judge(monkeypatch, probability=None, error=None):
+    calls = []
+    monkeypatch.setenv("NO_ANSWER_JUDGE_ENABLED", "true")
+    monkeypatch.setattr("config._settings", None)
+
+    def fake_decide_noul(state, question, *, timeout, purpose):
+        calls.append({"state": state, "purpose": purpose, "timeout": timeout})
+        if error:
+            raise error
+        return probability
+
+    monkeypatch.setattr("core.decision_router.decide_noul", fake_decide_noul)
+    return calls
+
+
+def test_reply_saying_not_found_marks_no_answer_even_with_citations(monkeypatch):
+    # 2026-10-14 正式機：問「火星上有幾座醫院？」檢索到院內服務 QA，回答說資料沒有提到，
+    # 原本 no_answer 卻是 false（檢索門檻刻意放寬，沾邊的段落也會帶回）。
+    calls = _judge(monkeypatch, probability=0.99)
+    fields = chat_service.answer_source_fields(
+        [_search("search_knowledge", "knowledge/qa/faq.md")], "pr",
+        question="火星上有幾座醫院？", reply="資料中沒有提到火星上有幾座醫院。",
+    )
+    assert fields == {"answer_source": "qa", "knowledge_searched": True, "no_answer": True}
+    assert calls[0]["purpose"] == "no_answer"
+    assert calls[0]["state"]["assistant_reply"].startswith("資料中沒有提到")
+
+
+def test_real_answer_stays_answered(monkeypatch):
+    _judge(monkeypatch, probability=0.04)
+    fields = chat_service.answer_source_fields(
+        [_search("search_knowledge", "knowledge/manual.md")], "pr",
+        question="最大流量？", reply="最大流量是 330 LPM。",
+    )
+    assert fields["no_answer"] is False
+
+
+def test_judge_failure_falls_back_to_citations(monkeypatch):
+    _judge(monkeypatch, error=RuntimeError("all decision providers failed"))
+    fields = chat_service.answer_source_fields(
+        [_search("search_knowledge", "knowledge/manual.md")], "pr",
+        question="q", reply="資料中沒有提到。",
+    )
+    assert fields["no_answer"] is False
+
+
+def test_judge_is_skipped_when_nothing_was_cited(monkeypatch):
+    # 沒引用已經確定是 no_answer；沒查知識庫（打招呼）也不需要多問一次。
+    calls = _judge(monkeypatch, probability=0.99)
+    chat_service.answer_source_fields([_search("search_knowledge")], "pr", question="q", reply="r")
+    chat_service.answer_source_fields([], "pr", question="你好", reply="你好")
+    assert calls == []
+
+
+def test_judge_can_be_turned_off(monkeypatch):
+    calls = _judge(monkeypatch, probability=0.99)
+    settings = chat_service.get_settings()
+    monkeypatch.setattr(
+        chat_service, "get_settings",
+        lambda: SimpleNamespace(**{**settings.__dict__, "no_answer_judge_enabled": False}),
+    )
+    fields = chat_service.answer_source_fields(
+        [_search("search_knowledge", "knowledge/manual.md")], "pr", question="q", reply="查不到",
+    )
+    assert fields["no_answer"] is False and calls == []

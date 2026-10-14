@@ -24,6 +24,9 @@ if "lancedb" not in sys.modules:
 @pytest.fixture(autouse=True)
 def default_internal_token_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GATEWAY_INTERNAL_TOKEN", "test-internal-token")
+    # 單元測試不能真的問決策模型；no_answer 判斷在 tests/core/test_answer_source.py 用假的測。
+    monkeypatch.setenv("NO_ANSWER_JUDGE_ENABLED", "false")
+    monkeypatch.setattr("config._settings", None)
     from config import get_settings
     if hasattr(get_settings, "cache_clear"):
         get_settings.cache_clear()

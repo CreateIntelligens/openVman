@@ -138,6 +138,9 @@ class BrainSettings(BaseSettings):
     privacy_filter_enabled: bool = False
     # 使用者每句話背景問 Clef 有沒有個資；實測每句約 0.85 秒，逾時就當沒掃。
     privacy_clef_timeout_seconds: float = 3.0
+    # /chat 的 no_answer：知識庫有引用時再問決策鏈「回覆是不是在說查不到」，每輪多約 0.1–0.2 秒。
+    no_answer_judge_enabled: bool = True
+    no_answer_judge_timeout_seconds: float = Field(default=0.8, gt=0, le=5)
     # 同時在掃的上限，滿了就跳過這句，不跟每輪決策搶 Clef。
     privacy_max_inflight: int = 2
     privacy_filter_cache_size: int = 512

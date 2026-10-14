@@ -150,7 +150,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | `knowledge_searched` | 本輪有沒有呼叫 `search_knowledge`（不論結果） |
 | `no_answer` | `knowledge_searched` 為 true 且沒有任何知識庫引用 |
 
-有引用不代表模型真的照著回答，`qa`／`knowledge` 只表示知識庫有命中。專案開了網路搜尋時，知識庫沒命中但網路有結果的回答也是 `no_answer: true`。`no_answer` 只代表完全沒檢索到段落：檢索門檻刻意放寬（相似度 0.68，接住錯字與跨語言），沾邊卻沒有答案的問題仍會帶回段落、`no_answer` 為 false（2026-10-14 實測，醫院專案問「火星上有幾座醫院？」最高相似度 0.70）。
+有引用不代表模型真的照著回答，`qa`／`knowledge` 只表示知識庫有命中。專案開了網路搜尋時，知識庫沒命中但網路有結果的回答也是 `no_answer: true`。檢索門檻刻意放寬（相似度 0.68，接住錯字與跨語言），沾邊卻沒有答案的問題也會帶回段落（2026-10-14 醫院專案問「火星上有幾座醫院？」最高相似度 0.70）；相似度切不乾淨（相關最低 0.711、無關最高 0.719），所以有引用時再以決策鏈問一題 noul「回覆是不是在說查不到」（purpose `no_answer`，`NO_ANSWER_JUDGE_TIMEOUT_SECONDS` 預設 0.8 秒，`NO_ANSWER_JUDGE_ENABLED` 可關），機率 ≥ 0.5 即 `no_answer: true`；逾時或失敗只看引用。10 句真實回覆實測全對、每句約 0.12 秒。
 
 ## 工具
 
