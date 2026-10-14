@@ -15,6 +15,7 @@ from app.auth.routes import (
 )
 from app.brain_proxy import router as brain_proxy_router
 from app.config import get_tts_config
+from app.cors import record_request_origin
 from app.gateway import asr_stream as asr_stream_routes
 from app.gateway import websocket as websocket_routes
 from app.gateway.routes import router as gateway_router
@@ -41,6 +42,7 @@ configure_server_logging()
 app = FastAPI(title="openVman Backend", lifespan=lifespan)
 app.add_middleware(FailClosedAuthMiddleware)
 app.middleware("http")(http_metrics_middleware)
+app.middleware("http")(record_request_origin)
 app.state.openapi_builder = BackendOpenAPI(app)
 app.openapi = app.state.openapi_builder.schema
 

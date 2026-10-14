@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-10-14]** **外部網站的瀏覽器前端可以直接呼叫 API，並記錄來源**：新增 `CORS_ALLOWED_ORIGINS`（逗號分隔的來源或 `*`，預設不開放）。原本預檢請求在驗證前就被回 401，其他網站的前端完全打不進來；現在由 auth middleware 先回 204，實際回應與 401／403／429 也帶 CORS 標頭並開放讀取 `X-TTS-*`。不允許帶 Cookie，跨網域只能用 Authorization 或 X-Embed-Key；Embed key 的網域白名單照舊、不受部署清單影響。每個外部網站的呼叫依「來源 × key／帳號」彙總寫入 Auth DB `request_origins`（migration 21），ROOT 以 `GET /api/v1/admin/request-origins` 查詢。另加每把帳號 API key 每分鐘上限 `API_KEY_RATE_LIMIT_PER_MINUTE`（預設 300，超過回 429 與 `Retry-After`）。Brain 代理路徑需要專案編輯權而帳號只有讀取授權時（例如一般帳號刪對話），改回 403，不再回 404 讓人以為對話不存在。串接文件補上錯誤碼、限流、CORS 與 key 放瀏覽器的風險說明。
+
 - **[2026-10-13]** **專案層的語音限制**：每個專案可設定允許的 ASR 引擎、預設引擎、台語分流引擎，以及允許的聲音與預設聲音（Auth DB 新表 `project_policies`，migration 20；`GET/PUT /api/v1/projects/{project_id}/policy`，改設定需 admin，受限 admin 只能放自己範圍內的資源）。實際能用的是帳號授權 ∩ 專案限制，套用在批次 ASR（明確指定、預設順序、備援、台語分流）、上傳媒體轉寫（`/api/v1/uploads` 新增 `project_id`）、串流 ASR（管理員也受限）、TTS（含台語換引擎；專案沒開 Edge 聲音時合成失敗直接回錯誤，不默默換成 Edge）與 Embed key。`/api/v1/me/capabilities`、`/api/v1/tts/providers`、`/v1/audio/speech` 新增選填 `project_id`。後台專案管理頁新增「語音設定」視窗。前台虛擬人的串流與整檔合成都帶 `project_id`（整檔原本沒帶，Edge 等聲音不受專案限制）。沒設定的專案行為不變。
 
 - **[2026-10-13]** **正式語音串接驗證紀錄**：以既有帳號 API key 經正式 HTTPS 入口實測 5 個批次及 3 個串流 ASR、兩專案 RAG、標準庫 CLI 與 5 家 TTS；記錄通過結果及尚未修復的過期 VoxCPM 聲音、Edge 空音訊假成功、IP 憑證不匹配問題。詳見 `docs/plans/integration-capabilities-asr.md`。

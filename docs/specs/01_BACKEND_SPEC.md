@@ -18,7 +18,15 @@
 
 Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 Cookie 共存，HTTP 與 WebSocket 使用同一帳號驗證。key 對應正式帳號並繼承當下資源授權；保存發行角色與 token version，角色或版本改變、帳號停用時拒絕。資料庫只存 SHA-256，明文只在建立時回傳；期限與撤銷在每次新驗證檢查。
 
-管理 API 為 `GET/POST /api/v1/api-keys` 與 `DELETE /api/v1/api-keys/{key_id}`，只接受登入 session，不接受 API key／Embed key。管理本人或其他帳號的規則、欄位及回應見 [完整契約](../guides/account-api-keys.md)。推論保留帳號 `user_id`，另帶 `principal_type=api_key` 與 key ID；管理列表保留每把 key 的驗證次數及最後使用時間。此機制不開放內部服務 token 路徑，也不自動開啟 CORS。
+管理 API 為 `GET/POST /api/v1/api-keys` 與 `DELETE /api/v1/api-keys/{key_id}`，只接受登入 session，不接受 API key／Embed key。管理本人或其他帳號的規則、欄位及回應見 [完整契約](../guides/account-api-keys.md)。推論保留帳號 `user_id`，另帶 `principal_type=api_key` 與 key ID；管理列表保留每把 key 的驗證次數及最後使用時間。此機制不開放內部服務 token 路徑。
+
+**跨網域（2026-10-14）**：`CORS_ALLOWED_ORIGINS`（逗號分隔的完整來源，或 `*`；留空不開放）列出的網站，瀏覽器前端可以直接帶 API key 呼叫。CORS 在 auth middleware 裡處理：帶 `Access-Control-Request-Method` 的 preflight 在驗證之前回 204，實際回應與 401／403／429 錯誤都補上 `Access-Control-Allow-Origin`（回請求的 Origin）、`Allow-Headers: Authorization, Content-Type, X-Embed-Key`、`Expose-Headers`（`X-TTS-Provider` 等）。不送 `Allow-Credentials`，跨網域只能靠 Authorization 或 X-Embed-Key，別的網站借不到使用者已登入的後台 Cookie。Embed key 的回應已帶自己的 CORS（金鑰白名單）時不覆蓋，部署清單也不會擋掉 Embed key 允許的網域。
+
+**來源紀錄**：每個帶外部 Origin 的請求（preflight 與自己網域除外）依「來源 × 主體（`api_key`／`embed_key`／`user`／`anonymous`）× 主體 ID」彙總寫入 Auth DB `request_origins`（migration 21），記第一次／最後一次時間、最後路徑與次數；不設外鍵，key 撤銷後紀錄仍在。ROOT 以 `GET /api/v1/admin/request-origins?limit=` 查詢。
+
+**限流**：每把帳號 API key 每分鐘最多 `API_KEY_RATE_LIMIT_PER_MINUTE`（預設 300，0 不限）個請求，超過回 429 與 `Retry-After`。計數只放記憶體（backend 單 worker），重啟歸零。Embed key 沿用自己的每分鐘與每日額度。
+
+**看得到但不能改的專案回 403**：Brain 代理路徑需要專案編輯權（刪對話、改知識庫等）而帳號只有讀取授權時回 403；看不到的專案仍回 404，不洩漏存在與否。
 
 ### 2. 連線與 Session 管理 (Session Management)
 伺服器必須在記憶體中維護一個 Session Map，管理所有活躍的機台連線。

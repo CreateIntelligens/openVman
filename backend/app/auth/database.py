@@ -368,6 +368,29 @@ _PROJECT_POLICY_STATEMENTS = (
     """,
 )
 
+# 開放 CORS 後，外部網站的前端可以直接呼叫 API；依「來源網域 × 哪把 key／哪個帳號」
+# 彙總記錄，才知道誰在用、從哪裡用。不設外鍵：key 撤銷或帳號刪除後仍要留著紀錄。
+_REQUEST_ORIGIN_SCHEMA_VERSION = 21
+_REQUEST_ORIGIN_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS request_origins (
+        origin TEXT NOT NULL,
+        principal_type TEXT NOT NULL,
+        principal_id TEXT NOT NULL DEFAULT '',
+        user_id TEXT,
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        last_path TEXT NOT NULL DEFAULT '',
+        request_count INTEGER NOT NULL DEFAULT 0 CHECK (request_count >= 0),
+        PRIMARY KEY (origin, principal_type, principal_id)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_request_origins_last_seen
+    ON request_origins(last_seen_at)
+    """,
+)
+
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
     (2, "temporary_accounts_grants_and_defaults", _TEMPORARY_ACCOUNT_STATEMENTS),
@@ -451,6 +474,11 @@ _MIGRATIONS = (
         _PROJECT_POLICY_SCHEMA_VERSION,
         "project_policies",
         _PROJECT_POLICY_STATEMENTS,
+    ),
+    (
+        _REQUEST_ORIGIN_SCHEMA_VERSION,
+        "request_origins",
+        _REQUEST_ORIGIN_STATEMENTS,
     ),
 )
 

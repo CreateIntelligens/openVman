@@ -114,6 +114,20 @@ def _authenticate_embed_key(
     return current
 
 
+def _enforce_api_key_rate_limit(runtime: AuthRuntime, key_id: str) -> None:
+    limiter = getattr(runtime, "api_key_requests", None)
+    if limiter is None:
+        return
+    retry_after = limiter.retry_after(key_id)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="API key rate limit exceeded",
+            headers={"Retry-After": str(retry_after)},
+        )
+    limiter.record_failure(key_id)
+
+
 def _authenticate_connection(
     connection: HTTPConnection,
     runtime: AuthRuntime,
@@ -133,6 +147,7 @@ def _authenticate_connection(
                 user, api_key = runtime.api_keys.authenticate(token)
             except InvalidApiKeyError as exc:
                 raise _unauthorized() from exc
+            _enforce_api_key_rate_limit(runtime, api_key.key_id)
             current = CurrentAccount(
                 user=user, transport=AuthTransport.API_KEY, api_key=api_key
             )

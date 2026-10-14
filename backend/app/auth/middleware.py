@@ -8,6 +8,8 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.cors import api_cors_headers, origin_allowed
+
 from .dependencies import CurrentAccount, authenticate_request
 from .embed import EMBED_KEY_HEADER, cors_headers, is_preflight_target
 from .runtime import AuthRuntime, get_auth_runtime
@@ -64,7 +66,22 @@ class FailClosedAuthMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        runtime = self._runtime or get_auth_runtime()
+        origin = request.headers.get("origin", "")
+        api_cors = origin_allowed(
+            getattr(runtime.config, "cors_allowed_origins", ""), origin,
+        )
+        if (
+            api_cors
+            and request.method.upper() == "OPTIONS"
+            and request.headers.get("access-control-request-method")
+        ):
+            return Response(status_code=204, headers=api_cors_headers(origin))
         response = await self._dispatch_authenticated(request, call_next)
+        # Embed key 的回應已帶自己的 CORS；其餘（API key、錯誤回應）照部署清單補上，
+        # 401／429 也要帶，否則瀏覽器擋掉回應，前端讀不到狀態碼。
+        if api_cors and "access-control-allow-origin" not in response.headers:
+            response.headers.update(api_cors_headers(origin))
         if request.url.path == "/api/v1/api-keys" or request.url.path.startswith(
             "/api/v1/api-keys/"
         ):

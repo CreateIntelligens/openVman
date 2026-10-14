@@ -85,7 +85,28 @@
 
 2026-10-13 [正式環境實測](../plans/integration-capabilities-asr.md)已跑通 5 個批次及 3 個串流 ASR、兩專案知識庫對話，以及 IndexTTS／CosyVoice／Gemini／有效 VoxCPM 聲音。當時仍有過期聲音被列出、Edge 回 200 卻無音訊，以及 IP 入口憑證不匹配等問題；不能僅因 HTTP 200 或聲音在清單上便視為成功，仍需檢查非空音訊及可解碼性。此為當日狀態，排障時需重新驗證。
 
-ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。
+ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。`PUT /settings/my-asr-provider` 改的是帳號偏好，共用同一把 key 的所有機台會一起變，機台各自要不同引擎時請每次帶 `provider`／`engine`。
+
+重開一段對話不需要刪除：換一個新的 `session_id` 即可。刪除對話（`DELETE /api/v1/sessions/{id}`、`POST /api/v1/sessions/batch-delete`）需要專案編輯權，只有讀取授權的帳號會收到 403。
+
+## 錯誤與限流
+
+| 狀態碼 | 意思 |
+|---|---|
+| 401 | key 錯誤、過期、撤銷，或帳號停用 |
+| 403 | 帳號沒有這個資源或動作的權限（例如看得到專案但不能改、聲音不在授權或專案限制內） |
+| 404 | 專案、角色等資源不存在，或這個帳號看不到 |
+| 422 | 參數格式不對，例如不支援的引擎名稱 |
+| 429 | 超過每把 key 每分鐘的上限（部署設定 `API_KEY_RATE_LIMIT_PER_MINUTE`，預設 300），依 `Retry-After` 秒數後重試 |
+| 502／503 | 指定的上游引擎失敗或未設定 |
+
+錯誤 body 為 `{"detail": ...}`。多台機台共用一把 key 時共用同一個上限。
+
+## 瀏覽器前端直接呼叫（CORS）
+
+部署的 `CORS_ALLOWED_ORIGINS` 列出的網站，可以在瀏覽器裡用 `fetch` 帶 `Authorization: Bearer <key>` 直接呼叫；沒列出的網站會被瀏覽器擋下（預檢請求拿不到 `Access-Control-Allow-Origin`）。不支援 Cookie 跨網域。要使用請提供前端的完整來源（例如 `https://kiosk.example.com`）給部署方。每個外部網站的呼叫會依來源與 key 記錄。
+
+key 放在瀏覽器裡任何人都能從開發者工具取得，等同公開：請用專用帳號、只授權需要的專案與聲音，並在外洩時立刻撤銷重發。較安全的做法是由自家後端代理轉發，key 只留在伺服器。瀏覽器原生 WebSocket 不能自訂 Authorization 標頭，所以串流 ASR 仍需由後端代理連線，或改用批次辨識／瀏覽器內建辨識。
 
 ## 可直接執行的標準庫範例
 

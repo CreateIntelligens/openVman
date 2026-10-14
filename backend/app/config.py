@@ -336,6 +336,16 @@ class TTSRouterConfig(BaseSettings):
         default=0.6, gt=0, le=5, validation_alias="JEV_INTERRUPT_TIMEOUT_SECONDS",
     )
 
+    # 允許哪些網站的瀏覽器前端直接呼叫 API：逗號分隔的完整來源（https://a.example），
+    # 或 * 表示全部；留空不開放。不允許帶 cookie，跨網域只能用 Authorization 或
+    # X-Embed-Key，別的網站借不到使用者已登入的後台身分。
+    cors_allowed_origins: str = Field(default="", validation_alias="CORS_ALLOWED_ORIGINS")
+    # 每把帳號 API key 每分鐘最多幾個請求，超過回 429；0 表示不限。Embed key 有自己的額度。
+    # 預設 300：多台機台常共用一把 key，每輪對話約 ASR、chat 各 1 次加 TTS 1～數次。
+    api_key_rate_limit_per_minute: int = Field(
+        default=300, ge=0, validation_alias="API_KEY_RATE_LIMIT_PER_MINUTE",
+    )
+
     # --- 888a2a Agent-to-Agent Network ---
     a2a_enabled: bool = Field(
         default=False,

@@ -16,6 +16,7 @@ from .database import AuthDatabase
 from .model_provider_repository import ModelProviderRepository
 from .embed_keys_repository import EmbedKeyRepository
 from .project_policy_repository import ProjectPolicyRepository
+from .request_origins_repository import RequestOriginRepository
 from .resource_repository import ResourceRepository
 from .settings_repository import SystemSettingsRepository
 from .temporary_accounts_repository import TemporaryAccountRepository
@@ -40,11 +41,15 @@ class AuthRuntime:
     settings: SystemSettingsRepository
     model_providers: ModelProviderRepository
     project_policies: ProjectPolicyRepository
+    request_origins: RequestOriginRepository
     temporary_passwords: TemporaryPasswordCipher
     # 每個 runtime 各自一份，測試與重建 runtime 時不會共用失敗次數。
     password_verify_attempts: FailedAttemptLimiter = field(
         default_factory=FailedAttemptLimiter,
     )
+    # 開放 CORS 後 key 可能被放進瀏覽器，限流擋住失控的迴圈或被拿去濫用。
+    # 只放記憶體：backend 只跑一個 worker，重啟歸零可以接受。
+    api_key_requests: FailedAttemptLimiter | None = None
 
 
 def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
@@ -73,6 +78,15 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
             encryption_secret=config.model_provider_encryption_secret,
         ),
         project_policies=ProjectPolicyRepository(database),
+        request_origins=RequestOriginRepository(database),
+        api_key_requests=(
+            FailedAttemptLimiter(
+                max_failures=config.api_key_rate_limit_per_minute,
+                window_seconds=60.0,
+            )
+            if config.api_key_rate_limit_per_minute > 0
+            else None
+        ),
         tokens=tokens,
         temporary_passwords=TemporaryPasswordCipher(
             config.auth_temporary_password_secret or config.session_jwt_secret,

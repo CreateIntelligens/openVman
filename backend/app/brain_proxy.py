@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
@@ -267,13 +267,31 @@ async def _authorize_project_context(
         raise ResourceNotFoundError
 
     runtime = get_auth_runtime()
-    resolve_resource(
-        runtime.resources,
-        current.user,
-        ResourceType.PROJECT,
-        resolved_project_id,
-        access=_project_access(path, request.method),
-    )
+    access = _project_access(path, request.method)
+    try:
+        resolve_resource(
+            runtime.resources,
+            current.user,
+            ResourceType.PROJECT,
+            resolved_project_id,
+            access=access,
+        )
+    except ResourceNotFoundError:
+        # 看得到專案、只是不能改（例如一般帳號刪對話、改知識庫）就明說 403；
+        # 回 404 會讓串接方以為專案或對話不存在。看不到的專案照舊 404，不洩漏存在與否。
+        if access is not ResourceAccess.EDIT:
+            raise
+        resolve_resource(
+            runtime.resources,
+            current.user,
+            ResourceType.PROJECT,
+            resolved_project_id,
+            access=ResourceAccess.READ,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account cannot modify this project",
+        ) from None
     request.state.resolved_project_id = resolved_project_id
     return resolved_project_id
 

@@ -289,3 +289,31 @@ async def get_tts_providers(
 
     providers = await build_tts_provider_catalog(get_tts_config())
     return JSONResponse(content=providers)
+
+
+@router.get(
+    "/api/v1/admin/request-origins",
+    tags=["System"],
+    summary="外部網站呼叫紀錄（依來源網域與金鑰彙總）",
+)
+def list_request_origins(
+    limit: int = 200,
+    _root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> dict[str, Any]:
+    records = runtime.request_origins.list_recent(limit)
+    return {
+        "origins": [
+            {
+                "origin": r.origin,
+                "principal_type": r.principal_type,
+                "principal_id": r.principal_id,
+                "user_id": r.user_id,
+                "first_seen_at": r.first_seen_at,
+                "last_seen_at": r.last_seen_at,
+                "last_path": r.last_path,
+                "request_count": r.request_count,
+            }
+            for r in records
+        ],
+    }

@@ -367,3 +367,35 @@ def test_catchall_proxy_blocks_backups_prefix() -> None:
     for path in ("backups", "backups/sessions"):
         response = asyncio.run(proxy_to_brain(request, path, current=None))
         assert response.status_code == 404
+
+
+def test_readable_but_not_editable_project_says_403(monkeypatch) -> None:
+    # 2026-10-14：一般帳號刪對話回 404，串接方以為對話不存在；看得到的專案改成明說沒權限。
+    from datetime import datetime, timezone
+
+    from app.auth.models import ResourceType, ResourceVisibility
+    from app.auth.runtime import get_auth_runtime
+    from tests.api.test_main import _authenticated_client, _load_main
+
+    module, _ = _load_main(monkeypatch)
+    _authenticated_client(module)  # admin 建立並擁有 default 專案
+    user_client, _ = _authenticated_client(module, admin=False)
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("test-admin")
+    user = runtime.users.get_by_username("test-user")
+    runtime.resources.register(
+        resource_type=ResourceType.PROJECT, resource_id="hidden",
+        owner_user_id=admin.id, visibility=ResourceVisibility.PRIVATE,
+    )
+    with runtime.database.transaction(write=True) as connection:
+        connection.execute(
+            "INSERT INTO resource_grants(grantee_user_id, resource_type, resource_id,"
+            " granted_by, created_at) VALUES (?, 'project', 'default', ?, ?)",
+            (user.id, admin.id, datetime.now(timezone.utc).isoformat()),
+        )
+
+    granted = user_client.delete("/api/v1/sessions/s-1", params={"project_id": "default"})
+    hidden = user_client.delete("/api/v1/sessions/s-1", params={"project_id": "hidden"})
+
+    assert granted.status_code == 403
+    assert hidden.status_code == 404
