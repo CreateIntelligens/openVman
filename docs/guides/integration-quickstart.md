@@ -99,6 +99,8 @@
 
 要在知識庫沒有答案時改顯示固定拒答句，以 `no_answer: true` 判斷。沒查知識庫（例如打招呼、閒聊）時 `no_answer` 是 false、`answer_source` 是 `none`。網路搜尋與記憶的引用不算知識庫命中：專案開了網路搜尋時，只靠網路回答的一輪也是 `no_answer: true`。帶 `turn_id` 的可合併回合在 `POST /api/v1/chat/accept` 回應中有相同的值。
 
+`no_answer` 只在**完全沒檢索到任何段落**時為 true。知識庫檢索為了接住錯字與跨語言問法，門檻刻意放寬，沾到邊的段落也會被帶回來：例如在醫院專案問「火星上有幾座醫院？」會檢索到幾段院內服務的 QA（`answer_source: qa`、`no_answer: false`），但回答本身會說資料中沒有提到。2026-10-14 實測各 10 題相關／無關問題：天氣、股價、寫詩這類完全無關的都檢索不到（`no_answer: true`）；跟專案主題沾邊、但資料裡其實沒有答案的問題則可能是 false。要對這類情況也換成固定拒答句，請另外判斷回覆文字。
+
 ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。`PUT /settings/my-asr-provider` 改的是帳號偏好，共用同一把 key 的所有機台會一起變，機台各自要不同引擎時請每次帶 `provider`／`engine`。
 
 重開一段對話不需要刪除：換一個新的 `session_id` 即可。刪除對話（`DELETE /api/v1/sessions/{id}`、`POST /api/v1/sessions/batch-delete`）需要專案編輯權，只有讀取授權的帳號會收到 403。

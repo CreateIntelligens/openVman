@@ -603,7 +603,7 @@ Content-Type: application/json
 **回答來源**：三個欄位只看本輪 `tool_steps` 中 `search_knowledge`（含伺服器預查）的引用，網路與記憶的引用不算：
 * `answer_source`：`qa` = 至少一筆引用文件的 `.doc_meta.json` `source_type` 是 `qa`（QA CSV 匯入、QA 筆記）；`knowledge` = 有知識庫引用但都不是 QA；`none` = 沒有知識庫引用。
 * `knowledge_searched`：本輪有沒有呼叫 `search_knowledge`，不論結果或錯誤。
-* `no_answer`：`knowledge_searched` 且沒有知識庫引用。整合方可據此把回答換成固定拒答句；知識庫沒命中但網路搜尋有結果時也是 true。
+* `no_answer`：`knowledge_searched` 且沒有知識庫引用。整合方可據此把回答換成固定拒答句；知識庫沒命中但網路搜尋有結果時也是 true。只代表完全沒檢索到段落，沾邊但資料沒有答案的問題仍可能檢索到段落而為 false。
 `POST /brain/chat/accept` 由暫存的同一份 `tool_steps` 重算，與暫存回應相同。
 
 **可合併回合（`turn_id`）**：前台在等待回答時可把補充句合併重送：請求帶相同 `session_id`、`turn_id`（1–128 字）與遞增的 `turn_revision`。這類回答先暫存在 `sessions.db`，回應帶 `requires_accept: true`，尚未寫入對話、日誌或記憶；前台收到後呼叫 `POST /brain/chat/accept` 確認。版本已被取代、回合不存在或主體不符時回 `409 TURN_SUPERSEDED`。確認具冪等性，版本比對與寫入在同一個 SQLite 交易內完成。視覺事件（`metadata.ephemeral_user_message`）不支援這個流程。
