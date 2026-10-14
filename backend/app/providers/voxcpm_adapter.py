@@ -208,7 +208,12 @@ class VoxCPMAdapter:
             return await self._send_stream(form_data)
         except VoxCPMHTTPError as exc:
             # 還沒更新的節點不認得 sample_rate 會回 422：拿掉再要一次 48k，由呼叫端轉換。
-            if sample_rate is None or exc.status_code != 422:
+            # 只在錯誤點名 sample_rate 時才重送；其他 422（文字、聲音不對）重送也一樣錯。
+            if (
+                sample_rate is None
+                or exc.status_code != 422
+                or "sample_rate" not in exc.detail
+            ):
                 raise
             logger.info("voxcpm rejected sample_rate=%s; falling back to 48 kHz", sample_rate)
             form_data.pop("sample_rate", None)

@@ -387,7 +387,7 @@ class TestHealthGate:
         assert exc.value.status_code == 503
 
 
-def _recording_client(statuses):
+def _recording_client(statuses, error_body=b"unknown field sample_rate"):
     sent = []
 
     class FakeResponse:
@@ -398,7 +398,7 @@ def _recording_client(statuses):
             yield b"RIFF"
 
         async def aread(self):
-            return b"unknown field sample_rate"
+            return error_body
 
         async def aclose(self):
             pass
@@ -452,3 +452,16 @@ async def test_default_stream_does_not_send_sample_rate(monkeypatch):
     stream = await adapter.open_stream(SynthesizeRequest(text="你好"))
     [c async for c in stream]
     assert "sample_rate" not in sent[0]
+
+
+@pytest.mark.asyncio
+async def test_other_validation_errors_are_not_retried(monkeypatch):
+    # PR Agent 2026-10-14：422 也可能是別的欄位錯，那時重送只是多等一次、錯誤照舊。
+    adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+    client, sent = _recording_client([422, 200], error_body=b"reference_preset_id not found")
+    monkeypatch.setattr(httpx, "AsyncClient", client)
+
+    with pytest.raises(VoxCPMHTTPError) as exc_info:
+        await adapter.open_stream(SynthesizeRequest(text="你好"), sample_rate=16000)
+    assert exc_info.value.status_code == 422
+    assert len(sent) == 1
