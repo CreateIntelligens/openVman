@@ -5,6 +5,9 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+import shutil
+import struct
+import subprocess
 import sys
 import types
 import warnings
@@ -12,6 +15,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 from urllib.parse import urlencode
 
+import pytest
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
@@ -1824,3 +1828,169 @@ def test_turn_timing_needs_a_signed_in_account(monkeypatch):
     from fastapi.testclient import TestClient
 
     assert TestClient(module.app).post("/api/v1/metrics/turn", json=_turn_payload()).status_code == 401
+
+
+# --- /tts/stream format=pcm16k ----------------------------------------------
+
+PCM16K = "audio/l16;rate=16000;channels=1"
+
+
+def _pcm16k_client(monkeypatch, service, **config):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: service)
+    monkeypatch.setattr(
+        module.tts_routes,
+        "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024, **config),
+    )
+    monkeypatch.setattr("app.auth.voice_access.resolve_tts_voice", lambda *a, **kw: None)
+    client, _ = _authenticated_client(module)
+    return module, client
+
+
+def _gemini_service(chunks):
+    async def _open_stream(request):
+        async def _gen():
+            for chunk in chunks:
+                yield chunk
+        return _gen()
+
+    return types.SimpleNamespace(
+        gemini_adapter=types.SimpleNamespace(enabled=True, open_stream=_open_stream),
+        voxcpm_adapter=types.SimpleNamespace(enabled=False),
+        edge_adapter=types.SimpleNamespace(enabled=False),
+    )
+
+
+def _wav_bytes(pcm: bytes, rate: int, data_size: int | None = None) -> bytes:
+    fmt = struct.pack("<HHIIHH", 1, 1, rate, rate * 2, 2, 16)
+    size = len(pcm) if data_size is None else data_size
+    body = b"WAVE" + b"fmt " + struct.pack("<I", 16) + fmt + b"data" + struct.pack("<I", size) + pcm
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
+def _tiny_mp3() -> bytes:
+    return subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=0.5:sample_rate=24000",
+            "-ac", "1", "-f", "mp3", "pipe:1",
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
+
+
+def test_tts_stream_pcm16k_resamples_gemini_pcm(monkeypatch):
+    raw = b"\x10\x00" * 2400  # 0.1 s of 24 kHz
+    _, client = _pcm16k_client(
+        monkeypatch, _gemini_service([raw[:1], raw[1:777], raw[777:]]), tts_indextts_url="",
+    )
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={"text": "你好", "provider": "gemini-tts", "voice": "Kore", "format": "pcm16k"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PCM16K
+    assert len(response.content) == 1600 * 2
+
+
+def test_tts_stream_default_format_keeps_gemini_bytes(monkeypatch):
+    raw = b"\x10\x00\x20" * 100
+    _, client = _pcm16k_client(monkeypatch, _gemini_service([raw]), tts_indextts_url="")
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={"text": "你好", "provider": "gemini-tts", "voice": "Kore"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/l16;rate=24000;channels=1"
+    assert response.content == raw
+
+
+def test_tts_stream_pcm16k_strips_voxcpm_wav_header(monkeypatch):
+    wav = _wav_bytes(b"\x00\x01" * 4800, 48000, data_size=0xFFFFFFFF)
+
+    async def _open_stream(request):
+        async def _gen():
+            yield wav[:44]
+            yield wav[44:1001]
+            yield wav[1001:]
+        return _gen()
+
+    service = types.SimpleNamespace(
+        voxcpm_adapter=types.SimpleNamespace(enabled=True, open_stream=_open_stream),
+        edge_adapter=types.SimpleNamespace(enabled=False),
+    )
+    _, client = _pcm16k_client(monkeypatch, service)
+    response = client.post(
+        "/api/v1/tts/stream", json={"text": "你好", "provider": "voxcpm", "format": "pcm16k"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PCM16K
+    assert len(response.content) == 1600 * 2
+    assert b"RIFF" not in response.content
+
+
+def test_tts_stream_pcm16k_converts_indextts_proxy(monkeypatch):
+    from fastapi.responses import StreamingResponse
+
+    wav = _wav_bytes(b"\x00\x01" * 1600, 16000)
+
+    async def _proxy(**kwargs):
+        async def _gen():
+            yield wav
+        return StreamingResponse(_gen(), media_type="audio/wav")
+
+    module, client = _pcm16k_client(
+        monkeypatch, types.SimpleNamespace(voxcpm_adapter=types.SimpleNamespace(enabled=False)),
+    )
+    monkeypatch.setattr(module.tts_routes, "_proxy_indextts_stream", _proxy)
+    response = client.post(
+        "/api/v1/tts/stream", json={"text": "你好", "character": "hayley", "format": "pcm16k"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PCM16K
+    assert response.content == b"\x00\x01" * 1600
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed on this host")
+def test_tts_stream_pcm16k_decodes_edge_and_cosyvoice_mp3(monkeypatch):
+    mp3 = _tiny_mp3()
+
+    def _edge_stream(request):
+        async def _gen():
+            yield mp3[:100]
+            yield mp3[100:]
+        return _gen()
+
+    class Service:
+        voxcpm_adapter = types.SimpleNamespace(enabled=False)
+        edge_adapter = types.SimpleNamespace(enabled=True, synthesize_stream=_edge_stream)
+
+        def synthesize(self, request, provider="", edge_fallback_voice=""):
+            return types.SimpleNamespace(
+                result=types.SimpleNamespace(audio_bytes=mp3, content_type="audio/mpeg"),
+            )
+
+    _, client = _pcm16k_client(monkeypatch, Service(), tts_indextts_url="")
+    for provider in ("edge-tts", "cosyvoice"):
+        response = client.post(
+            "/api/v1/tts/stream",
+            json={"text": "你好", "provider": provider, "format": "pcm16k"},
+        )
+        assert response.status_code == 200, provider
+        assert response.headers["content-type"] == PCM16K
+        # 0.5 s 的 MP3 解成 16 kHz，加上編碼器頭尾 padding。
+        assert 7500 * 2 <= len(response.content) <= 9500 * 2
+
+
+def test_tts_stream_rejects_unknown_format(monkeypatch):
+    _, client = _pcm16k_client(monkeypatch, _gemini_service([b""]))
+    response = client.post(
+        "/api/v1/tts/stream", json={"text": "你好", "format": "pcm24k"},
+    )
+    assert response.status_code == 422

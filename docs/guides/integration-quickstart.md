@@ -77,7 +77,7 @@
 | 能力探索 | `GET /api/v1/me/capabilities` | 上述 JSON |
 | 批次辨識 | `POST /api/v1/asr/transcribe`；multipart `file`，選填 `project_id`、`provider`、`language_routes` | JSON `text`、實際 `provider`、`language` 等 |
 | 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `preferred_language`、`metadata.speech_language` | JSON `reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer` 等；通常會建立對話紀錄 |
-| 念回答 | `POST /api/v1/tts/stream`；JSON `text`，選填 `project_id`、`provider`、`voice`、`speech_language` | 音訊 bytes，以實際 `Content-Type` 判斷格式 |
+| 念回答 | `POST /api/v1/tts/stream`；JSON `text`，選填 `project_id`、`provider`、`voice`、`speech_language`、`format` | 音訊 bytes，以實際 `Content-Type` 判斷格式；`format=pcm16k` 時固定為 16 kHz raw PCM |
 
 選填 batch ASR `provider` 必須在已授權且已設定的 `asr.batch`。非批次引擎回 422、未授權回 403、未設定回 503；指定引擎失敗回 502，不備援、不讓台語分流改用其他辨識引擎。省略或空白時沿用帳號偏好、部署預設與既有備援，備援限授權候選及原部署預設相容例外。舊流程失敗可能仍回 HTTP 200，必須檢查非空 `provider`、有效 `text`，避免把「（音訊轉錄失敗）」當成問題送入 Chat。
 
@@ -149,6 +149,18 @@ python scripts/integration_client.py \
 TLS 預設驗證憑證與主機名；內部 CA 用 `--ca-file /path/to/internal-ca.pem`，不提供跳過驗證選項。HTTP 重新導向會被拒絕，請直接設定正確入口，避免將 Bearer token 轉送到其他位置。腳本收到錯誤只顯示狀態碼，不印可能含敏感資訊的上游錯誤 body。
 
 範例會依 MIME 將 `--output` 副檔名改成 `.wav`、`.mp3` 或 `.pcm`；檔案已存在時拒絕覆蓋，其他 MIME 與空音訊也拒絕保存。`/tts/stream` 名稱不保證內容一定分塊或一定是 PCM：VoxCPM 可為 WAV，Edge 為 MP3，Gemini 串流目前為 `audio/l16;rate=24000;channels=1` 的 **16-bit little-endian、單聲道 raw PCM**（本部署的位元序由 adapter 契約決定，不可只依 MIME 名稱猜測）。raw PCM 沒有檔頭，必須按實際 rate、channels、位元深度與位元序解碼或封裝成 WAV；不能直接將任意音訊 bytes 當成 AudioContext 可解碼檔案。
+
+### 固定輸出 16 kHz PCM（MatesX 建議）
+
+接 MatesX 等對嘴引擎時，請在 `/tts/stream` 的 JSON 加上 `"format": "pcm16k"`。不論實際走哪個引擎（含台語分流、引擎失敗後的備援、整段合成的 MP3），回應一律是**串流**的 16 kHz、單聲道、16-bit little-endian raw PCM，`Content-Type: audio/l16;rate=16000;channels=1`，每個 chunk 都是完整樣本（偶數 byte），可直接依序送進 MatesX，不必再自己判斷 WAV／MP3／24 kHz PCM。
+
+| `format` | 行為 |
+|---|---|
+| 省略或 `""` | 照引擎原樣回傳（本服務前台使用，行為不變） |
+| `"pcm16k"` | 轉成 16 kHz mono s16le raw PCM 串流 |
+| 其他值 | 422 |
+
+轉換在 Backend 端進行：24 kHz raw PCM 與 WAV 在程序內重採樣（濾波器狀態跨 chunk 保留，邊界不會爆音），MP3 交由 ffmpeg 邊收邊解碼。首包額外延遲約為：Gemini 5–9 ms、VoxCPM WAV 約 4 ms、16 kHz WAV 幾乎為 0、MP3 引擎（Edge、CosyVoice）80–100 ms。整段合成的引擎本來就要等全文合成完才有第一包，轉換不會讓它變成真正的邊合成邊播。標準庫範例可用 `--tts-format pcm16k` 試跑，輸出存成 `.pcm`。
 
 ## 串流辨識
 

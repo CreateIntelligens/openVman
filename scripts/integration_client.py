@@ -165,6 +165,8 @@ def parser():
     result.add_argument("--asr-provider", help="此請求的 batch ASR 引擎")
     result.add_argument("--tts-provider", help="此請求的 TTS provider")
     result.add_argument("--voice", help="已授權 voice_id；省略使用帳號預設")
+    result.add_argument("--tts-format", choices=["pcm16k"],
+                        help="pcm16k：不論引擎都回 16 kHz 單聲道 16-bit LE raw PCM（MatesX 建議）")
     result.add_argument("--output", type=Path, default=Path("reply"),
                         help="輸出路徑；副檔名依 Content-Type 決定，不覆蓋既有檔案")
     result.add_argument("--ca-file", help="內部 CA PEM；仍驗證 TLS 憑證與主機名")
@@ -206,6 +208,8 @@ def run(args, client):
         payload["provider"] = args.tts_provider
     if args.voice:
         payload["voice"] = args.voice
+    if args.tts_format:
+        payload["format"] = args.tts_format
     raw, headers = client.request(
         "/api/v1/tts/stream", body=json.dumps(payload).encode(),
         content_type="application/json",
@@ -217,8 +221,7 @@ def run(args, client):
     client.emit(f"Chat: {reply}")
     client.emit(f"音訊: {destination} ({content_type})")
     if is_pcm:
-        client.emit("raw PCM 無檔頭；依 Content-Type 的 rate/channels 與供應商位元序設定解碼。")
-        client.emit("目前 Gemini 串流為 24000 Hz、單聲道、16-bit little-endian。")
+        client.emit("raw PCM 無檔頭；依 Content-Type 的 rate/channels 解碼，位元序為 16-bit little-endian。")
 
 
 def main(argv=None):

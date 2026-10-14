@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, Response
@@ -31,6 +32,12 @@ from app.providers.voxcpm_adapter import (
 )
 from app.service import TTSRouterService
 from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
+from app.tts_pcm import (
+    PCM16K_CONTENT_TYPE,
+    PCM16K_FORMAT,
+    convert_to_pcm16k,
+    iter_bytes,
+)
 from app.tts_text import prepare_tts_text_async
 from app.usage_ledger_client import (
     UNIT_CHARS,
@@ -164,6 +171,30 @@ class TtsStreamRequest(BaseModel):
     # 這一輪使用者語音被 ASR 判成的語言；只有 "nan"（真的講台語）才換 VoxCPM。
     # 打字、快速問答、講華語都沒有這個值，照使用者選的 TTS。
     speech_language: str = ""
+    # 空字串＝照引擎原樣回傳（前台虛擬人依賴這個行為）；"pcm16k"＝不論引擎都轉成
+    # 16 kHz mono s16le raw PCM 串流，給 MatesX 等只吃這種格式的對嘴引擎。
+    format: Literal["", "pcm16k"] = ""
+
+
+def _stream_audio(
+    stream: AsyncIterator[bytes],
+    media_type: str,
+    output_format: str,
+) -> StreamingResponse:
+    if output_format == PCM16K_FORMAT:
+        return StreamingResponse(
+            convert_to_pcm16k(stream, media_type),
+            media_type=PCM16K_CONTENT_TYPE,
+        )
+    return StreamingResponse(stream, media_type=media_type)
+
+
+def _buffered_audio(result: NormalizedTTSResult, output_format: str) -> Response:
+    if output_format == PCM16K_FORMAT:
+        return _stream_audio(
+            iter_bytes(result.audio_bytes), result.content_type, output_format,
+        )
+    return Response(content=result.audio_bytes, media_type=result.content_type)
 
 
 async def _proxy_indextts_stream(
@@ -295,7 +326,7 @@ async def tts_stream_endpoint(
             except RuntimeError as exc:
                 return JSONResponse(status_code=502, content={"error": str(exc)})
             _meter_stream("gemini-tts")
-            return StreamingResponse(stream, media_type=GEMINI_STREAM_CONTENT_TYPE)
+            return _stream_audio(stream, GEMINI_STREAM_CONTENT_TYPE, body.format)
 
     # provider 未指定（auto）且沒有 IndexTTS 時，VoxCPM 是 fallback 鏈的第一站，
     # 直接走它的串流端點，否則 auto 會掉到整段合成的路徑，前端要等好幾秒。
@@ -311,7 +342,7 @@ async def tts_stream_endpoint(
                     SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope)
                 )
                 _meter_stream(VOXCPM_PROVIDER_NAME)
-                return StreamingResponse(stream, media_type=VOXCPM_STREAM_CONTENT_TYPE)
+                return _stream_audio(stream, VOXCPM_STREAM_CONTENT_TYPE, body.format)
             except (VoxCPMHTTPError, RuntimeError) as exc:
                 # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
                 logger.warning("tts_stream voxcpm error: %s", exc)
@@ -331,10 +362,7 @@ async def tts_stream_endpoint(
             )
         except RuntimeError as exc:
             return JSONResponse(status_code=502, content={"error": str(exc)})
-        return Response(
-            content=output.result.audio_bytes,
-            media_type=output.result.content_type,
-        )
+        return _buffered_audio(output.result, body.format)
 
     # Primary: proxy stream directly from IndexTTS — 只在沒指定或指定 IndexTTS 時。明確指定
     # Edge（或 VoxCPM 掛掉往下退）卻先送 IndexTTS，IndexTTS 沒在跑時會回 200 空音檔。
@@ -347,6 +375,10 @@ async def tts_stream_endpoint(
         )
         if proxied is not None:
             _meter_stream("indextts")
+            if body.format:
+                return _stream_audio(
+                    proxied.body_iterator, proxied.media_type or "audio/wav", body.format,
+                )
             return proxied
 
     svc = _get_service()
@@ -363,7 +395,7 @@ async def tts_stream_endpoint(
             SynthesizeRequest(text=cleaned, voice_hint=edge_voice, usage_scope=scope)
         )
         _meter_stream("edge-tts")
-        return StreamingResponse(stream, media_type="audio/mpeg")
+        return _stream_audio(stream, "audio/mpeg", body.format)
 
     # Fallback (buffered): 其餘 provider 仍走 service chain 一次性回傳。
     try:
@@ -377,4 +409,4 @@ async def tts_stream_endpoint(
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
-    return Response(content=output.result.audio_bytes, media_type=output.result.content_type)
+    return _buffered_audio(output.result, body.format)
