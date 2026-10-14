@@ -189,7 +189,7 @@ class VoxCPMAdapter:
             raise VoxCPMHTTPError(status_code=503, detail=f"Request failed: {exc}")
 
     async def open_stream(
-        self, request: SynthesizeRequest,
+        self, request: SynthesizeRequest, *, sample_rate: int | None = None,
     ) -> AsyncIterator[bytes]:
         """驗證第一個回應沒有錯誤後，回傳串流音訊 chunk 的 async iterator。
 
@@ -201,7 +201,20 @@ class VoxCPMAdapter:
         await self._ensure_healthy_async()
 
         form_data = self._build_stream_form(request)
+        if sample_rate is not None:
+            # 2026-10-14 起 GB10 節點可直接輸出 16 kHz WAV，省掉我們這端 48k→16k 的重採樣。
+            form_data["sample_rate"] = str(sample_rate)
+        try:
+            return await self._send_stream(form_data)
+        except VoxCPMHTTPError as exc:
+            # 還沒更新的節點不認得 sample_rate 會回 422：拿掉再要一次 48k，由呼叫端轉換。
+            if sample_rate is None or exc.status_code != 422:
+                raise
+            logger.info("voxcpm rejected sample_rate=%s; falling back to 48 kHz", sample_rate)
+            form_data.pop("sample_rate", None)
+            return await self._send_stream(form_data)
 
+    async def _send_stream(self, form_data: dict[str, str]) -> AsyncIterator[bytes]:
         client = httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS)
         req = client.build_request(
             "POST",

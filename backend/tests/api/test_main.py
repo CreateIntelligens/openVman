@@ -589,7 +589,7 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
 def test_tts_stream_voxcpm_streaming(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 
-    async def _mock_voxcpm_stream(req):
+    async def _mock_voxcpm_stream(req, **_kwargs):
         async def _gen():
             yield b"voxcpm-wav-header"
             yield b"voxcpm-pcm-chunk"
@@ -1212,7 +1212,7 @@ def test_tts_stream_voxcpm_failure_falls_back_to_edge(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     from app.providers.voxcpm_adapter import VoxCPMHTTPError
 
-    async def _failing_voxcpm_stream(req):
+    async def _failing_voxcpm_stream(req, **_kwargs):
         raise VoxCPMHTTPError(status_code=503, detail="gpu node down")
 
     def _edge_stream(req):
@@ -1278,7 +1278,7 @@ def test_tts_stream_explicit_edge_skips_indextts(monkeypatch):
 def test_tts_stream_auto_provider_streams_voxcpm_when_indextts_is_absent(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 
-    async def _mock_voxcpm_stream(req):
+    async def _mock_voxcpm_stream(req, **_kwargs):
         async def _gen():
             yield b"wav"
         return _gen()
@@ -1717,7 +1717,7 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
     class FakeVox:
         enabled = True
 
-        async def open_stream(self, request):
+        async def open_stream(self, request, **_kwargs):
             opened["voice"] = request.voice_hint
 
             async def _gen():
@@ -1849,7 +1849,7 @@ def _pcm16k_client(monkeypatch, service, **config):
 
 
 def _gemini_service(chunks):
-    async def _open_stream(request):
+    async def _open_stream(request, **_kwargs):
         async def _gen():
             for chunk in chunks:
                 yield chunk
@@ -1912,7 +1912,7 @@ def test_tts_stream_default_format_keeps_gemini_bytes(monkeypatch):
 def test_tts_stream_pcm16k_strips_voxcpm_wav_header(monkeypatch):
     wav = _wav_bytes(b"\x00\x01" * 4800, 48000, data_size=0xFFFFFFFF)
 
-    async def _open_stream(request):
+    async def _open_stream(request, **_kwargs):
         async def _gen():
             yield wav[:44]
             yield wav[44:1001]

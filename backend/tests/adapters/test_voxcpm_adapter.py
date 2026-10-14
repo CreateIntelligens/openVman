@@ -385,3 +385,70 @@ class TestHealthGate:
         with pytest.raises(VoxCPMHTTPError) as exc:
             await adapter.open_stream(SynthesizeRequest(text="你好"))
         assert exc.value.status_code == 503
+
+
+def _recording_client(statuses):
+    sent = []
+
+    class FakeResponse:
+        def __init__(self, status):
+            self.status_code = status
+
+        async def aiter_bytes(self):
+            yield b"RIFF"
+
+        async def aread(self):
+            return b"unknown field sample_rate"
+
+        async def aclose(self):
+            pass
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def build_request(self, method, url, data=None, headers=None):
+            return {"data": dict(data)}
+
+        async def send(self, req, stream=False):
+            sent.append(req["data"])
+            return FakeResponse(statuses[len(sent) - 1])
+
+        async def aclose(self):
+            pass
+
+    return FakeAsyncClient, sent
+
+
+@pytest.mark.asyncio
+async def test_open_stream_asks_voxcpm_for_16k(monkeypatch):
+    # 2026-10-14 GB10 起可直接輸出 16 kHz，format=pcm16k 時就不用我們這端重採樣。
+    adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+    client, sent = _recording_client([200])
+    monkeypatch.setattr(httpx, "AsyncClient", client)
+
+    stream = await adapter.open_stream(SynthesizeRequest(text="你好"), sample_rate=16000)
+    assert [c async for c in stream] == [b"RIFF"]
+    assert sent[0]["sample_rate"] == "16000"
+
+
+@pytest.mark.asyncio
+async def test_node_without_16k_support_falls_back_to_48k(monkeypatch):
+    adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+    client, sent = _recording_client([422, 200])
+    monkeypatch.setattr(httpx, "AsyncClient", client)
+
+    stream = await adapter.open_stream(SynthesizeRequest(text="你好"), sample_rate=16000)
+    assert [c async for c in stream] == [b"RIFF"]
+    assert "sample_rate" in sent[0] and "sample_rate" not in sent[1]
+
+
+@pytest.mark.asyncio
+async def test_default_stream_does_not_send_sample_rate(monkeypatch):
+    adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+    client, sent = _recording_client([200])
+    monkeypatch.setattr(httpx, "AsyncClient", client)
+
+    stream = await adapter.open_stream(SynthesizeRequest(text="你好"))
+    [c async for c in stream]
+    assert "sample_rate" not in sent[0]

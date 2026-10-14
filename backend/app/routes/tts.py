@@ -339,7 +339,9 @@ async def tts_stream_endpoint(
         if voxcpm.enabled:
             try:
                 stream = await voxcpm.open_stream(
-                    SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope)
+                    SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope),
+                    # 要 16 kHz 就請 VoxCPM 直接出，轉換器只需剝檔頭。
+                    sample_rate=16000 if body.format == "pcm16k" else None,
                 )
                 _meter_stream(VOXCPM_PROVIDER_NAME)
                 return _stream_audio(stream, VOXCPM_STREAM_CONTENT_TYPE, body.format)
