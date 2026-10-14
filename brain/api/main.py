@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from config import API_INTERNAL_PORT, get_settings
+from infra.client_disconnect import ClientDisconnectMiddleware
 from internal_routes import router as internal_router
 from routes.backups import router as backups_router
 from routes.chat import router as chat_router
@@ -75,6 +76,9 @@ for router in (
     app.include_router(router)
 
 app.middleware("http")(metrics_middleware)
+# 最後加的在最外層：要在 BaseHTTPMiddleware 吞掉斷線訊息之前先看到它，
+# /brain/chat 才能在用戶端離開時停止生成。
+app.add_middleware(ClientDisconnectMiddleware)
 
 if __name__ == "__main__":
     import uvicorn

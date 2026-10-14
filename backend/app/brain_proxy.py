@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncIterator, Awaitable
 import logging
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -24,6 +25,7 @@ from app.auth.resources import (
     resolve_resource,
 )
 from app.auth.runtime import get_auth_runtime
+from app.client_disconnect import wait_for_client_disconnect
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
 
@@ -152,6 +154,44 @@ _BACKEND_OWNED_PREFIXES = (
 )
 
 _http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
+
+# nginx 的慣例：用戶端先斷線、伺服器沒回應。對方已經不在，這個狀態碼只會進 log。
+CLIENT_CLOSED_REQUEST = 499
+
+_T = TypeVar("_T")
+
+
+class _ClientDisconnected(Exception):
+    """The caller hung up while Backend was still waiting on Brain."""
+
+
+async def _unless_client_gone(request: Request, work: Awaitable[_T]) -> _T:
+    """Await *work*, cancelling it as soon as the caller disconnects.
+
+    取消 httpx 的 send 會關掉往 Brain 的連線，Brain 看到斷線就停止生成；
+    不這樣做的話使用者打斷數位人後，Brain 仍把整輪 LLM 與工具跑完。
+    正常請求在 work 完成的當下就返回，不多等。
+    """
+    work_task = asyncio.ensure_future(work)
+    watch_task = asyncio.ensure_future(wait_for_client_disconnect(request))
+    try:
+        done, _ = await asyncio.wait(
+            {work_task, watch_task}, return_when=asyncio.FIRST_COMPLETED,
+        )
+        if work_task in done:
+            return work_task.result()
+        work_task.cancel()
+        await asyncio.wait({work_task})
+        # 取消前一刻剛好拿到回應時要把它關掉，連線才會還回連線池。
+        if not work_task.cancelled() and work_task.exception() is None:
+            late = work_task.result()
+            if isinstance(late, httpx.Response):
+                await late.aclose()
+        raise _ClientDisconnected
+    finally:
+        watch_task.cancel()
+        if not work_task.done():
+            work_task.cancel()
 
 
 def _filter_headers(headers: httpx.Headers | dict | Any) -> dict[str, str]:
@@ -379,14 +419,17 @@ async def proxy_to_brain(
     client = _http.get()
 
     try:
-        upstream = await client.send(
-            client.build_request(
-                method=request.method,
-                url=_target_url(path, request.url.query),
-                headers=headers,
-                content=body,
+        upstream = await _unless_client_gone(
+            request,
+            client.send(
+                client.build_request(
+                    method=request.method,
+                    url=_target_url(path, request.url.query),
+                    headers=headers,
+                    content=body,
+                ),
+                stream=True,
             ),
-            stream=True,
         )
         content_type = upstream.headers.get("content-type", "")
         resp_headers = _filter_headers(upstream.headers)
@@ -402,7 +445,7 @@ async def proxy_to_brain(
 
         # Non-streaming: read full body, close stream, return plain Response.
         try:
-            content = await upstream.aread()
+            content = await _unless_client_gone(request, upstream.aread())
         finally:
             await upstream.aclose()
 
@@ -412,6 +455,12 @@ async def proxy_to_brain(
             media_type=content_type or "application/json",
             headers=resp_headers,
         )
+    except _ClientDisconnected:
+        logger.info(
+            "client disconnected; closed brain request method=%s path=%s",
+            request.method, path,
+        )
+        return Response(status_code=CLIENT_CLOSED_REQUEST)
     except httpx.TimeoutException as exc:
         logger.warning("brain request timeout path=%s error=%s", path, exc)
         return JSONResponse(

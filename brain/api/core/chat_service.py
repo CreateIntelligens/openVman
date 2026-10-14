@@ -16,6 +16,7 @@ from core.agent_loop import (  # noqa: F401 (ToolPhaseError re-exported)
     ToolPhaseError,
     run_agent_loop,
 )
+from core.generation_cancel import current_cancel_event
 from core.llm_client import LLMEmptyReplyError, LLMReply, generate_chat_turn
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
@@ -134,6 +135,8 @@ def prepare_generation(
             available_tools=tuple(registered),
             config=cfg,
             turn_id=envelope.context.trace_id,
+            # 用戶端斷線時連同進行中的決策請求一起停，不等它跑完。
+            cancel_event=current_cancel_event(),
             capture_debug=decision_debug,
             preferred_language=preferred_language or "",
         )

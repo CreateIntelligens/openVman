@@ -140,6 +140,12 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 前台在等待回答時可把補充句合併重送：請求帶相同 `session_id`、`turn_id`（1–128 字）與遞增的 `turn_revision`。這類回答先暫存在 `sessions.db`，回應帶 `requires_accept: true`，尚未寫入對話、日誌或記憶。前台收到後呼叫 `POST /brain/chat/accept` 確認；版本已被取代、回合不存在或主體不符時回 `409 TURN_SUPERSEDED`。確認具冪等性，版本比對與寫入在同一個 SQLite 交易內完成。未帶 `turn_id` 的呼叫照常直接寫入；視覺事件不支援這個流程。
 
+### 用戶端斷線時停止生成
+
+`POST /brain/chat` 在生成期間監看 HTTP 連線（Backend 代理在用戶端中斷時會關掉往 Brain 的請求）。斷線時設下這個請求的取消旗標（`core/generation_cancel.py`，以 context var 傳進 `asyncio.to_thread` 與工具執行緒），生成在下一個安全點拋出 `GenerationCancelled`：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前；每輪決策的 `decide()` 也收到同一個 `cancel_event`，進行中的請求立刻放棄。已送出的 LLM 請求收不回來，只是不開下一步。取消時不挑附圖、不呼叫 `finalize_generation`／`stage_turn`，所以不寫對話、日誌、記憶，也不暫存可合併回合；回 499（用戶端已離開），記 `chat_cancelled` 事件（`trace_id`、`stage`、`tool_steps`、`llm_calls`、`elapsed_s`），不記成生成失敗。
+
+斷線偵測靠最外層的 `infra/client_disconnect.py` ASGI middleware：Starlette 的 `request.is_disconnected()` 在 `BaseHTTPMiddleware`（`metrics_middleware`）後面永遠是 false。Backend 有一份相同的程式碼（`backend/app/client_disconnect.py`），測試會比對兩份。
+
 ### 回答來源（`answer_source`）
 
 `POST /brain/chat` 與 `POST /brain/chat/accept` 的回應都有三個欄位，讓整合方決定要不要把回答換成固定的拒答句。只看本輪 `tool_steps` 裡 `search_knowledge` 的引用（含伺服器先查的那一筆）；`search_web`、`search_memory` 的引用、`filter_products` 與 `get_document` 都不算知識庫命中。可合併回合暫存與確認時從同一份 `tool_steps` 算出，兩次的值相同。

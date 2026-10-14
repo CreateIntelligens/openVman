@@ -608,6 +608,8 @@ Content-Type: application/json
 
 **可合併回合（`turn_id`）**：前台在等待回答時可把補充句合併重送：請求帶相同 `session_id`、`turn_id`（1–128 字）與遞增的 `turn_revision`。這類回答先暫存在 `sessions.db`，回應帶 `requires_accept: true`，尚未寫入對話、日誌或記憶；前台收到後呼叫 `POST /brain/chat/accept` 確認。版本已被取代、回合不存在或主體不符時回 `409 TURN_SUPERSEDED`。確認具冪等性，版本比對與寫入在同一個 SQLite 交易內完成。視覺事件（`metadata.ephemeral_user_message`）不支援這個流程。
 
+**用戶端斷線**：生成期間監看 HTTP 連線（最外層 `ClientDisconnectMiddleware` 記下 `http.disconnect`；`request.is_disconnected()` 在 `BaseHTTPMiddleware` 後面看不到斷線）。斷線時設定該請求的取消旗標，生成在下一個安全點停止：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（關掉 provider 串流）、每輪工具之前；每輪決策的 `decide()` 收到同一個 `cancel_event`，進行中的請求立刻放棄。已送出的 LLM 請求不會被中止，只是不開下一步。取消的回合不呼叫 `finalize_generation`／`stage_turn`：不寫對話、日誌、記憶，可合併回合也不暫存（之後的 accept 回 409）。回 499，記 `chat_cancelled`（`trace_id`、`stage`、`tool_steps`、`llm_calls`、`elapsed_s`），不計入生成失敗。
+
 **其他介面**：
 * `POST /internal/enrich`（不帶 `/brain` 前綴）：把 Gateway 產生的外部內容（視覺、檔案描述等）以 system 訊息寫入 session。
 * `POST /internal/decision`：Backend 以 `X-Internal-Token` 呼叫共用決策供應鏈；request 帶 `state`、`questions`、`purpose` 與 `timeout_seconds`（0–10 秒），最多 32 題；response 回 `answers`、實際 provider、hop 與 model。失敗回 503，呼叫端執行該功能的既有安全退路。

@@ -557,6 +557,54 @@ def test_prepare_generation_passes_the_language_hint_without_forcing_it(
     assert hinted.preferred_language == "en"
 
 
+def test_prepare_generation_lets_a_disconnect_cancel_the_turn_decision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+
+    from core.generation_cancel import bind_cancel_event
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    chat_service = _load_chat_service(monkeypatch)
+    decisions: list[dict] = []
+    monkeypatch.setattr(chat_service, "enforce_guardrails", lambda *args: None)
+    monkeypatch.setattr(chat_service, "enforce_session_limits", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        chat_service, "route_message",
+        lambda _message: RouteDecision(path="rag", skip_rag=False, skip_tools=False),
+    )
+    monkeypatch.setattr(
+        chat_service, "get_or_create_session",
+        lambda session_id, persona_id, project_id="default": SimpleNamespace(session_id=session_id),
+    )
+    monkeypatch.setattr(chat_service, "list_session_messages", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        chat_service, "get_tool_registry",
+        lambda: SimpleNamespace(build_openai_tools=lambda: []),
+    )
+    monkeypatch.setattr(chat_service, "without_disabled_recall", lambda decision, *args: decision)
+    monkeypatch.setattr("knowledge.kb_settings.primary_language", lambda project_id: "zh")
+    monkeypatch.setattr(
+        chat_service, "run_turn_decision",
+        lambda **kwargs: decisions.append(kwargs) or TurnDecision(
+            turn_id="t", policy=TurnPolicy(), source="baseline",
+        ),
+    )
+    monkeypatch.setattr(
+        chat_service, "build_chat_messages",
+        lambda **kwargs: [{"role": "user", "content": "ok"}],
+    )
+    event = threading.Event()
+
+    with bind_cancel_event(event):
+        chat_service.prepare_generation(_make_envelope(content="ok"))
+    chat_service.prepare_generation(_make_envelope(content="ok"))
+
+    # 決策鏈的請求要能隨用戶端斷線中途取消（decide 的 cancel_event）。
+    assert decisions[0]["cancel_event"] is event
+    assert decisions[1]["cancel_event"] is None
+
+
 def test_execute_generation_skips_tool_loop_for_direct_route(monkeypatch: pytest.MonkeyPatch) -> None:
     chat_service = _load_chat_service(monkeypatch)
     agent_loop = sys.modules["core.agent_loop"]

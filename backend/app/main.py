@@ -14,6 +14,7 @@ from app.auth.routes import (
     users_router,
 )
 from app.brain_proxy import router as brain_proxy_router
+from app.client_disconnect import ClientDisconnectMiddleware
 from app.config import get_tts_config
 from app.cors import record_request_origin
 from app.gateway import asr_stream as asr_stream_routes
@@ -43,6 +44,8 @@ app = FastAPI(title="openVman Backend", lifespan=lifespan)
 app.add_middleware(FailClosedAuthMiddleware)
 app.middleware("http")(http_metrics_middleware)
 app.middleware("http")(record_request_origin)
+# 最後加的在最外層：要在 BaseHTTPMiddleware 吞掉斷線訊息之前先看到它。
+app.add_middleware(ClientDisconnectMiddleware)
 app.state.openapi_builder = BackendOpenAPI(app)
 app.openapi = app.state.openapi_builder.schema
 

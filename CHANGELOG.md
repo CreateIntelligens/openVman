@@ -50,6 +50,8 @@
 
 ### Fixed
 
+- **[2026-10-14]** **用戶端中斷 `POST /api/v1/chat` 後不再把整輪跑完**：使用者打斷數位人、整合方 abort fetch 時，Backend 原本照樣等 Brain 回應，Brain 也看不到斷線，LLM、工具、每輪決策與寫入對話紀錄全部照跑，白花 token 與延遲預算。現在 Backend 代理在等 Brain（連線與讀取回應）期間發現用戶端離開，就關掉往 Brain 的請求並回 499（只記一行 log）；Brain 的 `/brain/chat` 收到斷線後設下取消旗標，生成在下一個安全點停止：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前，進行中的每輪決策請求也一併取消。已送出的那一次 LLM 請求收不回來，但不會再開下一步；答案在斷線後才出來時不挑附圖、不寫入。取消的回合不寫對話、日誌與記憶（帶 `turn_id` 的回合也不暫存），記 `chat_cancelled` 事件（`trace_id`、停在哪個階段 `stage`、已完成的工具步數與 LLM 呼叫次數），不算生成失敗。Starlette 的 `request.is_disconnected()` 在 `BaseHTTPMiddleware` 後面永遠是 false（兩個服務都有這種 middleware），因此兩邊各加一層最外層的 ASGI middleware（`ClientDisconnectMiddleware`）看原始 `receive` 的斷線訊息；兩份程式碼由測試保證一致。SSE 與正常回應不受影響，正常請求不多等。
+
 - **[2026-10-14]** **`no_answer` 看得出「檢索到了但其實沒有答案」**：正式機實測在醫院專案問「火星上有幾座醫院？」，檢索門檻刻意放寬而帶回幾段院內服務 QA，回答說資料中沒有提到，`no_answer` 卻是 false，整合方無法據此換成拒答句。相似度門檻切不乾淨（各 10 題實測，相關最低 0.711、無關最高 0.719），改為有引用時再以決策鏈問一題「回覆是不是在說查不到」（purpose `no_answer`，預設逾時 0.8 秒，`NO_ANSWER_JUDGE_ENABLED` 可關；後台斷路器標為「查無答案判斷」），判斷失敗照舊只看引用。10 句中英文真實回覆實測全對，每句約 0.12 秒。
 
 - **[2026-10-14]** **Edge TTS 恢復可用**：微軟改了 Edge 朗讀服務的連線驗證，edge-tts 7.2.8 連線一律回 403（`WSServerHandshakeError`），不論有沒有專案限制都合成失敗，連帶其他 TTS 失敗時的 Edge 保底也失效。`backend/requirements.txt` 改為 `edge-tts>=7.3.1,<8`；同一段文字 7.2.8 回 403、7.3.1 正常產生音訊（2026-10-14 實測）。為了下次不必等現場沒聲音才發現：Backend 每 `TTS_EDGE_PROBE_INTERVAL_SECONDS`（預設 1800 秒）試念一句，結果與已安裝版本放在 `GET /healthz` 的 `dependencies.edge-tts`（失敗時整體狀態為 degraded），並輸出 Prometheus 指標 `vman_edge_tts_up`；Dockerfile 最後一層每次建置都以 `EDGE_TTS_REFRESH`（CI 帶 run id）略過快取、裝最新的 `edge-tts<8`。CI 只在 backend 檔案有變時重建，Edge 再壞時手動執行 Docker Publish 即可（見 `docs/operations/11_DEPLOYMENT.md`）。

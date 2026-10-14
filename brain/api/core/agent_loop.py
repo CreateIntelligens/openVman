@@ -12,6 +12,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Callable
 
 from config import get_settings
+from core.generation_cancel import raise_if_cancelled
 from core.llm_client import (
     REQUIRE_ANY_TOOL,
     LLMEmptyReplyError,
@@ -389,6 +390,7 @@ def _run_tool_phase(
             )
             _notify_tool_round(on_tool_round, tool_steps)
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
+            raise_if_cancelled(f"llm_round_{iteration}", tool_steps=len(tool_steps))
             current_forced = first_forced if iteration == 0 else None
             if iteration == 0:
                 current_tools = (later_tools or None) if prefetch else tools
@@ -530,6 +532,7 @@ def _append_tool_turns(
     *,
     round_index: int = 0,
 ) -> None:
+    raise_if_cancelled(f"tool_round_{round_index}", tool_steps=len(tool_steps))
     working_messages.append(_assistant_tool_message(turn))
     steps = _execute_tool_calls(turn.tool_calls)
     # 同一輪的工具是平行跑的：標上輪次讓前端把它們合成一組，耗時取最大值而不是相加。

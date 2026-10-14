@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 
 from core.chat_service import (
     execute_generation,
@@ -15,6 +17,12 @@ from core.chat_service import (
     reply_media,
 )
 from core.chat_turns import accept_turn, register_turn, stage_turn
+from core.decision_router import DecisionProviderCancelled
+from core.generation_cancel import (
+    GenerationCancelled,
+    bind_cancel_event,
+    raise_if_cancelled,
+)
 from core.llm_client import LLMEmptyReplyError
 from core.reply_modes import DEFAULT_MODE, available_modes
 from core.slash_command import try_rewrite_slash
@@ -22,7 +30,8 @@ from core.sse_events import (
     build_exception_protocol_error,
     build_protocol_error,
 )
-from core.usage import summarize_collected, usage_scope
+from core.usage import UsageScope, summarize_collected, usage_scope
+from infra.client_disconnect import wait_for_client_disconnect
 from protocol.history import serialize_history_messages
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
@@ -117,48 +126,98 @@ def _handle_generation_error(exc: Exception, action: str, request: Request) -> N
     raise HTTPException(status_code=502, detail=error_payload) from exc
 
 
+# nginx 的慣例：用戶端先斷線。對方已經不在，這個狀態碼只會進 log。
+_CLIENT_CLOSED_REQUEST = 499
+
+
+async def _cancel_on_disconnect(request: Request, cancel_event: threading.Event) -> None:
+    await wait_for_client_disconnect(request)
+    cancel_event.set()
+
+
+def _log_chat_cancelled(
+    request: Request,
+    payload: ChatRequest,
+    exc: Exception,
+    *,
+    context: Any,
+    scope: UsageScope | None,
+    started: float,
+) -> None:
+    if isinstance(exc, GenerationCancelled):
+        stage, tool_steps = exc.stage, exc.tool_steps
+    elif isinstance(exc, DecisionProviderCancelled):
+        stage, tool_steps = "turn_decision", 0
+    else:
+        stage, tool_steps = f"error:{type(exc).__name__}", 0
+    log_event(
+        "chat_cancelled",
+        trace_id=(
+            getattr(context, "trace_id", "")
+            or getattr(request.state, "trace_id", "")
+        ),
+        session_id=payload.session_id or "",
+        project_id=payload.project_id or "default",
+        turn_id=payload.turn_id or "",
+        stage=stage,
+        tool_steps=tool_steps,
+        llm_calls=len(scope.collected) if scope is not None else 0,
+        elapsed_s=round(time.monotonic() - started, 2),
+    )
+
+
 @router.post("/chat", summary="非串流對話")
 async def chat(request: Request, payload: ChatRequest):
+    # 用戶端斷線（數位人被打斷、整合方 abort fetch）就停止生成：不再開下一次 LLM
+    # 呼叫或工具輪，也不寫對話紀錄。已送出的那一次 LLM 請求收不回來。
+    t0 = time.monotonic()
+    cancel_event = threading.Event()
+    watcher = asyncio.create_task(_cancel_on_disconnect(request, cancel_event))
+    context: Any = None
+    scope: UsageScope | None = None
     try:
-        t0 = time.monotonic()
-        if payload.turn_id is not None:
-            await asyncio.to_thread(register_turn, request, payload)
-        logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
+        with bind_cancel_event(cancel_event):
+            if payload.turn_id is not None:
+                await asyncio.to_thread(register_turn, request, payload)
+            logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
 
-        # 用量歸屬：prepare 階段（recall 摘要、query expansion）也會呼叫 LLM，
-        # 所以 scope 要在 prepare 之前開，拿到正式 context 後再補齊 id。
-        with usage_scope(
-            kind="chat",
-            user_id=request.headers.get(USER_ID_HEADER, ""),
-            role=request.headers.get(USER_ROLE_HEADER, ""),
-            principal_type=request.headers.get(PRINCIPAL_TYPE_HEADER, "") or "user",
-            principal_id=(
-                request.headers.get(PRINCIPAL_ID_HEADER, "")
-                or request.headers.get(USER_ID_HEADER, "")
-            ),
-            project_id=payload.project_id or "default",
-            session_id=payload.session_id or "",
-            persona_id=payload.persona_id or "default",
-        ) as scope:
-            context = await asyncio.to_thread(_prepare_chat_context, request, payload)
-            scope.project_id = context.project_id
-            scope.session_id = context.session_id
-            scope.persona_id = context.persona_id
-            scope.trace_id = context.trace_id
-            scope.channel = str(context.request_context.get("channel", ""))
-            result = await asyncio.to_thread(execute_generation, context)
-            media = await asyncio.to_thread(reply_media, context, result.tool_steps)
-        response_time_s = round(time.monotonic() - t0, 2)
-        if payload.turn_id is not None:
-            response = await asyncio.to_thread(
-                stage_turn, request, payload, context,
-                result.reply, result.tool_steps, response_time_s, media,
-            )
-        else:
-            response = finalize_generation(
-                context, result.reply, result.tool_steps, response_time_s,
-                media=media,
-            )
+            # 用量歸屬：prepare 階段（recall 摘要、query expansion）也會呼叫 LLM，
+            # 所以 scope 要在 prepare 之前開，拿到正式 context 後再補齊 id。
+            with usage_scope(
+                kind="chat",
+                user_id=request.headers.get(USER_ID_HEADER, ""),
+                role=request.headers.get(USER_ROLE_HEADER, ""),
+                principal_type=request.headers.get(PRINCIPAL_TYPE_HEADER, "") or "user",
+                principal_id=(
+                    request.headers.get(PRINCIPAL_ID_HEADER, "")
+                    or request.headers.get(USER_ID_HEADER, "")
+                ),
+                project_id=payload.project_id or "default",
+                session_id=payload.session_id or "",
+                persona_id=payload.persona_id or "default",
+            ) as scope:
+                context = await asyncio.to_thread(_prepare_chat_context, request, payload)
+                scope.project_id = context.project_id
+                scope.session_id = context.session_id
+                scope.persona_id = context.persona_id
+                scope.trace_id = context.trace_id
+                scope.channel = str(context.request_context.get("channel", ""))
+                result = await asyncio.to_thread(execute_generation, context)
+                # 最後一次 LLM 呼叫可能在斷線後才跑完；答案沒人收就不挑圖、不寫紀錄。
+                raise_if_cancelled("reply_media", tool_steps=len(result.tool_steps))
+                media = await asyncio.to_thread(reply_media, context, result.tool_steps)
+            raise_if_cancelled("persist", tool_steps=len(result.tool_steps))
+            response_time_s = round(time.monotonic() - t0, 2)
+            if payload.turn_id is not None:
+                response = await asyncio.to_thread(
+                    stage_turn, request, payload, context,
+                    result.reply, result.tool_steps, response_time_s, media,
+                )
+            else:
+                response = finalize_generation(
+                    context, result.reply, result.tool_steps, response_time_s,
+                    media=media,
+                )
         if _decision_debug_requested(request, payload) and context.turn_decision is not None:
             # Added after stage_turn: never persist emotional diagnostics in the delivery payload.
             response["decision_debug"] = context.turn_decision.to_debug_payload()
@@ -171,8 +230,17 @@ async def chat(request: Request, payload: ChatRequest):
         return response
     except HTTPException:
         raise
+    except (GenerationCancelled, DecisionProviderCancelled) as exc:
+        _log_chat_cancelled(request, payload, exc, context=context, scope=scope, started=t0)
+        return Response(status_code=_CLIENT_CLOSED_REQUEST)
     except Exception as exc:
+        if cancel_event.is_set():
+            # 斷線後才冒出的錯誤（例如串流被關掉）是取消的結果，不算生成失敗。
+            _log_chat_cancelled(request, payload, exc, context=context, scope=scope, started=t0)
+            return Response(status_code=_CLIENT_CLOSED_REQUEST)
         _handle_generation_error(exc, "chat", request)
+    finally:
+        watcher.cancel()
 
 
 @router.post("/chat/accept", summary="確認接收可合併回合的回答")

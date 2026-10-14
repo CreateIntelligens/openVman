@@ -18,6 +18,11 @@ from core.fallback_chain import (
     has_admin_api_key,
     health_id,
 )
+from core.generation_cancel import (
+    GenerationCancelled,
+    is_cancelled,
+    raise_if_cancelled,
+)
 from core.key_pool import (
     FAILURE_AUTH_FORBIDDEN,
     FAILURE_AUTH_INVALID,
@@ -214,6 +219,8 @@ def stream_chat_turn(
     errors: list[str] = []
     last_reason = ""
     for hop in chain:
+        # 用戶端已離開就不再換下一站重試。
+        raise_if_cancelled("llm_call")
         t0 = _now_ms()
         client = _get_sync_client(hop.api_key, hop.base_url)
         try:
@@ -240,7 +247,7 @@ def stream_chat_turn(
                 chain_length=len(chain),
             )
             return reply
-        except ValueError:
+        except (ValueError, GenerationCancelled):
             raise
         except Exception as exc:
             last_reason = _record_hop_failure(hop, exc, _now_ms() - t0, chain, errors, tid)
@@ -378,6 +385,7 @@ def _create_sync_completion(
         create_kwargs["max_tokens"] = max_tokens
 
     for hop in chain:
+        raise_if_cancelled("llm_call")
         t0 = _now_ms()
         client = _get_sync_client(hop.api_key, hop.base_url)
         try:
@@ -467,6 +475,7 @@ def _try_routes_sync(
         create_kwargs["max_tokens"] = max_tokens
     provider = str(getattr(cfg, "llm_provider", "") or "")
     for route in routes:
+        raise_if_cancelled("llm_call")
         client = _get_sync_client(route.api_key, route.base_url)
         t0 = _now_ms()
         try:
@@ -503,6 +512,12 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
     usage: LLMUsage | None = None
 
     for chunk in stream:
+        if is_cancelled():
+            # 關掉串流會中斷與 provider 的連線，剩下的 token 不再生成。
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()
+            raise GenerationCancelled("llm_stream")
         # include_usage 時最後一個 chunk 只有 usage、choices 為空。
         chunk_usage = usage_from_response(getattr(chunk, "usage", None))
         if chunk_usage is not None:
@@ -569,6 +584,7 @@ def _stream_routes(
     errors: list[str] = []
     provider = str(getattr(cfg, "llm_provider", "") or "")
     for route in routes:
+        raise_if_cancelled("llm_call")
         client = _get_sync_client(route.api_key, route.base_url)
         t0 = _now_ms()
         try:
@@ -585,7 +601,7 @@ def _stream_routes(
             router.mark_success(route.api_key)
             _record_llm_usage(provider, route.model, reply.usage, _now_ms() - t0)
             return reply
-        except ValueError:
+        except (ValueError, GenerationCancelled):
             raise
         except Exception as exc:
             router.mark_failure(route.api_key, route.model, exc)

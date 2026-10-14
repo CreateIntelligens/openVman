@@ -101,6 +101,12 @@
 
 `no_answer` 有兩種情況會是 true：完全沒檢索到任何段落；或檢索到了段落，但回覆本身在說資料裡沒有答案。知識庫檢索為了接住錯字與跨語言問法，門檻刻意放寬，沾到邊的段落也會被帶回來，例如在醫院專案問「火星上有幾座醫院？」會檢索到院內服務的 QA。所以有引用時，後端會再請決策模型看一次回覆，判斷它是不是在說查不到（每輪約多 0.1–0.2 秒；判斷逾時或失敗時只看有沒有引用）。2026-10-14 實測 10 句真實回覆（中英文、答出來與查不到各半）全對。這時 `answer_source` 仍照實標出檢索到的是 QA 或一般文件。
 
+### 打斷對話
+
+使用者打斷數位人時，直接中斷 `POST /api/v1/chat` 的 HTTP 請求（瀏覽器 `AbortController.abort()`、HTTP 用戶端關閉連線）即可。Backend 發現連線斷了就關掉往 Brain 的請求，Brain 不再開始下一次 LLM 呼叫或下一輪工具，也不寫入這一輪。已送給模型的那一次請求收不回來，所以中斷後仍可能有幾秒的模型用量。你不會收到回應；Backend 的 log 會記成 499。
+
+不帶 `turn_id` 時，中斷與寫入可能同時發生：Brain 已經寫完對話、回應還在路上時才中斷，這一輪仍會留在對話紀錄裡。要讓被打斷的回合確定不進紀錄，請每輪帶 `turn_id` 與 `turn_revision`，只在真的播出回答後呼叫 `POST /api/v1/chat/accept`；沒有 accept 的回合不會寫入對話、日誌或記憶。
+
 ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。`PUT /settings/my-asr-provider` 改的是帳號偏好，共用同一把 key 的所有機台會一起變，機台各自要不同引擎時請每次帶 `provider`／`engine`。
 
 重開一段對話不需要刪除：換一個新的 `session_id` 即可。刪除對話（`DELETE /api/v1/sessions/{id}`、`POST /api/v1/sessions/batch-delete`）需要專案編輯權，只有讀取授權的帳號會收到 403。
