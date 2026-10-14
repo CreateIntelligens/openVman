@@ -632,3 +632,36 @@ def test_fail_closed_middleware_ignores_query_tokens_and_enforces_csrf(runtime):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert bearer.status_code == 200
+
+
+def test_account_list_survives_an_account_with_only_asr_grants(client, runtime):
+    # 2026-10-14 正式機：4 個帳號只被授權辨識引擎，讀取時用寫入規則（專案、人物、聲音
+    # 至少各一）驗證，GET /api/v1/users 整個 500，後台帳號頁打不開。
+    from datetime import datetime, timezone
+
+    from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+    from app.auth.passwords import hash_password
+
+    admin = _bootstrap_admin(runtime)
+    headers = {"Authorization": f"Bearer {_login(client, admin.username, _ADMIN_PASSWORD)['token']}"}
+    partial = runtime.users.create(
+        username="asr-only", password_hash=hash_password(_USER_PASSWORD), role=AccountRole.USER,
+        created_by=admin.id,
+    )
+    runtime.resources.register(
+        resource_type=ResourceType.ASR_ENGINE, resource_id="breeze",
+        owner_user_id=None, visibility=ResourceVisibility.SYSTEM_PUBLIC,
+    )
+    with runtime.database.transaction(write=True) as connection:
+        connection.execute(
+            "INSERT INTO resource_grants(grantee_user_id, resource_type, resource_id, granted_by,"
+            " created_at) VALUES (?, 'asr_engine', 'breeze', ?, ?)",
+            (partial.id, admin.id, datetime.now(timezone.utc).isoformat()),
+        )
+
+    response = client.get("/api/v1/users", headers=headers)
+
+    assert response.status_code == 200
+    row = next(u for u in response.json() if u["id"] == partial.id)
+    assert row["grants"]["asr_engines"] == ["breeze"]
+    assert row["grants"]["projects"] == []

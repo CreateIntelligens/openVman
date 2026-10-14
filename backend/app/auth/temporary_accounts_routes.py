@@ -18,6 +18,7 @@ from .repository_errors import InvalidResourceGrantError, UserNotFoundError
 from .routes import (
     AccountDefaultsProfile,
     AccountResourceGrants,
+    AccountResourceGrantsView,
     ResourceGrantProfile,
     _StrictModel,
     _defaults_tuple,
@@ -93,7 +94,7 @@ class TemporaryBatchAudit(_StrictModel):
     first_used_at: str | None
     expires_at: str | None
     account_count: int
-    grants: AccountResourceGrants
+    grants: AccountResourceGrantsView
     defaults: AccountDefaultsProfile
     accounts: list[TemporaryAccountAudit]
     admin_portal_access: bool
@@ -190,7 +191,7 @@ def _temporary_batch_audit(
         first_used_at=min(first_used_values) if first_used_values else None,
         expires_at=max(expires_values) if expires_values else None,
         account_count=len(accounts),
-        grants=AccountResourceGrants.from_records(first_account.grants),
+        grants=AccountResourceGrantsView.from_records(first_account.grants),
         defaults=AccountDefaultsProfile.from_record(first_account.defaults),
         accounts=accounts,
         admin_portal_access=first_account.user.admin_portal_access,

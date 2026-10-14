@@ -98,20 +98,26 @@ class AccountDefaultsProfile(_StrictModel):
         )
 
 
-class AccountResourceGrants(_StrictModel):
-    projects: list[str] = Field(min_length=1)
-    avatar_characters: list[str] = Field(min_length=1)
-    custom_voices: list[str] = Field(min_length=1)
+class AccountResourceGrantsView(_StrictModel):
+    """Grants as stored, for reading.
+
+    讀取不檢查「專案、人物、聲音至少各一」：資料庫裡可能有只被授權辨識引擎的帳號
+    （2026-10-14 正式機有 4 個），用寫入規則驗證讀出來的資料會讓整個帳號列表 500、
+    後台帳號頁打不開。
+    """
+
+    projects: list[str] = Field(default_factory=list)
+    avatar_characters: list[str] = Field(default_factory=list)
+    custom_voices: list[str] = Field(default_factory=list)
     avatar_mascots: list[str] = Field(default_factory=list)
     avatar_backgrounds: list[str] = Field(default_factory=list)
-    # 不設 min_length：沒授權任何引擎就是「只能用預設值」，是合法狀態。
     asr_engines: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_records(
         cls,
         records: tuple[ResourceGrantRecord, ...],
-    ) -> AccountResourceGrants:
+    ) -> "AccountResourceGrantsView":
         values: dict[ResourceType, list[str]] = {
             ResourceType.PROJECT: [],
             ResourceType.AVATAR_CHARACTER: [],
@@ -171,6 +177,18 @@ def _defaults_tuple(
     )
 
 
+
+
+class AccountResourceGrants(AccountResourceGrantsView):
+    """Grants as written: an account must get at least one project, character and voice."""
+
+    projects: list[str] = Field(min_length=1)
+    avatar_characters: list[str] = Field(min_length=1)
+    custom_voices: list[str] = Field(min_length=1)
+    avatar_mascots: list[str] = Field(default_factory=list)
+    avatar_backgrounds: list[str] = Field(default_factory=list)
+    # 不設 min_length：沒授權任何引擎就是「只能用預設值」，是合法狀態。
+    asr_engines: list[str] = Field(default_factory=list)
 
 class AccountProfile(_StrictModel):
     id: str
@@ -234,7 +252,7 @@ class AccountProfile(_StrictModel):
 
 class AdminAccountProfile(AccountProfile):
     resource_counts: dict[str, int]
-    grants: AccountResourceGrants | None
+    grants: AccountResourceGrantsView | None
 
     @classmethod
     def from_record(
@@ -247,7 +265,7 @@ class AdminAccountProfile(AccountProfile):
             **AccountProfile.from_record(user, runtime=runtime).model_dump(),
             resource_counts=runtime.resources.count_private_by_owner(user.id),
             grants=(
-                AccountResourceGrants.from_records(grant_records)
+                AccountResourceGrantsView.from_records(grant_records)
                 if grant_records
                 else None
             ),
