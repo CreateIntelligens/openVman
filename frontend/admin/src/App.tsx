@@ -91,6 +91,7 @@ function AppContent() {
   const canLoadPage = projects.some((project) => project.project_id === projectId)
     || route.tab === "Projects"
     || route.tab === "Accounts"
+    || route.tab === "AccessGraph"
     || route.tab === "ModelProviders";
 
   const applyRoute = useCallback(
@@ -195,7 +196,8 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
-  const requiresAdmin = (route.tab === "Accounts" && !isApiKeys);
+  const requiresAdmin = (route.tab === "Accounts" && !isApiKeys)
+    || route.tab === "AccessGraph";
   if ((requiresAdmin && !isAdmin) || (route.tab === "ModelProviders" && access !== "root")) {
     return <ForbiddenState />;
   }
@@ -284,7 +286,7 @@ function AppContent() {
           </div>
         </main>
 
-        {route.tab !== "Accounts" && <MascotWidget />}
+        {route.tab !== "Accounts" && route.tab !== "AccessGraph" && <MascotWidget />}
       </div>
     </NavigationProvider>
   );

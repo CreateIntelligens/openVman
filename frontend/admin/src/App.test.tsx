@@ -150,6 +150,14 @@ describe("App tab mounting", () => {
     expect(screen.queryByTestId("tab-api-keys")).toBeNull();
   });
 
+  it("forbids the access graph to ordinary users", async () => {
+    vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
+    window.history.replaceState(null, "", "/admin/access-graph");
+    render(<App />);
+    expect(await screen.findByText("權限不足")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /權限圖譜/ })).toBeNull();
+  });
+
   it("opens API key management from the mobile drawer", async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "開啟導覽" }));

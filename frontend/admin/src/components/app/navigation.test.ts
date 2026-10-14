@@ -122,3 +122,17 @@ describe("model-provider administration route", () => {
     expect(isTabVisible(tab!, "user")).toBe(false);
   });
 });
+
+describe("access graph route", () => {
+  it("sits next to account management and is hidden from plain users", () => {
+    const keys = allTabs.map((item) => item.key);
+    expect(keys.indexOf("AccessGraph")).toBe(keys.indexOf("Accounts") + 1);
+    expect(buildAdminPath("AccessGraph")).toBe("/admin/access-graph");
+    expect(parseAdminRoute("/admin/access-graph")).toEqual({ tab: "AccessGraph" });
+
+    const tab = allTabs.find((item) => item.key === "AccessGraph")!;
+    expect(isTabVisible(tab, "root")).toBe(true);
+    expect(isTabVisible(tab, "admin")).toBe(true);
+    expect(isTabVisible(tab, "user")).toBe(false);
+  });
+});

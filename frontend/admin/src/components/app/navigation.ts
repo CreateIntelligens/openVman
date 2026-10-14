@@ -23,6 +23,7 @@ export const knowledgeTabs = [
 export const systemTabs = [
   { key: "Projects", label: "專案管理", icon: "folder_copy" },
   { key: "Accounts", label: "帳號管理", icon: "manage_accounts" },
+  { key: "AccessGraph", label: "權限圖譜", icon: "hub" },
   { key: "EmbedKeys", label: "Embed 金鑰", icon: "key" },
   { key: "ModelProviders", label: "模型供應商", icon: "neurology" },
   { key: "Usage", label: "用量", icon: "data_usage" },
@@ -59,6 +60,7 @@ export const pageComponents: Record<
   Tools: lazy(() => import("../../pages/Tools")),
   Projects: lazy(() => import("../../pages/Projects")),
   Accounts: lazy(() => import("../../pages/Accounts")),
+  AccessGraph: lazy(() => import("../../pages/AccessGraph")),
   EmbedKeys: lazy(() => import("../../pages/EmbedKeys")),
   ModelProviders: lazy(() => import("../../pages/ModelProviders")),
   Usage: lazy(() => import("../../pages/Usage")),
@@ -79,6 +81,7 @@ const tabPathSegments: Record<Tab, string> = {
   Tools: "tools",
   Projects: "projects",
   Accounts: "accounts",
+  AccessGraph: "access-graph",
   EmbedKeys: "embed-keys",
   ModelProviders: "model-providers",
   Usage: "usage",
@@ -137,7 +140,7 @@ export function isTab(value: string | null): value is Tab {
 
 export type TabAccess = "user" | "admin" | "root";
 
-const ADMIN_ONLY_TABS = new Set<Tab>(["Accounts", "EmbedKeys"]);
+const ADMIN_ONLY_TABS = new Set<Tab>(["Accounts", "AccessGraph", "EmbedKeys"]);
 // 全站共用的模型順序與金鑰：只管部分專案的 admin 不能動。
 const ROOT_ONLY_TABS = new Set<Tab>(["ModelProviders"]);
 

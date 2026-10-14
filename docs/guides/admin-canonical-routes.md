@@ -20,6 +20,7 @@
 | 工具與技能 | `/admin/tools` |
 | 專案管理 | `/admin/projects` |
 | 帳號管理 | `/admin/accounts` |
+| 權限圖譜（admin／ROOT） | `/admin/access-graph` |
 | Embed 金鑰 | `/admin/embed-keys` |
 | 模型供應商（僅 ROOT） | `/admin/model-providers` |
 | 用量 | `/admin/usage` |
