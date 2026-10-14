@@ -432,7 +432,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 * **Live 音訊**：分流含 `nan` 時，Live 每句使用者語音暫存最後 20 秒；轉錄是中文字的句子才在背景送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）聽是不是台語，判成 `nan` 才覆寫訊息語言；英西看轉錄文字即可。Live 的 `search_knowledge` 最多等這個結果 3 秒，台語就讓台語文件優先（沒有就用主要語言與其他語言的文件補）。Live 每個文字新回合會清除前一句的語音語言判定。
 * **Brain 端點** `POST /brain/internal/audio-language`：Backend 把音訊轉成 WAV 送來，Brain 以同一個模型判斷是否為台語（重複使用同一個 Gemini client，啟動時預熱）。
-* **請求帶入語言**：Backend 的 ASR 判成台語時，前台隨訊息送 `speech_language`（文字模式放 `metadata.speech_language`、Live 放 `user_speak.speech_language`），Brain 以它存訊息語言，並讓 `search_knowledge` 查台語文件。回答文字仍是華語。
+* **請求帶入語言**：Backend 的 ASR 判成台語時，前台隨訊息送 `speech_language`（文字模式放 `metadata.speech_language`、Live 放 `user_speak.speech_language`），Brain 以它存訊息語言，並讓 `search_knowledge` 查台語文件。回答文字仍是華語。文字模式另可帶 `preferred_language: "nan"`（使用者選了台語），中文字句子同樣以台語文件優先（見第 18 節）。
 * **Backend 端行為**（細節見 `01_BACKEND_SPEC.md`）：
   - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，至少留一條）；語音請求帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。Backend 讀專案分流快取 30 秒；Brain 暫時查不到時沿用上次查到的設定，從沒查到過才當沒有分流。
   - 交集含台語時，前台語音走批次 `POST /api/v1/asr/transcribe`，ASR 一律改用 Breeze（台語直接翻成華語、華語也準），同時呼叫 Brain `POST /brain/internal/audio-language`；判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時當不是台語。上傳的已是 16 kHz 單聲道 PCM16 WAV 時不再跑 ffmpeg。回應多 `language`（台語時為 `nan`）與 `language_check: {"result", "ms"}`（`result` 為語言代碼、`timeout` 或 `failed`，用來分辨「判成華語」與「沒判出來」）。整句重複的轉錄會收成一次再回。瀏覽器內建辨識在台語分流時停用。
@@ -587,15 +587,24 @@ Content-Type: application/json
   "persona_id": "customer_service",
   "session_id": "可省略，省略時建立新 session",
   "metadata": {"speech_language": "zh"},
+  "preferred_language": "nan",
   "mode": "standard",
   "turn_id": null,
   "turn_revision": null
 }
 ```
 
+`preferred_language`（選填，`zh|en|es|nan|ja|ko`，其他值 422）是使用者在整合方介面選的語言，只是參考、不鎖定回答語言：使用者這句話看得出語言或明講要哪種語言時照使用者；看不出語言的短句與型號用它取代專案主要語言來決定回答語言、訊息語言標籤與檢索語言，並以 `user_preferred_language` 放進每輪決策 evidence。值為 `nan` 時，中文字的句子與看不出語言的短句跟 `speech_language=nan` 一樣讓 `search_knowledge` 以台語文件優先、回答用繁體中文；看得出是其他語言的句子照那個語言。只作用在當次請求，不存進 session。Live 不支援。
+
 處理順序：解析 slash command → 建立 envelope 與 guardrails（第 6 節）→ 載入 session 與歷史、組 prompt（第 7 節）→ agent loop（第 9 節）→ 寫入對話、每日日誌，背景執行記憶治理與 PII 掃描。
 
-回應欄位：`status`、`trace_id`、`session_id`、`request_context`、`reply`、`history`（含本輪 user／assistant）、`citations`、`pii_pending`、`tool_steps`、`response_time_s`、`usage`；附圖由決策鏈從這輪前 5 筆附圖檢索結果中挑選（見 9.1「回答附圖」），選中時附 `image_id`／`url`；決策關閉、逾時或失敗時沿用第一筆 citation 的圖片或網址。生成失敗時：驗證不通過回 400，LLM 失敗或空回覆回 502（`LLM_OVERLOAD`，`retry_after_ms`）。
+回應欄位：`status`、`trace_id`、`session_id`、`request_context`、`reply`、`history`（含本輪 user／assistant）、`citations`、`pii_pending`、`answer_source`、`knowledge_searched`、`no_answer`、`tool_steps`、`response_time_s`、`usage`；附圖由決策鏈從這輪前 5 筆附圖檢索結果中挑選（見 9.1「回答附圖」），選中時附 `image_id`／`url`；決策關閉、逾時或失敗時沿用第一筆 citation 的圖片或網址。生成失敗時：驗證不通過回 400，LLM 失敗或空回覆回 502（`LLM_OVERLOAD`，`retry_after_ms`）。
+
+**回答來源**：三個欄位只看本輪 `tool_steps` 中 `search_knowledge`（含伺服器預查）的引用，網路與記憶的引用不算：
+* `answer_source`：`qa` = 至少一筆引用文件的 `.doc_meta.json` `source_type` 是 `qa`（QA CSV 匯入、QA 筆記）；`knowledge` = 有知識庫引用但都不是 QA；`none` = 沒有知識庫引用。
+* `knowledge_searched`：本輪有沒有呼叫 `search_knowledge`，不論結果或錯誤。
+* `no_answer`：`knowledge_searched` 且沒有知識庫引用。整合方可據此把回答換成固定拒答句；知識庫沒命中但網路搜尋有結果時也是 true。
+`POST /brain/chat/accept` 由暫存的同一份 `tool_steps` 重算，與暫存回應相同。
 
 **可合併回合（`turn_id`）**：前台在等待回答時可把補充句合併重送：請求帶相同 `session_id`、`turn_id`（1–128 字）與遞增的 `turn_revision`。這類回答先暫存在 `sessions.db`，回應帶 `requires_accept: true`，尚未寫入對話、日誌或記憶；前台收到後呼叫 `POST /brain/chat/accept` 確認。版本已被取代、回合不存在或主體不符時回 `409 TURN_SUPERSEDED`。確認具冪等性，版本比對與寫入在同一個 SQLite 交易內完成。視覺事件（`metadata.ephemeral_user_message`）不支援這個流程。
 

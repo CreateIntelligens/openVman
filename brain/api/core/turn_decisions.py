@@ -232,6 +232,7 @@ def build_turn_evidence(
     speech_language: str,
     project_language: str,
     available_tools: tuple[str, ...] | list[str],
+    preferred_language: str = "",
 ) -> dict[str, Any]:
     eligible_history = [
         {"role": str(message["role"]), "content": _history_content(message)}
@@ -248,13 +249,17 @@ def build_turn_evidence(
         safe_history.pop(0)
     safe_speech_language = speech_language if speech_language in (*LANGUAGES, "undetermined") else ""
     safe_project_language = project_language if project_language in LANGUAGES else "zh"
-    return {
+    evidence = {
         "user_text": safe_user_text,
         "history": safe_history,
         "speech_language": safe_speech_language,
         "project_primary_language": safe_project_language,
         "available_read_tools": sorted(set(available_tools) & ALLOWED_TOOL_HINTS),
     }
+    # 只在整合方有帶時才加：沒帶的請求證據跟以前一字不差。
+    if preferred_language in LANGUAGES:
+        evidence["user_preferred_language"] = preferred_language
+    return evidence
 
 
 def _history_content(message: dict[str, Any]) -> str:
@@ -281,6 +286,7 @@ def resolve_turn_policy(
     project_language: str,
     speech_language: str,
     config: TurnDecisionConfig,
+    preferred_language: str = "",
 ) -> TurnPolicy:
     needs_knowledge = _noul_signal("needs_knowledge", answers, config)
     needs_web = _noul_signal("needs_web", answers, config)
@@ -294,10 +300,11 @@ def resolve_turn_policy(
     if requested == "none":
         requested = None
     response_language = _resolve_response_language(requested=requested)
-    retrieval_language = _resolve_retrieval_language(
+    retrieval_language = resolve_retrieval_language(
         user_text=user_text,
         project_language=project_language,
         speech_language=speech_language,
+        preferred_language=preferred_language,
     )
     tone = _choice_signal("tone", answers, TONES, config)
     if tone == "neutral":
@@ -336,6 +343,7 @@ def run_turn_decision(
     turn_id: str,
     cancel_event: Event | None = None,
     capture_debug: bool = False,
+    preferred_language: str = "",
 ) -> TurnDecision:
     started = monotonic()
 
@@ -362,7 +370,7 @@ def run_turn_decision(
             logger.debug("turn decision metric write failed", exc_info=True)
         return decision
 
-    baseline = _baseline_policy(user_text, project_language, speech_language)
+    baseline = _baseline_policy(user_text, project_language, speech_language, preferred_language)
     groups = {
         "retrieval_enabled": config.retrieval_enabled,
         "language_enabled": config.language_enabled,
@@ -379,6 +387,7 @@ def run_turn_decision(
         speech_language=speech_language,
         project_language=project_language,
         available_tools=available_tools,
+        preferred_language=preferred_language,
     )
     try:
         result: DecisionResult = decide(
@@ -395,6 +404,7 @@ def run_turn_decision(
             project_language=project_language,
             speech_language=speech_language,
             config=config,
+            preferred_language=preferred_language,
         )
     except DecisionProviderCancelled:
         raise
@@ -527,31 +537,46 @@ def _resolve_response_language(*, requested: str | None) -> str | None:
     return None
 
 
-def _resolve_retrieval_language(
+def resolve_retrieval_language(
     *,
     user_text: str,
     project_language: str,
     speech_language: str,
+    preferred_language: str = "",
 ) -> str:
+    """Language whose knowledge documents this turn's search should prefer.
+
+    整合方帶的 preferred_language 只取代主要語言這個退路；使用者選台語時，中文字的
+    句子照「聽出台語」處理先查台語文件（台語轉成文字也是中文字，看不出來），
+    看得出是別種語言的句子仍照那個語言。
+    """
     from memory.language_detect import LANGUAGES as DETECTED_LANGUAGES
     from memory.language_detect import TAIWANESE, detect_language
 
     if speech_language == TAIWANESE:
         return TAIWANESE
-    default = project_language if project_language in DETECTED_LANGUAGES else "zh"
-    return detect_language(user_text, default)
+    if preferred_language in DETECTED_LANGUAGES:
+        default = preferred_language
+    else:
+        default = project_language if project_language in DETECTED_LANGUAGES else "zh"
+    detected = detect_language(user_text, default)
+    if preferred_language == TAIWANESE and detected == "zh":
+        return TAIWANESE
+    return detected
 
 
 def _baseline_policy(
     user_text: str,
     project_language: str,
     speech_language: str,
+    preferred_language: str = "",
 ) -> TurnPolicy:
     return TurnPolicy(
-        retrieval_language=_resolve_retrieval_language(
+        retrieval_language=resolve_retrieval_language(
             user_text=user_text,
             project_language=project_language,
             speech_language=speech_language,
+            preferred_language=preferred_language,
         ),
     )
 
@@ -565,6 +590,7 @@ __all__ = [
     "TurnPolicy",
     "build_turn_evidence",
     "build_turn_questions",
+    "resolve_retrieval_language",
     "resolve_turn_policy",
     "run_turn_decision",
     "run_turn_decision_async",

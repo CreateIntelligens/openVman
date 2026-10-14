@@ -113,7 +113,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 2. 組 system prompt：核心文件、auto recall 摘要、請求情境、歷史摘要、回答規則、ASR 詞表、本輪回答語言與長度。知識與記憶不直接注入，由工具取得。
 3. 執行 agent loop（`core/agent_loop.py`）。
 4. 寫入對話與每日日誌，背景執行記憶治理與回覆的 PII 掃描。
-5. 回應附上 `tool_steps`、citations、`response_time_s` 與本輪 `usage` 彙總。
+5. 回應附上 `tool_steps`、citations、`response_time_s`、本輪 `usage` 彙總，以及回答來源 `answer_source`／`knowledge_searched`／`no_answer`（見下方「回答來源」）。
    回答附圖：查完知識庫就在背景請決策鏈從前 5 筆附圖結果選最能回答的一筆，都不相關就不附圖；決策關閉（`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`）、逾時或失敗時照舊附第一筆引用的圖。使用者要求再看之前的圖（「再給我看看剛剛那張圖」，每輪決策的 `wants_previous_picture`，只在對話顯示過圖時才問）時，這段對話最近顯示過的 3 張圖連同當時的問題排在候選最前面，不必等查知識庫就開始選；判定否或不確定時流程不變（`TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED=false` 可關掉這一題）。判定為是時 system prompt 加一行當輪提示：圖會附在回答旁邊，只說這是先前的圖、不猜是哪一張也不描述內容（選圖與回答並行，模型看不到結果）、不要呼叫 `request_action` 切換頁面（對話還沒顯示過圖時改提示照實說明）。目前只接 HTTP 聊天，Live 還沒有。
 
 ### Agent loop
@@ -139,6 +139,18 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 ### 可合併回合（`turn_id`）
 
 前台在等待回答時可把補充句合併重送：請求帶相同 `session_id`、`turn_id`（1–128 字）與遞增的 `turn_revision`。這類回答先暫存在 `sessions.db`，回應帶 `requires_accept: true`，尚未寫入對話、日誌或記憶。前台收到後呼叫 `POST /brain/chat/accept` 確認；版本已被取代、回合不存在或主體不符時回 `409 TURN_SUPERSEDED`。確認具冪等性，版本比對與寫入在同一個 SQLite 交易內完成。未帶 `turn_id` 的呼叫照常直接寫入；視覺事件不支援這個流程。
+
+### 回答來源（`answer_source`）
+
+`POST /brain/chat` 與 `POST /brain/chat/accept` 的回應都有三個欄位，讓整合方決定要不要把回答換成固定的拒答句。只看本輪 `tool_steps` 裡 `search_knowledge` 的引用（含伺服器先查的那一筆）；`search_web`、`search_memory` 的引用、`filter_products` 與 `get_document` 都不算知識庫命中。可合併回合暫存與確認時從同一份 `tool_steps` 算出，兩次的值相同。
+
+| 欄位 | 值 |
+|---|---|
+| `answer_source` | `qa`：引用裡至少一份文件是 QA 文件（`.doc_meta.json` 的 `source_type` 為 `qa`，即 QA CSV 匯入或 QA 筆記）；`knowledge`：有知識庫引用但都不是 QA 文件；`none`：沒有知識庫引用（沒查、查了沒結果或查詢失敗） |
+| `knowledge_searched` | 本輪有沒有呼叫 `search_knowledge`（不論結果） |
+| `no_answer` | `knowledge_searched` 為 true 且沒有任何知識庫引用 |
+
+有引用不代表模型真的照著回答，`qa`／`knowledge` 只表示知識庫有命中。專案開了網路搜尋時，知識庫沒命中但網路有結果的回答也是 `no_answer: true`。
 
 ## 工具
 
@@ -208,6 +220,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 文件語言存在 `.doc_meta.json`，可由 `PATCH /brain/knowledge/document/meta` 指定（`zh|en|es|auto`）。
 - 使用者訊息語言先以規則即時判斷，看不出語言的短句（ok、型號）歸主要語言，hi、hola 這類只有一種語言會用的招呼照該語言；`JEV_LANGUAGE_ENABLED` 時再於背景由決策供應鏈校正存檔的標籤。
 - 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。
+- 使用者選的語言（`POST /brain/chat` 選填 `preferred_language`，`zh|en|es|nan|ja|ko`，其他值回 422）：整合方讓使用者一開始選台語／華語／英文時帶入，只是參考、不鎖定。它取代主要語言當退路：看不出語言的短句與型號用它回答、存訊息語言標籤、決定檢索語言，並以 `user_preferred_language` 放進每輪決策的 evidence；使用者這句話看得出語言（英文句、中文句）或明講要哪種語言時仍照使用者，提示詞不會要求硬用選的語言。選 `nan` 時，中文字的句子（含看不出語言的短句）跟 ASR 聽出台語一樣以台語文件優先檢索、回答用繁體中文；看得出是其他語言的句子照那個語言。只作用在當次請求，不存進 session，每次請求都要帶。Live 沒有這個欄位。
 - 分流兩條以上時，system prompt（文字對話與 Live 都有）列出專案會說的語言（國語、台語、英文…），模型被問到會說什麼語言時照實回答（`core/prompt_templates.supported_languages_line`）；只有一條分流不寫，免得模型拒絕用其他語言回答。
 - 每輪 system prompt 結尾指定回答語言，並依 `reply_seconds`（預設 20 秒，0 為不限制，上限 120）換算成字數上限：中日韓每秒 4 字，其他語言每秒 1.5 個單字（`core/prompt_templates.reply_length_line`）。只靠提示詞，不截斷輸出。
 - ASR 詞表：workspace 的 `ASR_PROMPT.md` 為選填，`#` 開頭為說明，其餘最多 800 字放進每輪 prompt，提醒模型訊息可能是語音辨識結果；可寫「常見誤聽：A→B」對照。`GET /brain/internal/asr-glossary` 只回正確詞（不含對照行）給 Backend 的辨識引擎：`terms` 是整串前文（最多 2000 字），`vocabulary` 是以頓號、逗號、分號或換行切開的逐詞清單（含空白的詞算一個，去重，最多 100 個），給 Gemini 串流的 `customVocabulary`。檔案缺失或讀取失敗時忽略；內容經 HTML 跳脫後放在 `<glossary>` 內，明確標示為參考資料而非指令。
@@ -232,7 +245,7 @@ Backend 的 `GuardAgent` 先跑本地規則；規則無法分類時呼叫 Brain 
 
 ## 每輪對話決策
 
-`TURN_DECISIONS_ENABLED` 與 retrieval／language／tone 三個分組開關預設開啟。Brain 對 HTTP Chat user turn 與送入 Gemini Live `send_text_turn()` 的 finalized text／ASR text 組成一次 batch；同一 turn 的工具呼叫不重跑 batch。Live 原始 PCM 仍使用既有串流生成；當 Gemini 送來 finalized transcription 時，Brain 會分類並用於其後的 retrieval/tool policy，該音訊回合已開始的回覆仍沿用 Live session baseline 語言與 tone。Evidence 包含原句（最多 6,000 字元）、最近 6 則 user／assistant 歷史（每則最多 600 字，總計不超過 evidence 上限）、ASR `speech_language`、專案主要語言、支援語言代碼和 allowlisted read-tool 名稱。不送 system/persona prompt、帳號 ID、秘密、工具結果或 knowledge 內容。固定 question IDs 包含 `needs_knowledge`、`needs_web`、`needs_memory`、`turn_intent`、`uses_{zh,en,es,nan,ja,ko,other}`、`dominant_language`、`requested_response_language` 與 `tone`；輸出只接受 typed `noul`／`choice` 值，不接受 provider 生成的自由文字指令。
+`TURN_DECISIONS_ENABLED` 與 retrieval／language／tone 三個分組開關預設開啟。Brain 對 HTTP Chat user turn 與送入 Gemini Live `send_text_turn()` 的 finalized text／ASR text 組成一次 batch；同一 turn 的工具呼叫不重跑 batch。Live 原始 PCM 仍使用既有串流生成；當 Gemini 送來 finalized transcription 時，Brain 會分類並用於其後的 retrieval/tool policy，該音訊回合已開始的回覆仍沿用 Live session baseline 語言與 tone。Evidence 包含原句（最多 6,000 字元）、最近 6 則 user／assistant 歷史（每則最多 600 字，總計不超過 evidence 上限）、ASR `speech_language`、專案主要語言、整合方帶的 `preferred_language`（有帶才放，欄位 `user_preferred_language`）、支援語言代碼和 allowlisted read-tool 名稱。不送 system/persona prompt、帳號 ID、秘密、工具結果或 knowledge 內容。固定 question IDs 包含 `needs_knowledge`、`needs_web`、`needs_memory`、`turn_intent`、`uses_{zh,en,es,nan,ja,ko,other}`、`dominant_language`、`requested_response_language` 與 `tone`；輸出只接受 typed `noul`／`choice` 值，不接受 provider 生成的自由文字指令。
 
 檢索需求分開判斷：明確不需要專案知識時可以略過強制 RAG，web／memory 仍可同時需要。低信心時維持既有檢索政策；Fast mode、工具 registry、專案權限與 session recall toggle 仍由既有程式限制。`needs_memory=true` 使用 `search_memory` 並略過同回合重複 auto recall；session 關閉記憶召回時不會強制 memory read。`needs_memory=false` 可略過 auto recall；任何結果都不會授權 `save_memory`。
 
