@@ -14,7 +14,7 @@
 
 `app/main.py` 僅組裝 FastAPI、授權 middleware、HTTP metrics、lifespan、OpenAPI 及 router，並提供 server 執行入口。HTTP 業務處理由 `routes/tts.py`（同步／串流 TTS、授權、快取及備援）、`routes/asr.py`（帳號辨識、台語分流、語言路由及管理者試辨識）、`routes/documents.py`（文件轉換及暫存清理）承擔。基礎設施分為 `lifecycle.py`、`openapi.py`、`http_metrics.py`、`server_logging.py`。Brain proxy catch-all 必須最後註冊，否則遮蔽具體端點；入口邊界測試保護此順序與禁止 inline 業務端點。既有 R2T2 串流仍由 `gateway/asr_stream.py` 擁有，所有端點 URL、授權、用量與錯誤格式不變。
 
-**Brain proxy 與用戶端斷線（2026-10-14）**：`proxy_to_brain` 等 Brain 回應標頭與讀取非串流回應時，同時等用戶端斷線；用戶端先離開就取消 httpx 請求（連線關閉，Brain 看到斷線而停止生成，見 Brain spec 的 Chat 一節），回 499 並記一行 log。工作完成當下就返回，正常請求不多等；SSE 回應交給 `StreamingResponse`，行為不變。斷線偵測靠 `app/client_disconnect.py` 的 `ClientDisconnectMiddleware`，必須是最外層 middleware：`request.is_disconnected()` 在 `BaseHTTPMiddleware`（auth、metrics、CORS 來源紀錄）後面永遠是 false。
+**Brain proxy 與用戶端斷線（2026-10-14）**：`proxy_to_brain` 等 Brain 回應標頭與讀取非串流回應時，同時等用戶端斷線；用戶端先離開就取消 httpx 請求（連線關閉，Brain 看到斷線而停止生成，見 Brain spec 的 Chat 一節），回 499 並記一行 log。工作完成當下就返回，正常請求不多等；SSE 回應（例如 `POST /api/v1/chat/stream`）交給 `StreamingResponse` 逐塊轉發，不整段收完；串流中用戶端離開時 `StreamingResponse` 結束 generator 並關掉往 Brain 的串流，Brain 同樣看到斷線而停止生成。斷線偵測靠 `app/client_disconnect.py` 的 `ClientDisconnectMiddleware`，必須是最外層 middleware：`request.is_disconnected()` 在 `BaseHTTPMiddleware`（auth、metrics、CORS 來源紀錄）後面永遠是 false。
 
 ### 帳號 API key（2026-10-12）
 
@@ -489,6 +489,7 @@ session cookie 與 `X-Embed-Key` 時一律以金鑰為準；embed 主體不會�
 | 方法 | 路徑 |
 |---|---|
 | POST | `/api/v1/chat` |
+| POST | `/api/v1/chat/stream` |
 | GET | `/api/v1/characters` |
 | GET | `/api/v1/tts/providers` |
 | POST | `/api/v1/tts/stream` |

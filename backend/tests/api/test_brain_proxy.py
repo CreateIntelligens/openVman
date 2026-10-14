@@ -174,6 +174,7 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
     paths = response.json()["paths"]
     assert "/api/v1/health" in paths
     assert "/api/v1/chat" in paths
+    assert "/api/v1/chat/stream" in paths
     assert "/api/v1/chat/accept" in paths
     assert "/api/v1/knowledge/upload" in paths
     assert "/api/v1/knowledge/document/meta" in paths

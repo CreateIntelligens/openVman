@@ -232,6 +232,7 @@ SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'un
 | `/static/characters/<characterId>/combined_data.json.gz` | 角色驅動資料。 |
 | `/static/characters/<characterId>/01.webm` | 透明角色影片。 |
 | `/api/v1/chat` | 對話模式的回答端點（需 embed key 或 session）。 |
+| `/api/v1/chat/stream` | 同一個回答以 SSE 逐句送出（需 embed key 或 session；SDK 的 `ask()` 不使用，事件格式見[串接快速開始](../integration-quickstart.md)）。 |
 | `/v1/audio/speech` | 對話模式的語音合成端點（需 embed key 或 session）。 |
 
 `/api/embed/*`、`/ws/embed/*`、`/embed/avatar`、`/vman-embed.js` 與 `<vman-avatar>` 都不是支援的串接面，且已全數回 404。除上表列出者外，openVman 內部使用的 `/api/v1/*` 其餘端點不屬於 Avatar SDK 公開契約；embed key 也只能存取上表所列路徑。

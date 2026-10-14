@@ -29,6 +29,7 @@ _STATIC_CHARACTER_PATTERN = re.compile(r"^/static/characters/(?P<char_id>[^/]+)/
 _ALLOWLISTED_ROUTES = frozenset(
     {
         ("POST", "/api/v1/chat"),
+        ("POST", "/api/v1/chat/stream"),
         ("GET", "/api/v1/characters"),
         ("GET", "/api/v1/tts/providers"),
         ("POST", "/api/v1/tts/stream"),

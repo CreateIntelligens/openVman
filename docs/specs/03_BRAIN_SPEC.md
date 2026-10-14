@@ -275,7 +275,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 * Brain 使用 LLM 的 Native Function Calling。工具回傳值作為 `tool` 訊息餵回 LLM 繼續生成，並一律視為不可信資料，不能授權另一個工具執行。
 * 每輪的工具呼叫與結果記在回應的 `tool_steps`。
-* LLM 呼叫內部可能使用串流以縮短等待，但 Brain 不對外送出 token：`POST /brain/chat` 一次回傳完整結果。
+* LLM 呼叫內部可能使用串流以縮短等待。`POST /brain/chat` 一次回傳完整結果；`POST /brain/chat/stream` 把最終回答逐句以 SSE 送出（第 18 節），工具輪的文字不送出。
 
 #### 9.1 路由模式 (Routing Modes)
 
@@ -573,7 +573,7 @@ LIVE_AUDIO_LANGUAGE_ID_MODEL=gemini-3.5-flash-lite
 
 ### 18. 與 Backend 層的介面約定 (Interface with Backend Layer)
 
-所有 HTTP 路徑前綴 `/brain`，Backend 對外以 `/api/v1/*` 代理；完整端點清單見 `brain/README.md`「HTTP 介面」與 Brain 的 OpenAPI（`/brain/docs`，需內部存取）。Brain 沒有 SSE 端點：`POST /brain/chat` 一次回傳完整結果，即時語音走 Live WebSocket。
+所有 HTTP 路徑前綴 `/brain`，Backend 對外以 `/api/v1/*` 代理；完整端點清單見 `brain/README.md`「HTTP 介面」與 Brain 的 OpenAPI（`/brain/docs`，需內部存取）。`POST /brain/chat` 一次回傳完整結果；`POST /brain/chat/stream` 以 SSE 逐句送出同一份回答；即時語音走 Live WebSocket。
 
 **對話（`POST /brain/chat`）**：
 ```
@@ -607,6 +607,13 @@ Content-Type: application/json
 `POST /brain/chat/accept` 由暫存的同一份 `tool_steps` 重算，與暫存回應相同。
 
 **可合併回合（`turn_id`）**：前台在等待回答時可把補充句合併重送：請求帶相同 `session_id`、`turn_id`（1–128 字）與遞增的 `turn_revision`。這類回答先暫存在 `sessions.db`，回應帶 `requires_accept: true`，尚未寫入對話、日誌或記憶；前台收到後呼叫 `POST /brain/chat/accept` 確認。版本已被取代、回合不存在或主體不符時回 `409 TURN_SUPERSEDED`。確認具冪等性，版本比對與寫入在同一個 SQLite 交易內完成。視覺事件（`metadata.ephemeral_user_message`）不支援這個流程。
+
+**逐句串流（`POST /brain/chat/stream`）**：請求 body 與 `/brain/chat` 相同，回應 `text/event-stream`，事件格式 `event: <名稱>\ndata: <JSON>\n\n`：
+* `sentence`：`{"index": n, "text": "..."}`，最終回答每完成一句就送出，`index` 從 0 起算。
+* `done`：與 `/brain/chat` 回應相同的 JSON，之後結束。
+* `error`：`{"status": <HTTP 狀態碼>, "detail": ...}`，值與 `/brain/chat` 遇到同一個錯誤時的狀態碼與 `detail` 相同，之後結束。請求 body 驗證失敗（422）在串流開始前就以一般 HTTP 回應。
+
+句尾規則：中日文 `。！？；…`；英文 `. ! ?` 後接空白或文字結束（半形 `?!` 直接接中日文也算）；換行。收尾的引號、括號、`**` 併入前一句；小數（`3.5`）、型號（`HIPPO-50`）、網址不切；`Mr.`、`e.g.`、清單編號 `1.` 不算句尾；最後一段在結束前補送。句子保留原文空白，全部依序接起來等於 `done.reply`（`/brain/chat` 對回答只做 `strip()`）。只送最終回答的文字：工具輪不送；看起來是把工具呼叫寫成文字的回合先扣住；provider 在同一回合先寫文字再叫工具，或串流到一半換 fallback 站時，已送出的句子不在 `reply` 裡，最終回答仍完整送出。句子在挑附圖、寫入與 `no_answer` 判斷之前送完；寫入、個資掃描、用量、`turn_id` 暫存、`answer_source`／`no_answer` 與斷線取消都與 `/brain/chat` 相同。實作見 `core/reply_stream.py` 與 `brain/README.md`「逐句串流」。
 
 **用戶端斷線**：生成期間監看 HTTP 連線（最外層 `ClientDisconnectMiddleware` 記下 `http.disconnect`；`request.is_disconnected()` 在 `BaseHTTPMiddleware` 後面看不到斷線）。斷線時設定該請求的取消旗標，生成在下一個安全點停止：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（關掉 provider 串流）、每輪工具之前；每輪決策的 `decide()` 收到同一個 `cancel_event`，進行中的請求立刻放棄。已送出的 LLM 請求不會被中止，只是不開下一步。取消的回合不呼叫 `finalize_generation`／`stage_turn`：不寫對話、日誌、記憶，可合併回合也不暫存（之後的 accept 回 409）。回 499，記 `chat_cancelled`（`trace_id`、`stage`、`tool_steps`、`llm_calls`、`elapsed_s`），不計入生成失敗。
 

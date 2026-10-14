@@ -18,6 +18,7 @@ from core.llm_client import (
     LLMEmptyReplyError,
     LLMReply,
     LLMToolCall,
+    TextDeltaListener,
     generate_chat_turn,
     stream_chat_turn,
 )
@@ -99,11 +100,12 @@ def _stream_turn(
     *,
     tools: list[dict[str, Any]] | None,
     forced_tool_name: str | None = None,
+    text_listener: TextDeltaListener | None = None,
 ) -> LLMReply:
-    return stream_chat_turn(
-        messages,
-        **_build_turn_kwargs(tools, forced_tool_name, get_settings()),
-    )
+    kwargs = _build_turn_kwargs(tools, forced_tool_name, get_settings())
+    if text_listener is not None:
+        kwargs["text_listener"] = text_listener
+    return stream_chat_turn(messages, **kwargs)
 
 
 KNOWLEDGE_SEARCH_TOOL = "search_knowledge"
@@ -121,12 +123,14 @@ def run_agent_loop(
     force_memory_search: bool = False,
     force_knowledge_search: bool = False,
     on_tool_round: Callable[[list[dict[str, Any]]], None] | None = None,
+    text_listener: TextDeltaListener | None = None,
 ) -> AgentLoopResult:
     """Run a bounded think -> tool -> observe loop until the model returns text.
 
     *on_tool_round* sees all tool steps after each round, so callers can start work
     that only needs retrieval results (picking the reply picture) while the model
-    is still writing the answer.
+    is still writing the answer. *text_listener* receives the text of every round
+    that may be the answer while it streams (``/brain/chat/stream``).
     """
     working_messages, tool_steps, final_turn = _run_tool_phase(
         messages,
@@ -139,6 +143,7 @@ def run_agent_loop(
         force_memory_search=force_memory_search,
         force_knowledge_search=force_knowledge_search,
         on_tool_round=on_tool_round,
+        text_listener=text_listener,
     )
     if final_turn is None:
         raise ToolPhaseError(
@@ -311,6 +316,7 @@ def _run_tool_phase(
     force_memory_search: bool = False,
     force_knowledge_search: bool = False,
     on_tool_round: Callable[[list[dict[str, Any]]], None] | None = None,
+    text_listener: TextDeltaListener | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
     """Execute tool call rounds until the LLM returns a text turn or rounds are exhausted.
 
@@ -403,12 +409,21 @@ def _run_tool_phase(
             # tool_call，不需要串流；之後每一回合都可能是長文答案，都串流。
             # 先查過的回合每次呼叫都可能直接是答案。
             should_stream = iteration >= 1 if first_forced else (prefetch or iteration == 0)
-            turn_fn = _stream_turn if should_stream else _generate_turn
-            turn = turn_fn(
-                working_messages,
-                tools=current_tools,
-                forced_tool_name=current_forced,
-            )
+            if text_listener is not None and not current_forced:
+                # 逐句輸出時，每一個可能是答案的回合都要串流，句子才出得來。
+                turn = _stream_turn(
+                    working_messages,
+                    tools=current_tools,
+                    forced_tool_name=current_forced,
+                    text_listener=text_listener,
+                )
+            else:
+                turn_fn = _stream_turn if should_stream else _generate_turn
+                turn = turn_fn(
+                    working_messages,
+                    tools=current_tools,
+                    forced_tool_name=current_forced,
+                )
             if iteration == 0 and current_forced == REQUIRE_ANY_TOOL and not turn.tool_calls:
                 if force_knowledge_search:
                     turn = _ensure_knowledge_search(turn, last_user_message)

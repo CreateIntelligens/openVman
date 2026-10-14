@@ -76,7 +76,7 @@
 |---|---|---|
 | 能力探索 | `GET /api/v1/me/capabilities` | 上述 JSON |
 | 批次辨識 | `POST /api/v1/asr/transcribe`；multipart `file`，選填 `project_id`、`provider`、`language_routes` | JSON `text`、實際 `provider`、`language` 等 |
-| 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `preferred_language`、`metadata.speech_language` | JSON `reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer` 等；通常會建立對話紀錄 |
+| 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `preferred_language`、`metadata.speech_language` | JSON `reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer` 等；通常會建立對話紀錄。要邊生成邊念改用 `POST /api/v1/chat/stream`（見「逐句串流」） |
 | 念回答 | `POST /api/v1/tts/stream`；JSON `text`，選填 `project_id`、`provider`、`voice`、`speech_language`、`format` | 音訊 bytes，以實際 `Content-Type` 判斷格式；`format=pcm16k` 時固定為 16 kHz raw PCM |
 
 選填 batch ASR `provider` 必須在已授權且已設定的 `asr.batch`。非批次引擎回 422、未授權回 403、未設定回 503；指定引擎失敗回 502，不備援、不讓台語分流改用其他辨識引擎。省略或空白時沿用帳號偏好、部署預設與既有備援，備援限授權候選及原部署預設相容例外。舊流程失敗可能仍回 HTTP 200，必須檢查非空 `provider`、有效 `text`，避免把「（音訊轉錄失敗）」當成問題送入 Chat。
@@ -110,6 +110,84 @@
 ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。`PUT /settings/my-asr-provider` 改的是帳號偏好，共用同一把 key 的所有機台會一起變，機台各自要不同引擎時請每次帶 `provider`／`engine`。
 
 重開一段對話不需要刪除：換一個新的 `session_id` 即可。刪除對話（`DELETE /api/v1/sessions/{id}`、`POST /api/v1/sessions/batch-delete`）需要專案編輯權，只有讀取授權的帳號會收到 403。
+
+### 邊生成邊念：逐句串流（SSE）
+
+`POST /api/v1/chat` 要等整段回答寫完才回應。想讓數位人早一點開口，改用 `POST /api/v1/chat/stream`：請求 body、驗證方式與 `/chat` 完全相同（含 `preferred_language`、`metadata`、`turn_id`／`turn_revision`），回應是 `text/event-stream`，每個事件是 `event: <名稱>\ndata: <JSON>\n\n`：
+
+| 事件 | `data` | 說明 |
+|---|---|---|
+| `sentence` | `{"index": 0, "text": "營業時間是早上九點。"}` | 最終回答每完成一句就送一次，`index` 從 0 起算。查知識庫等工具輪的文字不會送出 |
+| `done` | 與 `/chat` 回應相同的 JSON（`reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer`、`session_id`、`trace_id`、`history`、`pii_pending`、`image_id`／`url` 等） | 最後一個事件，之後串流結束 |
+| `error` | `{"status": 502, "detail": ...}` | `status` 與 `detail` 就是 `/chat` 遇到同一個錯誤時的 HTTP 狀態碼與錯誤 `detail`（可能是字串，也可能是含 `error_code`、`retry_after_ms` 的物件）。之後串流結束，不會再有 `done` |
+
+句尾的判斷：中日文 `。！？；…`；英文 `. ! ?` 後面接空白或文字結束；換行。`3.5`、`HIPPO-50.html` 這類小數、型號與網址不會被切開，最後一段沒有句尾符號的文字在結束前補送。句子保留原文的空白與換行（換行後的那句以換行開頭），所有 `sentence.text` 依序接起來就等於 `done.reply`；送 TTS 前可以自己 trim。
+
+建議做法：收到第一個 `sentence` 就送 `POST /api/v1/tts/stream`，之後每句排進佇列依序合成、依序播放；附圖、引用與 `no_answer` 等 `done` 再處理。`no_answer` 是 true 時要改念固定拒答句的話，請先等 `done` 再念，或接受已經念出前幾句。
+
+其他行為與 `/chat` 相同：會寫入對話紀錄、計入用量；帶 `turn_id` 時一樣暫存、要 `POST /api/v1/chat/accept`。中途中斷（`AbortController.abort()`、關閉連線）時 Brain 停止生成、不寫入這一輪，跟「打斷對話」一樣。串流開始前就能判斷的錯誤（401、403、404、422、429）照一般 HTTP 狀態碼回應，不會開始串流；之後的錯誤才以 `error` 事件回報。
+
+極少數情況下模型在同一回合先寫了文字又改叫工具，或 LLM 供應商串流到一半斷線、換下一家重寫：已送出的那幾句收不回來，也不在 `done.reply` 裡，最終回答之後仍會完整逐句送出。要顯示的文字以 `done.reply` 為準。
+
+瀏覽器（`fetch` + `ReadableStream`）：
+
+```js
+const controller = new AbortController();
+const res = await fetch("/api/v1/chat/stream", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+  body: JSON.stringify({ message, project_id: projectId, session_id: sessionId }),
+  signal: controller.signal, // 使用者打斷時 controller.abort()
+});
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+let buffer = "";
+for (;;) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += value;
+  let cut;
+  while ((cut = buffer.indexOf("\n\n")) >= 0) {
+    const block = buffer.slice(0, cut);
+    buffer = buffer.slice(cut + 2);
+    const event = block.match(/^event: (.*)$/m)?.[1];
+    const data = JSON.parse(block.match(/^data: (.*)$/m)?.[1] ?? "null");
+    if (event === "sentence") speak(data.text.trim()); // 排進 TTS 佇列
+    else if (event === "done") showAnswer(data);
+    else if (event === "error") showError(data.status, data.detail);
+  }
+}
+```
+
+Python（httpx）：
+
+```python
+import json
+
+import httpx
+
+with httpx.stream(
+    "POST",
+    f"{base_url}/api/v1/chat/stream",
+    headers={"Authorization": f"Bearer {api_key}"},
+    json={"message": "營業時間？", "project_id": project_id, "session_id": session_id},
+    timeout=httpx.Timeout(10, read=120),
+) as response:
+    response.raise_for_status()
+    event = None
+    for line in response.iter_lines():
+        if line.startswith("event: "):
+            event = line[len("event: "):]
+        elif line.startswith("data: "):
+            data = json.loads(line[len("data: "):])
+            if event == "sentence":
+                speak(data["text"].strip())  # 排進 TTS 佇列
+            elif event == "done":
+                print(data["reply"], data["no_answer"])
+            elif event == "error":
+                raise RuntimeError(f"{data['status']}: {data['detail']}")
+```
 
 ## 錯誤與限流
 

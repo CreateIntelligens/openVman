@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-10-14]** **逐句串流對話 `POST /api/v1/chat/stream`（SSE）**：請求 body 與 `POST /api/v1/chat` 相同，回 `text/event-stream`，讓整合方在模型還在寫的時候就拿第一句去做 TTS。事件只有三種：`sentence`（`{"index", "text"}`，最終回答每完成一句就送）、`done`（與 `/chat` 回應完全相同的 JSON）、`error`（`{"status", "detail"}`，值與 `/chat` 遇到同一個錯誤時的 HTTP 狀態碼與 `detail` 相同，之後串流結束）。句尾規則：中日文 `。！？；…`、英文 `. ! ?` 後面接空白或文字結束、換行；不會切開 `3.5`、`HIPPO-50` 這類型號或網址，結尾剩下的部分最後補送。工具輪（`search_knowledge` 等）的文字不會送出；所有 `sentence.text` 依序接起來等於 `done.reply`（句子保留原文空白與換行，送 TTS 前可自行 trim）。寫入對話、個資掃描、用量紀錄、`turn_id`／`accept`、`answer_source`／`no_answer` 判斷與用戶端斷線取消都與 `/chat` 相同；句子在挑附圖、寫紀錄與 `no_answer` 判斷之前就送完。`/api/v1/chat` 的行為與回應不變。Backend 代理路由表與 Embed key 允許清單加入這條路徑，驗證、專案檢查與配額與 `/chat` 相同。本機以 gemini-3.5-flash-lite 寫 160–190 字的回答量 5 次：第一句中位數 0.65 秒送出，整段 1.31 秒；`/chat` 還要再等寫入與 `no_answer` 判斷才回。
+
 - **[2026-10-14]** **外部網站的瀏覽器前端可以直接呼叫 API，並記錄來源**：新增 `CORS_ALLOWED_ORIGINS`（逗號分隔的來源或 `*`，預設不開放）。原本預檢請求在驗證前就被回 401，其他網站的前端完全打不進來；現在由 auth middleware 先回 204，實際回應與 401／403／429 也帶 CORS 標頭並開放讀取 `X-TTS-*`。不允許帶 Cookie，跨網域只能用 Authorization 或 X-Embed-Key；Embed key 的網域白名單照舊、不受部署清單影響。每個外部網站的呼叫依「來源 × key／帳號」彙總寫入 Auth DB `request_origins`（migration 21），ROOT 以 `GET /api/v1/admin/request-origins` 查詢。另加每把帳號 API key 每分鐘上限 `API_KEY_RATE_LIMIT_PER_MINUTE`（預設 300，超過回 429 與 `Retry-After`）。Brain 代理路徑需要專案編輯權而帳號只有讀取授權時（例如一般帳號刪對話），改回 403，不再回 404 讓人以為對話不存在。串接文件補上錯誤碼、限流、CORS 與 key 放瀏覽器的風險說明。
 
 - **[2026-10-14]** **對話請求可帶使用者選的語言 `preferred_language`**：`POST /api/v1/chat` 新增選填 `preferred_language`（`zh|en|es|nan|ja|ko`，其他值回 422），給整合方讓使用者一開始選台語／華語／英文時帶入。只是參考、不鎖定回答語言：使用者這句話看得出語言或明講要哪種語言時仍照使用者；看不出語言的短句與型號改用它取代專案主要語言（回答語言、訊息語言標籤、檢索語言），並放進每輪決策的 evidence（`user_preferred_language`）。選 `nan` 時中文字的句子跟 ASR 聽出台語一樣優先查台語文件、回答用繁體中文。不帶時行為不變；Live 沒有這個欄位。
