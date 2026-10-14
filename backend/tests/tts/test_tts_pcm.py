@@ -270,3 +270,41 @@ def test_wav_with_codec_not_handled_in_process_falls_back_to_ffmpeg():
     # 一整塊送進來（大於切片大小），fallback 時不能漏掉還沒餵給解析器的部分。
     out = _samples(_collect([mulaw], "audio/wav"))
     assert 15800 <= len(out) <= 16200
+
+
+def test_resampling_does_not_hold_the_event_loop() -> None:
+    # PR Agent 2026-10-14：重採樣若直接在 async generator 裡算，一路 TTS 會卡住其他請求。
+    import asyncio
+    import time
+
+    from app import tts_pcm
+
+    pcm24k = (b"\x10\x00\x20\x00") * 48000  # 4 秒 24 kHz
+
+    async def source():
+        for i in range(0, len(pcm24k), 8192):
+            yield pcm24k[i:i + 8192]
+
+    async def main():
+        gaps = []
+        stop = False
+
+        async def ticker():
+            last = time.monotonic()
+            while not stop:
+                await asyncio.sleep(0.001)
+                now = time.monotonic()
+                gaps.append(now - last)
+                last = now
+
+        tick = asyncio.create_task(ticker())
+        out = b""
+        async for chunk in tts_pcm.convert_to_pcm16k(source(), "audio/l16;rate=24000;channels=1"):
+            out += chunk
+        stop = True
+        await tick
+        return out, max(gaps)
+
+    out, worst_gap = asyncio.run(main())
+    assert len(out) > 0
+    assert worst_gap < 0.05

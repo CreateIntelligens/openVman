@@ -548,7 +548,9 @@ async def convert_to_pcm16k(
         unsupported: UnsupportedWav | None = None
         async for piece in pieces:
             try:
-                out = converter.feed(piece)
+                # 純 Python 重採樣每塊約 10–17 ms CPU；丟到執行緒算，event loop 才能同時
+                # 服務其他請求與其他路串流，不會被一路 TTS 卡住。
+                out = await asyncio.to_thread(converter.feed, piece)
             except UnsupportedWav as exc:
                 unsupported = exc
                 break
@@ -560,7 +562,7 @@ async def convert_to_pcm16k(
             async for out in _decode_with_ffmpeg(_replay(unsupported.prefix, pieces)):
                 yield out
             return
-        tail = converter.finish()
+        tail = await asyncio.to_thread(converter.finish)
         if tail:
             yield tail
     finally:
