@@ -57,8 +57,12 @@ def build_chat_messages(
     allow_tools: bool = True,
     turn_policy: TurnPolicy | None = None,
     decision_dependency_unavailable: bool = False,
+    preferred_language: str | None = None,
 ) -> list[dict[str, str]]:
     """Build the system and conversation messages for the LLM call.
+
+    *preferred_language* is the caller's language hint; it only replaces the project's
+    primary language for input that shows no language of its own.
 
     Knowledge and memory retrieval are handled by tool calls (search_knowledge,
     search_memory) during the agent loop — they are NOT injected into the prompt.
@@ -115,6 +119,7 @@ def build_chat_messages(
             reply_language_line(
                 project_id, user_message, _speech_language(request_context),
                 resolved_language=turn_policy.response_language if turn_policy else None,
+                preferred_language=preferred_language or "",
             ),
             _tone_delivery_line(turn_policy.tone if turn_policy else None),
             _previous_picture_line(turn_policy, session_messages),

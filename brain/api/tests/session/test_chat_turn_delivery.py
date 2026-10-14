@@ -252,3 +252,47 @@ def test_debug_is_withheld_from_ordinary_accounts_and_embed_keys(delivery, monke
         response = client.post('/brain/chat', json={'message': 'hi', 'session_id': 's9', 'decision_debug': True}, headers=headers)
         assert response.status_code == 200
         assert 'decision_debug' not in response.json()
+
+
+def test_answer_source_is_the_same_when_staged_and_when_accepted(delivery, monkeypatch):
+    """可合併回合先回暫存結果、確認時再回一次：兩次的來源欄位要一致。"""
+    import json
+
+    client, _, _, _ = delivery
+    monkeypatch.setattr(
+        "knowledge.doc_meta.load_doc_meta",
+        lambda project_id: {"knowledge/qa/faq.md": {"source_type": "qa"}},
+    )
+    steps = [{
+        "name": "search_knowledge",
+        "result": json.dumps({"data": {"citations": [{"uri": "knowledge/qa/faq.md", "distance": 0.1}]}}),
+    }]
+    monkeypatch.setattr(
+        chat_routes, "execute_generation",
+        lambda context: SimpleNamespace(reply="回答", tool_steps=steps),
+    )
+    fields = ("answer_source", "knowledge_searched", "no_answer")
+    staged = generate(client).json()
+    accepted = client.post("/brain/chat/accept", json=turn()).json()
+    retried = client.post("/brain/chat/accept", json=turn()).json()
+    expected = {"answer_source": "qa", "knowledge_searched": True, "no_answer": False}
+    assert {key: staged[key] for key in fields} == expected
+    assert {key: accepted[key] for key in fields} == expected
+    assert {key: retried[key] for key in fields} == expected
+
+
+def test_preferred_language_reaches_generation_and_bad_codes_are_rejected(delivery, monkeypatch):
+    client, _, _, _ = delivery
+    seen: list[str | None] = []
+    original = chat_routes._prepare_chat_context
+
+    def prepare(request, payload):
+        seen.append(payload.preferred_language)
+        return original(request, payload)
+
+    monkeypatch.setattr(chat_routes, "_prepare_chat_context", prepare)
+    ok = client.post("/brain/chat", json={"message": "ok", "session_id": "s1", "preferred_language": "nan"})
+    assert ok.status_code == 200
+    assert seen == ["nan"]
+    bad = client.post("/brain/chat", json={"message": "ok", "session_id": "s1", "preferred_language": "de"})
+    assert bad.status_code == 422

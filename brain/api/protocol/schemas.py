@@ -91,6 +91,24 @@ class ChatRequest(BaseModel):
     mode: str = Field("", description="Reply depth mode: fast, standard or deep")
     turn_id: str | None = Field(None, min_length=1, max_length=128)
     turn_revision: int | None = Field(None, ge=1, le=1_000_000, strict=True)
+    # 整合方讓使用者一開始選的語言（台語／華語／英文…）。只是參考：使用者這句話看得出
+    # 語言或明講要哪種語言時照使用者；短句、看不出語言時才用它取代專案主要語言。
+    preferred_language: str | None = Field(
+        None,
+        description=(
+            "Language hint chosen by the user (zh, en, es, nan, ja or ko); used where the "
+            "message itself does not show a language. Never overrides a clear message language."
+        ),
+    )
+
+    @field_validator("preferred_language")
+    @classmethod
+    def _known_preferred_language(cls, value: str | None) -> str | None:
+        from memory.language_detect import LANGUAGES
+
+        if value is not None and value not in LANGUAGES:
+            raise ValueError(f"preferred_language 只能是 {', '.join(LANGUAGES)}")
+        return value
 
     @model_validator(mode="after")
     def validate_turn(self) -> "ChatRequest":

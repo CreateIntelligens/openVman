@@ -126,16 +126,21 @@ def supported_languages_line(project_id: str) -> str:
 
 def reply_language_line(
     project_id: str, user_message: str, speech_language: str = "",
-    *, resolved_language: str | None = None,
+    *, resolved_language: str | None = None, preferred_language: str = "",
 ) -> str:
     """Tell the model which language this turn's reply must be in.
 
     每一輪明講回答語言，模型才不會因為人設、知識庫是中文就跟著回中文。短句歸
     主要語言（跟訊息標籤一致）；規則判斷不出來時才交給模型看使用者的語言。
+    *preferred_language* 是整合方帶來的使用者選擇，只取代主要語言這個退路，
+    使用者這句話看得出語言或明講要哪種語言時仍照使用者。
     """
     from memory.language_detect import TAIWANESE, detect_language, is_short_text
 
-    primary = _primary_language(project_id)
+    primary = (
+        preferred_language if preferred_language in PRIMARY_LANGUAGE_NAMES
+        else _primary_language(project_id)
+    )
     if resolved_language == "follow_user":
         code = ""
         return (

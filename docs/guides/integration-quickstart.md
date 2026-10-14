@@ -76,7 +76,7 @@
 |---|---|---|
 | 能力探索 | `GET /api/v1/me/capabilities` | 上述 JSON |
 | 批次辨識 | `POST /api/v1/asr/transcribe`；multipart `file`，選填 `project_id`、`provider`、`language_routes` | JSON `text`、實際 `provider`、`language` 等 |
-| 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `metadata.speech_language` | JSON `reply` 等；通常會建立對話紀錄 |
+| 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `preferred_language`、`metadata.speech_language` | JSON `reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer` 等；通常會建立對話紀錄 |
 | 念回答 | `POST /api/v1/tts/stream`；JSON `text`，選填 `project_id`、`provider`、`voice`、`speech_language` | 音訊 bytes，以實際 `Content-Type` 判斷格式 |
 
 選填 batch ASR `provider` 必須在已授權且已設定的 `asr.batch`。非批次引擎回 422、未授權回 403、未設定回 503；指定引擎失敗回 502，不備援、不讓台語分流改用其他辨識引擎。省略或空白時沿用帳號偏好、部署預設與既有備援，備援限授權候選及原部署預設相容例外。舊流程失敗可能仍回 HTTP 200，必須檢查非空 `provider`、有效 `text`，避免把「（音訊轉錄失敗）」當成問題送入 Chat。
@@ -84,6 +84,20 @@
 一般帳號可選擇跨供應商的已授權聲音；TTS `provider` 與 `voice` 必須符合聲音資源 metadata。省略 provider 但提供 voice 時由 metadata 推導，舊 metadata 缺漏僅沿用管理員設定的預設 provider；省略 voice 時使用帳號預設，供應商不匹配仍拒絕。受限 admin 的 `/tts/providers` 與 capabilities 也僅列權限上限內的聲音。聲音 ID 的音質與可用性取決於部署及上游，不應把特定 ID 永久當成失效。Embed key 維持綁定聲音限制。
 
 2026-10-13 [正式環境實測](../plans/integration-capabilities-asr.md)已跑通 5 個批次及 3 個串流 ASR、兩專案知識庫對話，以及 IndexTTS／CosyVoice／Gemini／有效 VoxCPM 聲音。當時仍有過期聲音被列出、Edge 回 200 卻無音訊，以及 IP 入口憑證不匹配等問題；不能僅因 HTTP 200 或聲音在清單上便視為成功，仍需檢查非空音訊及可解碼性。此為當日狀態，排障時需重新驗證。
+
+### 對話的語言提示與回答來源
+
+`preferred_language` 是使用者在你的介面選的語言（`zh` 華語、`nan` 台語、`en`、`es`、`ja`、`ko`；其他值回 422）。它是參考，不會鎖定回答語言：使用者這句話看得出是哪種語言（英文句、中文句），或明講「請用英文回答」時，照使用者；只有「ok」、型號這類看不出語言的輸入，才用選的語言回答（原本是用專案主要語言）。選 `nan` 時，中文字的句子會優先查台語文件、回答用繁體中文，跟 ASR 聽出台語（`metadata.speech_language: "nan"`）一樣。Brain 不記住這個值，整段對話每次請求都要帶。
+
+回應的回答來源欄位只看這一輪的知識庫查詢（`search_knowledge`）：
+
+| 欄位 | 說明 |
+|---|---|
+| `answer_source` | `qa`：引用到 QA 文件（QA CSV 匯入或 QA 筆記）；`knowledge`：引用到知識庫其他文件、沒有 QA；`none`：沒有知識庫引用 |
+| `knowledge_searched` | 這一輪有沒有查知識庫 |
+| `no_answer` | 查了知識庫但沒有任何引用（`knowledge_searched` 且 `answer_source` 為 `none`） |
+
+要在知識庫沒有答案時改顯示固定拒答句，以 `no_answer: true` 判斷。沒查知識庫（例如打招呼、閒聊）時 `no_answer` 是 false、`answer_source` 是 `none`。網路搜尋與記憶的引用不算知識庫命中：專案開了網路搜尋時，只靠網路回答的一輪也是 `no_answer: true`。帶 `turn_id` 的可合併回合在 `POST /api/v1/chat/accept` 回應中有相同的值。
 
 ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。`PUT /settings/my-asr-provider` 改的是帳號偏好，共用同一把 key 的所有機台會一起變，機台各自要不同引擎時請每次帶 `provider`／`engine`。
 

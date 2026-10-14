@@ -79,6 +79,7 @@ def _prepare_chat_context(request: Request, payload: ChatRequest) -> Any:
     envelope = build_message_envelope(request, raw, content_key="message")
     return prepare_generation(
         envelope, reply_mode=payload.mode, decision_debug=_decision_debug_requested(request, payload),
+        preferred_language=payload.preferred_language,
     )
 
 

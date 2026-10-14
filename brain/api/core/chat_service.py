@@ -21,6 +21,7 @@ from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
 from core.turn_decisions import (
     TurnDecision,
+    resolve_retrieval_language,
     run_turn_decision,
     turn_decision_config,
 )
@@ -75,15 +76,20 @@ class GenerationContext:
     turn_decision: TurnDecision | None = None
     input_language: str | None = None
     media_choice: ReplyMediaChoice | None = None
+    preferred_language: str | None = None
 
 
 def prepare_generation(
     envelope: MessageEnvelope, *, reply_mode: str = "", decision_debug: bool = False,
+    preferred_language: str | None = None,
 ) -> GenerationContext:
     """Build prompt inputs and update the user side of the session.
 
     Knowledge and memory retrieval is no longer done here — the LLM will
     call search_knowledge / search_memory tools during the agent loop.
+
+    *preferred_language* is the caller's language hint (``ChatRequest``): it replaces
+    the project's primary language only where the message shows no language itself.
     """
     cleaned_message = envelope.content.strip()
     stored_user_message = read_text(envelope.context.metadata, METADATA_ORIGINAL_USER_MESSAGE) or cleaned_message
@@ -129,6 +135,7 @@ def prepare_generation(
             config=cfg,
             turn_id=envelope.context.trace_id,
             capture_debug=decision_debug,
+            preferred_language=preferred_language or "",
         )
         turn_decision = without_disabled_recall(turn_decision, session.session_id, project_id)
 
@@ -144,7 +151,9 @@ def prepare_generation(
             speech_language if speech_language in supported else
             turn_decision.policy.dominant_language
             if turn_decision.policy.dominant_language in supported else
-            detect_language(stored_user_message, primary_language(project_id))
+            detect_language(
+                stored_user_message, preferred_language or primary_language(project_id),
+            )
         )
     prompt_messages = build_chat_messages(
         user_message=cleaned_message,
@@ -155,6 +164,7 @@ def prepare_generation(
         decision_dependency_unavailable=bool(
             turn_decision and turn_decision.dependency_unavailable
         ),
+        preferred_language=preferred_language,
     )
 
     return GenerationContext(
@@ -171,6 +181,7 @@ def prepare_generation(
         reply_mode=reply_mode,
         turn_decision=turn_decision,
         input_language=input_language,
+        preferred_language=preferred_language,
     )
 
 
@@ -252,31 +263,69 @@ def _patch_message_pii_metadata(
         logger.exception("[privacy] reply PII writeback failed")
 
 
+def _step_citations(step: Any) -> list[tuple[str, dict[str, Any]]]:
+    """``(uri, citation)`` pairs one tool step returned; empty for errors and non-search tools."""
+    result = step.get("result") if isinstance(step, dict) else None
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(result, dict):
+        return []
+    data = result.get("data")
+    citation_source = data if isinstance(data, dict) else result
+    pairs: list[tuple[str, dict[str, Any]]] = []
+    for cite in citation_source.get("citations") or []:
+        if not isinstance(cite, dict):
+            continue
+        uri = str(cite.get("uri") or cite.get("title") or "")
+        if uri:
+            pairs.append((uri, cite))
+    return pairs
+
+
 def _collect_citations_from_tool_steps(tool_steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Aggregate ``citations`` across all search-tool steps, dedupe, sort by distance."""
     by_uri: dict[str, dict[str, Any]] = {}
     for step in tool_steps:
-        result = step.get("result") if isinstance(step, dict) else None
-        if isinstance(result, str):
-            try:
-                result = json.loads(result)
-            except json.JSONDecodeError:
-                continue
-        if not isinstance(result, dict):
-            continue
-        data = result.get("data")
-        citation_source = data if isinstance(data, dict) else result
-        for cite in citation_source.get("citations") or []:
-            if not isinstance(cite, dict):
-                continue
-            uri = str(cite.get("uri") or cite.get("title") or "")
-            if not uri:
-                continue
+        for uri, cite in _step_citations(step):
             distance = float(cite.get("distance", 999.0))
             existing = by_uri.get(uri)
             if existing is None or distance < float(existing.get("distance", 999.0)):
                 by_uri[uri] = dict(cite)
     return sorted(by_uri.values(), key=lambda c: float(c.get("distance", 999.0)))
+
+
+_KNOWLEDGE_SEARCH_TOOL = "search_knowledge"
+
+
+def answer_source_fields(tool_steps: list[dict[str, Any]], project_id: str) -> dict[str, Any]:
+    """Say whether this turn's answer came from the knowledge base, for integrators.
+
+    只看 search_knowledge 的引用：網路、記憶的引用不是知識庫命中。整合方拿
+    ``no_answer`` 決定要不要把回答換成固定的拒答句。
+    """
+    knowledge_steps = [
+        step for step in tool_steps
+        if isinstance(step, dict) and step.get("name") == _KNOWLEDGE_SEARCH_TOOL
+    ]
+    uris = {uri for step in knowledge_steps for uri, _ in _step_citations(step)}
+    if not uris:
+        source = "none"
+    else:
+        from knowledge.doc_meta import load_doc_meta
+
+        meta = load_doc_meta(project_id)
+        source = "qa" if any(
+            meta.get(uri, {}).get("source_type") == "qa" for uri in uris
+        ) else "knowledge"
+    searched = bool(knowledge_steps)
+    return {
+        "answer_source": source,
+        "knowledge_searched": searched,
+        "no_answer": searched and not uris,
+    }
 
 
 def reply_media(context: GenerationContext, tool_steps: list[dict[str, Any]]) -> dict[str, str] | None:
@@ -425,6 +474,7 @@ def finalize_generation(
         "history": history,
         "pii_pending": pii_pending,
         "citations": citations,
+        **answer_source_fields(tool_steps or [], context.project_id),
     }
     response.update(primary_media)
     return response
@@ -472,11 +522,20 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     speech_token = active_speech_language.set(
         speech_language if isinstance(speech_language, str) else "",
     )
-    retrieval_language = (
-        context.turn_decision.policy.retrieval_language
-        if context.turn_decision is not None
-        else ""
-    )
+    if context.turn_decision is not None:
+        retrieval_language = context.turn_decision.policy.retrieval_language
+    elif context.preferred_language:
+        # 沒跑當輪決策（視覺事件）時也要照整合方帶的語言提示查，跟有決策時一致。
+        from knowledge.kb_settings import primary_language
+
+        retrieval_language = resolve_retrieval_language(
+            user_text=context.user_message,
+            project_language=primary_language(context.project_id),
+            speech_language=speech_language if isinstance(speech_language, str) else "",
+            preferred_language=context.preferred_language,
+        )
+    else:
+        retrieval_language = ""
     retrieval_token = active_retrieval_language.set(retrieval_language or "")
     unavailable_token = active_turn_decision_unavailable.set(bool(
         context.turn_decision and context.turn_decision.dependency_unavailable
