@@ -120,6 +120,8 @@ async function synthesizeWithFallback(text, session) {
 }
 ```
 > **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → CosyVoice → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /api/v1/tts/stream`，VoxCPM 與 CosyVoice 則由同一路徑回傳完整 MP3。
+>
+> `POST /api/v1/tts/stream` 的選填 `format`：省略或 `""` 時照引擎原樣回傳（Gemini `audio/l16;rate=24000;channels=1`、VoxCPM／IndexTTS WAV、Edge／CosyVoice MP3），前台虛擬人依賴此行為；`"pcm16k"` 時所有路徑（含台語分流、VoxCPM 失敗退回、IndexTTS 代理、Edge 串流與整段合成）都經 `app/tts_pcm.py` 轉成串流的 16 kHz mono s16le raw PCM，`Content-Type: audio/l16;rate=16000;channels=1`；其他值回 422。判斷順序為先看內容是否為 `RIFF`／`RF64` WAV（逐 chunk 解析，未知長度讀到串流結束），再看 `audio/l16`／`audio/pcm`（視為 16-bit LE），其餘交給 ffmpeg 子程序（`-i pipe:0 -f s16le -ac 1 -ar 16000 pipe:1`）邊收邊解碼。程序內重採樣為純 Python 有狀態 polyphase FIR，不新增相依；不支援的 WAV 編碼（μ-law、ADPCM 等）改走 ffmpeg。
 
 #### 6.1 VoxCPM360 外部節點
 

@@ -154,6 +154,13 @@ def test_discover_does_not_create_chat_or_call_inference(capsys):
     assert json.loads(capsys.readouterr().out)["schema_version"] == 1
 
 
+def test_tts_format_is_sent_only_when_requested(tmp_path):
+    with server(mime="audio/l16;rate=16000;channels=1") as (base, requests):
+        assert client.main(cli_args(base, tmp_path) + ["--tts-format", "pcm16k"]) == 0
+    assert json.loads(requests[3][3])["format"] == "pcm16k"
+    assert (tmp_path / "reply.pcm").read_bytes() == b"test-audio"
+
+
 def test_omitted_providers_remain_omitted(tmp_path):
     with server() as (base, requests):
         assert client.main(cli_args(base, tmp_path)) == 0
@@ -161,6 +168,7 @@ def test_omitted_providers_remain_omitted(tmp_path):
     payload = json.loads(requests[3][3])
     assert "provider" not in payload
     assert "voice" not in payload
+    assert "format" not in payload
 
 
 def test_asr_legacy_failure_stops_before_chat(tmp_path, capsys):
