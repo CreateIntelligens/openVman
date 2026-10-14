@@ -7,7 +7,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
 from time import monotonic
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from openai import OpenAI
 
@@ -98,6 +98,19 @@ class LLMEmptyReplyError(ValueError):
     fallback chain 用 ``except ValueError: raise`` 讓空回覆不在下一個 hop 重試，
     改型別會讓那條路悄悄變成「換 provider 再試一次」。
     """
+
+
+class TextDeltaListener(Protocol):
+    """Receives a streamed turn's text as it arrives (``/brain/chat/stream``).
+
+    ``attempt_started`` runs before every provider attempt, so text from a hop that
+    failed mid-stream is not mistaken for the start of the next hop's answer.
+    ``text_delta`` stops being called once the turn turns out to be a tool call.
+    """
+
+    def attempt_started(self) -> None: ...
+
+    def text_delta(self, delta: str) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,11 +205,13 @@ def stream_chat_turn(
     model_override: str | None = None,
     forced_tool_name: str | None = None,
     max_tokens: int | None = None,
+    text_listener: TextDeltaListener | None = None,
 ) -> LLMReply:
     """Stream one chat turn; detect tool calls vs text without a second round-trip.
 
     Identical return type and signature to generate_chat_turn — callers need no changes.
-    Reuses the provider fallback chain and key-pool infrastructure.
+    Reuses the provider fallback chain and key-pool infrastructure. *text_listener*
+    sees the text deltas while they arrive.
     """
     _require_api_key()
     cfg = get_settings()
@@ -214,13 +229,17 @@ def stream_chat_turn(
     create_kwargs.update(_stream_usage_kwargs(cfg))
 
     if legacy_routes:
-        return _stream_routes(legacy_routes, messages, cfg, router, create_kwargs)
+        return _stream_routes(
+            legacy_routes, messages, cfg, router, create_kwargs, text_listener=text_listener,
+        )
 
     errors: list[str] = []
     last_reason = ""
     for hop in chain:
         # 用戶端已離開就不再換下一站重試。
         raise_if_cancelled("llm_call")
+        if text_listener is not None:
+            text_listener.attempt_started()
         t0 = _now_ms()
         client = _get_sync_client(hop.api_key, hop.base_url)
         try:
@@ -233,6 +252,7 @@ def stream_chat_turn(
                     **create_kwargs,
                 ),
                 model=hop.model,
+                text_listener=text_listener,
             )
             router.mark_success(hop.api_key)
             provider_health().record_success(health_id(hop.provider, hop.model, hop.api_key))
@@ -500,11 +520,15 @@ def _try_routes_sync(
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
-def _consume_stream(stream: Any, *, model: str) -> LLMReply:
+def _consume_stream(
+    stream: Any, *, model: str, text_listener: TextDeltaListener | None = None,
+) -> LLMReply:
     """Drain a streaming completion and return an LLMReply.
 
     Accumulates text tokens into content or assembles tool call fragments by
     index. Raises ValueError if the stream ends with neither content nor tool calls.
+    Text deltas go to *text_listener* until the first tool-call fragment shows up:
+    a tool-call turn's text is discarded, so it must not reach the caller either.
     """
     text_buf = ""
     tool_call_acc: dict[int, dict[str, str]] = {}
@@ -528,8 +552,12 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
         if choice.finish_reason:
             finish_reason = choice.finish_reason
         delta = choice.delta
+        if delta.tool_calls:
+            text_listener = None
         if delta.content:
             text_buf += delta.content
+            if text_listener is not None:
+                text_listener.text_delta(delta.content)
         if delta.tool_calls:
             for tc_delta in delta.tool_calls:
                 idx = tc_delta.index if tc_delta.index is not None else 0
@@ -579,12 +607,16 @@ def _stream_routes(
     cfg: Any,
     router: Any,
     create_kwargs: dict[str, Any],
+    *,
+    text_listener: TextDeltaListener | None = None,
 ) -> LLMReply:
     """Legacy route loop for streaming when no fallback chain is configured."""
     errors: list[str] = []
     provider = str(getattr(cfg, "llm_provider", "") or "")
     for route in routes:
         raise_if_cancelled("llm_call")
+        if text_listener is not None:
+            text_listener.attempt_started()
         client = _get_sync_client(route.api_key, route.base_url)
         t0 = _now_ms()
         try:
@@ -597,6 +629,7 @@ def _stream_routes(
                     **create_kwargs,
                 ),
                 model=route.model,
+                text_listener=text_listener,
             )
             router.mark_success(route.api_key)
             _record_llm_usage(provider, route.model, reply.usage, _now_ms() - t0)

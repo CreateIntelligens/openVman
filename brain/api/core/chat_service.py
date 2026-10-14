@@ -17,7 +17,13 @@ from core.agent_loop import (  # noqa: F401 (ToolPhaseError re-exported)
     run_agent_loop,
 )
 from core.generation_cancel import current_cancel_event
-from core.llm_client import LLMEmptyReplyError, LLMReply, generate_chat_turn
+from core.llm_client import (
+    LLMEmptyReplyError,
+    LLMReply,
+    TextDeltaListener,
+    generate_chat_turn,
+    stream_chat_turn,
+)
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
 from core.turn_decisions import (
@@ -561,16 +567,27 @@ def _reply_from_turn(turn: LLMReply) -> str:
     return reply
 
 
-def execute_generation(context: GenerationContext) -> AgentLoopResult:
-    """Run the configured agent loop on top of prepared prompt messages."""
+def _single_turn(
+    messages: list[dict[str, Any]], trace_id: str, text_listener: TextDeltaListener | None,
+) -> LLMReply:
+    if text_listener is None:
+        return generate_chat_turn(messages, trace_id=trace_id)
+    return stream_chat_turn(messages, trace_id=trace_id, text_listener=text_listener)
+
+
+def execute_generation(
+    context: GenerationContext, *, text_listener: TextDeltaListener | None = None,
+) -> AgentLoopResult:
+    """Run the configured agent loop on top of prepared prompt messages.
+
+    *text_listener* gets the answer's text deltas while the model writes it
+    (``/brain/chat/stream``); without it every turn behaves exactly as before.
+    """
     trace_id = _string_context_value(context, "trace_id")
     project_id = _string_context_value(context, "project_id", "default")
 
     if context.route.skip_tools:
-        turn = generate_chat_turn(
-            context.prompt_messages,
-            trace_id=trace_id,
-        )
+        turn = _single_turn(context.prompt_messages, trace_id, text_listener)
         return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=[])
     speech_language = context.request_context.get("metadata", {}).get("speech_language")
     speech_token = active_speech_language.set(
@@ -630,13 +647,11 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
                 and context.turn_decision.policy.needs_knowledge is True
             ),
             on_tool_round=context.media_choice.on_tool_round,
+            **({"text_listener": text_listener} if text_listener is not None else {}),
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
-        turn = generate_chat_turn(
-            fallback,
-            trace_id=trace_id,
-        )
+        turn = _single_turn(fallback, trace_id, text_listener)
         return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=exc.partial_steps)
     finally:
         active_speech_language.reset(speech_token)

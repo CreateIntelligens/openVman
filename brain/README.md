@@ -144,6 +144,20 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 `POST /brain/chat` 在生成期間監看 HTTP 連線（Backend 代理在用戶端中斷時會關掉往 Brain 的請求）。斷線時設下這個請求的取消旗標（`core/generation_cancel.py`，以 context var 傳進 `asyncio.to_thread` 與工具執行緒），生成在下一個安全點拋出 `GenerationCancelled`：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前；每輪決策的 `decide()` 也收到同一個 `cancel_event`，進行中的請求立刻放棄。已送出的 LLM 請求收不回來，只是不開下一步。取消時不挑附圖、不呼叫 `finalize_generation`／`stage_turn`，所以不寫對話、日誌、記憶，也不暫存可合併回合；回 499（用戶端已離開），記 `chat_cancelled` 事件（`trace_id`、`stage`、`tool_steps`、`llm_calls`、`elapsed_s`），不記成生成失敗。
 
+### 逐句串流（`POST /brain/chat/stream`）
+
+與 `POST /brain/chat` 同一個請求與流程（共用 `routes/chat.py` 的 `_generate_chat_response`），回應改成 SSE，讓整合方拿第一句就開始 TTS：
+
+- `event: sentence`，`data: {"index", "text"}`：最終回答每完成一句送一次。
+- `event: done`：與 `/chat` 回應完全相同的 JSON，之後結束。
+- `event: error`，`data: {"status", "detail"}`：`/chat` 遇到同一個錯誤時的 HTTP 狀態碼與 `detail`，之後結束。請求 body 驗證失敗（422）在串流開始前就以一般 HTTP 回應。
+
+句子來自 `core/reply_stream.py`。`ReplyStream` 以 `text_listener` 傳進 `execute_generation` → `run_agent_loop` → `stream_chat_turn` → `_consume_stream`：每個 provider 嘗試（每一輪、每個 fallback 站）先呼叫 `attempt_started()`，文字 delta 在生成執行緒送進 `SentenceSplitter`，切出的句子以 `loop.call_soon_threadsafe` 放進 `asyncio.Queue`，再由 SSE generator 送出；`done`／`error` 走同一條路，順序不會亂。帶 listener 時，除了強制工具的第一輪之外每一輪都串流（沒有 listener 時照原本的選擇，`/chat` 不變）。串流中出現工具呼叫的片段後就不再轉送那一輪的文字；開頭像 `search_knowledge(` 的文字（模型把工具呼叫寫成純文字，agent loop 會丟掉重來）先扣住不送。生成結束後 `finish(reply)` 補送最終回答還沒送出的部分，所以句子接起來一定等於 `reply`（`/chat` 對回答只做 `strip()`，句子保留中間的空白與換行）；沒有串流的回答（provider 忽略強制工具直接回文字、工具失敗後的補救回答）也在這裡整段切句送出。已送出的句子若不是最終回答的開頭（同一回合先寫字再叫工具、串流到一半換站），那幾句收不回來，最終回答照樣完整送出。
+
+句尾：中日文 `。！？；…`；英文 `. ! ?` 後接空白或文字結束（半形 `?!` 直接接中文也算）；換行。句尾後的收尾引號、括號、`**` 併進同一句；最後一個字元是句尾符號時等下一個 token 再決定。小數、型號、網址沒有空白所以不會被切開；`Mr.`、`e.g.`、清單編號 `1.` 不算句尾。
+
+句子在挑附圖、寫紀錄、`no_answer` 判斷之前送完。寫入、個資掃描、用量、`turn_id` 暫存、斷線取消與 `/chat` 相同：StreamingResponse 在用戶端離開時關掉 generator，generator 設下取消旗標，生成在下一個安全點停下並記 `chat_cancelled`。錯誤記在 `chat_stream_*` log 與 `record_generation_failure("chat_stream", ...)`。
+
 斷線偵測靠最外層的 `infra/client_disconnect.py` ASGI middleware：Starlette 的 `request.is_disconnected()` 在 `BaseHTTPMiddleware`（`metrics_middleware`）後面永遠是 false。Backend 有一份相同的程式碼（`backend/app/client_disconnect.py`），測試會比對兩份。
 
 ### 回答來源（`answer_source`）
@@ -315,7 +329,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 分類 | 端點 |
 |---|---|
 | 健康與監控 | `GET /health`（liveness，免驗證）、`GET /health/ready`（readiness，免驗證）、`GET /health/detailed`、`GET /metrics`、`GET /metrics/prometheus`、`GET /identity` |
-| 對話 | `POST /chat`、`POST /chat/accept`、`GET /chat/modes`、`GET /chat/history` |
+| 對話 | `POST /chat`、`POST /chat/stream`（SSE 逐句）、`POST /chat/accept`、`GET /chat/modes`、`GET /chat/history` |
 | Session | `GET /sessions`、`GET /sessions/export`（皆可用 `language` 篩選）、`DELETE /sessions/{id}`、`POST /sessions/batch-delete`、`POST /sessions/{id}/recall-toggle` |
 | 檢索與記憶 | `POST /search`、`GET/POST/DELETE /memories`、`POST /memories/maintain` |
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
@@ -330,7 +344,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 內部 | `POST /internal/decision`（最多 32 個 typed questions）、`GET /internal/asr-glossary`、`POST /internal/asr-judge`、`POST /internal/audio-language`、WebSocket `/internal/live/{relay_session_id}`；另有不帶前綴的 `POST /internal/enrich`（把外部內容以 system 訊息寫入 session） |
 | 協定 | `POST /protocol/validate` |
 
-Brain 沒有 SSE 端點：`POST /chat` 一次回傳完整結果，即時語音走 Live WebSocket。
+`POST /chat` 一次回傳完整結果；`POST /chat/stream` 以 SSE 逐句送出同一份回答（見「逐句串流」）；即時語音走 Live WebSocket。
 
 ## 設定
 
