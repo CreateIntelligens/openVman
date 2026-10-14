@@ -201,6 +201,10 @@ async def _probe_downstream_services(
 
     probes["voxcpm"] = await probe_voxcpm_health(client, cfg)
     probes["cosyvoice"] = await probe_cosyvoice_health(client, cfg)
+    if cfg.edge_tts_enabled and cfg.edge_tts_probe_interval_seconds > 0:
+        from app.providers.edge_tts_probe import edge_tts_probe_snapshot
+
+        probes["edge-tts"] = edge_tts_probe_snapshot()
 
     return probes
 

@@ -12,6 +12,8 @@ import pytest
 
 os.environ.setdefault("SESSION_JWT_SECRET", "test-session-jwt-secret-for-backend-unit-tests-32")
 os.environ.setdefault("AUTH_COOKIE_SECURE", "false")
+# 單元測試不能真的連微軟試念；Edge 偵測只在 tests/tts/test_edge_tts_probe.py 用假的合成測。
+os.environ.setdefault("TTS_EDGE_PROBE_INTERVAL_SECONDS", "0")
 
 # Repo-structure tests read docker-compose.yml / Dockerfile / .env.example from
 # the project root. Only the backend subtree is mounted into the container, so

@@ -1,5 +1,6 @@
 """Shared resources must close when a running Backend exits with an error."""
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -24,8 +25,20 @@ async def test_lifespan_closes_resources_after_application_failure(
     close_admin = AsyncMock()
     daemon = SimpleNamespace(start=Mock(), stop=AsyncMock())
     monkeypatch.setattr(lifecycle, "get_auth_runtime", lambda: runtime)
-    cfg = SimpleNamespace(a2a_enabled=a2a_enabled)
+    cfg = SimpleNamespace(
+        a2a_enabled=a2a_enabled, edge_tts_enabled=True, edge_tts_probe_interval_seconds=60,
+    )
     monkeypatch.setattr(lifecycle, "get_tts_config", lambda: cfg)
+    probe_cancelled = asyncio.Event()
+
+    async def probe_loop(interval):
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            probe_cancelled.set()
+            raise
+
+    monkeypatch.setattr(lifecycle, "run_edge_tts_probe_loop", probe_loop)
     monkeypatch.setattr(lifecycle, "_startup_gateway_resources", start_gateway)
     monkeypatch.setattr(lifecycle, "_shutdown_gateway_resources", stop_gateway)
     monkeypatch.setattr(lifecycle, "get_a2a_bridge_daemon", lambda: daemon)
@@ -47,9 +60,13 @@ async def test_lifespan_closes_resources_after_application_failure(
             app.state.openapi_builder.build.assert_awaited_once_with()
             sync_asr.assert_called_once_with(runtime)
             sync_voices.assert_awaited_once_with(runtime, cfg)
+            await asyncio.sleep(0)  # 讓 Edge 偵測真的開始跑
             raise RuntimeError("application failed")
 
     stop_gateway.assert_awaited_once_with()
+    await asyncio.sleep(0)
+    # Edge 定時偵測要跟著關掉，不能在 backend 停止後還在背景打微軟。
+    assert probe_cancelled.is_set()
     close_admin.assert_awaited_once_with()
     for client in clients:
         client.close.assert_awaited_once_with()

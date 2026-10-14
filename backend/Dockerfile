@@ -82,6 +82,13 @@ COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install -r requirements.txt
 
+# 微軟常改 Edge 朗讀服務的連線驗證，舊版 edge-tts 會整個被擋（2026-10-14 7.2.8 回 403）。
+# 每次建置帶不同的 EDGE_TTS_REFRESH，這層不吃快取，backend 只要重建就裝到最新版。
+ARG EDGE_TTS_REFRESH=local
+RUN --mount=type=cache,target=/root/.cache/uv \
+    echo "edge-tts refresh: ${EDGE_TTS_REFRESH}" \
+    && uv pip install --upgrade "edge-tts<8"
+
 COPY app /app/app
 
 COPY docker /app/docker

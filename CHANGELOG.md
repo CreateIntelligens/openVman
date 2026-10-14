@@ -42,7 +42,7 @@
 
 ### Fixed
 
-- **[2026-10-14]** **Edge TTS 恢復可用**：微軟改了 Edge 朗讀服務的連線驗證，edge-tts 7.2.8 連線一律回 403（`WSServerHandshakeError`），不論有沒有專案限制都合成失敗，連帶其他 TTS 失敗時的 Edge 保底也失效。`backend/requirements.txt` 改為 `edge-tts>=7.3.1,<8`；同一段文字 7.2.8 回 403、7.3.1 正常產生音訊（2026-10-14 實測）。
+- **[2026-10-14]** **Edge TTS 恢復可用**：微軟改了 Edge 朗讀服務的連線驗證，edge-tts 7.2.8 連線一律回 403（`WSServerHandshakeError`），不論有沒有專案限制都合成失敗，連帶其他 TTS 失敗時的 Edge 保底也失效。`backend/requirements.txt` 改為 `edge-tts>=7.3.1,<8`；同一段文字 7.2.8 回 403、7.3.1 正常產生音訊（2026-10-14 實測）。為了下次不必等現場沒聲音才發現：Backend 每 `TTS_EDGE_PROBE_INTERVAL_SECONDS`（預設 1800 秒）試念一句，結果與已安裝版本放在 `GET /healthz` 的 `dependencies.edge-tts`（失敗時整體狀態為 degraded），並輸出 Prometheus 指標 `vman_edge_tts_up`；Dockerfile 最後一層每次建置都以 `EDGE_TTS_REFRESH`（CI 帶 run id）略過快取、裝最新的 `edge-tts<8`。CI 只在 backend 檔案有變時重建，Edge 再壞時手動執行 Docker Publish 即可（見 `docs/operations/11_DEPLOYMENT.md`）。
 
 - **[2026-10-13]** **對外入口不再轉送 `/api/v1/internal/`**：`/api/v1/internal/model-providers` 回傳全部模型金鑰明文，原本從公開網址與內網 8787 都打得到，只靠 `GATEWAY_INTERNAL_TOKEN` 擋；而這個 token 也會用明文 HTTP 送到另一台機器的 IndexTTS 節點。admin 容器的 nginx 現在對 `/api/v1/internal/` 一律回 404（同 `/brain/`），容器之間照常直接打 `backend:8200`；新增測試防止被改回去。
 - **[2026-10-13]** **決策的部署預設不再啟用 Clef 備援端點**：備援是 CPU 機器，一次判斷要好幾秒，必定超過每站時限，還吃掉後面 Jev 的時間。正式機在測試者按「改回部署設定」後四站全開，每輪判斷都退回 baseline。現在部署預設為 Clef 主端點、Jev、OpenAI，備援仍可在後台手動啟用。

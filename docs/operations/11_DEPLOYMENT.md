@@ -207,6 +207,19 @@ compose 使用 `${UID:-1000}:${GID:-1000}`，但 bash 的 `UID` 是唯讀且不�
 因此在使用者非 1000 的主機上會落回預設值 1000。要覆寫請在 `.env` 設定 `UID` 與
 `GID`——這樣 compose 與 `ensure-data-dirs.sh` 會一起生效，不會各自為政。
 
+### Edge TTS 全部失敗（`WSServerHandshakeError: 403`）
+
+Edge 朗讀不是公開 API，微軟改連線驗證時舊版 `edge-tts` 會整個被擋，Edge 保底也跟著失效。
+Backend 每 `TTS_EDGE_PROBE_INTERVAL_SECONDS`（預設 1800 秒）試念一句：`GET /healthz` 的
+`dependencies.edge-tts` 會轉成 `error` 並顯示已安裝的 `edge-tts` 版本，Prometheus 指標
+`vman_edge_tts_up` 變 0。
+
+修法是重建 backend image：Dockerfile 最後一層每次建置都裝最新的 `edge-tts<8`。
+CI 只在 backend 檔案有變時才重建，只改 Brain、前台或文件**不會**更新 Edge；
+到 GitHub Actions 手動執行 Docker Publish（`workflow_dispatch`，五個 runner 都會重建），
+watchtower 換上新 image 後即恢復。上游若還沒發修正版，重建也沒用，先到 PyPI 確認
+`edge-tts` 是否有新版本。
+
 ---
 
 ## 五、建置

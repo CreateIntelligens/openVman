@@ -233,6 +233,7 @@ jobs:
           pull: true
           build-args: |
             BASE_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base@${{ needs.backend-base.outputs.digest }}
+            EDGE_TTS_REFRESH=${{ github.run_id }}
           push: true
           tags: |
             ${{ steps.decide.outputs.source_ref }}

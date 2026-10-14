@@ -119,6 +119,13 @@ class TTSRouterConfig(BaseSettings):
         default=2000,
         validation_alias="TTS_EDGE_MAX_TEXT_LENGTH",
     )
+    # 微軟常改 Edge 朗讀服務的連線驗證，舊版 edge-tts 會整個被擋；定時試念一句，
+    # 壞了在 /healthz 與 vman_edge_tts_up 指標上看得到。0 表示不檢查。
+    edge_tts_probe_interval_seconds: int = Field(
+        default=1800,
+        ge=0,
+        validation_alias="TTS_EDGE_PROBE_INTERVAL_SECONDS",
+    )
     document_max_upload_bytes: int = Field(
         default=100 * 1024 * 1024,
         validation_alias="DOCUMENT_MAX_UPLOAD_BYTES",
