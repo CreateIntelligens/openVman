@@ -84,7 +84,6 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 - **Two Python runtimes**: `backend/` and `brain/api/` have separate `requirements.txt`, configs, and venvs. Never assume shared dependencies.
 - **GPU services**: `index-tts-vllm` and `vlm` require NVIDIA GPU. `vlm` is opt-in via `docker compose --profile vlm up`.
 - **Brain skills**: Modular tools in `brain/skills/`. Each skill has its own directory. Skills are loaded dynamically at runtime.
-- **Graphify**: If `graphify-out/graph.json` exists, check `graphify-out/GRAPH_REPORT.md` before searching raw files (codex hook config).
 - **LanceDB data**: Runtime vector DB data in `brain/data/` and `.openclaw/` — both gitignored.
 - **Avatar assets**: User uploads in `data/avatar/` and `data/backgrounds/` — gitignored.
 - **TTS voice references**: Large audio files in `backend/app/assets/tts_references/` — gitignored.
