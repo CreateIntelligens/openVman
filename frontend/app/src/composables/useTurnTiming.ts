@@ -13,6 +13,8 @@ export type TurnMark =
   | 'speech_end'
   | 'asr_done'
   | 'sent'
+  // 逐句串流的第一句：TTS 從這裡開始，不必等 reply_done。
+  | 'first_sentence'
   | 'reply_done'
   | 'tts_start'
   | 'first_audio'
@@ -61,6 +63,7 @@ export function turnDurations(marks: Partial<Record<TurnMark, number>>): Record<
     // 辨識完到真的送出：要先建連線時會出現在這裡。
     ['send', span(marks, 'asr_done', 'sent')],
     ['brain', span(marks, 'sent', 'reply_done')],
+    ['brain_first_sentence', span(marks, 'sent', 'first_sentence')],
     ['tts_first_audio', span(marks, 'tts_start', 'first_audio')],
     ['to_playback', span(marks, 'first_audio', 'playback_start')],
     // 使用者體感的等待：講完話（打字就是送出）到聽到聲音。
@@ -155,7 +158,10 @@ export function useTurnTiming(options: {
    * 結束已經收到回覆的那一輪，不要把剛開始的新一輪記成被打斷。
    */
   function interrupted(): void {
-    if (turn && (turn.marks.reply_done !== undefined || turn.marks.first_audio !== undefined)) {
+    const marks = turn?.marks
+    if (marks && (
+      marks.reply_done !== undefined || marks.first_sentence !== undefined || marks.first_audio !== undefined
+    )) {
       finish('interrupted')
     }
   }

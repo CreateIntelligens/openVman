@@ -34,6 +34,7 @@ TurnMark = Literal[
     "speech_end",
     "asr_done",
     "sent",
+    "first_sentence",
     "reply_done",
     "tts_start",
     "first_audio",

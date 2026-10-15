@@ -37,15 +37,7 @@ export function useTypewriter(options: TypewriterOptions) {
     options.onDone?.()
   }
 
-  /**
-   * Buffer text and start drip-feeding once called.
-   * Cancels any in-progress typewriter before starting.
-   */
-  function start(text: string): void {
-    stop()
-    pendingText = text
-    if (!pendingText) return
-    options.onBegin()
+  function run(): void {
     if (
       typeof window !== "undefined"
       && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -64,5 +56,24 @@ export function useTypewriter(options: TypewriterOptions) {
     }, TYPEWRITER_INTERVAL_MS)
   }
 
-  return { start, stop, flush }
+  /**
+   * Buffer text and start drip-feeding once called.
+   * Cancels any in-progress typewriter before starting.
+   */
+  function start(text: string): void {
+    stop()
+    pendingText = text
+    if (!pendingText) return
+    options.onBegin()
+    run()
+  }
+
+  /** Continue the current message with more text (next sentence of a streamed reply). */
+  function append(text: string): void {
+    if (!text) return
+    pendingText += text
+    if (timer === null) run()
+  }
+
+  return { start, append, stop, flush }
 }

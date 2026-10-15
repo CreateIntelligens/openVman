@@ -138,7 +138,9 @@ test("every voice turn is timed from speech to playback", () => {
   assert.match(source, /turnTiming\.begin\(chat\.mergesWithPending\(sourcePath\) \? "merged" : "superseded"\);/);
   assert.match(source, /turnTiming\.mark\("sent"\);\s*const result: SendMessageResult = chat\.sendMessage\(/);
   assert.match(source, /turnTiming\.mark\("reply_done"\);/);
-  assert.match(source, /turnTiming\.mark\("tts_start"\);\s*void ttsStreamer\.speak\(/);
+  assert.match(source, /turnTiming\.mark\("tts_start"\);\s*return ttsStreamer\.speak\(/);
+  // 逐句串流：第一句到的時間點，TTS 從這裡開始。
+  assert.match(source, /onReplyStart: \(context\) => \{\s*beginReply\(context\);\s*turnTiming\.mark\("first_sentence"\);/);
   assert.match(source, /onFirstAudio: \(\) => \{\s*turnTiming\.mark\("first_audio"\);/);
   assert.match(source, /onPlaybackStart: \(\) => \{[\s\S]{0,120}turnTiming\.playbackStarted\(\);/);
   assert.match(source, /onStopAudio: \(\) => \{\s*turnTiming\.interrupted\(\);/);

@@ -45,3 +45,17 @@ test("TTS finishing its download does not dump the subtitle", () => {
   assert.ok(onEnd, "ttsStreamer onEnd not found");
   assert.doesNotMatch(onEnd[1], /flush/);
 });
+
+test("append continues the same bubble with the next sentence", async () => {
+  let shown = "";
+  let begun = 0;
+  const tw = useTypewriter({ onBegin: () => { begun += 1; }, onChar: (c) => { shown += c; } });
+  tw.start("ab");
+  tw.append("c");
+  await sleep(200);
+  assert.equal(shown, "abc");
+  tw.append("de");
+  await sleep(150);
+  assert.equal(shown, "abcde");
+  assert.equal(begun, 1, "a streamed reply stays in one message bubble");
+});

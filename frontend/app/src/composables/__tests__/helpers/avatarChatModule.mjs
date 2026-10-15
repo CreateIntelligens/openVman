@@ -6,6 +6,7 @@ import { decisionDebugModuleUrl } from './decisionDebugModule.mjs'
 // one unit. Listed leaves first so each module's imports are already built.
 const MODULES = [
   'avatarChatTypes',
+  'chatSseStream',
   'useAvatarTransport',
   'useAvatarVisualInput',
   'useAvatarTextTurn',

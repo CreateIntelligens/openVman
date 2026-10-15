@@ -1811,6 +1811,22 @@ def test_turn_timing_accepts_a_merged_turn(monkeypatch, tmp_path):
     assert json.loads(log.read_text(encoding="utf-8"))["outcome"] == "merged"
 
 
+def test_turn_timing_accepts_the_first_streamed_sentence(monkeypatch, tmp_path):
+    """逐句串流的文字模式從第一句開始合成，前台另記 first_sentence。"""
+    module, _ = _load_main(monkeypatch)
+    log = tmp_path / "turn_timing.jsonl"
+    monkeypatch.setenv("TURN_TIMING_LOG", str(log))
+    client, _ = _authenticated_client(module, admin=False)
+
+    marks = {"sent": 0, "first_sentence": 650, "tts_start": 650, "first_audio": 1900, "playback_start": 1950}
+    response = client.post(
+        "/api/v1/metrics/turn", json=_turn_payload(input="text", marks_ms=marks),
+    )
+
+    assert response.status_code == 204
+    assert json.loads(log.read_text(encoding="utf-8"))["marks_ms"]["first_sentence"] == 650
+
+
 def test_turn_timing_rejects_unknown_marks(monkeypatch, tmp_path):
     module, _ = _load_main(monkeypatch)
     monkeypatch.setenv("TURN_TIMING_LOG", str(tmp_path / "turn_timing.jsonl"))

@@ -1,14 +1,20 @@
 /**
- * useAvatarTextTurn — text-mode turns for useAvatarChat over HTTP
- * POST /api/v1/chat (standard chat completions, any provider), including
+ * useAvatarTextTurn — text-mode turns for useAvatarChat over HTTP, including
  * turn revisions for merged re-sends and the /accept delivery acknowledgement.
+ *
+ * With `chatStreamEndpoint` set, turns use POST /api/v1/chat/stream (SSE):
+ * each `sentence` is handed to TTS as it arrives and `done` carries the same
+ * JSON as /chat. Deployments without the stream route (404/405) fall back to
+ * POST /api/v1/chat for the rest of the page's life.
  */
 import type { Ref } from 'vue'
 import { apiFetch } from '../api/http'
 import { parseDecisionDebug, type DecisionDebug } from '../components/debug/decisionDebug'
+import { readSseEvents } from './chatSseStream'
 import {
        CONNECT_TIMEOUT_MS,
        createClientId,
+       isRecord,
        type AvatarState,
        type ChatMessage,
        type ChatOptions,
@@ -17,6 +23,7 @@ import {
 } from './avatarChatTypes'
 
 export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/v1/chat'
+export const DEFAULT_TEXT_CHAT_STREAM_ENDPOINT = '/api/v1/chat/stream'
 
 export interface PendingTurn {
        text: string
@@ -35,7 +42,36 @@ interface TextTurnContext {
        projectId: () => string
        personaId: () => string
        applyResponseMedia: (data: ChatResponse) => void
+       /** Media for a streamed reply whose bubble may already be on screen. */
+       attachStreamedMedia: (data: ChatResponse, userMessageIndex: number) => void
        playReply: (text: string, context: UtteranceContext) => void
+       replyStarted: (context: UtteranceContext) => void
+       replySentence: (text: string) => void
+       replyFinished: (text: string) => void
+       /** A streamed reply that already started speaking failed (error event, accept rejected). */
+       abandonReply: () => void
+}
+
+/** `error` event / failed stream: reported like /chat's HTTP error. */
+class ChatStreamError extends Error {
+       constructor(message: string, readonly code: string, readonly retryAfterMs?: number) {
+              super(message)
+       }
+}
+
+function streamErrorFrom(data: unknown): ChatStreamError {
+       const payload = isRecord(data) ? data : {}
+       const detail = payload.detail
+       const status = typeof payload.status === 'number' ? payload.status : 500
+       if (isRecord(detail)) {
+              const code = typeof detail.error_code === 'string' ? detail.error_code : 'BRAIN_ERROR'
+              const message = typeof detail.message === 'string' ? detail.message
+                     : typeof detail.error === 'string' ? detail.error
+                     : `HTTP ${status}`
+              const retry = typeof detail.retry_after_ms === 'number' ? detail.retry_after_ms : undefined
+              return new ChatStreamError(message, code, retry)
+       }
+       return new ChatStreamError(typeof detail === 'string' && detail ? detail : `HTTP ${status}`, 'BRAIN_ERROR')
 }
 
 export function useAvatarTextTurn(context: TextTurnContext) {
@@ -48,6 +84,8 @@ export function useAvatarTextTurn(context: TextTurnContext) {
        let awaitingReply: PendingTurn | null = null
        // 下一輪的歷史必須包含前台已接受的上一輪；停止播放不能撤銷這次確認。
        let acceptingReply: Promise<void> | null = null
+       // 部署沒有串流路由時只試一次，之後整個頁面都走 /chat。
+       let streamUnavailable = false
 
        async function _sendMessageText(
               text: string,
@@ -81,11 +119,12 @@ export function useAvatarTextTurn(context: TextTurnContext) {
                             : messages.value.length - 1,
               }
               state.value = 'THINKING'
+              let spokenSentences = 0
 
               try {
                      if (previousAcceptance) await previousAcceptance.catch(() => {})
                      if (requestId !== textRequestId || abort.signal.aborted) return
-                     const res = await apiFetch(options.chatEndpoint ?? DEFAULT_TEXT_CHAT_ENDPOINT, {
+                     const requestInit: RequestInit = {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
                             body: JSON.stringify({
@@ -100,7 +139,18 @@ export function useAvatarTextTurn(context: TextTurnContext) {
                                    ...(speechLanguage ? { metadata: { speech_language: speechLanguage } } : {}),
                             }),
                             signal: abort.signal,
-                     })
+                     }
+                     const chatEndpoint = options.chatEndpoint ?? DEFAULT_TEXT_CHAT_ENDPOINT
+                     let streamed = Boolean(options.chatStreamEndpoint) && !streamUnavailable
+                     let res = await apiFetch(streamed ? options.chatStreamEndpoint! : chatEndpoint, requestInit)
+                     if (streamed && (res.status === 404 || res.status === 405)) {
+                            void res.body?.cancel().catch(() => {})
+                            if (requestId !== textRequestId || abort.signal.aborted) return
+                            streamed = false
+                            res = await apiFetch(chatEndpoint, requestInit)
+                            // 專案或角色不存在時兩條路由都回 404；那不代表部署沒有串流。
+                            if (res.status !== 404 && res.status !== 405) streamUnavailable = true
+                     }
 
                      if (requestId !== textRequestId || abort.signal.aborted) return
                      if (!res.ok) {
@@ -112,7 +162,37 @@ export function useAvatarTextTurn(context: TextTurnContext) {
                             return
                      }
 
-                     const data = await res.json() as ChatResponse
+                     const replyContext: UtteranceContext = { source: 'text', speechLanguage: speechLanguage ?? null }
+                     const userMessageIndex = awaitingReply?.messageIndex ?? messages.value.length - 1
+                     let data: ChatResponse | null = null
+                     if (streamed && res.body) {
+                            for await (const event of readSseEvents(res.body)) {
+                                   if (requestId !== textRequestId || abort.signal.aborted) return
+                                   if (event.event === 'sentence') {
+                                          const sentence = isRecord(event.data) && typeof event.data.text === 'string'
+                                                 ? event.data.text
+                                                 : ''
+                                          if (!sentence) continue
+                                          if (spokenSentences === 0) {
+                                                 // 已經開口就不再合併：使用者這時補的話是下一輪。
+                                                 awaitingReply = null
+                                                 state.value = 'SPEAKING'
+                                                 context.replyStarted(replyContext)
+                                          }
+                                          spokenSentences += 1
+                                          context.replySentence(sentence)
+                                   } else if (event.event === 'done') {
+                                          data = (isRecord(event.data) ? event.data : {}) as ChatResponse
+                                          break
+                                   } else if (event.event === 'error') {
+                                          throw streamErrorFrom(event.data)
+                                   }
+                            }
+                            if (requestId !== textRequestId || abort.signal.aborted) return
+                            if (!data) throw new ChatStreamError('回答串流中斷', 'BRAIN_ERROR')
+                     } else {
+                            data = await res.json() as ChatResponse
+                     }
                      if (requestId !== textRequestId || abort.signal.aborted) return
                      // 解析出完整回答才關閉合併視窗；headers 到了但 body 未到仍可補句。
                      awaitingReply = null
@@ -137,20 +217,27 @@ export function useAvatarTextTurn(context: TextTurnContext) {
                      }
                      if (data.session_id) sessionId.value = data.session_id
                      if (decisionDebugEnabled.value) decisionDebug.value = parseDecisionDebug(data.decision_debug)
-                     context.applyResponseMedia(data)
                      state.value = 'IDLE'
-                     if (data.reply?.trim()) {
-                            context.playReply(data.reply, {
-                                   source: 'text',
-                                   speechLanguage: speechLanguage ?? null,
-                            })
+                     if (spokenSentences > 0) {
+                            context.attachStreamedMedia(data, userMessageIndex)
+                            context.replyFinished(data.reply ?? '')
+                     } else {
+                            context.applyResponseMedia(data)
+                            if (data.reply?.trim()) context.playReply(data.reply, replyContext)
                      }
               } catch (err) {
                      if ((err as Error).name !== 'AbortError' && requestId === textRequestId) {
                             console.error('[AvatarChat] text chat error:', err)
-                            if (requestId === textRequestId) awaitingReply = null
+                            awaitingReply = null
                             state.value = 'ERROR'
-                            options.onServerError?.('BRAIN_ERROR', (err as Error).message)
+                            // 已經開口的回答沒有被確認，不寫進歷史；停掉，免得念完一個不存在的回答。
+                            if (spokenSentences > 0) context.abandonReply()
+                            const streamError = err instanceof ChatStreamError ? err : null
+                            options.onServerError?.(
+                                   streamError?.code ?? 'BRAIN_ERROR',
+                                   (err as Error).message,
+                                   streamError?.retryAfterMs,
+                            )
                      }
               } finally {
                      if (textAbortController === abort) {

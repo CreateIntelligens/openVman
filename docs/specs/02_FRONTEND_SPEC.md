@@ -185,9 +185,11 @@ VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 
 #### 可合併回答的接收確認（2026-10-02）
 
 前台 HTTP Chat 同時送 `turn_id`、`turn_revision`；補句沿用 ID 並遞增版本。
-回答 headers 抵達不代表內容已收到，直到 JSON 完整解析並通過請求版本檢查前，
-都保持合併視窗。Brain 回傳 `requires_accept: true` 後，先送
-`POST /api/v1/chat/accept` 確認，再進入 TTS／字幕。確認使用與原請求相同的
+回答 headers 抵達不代表內容已收到：逐句串流時到第一個 `sentence` 為止、退回
+`/chat` 時到 JSON 完整解析並通過請求版本檢查為止，都保持合併視窗。Brain 回傳
+`requires_accept: true` 後送 `POST /api/v1/chat/accept` 確認；退回 `/chat` 時
+確認完才進入 TTS／字幕，逐句串流則邊收邊念、在 `done` 之後確認（中途停止就
+不確認，這輪不寫入歷史）。確認使用與原請求相同的
 帳號、專案、人設與 session；丟失回應最多重試一次，每次等 10 秒。
 這次確認不跟隨播放停止一起取消，下一輪生成需等待確認，以確保歷史完整。
 過時回答與過時錯誤均不能覆寫新一輪狀態。
@@ -196,6 +198,27 @@ Brain 在 SQLite 同一交易內檢查版本並寫入兩則訊息，未確認答
 自動記憶。這不是模型或工具副作用的回滾。後台 Chat、外部 SDK、視覺事件與
 未提供回合欄位的 API 沿用原流程。ASR 啟動尚未完成而回答開始播放時，也必須
 取消啟動；連續 VAD 說話超過閒置上限不能被中途關麥克風。
+
+#### 文字模式逐句串流（2026-10-15）
+
+虛擬人前台的文字模式（`settings.voiceMode === 'text'`）改用
+`POST /api/v1/chat/stream`（SSE，request body 與 `/chat` 相同；事件定義見
+`docs/guides/integration-quickstart.md`「逐句串流」）：
+
+| 階段 | 前台行為 |
+|---|---|
+| 送出 | `useAvatarTextTurn` 以 `fetch` + `ReadableStream` 讀事件（`chatSseStream.ts`，EventSource 不能送 POST body）；`state` 為 `THINKING`，可合併補句 |
+| 第一個 `sentence` | 關閉合併視窗、`state` 改 `SPEAKING`，`onReplyStart` 重設播放排程，延遲量測記 `first_sentence` 與 `tts_start` |
+| 每個 `sentence` | `onReplySentence` 交給 `replySpeechQueue`：同時只跑一個 `/api/v1/tts/stream`，聲音依序進同一個播放佇列（對嘴與 2D 唇形照舊）；前一段還在合成時到的句子併成下一個請求，避免短句各等一次 TTS 首包 |
+| 字幕 | 每段的第一個聲音出來時才把該段文字接到同一個 AI 氣泡（`useTypewriter.append`），字幕跟著聲音一段一段出現 |
+| `done` | 與 `/chat` 回應相同：版本檢查與 `accept`、`session_id`、決策除錯、附圖／連結（補到已出現的氣泡上），`state` 回 `IDLE`。`onReplyEnd` 以 `done.reply` 為準；句子與它不一致（模型改叫工具、供應商中途換家，極少見）時字幕直接換成 `done.reply`，已念出的部分收不回 |
+| `error` | 依 `detail.error_code`（沒有就 `BRAIN_ERROR`）與 `retry_after_ms` 走 `onServerError`，這輪不確認；串流沒有 `done` 就結束、`accept` 被拒也視為錯誤。已經開口的回答會停掉（沒確認就不在歷史裡） |
+| 停止／插話／新的一句 | `stopActiveResponse()` abort 這個 fetch（Brain 停止生成、不寫這輪）、清空句子佇列並停止 TTS 與播放；晚到的事件以 request id 丟棄 |
+
+串流路由回 404／405 時，同一個請求改送 `POST /api/v1/chat`；`/chat` 也回 404／405
+表示是專案或角色不存在，下一輪仍先試串流，否則視為部署沒有串流路由，之後整個頁面
+直接走 `/chat`，行為同串流之前（整段回答到齊後才合成）。視覺事件與 Live
+（WebSocket）模式仍以 `onUtteranceComplete` 一次念整段，但同樣經過句子佇列。
 
 ### 7. 狀態機控制 (State Transitions)
 

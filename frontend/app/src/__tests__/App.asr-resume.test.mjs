@@ -36,7 +36,7 @@ test("the stream is closed rather than left idle while the avatar speaks", () =>
 test("the gap while TTS synthesises still counts as answering", () => {
   const block = app.match(/const avatarSpeaking = computed\(\(\) =>([\s\S]*?)\);/);
   assert.match(block[1], /ttsPending\.value/);
-  assert.match(app, /ttsPending\.value = true;\s*turnTiming\.mark\("tts_start"\);\s*void ttsStreamer\.speak/);
+  assert.match(app, /ttsPending\.value = true;\s*turnTiming\.mark\("tts_start"\);\s*return ttsStreamer\.speak/);
 });
 
 test("turning the microphone off by hand is not undone after the reply", () => {

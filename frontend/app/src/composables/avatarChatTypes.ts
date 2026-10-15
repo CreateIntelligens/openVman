@@ -75,10 +75,22 @@ export interface ChatOptions {
        onDisconnect?: () => void
        /** Called after automatic reconnect attempts are exhausted */
        onReconnectExhausted?: () => void
-       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/v1/chat */
+       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/v1/chat(/stream) */
        mode?: 'live' | 'text'
-       /** Override text-mode chat endpoint. */
+       /** Override text-mode chat endpoint (also the fallback when streaming is unavailable). */
        chatEndpoint?: string
+       /**
+        * Text-mode SSE endpoint (normally /api/v1/chat/stream). When set, replies
+        * arrive sentence by sentence through onReplyStart / onReplySentence /
+        * onReplyEnd instead of a single onUtteranceComplete.
+        */
+       chatStreamEndpoint?: string
+       /** First sentence of a streamed text reply arrived. */
+       onReplyStart?: (context: UtteranceContext) => void
+       /** One sentence of a streamed text reply, in order, whitespace preserved. */
+       onReplySentence?: (text: string) => void
+       /** Streamed reply finished; `text` is the authoritative full reply (done.reply). */
+       onReplyEnd?: (text: string) => void
        /** Delivery acknowledgement for replaceable text turns. */
        chatAcceptEndpoint?: string
        /** Override text-mode vision describe endpoint. */

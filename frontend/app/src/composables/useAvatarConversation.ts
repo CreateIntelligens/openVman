@@ -1,6 +1,12 @@
 import { computed, ref, onUnmounted, type Ref } from "vue";
 import { useAudioPlayer } from "./useAudioPlayer";
-import { useAvatarChat, type SendMessageResult } from "./useAvatarChat";
+import {
+  DEFAULT_TEXT_CHAT_STREAM_ENDPOINT,
+  useAvatarChat,
+  type SendMessageResult,
+  type UtteranceContext,
+} from "./useAvatarChat";
+import { createReplySpeechQueue } from "./replySpeechQueue";
 import { useTtsStreamer, type TtsProvider } from "./useTtsStreamer";
 import { useTypewriter } from "./useTypewriter";
 import type { useAvatarStage } from "./useAvatarStage";
@@ -80,8 +86,14 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     },
   });
 
-  // pendingText holds the text between onUtteranceComplete and onFirstAudio
+  // pendingText：正在合成的那一段文字，第一段聲音出來時才交給打字機。
   let pendingText = "";
+  // 這一輪的字幕氣泡已經開了：後面的句子接在同一個氣泡後面。
+  let subtitleStarted = false;
+  // 串流句子跟最終回答不一致（極少見）時，字幕直接換成最終回答，後面的段落不再追加。
+  let subtitleFinal = false;
+  let streamedText = "";
+  let replySpeakOptions: ReturnType<typeof languageRoutesSpeakOptions> | undefined;
   // 回覆已到、TTS 還在合成第一段聲音（約 2 秒）：這段空檔也算在回答，否則講完自動
   // 恢復收音會在開口前就打開麥克風，收到虛擬人自己的聲音。
   const ttsPending = ref(false);
@@ -92,7 +104,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     onFirstAudio: () => {
       turnTiming.mark("first_audio");
       ttsPending.value = false;
-      typewriter.start(pendingText);
+      showSubtitle(pendingText);
       pendingText = "";
     },
     onPcmChunk: (pcm) => {
@@ -108,6 +120,9 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       ttsPending.value = false;
       console.error("[TTS] stream error:", err);
       turnTiming.finish("error");
+      // 這段念不出來也要讓字看得到。
+      showSubtitle(pendingText);
+      pendingText = "";
       typewriter.flush();
       isTyping.value = false;
     },
@@ -115,6 +130,47 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       statusToastRef.value?.show(fallback.message);
     },
   });
+  function showSubtitle(text: string): void {
+    if (!text || subtitleFinal) return;
+    if (!subtitleStarted) {
+      subtitleStarted = true;
+      typewriter.start(text);
+      return;
+    }
+    isTyping.value = true;
+    typewriter.append(text);
+  }
+
+  const speechQueue = createReplySpeechQueue({
+    speak: (segment) => {
+      pendingText = segment;
+      ttsPending.value = true;
+      turnTiming.mark("tts_start");
+      return ttsStreamer.speak(segment, replySpeakOptions).finally(() => {
+        ttsPending.value = false;
+      });
+    },
+  });
+
+  function beginReply(context: UtteranceContext): void {
+    speechQueue.cancel();
+    isFinalReceived = true;
+    clearUnderrunTimer();
+    audio.resetSchedule();
+    pendingText = "";
+    subtitleStarted = false;
+    subtitleFinal = false;
+    streamedText = "";
+    spokenReply.value = "";
+    replySpeakOptions = languageRoutesSpeakOptions(context.speechLanguage);
+  }
+
+  function speakSentence(text: string): void {
+    streamedText += text;
+    spokenReply.value = streamedText;
+    speechQueue.push(text);
+  }
+
   /** TTS 參數：使用者真的講台語（且有台語分流）才換 VoxCPM，後端會再核對一次。 */
   function languageRoutesSpeakOptions(speechLanguage: string | null) {
     const { provider, switched } = languageRoutes.ttsProviderFor(
@@ -155,6 +211,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     onStopAudio: () => {
       turnTiming.interrupted();
       ttsPending.value = false;
+      speechQueue.cancel();
       ttsStreamer.cancel();
       audio.flush();
       wasm.clearAudio();
@@ -166,18 +223,29 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       isFinalReceived = false;
     },
     onUtteranceComplete: (fullText, context) => {
-      spokenReply.value = fullText;
-      isFinalReceived = true;
-      clearUnderrunTimer();
-      audio.resetSchedule();
-      pendingText = fullText;
+      beginReply(context);
       turnTiming.mark("reply_done");
       turnTiming.replyText(fullText);
-      ttsPending.value = true;
-      turnTiming.mark("tts_start");
-      void ttsStreamer.speak(fullText, languageRoutesSpeakOptions(context.speechLanguage)).finally(() => {
-        ttsPending.value = false;
-      });
+      speakSentence(fullText);
+    },
+    // 逐句串流：第一句到就開始合成，後面的句子依序排隊，播放與對嘴不中斷。
+    chatStreamEndpoint: DEFAULT_TEXT_CHAT_STREAM_ENDPOINT,
+    onReplyStart: (context) => {
+      beginReply(context);
+      turnTiming.mark("first_sentence");
+    },
+    onReplySentence: speakSentence,
+    onReplyEnd: (fullText) => {
+      turnTiming.mark("reply_done");
+      turnTiming.replyText(fullText);
+      spokenReply.value = fullText;
+      if (!fullText.trim() || fullText.trim() === streamedText.trim()) return;
+      subtitleFinal = true;
+      typewriter.stop();
+      if (!subtitleStarted) chat.beginAssistantMessage();
+      subtitleStarted = true;
+      chat.setAssistantText(fullText);
+      isTyping.value = false;
     },
     onServerError: (code, message, retryAfterMs) => {
       turnTiming.finish("error");

@@ -3,7 +3,7 @@
  * gateway: messages, turn state, decision debug and live protocol events.
  * Transport and side channels live in sibling modules:
  *   useAvatarTransport   — live-mode WebSocket connect / reconnect
- *   useAvatarTextTurn    — text-mode HTTP POST /api/v1/chat turns
+ *   useAvatarTextTurn    — text-mode HTTP turns (/api/v1/chat/stream or /api/v1/chat)
  *   useAvatarVisualInput — camera frames and visual signal state
  *
  * Protocol (live mode):
@@ -11,7 +11,8 @@
  *   user_speak  → server_stream_chunk (audio) → server_stop_audio
  *   client_interrupt
  *
- * Text mode: uses /api/v1/chat (standard chat completions, any provider)
+ * Text mode: uses /api/v1/chat/stream when chatStreamEndpoint is set (sentences
+ * reach TTS as they are written), otherwise /api/v1/chat.
  */
 import { ref, readonly, onUnmounted } from 'vue'
 import { parseDecisionDebug, type DecisionDebug } from '../components/debug/decisionDebug'
@@ -39,7 +40,7 @@ export type {
        VisualSignalState,
        VisualState,
 } from './avatarChatTypes'
-export { DEFAULT_TEXT_CHAT_ENDPOINT } from './useAvatarTextTurn'
+export { DEFAULT_TEXT_CHAT_ENDPOINT, DEFAULT_TEXT_CHAT_STREAM_ENDPOINT } from './useAvatarTextTurn'
 export { DEFAULT_VISION_ENDPOINT, DEFAULT_VISION_RESET_ENDPOINT } from './useAvatarVisualInput'
 
 interface Citation {
@@ -94,7 +95,18 @@ export function useAvatarChat(options: ChatOptions = {}) {
               projectId: () => currentProjectId,
               personaId: () => currentPersonaId,
               applyResponseMedia,
+              attachStreamedMedia,
               playReply,
+              replyStarted: (context) => {
+                     responsePlaybackActive = true
+                     options.onReplyStart?.(context)
+              },
+              replySentence: (text) => options.onReplySentence?.(text),
+              replyFinished: (text) => options.onReplyEnd?.(text),
+              abandonReply: () => {
+                     responsePlaybackActive = false
+                     options.onStopAudio?.()
+              },
        })
        const {
               resetVisualState,
@@ -138,6 +150,16 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      ?? optionalString(primary?.source_url)
               if (imageId) activeImageId = imageId
               if (url) activeUrl = url
+       }
+
+       /** 串流回答的字幕氣泡通常在 done 之前就出現了，附圖要補到那個氣泡上。 */
+       function attachStreamedMedia(data: ChatResponse, userMessageIndex: number): void {
+              applyResponseMedia(data)
+              const lastIndex = messages.value.length - 1
+              const last = messages.value[lastIndex]
+              if (last?.role === 'ai' && lastIndex > userMessageIndex) {
+                     Object.assign(last, consumeActiveMetadata())
+              }
        }
 
        function consumeActiveMetadata(): Pick<
@@ -434,6 +456,13 @@ export function useAvatarChat(options: ChatOptions = {}) {
               })
        }
 
+       /** Replace the current AI bubble's text (the streamed sentences differed from the final reply). */
+       function setAssistantText(text: string): void {
+              const last = messages.value[messages.value.length - 1]
+              if (last && last.role === 'ai') last.text = text
+              else appendAssistantText(text)
+       }
+
        /** Append a chunk of text to the current AI bubble (creating one if needed). */
        function appendAssistantText(chunk: string): void {
               if (!chunk) return
@@ -474,5 +503,6 @@ export function useAvatarChat(options: ChatOptions = {}) {
               manualReconnect,
               beginAssistantMessage,
               appendAssistantText,
+              setAssistantText,
        }
 }
