@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  accessSectionOf,
   buildAdminPath,
+  canAccessRoute,
   consumeChatDeepLink,
   parseAdminRoute,
   allTabs,
   isTabVisible,
+  tabGroups,
+  visibleAccessSections,
+  type TabAccess,
 } from "./navigation";
 
 beforeEach(() => window.history.replaceState(null, "", "/admin/chat"));
@@ -30,10 +35,10 @@ describe("admin navigation routes", () => {
   });
 
   it("round-trips account API key routes including the public prefix", () => {
-    expect(parseAdminRoute("/admin/accounts/api-keys")).toEqual({ tab: "Accounts", subView: "api-keys" });
+    expect(parseAdminRoute("/admin/access/api-keys")).toEqual({ tab: "Access", subView: "api-keys" });
     window.history.replaceState(null, "", "/openvman/admin/chat");
-    expect(buildAdminPath("Accounts", "default", "api-keys")).toBe("/openvman/admin/accounts/api-keys");
-    expect(parseAdminRoute("/openvman/admin/accounts/api-keys")).toEqual({ tab: "Accounts", subView: "api-keys" });
+    expect(buildAdminPath("Access", "default", "api-keys")).toBe("/openvman/admin/access/api-keys");
+    expect(parseAdminRoute("/openvman/admin/access/api-keys")).toEqual({ tab: "Access", subView: "api-keys" });
   });
 
   it("rejects unknown paths", () => {
@@ -85,7 +90,7 @@ describe("admin navigation routes", () => {
 describe("canonical subpage routes", () => {
   it("opens subpages directly without depending on saved browser state", () => {
     expect(parseAdminRoute("/admin/voice/asr")).toEqual({ tab: "Voice", subView: "asr" });
-    expect(parseAdminRoute("/admin/accounts/temporary")).toEqual({ tab: "Accounts", subView: "temporary" });
+    expect(parseAdminRoute("/admin/access/accounts/temporary")).toEqual({ tab: "Access", subView: "accounts/temporary" });
     expect(parseAdminRoute("/openvman/admin/avatar/mascots/")).toEqual({ tab: "Avatar", subView: "mascots" });
   });
 
@@ -123,16 +128,108 @@ describe("model-provider administration route", () => {
   });
 });
 
-describe("access graph route", () => {
-  it("sits next to account management and is hidden from plain users", () => {
-    const keys = allTabs.map((item) => item.key);
-    expect(keys.indexOf("AccessGraph")).toBe(keys.indexOf("Accounts") + 1);
-    expect(buildAdminPath("AccessGraph")).toBe("/admin/access-graph");
-    expect(parseAdminRoute("/admin/access-graph")).toEqual({ tab: "AccessGraph" });
+describe("merged access and system status pages", () => {
+  const accessRoutes: [string, string | undefined][] = [
+    ["/admin/access", undefined],
+    ["/admin/access/accounts", "accounts"],
+    ["/admin/access/accounts/temporary", "accounts/temporary"],
+    ["/admin/access/accounts/manage", "accounts/manage"],
+    ["/admin/access/api-keys", "api-keys"],
+    ["/admin/access/graph", "graph"],
+    ["/admin/access/embed-keys", "embed-keys"],
+  ];
 
-    const tab = allTabs.find((item) => item.key === "AccessGraph")!;
-    expect(isTabVisible(tab, "root")).toBe(true);
-    expect(isTabVisible(tab, "admin")).toBe(true);
-    expect(isTabVisible(tab, "user")).toBe(false);
+  it.each(accessRoutes)("round-trips %s", (path, subView) => {
+    const route = subView ? { tab: "Access", subView } : { tab: "Access" };
+    expect(parseAdminRoute(path)).toEqual(route);
+    expect(parseAdminRoute(`${path}/`)).toEqual(route);
+    expect(buildAdminPath("Access", "demo", subView)).toBe(`${path}?project=demo`);
+    window.history.replaceState(null, "", "/openvman/admin/chat");
+    expect(buildAdminPath("Access", "default", subView)).toBe(`/openvman${path}`);
+    expect(parseAdminRoute(`/openvman${path}`)).toEqual(route);
+  });
+
+  it("uses projects and health as the default tabs", () => {
+    expect(buildAdminPath("Access", "default", "projects")).toBe("/admin/access");
+    expect(parseAdminRoute("/admin/access/projects")).toEqual({ tab: "Access" });
+    expect(buildAdminPath("SystemStatus")).toBe("/admin/system");
+    expect(buildAdminPath("SystemStatus", "default", "health")).toBe("/admin/system");
+    expect(parseAdminRoute("/admin/system")).toEqual({ tab: "SystemStatus" });
+    expect(buildAdminPath("SystemStatus", "default", "monitoring")).toBe("/admin/system/monitoring");
+    expect(parseAdminRoute("/admin/system/monitoring")).toEqual({ tab: "SystemStatus", subView: "monitoring" });
+  });
+
+  it("only accepts known nested views", () => {
+    expect(parseAdminRoute("/admin/access/accounts/unknown")).toBeNull();
+    expect(parseAdminRoute("/admin/access/graph/extra")).toBeNull();
+    expect(parseAdminRoute("/admin/access/accounts/manage/extra")).toBeNull();
+    expect(parseAdminRoute("/admin/system/health/extra")).toBeNull();
+    expect(parseAdminRoute("/admin/voice/tts/asr")).toBeNull();
+  });
+
+  // 路徑改版不留轉址：舊網址直接失效。
+  it.each([
+    "/admin/projects",
+    "/admin/accounts",
+    "/admin/accounts/temporary",
+    "/admin/accounts/manage",
+    "/admin/accounts/api-keys",
+    "/admin/access-graph",
+    "/admin/embed-keys",
+    "/admin/health",
+    "/admin/monitoring",
+  ])("no longer resolves the retired path %s", (path) => {
+    expect(parseAdminRoute(path)).toBeNull();
+  });
+
+  it("maps nested account views to the accounts tab", () => {
+    expect(accessSectionOf(undefined)).toBe("projects");
+    expect(accessSectionOf("accounts/temporary")).toBe("accounts");
+    expect(accessSectionOf("embed-keys")).toBe("embed-keys");
+  });
+
+  it("enforces the access tab permission matrix", () => {
+    const matrix: Record<string, Record<TabAccess, boolean>> = {
+      projects: { user: true, admin: true, root: true },
+      accounts: { user: false, admin: true, root: true },
+      "accounts/temporary": { user: false, admin: true, root: true },
+      "accounts/manage": { user: false, admin: true, root: true },
+      "api-keys": { user: true, admin: true, root: true },
+      graph: { user: false, admin: true, root: true },
+      "embed-keys": { user: false, admin: true, root: true },
+    };
+    for (const [subView, expected] of Object.entries(matrix)) {
+      for (const access of ["user", "admin", "root"] as const) {
+        expect(
+          canAccessRoute({ tab: "Access", subView }, access),
+          `${subView} for ${access}`,
+        ).toBe(expected[access]);
+      }
+    }
+    expect(visibleAccessSections("user").map((item) => item.id)).toEqual(["projects", "api-keys"]);
+    expect(visibleAccessSections("admin").map((item) => item.id)).toEqual([
+      "projects",
+      "accounts",
+      "api-keys",
+      "graph",
+      "embed-keys",
+    ]);
+  });
+
+  it("shows the merged pages in the sidebar to every role", () => {
+    for (const key of ["Access", "SystemStatus"] as const) {
+      const tab = allTabs.find((item) => item.key === key)!;
+      expect(isTabVisible(tab, "user")).toBe(true);
+      expect(isTabVisible(tab, "admin")).toBe(true);
+    }
+  });
+
+  it("groups the sidebar into conversation, knowledge, character and system", () => {
+    expect(tabGroups.map((group) => [group.label, group.tabs.map((tab) => tab.key)])).toEqual([
+      ["Workspace", ["Chat", "Voice", "Sessions", "Search"]],
+      ["Knowledge", ["KnowledgeBase", "Memory", "Workspace"]],
+      ["Character", ["Personas", "Avatar", "Tools"]],
+      ["System", ["Access", "ModelProviders", "Usage", "SystemStatus"]],
+    ]);
   });
 });

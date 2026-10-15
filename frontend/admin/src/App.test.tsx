@@ -51,6 +51,12 @@ vi.mock("./pages/ApiKeys", () => ({
 vi.mock("./pages/Accounts", () => ({
   default: () => <div data-testid="tab-accounts">Accounts tab</div>,
 }));
+vi.mock("./pages/AccessGraph", () => ({
+  default: () => <div data-testid="tab-access-graph">Access graph tab</div>,
+}));
+vi.mock("./pages/EmbedKeys", () => ({
+  default: () => <div data-testid="tab-embed-keys">Embed keys tab</div>,
+}));
 vi.mock("./pages/Chat", () => ({
   default: () => <div data-testid="tab-chat">Chat tab</div>,
 }));
@@ -89,7 +95,6 @@ import {
   getCurrentAccount,
   temporaryLogin,
 } from "./api/auth";
-import { allTabs, isTabVisible } from "./components/app/navigation";
 
 describe("App tab mounting", () => {
   beforeEach(() => {
@@ -134,28 +139,90 @@ describe("App tab mounting", () => {
 
   it("opens account API keys directly for a formal account with existing portal access", async () => {
     vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", kind: "formal", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
-    window.history.replaceState(null, "", "/openvman/admin/accounts/api-keys");
+    window.history.replaceState(null, "", "/openvman/admin/access/api-keys");
     render(<App />);
     expect(await screen.findByTestId("tab-api-keys")).toBeTruthy();
-    expect(window.location.pathname).toBe("/openvman/admin/accounts/api-keys");
+    expect(window.location.pathname).toBe("/openvman/admin/access/api-keys");
     expect(screen.queryByTestId("tab-accounts")).toBeNull();
+    const tabs = within(screen.getByRole("tablist", { name: "專案與權限分頁" }));
+    expect(tabs.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["專案", "API 金鑰"]);
   });
 
   it("keeps other account management pages forbidden to ordinary users", async () => {
     vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
-    window.history.replaceState(null, "", "/admin/accounts/manage");
+    window.history.replaceState(null, "", "/admin/access/accounts/manage");
     render(<App />);
-    await waitFor(() => expect(screen.queryByText("正在載入可用專案…")).toBeNull());
+    expect(await screen.findByText("權限不足")).toBeTruthy();
     expect(screen.queryByTestId("tab-accounts")).toBeNull();
     expect(screen.queryByTestId("tab-api-keys")).toBeNull();
   });
 
   it("forbids the access graph to ordinary users", async () => {
     vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
-    window.history.replaceState(null, "", "/admin/access-graph");
+    window.history.replaceState(null, "", "/admin/access/graph");
     render(<App />);
     expect(await screen.findByText("權限不足")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /權限圖譜/ })).toBeNull();
+    expect(screen.queryByTestId("tab-access-graph")).toBeNull();
+  });
+
+  it("forbids Embed keys to ordinary users who open the link directly", async () => {
+    vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
+    window.history.replaceState(null, "", "/admin/access/embed-keys");
+    render(<App />);
+    expect(await screen.findByText("權限不足")).toBeTruthy();
+    expect(screen.queryByTestId("tab-embed-keys")).toBeNull();
+  });
+
+  it("shows ordinary users only the project and API key tabs", async () => {
+    vi.mocked(getCurrentAccount).mockResolvedValue({ id: "user-1", username: "user", role: "user", kind: "formal", disabled: false, created_at: "2026-01-01T00:00:00Z", admin_portal_access: true });
+    window.history.replaceState(null, "", "/admin/access");
+    render(<App />);
+    expect(await screen.findByTestId("tab-projects")).toBeTruthy();
+    const tabs = within(screen.getByRole("tablist", { name: "專案與權限分頁" }));
+    expect(tabs.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["專案", "API 金鑰"]);
+    fireEvent.click(tabs.getByRole("tab", { name: "API 金鑰" }));
+    expect(await screen.findByTestId("tab-api-keys")).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/access/api-keys");
+  });
+
+  it("gives administrators every access tab and keeps tab changes in the URL", async () => {
+    window.history.replaceState(null, "", "/admin/access");
+    render(<App />);
+    expect(await screen.findByTestId("tab-projects")).toBeTruthy();
+    const tabs = within(screen.getByRole("tablist", { name: "專案與權限分頁" }));
+    expect(tabs.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "專案",
+      "帳號",
+      "API 金鑰",
+      "權限圖譜",
+      "Embed 金鑰",
+    ]);
+    fireEvent.click(tabs.getByRole("tab", { name: "Embed 金鑰" }));
+    expect(await screen.findByTestId("tab-embed-keys")).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/access/embed-keys");
+    fireEvent.click(tabs.getByRole("tab", { name: "權限圖譜" }));
+    expect(await screen.findByTestId("tab-access-graph")).toBeTruthy();
+    expect(screen.queryByTestId("tab-embed-keys")).toBeNull();
+    expect(window.location.pathname).toBe("/admin/access/graph");
+  });
+
+  it("mounts only the active system status tab", async () => {
+    window.history.replaceState(null, "", "/admin/system/monitoring");
+    render(<App />);
+    expect(await screen.findByTestId("tab-monitoring")).toBeTruthy();
+    expect(screen.queryByTestId("tab-health")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "健康" }));
+    expect(await screen.findByTestId("tab-health")).toBeTruthy();
+    expect(screen.queryByTestId("tab-monitoring")).toBeNull();
+    expect(window.location.pathname).toBe("/admin/system");
+  });
+
+  it("does not resolve the retired page paths", async () => {
+    window.history.replaceState(null, "", "/admin/health");
+    render(<App />);
+    expect(await screen.findByTestId("tab-chat")).toBeTruthy();
+    expect(screen.queryByTestId("tab-health")).toBeNull();
+    expect(window.location.pathname).toBe("/admin/chat");
   });
 
   it("opens API key management from the mobile drawer", async () => {
@@ -165,14 +232,14 @@ describe("App tab mounting", () => {
     fireEvent.click(within(drawer).getByRole("button", { name: "API 金鑰" }));
     expect(await screen.findByTestId("tab-api-keys")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "主要導覽" })).toBeNull();
-    expect(window.location.pathname).toBe("/admin/accounts/api-keys");
+    expect(window.location.pathname).toBe("/admin/access/api-keys");
   });
 
   it("opens API key management from the global account entry", async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "管理帳號 API 金鑰" }));
     expect(await screen.findByTestId("tab-api-keys")).toBeTruthy();
-    expect(window.location.pathname).toBe("/admin/accounts/api-keys");
+    expect(window.location.pathname).toBe("/admin/access/api-keys");
   });
 
   it("uses the URL default project instead of a saved project for direct links", async () => {
@@ -181,7 +248,7 @@ describe("App tab mounting", () => {
       { project_id: "default", label: "Default", document_count: 0, persona_count: 0 },
       { project_id: "saved", label: "Saved", document_count: 0, persona_count: 0 },
     ] });
-    window.history.replaceState(null, "", "/admin/health");
+    window.history.replaceState(null, "", "/admin/system");
     render(<App />);
     await screen.findByTestId("tab-health");
     expect(window.location.search).toBe("");
@@ -210,10 +277,10 @@ describe("App tab mounting", () => {
   it("restores page and project on browser history navigation", async () => {
     render(<App />);
     await screen.findByTestId("tab-chat");
-    window.history.pushState(null, "", "/admin/health?project=default");
+    window.history.pushState(null, "", "/admin/system?project=default");
     fireEvent.popState(window);
     await screen.findByTestId("tab-health");
-    expect(window.location.pathname + window.location.search).toBe("/admin/health");
+    expect(window.location.pathname + window.location.search).toBe("/admin/system");
   });
 
   it("does not mount Chat without a project grant and keeps project management reachable", async () => {
@@ -223,7 +290,7 @@ describe("App tab mounting", () => {
     expect(await screen.findByText("目前沒有可存取的專案，請聯絡管理員設定權限。")).toBeTruthy();
     expect(screen.queryByTestId("tab-chat")).toBeNull();
     fireEvent.click(screen.getAllByRole("button", { name: "System" })[0]);
-    fireEvent.click(screen.getAllByRole("link", { name: /專案管理/ })[0]);
+    fireEvent.click(screen.getAllByRole("link", { name: /專案與權限/ })[0]);
     expect(await screen.findByTestId("tab-projects")).toBeTruthy();
   });
 
@@ -264,7 +331,7 @@ describe("App tab mounting", () => {
     unmount();
 
     // 切到沒有子視圖的分頁，殘留的值要清掉，否則會跟著跑到別的分頁上。
-    window.history.replaceState(null, "", "/admin/health");
+    window.history.replaceState(null, "", "/admin/system");
     const second = render(<App />);
 
     await waitFor(() => {
@@ -274,16 +341,8 @@ describe("App tab mounting", () => {
     second.unmount();
   });
 
-  it("exposes Embed Keys navigation to administrators only", () => {
-    const embedKeysTab = allTabs.find((tab) => String(tab.key) === "EmbedKeys");
-
-    expect(embedKeysTab).toBeTruthy();
-    expect(isTabVisible(embedKeysTab!, "admin")).toBe(true);
-    expect(isTabVisible(embedKeysTab!, "user")).toBe(false);
-  });
-
   it("restores a deep-linked tab and keeps tab changes in the URL", async () => {
-    window.history.replaceState(null, "", "/admin/health?project=default");
+    window.history.replaceState(null, "", "/admin/system?project=default");
     render(<App />);
 
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
@@ -307,7 +366,7 @@ describe("App tab mounting", () => {
     expect(document.activeElement).toBe(knowledge);
     expect(screen.getAllByRole("button", { name: "Knowledge" }).every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
     fireEvent.click(within(drawer).getByRole("button", { name: "System" }));
-    fireEvent.click(within(drawer).getByRole("link", { name: /系統健康/ }));
+    fireEvent.click(within(drawer).getByRole("link", { name: /系統狀態/ }));
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "主要導覽" })).toBeNull();
   });
@@ -341,7 +400,7 @@ describe("App tab mounting", () => {
   });
 
   it("blocks the account page for a normal user", async () => {
-    window.history.replaceState(null, "", "/admin/accounts");
+    window.history.replaceState(null, "", "/admin/access/accounts");
     vi.mocked(getCurrentAccount).mockResolvedValue({
       id: "user-1",
       username: "viewer",
@@ -394,7 +453,7 @@ describe("App tab mounting", () => {
   });
 
   it("grants ROOT the existing administrator navigation and account route", async () => {
-    window.history.replaceState(null, "", "/admin/accounts");
+    window.history.replaceState(null, "", "/admin/access/accounts");
     vi.mocked(getCurrentAccount).mockResolvedValue({
       id: "root-1",
       username: "ai360",
@@ -407,7 +466,7 @@ describe("App tab mounting", () => {
 
     expect(await screen.findByTestId("tab-accounts")).toBeTruthy();
     expect(
-      screen.getAllByRole("link", { name: /帳號管理/ }).length,
+      screen.getAllByRole("link", { name: /專案與權限/ }).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText("權限不足")).toBeNull();
   });
@@ -429,7 +488,7 @@ describe("App tab mounting", () => {
   });
 
   it("keeps the mascot from covering account administration controls", async () => {
-    window.history.replaceState(null, "", "/admin/accounts");
+    window.history.replaceState(null, "", "/admin/access/accounts");
 
     render(<App />);
 

@@ -53,23 +53,22 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 ### 管理後台
 
-後台每頁都有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/accounts/temporary`），以 `?project=<id>` 指定專案，公開子路徑部署時加 `/openvman` 前綴。完整路由表見 [Canonical Routes](docs/guides/admin-canonical-routes.md)。
+後台每頁都有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/access/accounts/temporary`），以 `?project=<id>` 指定專案，公開子路徑部署時加 `/openvman` 前綴。完整路由表見 [Canonical Routes](docs/guides/admin-canonical-routes.md)。
 
 | 群組 | 頁面 | 用途 |
 |---|---|---|
 | Workspace | 對話 | 文字／語音對話測試；AI 回答可一鍵「修正成 QA」寫回知識庫 |
 | | 語音 | TTS 試聽（`/admin/voice`）；ASR 測試台（`/admin/voice/asr`）：專案詞表、語言分流、多引擎同句比較與錯字率 |
-| | 對話紀錄、知識庫搜尋、工作區 | 檢視 session、測試檢索、編輯 workspace 文件 |
+| | 對話紀錄、知識庫搜尋 | 檢視 session、測試檢索 |
 | Knowledge | 知識庫 | 文件上傳與轉換、問答節點與快速問答、語言分流、知識圖譜、多選批次移動／設定語言／刪除 |
-| | 記憶管理、角色管理 | 長期記憶與人設 |
+| | 記憶管理、工作區 | 長期記憶、編輯 workspace 文件 |
+| Character | 角色管理 | 人設 |
 | | Avatar | 2D 角色、背景，以及嵌入網站右下角的小助理 |
 | | 工具與技能 | Brain 工具與 skills 狀態 |
-| System | 專案管理 | 建立與列出專案 |
-| | 帳號管理 | 正式帳號、臨時帳號批次、資源與引擎授權、展示機台旗標；帳號 API 金鑰（`/admin/accounts/api-keys`）可獨立設定期限、撤銷與查使用紀錄 |
-| | 權限圖譜 | 唯讀的帳號 ↔ 專案授權網路圖（`/admin/access-graph`），可疊加人物、聲音、辨識引擎與臨時帳號圖層，專案標出語言分流，點節點看授權明細 |
-| | Embed 金鑰 | 外部網站嵌入 Avatar 用的金鑰 |
+| System | 專案與權限（`/admin/access`） | 分頁：專案（建立與列出專案）；帳號（正式帳號、臨時帳號批次、資源與引擎授權、展示機台旗標）；API 金鑰（`/admin/access/api-keys`，可獨立設定期限、撤銷與查使用紀錄）；權限圖譜（`/admin/access/graph`，唯讀的帳號 ↔ 專案授權網路圖，可疊加人物、聲音、辨識引擎與臨時帳號圖層）；Embed 金鑰（外部網站嵌入 Avatar 用的金鑰）。一般帳號只看得到專案與 API 金鑰 |
+| | 模型供應商 | 全站模型順序與金鑰，僅 ROOT |
 | | 用量 | 依帳號、專案、session 彙總的模型與 token 用量 |
-| | 系統健康、系統監控 | 服務健康檢查與 Grafana 儀表板 |
+| | 系統狀態（`/admin/system`） | 分頁：健康（服務健康檢查）、監控（Grafana 儀表板，`/admin/system/monitoring`） |
 
 可信任的後端程式可使用帳號 API key，以 `Authorization: Bearer ovk_<key_id>.<secret>` 呼叫 ASR、TTS、Chat 與其他應用 API；權限沿用所屬帳號，root／admin 不需各套獨立 API。完整 key 只在建立時顯示一次，資料庫只存雜湊；管理 key 仍需登入 session。操作、契約與 ASR 範例見 [API key 整合指南](docs/guides/account-api-keys.md)。
 
@@ -101,7 +100,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語分流改用 VoxCPM 或 CosyVoice） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
 
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
-- 專案可在「專案管理 → 語音設定」限制能用的 ASR 引擎與聲音、指定預設值與台語分流引擎；實際能用的是帳號授權與專案限制的交集，備援也不會超出範圍。沒設定的專案不受影響。規則見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
+- 專案可在「專案與權限 → 專案 → 語音設定」限制能用的 ASR 引擎與聲音、指定預設值與台語分流引擎；實際能用的是帳號授權與專案限制的交集，備援也不會超出範圍。沒設定的專案不受影響。規則見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
 - 專案可設定語言分流與 ASR 詞表；未明確指定單次 ASR provider 時，開啟台語分流的專案改用 Breeze（或專案指定的台語引擎）批次辨識並判斷是否為台語，明確指定則保留該引擎。
 - TTS 依帳號授權選擇供應商與聲音，主要節點失敗時自動改用下一家。
 

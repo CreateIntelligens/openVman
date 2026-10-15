@@ -40,7 +40,7 @@
 
 ### 帶專案查詢
 
-專案可以在後台「專案管理 → 語音設定」限制能用的 ASR 引擎與聲音；實際能用的是帳號授權與專案限制的交集。呼叫 `GET /api/v1/me/capabilities?project_id=<project_id>` 時，`asr` 與 `tts.providers` 會改成這個專案能用的範圍，`asr.effective` 是這個專案會先用的引擎，並多一個 `project_policy`：
+專案可以在後台「專案與權限 → 專案 → 語音設定」限制能用的 ASR 引擎與聲音；實際能用的是帳號授權與專案限制的交集。呼叫 `GET /api/v1/me/capabilities?project_id=<project_id>` 時，`asr` 與 `tts.providers` 會改成這個專案能用的範圍，`asr.effective` 是這個專案會先用的引擎，並多一個 `project_policy`：
 
 ```json
 {

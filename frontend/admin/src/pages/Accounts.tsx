@@ -18,10 +18,14 @@ import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
-import { useNavigation } from "../context/NavigationContext";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 
-const ACCOUNT_VIEWS = ["create", "temporary", "manage"] as const;
+// 「專案與權限 → 帳號」分頁內的第二層：建立（正式／臨時）與編輯／管理。
+const ACCOUNT_VIEWS = [
+  "accounts",
+  "accounts/temporary",
+  "accounts/manage",
+] as const;
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -54,18 +58,18 @@ function getDeleteDisabledReason(account: Account, resourceCount: number): strin
 
 export default function Accounts() {
   const { account: currentAccount } = useAuth();
-  const { navigateTo } = useNavigation();
   const isRoot = currentAccount?.role === "root";
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AssignableAccountRole>("user");
-  const [view, setView] = useAdminSubView("Accounts", "create", ACCOUNT_VIEWS);
-  const mainTab = view === "manage" ? "manage" : "create";
-  const creationMode = view === "temporary" ? "temporary" : "formal";
-  const setMainTab = (next: "create" | "manage") => setView(next);
+  const [view, setView] = useAdminSubView("Access", "accounts", ACCOUNT_VIEWS);
+  const mainTab = view === "accounts/manage" ? "manage" : "create";
+  const creationMode = view === "accounts/temporary" ? "temporary" : "formal";
+  const setMainTab = (next: "create" | "manage") =>
+    setView(next === "manage" ? "accounts/manage" : "accounts");
   const setCreationMode = (next: "formal" | "temporary") =>
-    setView(next === "temporary" ? "temporary" : "create");
+    setView(next === "temporary" ? "accounts/temporary" : "accounts");
   const [hasOpenedBatches, setHasOpenedBatches] = useState(false);
   const [createdNotice, setCreatedNotice] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
@@ -151,62 +155,46 @@ export default function Accounts() {
 
   return (
     <div className="page-scroll p-6 lg:p-8">
-      <header className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
-        <h1 className="page-title whitespace-nowrap">帳號管理</h1>
-        <button type="button" className="btn btn-ghost" onClick={() => navigateTo("Accounts", "api-keys")}>API 金鑰</button>
-        <nav
-          className="flex"
-          aria-label="帳號主要功能"
-          role="tablist"
-          onKeyDown={(event) => {
-            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-            event.preventDefault();
-            const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-            const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : mainTab === "create" ? 1 : 0;
-            tabs[next]?.focus();
-            tabs[next]?.click();
-          }}
-        >
+      {/* 第一層分頁在外層頁首；這一層用分段控制，視覺上明顯低一階，不再疊一條底線分頁。 */}
+      <div
+        className="mb-5 inline-flex rounded-lg border border-border bg-surface-sunken p-1"
+        aria-label="帳號功能"
+        role="tablist"
+        onKeyDown={(event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+          const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : mainTab === "create" ? 1 : 0;
+          tabs[next]?.focus();
+          tabs[next]?.click();
+        }}
+      >
+        {([
+          ["create", "建立帳號"],
+          ["manage", "編輯／管理"],
+        ] as const).map(([id, label]) => (
           <button
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-left ${
-              mainTab === "create"
-                ? "border-primary text-content"
-                : "border-transparent text-content-muted hover:text-content"
+            key={id}
+            className={`whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
+              mainTab === id
+                ? "bg-surface-raised text-content shadow-sm"
+                : "text-content-muted hover:text-content"
             }`}
             type="button"
             role="tab"
-            id="accounts-create-tab"
+            id={`accounts-${id}-tab`}
             aria-controls="accounts-main-panel"
-            aria-selected={mainTab === "create"}
-            tabIndex={mainTab === "create" ? 0 : -1}
+            aria-selected={mainTab === id}
+            tabIndex={mainTab === id ? 0 : -1}
             onClick={() => {
-              setMainTab("create");
+              setMainTab(id);
               setError(null);
             }}
           >
-            <span className="block text-sm font-semibold">建立帳號</span>
+            {label}
           </button>
-          <button
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-left ${
-              mainTab === "manage"
-                ? "border-primary text-content"
-                : "border-transparent text-content-muted hover:text-content"
-            }`}
-            type="button"
-            role="tab"
-            id="accounts-manage-tab"
-            aria-controls="accounts-main-panel"
-            aria-selected={mainTab === "manage"}
-            tabIndex={mainTab === "manage" ? 0 : -1}
-            onClick={() => {
-              setMainTab("manage");
-              setError(null);
-            }}
-          >
-            <span className="block text-sm font-semibold">編輯／管理</span>
-          </button>
-        </nav>
-      </header>
+        ))}
+      </div>
 
       {error && (
         <div className="mb-5 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">

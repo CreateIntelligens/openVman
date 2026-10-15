@@ -10,7 +10,6 @@ import { listAccounts, type Account } from "../api/auth";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
 import { useAuth } from "../context/AuthContext";
-import { useNavigation } from "../context/NavigationContext";
 
 const inputClass = "w-full rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm text-content focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50";
 
@@ -30,7 +29,6 @@ function dateLabel(value: string | null): string {
 
 export default function ApiKeys() {
   const { account } = useAuth();
-  const { navigateTo } = useNavigation();
   const [owners, setOwners] = useState<Account[]>([]);
   const [ownerId, setOwnerId] = useState(account?.id ?? "");
   const [keys, setKeys] = useState<AccountApiKey[]>([]);
@@ -148,20 +146,9 @@ export default function ApiKeys() {
 
   return (
     <div className="page-scroll p-6 lg:p-8">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <h1 className="page-title">帳號 API 金鑰</h1>
-          <p className="page-subtitle">供服務串接使用，權限隨所屬帳號的角色與資源授權變動。</p>
-        </div>
-        {isAdmin && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => navigateTo("Accounts", "manage")}
-          >
-            返回帳號管理
-          </button>
-        )}
+      <header className="mb-6 border-b border-border pb-4">
+        <h2 className="page-title">帳號 API 金鑰</h2>
+        <p className="page-subtitle">供服務串接使用，權限隨所屬帳號的角色與資源授權變動。</p>
       </header>
       <div className="space-y-6">
         {error && <StatusAlert type="error" message={error} onDismiss={() => setError(null)} />}

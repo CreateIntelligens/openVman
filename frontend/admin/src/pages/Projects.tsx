@@ -34,7 +34,7 @@ export default function Projects() {
     <div className="page-scroll">
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10 transition-colors">
         <div>
-          <h1 className="page-title">專案管理</h1>
+          <h2 className="page-title">專案管理</h2>
           <p className="page-subtitle">
             管理多專案隔離，每個專案有獨立的 knowledge、persona、memory 空間。
           </p>

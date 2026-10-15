@@ -200,7 +200,7 @@ export default function EmbedKeys() {
     <div className="page-scroll">
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10 transition-colors">
         <div>
-          <h1 className="page-title">Embed 金鑰</h1>
+          <h2 className="page-title">Embed 金鑰</h2>
           <p className="page-subtitle">
             管理外部網站嵌入用的金鑰：綁定專案、限制來源網域與每日用量。
           </p>

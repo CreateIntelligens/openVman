@@ -56,7 +56,7 @@ function render(element: ReactElement) {
       window.addEventListener("popstate", update);
       return () => window.removeEventListener("popstate", update);
     }, []);
-    return <NavigationProvider currentTab="Accounts" currentSubView={view} onSelectTab={(tab, next) => {
+    return <NavigationProvider currentTab="Access" currentSubView={view} onSelectTab={(tab, next) => {
       window.history.pushState(null, "", buildAdminPath(tab, "default", next));
       setView(next);
     }}>{element}</NavigationProvider>;
@@ -66,7 +66,7 @@ function render(element: ReactElement) {
 
 describe("Accounts", () => {
   beforeEach(() => {
-  window.history.replaceState(null, "", "/admin/accounts");
+  window.history.replaceState(null, "", "/admin/access/accounts");
     vi.clearAllMocks();
     authState.account = {
       id: "admin-a",
@@ -92,21 +92,21 @@ describe("Accounts", () => {
   });
 
   it("opens management directly from its URL", async () => {
-    window.history.replaceState(null, "", "/admin/accounts/manage");
+    window.history.replaceState(null, "", "/admin/access/accounts/manage");
     render(<Accounts />);
     expect(screen.getByRole("tab", { name: "編輯／管理" }).getAttribute("aria-selected")).toBe("true");
     expect(await screen.findByText("批次紀錄")).toBeTruthy();
   });
 
   it("opens temporary creation directly and synchronizes mode changes", async () => {
-    window.history.replaceState(null, "", "/admin/accounts/temporary");
+    window.history.replaceState(null, "", "/admin/access/accounts/temporary");
     render(<Accounts />);
     expect(await screen.findByText("臨時帳號批次")).toBeTruthy();
     expect(screen.getByRole("button", { name: "臨時帳號" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "正式帳號" }));
-    expect(window.location.pathname).toBe("/admin/accounts");
+    expect(window.location.pathname).toBe("/admin/access/accounts");
     fireEvent.click(screen.getByRole("button", { name: "臨時帳號" }));
-    expect(window.location.pathname).toBe("/admin/accounts/temporary");
+    expect(window.location.pathname).toBe("/admin/access/accounts/temporary");
   });
 
   it("selects access before creating a formal user", async () => {

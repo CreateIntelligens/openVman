@@ -1,13 +1,11 @@
 import {
   Suspense,
-  lazy,
   useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
 
-import { isAtLeastAdmin } from "./api/auth";
 import AppSidebar from "./components/app/AppSidebar";
 import {
   AdminPortalDeniedState,
@@ -19,7 +17,9 @@ import MascotWidget from "./components/app/MascotWidget";
 import OfflineBanner from "./components/app/OfflineBanner";
 import TopBar, { MobileNavDrawer } from "./components/app/TopBar";
 import {
+  accessSectionOf,
   buildAdminPath,
+  canAccessRoute,
   isTab,
   pageComponents,
   parseAdminRoute,
@@ -42,8 +42,6 @@ import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { useNavigationGroups } from "./hooks/useNavigationGroups";
 import { readScoped, removeScoped, writeScoped } from "./utils/scopedStorage";
-
-const ApiKeys = lazy(() => import("./pages/ApiKeys"));
 
 function initialRoute(): AdminRoute {
   const route = parseAdminRoute(window.location.pathname, window.location.search);
@@ -84,14 +82,14 @@ function AppContent() {
   const currentUrlRef = useRef(
     buildAdminPath(route.tab, projectId, route.subView),
   );
-  const isApiKeys = route.tab === "Accounts" && route.subView === "api-keys";
-  const ActiveComponent = isApiKeys ? ApiKeys : pageComponents[route.tab];
-  const isAdmin = account ? isAtLeastAdmin(account.role) : false;
+  const ActiveComponent = pageComponents[route.tab];
   const access: TabAccess = account?.role ?? "user";
+  const accessSection = route.tab === "Access"
+    ? accessSectionOf(route.subView)
+    : undefined;
+  // 專案與權限頁（Embed 金鑰綁專案除外）要在沒有任何專案授權時也進得去。
   const canLoadPage = projects.some((project) => project.project_id === projectId)
-    || route.tab === "Projects"
-    || route.tab === "Accounts"
-    || route.tab === "AccessGraph"
+    || (accessSection !== undefined && accessSection !== "embed-keys")
     || route.tab === "ModelProviders";
 
   const applyRoute = useCallback(
@@ -196,9 +194,7 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
-  const requiresAdmin = (route.tab === "Accounts" && !isApiKeys)
-    || route.tab === "AccessGraph";
-  if ((requiresAdmin && !isAdmin) || (route.tab === "ModelProviders" && access !== "root")) {
+  if (!canAccessRoute(route, access)) {
     return <ForbiddenState />;
   }
 
@@ -244,7 +240,7 @@ function AppContent() {
             onToggleTheme={toggleTheme}
             onOpenMobileNav={() => setMobileNavOpen(true)}
             onLogout={() => void logout()}
-            onOpenApiKeys={() => switchTab("Accounts", "api-keys")}
+            onOpenApiKeys={() => switchTab("Access", "api-keys")}
           />
 
           <MobileNavDrawer
@@ -255,7 +251,7 @@ function AppContent() {
             onSelectTab={switchTab}
             access={access}
             canManageApiKeys={(account!.kind ?? account!.account_type ?? "formal") === "formal"}
-            onOpenApiKeys={() => switchTab("Accounts", "api-keys")}
+            onOpenApiKeys={() => switchTab("Access", "api-keys")}
             collapsedGroups={collapsedGroups}
             onToggleGroup={toggleGroup}
             username={account!.username}
@@ -286,7 +282,10 @@ function AppContent() {
           </div>
         </main>
 
-        {route.tab !== "Accounts" && route.tab !== "AccessGraph" && <MascotWidget />}
+        {accessSection !== "accounts"
+          && accessSection !== "api-keys"
+          && accessSection !== "graph"
+          && <MascotWidget />}
       </div>
     </NavigationProvider>
   );

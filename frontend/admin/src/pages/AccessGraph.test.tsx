@@ -108,7 +108,7 @@ const accounts: Account[] = [
 
 function renderPage(onSelectTab = vi.fn()) {
   render(
-    <NavigationProvider currentTab="AccessGraph" onSelectTab={onSelectTab}>
+    <NavigationProvider currentTab="Access" currentSubView="graph" onSelectTab={onSelectTab}>
       <AccessGraph />
     </NavigationProvider>,
   );
@@ -171,7 +171,7 @@ describe("AccessGraph page", () => {
     expect(within(panel).getByRole("button", { name: /鶴記/ }).textContent).toContain("預設");
 
     fireEvent.click(within(panel).getByRole("button", { name: /到帳號管理編輯/ }));
-    expect(onSelectTab).toHaveBeenCalledWith("Accounts", "manage");
+    expect(onSelectTab).toHaveBeenCalledWith("Access", "accounts/manage");
   });
 
   it("finds a project through search and lists who can reach it", async () => {

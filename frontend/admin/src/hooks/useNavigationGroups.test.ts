@@ -21,12 +21,12 @@ describe("navigation group preferences", () => {
     const { result, rerender } = renderHook(({ active }: { active: Tab }) => useNavigationGroups(active), {
       initialProps: { active: "Chat" },
     });
-    expect(result.current.collapsedGroups).toEqual({ Workspace: false, Knowledge: true, System: true });
+    expect(result.current.collapsedGroups).toEqual({ Workspace: false, Knowledge: true, Character: true, System: true });
     act(() => result.current.toggleGroup("Workspace"));
     rerender({ active: "Chat" });
     expect(result.current.collapsedGroups.Workspace).toBe(true);
-    rerender({ active: "Health" });
-    expect(result.current.collapsedGroups).toEqual({ Workspace: true, Knowledge: true, System: false });
+    rerender({ active: "SystemStatus" });
+    expect(result.current.collapsedGroups).toEqual({ Workspace: true, Knowledge: true, Character: true, System: false });
     rerender({ active: "Chat" });
     expect(result.current.collapsedGroups.Workspace).toBe(false);
   });
@@ -37,7 +37,7 @@ describe("navigation group preferences", () => {
     act(() => first.result.current.toggleGroup("Workspace"));
     first.unmount();
     const reload = renderHook(() => useNavigationGroups("Chat"));
-    expect(reload.result.current.collapsedGroups).toEqual({ Workspace: false, Knowledge: false, System: true });
+    expect(reload.result.current.collapsedGroups).toEqual({ Workspace: false, Knowledge: false, Character: true, System: true });
     reload.unmount();
     setStorageScope("account-b");
     const other = renderHook(() => useNavigationGroups("Chat"));

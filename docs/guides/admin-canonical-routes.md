@@ -6,26 +6,24 @@
 
 ## 固定頁面路徑
 
-| 頁面 | Canonical path |
-|------|----------------|
-| 對話 | `/admin/chat` |
-| 語音 | `/admin/voice` |
-| 對話紀錄 | `/admin/sessions` |
-| 知識庫搜尋 | `/admin/search` |
-| 工作區 | `/admin/workspace` |
-| 知識庫 | `/admin/knowledge` |
-| 記憶管理 | `/admin/memory` |
-| 角色管理 | `/admin/personas` |
-| Avatar | `/admin/avatar` |
-| 工具與技能 | `/admin/tools` |
-| 專案管理 | `/admin/projects` |
-| 帳號管理 | `/admin/accounts` |
-| 權限圖譜（admin／ROOT） | `/admin/access-graph` |
-| Embed 金鑰 | `/admin/embed-keys` |
-| 模型供應商（僅 ROOT） | `/admin/model-providers` |
-| 用量 | `/admin/usage` |
-| 系統健康 | `/admin/health` |
-| 系統監控 | `/admin/monitoring` |
+側欄分四組，頁面與路徑如下。
+
+| 群組 | 頁面 | Canonical path |
+|------|------|----------------|
+| Workspace（對話） | 對話 | `/admin/chat` |
+| | 語音 | `/admin/voice` |
+| | 對話紀錄 | `/admin/sessions` |
+| | 知識庫搜尋 | `/admin/search` |
+| Knowledge（知識） | 知識庫 | `/admin/knowledge` |
+| | 記憶管理 | `/admin/memory` |
+| | 工作區 | `/admin/workspace` |
+| Character（角色） | 角色管理 | `/admin/personas` |
+| | Avatar | `/admin/avatar` |
+| | 工具與技能 | `/admin/tools` |
+| System（管理） | 專案與權限 | `/admin/access` |
+| | 模型供應商（僅 ROOT） | `/admin/model-providers` |
+| | 用量 | `/admin/usage` |
+| | 系統狀態 | `/admin/system` |
 
 ## 子頁直達
 
@@ -35,12 +33,45 @@
 | 知識庫 | 文件：`/admin/knowledge` | 圖譜：`/admin/knowledge/graph` |
 | Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds`；小助理：`/admin/avatar/mascots` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
-| 帳號 | 正式建立：`/admin/accounts` | 臨時建立：`/admin/accounts/temporary`；編輯／管理：`/admin/accounts/manage`；API 金鑰：`/admin/accounts/api-keys` |
+| 專案與權限 | 專案：`/admin/access` | 帳號：`/admin/access/accounts`（正式建立）、`/admin/access/accounts/temporary`（臨時建立）、`/admin/access/accounts/manage`（編輯／管理）；API 金鑰：`/admin/access/api-keys`；權限圖譜：`/admin/access/graph`；Embed 金鑰：`/admin/access/embed-keys` |
 | 模型供應商 | 主對話模型：`/admin/model-providers` | 決策模型：`/admin/model-providers/decision`；API 金鑰：`/admin/model-providers/keys` |
+| 系統狀態 | 健康：`/admin/system` | 監控（Grafana）：`/admin/system/monitoring` |
+
+子路徑最多兩層，只有「專案與權限 → 帳號」用到第二層；合法組合集中在 `adminSubViews`，其他組合（例如 `/admin/access/graph/extra`）解析為無效路由。
+
+### 分頁權限
+
+「專案與權限」頁的分頁依角色顯示，`requiredRouteAccess()` 是側欄、頁內分頁與直連擋法共用的唯一來源：
+
+| 分頁 | 一般帳號 | admin | ROOT |
+|------|----------|-------|------|
+| 專案 | 可見 | 可見 | 可見 |
+| 帳號（含臨時、編輯／管理） | 權限不足 | 可見 | 可見 |
+| API 金鑰 | 可見（只管本人 key） | 可見 | 可見 |
+| 權限圖譜 | 權限不足 | 可見 | 可見 |
+| Embed 金鑰 | 權限不足 | 可見 | 可見 |
+
+一般帳號只看得到「專案」「API 金鑰」兩個分頁；直接開啟沒有權限的分頁網址會顯示「權限不足」。系統狀態頁只掛目前分頁：離開健康分頁即停止 30 秒輪詢，沒進監控分頁不載入 Grafana iframe。
+
+### 已失效的舊路徑
+
+2026-10-15 起側欄合併，下列舊路徑不轉址、直接失效（解析為無效路由，`/admin/` 入口走還原流程）：
+
+| 舊路徑 | 新路徑 |
+|--------|--------|
+| `/admin/projects` | `/admin/access` |
+| `/admin/accounts` | `/admin/access/accounts` |
+| `/admin/accounts/temporary` | `/admin/access/accounts/temporary` |
+| `/admin/accounts/manage` | `/admin/access/accounts/manage` |
+| `/admin/accounts/api-keys` | `/admin/access/api-keys` |
+| `/admin/access-graph` | `/admin/access/graph` |
+| `/admin/embed-keys` | `/admin/access/embed-keys` |
+| `/admin/health` | `/admin/system` |
+| `/admin/monitoring` | `/admin/system/monitoring` |
 
 公開子路徑部署時加上 `/openvman`，例如 `/openvman/admin/knowledge/graph?project=demo`。`publicAdminPath()` 依目前網址保留此部署前綴。
 
-API 金鑰子頁在既有後台門禁內開放正式帳號管理本人 key，入口位於桌面頁首及手機導覽；管理員另可由帳號頁前往。其他帳號管理子頁仍需 admin／root，不因新增子頁而放寬。
+API 金鑰分頁在既有後台門禁內開放正式帳號管理本人 key，入口位於「專案與權限」頁、桌面頁首及手機導覽。帳號、權限圖譜與 Embed 金鑰分頁仍需 admin／root。
 
 ## 正規化與導覽
 
@@ -63,7 +94,7 @@ API 金鑰子頁在既有後台門禁內開放正式帳號管理本人 key，入
 另以本機 Chrome + Playwright，mock 本地帳號／專案及頁面讀取 API，驗證以下結果：
 
 - `/admin/voice/asr?project=audit` 直達 ASR，切換 TTS、重新整理及上一頁／下一頁均還原對應畫面與網址。
-- `/admin/avatar/mascots`、`/admin/accounts/temporary` 直達指定子頁；省略 project 採 default。
+- `/admin/avatar/mascots`、`/admin/accounts/temporary`（2026-10-15 起改為 `/admin/access/accounts/temporary`）直達指定子頁；省略 project 採 default。
 - 舊 `?view=asr` 正規化為 `/admin/voice/asr`。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址（2026-10-05 起）。
 - Chat lazy module 載入前保留 `session`／`persona`，掛載後對指定對話讀取 history 並清除一次性參數。
 

@@ -382,7 +382,8 @@ ws.onclose = () => { reconnect(); };
 * **Action Request Card**：當 Brain 回傳 `action_request` 事件時，前端以 `ActionRequestCard` 呈現工具調用提案（名稱、參數、說明）；操作者可逐案核可/拒絕，核可後才真正執行工具。
 * **TTS / ASR 控制集中化**：TTS provider / voice、ASR 開關、Live 麥克風鍵皆整併至輸入列，降低視覺雜訊。TTS fallback 會以 toast 提示。
 * **統一導覽 (`NavigationContext`)**：`AppSidebar`、`ChatSidebar`、各頁面共享單一導覽狀態，切換角色 (persona)、載入歷史 session、建立新對話都透過同一份 context 管理。
-* **可收合導覽群組**：`AppSidebar` 與手機 `MobileNavDrawer` 共用 `TabGroup`、`useNavigationGroups`，提供 Workspace／Knowledge／System 個別收合。首次僅開啟目前群組，偏好以帳號範圍保存；載入與路由切換會展開目前頁面的群組。窄側欄保留 W／K／S 標題，群組按鈕具 `aria-expanded`／`aria-controls`，收合項目不進入鍵盤焦點順序。
+* **可收合導覽群組**：`AppSidebar` 與手機 `MobileNavDrawer` 共用 `TabGroup`、`useNavigationGroups`，提供 Workspace／Knowledge／Character／System 個別收合。首次僅開啟目前群組，偏好以帳號範圍保存；載入與路由切換會展開目前頁面的群組。窄側欄保留 W／K／C／S 標題，群組按鈕具 `aria-expanded`／`aria-controls`，收合項目不進入鍵盤焦點順序。
+* **合併分頁頁面**：「專案與權限」（`/admin/access`）與「系統狀態」（`/admin/system`）以 `PageTabsShell` 呈現第一層底線分頁，分頁狀態綁在網址子路徑；「帳號」分頁內的第二層（建立／編輯管理）改用分段控制，與第一層區隔。分頁可見性與直連擋法共用 `navigation.ts` 的 `requiredRouteAccess()`，路由表見 [Canonical Routes](../guides/admin-canonical-routes.md)。
 * **對話紀錄管理與匯出**：`Sessions` workspace 集中提供跨角色瀏覽、文字與秒級時間篩選、排序、批次選取、匯出及刪除。匯出由 Backend 驗證專案讀取權限後交由 Brain 組裝，不從前端逐筆抓取歷史；從紀錄列開啟 Chat 時，以一次性 URL deep link 還原角色與 session，消費後立即移除該參數。
 * **設計 Token (RGB channels)**：`tailwind.config.js` 與 `index.css` 將語意色 (`primary`、`surface`、`danger` 等) 以 `R G B` 三通道形式暴露，讓 Tailwind 透明度修飾符 (`bg-primary/20` 等) 能夠正確運算。
 * **共用控制元件樣式**：Admin 頁面標題與副標題統一使用 `page-title`／`page-subtitle`，按鈕與輸入欄位優先使用 `btn`／`input`，並以 semantic color token 取代頁面專屬色碼。
@@ -391,7 +392,7 @@ ws.onclose = () => { reconnect(); };
 
 ### 12.6 帳號 API 金鑰
 
-`/admin/accounts/api-keys` 提供帳號 API key 的建立、列表及撤銷。桌面頂列、手機導覽及帳號管理頁皆有入口，沿用既有後台准入規則；已可進後台的正式一般帳號只管理自己的 key，root／admin 可選擇其管理範圍內的正式帳號。代發的權限上限由 Backend 驗證。
+`/admin/access/api-keys`（「專案與權限」頁的 API 金鑰分頁）提供帳號 API key 的建立、列表及撤銷。桌面頂列、手機導覽及「專案與權限」頁皆有入口，沿用既有後台准入規則；已可進後台的正式一般帳號只管理自己的 key，root／admin 可選擇其管理範圍內的正式帳號。代發的權限上限由 Backend 驗證。
 
 建立表單包含名稱、到期時間（預設 90 天）及不設期限選項。完整 key 只在建立成功後顯示一次並可複製，關閉提示或離開頁面即清除，不寫入瀏覽器儲存空間或網址。列表顯示期限、撤銷狀態、最近驗證時間及請求次數；撤銷須確認。用量頁可依 `api_key` 主體與 key ID 篩選。契約及串接範例見[帳號 API 金鑰指南](../guides/account-api-keys.md)。
 

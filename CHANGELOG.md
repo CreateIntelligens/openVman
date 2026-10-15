@@ -32,6 +32,8 @@
 
 ### Changed
 
+- **[2026-10-15]** **後台側欄整理**：側欄改為 Workspace（對話、語音、對話紀錄、知識庫搜尋）、Knowledge（知識庫、記憶管理、工作區）、Character（角色管理、Avatar、工具與技能）、System（專案與權限、模型供應商、用量、系統狀態）四組。原「專案管理」「帳號管理」「權限圖譜」「Embed 金鑰」合併為帶分頁的「專案與權限」頁：專案 `/admin/access`、帳號 `/admin/access/accounts`（臨時建立 `/admin/access/accounts/temporary`、編輯／管理 `/admin/access/accounts/manage`，帳號分頁內以分段控制切換）、API 金鑰 `/admin/access/api-keys`、權限圖譜 `/admin/access/graph`、Embed 金鑰 `/admin/access/embed-keys`；一般帳號只看得到專案與 API 金鑰分頁，直連帳號、權限圖譜或 Embed 金鑰分頁顯示「權限不足」（補上 Embed 金鑰原本直連未擋的缺口）。原「系統健康」「系統監控」合併為「系統狀態」頁：健康 `/admin/system`、監控 `/admin/system/monitoring`，只掛目前分頁，離開健康分頁即停止 30 秒輪詢、未進監控分頁不載入 Grafana iframe。路由解析支援兩層子路徑，權限改由 `requiredRouteAccess()` 單一來源判斷。**舊路徑 `/admin/projects`、`/admin/accounts`（含 `/temporary`、`/manage`、`/api-keys`）、`/admin/access-graph`、`/admin/embed-keys`、`/admin/health`、`/admin/monitoring` 不轉址、直接失效**，書籤與外部連結需改用新路徑。後端不變。
+
 - **[2026-10-13]** **個資偵測預設關，改成先問一題總判斷**：`PRIVACY_FILTER_ENABLED` 預設改為 false（正式環境原本靠預設值開著，部署後會關閉，需要時在 `.env` 設 true）。開啟時先問 Clef「有沒有任何個資」一題，有才問 7 類細項：一次 7 題約 0.85 秒，總判斷一題約 0.11 秒，同一批 52 句也是個資句 25/25、誤報 0/27，而大部分訊息沒有個資，Clef 用量約降為八分之一。總判斷說有、細項都沒過門檻時記為 `unclassified`，後台顯示「個資」。
 
 - **[2026-10-13]** **個資偵測改問 Clef，只掃使用者的話**：原本以 OpenAI Privacy Filter（OPF）在 CPU 上掃每次送往 LLM 的使用者訊息與工具結果，再掃模型回覆；每句 3–4 秒、模型 2.7 GB，知識庫段落常被誤判成 secret。52 句虛構中文句子比較：OPF 抓到 19/25（漏「民國75年3月14日」「我爸周文雄」、信用卡與健保卡號）、誤報 2/27；Clef 25/25、誤報 2/27（綽號、職稱）、每句約 0.85 秒。現在使用者每句話在背景問 Clef 7 類個資，只走 Clef（決策路由新增 `providers` 限定，不退到外部的 Jev 或 OpenAI），同時在掃超過 `PRIVACY_MAX_INFLIGHT` 就跳過，逾時或失敗當作沒掃。不再掃工具結果與模型回覆；移除 `opf` 套件、啟動時的模型載入、`opf-cache` volume 與 `PRIVACY_FILTER_DEVICE`、`PRIVACY_FILTER_INCLUDE_SYSTEM` 設定（正式 `.env` 裡的 `PRIVACY_FILTER_EGRESS_ENABLED` 本來就沒有程式讀取，可刪）。後台斷路器的用途標籤新增「個資偵測」。

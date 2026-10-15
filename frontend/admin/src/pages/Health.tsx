@@ -19,7 +19,7 @@ export default function Health() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
         <div>
-          <h1 className="page-title">系統健康</h1>
+          <h2 className="page-title">系統健康</h2>
           <p className="page-subtitle">Real-time status of your brain infrastructure</p>
         </div>
         <div className="flex items-center gap-4">

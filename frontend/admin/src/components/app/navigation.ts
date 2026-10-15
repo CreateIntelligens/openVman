@@ -9,35 +9,40 @@ export const workspaceTabs = [
   { key: "Voice", label: "語音", icon: "graphic_eq" },
   { key: "Sessions", label: "對話紀錄", icon: "forum" },
   { key: "Search", label: "知識庫搜尋", icon: "search" },
-  { key: "Workspace", label: "工作區", icon: "folder_managed" },
 ] as const;
 
 export const knowledgeTabs = [
   { key: "KnowledgeBase", label: "知識庫", icon: "school" },
   { key: "Memory", label: "記憶管理", icon: "memory" },
+  { key: "Workspace", label: "工作區", icon: "folder_managed" },
+] as const;
+
+export const characterTabs = [
   { key: "Personas", label: "角色管理", icon: "groups" },
   { key: "Avatar", label: "Avatar", icon: "face" },
   { key: "Tools", label: "工具與技能", icon: "build" },
 ] as const;
 
 export const systemTabs = [
-  { key: "Projects", label: "專案管理", icon: "folder_copy" },
-  { key: "Accounts", label: "帳號管理", icon: "manage_accounts" },
-  { key: "AccessGraph", label: "權限圖譜", icon: "hub" },
-  { key: "EmbedKeys", label: "Embed 金鑰", icon: "key" },
+  { key: "Access", label: "專案與權限", icon: "admin_panel_settings" },
   { key: "ModelProviders", label: "模型供應商", icon: "neurology" },
   { key: "Usage", label: "用量", icon: "data_usage" },
-  { key: "Health", label: "系統健康", icon: "health_metrics" },
-  { key: "Monitoring", label: "系統監控", icon: "monitoring" },
+  { key: "SystemStatus", label: "系統狀態", icon: "monitor_heart" },
 ] as const;
 
 export const tabGroups = [
   { label: "Workspace", tabs: workspaceTabs },
   { label: "Knowledge", tabs: knowledgeTabs },
+  { label: "Character", tabs: characterTabs },
   { label: "System", tabs: systemTabs },
 ] as const;
 
-export const allTabs = [...workspaceTabs, ...knowledgeTabs, ...systemTabs] as const;
+export const allTabs = [
+  ...workspaceTabs,
+  ...knowledgeTabs,
+  ...characterTabs,
+  ...systemTabs,
+] as const;
 
 export type Tab = (typeof allTabs)[number]["key"];
 export type TabConfig = (typeof allTabs)[number];
@@ -58,14 +63,10 @@ export const pageComponents: Record<
   Personas: lazy(() => import("../../pages/Personas")),
   Avatar: lazy(() => import("../../pages/Avatar")),
   Tools: lazy(() => import("../../pages/Tools")),
-  Projects: lazy(() => import("../../pages/Projects")),
-  Accounts: lazy(() => import("../../pages/Accounts")),
-  AccessGraph: lazy(() => import("../../pages/AccessGraph")),
-  EmbedKeys: lazy(() => import("../../pages/EmbedKeys")),
+  Access: lazy(() => import("../../pages/Access")),
   ModelProviders: lazy(() => import("../../pages/ModelProviders")),
   Usage: lazy(() => import("../../pages/Usage")),
-  Health: lazy(() => import("../../pages/Health")),
-  Monitoring: lazy(() => import("../../pages/Monitoring")),
+  SystemStatus: lazy(() => import("../../pages/SystemStatus")),
 };
 
 const tabPathSegments: Record<Tab, string> = {
@@ -79,28 +80,37 @@ const tabPathSegments: Record<Tab, string> = {
   Personas: "personas",
   Avatar: "avatar",
   Tools: "tools",
-  Projects: "projects",
-  Accounts: "accounts",
-  AccessGraph: "access-graph",
-  EmbedKeys: "embed-keys",
+  Access: "access",
   ModelProviders: "model-providers",
   Usage: "usage",
-  Health: "health",
-  Monitoring: "monitoring",
+  SystemStatus: "system",
 };
 
 const tabsByPathSegment = Object.fromEntries(
   Object.entries(tabPathSegments).map(([tab, segment]) => [segment, tab]),
 ) as Record<string, Tab>;
 
-/** First view is the page default; non-default views have their own URL. */
+/**
+ * First view is the page default; non-default views have their own URL.
+ * A view may carry one nested level ("accounts/temporary") for pages whose
+ * tabs have their own sub-tabs.
+ */
 export const adminSubViews: Partial<Record<Tab, readonly string[]>> = {
   Voice: ["tts", "asr"],
   KnowledgeBase: ["documents", "graph"],
   Avatar: ["characters", "backgrounds", "mascots"],
   Memory: ["browse", "add"],
-  Accounts: ["create", "temporary", "manage", "api-keys"],
+  Access: [
+    "projects",
+    "accounts",
+    "accounts/temporary",
+    "accounts/manage",
+    "api-keys",
+    "graph",
+    "embed-keys",
+  ],
   ModelProviders: ["chat", "decision", "keys"],
+  SystemStatus: ["health", "monitoring"],
 };
 
 export function normalizeAdminRoute(route: AdminRoute): AdminRoute {
@@ -140,13 +150,60 @@ export function isTab(value: string | null): value is Tab {
 
 export type TabAccess = "user" | "admin" | "root";
 
-const ADMIN_ONLY_TABS = new Set<Tab>(["Accounts", "AccessGraph", "EmbedKeys"]);
+const ACCESS_RANK: Record<TabAccess, number> = { user: 0, admin: 1, root: 2 };
+
 // 全站共用的模型順序與金鑰：只管部分專案的 admin 不能動。
 const ROOT_ONLY_TABS = new Set<Tab>(["ModelProviders"]);
 
+export type AccessSection =
+  | "projects"
+  | "accounts"
+  | "api-keys"
+  | "graph"
+  | "embed-keys";
+
+/** 「專案與權限」頁第一層分頁；API 金鑰對一般正式帳號也開放（只管自己的 key）。 */
+export const accessSections: readonly {
+  id: AccessSection;
+  label: string;
+  access: TabAccess;
+}[] = [
+  { id: "projects", label: "專案", access: "user" },
+  { id: "accounts", label: "帳號", access: "admin" },
+  { id: "api-keys", label: "API 金鑰", access: "user" },
+  { id: "graph", label: "權限圖譜", access: "admin" },
+  { id: "embed-keys", label: "Embed 金鑰", access: "admin" },
+];
+
+export function accessSectionOf(subView?: string): AccessSection {
+  const section = subView?.split("/")[0];
+  return accessSections.find((item) => item.id === section)?.id ?? "projects";
+}
+
+export function hasAccess(access: TabAccess, required: TabAccess): boolean {
+  return ACCESS_RANK[access] >= ACCESS_RANK[required];
+}
+
+export function visibleAccessSections(access: TabAccess) {
+  return accessSections.filter((item) => hasAccess(access, item.access));
+}
+
+/** Minimum role for a route; the single source for sidebar, sub-tabs and direct-link guards. */
+export function requiredRouteAccess(route: AdminRoute): TabAccess {
+  if (ROOT_ONLY_TABS.has(route.tab)) return "root";
+  if (route.tab === "Access") {
+    const section = accessSectionOf(route.subView);
+    return accessSections.find((item) => item.id === section)!.access;
+  }
+  return "user";
+}
+
+export function canAccessRoute(route: AdminRoute, access: TabAccess): boolean {
+  return hasAccess(access, requiredRouteAccess(route));
+}
+
 export function isTabVisible(tab: TabConfig, access: TabAccess): boolean {
-  if (ROOT_ONLY_TABS.has(tab.key)) return access === "root";
-  return !ADMIN_ONLY_TABS.has(tab.key) || access !== "user";
+  return canAccessRoute({ tab: tab.key }, access);
 }
 
 export function parseAdminRoute(
@@ -156,7 +213,9 @@ export function parseAdminRoute(
   const normalizedPath = pathname.startsWith(`${PUBLIC_OPENVMAN_PREFIX}/`)
     ? pathname.slice(PUBLIC_OPENVMAN_PREFIX.length)
     : pathname;
-  const match = normalizedPath.match(/^\/admin\/([^/]+)(?:\/([^/]+))?\/?$/);
+  const match = normalizedPath.match(
+    /^\/admin\/([^/]+)(?:\/([^/]+(?:\/[^/]+)?))?\/?$/,
+  );
   if (!match) return null;
 
   const tab = Object.prototype.hasOwnProperty.call(tabsByPathSegment, match[1])
