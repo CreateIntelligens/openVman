@@ -72,6 +72,8 @@
 
 ### Fixed
 
+- **[2026-10-15]** **排除的 VoxCPM／CosyVoice 聲音不再留在授權清單**：`TTS_VOXCPM_EXCLUDED_VOICES`／`TTS_COSYVOICE_EXCLUDED_VOICES` 原本只讓同步略過、不會刪掉以前登錄的聲音，所以 `barbet-hung-yi-lee`（李宏毅老師，9/2 登錄、上游已無此聲音）一直留在資源表，隨「授權全部資源」被授權給帳號，清單看得到、選了卻合成失敗。Backend 啟動同步聲音後新增 `drop_excluded_voices`：該 provider 排除清單上的已登錄聲音連同授權與 admin 範圍一起刪除（外鍵 CASCADE）；只比對同一家 provider，不會誤刪別家同名聲音。
+
 - **[2026-10-15]** **虛擬人前台同分頁重新登入後人物不顯示**：DHLiveMini2.js 在 script 載入時就固定抓住當下的 `#canvas_video`，而 vendor script 與 WASM instance 每頁只載一次。同一分頁登出再登入（或從權限不足頁返回）會卸載整個 App、建一顆新 canvas，引擎卻繼續畫在已脫離頁面的舊 canvas 上，舞台只剩背景，錯誤畫面的重試也沒用，只能手動重新整理。`useOpenVmanAvatarRuntime` 現在記下 vendor 綁定的 canvas，`initWasm` 發現它已不在頁面上時整頁重新載入，再由新頁面重新初始化。與帳號、人物或影片解析度無關。
 
 - **[2026-10-14]** **後台帳號列表不再因授權不完整的帳號整個 500**：正式機有 4 個帳號只被授權辨識引擎、沒有專案／人物／聲音，`GET /api/v1/users` 讀取時套用寫入規則（三類至少各一）驗證而 500，後台帳號管理頁打不開。讀取改用不檢查最少數量的 `AccountResourceGrantsView`（臨時帳號批次的讀取同樣處理），寫入授權仍要求三類至少各一。

@@ -6,6 +6,7 @@ resources at startup so the admin pages can grant them one by one.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -87,6 +88,34 @@ def drop_retired_asr_engines(runtime: AuthRuntime) -> None:
         logger.warning("failed to drop retired asr engines: %s", exc)
 
 
+# 排除清單只對這兩家上游的同步生效；其他 provider 的聲音 ID 可能剛好同名。
+_EXCLUDABLE_VOICE_PROVIDERS = {
+    VOXCPM_PROVIDER_NAME: "tts_voxcpm_excluded_voices",
+    COSYVOICE_PROVIDER_NAME: "tts_cosyvoice_excluded_voices",
+}
+
+
+def drop_excluded_voices(runtime: AuthRuntime, cfg: Any) -> None:
+    """Forget voices an operator excluded after they were already registered.
+
+    同步只會略過排除清單、不會刪掉以前登錄的：barbet-hung-yi-lee 在排除前就
+    進了資源表，之後隨「授權全部資源」一路被授權出去，清單裡一直看得到，選了
+    卻因為上游已沒有這個聲音而合成失敗。刪資源時授權與 admin 範圍靠外鍵一起清。
+    """
+    try:
+        excluded = {
+            provider: excluded_voices(cfg, attr)
+            for provider, attr in _EXCLUDABLE_VOICE_PROVIDERS.items()
+        }
+        for record in runtime.resources.list_by_type(ResourceType.CUSTOM_VOICE):
+            provider = json.loads(record.metadata_json or "{}").get("provider")
+            if record.resource_id in excluded.get(provider, frozenset()):
+                runtime.resources.unregister(ResourceType.CUSTOM_VOICE, record.resource_id)
+                logger.info("removed excluded %s voice %s", provider, record.resource_id)
+    except Exception as exc:
+        logger.warning("failed to drop excluded voices: %s", exc)
+
+
 async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
     """Register voices from enabled providers, mascots and backgrounds."""
     if cfg.edge_tts_enabled:
@@ -159,6 +188,8 @@ async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
                 )
         except Exception as exc:
             logger.warning("failed to sync cosyvoice voices: %s", exc)
+
+    drop_excluded_voices(runtime, cfg)
 
     if cfg.tts_gcp_enabled and cfg.tts_gcp_voice_name:
         try:
