@@ -53,6 +53,8 @@ interface AccessGraphCanvasProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   centerRequest?: CenterRequest | null;
+  /** 傳給版面配置；值變了就重新排版。 */
+  layoutKey?: string;
 }
 
 const FALLBACK_SIZE = { width: 960, height: 640 };
@@ -282,11 +284,12 @@ export default function AccessGraphCanvas({
   selectedId,
   onSelect,
   centerRequest,
+  layoutKey,
 }: AccessGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const { width, height } = useElementSize(containerRef);
-  const { nodes: positions, rings, pin, release } = useForceLayout(graph);
+  const { nodes: positions, rings, pin, release } = useForceLayout(graph, layoutKey);
   const [viewport, setViewport] = useState<Viewport>(() =>
     fitViewport(positions, width, height),
   );

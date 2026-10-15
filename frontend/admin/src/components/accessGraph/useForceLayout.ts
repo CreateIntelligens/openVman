@@ -157,19 +157,28 @@ export function runLayout(
   };
 }
 
-export function useForceLayout(graph: AccessGraph) {
+/**
+ * resetKey 變了就不沿用舊座標：篩選換掉大半節點時，留下來的幾個還停在
+ * 原本的角度，會散在整圈上；重新排才會聚在一起。
+ */
+export function useForceLayout(graph: AccessGraph, resetKey = "") {
   const nodesRef = useRef<Map<string, LayoutNode>>(new Map());
+  const resetKeyRef = useRef(resetKey);
   const simulationRef = useRef<Simulation<LayoutNode, undefined> | null>(null);
   const frameRef = useRef<number | null>(null);
   const [, setFrame] = useState(0);
 
   const layout = useMemo(() => {
     simulationRef.current?.stop();
+    if (resetKeyRef.current !== resetKey) {
+      resetKeyRef.current = resetKey;
+      nodesRef.current = new Map();
+    }
     const result = runLayout(graph, nodesRef.current);
     nodesRef.current = result.nodes;
     simulationRef.current = result.simulation;
     return result;
-  }, [graph]);
+  }, [graph, resetKey]);
 
   useEffect(() => {
     const simulation = layout.simulation;

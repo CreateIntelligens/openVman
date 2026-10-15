@@ -15,8 +15,14 @@ import {
 } from "./buildAccessGraph";
 
 interface AccessGraphPanelProps {
+  /** 完整的圖：細節照實列出，不受篩選影響。 */
   graph: AccessGraph;
+  /** 畫面上實際畫出來的部分。 */
+  visibleGraph: AccessGraph;
   node: GraphNode | null;
+  /** 已聚焦的專案或資源節點 id。 */
+  focusedIds: ReadonlySet<string>;
+  onToggleFocus: (node: GraphNode) => void;
   accounts: Account[];
   onSelect: (id: string) => void;
   onOpenAccounts: () => void;
@@ -64,13 +70,18 @@ function labelFor(graph: AccessGraph, id: string | undefined, kind: "project" | 
   return graph.labels.get(resourceNodeId(kind, id)) ?? id;
 }
 
+type DetailProps = Pick<AccessGraphPanelProps, "graph" | "onSelect" | "onOpenAccounts"> & {
+  node: GraphNode;
+};
+type AccountDetailsProps = DetailProps & Pick<AccessGraphPanelProps, "accounts">;
+
 function AccountDetails({
   graph,
   node,
   accounts,
   onSelect,
   onOpenAccounts,
-}: Omit<AccessGraphPanelProps, "onClose"> & { node: GraphNode }) {
+}: AccountDetailsProps) {
   const account = node.account!;
   const counts = grantCounts(account);
   const full = hasFullAccess(node.accessMode);
@@ -182,7 +193,7 @@ function TemporaryBatchDetails({
   node,
   onSelect,
   onOpenAccounts,
-}: Omit<AccessGraphPanelProps, "onClose" | "accounts"> & { node: GraphNode }) {
+}: DetailProps) {
   const batch = node.batch!;
   const projectEdges = graph.edges.filter(
     (edge) => edge.source === node.id && graph.byId.get(edge.target)?.kind === "project",
@@ -301,7 +312,11 @@ function ResourceDetails({
   node,
   accounts,
   onSelect,
-}: Omit<AccessGraphPanelProps, "onClose" | "onOpenAccounts"> & { node: GraphNode }) {
+  focusedIds,
+  onToggleFocus,
+}: Pick<AccessGraphPanelProps, "graph" | "accounts" | "onSelect" | "focusedIds" | "onToggleFocus"> & {
+  node: GraphNode;
+}) {
   const incoming = graph.edges.filter((edge) => edge.target === node.id);
   const linked = new Set(incoming.map((edge) => edge.source));
   const fullAccess = graph.nodes.filter(
@@ -315,6 +330,19 @@ function ResourceDetails({
         {node.provider && <p className="mt-1 text-xs text-content-muted">供應商：{node.provider}</p>}
         {node.missing && (
           <p className="mt-2 text-xs text-warn">這項資源出現在授權裡，但不在目前可見的資源清單中（可能已刪除或超出你的管理範圍）。</p>
+        )}
+        {!node.missing && (
+          <button
+            type="button"
+            className="btn btn-ghost mt-3 w-full"
+            aria-pressed={focusedIds.has(node.id)}
+            onClick={() => onToggleFocus(node)}
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">
+              {focusedIds.has(node.id) ? "filter_alt_off" : "filter_alt"}
+            </span>
+            {focusedIds.has(node.id) ? "取消聚焦" : "只看能存取這裡的帳號"}
+          </button>
         )}
       </div>
 
@@ -359,18 +387,21 @@ function ResourceDetails({
 }
 
 export default function AccessGraphPanel(props: AccessGraphPanelProps) {
-  const { node, onClose, graph } = props;
+  const { node, onClose, visibleGraph } = props;
 
   if (!node) {
-    const accounts = graph.nodes.filter((item) => item.kind === "account").length;
-    const projects = graph.nodes.filter((item) => item.kind === "project").length;
+    const accounts = visibleGraph.nodes.filter(
+      (item) => item.kind === "account" || item.kind === "temporary",
+    ).length;
+    const projects = visibleGraph.nodes.filter((item) => item.kind === "project").length;
     return (
       <div className="flex h-full flex-col justify-center gap-2 p-6 text-sm text-content-muted">
         <p className="font-medium text-content">點選節點查看細節</p>
         <p>
-          目前畫面上有 {accounts} 個帳號、{projects} 個專案、{graph.edges.length} 條連線。
+          目前畫面上有 {accounts} 個帳號、{projects} 個專案、{visibleGraph.edges.length} 條連線。
           拖曳空白處平移，滾輪或右上角按鈕縮放，拖曳節點可以調整位置。
         </p>
+        <p>專案或資源的細節裡可以直接「只看能存取這裡的帳號」。</p>
       </div>
     );
   }
@@ -391,6 +422,11 @@ export default function AccessGraphPanel(props: AccessGraphPanelProps) {
           <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">close</span>
         </button>
       </header>
+      {!visibleGraph.byId.has(node.id) && (
+        <p className="mx-5 mb-3 rounded-md border border-border bg-surface-sunken px-3 py-2 text-xs text-content-muted">
+          這個節點目前被篩選隱藏，細節照實列出。
+        </p>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {node.kind === "account" ? (
           <AccountDetails {...props} node={node} />

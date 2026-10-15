@@ -1,20 +1,17 @@
 import { useState } from "react";
 
-const ITEMS: Array<{ label: string; symbol: React.ReactNode }> = [
-  { label: "專案", symbol: <rect x={2} y={2} width={12} height={12} rx={3} className="fill-primary" /> },
-  { label: "ROOT", symbol: <circle cx={8} cy={8} r={5.5} className="fill-content stroke-primary" strokeWidth={1.5} /> },
-  { label: "管理員", symbol: <circle cx={8} cy={8} r={5} className="fill-info" /> },
-  { label: "一般帳號", symbol: <circle cx={8} cy={8} r={5} className="fill-surface-raised stroke-content-muted" strokeWidth={1.2} /> },
-  { label: "臨時帳號（一批）", symbol: <path d="M5,2.5 L11,2.5 L14,8 L11,13.5 L5,13.5 L2,8Z" className="fill-surface-raised stroke-info" strokeWidth={1.2} /> },
-  { label: "人物", symbol: <path d="M8,2 L14,8 L8,14 L2,8Z" className="fill-success" /> },
-  { label: "聲音", symbol: <circle cx={8} cy={8} r={3.5} className="fill-warn" /> },
-  { label: "辨識引擎", symbol: <path d="M8,2 L14,13 L2,13Z" className="fill-content-subtle" /> },
-];
+import { RELATION_KINDS, RELATION_LABELS, type RelationKind } from "./filterAccessGraph";
+import { LineSymbol, NodeSymbol, type SymbolKey } from "./graphSymbols";
 
-const LINES: Array<{ label: string; className: string; width: number; dash?: string }> = [
-  { label: "授權", className: "stroke-content-subtle", width: 1.2 },
-  { label: "預設", className: "stroke-primary", width: 2.6 },
-  { label: "管理範圍", className: "stroke-info", width: 1.2, dash: "4 3" },
+const ITEMS: Array<{ key: SymbolKey; label: string }> = [
+  { key: "project", label: "專案" },
+  { key: "root", label: "ROOT" },
+  { key: "admin", label: "管理員" },
+  { key: "user", label: "一般帳號" },
+  { key: "temporary", label: "臨時帳號（一批）" },
+  { key: "character", label: "人物" },
+  { key: "voice", label: "聲音" },
+  { key: "asr", label: "辨識引擎" },
 ];
 
 function startsOpen(): boolean {
@@ -26,7 +23,16 @@ function startsOpen(): boolean {
   }
 }
 
-export default function AccessGraphLegend() {
+interface AccessGraphLegendProps {
+  /** 被篩選關掉的圖例項目，淡化並註明，讓圖例跟畫面上看到的一致。 */
+  muted?: ReadonlySet<SymbolKey | RelationKind>;
+}
+
+function itemClass(muted: boolean): string {
+  return `flex items-center gap-1.5 whitespace-nowrap ${muted ? "opacity-40 line-through" : ""}`;
+}
+
+export default function AccessGraphLegend({ muted = new Set() }: AccessGraphLegendProps) {
   const [open] = useState(startsOpen);
   return (
     <details
@@ -38,35 +44,41 @@ export default function AccessGraphLegend() {
         <span aria-hidden="true" className="ml-1 inline-block transition-transform group-open:rotate-180">▾</span>
       </summary>
       <div className="px-3 pb-2">
-      <ul className="flex flex-wrap gap-x-3 gap-y-1">
-        {ITEMS.map((item) => (
-          <li key={item.label} className="flex items-center gap-1.5 whitespace-nowrap">
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">{item.symbol}</svg>
-            {item.label}
-          </li>
-        ))}
-      </ul>
-      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-        {LINES.map((line) => (
-          <li key={line.label} className="flex items-center gap-1.5 whitespace-nowrap">
-            <svg viewBox="0 0 24 8" className="h-2 w-6" aria-hidden="true">
-              <line x1={1} y1={4} x2={23} y2={4} className={line.className} strokeWidth={line.width} strokeDasharray={line.dash} />
+        <ul className="flex flex-wrap gap-x-3 gap-y-1">
+          {ITEMS.map((item) => (
+            <li
+              key={item.key}
+              className={itemClass(muted.has(item.key))}
+              title={muted.has(item.key) ? "目前被篩選隱藏" : undefined}
+            >
+              <NodeSymbol kind={item.key} />
+              {item.label}
+            </li>
+          ))}
+        </ul>
+        <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+          {RELATION_KINDS.map((kind) => (
+            <li
+              key={kind}
+              className={itemClass(muted.has(kind))}
+              title={muted.has(kind) ? "目前被篩選隱藏" : undefined}
+            >
+              <LineSymbol kind={kind} />
+              {RELATION_LABELS[kind]}
+            </li>
+          ))}
+          <li className="flex items-center gap-1.5 whitespace-nowrap">
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
+              <circle cx={8} cy={8} r={5} className="fill-surface-raised stroke-content-muted" strokeWidth={1.2} strokeDasharray="2 1.5" />
             </svg>
-            {line.label}
+            停用／過期／不在可見清單
           </li>
-        ))}
-        <li className="flex items-center gap-1.5 whitespace-nowrap">
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
-            <circle cx={8} cy={8} r={5} className="fill-surface-raised stroke-content-muted" strokeWidth={1.2} strokeDasharray="2 1.5" />
-          </svg>
-          停用／過期／不在可見清單
-        </li>
-        <li className="flex items-center gap-1.5 whitespace-nowrap">
-          <span className="font-medium text-info">中·台</span>
-          專案的語言分流（只有中文不標）
-        </li>
-      </ul>
-      <p className="mt-1">內圈專案・中圈帳號・外圈人物／聲音／辨識引擎</p>
+          <li className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="font-medium text-info">中·台</span>
+            專案的語言分流（只有中文不標）
+          </li>
+        </ul>
+        <p className="mt-1">內圈專案・中圈帳號・外圈人物／聲音／辨識引擎</p>
       </div>
     </details>
   );

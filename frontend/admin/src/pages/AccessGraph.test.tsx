@@ -118,6 +118,7 @@ function renderPage(onSelectTab = vi.fn()) {
 describe("AccessGraph page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     vi.mocked(listAccounts).mockResolvedValue(accounts);
     vi.mocked(fetchAccountAccessOptions).mockResolvedValue({
       projects: [
@@ -207,7 +208,7 @@ describe("AccessGraph page", () => {
     await screen.findByRole("button", { name: /帳號 clerk/ });
 
     expect(screen.queryByRole("button", { name: /^臨時帳號 臨時/ })).toBeNull();
-    const toggle = screen.getByRole("button", { name: /^臨時帳號/ });
+    const toggle = screen.getByRole("button", { name: /^臨時批次/ });
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
     expect(toggle.textContent).toContain("1 批");
 
@@ -224,15 +225,18 @@ describe("AccessGraph page", () => {
     expect(document.body.textContent).not.toContain("SECRET-PASS");
   });
 
-  it("finds a temporary account by username once the batches are shown", async () => {
+  it("finds a temporary account by username, marking it while batches are hidden", async () => {
     renderPage();
     await screen.findByRole("button", { name: /帳號 clerk/ });
-    fireEvent.click(screen.getByRole("button", { name: /^臨時帳號/ }));
 
-    fireEvent.change(screen.getByRole("combobox", { name: "搜尋節點" }), {
-      target: { value: "tmp-c3d4" },
-    });
-    expect(within(screen.getByRole("listbox")).getByText("臨時帳號")).toBeTruthy();
+    const search = screen.getByRole("combobox", { name: "搜尋節點" });
+    fireEvent.change(search, { target: { value: "tmp-c3d4" } });
+    expect(within(screen.getByRole("listbox")).getByText("已篩掉")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^臨時批次/ }));
+    const listbox = screen.getByRole("listbox");
+    expect(within(listbox).getByText("臨時帳號")).toBeTruthy();
+    expect(within(listbox).queryByText("已篩掉")).toBeNull();
   });
 
   it("keeps the graph when temporary accounts cannot be read", async () => {
@@ -240,7 +244,7 @@ describe("AccessGraph page", () => {
     renderPage();
 
     await screen.findByRole("button", { name: /帳號 clerk/ });
-    const toggle = screen.getByRole("button", { name: /^臨時帳號/ }) as HTMLButtonElement;
+    const toggle = screen.getByRole("button", { name: /^臨時批次/ }) as HTMLButtonElement;
     expect(toggle.disabled).toBe(true);
     expect(toggle.title).toBe("讀不到臨時帳號");
   });
@@ -269,6 +273,111 @@ describe("AccessGraph page", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: /專案 展示/ }), { key: "Enter" });
     panel = screen.getByRole("complementary", { name: "節點細節" });
     expect(within(panel).getByText("讀不到這個專案的語言分流。")).toBeTruthy();
+  });
+
+  it("focuses on a project picked from the project menu and clears it from the chip", async () => {
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+    expect(screen.queryByRole("region", { name: "目前的篩選" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "專案" }));
+    const dialog = screen.getByRole("dialog", { name: "選擇專案" });
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /展示/ }));
+
+    // clerk 有授權、pm-admin 在管理範圍內、ROOT 本來就全部能用；retired 沒有任何授權。
+    expect(screen.getByRole("button", { name: /帳號 clerk/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /帳號 pm-admin/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /帳號 ai360/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /帳號 retired/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /專案 鶴記/ })).toBeNull();
+    expect(screen.getByText(/篩選後 3 \/ 4 個帳號/)).toBeTruthy();
+
+    const region = screen.getByRole("region", { name: "目前的篩選" });
+    expect(within(region).getByText("1 個篩選")).toBeTruthy();
+    fireEvent.click(within(region).getByRole("button", { name: "移除篩選：專案：展示" }));
+
+    expect(screen.getByRole("button", { name: /帳號 retired/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /專案 鶴記/ })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "目前的篩選" })).toBeNull();
+  });
+
+  it("filters by role and shows an empty state with a clear-all action", async () => {
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+
+    fireEvent.click(screen.getByRole("button", { name: /^ROOT/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^管理員/ }));
+    expect(screen.queryByRole("button", { name: /帳號 ai360/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /帳號 pm-admin/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /帳號 clerk/ })).toBeTruthy();
+    const region = screen.getByRole("region", { name: "目前的篩選" });
+    expect(within(region).getByText("角色：一般帳號")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^一般帳號/ }));
+    const empty = screen.getByRole("status");
+    expect(empty.textContent).toContain("沒有帳號符合目前的篩選");
+    expect(empty.textContent).toContain("角色：無");
+
+    fireEvent.click(within(empty).getByRole("button", { name: "清除全部篩選" }));
+    expect(screen.getByRole("button", { name: /帳號 ai360/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /帳號 pm-admin/ })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "目前的篩選" })).toBeNull();
+  });
+
+  it("keeps only default lines when the other relation kinds are off", async () => {
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+
+    const relations = screen.getByRole("group", { name: "連線" });
+    fireEvent.click(within(relations).getByRole("button", { name: /授權/ }));
+    fireEvent.click(within(relations).getByRole("button", { name: /管理範圍/ }));
+
+    expect(document.querySelectorAll('[data-edge-kind="scope"]').length).toBe(0);
+    expect(document.querySelectorAll('[data-edge-kind="grant"]').length).toBe(0);
+    expect(document.querySelectorAll('[data-edge-kind="default"]').length).toBe(2);
+    expect(screen.getByRole("button", { name: /帳號 pm-admin/ })).toBeTruthy();
+    const region = screen.getByRole("region", { name: "目前的篩選" });
+    expect(within(region).getByText("連線：預設")).toBeTruthy();
+  });
+
+  it("focuses on a resource from the menu, turning its layer on, and unfocuses from details", async () => {
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+
+    fireEvent.click(screen.getByRole("button", { name: /^資源/ }));
+    const dialog = screen.getByRole("dialog", { name: "選擇資源" });
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /女聲/ }));
+
+    expect(screen.getByRole("button", { name: /聲音 女聲/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /帳號 pm-admin/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /帳號 retired/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /帳號 clerk/ })).toBeTruthy();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /聲音 女聲/ }), { key: "Enter" });
+    const panel = screen.getByRole("complementary", { name: "節點細節" });
+    fireEvent.click(within(panel).getByRole("button", { name: /取消聚焦/ }));
+    expect(screen.getByRole("button", { name: /帳號 pm-admin/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /聲音 女聲/ })).toBeNull();
+  });
+
+  it("restores filters from sessionStorage and saves changes back", async () => {
+    window.sessionStorage.setItem(
+      "openvman.access-graph.filters",
+      JSON.stringify({ projects: ["p-hk", "p-gone"], includeDisabled: false }),
+    );
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+
+    const region = screen.getByRole("region", { name: "目前的篩選" });
+    expect(within(region).getByText("2 個篩選")).toBeTruthy();
+    expect(within(region).getByText("專案：鶴記")).toBeTruthy();
+    expect(within(region).getByText("隱藏停用")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /專案 展示/ })).toBeNull();
+
+    fireEvent.click(within(region).getByRole("button", { name: "清除全部" }));
+    const saved = JSON.parse(window.sessionStorage.getItem("openvman.access-graph.filters")!);
+    expect(saved.projects).toEqual([]);
+    expect(saved.includeDisabled).toBe(true);
   });
 
   it("shows the error when the account list fails", async () => {
