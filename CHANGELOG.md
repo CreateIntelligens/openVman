@@ -34,6 +34,8 @@
 
 ### Changed
 
+- **[2026-10-15]** **主機 nginx 可讓其他專案掛路徑而不改 repo**：`infra/nginx/native/openvman.conf.template`（與參考檔 `146-openvman.conf`）在 HTTPS server 區塊的兜底 location 之前加入 `include /etc/nginx/openvman-extra/*.conf;`。其他專案（例如 `/arwin/`）把自己的 `location` 放在主機的 `/etc/nginx/openvman-extra/`，不進 openVman 版控；資料夾空的或不存在時行為不變。做法見 `infra/nginx/native/README.md`。
+
 - **[2026-10-15]** **Auth DB migration 拆檔**：各 migration 的 SQL 與版本清單從 `backend/app/auth/database.py` 移到新的 `schema_migrations.py`，`database.py` 只留連線設定與套用 migration 的流程（加入 migration 22 後超過單檔 1000 行上限，CI 的 `test_entry_boundaries` 擋下）。行為與 schema 不變。
 
 - **[2026-10-15]** **權限圖譜篩選與介面**：`/admin/access/graph` 的篩選列重新整理成「專案」「資源」兩個多選選單與「帳號／連線／圖層」三組切換鈕。新增依專案聚焦（只畫能存取所選專案的帳號與他們的資源，同類任一、跨類都要；ROOT 與不受限 admin 一律保留）、依資源聚焦（選人物、聲音或辨識引擎，圖層關著也會畫出）、依角色（ROOT／管理員／一般）、依類型（正式／臨時批次，取代原本的「臨時帳號」鈕）與依連線種類（授權／預設／管理範圍，只拿掉線不拿掉節點）；「停用帳號」照舊。專案與資源的細節多了「只看能存取這裡的帳號」鈕。有篩選時列出「N 個篩選」標籤可逐一移除或清除全部（圖層保留），頁首帳號數改為「篩選後 X / 總數」，圖例淡化被篩掉的項目並與篩選鈕共用同一組圖示，篩到沒有帳號時顯示目前條件與清除鈕，手機寬度下次要的條件收進「更多條件」。篩選只影響畫面：細節面板照實列出所有能存取的帳號，搜尋也找得到被篩掉的節點（標「已篩掉」）。篩選狀態存在 sessionStorage（依登入帳號分開，重新整理保留、關分頁即清除），不寫進網址，因為後台換頁時會把網址整理成標準路徑並移除其他查詢參數。篩選改變節點集合時重新排版，不沿用舊座標。前端純函式 `filterAccessGraph` 附單元測試；不改後端、不加依賴。

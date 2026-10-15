@@ -25,6 +25,25 @@ That layer is not managed by compose, so it has to be set up once per machine.
 | `openvman.conf` | Render output. Git-ignored — never edit by hand. |
 | `clef-api.conf` | Independent source vhost for `decision-primary.example.com`; deployed to `/etc/nginx/conf.d/clef-api.conf`. |
 
+## Other projects on this domain
+
+The template includes `/etc/nginx/openvman-extra/*.conf` inside the HTTPS
+server block, just before the catch-all locations. Another project that needs
+a path on this domain (for example `/arwin/`) drops its own `location` blocks
+into that directory instead of editing this repository; nothing there is
+version-controlled here, and an empty or missing directory changes nothing.
+
+```sh
+sudo install -d /etc/nginx/openvman-extra
+sudo install -m 0644 my-project.conf /etc/nginx/openvman-extra/my-project.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Use `location ^~ /<prefix>/` so the openVman regex routes cannot take the
+request, and keep the proxied app working under that prefix (relative asset
+URLs). The `$openvman_connection_upgrade` map from this vhost is available for
+WebSocket upgrades.
+
 ## Clef-Flash API domain
 
 In this example, `decision-primary.example.com` points to `203.0.113.10`. The host nginx serves the
