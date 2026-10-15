@@ -359,6 +359,11 @@ export function fetchKnowledgeSettings() {
   return get<KnowledgeSettings>(knowledgePath("/settings"));
 }
 
+/** 指定專案的知識庫設定，不看目前選中的專案（權限圖譜一次讀所有專案）。 */
+export function fetchProjectKnowledgeSettings(projectId: string) {
+  return get<KnowledgeSettings>(knowledgePath("/settings"), { project_id: projectId });
+}
+
 export function saveKnowledgeSettings(settings: KnowledgeSettings) {
   return put<KnowledgeSettings>(knowledgePath("/settings"), {
     project_id: getActiveProjectId(),

@@ -66,7 +66,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | | 工具與技能 | Brain 工具與 skills 狀態 |
 | System | 專案管理 | 建立與列出專案 |
 | | 帳號管理 | 正式帳號、臨時帳號批次、資源與引擎授權、展示機台旗標；帳號 API 金鑰（`/admin/accounts/api-keys`）可獨立設定期限、撤銷與查使用紀錄 |
-| | 權限圖譜 | 唯讀的帳號 ↔ 專案授權網路圖（`/admin/access-graph`），可疊加人物、聲音、辨識引擎圖層，點節點看授權明細 |
+| | 權限圖譜 | 唯讀的帳號 ↔ 專案授權網路圖（`/admin/access-graph`），可疊加人物、聲音、辨識引擎與臨時帳號圖層，專案標出語言分流，點節點看授權明細 |
 | | Embed 金鑰 | 外部網站嵌入 Avatar 用的金鑰 |
 | | 用量 | 依帳號、專案、session 彙總的模型與 token 用量 |
 | | 系統健康、系統監控 | 服務健康檢查與 Grafana 儀表板 |

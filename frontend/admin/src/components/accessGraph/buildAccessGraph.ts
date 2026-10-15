@@ -2,11 +2,20 @@ import type {
   Account,
   AccountAccessOption,
   AccountAccessOptions,
+  AccountDefaults,
+  AccountResourceGrants,
   AdminScope,
+  TemporaryBatchAudit,
 } from "../../api/auth";
+import type { KnowledgeLanguage } from "../../api/knowledge";
+import { KNOWLEDGE_LANGUAGE_LABELS } from "../kb/helpers";
 
 export type ResourceLayer = "character" | "voice" | "asr";
-export type NodeKind = "account" | "project" | ResourceLayer;
+/** temporary：一批臨時帳號（同一批共用授權與預設，畫成一顆節點）。 */
+export type NodeKind = "account" | "temporary" | "project" | ResourceLayer;
+
+/** 專案的語言分流；讀不到時是 "error"，還沒讀完時不在對照表裡。 */
+export type LanguageRoutesResult = KnowledgeLanguage[] | "error";
 
 /**
  * 帳號實際怎麼拿到存取權。admin 不看授權清單（後端直接放行），
@@ -30,6 +39,12 @@ export interface GraphNode {
   missing?: boolean;
   account?: Account;
   accessMode?: AccessMode;
+  /** kind 為 temporary 時的批次資料（不含密碼）。 */
+  batch?: TemporaryBatchAudit;
+  /** 搜尋也比對這些字，例如臨時帳號批次裡每個帳號的名稱。 */
+  aliases?: string[];
+  /** kind 為 project 時的語言分流。 */
+  languageRoutes?: LanguageRoutesResult;
 }
 
 export type EdgeKind = "grant" | "scope" | "full";
@@ -60,11 +75,18 @@ export interface BuildAccessGraphInput {
   scopes?: Record<string, AdminScopeResult | undefined>;
   layers?: Iterable<ResourceLayer>;
   includeDisabled?: boolean;
+  temporaryBatches?: TemporaryBatchAudit[];
+  /** 臨時帳號預設不畫：活動一場就是好幾批，會把正式帳號擠掉。 */
+  includeTemporary?: boolean;
+  languageRoutes?: Record<string, LanguageRoutesResult | undefined>;
 }
 
 export const accountNodeId = (id: string) => `account:${id}`;
-export const resourceNodeId = (kind: Exclude<NodeKind, "account">, id: string) =>
-  `${kind}:${id}`;
+export const temporaryNodeId = (batchId: string) => `temporary:${batchId}`;
+export const resourceNodeId = (
+  kind: Exclude<NodeKind, "account" | "temporary">,
+  id: string,
+) => `${kind}:${id}`;
 
 const RESOURCE_SOURCES = {
   project: { option: "projects", grant: "projects", scope: "projects" },
@@ -97,7 +119,13 @@ export function hasFullAccess(mode: AccessMode | undefined): boolean {
 }
 
 function defaultIdFor(account: Account, kind: ResourceKind): string | undefined {
-  const defaults = account.defaults;
+  return defaultFrom(account.defaults, kind);
+}
+
+function defaultFrom(
+  defaults: AccountDefaults | null | undefined,
+  kind: ResourceKind,
+): string | undefined {
   if (!defaults) return undefined;
   if (kind === "project") return defaults.project_id || undefined;
   if (kind === "character") return defaults.character_id || undefined;
@@ -120,8 +148,45 @@ function linkedIds(
     return { ids: key ? scope.resources[key] ?? [] : [], edgeKind: "scope" };
   }
   if (mode === "admin-unknown") return { ids: [], edgeKind: "scope" };
-  const key = RESOURCE_SOURCES[kind].grant;
-  return { ids: account.grants?.[key] ?? [], edgeKind: "grant" };
+  return { ids: grantedIds(account.grants, kind), edgeKind: "grant" };
+}
+
+function grantedIds(
+  grants: AccountResourceGrants | null | undefined,
+  kind: ResourceKind,
+): string[] {
+  return grants?.[RESOURCE_SOURCES[kind].grant] ?? [];
+}
+
+/** 撤銷或過期的批次已經不能登入，跟停用帳號一樣處理。 */
+export function isInactiveBatch(batch: TemporaryBatchAudit): boolean {
+  return batch.state === "revoked" || batch.state === "expired" || Boolean(batch.revoked_at);
+}
+
+const TEMPORARY_STATE_LABELS: Record<NonNullable<TemporaryBatchAudit["state"]>, string> = {
+  unused: "未使用",
+  active: "使用中",
+  expired: "已過期",
+  revoked: "已撤銷",
+};
+
+export function temporaryStateLabel(state: TemporaryBatchAudit["state"]): string {
+  return state ? TEMPORARY_STATE_LABELS[state] : "狀態不明";
+}
+
+function batchLabel(batch: TemporaryBatchAudit): string {
+  const created = new Date(batch.created_at);
+  const count = batch.account_count ?? batch.accounts?.length ?? 0;
+  const when = Number.isNaN(created.getTime())
+    ? batch.batch_id.slice(0, 8)
+    : created.toLocaleString("zh-TW", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+  return `臨時 ${when}（${count}）`;
 }
 
 export function buildAccessGraph({
@@ -130,6 +195,9 @@ export function buildAccessGraph({
   scopes = {},
   layers = [],
   includeDisabled = true,
+  temporaryBatches = [],
+  includeTemporary = false,
+  languageRoutes = {},
 }: BuildAccessGraphInput): AccessGraph {
   const activeLayers = new Set<ResourceLayer>(layers);
   const kinds: ResourceKind[] = [
@@ -165,9 +233,37 @@ export function buildAccessGraph({
         rawId: option.id,
         label: option.label || option.id,
         provider: option.provider ?? null,
+        ...(kind === "project" && languageRoutes[option.id]
+          ? { languageRoutes: languageRoutes[option.id] }
+          : {}),
       });
     }
   }
+
+  const linkResources = (
+    sourceId: string,
+    kind: ResourceKind,
+    ids: string[],
+    edgeKind: EdgeKind,
+    defaultId: string | undefined,
+  ) => {
+    for (const rawId of new Set(ids)) {
+      const target = addNode({
+        id: resourceNodeId(kind, rawId),
+        kind,
+        rawId,
+        label: rawId,
+        missing: true,
+      });
+      edges.push({
+        id: `${sourceId}->${target.id}`,
+        source: sourceId,
+        target: target.id,
+        kind: edgeKind,
+        isDefault: edgeKind === "full" || rawId === defaultId,
+      });
+    }
+  };
 
   const visibleAccounts = accounts.filter(
     (account) => includeDisabled || !account.disabled,
@@ -188,22 +284,24 @@ export function buildAccessGraph({
 
     for (const kind of kinds) {
       const { ids, edgeKind } = linkedIds(account, mode, kind, scope);
-      const defaultId = defaultIdFor(account, kind);
-      for (const rawId of new Set(ids)) {
-        const target = addNode({
-          id: resourceNodeId(kind, rawId),
-          kind,
-          rawId,
-          label: rawId,
-          missing: true,
-        });
-        edges.push({
-          id: `${accountId}->${target.id}`,
-          source: accountId,
-          target: target.id,
-          kind: edgeKind,
-          isDefault: edgeKind === "full" || rawId === defaultId,
-        });
+      linkResources(accountId, kind, ids, edgeKind, defaultIdFor(account, kind));
+    }
+  }
+
+  if (includeTemporary) {
+    for (const batch of temporaryBatches) {
+      if (!includeDisabled && isInactiveBatch(batch)) continue;
+      const batchId = temporaryNodeId(batch.batch_id);
+      addNode({
+        id: batchId,
+        kind: "temporary",
+        rawId: batch.batch_id,
+        label: batchLabel(batch),
+        batch,
+        aliases: (batch.accounts ?? []).map((item) => item.username),
+      });
+      for (const kind of kinds) {
+        linkResources(batchId, kind, grantedIds(batch.grants, kind), "grant", defaultFrom(batch.defaults, kind));
       }
     }
   }
@@ -241,6 +339,7 @@ export function grantCounts(account: Account): GrantCounts {
 
 export const KIND_LABELS: Record<NodeKind, string> = {
   account: "帳號",
+  temporary: "臨時帳號",
   project: "專案",
   character: "人物",
   voice: "聲音",
@@ -261,3 +360,32 @@ export const ACCESS_MODE_LABELS: Record<AccessMode, string> = {
   grants: "依授權清單",
   none: "尚未授權專案",
 };
+
+const LANGUAGE_SHORT: Record<KnowledgeLanguage, string> = {
+  zh: "中",
+  nan: "台",
+  en: "EN",
+  ja: "日",
+  ko: "韓",
+  es: "ES",
+};
+
+/**
+ * 圖上專案名稱下的小字。只有中文等於不分流，每個專案都標「中」只是雜訊，
+ * 所以只有多開了其他語言才標。
+ */
+export function languageBadge(routes: LanguageRoutesResult | undefined): string | null {
+  if (!routes || routes === "error") return null;
+  if (routes.every((route) => route === "zh")) return null;
+  return routes.map((route) => LANGUAGE_SHORT[route] ?? route).join("·");
+}
+
+export function languageName(route: KnowledgeLanguage): string {
+  return KNOWLEDGE_LANGUAGE_LABELS[route] ?? route;
+}
+
+export function languageRoutesText(routes: LanguageRoutesResult): string {
+  if (routes === "error") return "語言分流：讀不到";
+  if (routes.every((route) => route === "zh")) return "語言分流：只有中文（不分流）";
+  return `語言分流：${routes.map(languageName).join("、")}`;
+}

@@ -4,9 +4,12 @@ import {
   fetchAccountAccessOptions,
   fetchAdminScope,
   listAccounts,
+  listTemporaryBatches,
   type Account,
   type AccountAccessOptions,
+  type TemporaryBatchAudit,
 } from "../api/auth";
+import { fetchProjectKnowledgeSettings } from "../api/knowledge";
 import AccessGraphCanvas, {
   type CenterRequest,
 } from "../components/accessGraph/AccessGraphCanvas";
@@ -15,8 +18,10 @@ import AccessGraphPanel from "../components/accessGraph/AccessGraphPanel";
 import {
   KIND_LABELS,
   buildAccessGraph,
+  isInactiveBatch,
   type AdminScopeResult,
   type GraphNode,
+  type LanguageRoutesResult,
   type ResourceLayer,
 } from "../components/accessGraph/buildAccessGraph";
 import StatusAlert from "../components/StatusAlert";
@@ -26,6 +31,8 @@ interface GraphData {
   accounts: Account[];
   options: AccountAccessOptions;
   scopes: Record<string, AdminScopeResult>;
+  /** null：讀不到臨時帳號（不影響其他部分）。 */
+  temporaryBatches: TemporaryBatchAudit[] | null;
 }
 
 const LAYERS: Array<{ key: ResourceLayer; label: string; option: keyof AccountAccessOptions }> = [
@@ -43,10 +50,19 @@ const chipClass = (active: boolean) =>
       : "border-border bg-surface-raised text-content-muted hover:border-border-strong hover:text-content"
   }`;
 
+/** 批次清單會帶回明文密碼；這頁用不到，進 state 前就拿掉。 */
+function withoutPasswords(batches: TemporaryBatchAudit[]): TemporaryBatchAudit[] {
+  return batches.map((batch) => ({
+    ...batch,
+    accounts: batch.accounts?.map(({ password: _password, ...rest }) => rest),
+  }));
+}
+
 async function loadGraphData(): Promise<GraphData> {
-  const [accounts, options] = await Promise.all([
+  const [accounts, options, temporaryBatches] = await Promise.all([
     listAccounts(),
     fetchAccountAccessOptions(),
+    listTemporaryBatches().then(withoutPasswords, () => null),
   ]);
   const admins = accounts.filter((account) => account.role === "admin");
   // 單一管理員讀不到範圍時只影響他自己那顆節點，不讓整張圖失敗。
@@ -56,13 +72,33 @@ async function loadGraphData(): Promise<GraphData> {
     const result = results[index];
     scopes[admin.id] = result.status === "fulfilled" ? result.value : "error";
   });
-  return { accounts, options, scopes };
+  return { accounts, options, scopes, temporaryBatches };
+}
+
+/** 每個專案一個請求，同時送；單一專案讀不到只標那一個。 */
+async function loadLanguageRoutes(
+  projectIds: string[],
+): Promise<Record<string, LanguageRoutesResult>> {
+  const results = await Promise.allSettled(
+    projectIds.map((id) => fetchProjectKnowledgeSettings(id)),
+  );
+  const routes: Record<string, LanguageRoutesResult> = {};
+  projectIds.forEach((id, index) => {
+    const result = results[index];
+    routes[id] =
+      result.status === "fulfilled" && Array.isArray(result.value.language_routes)
+        ? result.value.language_routes
+        : "error";
+  });
+  return routes;
 }
 
 function matches(node: GraphNode, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return false;
-  return node.label.toLowerCase().includes(needle) || node.rawId.toLowerCase().includes(needle);
+  return [node.label, node.rawId, ...(node.aliases ?? [])].some((text) =>
+    text.toLowerCase().includes(needle),
+  );
 }
 
 export default function AccessGraph() {
@@ -72,6 +108,8 @@ export default function AccessGraph() {
   const [error, setError] = useState<string | null>(null);
   const [layers, setLayers] = useState<Set<ResourceLayer>>(() => new Set(["character"]));
   const [includeDisabled, setIncludeDisabled] = useState(true);
+  const [includeTemporary, setIncludeTemporary] = useState(false);
+  const [languageRoutes, setLanguageRoutes] = useState<Record<string, LanguageRoutesResult>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [centerRequest, setCenterRequest] = useState<CenterRequest | null>(null);
@@ -92,6 +130,19 @@ export default function AccessGraph() {
     void refresh();
   }, [refresh]);
 
+  // 語言分流不擋圖：先畫圖，讀到再補上標記。
+  useEffect(() => {
+    const projectIds = data?.options.projects.map((project) => project.id) ?? [];
+    if (projectIds.length === 0) return;
+    let cancelled = false;
+    void loadLanguageRoutes(projectIds).then((routes) => {
+      if (!cancelled) setLanguageRoutes(routes);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
+
   const graph = useMemo(
     () =>
       buildAccessGraph({
@@ -100,17 +151,21 @@ export default function AccessGraph() {
         scopes: data?.scopes,
         layers,
         includeDisabled,
+        temporaryBatches: data?.temporaryBatches ?? [],
+        includeTemporary,
+        languageRoutes,
       }),
-    [data, includeDisabled, layers],
+    [data, includeDisabled, includeTemporary, languageRoutes, layers],
   );
 
   const summary = useMemo(() => {
     const accounts = graph.nodes.filter((node) => node.kind === "account").length;
+    const batches = graph.nodes.filter((node) => node.kind === "temporary").length;
     const projects = graph.nodes.filter((node) => node.kind === "project").length;
     const projectLinks = graph.edges.filter(
       (edge) => graph.byId.get(edge.target)?.kind === "project",
     ).length;
-    return { accounts, projects, projectLinks };
+    return { accounts, batches, projects, projectLinks };
   }, [graph]);
 
   const selectedNode = selectedId ? graph.byId.get(selectedId) ?? null : null;
@@ -118,7 +173,10 @@ export default function AccessGraph() {
     () => (query.trim() ? graph.nodes.filter((node) => matches(node, query)).slice(0, SEARCH_LIMIT) : []),
     [graph, query],
   );
-  const disabledCount = data?.accounts.filter((account) => account.disabled).length ?? 0;
+  const temporaryBatches = data?.temporaryBatches;
+  const disabledCount =
+    (data?.accounts.filter((account) => account.disabled).length ?? 0)
+    + (includeTemporary ? temporaryBatches?.filter(isInactiveBatch).length ?? 0 : 0);
 
   const focusNode = useCallback((id: string) => {
     setSelectedId(id);
@@ -150,7 +208,9 @@ export default function AccessGraph() {
         </div>
         {data && (
           <p className="text-sm tabular-nums text-content-muted">
-            {summary.accounts} 個帳號 · {summary.projects} 個專案 · {summary.projectLinks} 條專案連線
+            {summary.accounts} 個帳號
+            {summary.batches > 0 && ` · ${summary.batches} 批臨時帳號`}
+            {` · ${summary.projects} 個專案 · ${summary.projectLinks} 條專案連線`}
           </p>
         )}
       </header>
@@ -226,6 +286,19 @@ export default function AccessGraph() {
               </button>
             );
           })}
+          <button
+            type="button"
+            className={chipClass(includeTemporary)}
+            aria-pressed={includeTemporary}
+            disabled={!temporaryBatches || temporaryBatches.length === 0}
+            title={data && !temporaryBatches ? "讀不到臨時帳號" : undefined}
+            onClick={() => setIncludeTemporary((value) => !value)}
+          >
+            臨時帳號
+            <span className="tabular-nums opacity-70">
+              {temporaryBatches ? `${temporaryBatches.length} 批` : "—"}
+            </span>
+          </button>
           <button
             type="button"
             className={chipClass(includeDisabled)}

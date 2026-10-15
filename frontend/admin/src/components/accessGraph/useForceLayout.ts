@@ -33,7 +33,7 @@ export function ringRadii(graph: AccessGraph): Rings {
   let resources = 0;
   for (const node of graph.nodes) {
     if (node.kind === "project") projects += 1;
-    else if (node.kind === "account") accounts += 1;
+    else if (node.kind === "account" || node.kind === "temporary") accounts += 1;
     else resources += 1;
   }
   // 以「每個節點在圓周上分到的弧長」反推半徑，數量多時自動外擴。
@@ -53,13 +53,13 @@ function ringOf(kind: NodeKind, rings: Rings): number {
 
 function ringKey(kind: NodeKind): Ring {
   if (kind === "project") return "project";
-  if (kind === "account") return "account";
+  if (kind === "account" || kind === "temporary") return "account";
   return "resource";
 }
 
 function collideRadius(node: LayoutNode): number {
   if (node.kind === "project") return 24;
-  if (node.kind === "account") return 13;
+  if (node.kind === "account" || node.kind === "temporary") return 13;
   return 7;
 }
 

@@ -15,6 +15,10 @@ import {
   ROLE_LABELS,
   grantCounts,
   hasFullAccess,
+  isInactiveBatch,
+  languageBadge,
+  languageRoutesText,
+  temporaryStateLabel,
   type AccessGraph,
   type GraphEdge,
   type GraphNode,
@@ -61,7 +65,7 @@ const ACCOUNT_LABEL_LIMIT = 40;
 
 const RING_GUIDES: Array<{ ring: keyof Rings; kinds: NodeKind[] }> = [
   { ring: "project", kinds: ["project"] },
-  { ring: "account", kinds: ["account"] },
+  { ring: "account", kinds: ["account", "temporary"] },
   { ring: "resource", kinds: ["character", "voice", "asr"] },
 ];
 
@@ -126,8 +130,12 @@ function edgeClass(edge: GraphEdge): string {
   return "stroke-content-subtle";
 }
 
+function isDimmed(node: GraphNode): boolean {
+  return Boolean(node.account?.disabled || (node.batch && isInactiveBatch(node.batch)));
+}
+
 function NodeShape({ node }: { node: GraphNode }) {
-  const disabled = node.account?.disabled;
+  const disabled = isDimmed(node);
   const dash = node.missing || disabled ? "3 2" : undefined;
   switch (node.kind) {
     case "project":
@@ -156,6 +164,16 @@ function NodeShape({ node }: { node: GraphNode }) {
         <circle
           r={4.5}
           className={node.missing ? "fill-surface-raised stroke-warn" : "fill-warn"}
+          strokeDasharray={dash}
+        />
+      );
+    case "temporary":
+      // 六角形：跟正式帳號同一圈，但一眼分得出是一整批臨時帳號。
+      return (
+        <path
+          d="M-4.5,-8 L4.5,-8 L9,0 L4.5,8 L-4.5,8 L-9,0Z"
+          className="fill-surface-raised stroke-info"
+          strokeWidth={1.5}
           strokeDasharray={dash}
         />
       );
@@ -193,10 +211,19 @@ function nodeAriaLabel(node: GraphNode, degree: number): string {
       ACCESS_MODE_LABELS[node.accessMode ?? "none"]
     }`;
   }
+  if (node.kind === "temporary" && node.batch) {
+    return `${KIND_LABELS.temporary} ${node.label}，${temporaryStateLabel(node.batch.state)}`;
+  }
+  if (node.kind === "project" && node.languageRoutes) {
+    return `${KIND_LABELS.project} ${node.label}，${degree} 個帳號，${languageRoutesText(node.languageRoutes)}`;
+  }
   return `${KIND_LABELS[node.kind]} ${node.label}，${degree} 個帳號`;
 }
 
 function badgeFor(node: GraphNode): string | null {
+  if (node.kind === "temporary" && node.batch && node.batch.state !== "active") {
+    return temporaryStateLabel(node.batch.state);
+  }
   if (node.kind !== "account") return null;
   if (node.accessMode === "root") return "ROOT：全部";
   if (node.accessMode === "admin-unscoped") return "不受限";
@@ -222,6 +249,20 @@ function Tooltip({ node, degree }: { node: GraphNode; degree: number }) {
       </>
     );
   }
+  if (node.kind === "temporary" && node.batch) {
+    const batch = node.batch;
+    return (
+      <>
+        <p className="font-medium text-content">{node.label}</p>
+        <p className="text-content-muted">
+          {KIND_LABELS.temporary} · {batch.account_count ?? batch.accounts?.length ?? 0} 個 · {temporaryStateLabel(batch.state)}
+        </p>
+        <p className="mt-1 tabular-nums text-content-muted">
+          專案 {batch.grants?.projects.length ?? 0} · 人物 {batch.grants?.avatar_characters.length ?? 0} · 聲音 {batch.grants?.custom_voices.length ?? 0}
+        </p>
+      </>
+    );
+  }
   return (
     <>
       <p className="font-medium text-content">{node.label}</p>
@@ -229,6 +270,9 @@ function Tooltip({ node, degree }: { node: GraphNode; degree: number }) {
         {KIND_LABELS[node.kind]}
         {node.missing ? " · 不在可見清單" : ""} · {degree} 個帳號連到這裡
       </p>
+      {node.kind === "project" && node.languageRoutes && (
+        <p className="mt-1 text-content-muted">{languageRoutesText(node.languageRoutes)}</p>
+      )}
     </>
   );
 }
@@ -366,14 +410,14 @@ export default function AccessGraphCanvas({
   const restOpacity = Math.min(0.6, 3.2 / Math.sqrt(Math.max(1, graph.edges.length)));
 
   const accountCount = useMemo(
-    () => graph.nodes.filter((node) => node.kind === "account").length,
+    () => graph.nodes.filter((node) => node.kind === "account" || node.kind === "temporary").length,
     [graph],
   );
 
   const labelVisible = (node: GraphNode) => {
     if (focusSet?.has(node.id)) return true;
     if (node.kind === "project") return true;
-    if (node.kind === "account") {
+    if (node.kind === "account" || node.kind === "temporary") {
       return accountCount <= ACCOUNT_LABEL_LIMIT || viewport.k >= 0.5;
     }
     return viewport.k >= 1;
@@ -450,14 +494,16 @@ export default function AccessGraphCanvas({
             const labelBelow = node.kind === "project";
             // 外圈節點的名字往圓外長，左半邊靠右對齊，才不會壓到中間的連線。
             const labelLeft = !labelBelow && (position.x ?? 0) < 0;
-            const labelOffset = (node.kind === "account" ? 10 : 7) * nodeScale + labelGap;
+            const labelOffset =
+              (node.kind === "account" || node.kind === "temporary" ? 10 : 7) * nodeScale + labelGap;
+            const routesBadge = node.kind === "project" ? languageBadge(node.languageRoutes) : null;
             return (
               <g
                 key={node.id}
                 data-node-id={node.id}
                 transform={`translate(${position.x},${position.y})`}
                 className="cursor-pointer outline-none transition-opacity duration-150 [&:focus-visible_.focus-ring]:opacity-100"
-                opacity={faded ? 0.15 : node.account?.disabled ? 0.55 : 1}
+                opacity={faded ? 0.15 : isDimmed(node) ? 0.55 : 1}
                 role="button"
                 tabIndex={0}
                 aria-label={nodeAriaLabel(node, degree)}
@@ -510,6 +556,21 @@ export default function AccessGraphCanvas({
                         {badge}
                       </tspan>
                     )}
+                  </text>
+                )}
+                {showLabel && routesBadge && (
+                  <text
+                    data-language-badge
+                    y={11 * nodeScale + labelGap + labelSize * 1.35}
+                    dy="0.7em"
+                    textAnchor="middle"
+                    fontSize={labelSize * 0.85}
+                    className="fill-info stroke-surface font-medium"
+                    strokeWidth={3 / viewport.k}
+                    strokeLinejoin="round"
+                    style={{ paintOrder: "stroke" }}
+                  >
+                    {routesBadge}
                   </text>
                 )}
               </g>

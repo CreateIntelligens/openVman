@@ -5,6 +5,7 @@ const ITEMS: Array<{ label: string; symbol: React.ReactNode }> = [
   { label: "ROOT", symbol: <circle cx={8} cy={8} r={5.5} className="fill-content stroke-primary" strokeWidth={1.5} /> },
   { label: "管理員", symbol: <circle cx={8} cy={8} r={5} className="fill-info" /> },
   { label: "一般帳號", symbol: <circle cx={8} cy={8} r={5} className="fill-surface-raised stroke-content-muted" strokeWidth={1.2} /> },
+  { label: "臨時帳號（一批）", symbol: <path d="M5,2.5 L11,2.5 L14,8 L11,13.5 L5,13.5 L2,8Z" className="fill-surface-raised stroke-info" strokeWidth={1.2} /> },
   { label: "人物", symbol: <path d="M8,2 L14,8 L8,14 L2,8Z" className="fill-success" /> },
   { label: "聲音", symbol: <circle cx={8} cy={8} r={3.5} className="fill-warn" /> },
   { label: "辨識引擎", symbol: <path d="M8,2 L14,13 L2,13Z" className="fill-content-subtle" /> },
@@ -58,7 +59,11 @@ export default function AccessGraphLegend() {
           <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
             <circle cx={8} cy={8} r={5} className="fill-surface-raised stroke-content-muted" strokeWidth={1.2} strokeDasharray="2 1.5" />
           </svg>
-          停用／不在可見清單
+          停用／過期／不在可見清單
+        </li>
+        <li className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="font-medium text-info">中·台</span>
+          專案的語言分流（只有中文不標）
         </li>
       </ul>
       <p className="mt-1">內圈專案・中圈帳號・外圈人物／聲音／辨識引擎</p>

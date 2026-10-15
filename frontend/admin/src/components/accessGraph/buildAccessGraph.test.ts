@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { Account, AccountAccessOptions } from "../../api/auth";
+import type { Account, AccountAccessOptions, TemporaryBatchAudit } from "../../api/auth";
 import {
   accessModeOf,
   buildAccessGraph,
   grantCounts,
+  languageBadge,
+  languageRoutesText,
 } from "./buildAccessGraph";
 import { runLayout } from "./useForceLayout";
 
@@ -207,6 +209,89 @@ describe("buildAccessGraph", () => {
 
   it("treats a user with project grants as grant-based", () => {
     expect(accessModeOf(alice, undefined)).toBe("grants");
+  });
+});
+
+function batch(overrides: Partial<TemporaryBatchAudit> & Pick<TemporaryBatchAudit, "batch_id">): TemporaryBatchAudit {
+  return {
+    created_at: "2026-10-14T06:05:00Z",
+    state: "active",
+    account_count: 1,
+    grants: { projects: ["p-hk"], avatar_characters: ["c-1"], custom_voices: ["v-1"], asr_engines: [] },
+    defaults: { project_id: "p-hk", character_id: "c-1", voice_provider: "voxcpm", voice_id: "v-1" },
+    accounts: [
+      {
+        user_id: "t-1", username: "tmp-a1b2", state: "active", disabled: false,
+        first_used_at: null, expires_at: null, remaining_seconds: null,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe("temporary account batches", () => {
+  const live = batch({ batch_id: "b-live" });
+  const gone = batch({ batch_id: "b-gone", state: "expired", grants: { projects: ["p-demo"], avatar_characters: [], custom_voices: [] } });
+
+  it("are left out unless asked for", () => {
+    const graph = buildAccessGraph({ accounts: [alice], options, temporaryBatches: [live] });
+    expect(graph.byId.has("temporary:b-live")).toBe(false);
+  });
+
+  it("become one node per batch with grant edges and the default marked", () => {
+    const graph = buildAccessGraph({
+      accounts: [alice],
+      options,
+      temporaryBatches: [live, gone],
+      includeTemporary: true,
+      layers: ["voice"],
+    });
+    const node = graph.byId.get("temporary:b-live")!;
+    expect(node.kind).toBe("temporary");
+    expect(node.label).toMatch(/^臨時 .*（1）$/);
+    expect(node.aliases).toEqual(["tmp-a1b2"]);
+    const edges = graph.edges.filter((edge) => edge.source === node.id);
+    expect(edges.map((edge) => [edge.target, edge.kind, edge.isDefault])).toEqual([
+      ["project:p-hk", "grant", true],
+      ["voice:v-1", "grant", true],
+    ]);
+    expect(graph.neighbors.get("project:p-demo")!.has("temporary:b-gone")).toBe(true);
+  });
+
+  it("hide expired or revoked batches together with disabled accounts", () => {
+    const graph = buildAccessGraph({
+      accounts: [alice],
+      options,
+      temporaryBatches: [live, gone, batch({ batch_id: "b-revoked", revoked_at: "2026-10-14T07:00:00Z" })],
+      includeTemporary: true,
+      includeDisabled: false,
+    });
+    expect(graph.byId.has("temporary:b-live")).toBe(true);
+    expect(graph.byId.has("temporary:b-gone")).toBe(false);
+    expect(graph.byId.has("temporary:b-revoked")).toBe(false);
+  });
+});
+
+describe("language routes", () => {
+  it("are attached to visible project nodes", () => {
+    const graph = buildAccessGraph({
+      accounts: [alice],
+      options,
+      languageRoutes: { "p-hk": ["zh", "nan"], "p-demo": "error" },
+    });
+    expect(graph.byId.get("project:p-hk")!.languageRoutes).toEqual(["zh", "nan"]);
+    expect(graph.byId.get("project:p-demo")!.languageRoutes).toBe("error");
+    expect(graph.byId.get("project:p-idle")!.languageRoutes).toBeUndefined();
+  });
+
+  it("only get a badge when a language besides Chinese is routed", () => {
+    expect(languageBadge(["zh"])).toBeNull();
+    expect(languageBadge("error")).toBeNull();
+    expect(languageBadge(undefined)).toBeNull();
+    expect(languageBadge(["zh", "nan", "en"])).toBe("中·台·EN");
+    expect(languageRoutesText(["zh"])).toBe("語言分流：只有中文（不分流）");
+    expect(languageRoutesText(["zh", "nan"])).toBe("語言分流：中文、台語");
+    expect(languageRoutesText("error")).toBe("語言分流：讀不到");
   });
 });
 

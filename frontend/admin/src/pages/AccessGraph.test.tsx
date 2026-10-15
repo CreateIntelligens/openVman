@@ -5,8 +5,11 @@ import {
   fetchAccountAccessOptions,
   fetchAdminScope,
   listAccounts,
+  listTemporaryBatches,
   type Account,
+  type TemporaryBatchAudit,
 } from "../api/auth";
+import { fetchProjectKnowledgeSettings } from "../api/knowledge";
 import { NavigationProvider } from "../context/NavigationContext";
 import AccessGraph from "./AccessGraph";
 
@@ -14,7 +17,43 @@ vi.mock("../api/auth", () => ({
   fetchAccountAccessOptions: vi.fn(),
   fetchAdminScope: vi.fn(),
   listAccounts: vi.fn(),
+  listTemporaryBatches: vi.fn(),
 }));
+
+vi.mock("../api/knowledge", () => ({
+  fetchProjectKnowledgeSettings: vi.fn(),
+}));
+
+const batches: TemporaryBatchAudit[] = [
+  {
+    batch_id: "batch-1",
+    created_at: "2026-10-14T06:05:00Z",
+    state: "active",
+    first_used_at: "2026-10-14T06:10:00Z",
+    expires_at: "2026-10-14T14:10:00Z",
+    account_count: 2,
+    grants: {
+      projects: ["p-hk"],
+      avatar_characters: ["c-1"],
+      custom_voices: ["v-1"],
+      asr_engines: [],
+    },
+    defaults: { project_id: "p-hk", character_id: "c-1", voice_provider: "voxcpm", voice_id: "v-1" },
+    accounts: [
+      {
+        user_id: "t-1", username: "tmp-a1b2", password: "SECRET-PASS-1", state: "active",
+        disabled: false, first_used_at: "2026-10-14T06:10:00Z", expires_at: "2026-10-14T14:10:00Z",
+        remaining_seconds: 100,
+      },
+      {
+        user_id: "t-2", username: "tmp-c3d4", password: "SECRET-PASS-2", state: "unused",
+        disabled: false, first_used_at: null, expires_at: null, remaining_seconds: null,
+      },
+    ],
+    admin_portal_access: false,
+    kiosk: true,
+  },
+];
 
 const accounts: Account[] = [
   {
@@ -100,6 +139,11 @@ describe("AccessGraph page", () => {
         avatar_backgrounds: [],
       },
     });
+    vi.mocked(listTemporaryBatches).mockResolvedValue(batches);
+    vi.mocked(fetchProjectKnowledgeSettings).mockImplementation(async (projectId: string) => {
+      if (projectId === "p-hk") return { language_routes: ["zh", "nan"] };
+      return { language_routes: ["zh"] };
+    });
   });
 
   it("renders accounts and projects as nodes with a summary", async () => {
@@ -156,6 +200,75 @@ describe("AccessGraph page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^停用帳號/ }));
     expect(screen.queryByRole("button", { name: /帳號 retired/ })).toBeNull();
+  });
+
+  it("draws temporary account batches only after the toggle, without passwords", async () => {
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+
+    expect(screen.queryByRole("button", { name: /^臨時帳號 臨時/ })).toBeNull();
+    const toggle = screen.getByRole("button", { name: /^臨時帳號/ });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(toggle.textContent).toContain("1 批");
+
+    fireEvent.click(toggle);
+    const batchNode = screen.getByRole("button", { name: /^臨時帳號 臨時 .*（2），使用中/ });
+    expect(screen.getByText(/1 批臨時帳號/)).toBeTruthy();
+    fireEvent.keyDown(batchNode, { key: "Enter" });
+
+    const panel = screen.getByRole("complementary", { name: "節點細節" });
+    expect(within(panel).getByText("tmp-a1b2")).toBeTruthy();
+    expect(within(panel).getByText("未使用")).toBeTruthy();
+    expect(within(panel).getByText("展示機台")).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: /鶴記/ }).textContent).toContain("預設");
+    expect(document.body.textContent).not.toContain("SECRET-PASS");
+  });
+
+  it("finds a temporary account by username once the batches are shown", async () => {
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+    fireEvent.click(screen.getByRole("button", { name: /^臨時帳號/ }));
+
+    fireEvent.change(screen.getByRole("combobox", { name: "搜尋節點" }), {
+      target: { value: "tmp-c3d4" },
+    });
+    expect(within(screen.getByRole("listbox")).getByText("臨時帳號")).toBeTruthy();
+  });
+
+  it("keeps the graph when temporary accounts cannot be read", async () => {
+    vi.mocked(listTemporaryBatches).mockRejectedValue(new Error("boom"));
+    renderPage();
+
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+    const toggle = screen.getByRole("button", { name: /^臨時帳號/ }) as HTMLButtonElement;
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.title).toBe("讀不到臨時帳號");
+  });
+
+  it("shows each project's language routes as a badge and in the side panel", async () => {
+    vi.mocked(fetchProjectKnowledgeSettings).mockImplementation(async (projectId: string) => {
+      if (projectId === "p-hk") return { language_routes: ["zh", "nan"] };
+      throw new Error("forbidden");
+    });
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+
+    await waitFor(() =>
+      expect(document.querySelector("[data-language-badge]")?.textContent).toBe("中·台"),
+    );
+    expect(fetchProjectKnowledgeSettings).toHaveBeenCalledWith("p-hk");
+    expect(fetchProjectKnowledgeSettings).toHaveBeenCalledWith("p-demo");
+    expect(document.querySelectorAll("[data-language-badge]").length).toBe(1);
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /專案 鶴記/ }), { key: "Enter" });
+    let panel = screen.getByRole("complementary", { name: "節點細節" });
+    expect(within(panel).getByText("語言分流")).toBeTruthy();
+    expect(within(panel).getByText("台語")).toBeTruthy();
+    expect(within(panel).getByText("中文")).toBeTruthy();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /專案 展示/ }), { key: "Enter" });
+    panel = screen.getByRole("complementary", { name: "節點細節" });
+    expect(within(panel).getByText("讀不到這個專案的語言分流。")).toBeTruthy();
   });
 
   it("shows the error when the account list fails", async () => {

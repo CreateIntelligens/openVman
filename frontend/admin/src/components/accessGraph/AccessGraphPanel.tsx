@@ -6,7 +6,9 @@ import {
   accountNodeId,
   grantCounts,
   hasFullAccess,
+  languageName,
   resourceNodeId,
+  temporaryStateLabel,
   type AccessGraph,
   type GraphEdge,
   type GraphNode,
@@ -167,6 +169,127 @@ function AccountDetails({
   );
 }
 
+function formatTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString("zh-TW", { hour12: false });
+}
+
+function TemporaryBatchDetails({
+  graph,
+  node,
+  onSelect,
+  onOpenAccounts,
+}: Omit<AccessGraphPanelProps, "onClose" | "accounts"> & { node: GraphNode }) {
+  const batch = node.batch!;
+  const projectEdges = graph.edges.filter(
+    (edge) => edge.source === node.id && graph.byId.get(edge.target)?.kind === "project",
+  );
+  const accounts = batch.accounts ?? [];
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-1.5 px-5 pb-4">
+        <span className="chip">{temporaryStateLabel(batch.state)}</span>
+        <span className="chip tabular-nums">{batch.account_count ?? accounts.length} 個帳號</span>
+        {batch.admin_portal_access && <span className="chip">可進管理後台</span>}
+        {batch.kiosk && <span className="chip">展示機台</span>}
+      </div>
+
+      <Section title="時間">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm tabular-nums">
+          <dt className="text-content-muted">建立</dt>
+          <dd>{formatTime(batch.created_at)}</dd>
+          <dt className="text-content-muted">第一次登入</dt>
+          <dd>{formatTime(batch.first_used_at)}</dd>
+          <dt className="text-content-muted">到期</dt>
+          <dd>{formatTime(batch.expires_at)}</dd>
+          {batch.revoked_at && (
+            <>
+              <dt className="text-content-muted">撤銷</dt>
+              <dd>{formatTime(batch.revoked_at)}</dd>
+            </>
+          )}
+        </dl>
+      </Section>
+
+      <Section title="預設">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+          <dt className="text-content-muted">專案</dt>
+          <dd className="truncate">{labelFor(graph, batch.defaults?.project_id, "project")}</dd>
+          <dt className="text-content-muted">人物</dt>
+          <dd className="truncate">{labelFor(graph, batch.defaults?.character_id, "character")}</dd>
+          <dt className="text-content-muted">聲音</dt>
+          <dd className="truncate">{labelFor(graph, batch.defaults?.voice_id, "voice")}</dd>
+        </dl>
+      </Section>
+
+      <Section title="可存取的專案">
+        {projectEdges.length === 0 ? (
+          <p className="text-sm text-content-muted">沒有</p>
+        ) : (
+          <ul className="-mx-2 space-y-0.5">
+            {projectEdges.map((edge) => (
+              <NodeLink
+                key={edge.id}
+                node={graph.byId.get(edge.target)!}
+                onSelect={onSelect}
+                suffix={edge.isDefault ? defaultChip : undefined}
+              />
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      {accounts.length > 0 && (
+        <Section title={`帳號（${accounts.length}）`}>
+          <ul className="space-y-1 text-sm">
+            {accounts.map((item) => (
+              <li key={item.user_id} className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">{item.username}</span>
+                <span className="shrink-0 text-xs text-content-muted">{temporaryStateLabel(item.state)}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <div className="border-t border-border px-5 py-4">
+        <button type="button" className="btn btn-ghost w-full" onClick={onOpenAccounts}>
+          <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">manage_accounts</span>
+          到帳號管理查看臨時帳號
+        </button>
+      </div>
+    </>
+  );
+}
+
+function LanguageRoutesSection({ node }: { node: GraphNode }) {
+  const routes = node.languageRoutes;
+  return (
+    <Section title="語言分流">
+      {routes === undefined ? (
+        <p className="text-sm text-content-muted">讀取中…</p>
+      ) : routes === "error" ? (
+        <p className="text-sm text-content-muted">讀不到這個專案的語言分流。</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {routes.map((route) => (
+              <span key={route} className="chip">{languageName(route)}</span>
+            ))}
+          </div>
+          {routes.every((route) => route === "zh") && (
+            <p className="mt-2 text-xs text-content-muted">只有中文，不分流。</p>
+          )}
+        </>
+      )}
+    </Section>
+  );
+}
+
 const EDGE_GROUPS: Array<{ title: string; match: (edge: GraphEdge) => boolean }> = [
   { title: "依授權清單", match: (edge) => edge.kind === "grant" },
   { title: "依管理範圍", match: (edge) => edge.kind === "scope" },
@@ -194,6 +317,8 @@ function ResourceDetails({
           <p className="mt-2 text-xs text-warn">這項資源出現在授權裡，但不在目前可見的資源清單中（可能已刪除或超出你的管理範圍）。</p>
         )}
       </div>
+
+      {node.kind === "project" && !node.missing && <LanguageRoutesSection node={node} />}
 
       {EDGE_GROUPS.map(({ title, match }) => {
         const edges = incoming.filter(match);
@@ -269,6 +394,8 @@ export default function AccessGraphPanel(props: AccessGraphPanelProps) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {node.kind === "account" ? (
           <AccountDetails {...props} node={node} />
+        ) : node.kind === "temporary" ? (
+          <TemporaryBatchDetails {...props} node={node} />
         ) : (
           <ResourceDetails {...props} node={node} />
         )}
