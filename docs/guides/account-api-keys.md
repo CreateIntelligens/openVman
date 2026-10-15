@@ -62,7 +62,7 @@ API key 不接受 query 參數；不要把 key 放進網址。瀏覽器原生 We
 ## 失效與用量
 
 - 到期或撤銷 key 後，後續驗證拒絕；已在執行的請求或已連上的 WebSocket 不會因此自動中斷。
-- 停用帳號、撤銷帳號憑證（token version）或變更角色後，原 key 失效，需重新建立。資源授權變更則在後續請求按新權限判斷。
+- 停用帳號或變更角色後，原 key 失效，需重新建立。重設密碼與撤銷登入 session（強制登出）只影響登入，不會讓 key 失效；要停用某把 key 請個別撤銷。資源授權變更則在後續請求按新權限判斷。
 - `request_count` 記錄通過 key 驗證的 HTTP 請求及 WebSocket 握手，包含稍後被資源權限拒絕的請求；不代表成功辨識次數。WebSocket 每個音訊 frame 不另算一個請求。
 - 推論帳本保留擁有者 `user_id`，以 `principal_type=api_key`、`principal_id=key_id` 區分每把 key；用量頁可篩選 API 金鑰。請求次數與模型 token／字元／音訊秒數是不同指標。
 - 無效、到期或撤銷的 key 回 401；角色／資源不足或用 API key 管理 key 回 403。欄位驗證、音檔大小與服務失敗仍遵循各端點的狀態碼。

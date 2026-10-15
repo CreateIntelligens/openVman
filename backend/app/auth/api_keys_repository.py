@@ -225,11 +225,12 @@ class ApiKeyRepository:
             if user_row is None:
                 raise InvalidApiKeyError("invalid API key")
             user = _user_from_row(user_row)
+            # 重設密碼與強制登出只作廢登入 session（token_version），不影響 key；
+            # key 要停用請逐把撤銷，或停用帳號。
             if (
                 user.disabled
                 or user.account_type is not AccountType.FORMAL
                 or user.role.value != row["issued_role"]
-                or user.token_version != row["issued_token_version"]
             ):
                 raise InvalidApiKeyError("invalid API key")
             connection.execute(

@@ -32,6 +32,8 @@
 
 ### Changed
 
+- **[2026-10-15]** **重設密碼與強制登出不再讓帳號 API key 失效**：key 驗證不再比對帳號的 `token_version`，重設密碼、撤銷登入 session 只作廢登入，串接用的 key 照常可用，避免每次改密碼都要重發 key 給整合方。停用帳號、變更角色、帳號改為非正式帳號、key 過期或個別撤銷仍會讓 key 失效。懷疑帳號外洩時，除了重設密碼也要到「API 金鑰」逐把撤銷。
+
 - **[2026-10-15]** **移除過時的程式碼圖譜提示**：repo 根目錄的 `graphify-out/` 已於 2026-04-17 移除，`.codex/hooks.json` 的「有 graph.json 就提示先讀 GRAPH_REPORT.md」hook 與 `AGENTS.md` 對應說明一直沒有作用，一併刪除。各專案知識庫圖譜（`<workspace>/graphify-out/`）不受影響。
 
 - **[2026-10-15]** **後台側欄整理**：側欄改為 Workspace（對話、語音、對話紀錄、知識庫搜尋）、Knowledge（知識庫、記憶管理、工作區）、Character（角色管理、Avatar、工具與技能）、System（專案與權限、模型供應商、用量、系統狀態）四組。原「專案管理」「帳號管理」「權限圖譜」「Embed 金鑰」合併為帶分頁的「專案與權限」頁：專案 `/admin/access`、帳號 `/admin/access/accounts`（臨時建立 `/admin/access/accounts/temporary`、編輯／管理 `/admin/access/accounts/manage`，帳號分頁內以分段控制切換）、API 金鑰 `/admin/access/api-keys`、權限圖譜 `/admin/access/graph`、Embed 金鑰 `/admin/access/embed-keys`；一般帳號只看得到專案與 API 金鑰分頁，直連帳號、權限圖譜或 Embed 金鑰分頁顯示「權限不足」（補上 Embed 金鑰原本直連未擋的缺口）。原「系統健康」「系統監控」合併為「系統狀態」頁：健康 `/admin/system`、監控 `/admin/system/monitoring`，只掛目前分頁，離開健康分頁即停止 30 秒輪詢、未進監控分頁不載入 Grafana iframe。路由解析支援兩層子路徑，權限改由 `requiredRouteAccess()` 單一來源判斷。**舊路徑 `/admin/projects`、`/admin/accounts`（含 `/temporary`、`/manage`、`/api-keys`）、`/admin/access-graph`、`/admin/embed-keys`、`/admin/health`、`/admin/monitoring` 不轉址、直接失效**，書籤與外部連結需改用新路徑。後端不變。

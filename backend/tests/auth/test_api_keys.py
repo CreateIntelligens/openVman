@@ -174,7 +174,6 @@ def test_key_bearer_preserves_identity_and_counts_http_and_ws_once(setup):
         "revoked",
         "disabled",
         "role",
-        "version",
         "temporary",
         "invalid_expiry",
     ],
@@ -206,7 +205,6 @@ def test_invalid_credentials_fail_closed_without_counting(setup, failure):
             updates = {
                 "disabled": "disabled = 1",
                 "role": "role = 'admin'",
-                "version": "token_version = token_version + 1",
                 "temporary": "account_type = 'temporary'",
             }
             connection.execute(
@@ -224,6 +222,19 @@ def test_invalid_credentials_fail_closed_without_counting(setup, failure):
         assert connection.execute(
             "SELECT request_count, last_used_at FROM account_api_keys"
         ).fetchone()[:] == (0, None)
+
+
+def test_password_reset_and_session_revocation_keep_keys_valid(setup):
+    runtime, root, owner, client = setup
+    _, secret = _issue(runtime, owner)
+    headers = {"Authorization": f"Bearer {secret}"}
+
+    runtime.users.reset_password(
+        actor_id=root.id, user_id=owner.id, password_hash="new-hash"
+    )
+    assert client.get("/probe", headers=headers).status_code == 200
+    runtime.users.revoke_sessions(owner.id, actor_id=root.id)
+    assert client.get("/probe", headers=headers).status_code == 200
 
 
 def test_revoke_is_retained_idempotent_and_invalidates_immediately(setup):
