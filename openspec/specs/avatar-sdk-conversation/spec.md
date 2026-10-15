@@ -17,7 +17,7 @@ The `openvman-avatar-sdk.js` bundle SHALL accept `embedKey`, `projectId`, `perso
 - **THEN** the second call is rejected with `INSTANCE_EXISTS` as for any other differing option
 
 ### Requirement: ask(text) runs a full turn
-An instance SHALL provide `ask(text): Promise<string>` that sends the text to `POST /api/v1/chat` with the instance's `project_id`, `persona_id`, and a per-instance `session_id`, emits a `reply` event with the answer text, requests `POST /v1/audio/speech` with the configured provider and voice, and plays the returned audio through the runtime. The promise SHALL resolve with the reply text once playback has finished or been interrupted; hosts that need the start of speech use the `speaking` event.
+An instance SHALL provide `ask(text): Promise<string>` that sends the text to `POST /api/v1/chat/stream` with the instance's `project_id`, `persona_id`, and a per-instance `session_id`, emits a `sentence` event for each streamed sentence, synthesizes the sentences through `POST /v1/audio/speech` with the configured provider and voice as they arrive (one request at a time, joining sentences that arrive meanwhile), plays each segment after the previous one without interrupting it, and emits one `reply` event with the final `done.reply`. When no sentence arrives the final reply SHALL be synthesized whole. The promise SHALL resolve with the reply text once playback has finished; when the turn is interrupted before `done` it SHALL resolve with the sentences received so far and emit no `reply`, and when interrupted after `done` (while audio still plays) it SHALL resolve with the full reply. When the stream route answers 404 or 405 and `POST /api/v1/chat` succeeds, the instance SHALL use `/api/v1/chat` for later turns. Hosts that need the start of speech use the `speaking` event.
 
 #### Scenario: Keyed host
 - **WHEN** `init` received `embedKey` and the host calls `ask("你好")`
@@ -32,11 +32,11 @@ An instance SHALL provide `ask(text): Promise<string>` that sends the text to `P
 - **THEN** every chat request reuses the same `session_id`
 
 #### Scenario: Interrupt
-- **WHEN** the host calls `ask` while a previous answer is still playing
-- **THEN** the previous playback is interrupted before the new turn starts
+- **WHEN** the host calls `ask`, `interrupt`, or `destroy` while a previous answer is still streaming or playing
+- **THEN** the previous stream, pending synthesis, and playback are stopped before the new turn starts, and no further speech is requested for the old turn
 
 ### Requirement: Conversation errors are named
-`ask` SHALL reject with `OpenVmanAvatarError` codes `UNAUTHORIZED` for 401 or 403, `RATE_LIMITED` for 429 (carrying `retryAfterSeconds` when the header is present), `CHAT_FAILED` for other chat failures, and `SPEECH_FAILED` for speech failures, and SHALL emit the same error through the `error` event.
+`ask` SHALL reject with `OpenVmanAvatarError` codes `UNAUTHORIZED` for 401 or 403, `RATE_LIMITED` for 429 (carrying `retryAfterSeconds` from the `Retry-After` header or the stream error's `retry_after_ms`), `CHAT_FAILED` for other chat failures including a stream `error` event with any other status, and `SPEECH_FAILED` for speech failures, and SHALL emit the same error through the `error` event.
 
 #### Scenario: Revoked key
 - **WHEN** the chat request returns 401

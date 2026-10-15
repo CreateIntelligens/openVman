@@ -11,7 +11,9 @@ export class AvatarAudio {
   private outputNode: AudioNode | null = null;
   private nextStartTime = 0;
   private playbackGeneration = 0;
-  private settlePlayback: (() => void) | null = null;
+  // 讓排隊中的片段依呼叫順序解碼、排上時間軸。
+  private queueTail: Promise<void> = Promise.resolve();
+  private settlers = new Set<() => void>();
   private sources = new Set<AudioBufferSourceNode>();
   private speaking = false;
 
@@ -36,32 +38,58 @@ export class AvatarAudio {
     this.interrupt();
     const generation = this.playbackGeneration;
     if (this.destroyed) return;
-    const context = this.ensureContext();
+    // 先在使用者手勢內恢復 AudioContext，再去等 Blob 讀完。
     await this.prepare();
     if (generation !== this.playbackGeneration || this.destroyed) return;
-
     const encoded = typeof (source as Blob).arrayBuffer === "function"
       ? await (source as Blob).arrayBuffer()
       : source as ArrayBuffer;
-    if (generation !== this.playbackGeneration || this.destroyed) return;
+    const scheduled = await this.decodeAndSchedule(encoded, generation);
+    if (scheduled) await this.untilFinished(scheduled);
+  }
+
+  /**
+   * Plays encoded audio right after whatever is already scheduled, without
+   * interrupting it. Resolves when this segment ends or playback is
+   * interrupted, so a reply can be spoken one segment at a time without gaps.
+   */
+  async queueAudio(source: ArrayBuffer): Promise<void> {
+    const generation = this.playbackGeneration;
+    const step = this.queueTail.then(() =>
+      this.decodeAndSchedule(source, generation)
+    );
+    this.queueTail = step.then(() => undefined, () => undefined);
+    const scheduled = await step;
+    if (scheduled) await this.untilFinished(scheduled);
+  }
+
+  private async decodeAndSchedule(
+    encoded: ArrayBuffer,
+    generation: number,
+  ): Promise<ScheduledSource | null> {
+    const stale = () =>
+      generation !== this.playbackGeneration || this.destroyed;
+    if (stale()) return null;
+    const context = this.ensureContext();
+    await this.prepare();
+    if (stale()) return null;
     const decoded = await context.decodeAudioData(encoded);
-    if (generation !== this.playbackGeneration || this.destroyed) return;
+    if (stale()) return null;
     this.runtime.beginSpeaking();
     for (const chunk of decodedAudioBufferToPcmChunks(decoded)) {
       this.runtime.pushAudio(chunk);
     }
+    return this.scheduleSource(context, decoded);
+  }
 
-    await new Promise<void>((resolve, reject) => {
-      try {
-        const { onFinished } = this.scheduleSource(context, decoded);
-        this.settlePlayback = () => resolve();
-        onFinished(() => {
-          if (this.settlePlayback) this.settlePlayback = null;
-          resolve();
-        });
-      } catch (error) {
-        reject(error);
-      }
+  private untilFinished(scheduled: ScheduledSource): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const settle = () => {
+        this.settlers.delete(settle);
+        resolve();
+      };
+      this.settlers.add(settle);
+      scheduled.onFinished(settle);
     });
   }
 
@@ -88,13 +116,15 @@ export class AvatarAudio {
   private scheduleSource(
     context: AudioContext,
     buffer: AudioBuffer,
-  ): { onFinished: (listener: () => void) => void } {
+  ): ScheduledSource {
     const playbackSource = context.createBufferSource();
     this.sources.add(playbackSource);
     playbackSource.buffer = buffer;
     playbackSource.connect(this.ensureOutputNode(context));
     let listener: (() => void) | null = null;
+    let finished = false;
     const finish = () => {
+      finished = true;
       this.sources.delete(playbackSource);
       this.finishIfIdle();
       listener?.();
@@ -110,7 +140,13 @@ export class AvatarAudio {
       this.finishIfIdle();
       throw error;
     }
-    return { onFinished: (next) => { listener = next; } };
+    return {
+      // 片段可能在呼叫端掛上 listener 前就播完了。
+      onFinished: (next) => {
+        if (finished) next();
+        else listener = next;
+      },
+    };
   }
 
   interrupt(): void {
@@ -125,9 +161,7 @@ export class AvatarAudio {
     }
     this.sources.clear();
     this.nextStartTime = this.context?.currentTime ?? 0;
-    const settle = this.settlePlayback;
-    this.settlePlayback = null;
-    if (settle) settle();
+    for (const settle of [...this.settlers]) settle();
     this.runtime.clearAudio();
     this.runtime.resetSpeaking();
     this.setSpeaking(false);
@@ -182,6 +216,10 @@ export class AvatarAudio {
     this.speaking = speaking;
     this.onSpeakingChange(speaking);
   }
+}
+
+interface ScheduledSource {
+  onFinished: (listener: () => void) => void;
 }
 
 export function decodedAudioBufferToPcmChunks(

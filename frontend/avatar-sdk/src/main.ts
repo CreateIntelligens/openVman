@@ -190,7 +190,10 @@ async function createInstance(
   const conversation = new AvatarConversation(resourceBaseUrl, options, {
     interrupt: () => audio.interrupt(),
     onReply: (text) => emit("reply", { text, type: "reply" }),
+    onSentence: (index, text) =>
+      emit("sentence", { index, text, type: "sentence" }),
     playAudio: (source) => audio.playAudio(source),
+    queueAudio: (source) => audio.queueAudio(source),
   });
 
   const instance: OpenVmanAvatarInstance = {
@@ -219,6 +222,7 @@ async function createInstance(
       if (destroyed) return;
       destroyed = true;
       runtimeDisposed = true;
+      conversation.interrupt();
       audio.destroy();
       runtime.dispose();
       removeAvatarDom(dom);
@@ -227,7 +231,8 @@ async function createInstance(
       activeInstance = null;
     },
     interrupt() {
-      audio.interrupt();
+      // 連同進行中的對話串流與還沒合成的句子一起停，否則句子會繼續到、繼續念。
+      conversation.interrupt();
     },
     off(type, handler) {
       handlers.get(type)?.delete(

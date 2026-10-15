@@ -3,6 +3,7 @@ export type OpenVmanAvatarEventType =
   | "error"
   | "ready"
   | "reply"
+  | "sentence"
   | "speaking";
 
 export type OpenVmanAvatarAudioOutput = "speaker" | "silent";
@@ -39,6 +40,8 @@ export interface OpenVmanAvatarEventMap {
   };
   ready: { type: "ready" };
   reply: { text: string; type: "reply" };
+  // 串流回答每到一句派送一次，index 從 0 起算；整段回答以 reply 為準。
+  sentence: { index: number; text: string; type: "sentence" };
   speaking: { state: "start" | "stop"; type: "speaking" };
 }
 

@@ -14,7 +14,11 @@ async function loadSdk({
   chatHeaders = {},
   chatStatus = 200,
   deferChat = false,
+  manualStream = false,
+  speechDelayMs = 0,
   speechStatus = 200,
+  streamEvents,
+  streamStatus = chatStatus,
   withCryptoUuid = true,
 } = {}) {
   const source = await readFile(bundleUrl, "utf8");
@@ -30,6 +34,7 @@ async function loadSdk({
     silentOutput: 0,
   };
   let finishChat;
+  let stream = null;
   let context;
   const createElement = (tagName) => {
     const element = {
@@ -139,6 +144,34 @@ async function loadSdk({
     },
     fetch: async (url, options) => {
       requests.push({ options, url });
+      if (String(url).endsWith("/api/v1/chat/stream")) {
+        const respond = () => {
+          if (streamStatus !== 200) {
+            return {
+              headers: makeHeaders(chatHeaders),
+              ok: false,
+              status: streamStatus,
+            };
+          }
+          stream = createSseStream(options.signal);
+          if (!manualStream) {
+            for (const item of streamEvents ?? defaultStreamEvents(chatBody)) {
+              stream.push(item.event, item.data);
+            }
+            stream.end();
+          }
+          return {
+            body: stream.body,
+            headers: makeHeaders({}),
+            ok: true,
+            status: 200,
+          };
+        };
+        if (!deferChat) return respond();
+        return new Promise((resolve) => {
+          finishChat = () => resolve(respond());
+        });
+      }
       if (String(url).endsWith("/api/v1/chat")) {
         const respond = () => ({
           arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
@@ -153,6 +186,9 @@ async function loadSdk({
         });
       }
       if (String(url).endsWith("/v1/audio/speech")) {
+        if (speechDelayMs) {
+          await new Promise((resolve) => setTimeout(resolve, speechDelayMs));
+        }
         return {
           arrayBuffer: async () => new ArrayBuffer(32),
           headers: makeHeaders({}),
@@ -236,13 +272,74 @@ async function loadSdk({
     document: context.document,
     finishChat: () => finishChat?.(),
     requests,
+    stream: () => stream,
     runtimeCalls,
     sdk: context.window.OpenVmanAvatar,
   };
 }
 
-const chatRequests = (requests) =>
+function defaultStreamEvents(chatBody) {
+  return [
+    { data: { index: 0, text: chatBody.reply }, event: "sentence" },
+    { data: chatBody, event: "done" },
+  ];
+}
+
+/** A text/event-stream body the test can feed one event at a time. */
+function createSseStream(signal) {
+  const encoder = new TextEncoder();
+  const chunks = [];
+  let ended = false;
+  let waiting = null;
+  let failure = null;
+  const wake = () => {
+    const next = waiting;
+    waiting = null;
+    next?.();
+  };
+  signal?.addEventListener("abort", () => {
+    failure = new Error("The operation was aborted.");
+    wake();
+  });
+  const reader = {
+    async cancel() {
+      ended = true;
+      wake();
+    },
+    async read() {
+      for (;;) {
+        if (failure) throw failure;
+        if (chunks.length) return { done: false, value: chunks.shift() };
+        if (ended) return { done: true, value: undefined };
+        await new Promise((resolve) => {
+          waiting = resolve;
+        });
+      }
+    },
+  };
+  return {
+    body: { getReader: () => reader },
+    end() {
+      ended = true;
+      wake();
+    },
+    push(event, data) {
+      chunks.push(
+        encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+      );
+      wake();
+    },
+  };
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+const streamRequests = (requests) =>
+  requests.filter(({ url }) => String(url).endsWith("/api/v1/chat/stream"));
+const wholeChatRequests = (requests) =>
   requests.filter(({ url }) => String(url).endsWith("/api/v1/chat"));
+const chatRequests = (requests) =>
+  [...streamRequests(requests), ...wholeChatRequests(requests)];
 const speechRequests = (requests) =>
   requests.filter(({ url }) => String(url).endsWith("/v1/audio/speech"));
 
@@ -468,4 +565,189 @@ test("a silent instance drives lip sync through the runtime without sound", asyn
   assert.ok(runtimeCalls.pushedAudio > 0);
   assert.equal(runtimeCalls.silentOutput > 0, true);
   assert.equal(runtimeCalls.speakerOutput, 0);
+});
+
+test("ask streams the reply and speaks the first sentence before done", async () => {
+  const { requests, sdk, stream } = await loadSdk({ manualStream: true });
+  const avatar = await sdk.init({ characterId: "000", embedKey: "ovk_demo" });
+  const sentences = [];
+  const replies = [];
+  avatar.on("sentence", (event) => sentences.push([event.index, event.text]));
+  avatar.on("reply", (event) => replies.push(event.text));
+
+  const pending = avatar.ask("你好");
+  await flush();
+  const [chat] = streamRequests(requests);
+  assert.equal(chat.options.headers["X-Embed-Key"], "ovk_demo");
+  assert.equal(chat.options.credentials, "omit");
+  assert.equal(JSON.parse(chat.options.body).message, "你好");
+
+  stream().push("sentence", { index: 0, text: "第一句。" });
+  await flush();
+  // done 還沒到就已經在合成第一句。
+  assert.deepEqual(
+    speechRequests(requests).map(({ options }) => JSON.parse(options.body).input),
+    ["第一句。"],
+  );
+  assert.deepEqual(replies, []);
+
+  stream().push("sentence", { index: 1, text: "第二句。" });
+  stream().push("done", { reply: "第一句。第二句。" });
+  stream().end();
+
+  assert.equal(await pending, "第一句。第二句。");
+  assert.deepEqual(sentences, [[0, "第一句。"], [1, "第二句。"]]);
+  assert.deepEqual(replies, ["第一句。第二句。"]);
+  assert.equal(
+    speechRequests(requests).map(({ options }) => JSON.parse(options.body).input).join(""),
+    "第一句。第二句。",
+  );
+  assert.equal(wholeChatRequests(requests).length, 0);
+});
+
+test("sentences arriving during synthesis join the next speech request", async () => {
+  const { requests, sdk } = await loadSdk({
+    speechDelayMs: 5,
+    streamEvents: [
+      { data: { index: 0, text: "一。" }, event: "sentence" },
+      { data: { index: 1, text: "二。" }, event: "sentence" },
+      { data: { index: 2, text: "三。" }, event: "sentence" },
+      { data: { reply: "一。二。三。" }, event: "done" },
+    ],
+  });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  await avatar.ask("數數");
+
+  const inputs = speechRequests(requests).map(
+    ({ options }) => JSON.parse(options.body).input,
+  );
+  assert.deepEqual(inputs, ["一。", "二。三。"]);
+});
+
+test("a stream without sentences still speaks the final reply", async () => {
+  const { requests, sdk } = await loadSdk({
+    streamEvents: [{ data: { reply: "只有完整回答。" }, event: "done" }],
+  });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  assert.equal(await avatar.ask("你好"), "只有完整回答。");
+  assert.deepEqual(
+    speechRequests(requests).map(({ options }) => JSON.parse(options.body).input),
+    ["只有完整回答。"],
+  );
+});
+
+test("a missing stream route falls back to /chat for the rest of the instance", async () => {
+  const { requests, sdk } = await loadSdk({ streamStatus: 404 });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  assert.equal(await avatar.ask("第一句"), "你好，我是 openVman。");
+  assert.equal(await avatar.ask("第二句"), "你好，我是 openVman。");
+
+  assert.equal(streamRequests(requests).length, 1);
+  assert.equal(wholeChatRequests(requests).length, 2);
+  const sessionIds = chatRequests(requests).map(
+    ({ options }) => JSON.parse(options.body).session_id,
+  );
+  assert.equal(new Set(sessionIds).size, 1);
+});
+
+test("a 404 from both routes is a chat failure and keeps trying the stream", async () => {
+  const { requests, sdk } = await loadSdk({ chatStatus: 404 });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  await assert.rejects(avatar.ask("一"), (error) => error.code === "CHAT_FAILED");
+  await assert.rejects(avatar.ask("二"), (error) => error.code === "CHAT_FAILED");
+
+  assert.equal(streamRequests(requests).length, 2);
+});
+
+for (const [status, detail, code, retryAfterSeconds] of [
+  [429, { retry_after_ms: 3000 }, "RATE_LIMITED", 3],
+  [403, "forbidden", "UNAUTHORIZED", undefined],
+  [502, { error_code: "LLM_OVERLOAD", retry_after_ms: 3000 }, "CHAT_FAILED", undefined],
+]) {
+  test(`a stream error event with status ${status} maps to ${code}`, async () => {
+    const { requests, sdk } = await loadSdk({
+      streamEvents: [{ data: { detail, status }, event: "error" }],
+    });
+    const avatar = await sdk.init({ characterId: "000" });
+    const replies = [];
+    avatar.on("reply", (event) => replies.push(event.text));
+
+    await assert.rejects(
+      avatar.ask("你好"),
+      (error) =>
+        error.code === code && error.retryAfterSeconds === retryAfterSeconds,
+    );
+    assert.deepEqual(replies, []);
+    assert.equal(speechRequests(requests).length, 0);
+  });
+}
+
+test("a stream that ends without done fails with CHAT_FAILED", async () => {
+  const { sdk } = await loadSdk({
+    streamEvents: [{ data: { index: 0, text: "說到一半" }, event: "sentence" }],
+  });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  await assert.rejects(avatar.ask("你好"), (error) => error.code === "CHAT_FAILED");
+});
+
+test("interrupt mid-stream aborts the stream and requests no more speech", async () => {
+  const { requests, sdk, stream } = await loadSdk({ manualStream: true });
+  const avatar = await sdk.init({ characterId: "000" });
+  const replies = [];
+  avatar.on("reply", (event) => replies.push(event.text));
+
+  const pending = avatar.ask("你好");
+  await flush();
+  stream().push("sentence", { index: 0, text: "第一句。" });
+  await flush();
+  const speechBefore = speechRequests(requests).length;
+
+  avatar.interrupt();
+  stream().push("sentence", { index: 1, text: "第二句。" });
+  stream().push("done", { reply: "第一句。第二句。" });
+
+  // 中斷時回傳已經收到的部分，不派送 reply。
+  assert.equal(await pending, "第一句。");
+  await flush();
+  assert.equal(streamRequests(requests)[0].options.signal.aborted, true);
+  assert.equal(speechRequests(requests).length, speechBefore);
+  assert.deepEqual(replies, []);
+});
+
+test("a new ask aborts the previous stream", async () => {
+  const { requests, sdk, stream } = await loadSdk({ manualStream: true });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  const first = avatar.ask("第一題");
+  await flush();
+  const firstStream = stream();
+  firstStream.push("sentence", { index: 0, text: "舊的。" });
+  await flush();
+
+  const second = avatar.ask("第二題");
+  assert.equal(await first, "舊的。");
+  await flush();
+  stream().push("sentence", { index: 0, text: "新的。" });
+  stream().push("done", { reply: "新的。" });
+  stream().end();
+  assert.equal(await second, "新的。");
+
+  assert.equal(streamRequests(requests)[0].options.signal.aborted, true);
+  assert.equal(streamRequests(requests).length, 2);
+});
+
+test("a speech failure mid-stream still reports the reply before SPEECH_FAILED", async () => {
+  const { sdk } = await loadSdk({ speechStatus: 502 });
+  const avatar = await sdk.init({ characterId: "000" });
+  const events = [];
+  avatar.on("reply", () => events.push("reply"));
+  avatar.on("error", (event) => events.push(event.code));
+
+  await assert.rejects(avatar.ask("你好"), (error) => error.code === "SPEECH_FAILED");
+  assert.deepEqual(events, ["reply", "SPEECH_FAILED"]);
 });

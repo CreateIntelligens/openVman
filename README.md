@@ -109,7 +109,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 ### 對外嵌入
 
-第三方網站以 Avatar JavaScript SDK（`frontend/avatar-sdk/`，發布於 `/static/sdk/openvman-avatar-sdk.js`）搭配 Embed 金鑰載入角色，以 `playAudio()` 或 `pushPcm()` 提供自己的音訊驅動對嘴。SDK 不開放 Brain、Chat、ASR 或 TTS。整合方式見 [Avatar 外部整合指南](docs/guides/avatar-embed/README.md)。
+第三方網站以 Avatar JavaScript SDK（`frontend/avatar-sdk/`，發布於 `/static/sdk/openvman-avatar-sdk.js`）搭配 Embed 金鑰載入角色，以 `playAudio()` 或 `pushPcm()` 提供自己的音訊驅動對嘴，或以 `ask(text)` 走對話模式：經 `POST /api/v1/chat/stream` 逐句取得回答，每句一到就以 `POST /v1/audio/speech` 合成並播放。整合方式見 [Avatar 外部整合指南](docs/guides/avatar-embed/README.md)。
 
 同一個 edge nginx 也以 Bearer token 對其他 stack 提供 Embedding 端點（`/api/embedding`、OpenAI 相容的 `/api/embedding/v1/embeddings`），設定見 [GPU 服務共用指南](docs/operations/gpu-service-sharing.md)。
 

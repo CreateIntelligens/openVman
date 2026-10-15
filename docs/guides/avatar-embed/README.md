@@ -73,13 +73,15 @@ const avatar = await OpenVmanAvatar.init({
 
 ## 對話模式
 
-設定對話選項後，`await avatar.ask(text)` 會依序完成一整輪：送出 `POST /api/v1/chat`、派送 `reply` 事件、以回覆文字呼叫 `POST /v1/audio/speech`，再把合成音訊交給既有播放路徑驅動嘴型。Promise 會在語音播完（或被下一輪 `ask()` 中斷）後 resolve，回傳回覆文字；需要知道開口時機請監聽 `speaking` 事件。
+設定對話選項後，`await avatar.ask(text)` 會完成一整輪：送出 `POST /api/v1/chat/stream`，回答每寫完一句就派送 `sentence` 事件，並以該句呼叫 `POST /v1/audio/speech` 合成、接在前一段後面播放，不必等整段回答。同時只送一個語音請求，合成期間到的句子會併進下一個請求。回答結束時派送一次 `reply` 事件（完整回答），Promise 在語音全部播完後 resolve，回傳回覆文字。需要知道開口時機請監聽 `speaking` 事件；一輪中若下一句還沒合成好，`speaking` 可能先 `stop` 再 `start`。
 
-同一個 instance 的每次 `ask()` 都會沿用同一組 `session_id`，因此後端看得到完整上下文。新的 `ask()` 一定會先中止上一輪還在播的語音，不會兩段答案疊在一起。
+同一個 instance 的每次 `ask()` 都會沿用同一組 `session_id`，因此後端看得到完整上下文。新的 `ask()`、`interrupt()` 或 `destroy()` 會連同上一輪的串流、還沒送出的合成與正在播的語音一起中止，不會兩段答案疊在一起；在回答結束前被中止的 `ask()` 會 resolve 為已收到的句子，不派送 `reply`，這一輪也不寫入對話紀錄；回答已結束、只剩語音在播時才中止，則 resolve 為完整回答（`reply` 已派送過）。
+
+部署沒有串流路由（回 404／405）而 `POST /api/v1/chat` 可用時，該 instance 之後的 `ask()` 都直接走 `/api/v1/chat`，等整段回答後再合成。
 
 ### 外部網站（embed key）
 
-embed key 是公開識別碼，不是密鑰，可以直接寫在前端。實際權限由後端的 origin allowlist、專案綁定、速率與每日配額決定，請在 Admin 的 Embed Keys 頁面建立並限定允許的 origin。
+embed key 是公開識別碼，不是密鑰，可以直接寫在前端。實際權限由後端的 origin allowlist、專案綁定、速率與每日配額決定，請在 Admin 的 Embed Keys 頁面建立並限定允許的 origin。每輪 `ask()` 會用掉 1 個對話串流請求，加上 1 個以上的語音請求（合成期間到的句子會併進同一個請求），設定速率與每日配額時請一併計入。
 
 ```html
 <button id="ask" type="button">問一句</button>
@@ -126,10 +128,11 @@ const reply = await avatar.ask("今天有哪些待辦？");
 
 ### 對話事件與錯誤
 
-`ask()` 期間會派送 `reply`、`speaking` 與 `error` 事件；`error` 事件與 `ask()` reject 的錯誤內容相同，方便集中處理。
+`ask()` 期間會派送 `sentence`、`reply`、`speaking` 與 `error` 事件；`error` 事件與 `ask()` reject 的錯誤內容相同，方便集中處理。`sentence`（`{ index, text }`）適合逐句顯示字幕，所有句子依序接起來等於 `reply` 的 `text`。
 
 ```js
-avatar.on("reply", ({ text }) => renderBubble(text));
+avatar.on("sentence", ({ text }) => appendToBubble(text));
+avatar.on("reply", ({ text }) => replaceBubble(text));
 avatar.on("error", ({ code, retryAfterSeconds }) => {
   if (code === "RATE_LIMITED") {
     showNotice(`請於 ${retryAfterSeconds ?? 60} 秒後再試。`);
@@ -140,9 +143,9 @@ avatar.on("error", ({ code, retryAfterSeconds }) => {
 | 代碼 | 觸發情境 | 建議處理 |
 |---|---|---|
 | `UNAUTHORIZED` | HTTP 401 或 403：金鑰無效、已停用、origin 不在 allowlist，或 `projectId` 與金鑰綁定的專案不符。 | 停用對話 UI，不要重試。 |
-| `RATE_LIMITED` | HTTP 429：超過每分鐘速率或每日配額；有 `Retry-After` 時會帶 `retryAfterSeconds`。 | 依 `retryAfterSeconds` 退避後再試。 |
-| `CHAT_FAILED` | 其他對話失敗：網路錯誤、後端 5xx，或回應沒有 `reply`。 | 提示稍後再試。 |
-| `SPEECH_FAILED` | 語音合成失敗。此時 `reply` 事件已派送，宿主仍可只顯示文字。 | 降級為純文字回覆。 |
+| `RATE_LIMITED` | HTTP 429：超過每分鐘速率或每日配額；有 `Retry-After`（或串流 `error` 事件的 `retry_after_ms`）時會帶 `retryAfterSeconds`。 | 依 `retryAfterSeconds` 退避後再試。 |
+| `CHAT_FAILED` | 其他對話失敗：網路錯誤、後端 5xx、串流中途的 `error` 事件，或沒有收到完整回答。已開口的部分會停掉。 | 提示稍後再試。 |
+| `SPEECH_FAILED` | 語音合成失敗。SDK 仍會讀完回答並派送 `reply` 事件後才 reject，宿主可只顯示文字。 | 降級為純文字回覆。 |
 
 若初始化時設定 `audioOutput: "silent"`，`ask()` 一樣會驅動嘴型並正常 resolve，只是 SDK 不出聲，適合宿主自行播放同一段語音的情境。
 
@@ -191,7 +194,7 @@ for await (const chunk of pcmStream) {
 
 ### `avatar.interrupt()`
 
-立即停止完整音訊與 PCM queue，清除嘴形狀態並派送 `{ state: "stop" }`。
+立即停止完整音訊與 PCM queue，清除嘴形狀態並派送 `{ state: "stop" }`；`ask()` 進行中時一併中止對話串流與還沒送出的合成。
 
 ### `avatar.on(type, handler)`／`avatar.off(type, handler)`
 

@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-10-15]** **Avatar SDK `ask()` 改用逐句串流**：`ask()` 改送 `POST /api/v1/chat/stream`，第一句一到就呼叫 `POST /v1/audio/speech` 合成並開始念，不等整段回答。同時只跑一個語音請求，合成中到的句子併成下一個請求（每輪請求數不隨句數暴增，Embed key 配額也省）；各段音訊用新的 `AvatarAudio.queueAudio()` 接在時間軸後面播，句子之間不中斷。新增 `sentence` 事件（`{ index, text }`）給宿主做逐句字幕；`reply` 事件仍只派送一次，內容是 `done.reply`。串流的 `error` 事件照 HTTP 錯誤對應：401／403 為 `UNAUTHORIZED`、429 為 `RATE_LIMITED`（`retryAfterSeconds` 由 `detail.retry_after_ms` 換算）、其餘為 `CHAT_FAILED`；串流出錯會停掉已開口的部分。`interrupt()`、新的 `ask()` 與 `destroy()` 會連同串流與還沒送出的合成一起中斷，在 `done` 之前被中斷的 `ask()` 回傳已收到的句子、不派送 `reply`，這一輪也不寫入紀錄；`done` 之後（語音還在播）才中斷則回傳完整回答，`reply` 已派送過。一輪 `ask()` 會用掉 1 個串流請求加上 1 個以上的語音請求（原本固定 2 個），Embed key 配額請依此估算。整輪沒有 `sentence` 時整段合成 `done.reply`。部署沒有串流路由（404／405）且 `/chat` 可用時，該 instance 之後都改走 `/api/v1/chat`。一輪中若下一句還沒合成好，`speaking` 可能先 `stop` 再 `start`。
+
 - **[2026-10-15]** **權限圖譜加上臨時帳號與語言分流**：`/admin/access-graph` 新增「臨時帳號」圖層鈕（預設關閉），讀 `GET /api/v1/temporary-accounts/batches`，每一批畫成帳號圈上的一顆六角形節點並連到它授權的專案與資源（登入預設以粗線表示），非使用中的批次標狀態，已過期或撤銷的批次與停用帳號一起受「停用帳號」鈕控制；點批次列出時間、預設、專案與批內帳號，搜尋可用臨時帳號名稱。該 API 回傳的明文密碼在頁面讀入時就丟棄。專案改為同時讀每個專案的 `GET /api/v1/knowledge/settings` 取語言分流：有中文以外的分流時在專案名稱下標小字（例如「中·台」），tooltip 與專案細節列出完整語言，讀不到只影響該專案。後端不變。
 
 - **[2026-10-15]** **虛擬人前台文字模式改用逐句串流**：文字模式送 `POST /api/v1/chat/stream`，第一句一到就開始合成語音，不再等整段回答與寫入紀錄。句子依序排進 TTS（同時只跑一個 `/api/v1/tts/stream`，合成中累積的句子併成下一個請求），聲音進同一個播放佇列，對嘴不中斷；字幕在每段開口時接到同一個氣泡。`done` 照 `/chat` 的回應處理附圖、引用、session、決策除錯與 `turn_id`／`accept`；以 `done.reply` 為最終字幕。思考中補句照舊合併重送，開口後補的話算下一輪；停止、插話會中止串流（這輪不寫入歷史）；串流出錯或 `accept` 被拒時停掉已開口的回答。部署沒有串流路由（404／405，且 `/chat` 不是同樣回 404）時自動改走 `/api/v1/chat`。延遲量測新增 `first_sentence` 時間點與 `brain_first_sentence` 分段（backend `/api/v1/metrics/turn` 接受此時間點）。
