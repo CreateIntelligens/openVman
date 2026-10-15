@@ -66,6 +66,8 @@
 
 ### Fixed
 
+- **[2026-10-15]** **虛擬人前台同分頁重新登入後人物不顯示**：DHLiveMini2.js 在 script 載入時就固定抓住當下的 `#canvas_video`，而 vendor script 與 WASM instance 每頁只載一次。同一分頁登出再登入（或從權限不足頁返回）會卸載整個 App、建一顆新 canvas，引擎卻繼續畫在已脫離頁面的舊 canvas 上，舞台只剩背景，錯誤畫面的重試也沒用，只能手動重新整理。`useOpenVmanAvatarRuntime` 現在記下 vendor 綁定的 canvas，`initWasm` 發現它已不在頁面上時整頁重新載入，再由新頁面重新初始化。與帳號、人物或影片解析度無關。
+
 - **[2026-10-14]** **後台帳號列表不再因授權不完整的帳號整個 500**：正式機有 4 個帳號只被授權辨識引擎、沒有專案／人物／聲音，`GET /api/v1/users` 讀取時套用寫入規則（三類至少各一）驗證而 500，後台帳號管理頁打不開。讀取改用不檢查最少數量的 `AccountResourceGrantsView`（臨時帳號批次的讀取同樣處理），寫入授權仍要求三類至少各一。
 
 - **[2026-10-14]** **用戶端中斷 `POST /api/v1/chat` 後不再把整輪跑完**：使用者打斷數位人、整合方 abort fetch 時，Backend 原本照樣等 Brain 回應，Brain 也看不到斷線，LLM、工具、每輪決策與寫入對話紀錄全部照跑，白花 token 與延遲預算。現在 Backend 代理在等 Brain（連線與讀取回應）期間發現用戶端離開，就關掉往 Brain 的請求並回 499（只記一行 log）；Brain 的 `/brain/chat` 收到斷線後設下取消旗標，生成在下一個安全點停止：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前，進行中的每輪決策請求也一併取消。已送出的那一次 LLM 請求收不回來，但不會再開下一步；答案在斷線後才出來時不挑附圖、不寫入。取消的回合不寫對話、日誌與記憶（帶 `turn_id` 的回合也不暫存），記 `chat_cancelled` 事件（`trace_id`、停在哪個階段 `stage`、已完成的工具步數與 LLM 呼叫次數），不算生成失敗。Starlette 的 `request.is_disconnected()` 在 `BaseHTTPMiddleware` 後面永遠是 false（兩個服務都有這種 middleware），因此兩邊各加一層最外層的 ASGI middleware（`ClientDisconnectMiddleware`）看原始 `receive` 的斷線訊息；兩份程式碼由測試保證一致。SSE 與正常回應不受影響，正常請求不多等。

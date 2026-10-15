@@ -113,3 +113,21 @@ test("character assets are fetched from the path the Backend actually serves", (
     "不可再退回沒有路由的 /assets",
   );
 });
+
+test("a remounted stage reloads instead of reusing a runtime bound to the old canvas", () => {
+  // vendor 只在 script 載入時抓一次 #canvas_video；App 重掛後新 canvas 永遠
+  // 不會被畫到（同分頁登出再登入時人物不見）。initWasm 必須先檢查再沿用單例。
+  const settle = functionBody(runtimeSource, "settleRuntimeScriptLoad");
+  assert.match(settle, /vendorCanvas = document\.getElementById\('canvas_video'\)/);
+  assert.match(
+    functionBody(runtimeSource, "vendorCanvasDetached"),
+    /!vendorCanvas\.isConnected/,
+  );
+  const init = functionBody(runtimeSource, "initWasm");
+  const reloadAt = init.indexOf("window.location.reload()");
+  assert.ok(init.indexOf("vendorCanvasDetached()") >= 0 && reloadAt >= 0);
+  assert.ok(
+    reloadAt < init.indexOf("return runtimeInstance"),
+    "必須在沿用既有 runtimeInstance 之前檢查",
+  );
+});

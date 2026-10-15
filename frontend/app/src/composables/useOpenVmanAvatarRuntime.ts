@@ -11,6 +11,8 @@ let runtimeInstance: OpenVmanAvatarRuntimeInstance | null = null
 let runtimeInitPromise: Promise<OpenVmanAvatarRuntimeInstance> | null = null
 let runtimeScriptPromise: Promise<void> | null = null
 let idleLipSyncBypass: IdleLipSyncBypass | null = null
+// DHLiveMini2.js 載入時用 const 抓住當下的 #canvas_video，之後不再重查。
+let vendorCanvas: HTMLElement | null = null
 // runtime 是模組層級的單例，可能同時被多個元件使用。用引用計數決定何時真正
 // 拆掉 canvas patch：最後一個使用者卸載才還原，否則會扯掉還在用的人的嘴型。
 let activeConsumers = 0
@@ -58,6 +60,7 @@ function settleRuntimeScriptLoad(
   reject: (reason: Error) => void,
 ): void {
   if (typeof window.createQtAppInstance === 'function') {
+    vendorCanvas = document.getElementById('canvas_video')
     resolve()
     return
   }
@@ -66,6 +69,17 @@ function settleRuntimeScriptLoad(
       '[OpenVmanAvatarRuntime] Vendor runtime loaded without createQtAppInstance',
     ),
   )
+}
+
+/**
+ * Whether the vendor runtime still draws into a canvas that left the page.
+ *
+ * 同一分頁登出再登入（或權限不足頁返回）會卸載整個 App 再建一顆新的
+ * canvas，但 vendor script 與 WASM instance 每頁只載一次，仍畫在舊
+ * canvas 上：舞台只剩背景、重試也沒用。只能整頁重新載入。
+ */
+function vendorCanvasDetached(): boolean {
+  return vendorCanvas !== null && !vendorCanvas.isConnected
 }
 
 async function ensureAvatarRuntimeScript(): Promise<void> {
@@ -126,6 +140,11 @@ export function useOpenVmanAvatarRuntime() {
   let chunkIndex = 0
 
   async function initWasm(): Promise<OpenVmanAvatarRuntimeInstance> {
+    if (vendorCanvasDetached()) {
+      window.location.reload()
+      // reload 生效前不要讓呼叫端拿舊 instance 去載角色。
+      return new Promise<OpenVmanAvatarRuntimeInstance>(() => {})
+    }
     if (runtimeInstance) {
       isReady.value = true
       error.value = null
