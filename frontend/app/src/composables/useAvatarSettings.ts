@@ -23,6 +23,9 @@ export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>,
   function handleProjectChange(projectId: string): void {
     if (!projectId) return;
     saveSettings({ projectId });
+    if (bootstrap.switchProject) {
+      void bootstrap.switchProject(projectId);
+    }
   }
 
   function handlePersonaChange(personaId: string): void {

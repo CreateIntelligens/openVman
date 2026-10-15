@@ -1,4 +1,10 @@
+import { useEffect, useState } from "react";
 import type { Account } from "../../api/auth";
+import {
+  fetchProjectResources,
+  type ProjectResourceItem,
+  type ProjectResourcesResponse,
+} from "../../api/projects";
 import {
   ACCESS_MODE_LABELS,
   KIND_LABELS,
@@ -301,10 +307,98 @@ function LanguageRoutesSection({ node }: { node: GraphNode }) {
   );
 }
 
+function ProjectResourcesSection({ projectId }: { projectId: string }) {
+  const [data, setData] = useState<ProjectResourcesResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetchProjectResources(projectId)
+      .then((res) => {
+        if (active) setData(res);
+      })
+      .catch(() => {
+        if (active) setData(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+
+  if (loading) {
+    return (
+      <Section title="專案資源">
+        <p className="text-sm text-content-muted">載入專案資源中…</p>
+      </Section>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Section title="專案資源">
+        <p className="text-sm text-content-muted">無法載入專案資源。</p>
+      </Section>
+    );
+  }
+
+  const sections: Array<{ label: string; items: ProjectResourceItem[] }> = [
+    { label: "人物", items: data.avatar_character ?? [] },
+    { label: "背景", items: data.avatar_background ?? [] },
+    { label: "小助理", items: data.avatar_mascot ?? [] },
+    { label: "聲音", items: data.custom_voice ?? [] },
+    { label: "ASR", items: data.asr_engine ?? [] },
+  ];
+
+  const sourceChip = (source: string) => {
+    switch (source) {
+      case "project":
+        return <span className="rounded bg-primary/10 text-primary px-1.5 py-0.5 text-xs font-medium">專案專屬</span>;
+      case "assigned":
+        return <span className="rounded bg-amber-500/10 text-amber-500 px-1.5 py-0.5 text-xs font-medium">ROOT 指派</span>;
+      case "grant":
+        return <span className="rounded bg-surface-sunken text-content-muted px-1.5 py-0.5 text-xs font-medium">帳號授權</span>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Section title="專案可用資源">
+      <div className="space-y-3">
+        {sections.map(({ label, items }) => (
+          <div key={label} className="text-sm">
+            <p className="text-xs font-semibold text-content-muted mb-1">{label}（{items.length}）</p>
+            {items.length === 0 ? (
+              <p className="text-xs text-content-subtle italic">無</p>
+            ) : (
+              <ul className="space-y-1">
+                {items.map((item) => (
+                  <li key={item.resource_id} className="flex items-center justify-between gap-2 rounded px-2 py-1 bg-surface-sunken text-xs">
+                    <span className="truncate font-medium">{item.label || item.resource_id}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.is_default && <span className="text-primary font-medium text-xs">預設</span>}
+                      {sourceChip(item.source)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 const EDGE_GROUPS: Array<{ title: string; match: (edge: GraphEdge) => boolean }> = [
   { title: "依授權清單", match: (edge) => edge.kind === "grant" },
   { title: "依管理範圍", match: (edge) => edge.kind === "scope" },
   { title: "全權限帳號的預設", match: (edge) => edge.kind === "full" },
+  { title: "ROOT 指派至專案", match: (edge) => edge.kind === "assigned" },
 ];
 
 function ResourceDetails({
@@ -328,6 +422,17 @@ function ResourceDetails({
       <div className="px-5 pb-4">
         <p className="break-all font-mono text-xs text-content-subtle">{node.rawId}</p>
         {node.provider && <p className="mt-1 text-xs text-content-muted">供應商：{node.provider}</p>}
+        {node.resourceSource && (
+          <p className="mt-1 text-xs text-content-muted">
+            來源：
+            <span className="ml-1 inline-flex items-center rounded bg-surface-sunken px-1.5 py-0.5 text-xs font-medium">
+              {node.resourceSource === "project" && `專案專屬${node.ownerProjectId ? `（${node.ownerProjectId}）` : ""}`}
+              {node.resourceSource === "assigned" && "ROOT 指派"}
+              {node.resourceSource === "orphan" && "孤兒資源"}
+              {node.resourceSource === "grant" && "帳號授權"}
+            </span>
+          </p>
+        )}
         {node.missing && (
           <p className="mt-2 text-xs text-warn">這項資源出現在授權裡，但不在目前可見的資源清單中（可能已刪除或超出你的管理範圍）。</p>
         )}
@@ -346,7 +451,12 @@ function ResourceDetails({
         )}
       </div>
 
-      {node.kind === "project" && !node.missing && <LanguageRoutesSection node={node} />}
+      {node.kind === "project" && !node.missing && (
+        <>
+          <LanguageRoutesSection node={node} />
+          <ProjectResourcesSection projectId={node.rawId} />
+        </>
+      )}
 
       {EDGE_GROUPS.map(({ title, match }) => {
         const edges = incoming.filter(match);

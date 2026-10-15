@@ -20,7 +20,11 @@ from app.auth.models import (
     ResourceVisibility,
     is_at_least_admin,
 )
-from app.auth.resources import ResourceNotFoundError, resolve_resource
+from app.auth.resources import (
+    ResourceAccess,
+    ResourceNotFoundError,
+    resolve_resource,
+)
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.config import get_tts_config
 
@@ -35,26 +39,39 @@ def _check_resource_access(
     resource_id: str,
 ) -> ResourceRecord | None:
     record = runtime.resources.get(resource_type, resource_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="File not found")
+
     if current is None:
-        if (
-            record is None
-            or record.visibility is not ResourceVisibility.SYSTEM_PUBLIC
-        ):
+        if record.visibility is not ResourceVisibility.SYSTEM_PUBLIC:
             raise HTTPException(status_code=404, detail="File not found")
         return record
+
     if (
         current.user.account_type is AccountType.FORMAL
         and is_at_least_admin(current.user.role)
     ):
-        if record is None:
-            raise HTTPException(status_code=404, detail="File not found")
         return record
+
     if current.embed_key is not None:
-        # Embed 主體沒有資源授權；能不能讀這個角色已經由 middleware 依
-        # 金鑰的預設／額外角色清單判定過，這裡只確認資源存在。
-        if record is None:
-            raise HTTPException(status_code=404, detail="File not found")
-        return record
+        # Embed key 只看金鑰綁定的專案
+        embed_proj = current.embed_key.project_id
+        is_public = record.visibility is ResourceVisibility.SYSTEM_PUBLIC
+        is_owner_proj = bool(embed_proj and record.owner_project_id == embed_proj)
+        is_assigned_proj = bool(
+            embed_proj
+            and runtime.project_resource_assignments.is_assigned(
+                embed_proj, resource_type, resource_id
+            )
+        )
+        if is_public or is_owner_proj or is_assigned_proj:
+            return record
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied to {resource_type.value}/{resource_id}",
+        )
+
+    # 一般帳號：先看自身 grant / ownership / public
     try:
         return resolve_resource(
             runtime.resources,
@@ -62,11 +79,36 @@ def _check_resource_access(
             resource_type,
             resource_id,
         )
-    except ResourceNotFoundError as exc:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access denied to {resource_type.value}/{resource_id}",
-        ) from exc
+    except ResourceNotFoundError:
+        pass
+
+    # 專案來源檢查：該資源屬於、或被指派給任一個該帳號能讀的專案
+    candidate_projects: set[str] = set()
+    if record.owner_project_id:
+        candidate_projects.add(record.owner_project_id)
+    assigned_projects = runtime.project_resource_assignments.list_projects_for_resource(
+        resource_type, resource_id
+    )
+    candidate_projects.update(assigned_projects)
+
+    for proj_id in candidate_projects:
+        try:
+            resolve_resource(
+                runtime.resources,
+                current.user,
+                ResourceType.PROJECT,
+                proj_id,
+                access=ResourceAccess.READ,
+            )
+            return record
+        except ResourceNotFoundError:
+            continue
+
+    raise HTTPException(
+        status_code=403,
+        detail=f"Access denied to {resource_type.value}/{resource_id}",
+    )
+
 
 
 def _get_optional_current_account(

@@ -305,15 +305,16 @@ describe("AccessGraph page", () => {
     renderPage();
     await screen.findByRole("button", { name: /帳號 clerk/ });
 
-    fireEvent.click(screen.getByRole("button", { name: /^ROOT/ }));
-    fireEvent.click(screen.getByRole("button", { name: /^管理員/ }));
+    const accountGroup = screen.getByRole("group", { name: "帳號" });
+    fireEvent.click(within(accountGroup).getByRole("button", { name: /^ROOT/ }));
+    fireEvent.click(within(accountGroup).getByRole("button", { name: /^管理員/ }));
     expect(screen.queryByRole("button", { name: /帳號 ai360/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /帳號 pm-admin/ })).toBeNull();
     expect(screen.getByRole("button", { name: /帳號 clerk/ })).toBeTruthy();
     const region = screen.getByRole("region", { name: "目前的篩選" });
     expect(within(region).getByText("角色：一般帳號")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /^一般帳號/ }));
+    fireEvent.click(within(accountGroup).getByRole("button", { name: /^一般帳號/ }));
     const empty = screen.getByRole("status");
     expect(empty.textContent).toContain("沒有帳號符合目前的篩選");
     expect(empty.textContent).toContain("角色：無");
@@ -329,8 +330,9 @@ describe("AccessGraph page", () => {
     await screen.findByRole("button", { name: /帳號 clerk/ });
 
     const relations = screen.getByRole("group", { name: "連線" });
-    fireEvent.click(within(relations).getByRole("button", { name: /授權/ }));
-    fireEvent.click(within(relations).getByRole("button", { name: /管理範圍/ }));
+    fireEvent.click(within(relations).getByRole("button", { name: /^授權/ }));
+    fireEvent.click(within(relations).getByRole("button", { name: /^管理範圍/ }));
+    fireEvent.click(within(relations).getByRole("button", { name: /^ROOT 指派/ }));
 
     expect(document.querySelectorAll('[data-edge-kind="scope"]').length).toBe(0);
     expect(document.querySelectorAll('[data-edge-kind="grant"]').length).toBe(0);

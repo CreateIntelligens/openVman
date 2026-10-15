@@ -12,7 +12,7 @@ from app.auth.dependencies import (
     get_current_account,
     require_root,
 )
-from app.auth.models import AccountType, is_at_least_admin
+from app.auth.models import AccountType, ResourceType, is_at_least_admin
 from app.auth.resources import resolve_admin_scope
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.voice_access import embed_tts_providers, scoped_tts_providers
@@ -277,18 +277,35 @@ async def get_tts_providers(
     _project, policy = voice_policy.request_policy(runtime, current, project_id)
     if current.embed_key is not None:
         return JSONResponse(content=embed_tts_providers(current, runtime, policy))
+    has_project_override = False
+    if _project:
+        if (
+            runtime.project_resource_assignments.list_for_project(
+                _project, resource_type=ResourceType.CUSTOM_VOICE
+            )
+            or runtime.resources.list_by_owner_project(
+                _project, resource_type=ResourceType.CUSTOM_VOICE
+            )
+        ):
+            has_project_override = True
+
     if not (
         current.user.account_type is AccountType.FORMAL
         and is_at_least_admin(current.user.role)
     ) or resolve_admin_scope(current.user, runtime.admin_scopes).scoped or (
         # 完整型錄列的是上游的所有聲音，不是已註冊的資源，沒辦法套專案清單；
-        # 專案有限制時改列已註冊且允許的聲音。
-        policy is not None and policy.restricts_tts
+        # 專案有限制或有專案/指派聲音時改列已註冊且允許的聲音。
+        (policy is not None and policy.restricts_tts) or has_project_override
     ):
-        return JSONResponse(content=scoped_tts_providers(current, runtime, policy))
+        return JSONResponse(
+            content=scoped_tts_providers(
+                current, runtime, policy, project_id=_project
+            )
+        )
 
     providers = await build_tts_provider_catalog(get_tts_config())
     return JSONResponse(content=providers)
+
 
 
 @router.get(

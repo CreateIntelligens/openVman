@@ -30,6 +30,12 @@ const UNRESTRICTED = {
   taiwanese_asr_engine: null,
   allowed_tts_voices: [],
   default_tts_voice: null,
+  allowed_characters: [],
+  default_character_id: null,
+  allowed_backgrounds: [],
+  default_background_id: null,
+  allowed_mascots: [],
+  default_mascot_id: null,
   updated_by: null,
   updated_at: null,
 };
@@ -55,7 +61,16 @@ describe("ProjectPolicyDialog", () => {
     api.saveProjectPolicy.mockImplementation(async (_id, policy) => ({ ...UNRESTRICTED, ...policy }));
     api.fetchAccountAccessOptions.mockResolvedValue({
       projects: [],
-      avatar_characters: [],
+      avatar_characters: [
+        { id: "0713", label: "角色 0713" },
+        { id: "0714", label: "角色 0714" },
+      ],
+      avatar_backgrounds: [
+        { id: "bg-office", label: "辦公室" },
+      ],
+      avatar_mascots: [
+        { id: "qqman", label: "QQMan" },
+      ],
       custom_voices: [
         { id: "hayley", label: "Hayley", provider: "indextts" },
         { id: "edge-yun", label: "雲哲", provider: "edge-tts" },
@@ -71,7 +86,7 @@ describe("ProjectPolicyDialog", () => {
   it("shows empty lists as unrestricted", async () => {
     renderDialog();
     expect(await screen.findByText("允許的語音辨識引擎")).toBeTruthy();
-    expect(screen.getAllByText("不限制")).toHaveLength(2);
+    expect(screen.getAllByText("不限制")).toHaveLength(5);
   });
 
   it("saves allowlists and defaults, keeping defaults inside the list", async () => {
@@ -82,6 +97,10 @@ describe("ProjectPolicyDialog", () => {
     fireEvent.change(screen.getByLabelText("台語分流引擎"), { target: { value: "breeze" } });
     fireEvent.click(screen.getByLabelText(/^雲哲/));
     fireEvent.change(screen.getByLabelText("預設聲音"), { target: { value: "edge-yun" } });
+
+    // 角色設定
+    fireEvent.click(screen.getByLabelText("角色 0713"));
+    fireEvent.change(screen.getByLabelText("預設人物"), { target: { value: "0713" } });
 
     // 串流引擎不能當台語分流引擎。
     const taiwanese = screen.getByLabelText("台語分流引擎") as HTMLSelectElement;
@@ -97,8 +116,14 @@ describe("ProjectPolicyDialog", () => {
       taiwanese_asr_engine: "breeze",
       allowed_tts_voices: ["edge-yun"],
       default_tts_voice: "edge-yun",
+      allowed_characters: ["0713"],
+      default_character_id: "0713",
+      allowed_backgrounds: [],
+      default_background_id: null,
+      allowed_mascots: [],
+      default_mascot_id: null,
     }));
-    expect(onSaved).toHaveBeenCalledWith("專案「示例專案」的語音設定已更新");
+    expect(onSaved).toHaveBeenCalledWith("專案「示例專案」的設定已更新");
   });
 
   it("lists stale ids so they can be removed", async () => {

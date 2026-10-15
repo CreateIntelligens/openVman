@@ -13,6 +13,7 @@ import {
   readPref,
   setPrefScope,
   writePref,
+  writeProjectPref,
 } from "../utils/storageUtils"
 
 function normalizeAvatarRenderMode(value: string): '2d' | '3d' {
@@ -145,8 +146,17 @@ async function pushAccountSettings(patch: Partial<SettingsState>): Promise<void>
 export function saveSettings(patch: Partial<SettingsState>): void {
   Object.assign(state, patch)
   saved = { ...saved, ...patch }
+  const currentProjectId = patch.projectId ?? state.projectId
   for (const field of Object.keys(patch) as (keyof SettingsState)[]) {
-    writePref(PREF_KEYS[field], String(patch[field]))
+    const key = PREF_KEYS[field]
+    const val = String(patch[field])
+    writePref(key, val)
+    if (
+      currentProjectId &&
+      (field === "characterId" || field === "backgroundId" || field === "vrmAvatarId")
+    ) {
+      writeProjectPref(currentProjectId, key, val)
+    }
   }
   void pushAccountSettings(patch)
 }

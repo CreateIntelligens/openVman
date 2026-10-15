@@ -56,6 +56,7 @@ class AccountType(StrEnum):
 class ResourceVisibility(StrEnum):
     PRIVATE = "private"
     SYSTEM_PUBLIC = "system_public"
+    PROJECT = "project"
 
 
 class ResourceType(StrEnum):
@@ -96,6 +97,7 @@ class ResourceRecord:
     visibility: ResourceVisibility
     created_at: str
     metadata_json: str
+    owner_project_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +133,7 @@ class AccountDefaultsRecord:
 
 @dataclass(frozen=True, slots=True)
 class ProjectPolicyRecord:
-    """Per-project voice limits layered on top of account grants.
+    """Per-project voice and resource limits layered on top of account grants.
 
     空清單代表「專案不另外限制」，所以沒有設定的專案行為與以前完全一樣；
     請求實際能用的是帳號授權與這份清單的交集。
@@ -143,6 +145,12 @@ class ProjectPolicyRecord:
     taiwanese_asr_engine: str | None = None
     allowed_tts_voices: tuple[str, ...] = ()
     default_tts_voice: str | None = None
+    allowed_characters: tuple[str, ...] = ()
+    default_character_id: str | None = None
+    allowed_backgrounds: tuple[str, ...] = ()
+    default_background_id: str | None = None
+    allowed_mascots: tuple[str, ...] = ()
+    default_mascot_id: str | None = None
     updated_by: str | None = None
     updated_at: str | None = None
 
@@ -154,16 +162,46 @@ class ProjectPolicyRecord:
     def restricts_tts(self) -> bool:
         return bool(self.allowed_tts_voices)
 
+    @property
+    def restricts_characters(self) -> bool:
+        return bool(self.allowed_characters)
+
+    @property
+    def restricts_backgrounds(self) -> bool:
+        return bool(self.allowed_backgrounds)
+
+    @property
+    def restricts_mascots(self) -> bool:
+        return bool(self.allowed_mascots)
+
     def allows_asr(self, engine: str) -> bool:
         return not self.allowed_asr_engines or engine in self.allowed_asr_engines
 
     def allows_voice(self, voice_id: str) -> bool:
         return not self.allowed_tts_voices or voice_id in self.allowed_tts_voices
 
+    def allows_character(self, character_id: str) -> bool:
+        return not self.allowed_characters or character_id in self.allowed_characters
+
+    def allows_background(self, background_id: str) -> bool:
+        return not self.allowed_backgrounds or background_id in self.allowed_backgrounds
+
+    def allows_mascot(self, mascot_id: str) -> bool:
+        return not self.allowed_mascots or mascot_id in self.allowed_mascots
+
     def narrow_asr(self, engines: set[str]) -> set[str]:
         if not self.allowed_asr_engines:
             return set(engines)
         return {engine for engine in engines if engine in self.allowed_asr_engines}
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectResourceAssignmentRecord:
+    project_id: str
+    resource_type: ResourceType
+    resource_id: str
+    assigned_by: str | None
+    assigned_at: str
 
 
 @dataclass(frozen=True, slots=True)

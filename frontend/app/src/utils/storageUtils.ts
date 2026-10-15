@@ -84,3 +84,38 @@ export function removePref(key: string): void {
     // 同上。
   }
 }
+
+function projectScopedKey(projectId: string, key: string): string {
+  const base = `${key}::proj::${projectId}`
+  return scopedKey(base)
+}
+
+export function readProjectPref(projectId: string, key: string, fallback: string): string {
+  if (!projectId) return readPref(key, fallback)
+  try {
+    const val = window.localStorage.getItem(projectScopedKey(projectId, key))
+    if (val !== null) return val
+  } catch {
+    // ignore
+  }
+  return fallback
+}
+
+export function hasProjectPref(projectId: string, key: string): boolean {
+  if (!projectId) return hasPref(key)
+  try {
+    return window.localStorage.getItem(projectScopedKey(projectId, key)) !== null
+  } catch {
+    return false
+  }
+}
+
+export function writeProjectPref(projectId: string, key: string, value: string): void {
+  writePref(key, value)
+  if (!projectId) return
+  try {
+    window.localStorage.setItem(projectScopedKey(projectId, key), value)
+  } catch {
+    // ignore
+  }
+}

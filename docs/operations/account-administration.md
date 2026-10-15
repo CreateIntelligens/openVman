@@ -84,7 +84,16 @@ ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立�
 
 授權指派在資料庫 transaction 內直接檢查操作者的範圍；ROOT 縮小範圍時，會同步撤銷該 admin 已發出的範圍外授權並修正預設值。
 
+### 專案資源範圍與 ROOT 指派
+
+在 Migration 23 之後，虛擬人角色（Character）、背景（Background）與小助理（Mascot）支援設定所屬專案（`owner_project_id`）：
+- **全域資源**（`owner_project_id` 為 NULL）：維持既有行為，依帳號授權清單與專案政策（`allowed_*`）決定是否可用。
+- **專案專屬資源**（`owner_project_id` 不為 NULL）：只有能存取該專案的帳號能看見與使用，專案成員無需額外在個人 grants 內獲取授權，亦不受專案白名單限制。
+- **ROOT 指派資源**：ROOT 可在專案設定的「資源指派（ROOT 專用）」中，將任何全域或專案專屬資源直接指派給特定專案（寫入 `project_resource_assignments`）。指派後該專案所有成員皆可使用，不受個人 grants 與專案政策白名單限制。
+- **孤兒資源保護**：當擁有專屬資源的專案被刪除時，系統不會連帶刪除實體檔案或 `resources` 表資料，而是將 `owner_project_id` 設為 NULL，並將 visibility 維持為 `project`。此類孤兒資源只有 ROOT 能在後台檢視與重新指派；指派關聯表記錄則自動透過 CASCADE 清除。
+
 ### 尚未授權的正式帳號
+
 
 管理介面建立一般使用者時，要求先選好專案、聲音、人物或 VRM 授權及登入預設值。API `POST /api/v1/users` 仍允許省略 `access`，供先建立帳號、後續指派資源的流程使用；列表會顯示「未授權」。
 

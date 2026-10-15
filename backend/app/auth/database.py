@@ -22,6 +22,10 @@ from .schema_migrations import (
     _LAST_LOGIN_MIGRATION_NAME,
     _LAST_LOGIN_SCHEMA_VERSION,
     _MIGRATIONS,
+    _PROJECT_RESOURCE_ASSIGNMENTS_TABLE,
+    _PROJECT_RESOURCE_SCOPE_MIGRATION_NAME,
+    _PROJECT_RESOURCE_SCOPE_RESOURCES_TABLE,
+    _PROJECT_RESOURCE_SCOPE_SCHEMA_VERSION,
     _ROOT_ACCOUNT_MIGRATION_NAME,
     _ROOT_ACCOUNT_SCHEMA_VERSION,
     _TEMPORARY_USERNAME_MIGRATION_NAME,
@@ -147,6 +151,128 @@ class AuthDatabase:
         self._add_admin_portal_access()
         self._add_kiosk_flag()
         self._add_last_login_at()
+        self._migrate_project_resource_scope()
+
+    def _migrate_project_resource_scope(self) -> None:
+        """Allow visibility='project' on resources and add per-project resources and assignments."""
+        connection = self.connect()
+        try:
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_PROJECT_RESOURCE_SCOPE_SCHEMA_VERSION,),
+            ).fetchone()
+            if applied is not None:
+                return
+
+            existing = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'resources'"
+            ).fetchone()
+            if existing is None:
+                return
+
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(resources)").fetchall()
+            }
+            needs_rebuild = "owner_project_id" not in columns or "'project'" not in existing["sql"]
+
+            if needs_rebuild:
+                connection.execute("PRAGMA foreign_keys = OFF")
+                connection.execute("BEGIN IMMEDIATE")
+                connection.execute(_PROJECT_RESOURCE_SCOPE_RESOURCES_TABLE)
+                connection.execute(
+                    """
+                    INSERT INTO resources_rebuilt(
+                        resource_type, resource_id, owner_user_id, visibility,
+                        created_at, metadata_json, owner_project_id
+                    )
+                    SELECT resource_type, resource_id, owner_user_id, visibility,
+                           created_at, metadata_json, NULL
+                    FROM resources
+                    """
+                )
+                connection.execute("DROP TABLE resources")
+                connection.execute("ALTER TABLE resources_rebuilt RENAME TO resources")
+                connection.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_resources_owner_visibility_type
+                    ON resources(owner_user_id, visibility, resource_type)
+                    """
+                )
+                connection.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_resources_owner_project
+                    ON resources(owner_project_id, resource_type)
+                    """
+                )
+                connection.commit()
+                connection.execute("PRAGMA foreign_keys = ON")
+                violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+                if violations:
+                    raise RuntimeError(
+                        f"foreign key violations after rebuilding resources: {violations}"
+                    )
+            else:
+                connection.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_resources_owner_project
+                    ON resources(owner_project_id, resource_type)
+                    """
+                )
+                connection.commit()
+
+            with self.transaction(write=True) as tx_conn:
+                policy_columns = {
+                    row["name"]
+                    for row in tx_conn.execute("PRAGMA table_info(project_policies)").fetchall()
+                }
+                if "allowed_characters_json" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN allowed_characters_json TEXT NOT NULL DEFAULT '[]'"
+                    )
+                if "default_character_id" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN default_character_id TEXT"
+                    )
+                if "allowed_backgrounds_json" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN allowed_backgrounds_json TEXT NOT NULL DEFAULT '[]'"
+                    )
+                if "default_background_id" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN default_background_id TEXT"
+                    )
+                if "allowed_mascots_json" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN allowed_mascots_json TEXT NOT NULL DEFAULT '[]'"
+                    )
+                if "default_mascot_id" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN default_mascot_id TEXT"
+                    )
+
+                tx_conn.execute(_PROJECT_RESOURCE_ASSIGNMENTS_TABLE)
+                tx_conn.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_project_resource_assignments_project
+                    ON project_resource_assignments(project_id, resource_type)
+                    """
+                )
+                tx_conn.execute(
+                    """
+                    INSERT INTO schema_migrations(version, details_json)
+                    VALUES (?, ?)
+                    """,
+                    (
+                        _PROJECT_RESOURCE_SCOPE_SCHEMA_VERSION,
+                        json.dumps(
+                            {"name": _PROJECT_RESOURCE_SCOPE_MIGRATION_NAME},
+                            separators=(",", ":"),
+                        ),
+                    ),
+                )
+        finally:
+            connection.close()
 
     def _add_last_login_at(self) -> None:
         """Add the nullable last-login timestamp after the ROOT rebuild of users.

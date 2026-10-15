@@ -20,8 +20,14 @@ from app.auth.dependencies import (
     get_current_account,
     require_admin,
 )
-from app.auth.models import ResourceType
-from app.auth.resources import list_accessible_resources
+from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+from app.auth.project_resources import effective_project_resources
+from app.auth.resources import (
+    ResourceAccess,
+    ResourceNotFoundError,
+    list_accessible_resources,
+    resolve_resource,
+)
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.avatar.mascot_store import (
     VIDEO_ENGINE,
@@ -66,6 +72,7 @@ class CreateVideoMascotRequest(BaseModel):
     mascot_id: str = Field(..., min_length=1)
     label: str = ""
     character_id: str = Field(..., min_length=1)
+    project_id: str | None = None
 
 
 def _normalize_mascot_id_or_400(mascot_id: str) -> str:
@@ -77,49 +84,122 @@ def _normalize_mascot_id_or_400(mascot_id: str) -> str:
 
 @router.get("/api/v1/avatar/mascots", summary="列出右下角小助理")
 async def list_mascots(
+    project_id: str | None = None,
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, list[dict[str, Any]]]:
-    accessible_ids = {
-        resource.resource_id
-        for resource in list_accessible_resources(
-            runtime.resources,
-            current.user,
-            ResourceType.AVATAR_MASCOT,
-        )
-    }
-    # 影片型小助理的影片與嘴型資料由 /static/characters/{char_id} 依角色授權提供；
-    # 看不到角色的帳號連小助理也不列出，避免選了卻載不出來。
-    accessible_character_ids = {
-        resource.resource_id
-        for resource in list_accessible_resources(
-            runtime.resources,
-            current.user,
-            ResourceType.AVATAR_CHARACTER,
-        )
-    }
     store = get_store()
+    if project_id:
+        try:
+            resolve_resource(
+                runtime.resources,
+                current.user,
+                ResourceType.PROJECT,
+                project_id,
+                access=ResourceAccess.READ,
+            )
+        except ResourceNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail=f"專案不存在或無權限存取：{project_id}",
+            )
+        mascot_entries = effective_project_resources(
+            runtime, current.user, project_id, ResourceType.AVATAR_MASCOT
+        )
+        char_entries = effective_project_resources(
+            runtime, current.user, project_id, ResourceType.AVATAR_CHARACTER
+        )
+        mascot_source_by_id = {e.resource_id: e.source for e in mascot_entries}
+        char_source_by_id = {e.resource_id: e.source for e in char_entries}
+        mascots = [
+            {**mascot, "source": mascot_source_by_id[mascot["mascot_id"]]}
+            for mascot in store.list_mascots()
+            if mascot.get("mascot_id") in mascot_source_by_id
+            and (
+                mascot.get("engine") != VIDEO_ENGINE
+                or mascot.get("character_id") in char_source_by_id
+            )
+        ]
+        covered = {
+            m.get("character_id")
+            for m in mascots
+            if m.get("engine") == VIDEO_ENGINE
+        }
+        for character in get_character_store().list_characters():
+            char_id = character.get("char_id")
+            if (
+                char_id in char_source_by_id
+                and char_id not in covered
+                and character.get("has_video")
+                and character.get("has_data")
+            ):
+                item = store.video_mascot_from_character(character)
+                item["source"] = char_source_by_id[char_id]
+                mascots.append(item)
+        return {"mascots": mascots}
+
+    is_root = current.user.role is AccountRole.ROOT
+    accessible_mascots = list_accessible_resources(
+        runtime.resources,
+        current.user,
+        ResourceType.AVATAR_MASCOT,
+    )
+    accessible_mascot_sources = {
+        resource.resource_id: (
+            "orphan"
+            if is_root
+            and resource.visibility is ResourceVisibility.PROJECT
+            and resource.owner_project_id is None
+            else "grant"
+        )
+        for resource in accessible_mascots
+        if resource.visibility is not ResourceVisibility.PROJECT
+        or (is_root and resource.owner_project_id is None)
+    }
+
+    accessible_characters = list_accessible_resources(
+        runtime.resources,
+        current.user,
+        ResourceType.AVATAR_CHARACTER,
+    )
+    accessible_char_sources = {
+        resource.resource_id: (
+            "orphan"
+            if is_root
+            and resource.visibility is ResourceVisibility.PROJECT
+            and resource.owner_project_id is None
+            else "grant"
+        )
+        for resource in accessible_characters
+        if resource.visibility is not ResourceVisibility.PROJECT
+        or (is_root and resource.owner_project_id is None)
+    }
+
     mascots = [
-        mascot
+        {**mascot, "source": accessible_mascot_sources[mascot["mascot_id"]]}
         for mascot in store.list_mascots()
-        if mascot.get("mascot_id") in accessible_ids
+        if mascot.get("mascot_id") in accessible_mascot_sources
         and (
             mascot.get("engine") != VIDEO_ENGINE
-            or mascot.get("character_id") in accessible_character_ids
+            or mascot.get("character_id") in accessible_char_sources
         )
     ]
-    # 每個素材齊全且有權限的 avatar 角色都自動列為小助理，不必逐一建立；
-    # 已手動建立過的角色不重複列。
-    covered = {m.get("character_id") for m in mascots if m.get("engine") == VIDEO_ENGINE}
+    covered = {
+        m.get("character_id")
+        for m in mascots
+        if m.get("engine") == VIDEO_ENGINE
+    }
     for character in get_character_store().list_characters():
         char_id = character.get("char_id")
         if (
-            char_id in accessible_character_ids
+            char_id in accessible_char_sources
             and char_id not in covered
             and character.get("has_video")
             and character.get("has_data")
         ):
-            mascots.append(store.video_mascot_from_character(character))
+            item = store.video_mascot_from_character(character)
+            item["source"] = accessible_char_sources[char_id]
+            mascots.append(item)
     return {"mascots": mascots}
 
 
@@ -129,11 +209,48 @@ async def create_mascot(
     label: str = Form(""),
     model: UploadFile = File(...),
     thumbnail: UploadFile | None = File(None),
+    project_id: str | None = Form(default=None),
     _admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, Any]:
     cfg = get_tts_config()
     mid = _normalize_mascot_id_or_400(mascot_id)
+    norm_project_id = project_id.strip() if project_id and project_id.strip() else None
+    if norm_project_id:
+        project = runtime.resources.get(ResourceType.PROJECT, norm_project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"專案不存在：{norm_project_id}",
+            )
+        if _admin.user.role is not AccountRole.ROOT:
+            try:
+                resolve_resource(
+                    runtime.resources,
+                    _admin.user,
+                    ResourceType.PROJECT,
+                    norm_project_id,
+                    access=ResourceAccess.MUTATE,
+                )
+            except ResourceNotFoundError:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"您沒有專案 {norm_project_id} 的管理權限",
+                )
+
+    existing = runtime.resources.get(ResourceType.AVATAR_MASCOT, mid)
+    if existing is not None:
+        if existing.owner_project_id is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"小助理 {mid} 已存在且為全域資源",
+            )
+        if existing.owner_project_id != norm_project_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"小助理 {mid} 已存在於其他專案",
+            )
+
     model_bytes = await model.read()
     thumbnail_bytes = await thumbnail.read() if thumbnail else None
 
@@ -148,14 +265,26 @@ async def create_mascot(
             vrm_bytes=model_bytes,
             thumbnail_bytes=thumbnail_bytes,
         )
-        try:
-            runtime.resources.upsert_system_resource(
+        if existing is not None:
+            runtime.resources.update_metadata(
+                ResourceType.AVATAR_MASCOT,
+                mid,
+                {"label": label or mid},
+            )
+        else:
+            visibility = (
+                ResourceVisibility.PROJECT
+                if norm_project_id
+                else ResourceVisibility.SYSTEM_PUBLIC
+            )
+            runtime.resources.register(
                 resource_type=ResourceType.AVATAR_MASCOT,
                 resource_id=mid,
+                owner_user_id=None,
+                visibility=visibility,
+                owner_project_id=norm_project_id,
                 metadata={"label": label or mid},
             )
-        except Exception as exc:
-            logger.warning("failed to upsert mascot resource %s: %s", mid, exc)
     except InvalidMascotUpload as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except MascotExists as exc:
@@ -170,6 +299,42 @@ async def create_video_mascot(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, Any]:
     mid = _normalize_mascot_id_or_400(payload.mascot_id)
+    norm_project_id = payload.project_id.strip() if payload.project_id and payload.project_id.strip() else None
+    if norm_project_id:
+        project = runtime.resources.get(ResourceType.PROJECT, norm_project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"專案不存在：{norm_project_id}",
+            )
+        if _admin.user.role is not AccountRole.ROOT:
+            try:
+                resolve_resource(
+                    runtime.resources,
+                    _admin.user,
+                    ResourceType.PROJECT,
+                    norm_project_id,
+                    access=ResourceAccess.MUTATE,
+                )
+            except ResourceNotFoundError:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"您沒有專案 {norm_project_id} 的管理權限",
+                )
+
+    existing = runtime.resources.get(ResourceType.AVATAR_MASCOT, mid)
+    if existing is not None:
+        if existing.owner_project_id is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"小助理 {mid} 已存在且為全域資源",
+            )
+        if existing.owner_project_id != norm_project_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"小助理 {mid} 已存在於其他專案",
+            )
+
     try:
         cid = normalize_char_id(payload.character_id)
     except InvalidCharId as exc:
@@ -193,15 +358,29 @@ async def create_video_mascot(
         )
     except MascotExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    try:
-        runtime.resources.upsert_system_resource(
+
+    if existing is not None:
+        runtime.resources.update_metadata(
+            ResourceType.AVATAR_MASCOT,
+            mid,
+            {"label": label or mid},
+        )
+    else:
+        visibility = (
+            ResourceVisibility.PROJECT
+            if norm_project_id
+            else ResourceVisibility.SYSTEM_PUBLIC
+        )
+        runtime.resources.register(
             resource_type=ResourceType.AVATAR_MASCOT,
             resource_id=mid,
+            owner_user_id=None,
+            visibility=visibility,
+            owner_project_id=norm_project_id,
             metadata={"label": label, "character_id": cid},
         )
-    except Exception as exc:
-        logger.warning("failed to upsert mascot resource %s: %s", mid, exc)
     return {"status": "ok", "mascot": mascot}
+
 
 
 @router.delete("/api/v1/avatar/mascots/{mascot_id}", summary="刪除上傳的小助理")

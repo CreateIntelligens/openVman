@@ -4,6 +4,7 @@
 
 ### Added
 
+- **[2026-10-15]** **專案資源範圍與 ROOT 指派（人物、背景、小助理、聲音、ASR）**：Auth DB migration 23 新增 `resources.owner_project_id` 欄位與 `project_resource_assignments` 關聯表，並在 `project_policies` 擴充允許人物、背景、小助理清單與專案預設值（`allowed_characters`、`default_character_id`、`allowed_backgrounds`、`default_background_id`、`allowed_mascots`、`default_mascot_id`）。虛擬人資源支援「全域」與「專案專屬」歸屬；ROOT 可透過 `POST/DELETE /api/v1/projects/{project_id}/assignments` 直接將全域或專屬資源指派給特定專案。專案實際有效資源為帳號授權清單與專案專屬、ROOT 指派資源之聯集（`grant ∪ project ∪ assigned`），專案與指派資源免受帳號授權上限約束。專案預設值優先於帳號預設值生效；前台虛擬人支援專案預設載入與以專案為單位的記憶回退鏈（`useAvatarBootstrap` 與 `storageUtils`）。後台提供專案資源列表 API（`GET /api/v1/projects/{project_id}/resources`）、專案政策設定視窗、ROOT 即時資源指派區、上傳歸屬專案選取，以及資源來源標籤（專案專屬、ROOT 指派、孤兒資源、全域）；權限圖譜支援顯示專案專屬資源與 ROOT 指派連線（綠色虛線）。刪除專案時，其專屬資源保留為孤兒資源（`owner_project_id=NULL`）供 ROOT 檢視管理，指派關聯則自動連帶清除。
 - **[2026-10-15]** **記錄帳號最後登入時間，後台帳號列表改成單一主要動作＋更多選單**：Auth DB migration 22（`add_users_last_login_at`）在 `users` 新增可為 NULL 的 `last_login_at`，正式帳號（`/api/v1/auth/login`、`/admin-login`）與臨時帳號（`/temporary-login`、`/admin-temporary-login`）登入成功時寫入；密碼錯、帳號停用、沒有後台權限（403）或臨時批次過期都不寫，也不動 `updated_at`、不寫稽核。升級前沒有紀錄，既有帳號一律從 NULL（「從未登入」）開始。後台帳號 API（`GET /api/v1/users` 與各帳號操作回應）新增 `last_login_at` 與 `api_key_last_used_at`（該帳號所有 API key，含已撤銷，最近一次被使用的時間）；`/api/v1/auth/me` 與登入回應不變。後台「專案與權限 → 帳號 → 編輯／管理」的正式帳號列表每列只留「資源權限」，其餘收進「⋯」更多動作選單，分「帳號設定」（資源上限、變更角色、重設密碼）與「安全與危險」（登出所有裝置、停用／啟用、刪除，刪除為紅字放最後），各動作的顯示權限不變；尚不能刪除時項目照樣列出並寫明原因。選單可用方向鍵、Home／End 移動，Esc 關閉並把焦點還給觸發鈕，點選單外關閉。狀態改為精簡標籤（「授權 N 項」「未授權」，一般使用者被開放後台時標「可進後台」），每列顯示「最後登入 N 天前」（滑過顯示完整時間）或「從未登入」，有 API 使用時加「API 最近使用」；列表可切換「最久未使用優先」排序（登入與 API 使用取較晚者，從未使用的排最前），方便清理帳號。
 
 - **[2026-10-15]** **Avatar SDK `ask()` 改用逐句串流**：`ask()` 改送 `POST /api/v1/chat/stream`，第一句一到就呼叫 `POST /v1/audio/speech` 合成並開始念，不等整段回答。同時只跑一個語音請求，合成中到的句子併成下一個請求（每輪請求數不隨句數暴增，Embed key 配額也省）；各段音訊用新的 `AvatarAudio.queueAudio()` 接在時間軸後面播，句子之間不中斷。新增 `sentence` 事件（`{ index, text }`）給宿主做逐句字幕；`reply` 事件仍只派送一次，內容是 `done.reply`。串流的 `error` 事件照 HTTP 錯誤對應：401／403 為 `UNAUTHORIZED`、429 為 `RATE_LIMITED`（`retryAfterSeconds` 由 `detail.retry_after_ms` 換算）、其餘為 `CHAT_FAILED`；串流出錯會停掉已開口的部分。`interrupt()`、新的 `ask()` 與 `destroy()` 會連同串流與還沒送出的合成一起中斷，在 `done` 之前被中斷的 `ask()` 回傳已收到的句子、不派送 `reply`，這一輪也不寫入紀錄；`done` 之後（語音還在播）才中斷則回傳完整回答，`reply` 已派送過。一輪 `ask()` 會用掉 1 個串流請求加上 1 個以上的語音請求（原本固定 2 個），Embed key 配額請依此估算。整輪沒有 `sentence` 時整段合成 `done.reply`。部署沒有串流路由（404／405）且 `/chat` 可用時，該 instance 之後都改走 `/api/v1/chat`。一輪中若下一句還沒合成好，`speaking` 可能先 `stop` 再 `start`。
@@ -31,6 +32,17 @@
 - **[2026-10-13]** **帳號串接能力探索與單次語音選擇**：新增 `GET /api/v1/me/capabilities`，彙整帳號可用專案、角色、吉祥物、背景、TTS 聲音及 ASR batch／stream／browser 模式、部署設定與預設值；不接受 Embed key，`configured` 不代表即時健康。批次 ASR 可用 form `provider` 指定已授權、已設定的單次引擎，失敗回 502 且不暗中備援；一般帳號可在串流 ASR query `engine` 選擇已授權引擎，TTS 可選跨 provider 的已授權聲音並驗證 metadata，均不修改偏好。提供完整串接指南及 Python 標準庫 CLI，依 Content-Type 保存 WAV／MP3／PCM，TLS 預設驗證，搭配隔離 HTTP 測試。
 
 - **[2026-10-12]** **帳號 API 金鑰**：正式帳號可建立多把具期限、獨立撤銷與使用紀錄的 key，以 Bearer 呼叫既有 HTTP／WebSocket 應用 API。權限沿用帳號與即時資源授權；金鑰只顯示一次、資料庫只存雜湊，管理 key 需登入 session。後台新增 `/admin/accounts/api-keys`，用量依 key ID 歸屬，OpenAPI 標示 Bearer／Cookie／Embed 驗證方式，並提供 ASR 整合文件。
+
+### Fixed
+
+- **[2026-10-15]** **專案資源範圍第一輪 Review 修正與契約統一**：
+  - 修復上傳專案資源時使用不存在的 `ResourceAccess.WRITE` 錯誤，全數改用 `ResourceAccess.MUTATE` 並補齊非 ROOT 管理員上傳測試。
+  - 修復 `/api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/mascots` 列表在帶 `?project_id=` 時未檢查專案讀取權限之漏洞（未授權專案一律回 404）。
+  - 修復靜態檔案授權（`/static/characters/`、`/static/backgrounds/`、`/static/mascots/`）無法讀取專案專屬與 ROOT 指派檔案問題（一般帳號只要具備所屬或指派專案的 READ 權限即放行；Embed key 限綁定專案）。
+  - 統一前後端欄位契約：`/projects/{id}/resources` 的 `defaults` 鍵一律使用 resource_type（`avatar_character`、`avatar_background`、`avatar_mascot`、`custom_voice`、`asr_engine`），移除重複別名；指派 API 與後台設定全面統一使用後端標準 enum 與 `resource_id`。
+  - 修復 TTS 預設回歸行為（恢復 0bb101e2 行為，僅在專案/指派資源參與時生效）與 Embed key 專案預設聲音直接採用修復。
+  - 修復前台虛擬人四級選擇順序（本專案偏好 → 專案預設 → 帳號預設 → 清單第一個），相容同專案舊格式偏好，並通過正則測試與專案切換測試。
+  - 修復權限圖譜 ROOT 指派連線（`assigned`，綠色虛線）與圖例、專案限制標籤，以及點擊專案即時串接 `/projects/{id}/resources` 顯示各資源來源標示。
 
 ### Changed
 

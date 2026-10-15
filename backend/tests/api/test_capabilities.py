@@ -397,6 +397,12 @@ def test_project_id_narrows_asr_and_tts_to_the_project_policy(env):
         "allowed_tts_voices": ["voice-b"],
         "default_tts_voice": "voice-b",
         "effective_tts_voice": "voice-b",
+        "allowed_characters": [],
+        "default_character_id": None,
+        "allowed_backgrounds": [],
+        "default_background_id": None,
+        "allowed_mascots": [],
+        "default_mascot_id": None,
     }
     # 不帶 project_id 時回應一個欄位都沒變。
     _assert_scoped(env.client.get(_PATH, headers=_headers(env)).json())

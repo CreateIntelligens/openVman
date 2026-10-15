@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 
 import type { AvatarBackground } from "../../api";
+import { ResourceSourceBadge } from "./ResourceSourceBadge";
 import {
   assetCardClassName,
   assetGridStyle,
@@ -25,6 +26,9 @@ type BackgroundsPanelProps = {
   uploadLabel: string;
   selectedImageName: string;
   imageRef: RefObject<HTMLInputElement>;
+  projects?: Array<{ project_id: string; label: string }>;
+  selectedProjectId?: string;
+  onProjectIdChange?: (value: string) => void;
   onUploadIdChange: (value: string) => void;
   onUploadLabelChange: (value: string) => void;
   onImageChange: (fileName: string) => void;
@@ -42,6 +46,9 @@ export default function BackgroundsPanel({
   uploadLabel,
   selectedImageName,
   imageRef,
+  projects,
+  selectedProjectId,
+  onProjectIdChange,
   onUploadIdChange,
   onUploadLabelChange,
   onImageChange,
@@ -72,6 +79,20 @@ export default function BackgroundsPanel({
             onChange={(e) => onUploadLabelChange(e.target.value)}
             className={inputClassName}
           />
+          {projects && projects.length > 0 && onProjectIdChange && (
+            <select
+              value={selectedProjectId || ""}
+              onChange={(e) => onProjectIdChange(e.target.value)}
+              className={inputClassName}
+            >
+              <option value="">全域資源（所有專案可用）</option>
+              {projects.map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  專案專屬：{p.label || p.project_id}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
@@ -125,9 +146,15 @@ export default function BackgroundsPanel({
                 />
               </div>
               <div className={cardBodyClassName}>
-                <p className="font-mono text-sm font-semibold text-content">
-                  {background.background_id}
-                </p>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="font-mono text-sm font-semibold text-content">
+                    {background.background_id}
+                  </p>
+                  <ResourceSourceBadge
+                    source={background.source}
+                    ownerProjectId={background.owner_project_id}
+                  />
+                </div>
                 <p className="text-sm text-content-muted">{background.label}</p>
                 <p className="text-xs text-content-subtle">
                   {background.mime_type} · {formatSize(background.size_bytes)}

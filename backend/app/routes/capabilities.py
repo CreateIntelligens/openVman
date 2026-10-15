@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from app import project_routes, voice_policy
 from app.auth.dependencies import CurrentAccount, get_current_account
 from app.auth.models import ResourceType
+from app.auth.project_resources import effective_project_resources
 from app.auth.resources import (
     ResourceAccess,
     ResourceNotFoundError,
@@ -83,6 +84,12 @@ class ProjectPolicyCapability(BaseModel):
     default_tts_voice: str | None
     # 這個帳號在這個專案沒指定聲音時會用的聲音（""：交給下游預設）。
     effective_tts_voice: str
+    allowed_characters: list[str] | None = None
+    default_character_id: str | None = None
+    allowed_backgrounds: list[str] | None = None
+    default_background_id: str | None = None
+    allowed_mascots: list[str] | None = None
+    default_mascot_id: str | None = None
 
 
 class AccountCapabilities(BaseModel):
@@ -161,20 +168,42 @@ async def get_capabilities(
             status_code=502, detail="Invalid project service response",
         ) from exc
 
-    characters = await avatar.list_characters(current, runtime)
-    mascot_list = await mascots.list_mascots(current, runtime)
-    background_list = await backgrounds.list_backgrounds(current, runtime)
+    characters = await avatar.list_characters(
+        project_id=project_id or None, current=current, runtime=runtime
+    )
+    mascot_list = await mascots.list_mascots(
+        project_id=project_id or None, current=current, runtime=runtime
+    )
+    background_list = await backgrounds.list_backgrounds(
+        project_id=project_id or None, current=current, runtime=runtime
+    )
     tts_providers = await admin.get_tts_providers(
         current, runtime, project_id=project_id,
     )
     asr = get_my_asr_provider(current, runtime)
-    asr_allowed = (
-        [engine for engine in asr.allowed if policy.allows_asr(engine)]
-        if policy is not None else asr.allowed
-    )
+    assigned_asr: list[str] = []
+    if project_id:
+        assigned_asr = [
+            e.resource_id
+            for e in effective_project_resources(
+                runtime, current.user, project_id, ResourceType.ASR_ENGINE
+            )
+            if e.source in ("project", "assigned")
+        ]
+    base_allowed = asr.allowed
+    if policy is not None:
+        asr_allowed = [engine for engine in base_allowed if policy.allows_asr(engine)]
+    else:
+        asr_allowed = list(base_allowed)
+    for engine in assigned_asr:
+        if engine not in asr_allowed:
+            asr_allowed.append(engine)
+
     asr_effective = (
-        voice_policy.effective_asr_engine(runtime, current.user, policy)
-        if policy is not None else asr.effective
+        voice_policy.effective_asr_engine(
+            runtime, current.user, policy, project_id=project_id or None
+        )
+        if (policy is not None or project_id) else asr.effective
     )
     batch_configured = set(configured_providers())
     stream_configured = set(configured_stream_engines())
@@ -229,6 +258,12 @@ async def get_capabilities(
         allowed_tts_voices=list(policy.allowed_tts_voices),
         default_tts_voice=policy.default_tts_voice,
         effective_tts_voice=_effective_voice(current, runtime, project_id),
+        allowed_characters=list(policy.allowed_characters),
+        default_character_id=policy.default_character_id,
+        allowed_backgrounds=list(policy.allowed_backgrounds),
+        default_background_id=policy.default_background_id,
+        allowed_mascots=list(policy.allowed_mascots),
+        default_mascot_id=policy.default_mascot_id,
     ).model_dump(mode="json")
     return JSONResponse(content=payload)
 

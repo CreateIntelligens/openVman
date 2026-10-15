@@ -36,9 +36,10 @@ class ResourceNotFoundError(LookupError):
 def is_unrestricted_admin(account: UserRecord) -> bool:
     """Whether an account bypasses grant checks entirely."""
     return (
-        account.account_type is AccountType.FORMAL
+        getattr(account, "account_type", AccountType.FORMAL) is AccountType.FORMAL
         and is_at_least_admin(account.role)
     )
+
 
 
 def resolve_admin_scope(

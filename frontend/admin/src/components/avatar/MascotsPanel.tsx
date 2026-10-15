@@ -1,6 +1,7 @@
 import type { CSSProperties, RefObject } from "react";
 
 import type { AvatarMascot } from "../../api";
+import { ResourceSourceBadge } from "./ResourceSourceBadge";
 import { MASCOT_ENGINE_LABELS } from "../../data/mascotCatalog";
 import {
   assetCardClassName,
@@ -64,6 +65,9 @@ type MascotsPanelProps = {
   selectedThumbnailName: string;
   modelRef: RefObject<HTMLInputElement>;
   thumbnailRef: RefObject<HTMLInputElement>;
+  projects?: Array<{ project_id: string; label: string }>;
+  selectedProjectId?: string;
+  onProjectIdChange?: (value: string) => void;
   onUploadIdChange: (value: string) => void;
   onUploadLabelChange: (value: string) => void;
   onModelChange: (fileName: string) => void;
@@ -85,6 +89,9 @@ export default function MascotsPanel({
   selectedThumbnailName,
   modelRef,
   thumbnailRef,
+  projects,
+  selectedProjectId,
+  onProjectIdChange,
   onUploadIdChange,
   onUploadLabelChange,
   onModelChange,
@@ -116,6 +123,20 @@ export default function MascotsPanel({
             onChange={(e) => onUploadLabelChange(e.target.value)}
             className={inputClassName}
           />
+          {projects && projects.length > 0 && onProjectIdChange && (
+            <select
+              value={selectedProjectId || ""}
+              onChange={(e) => onProjectIdChange(e.target.value)}
+              className={inputClassName}
+            >
+              <option value="">全域資源（所有專案可用）</option>
+              {projects.map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  專案專屬：{p.label || p.project_id}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
@@ -206,9 +227,15 @@ export default function MascotsPanel({
                   )}
                 </div>
                 <div className={cardBodyClassName}>
-                  <p className="font-mono text-sm font-semibold text-content">
-                    {mascot.mascot_id}
-                  </p>
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="font-mono text-sm font-semibold text-content">
+                      {mascot.mascot_id}
+                    </p>
+                    <ResourceSourceBadge
+                      source={mascot.source}
+                      ownerProjectId={mascot.owner_project_id}
+                    />
+                  </div>
                   <p className="text-sm text-content-muted">{mascot.label}</p>
                   <p className="text-xs uppercase text-content-subtle">
                     {formatMascotMetadata(mascot)}

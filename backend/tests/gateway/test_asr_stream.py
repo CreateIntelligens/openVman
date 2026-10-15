@@ -295,3 +295,43 @@ def test_judge_sends_the_connection_routes_to_brain(monkeypatch, tmp_path):
     assert text == "who am i"
     # 前台臨時關掉的語言不該出現在 Jev 的情境裡。
     assert sent["languages"] == ["ja", "zh"]
+
+
+def test_stream_asr_accepts_root_assigned_engine(monkeypatch):
+    from app.auth.project_resources import ProjectResourceEntry
+
+    client, _ = _client(monkeypatch, allowed=False)
+    upstream = FakeUpstream()
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    monkeypatch.setattr(
+        asr_stream,
+        "_assigned_or_project_asr",
+        lambda current, pid: {"gemini-live"} if pid == "p1" else set(),
+    )
+    with client.websocket_connect("/api/v1/asr/stream?project_id=p1&engine=gemini-live") as ws:
+        assert ws.receive_json() == {"type": "ready"}
+
+    # 同樣帳號在沒有指派的專案連線會被拒絕
+    with client.websocket_connect("/api/v1/asr/stream?project_id=other&engine=gemini-live") as ws:
+        assert ws.receive_json() == {"type": "error", "code": "not_allowed"}
+
+
+def test_stream_asr_accepts_root_assigned_default_engine(monkeypatch):
+    from app.auth.models import ProjectPolicyRecord
+
+    client, _ = _client(monkeypatch, allowed=False)
+    upstream = FakeUpstream()
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    policy = ProjectPolicyRecord(
+        project_id="p1",
+        default_asr_engine="gemini-live",
+        allowed_asr_engines=("gemini-live",),
+    )
+    monkeypatch.setattr(asr_stream, "_project_policy", lambda current, pid: policy if pid == "p1" else None)
+    monkeypatch.setattr(
+        asr_stream,
+        "_assigned_or_project_asr",
+        lambda current, pid: {"gemini-live"} if pid == "p1" else set(),
+    )
+    with client.websocket_connect("/api/v1/asr/stream?project_id=p1") as ws:
+        assert ws.receive_json() == {"type": "ready"}

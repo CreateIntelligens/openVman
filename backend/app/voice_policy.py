@@ -15,7 +15,8 @@ from dataclasses import dataclass
 from app import language_routes as language_routes_mod
 from app.auth.asr_selection import asr_user_choices, permitted_asr_preference
 from app.auth.dependencies import CurrentAccount
-from app.auth.models import ProjectPolicyRecord, UserRecord
+from app.auth.models import ProjectPolicyRecord, ResourceType, UserRecord
+from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import AuthRuntime
 from app.auth.settings_repository import SERVER_ASR_PROVIDERS
 from app.config import get_tts_config
@@ -45,7 +46,7 @@ def request_policy(
 class BatchAsrScope:
     """Batch ASR limits for one request."""
 
-    # 單次請求明確指定 provider 時可以點名的引擎（帳號授權 ∩ 專案清單）。
+    # 單次請求明確指定 provider 時可以點名的引擎（帳號授權 ∩ 專案清單 ∪ 專案資源 ∪ ROOT 指派）。
     explicit: frozenset[str]
     # 每一次嘗試（含備援）可以用的引擎；部署預設只有專案允許時才算在內。
     allowed: frozenset[str]
@@ -61,9 +62,24 @@ def batch_asr_scope(
     policy: ProjectPolicyRecord | None,
     *,
     embed: bool = False,
+    project_id: str | None = None,
 ) -> BatchAsrScope:
     """Compute the batch ASR scope for an account (or embed key) and project."""
     cfg = get_tts_config()
+    p_id = (policy.project_id if policy is not None else None) or project_id
+    assigned_or_project_asr: set[str] = set()
+    if p_id:
+        assigned_or_project_asr = {
+            e.resource_id
+            for e in effective_project_resources(
+                runtime,
+                None if embed or user is None else user,
+                p_id,
+                ResourceType.ASR_ENGINE,
+            )
+            if e.source in ("project", "assigned")
+        }
+
     if embed or user is None:
         granted = (
             set(policy.allowed_asr_engines)
@@ -75,9 +91,13 @@ def batch_asr_scope(
         preference = permitted_asr_preference(
             runtime, user, runtime.account_access.get_asr_provider(user.id),
         )
-    implicit = granted | {cfg.asr_provider}
-    allowed = policy.narrow_asr(implicit) if policy is not None else implicit
-    explicit = policy.narrow_asr(granted) if policy is not None else granted
+    implicit = granted | {cfg.asr_provider} | assigned_or_project_asr
+    allowed = (
+        policy.narrow_asr(implicit) if policy is not None else implicit
+    ) | assigned_or_project_asr
+    explicit = (
+        policy.narrow_asr(granted) if policy is not None else granted
+    ) | assigned_or_project_asr
 
     # 偏好 → 專案預設 → 部署預設；每一個都要落在 allowed 裡才算數。
     candidates = (
@@ -115,6 +135,8 @@ def effective_asr_engine(
     runtime: AuthRuntime,
     user: UserRecord,
     policy: ProjectPolicyRecord | None,
+    *,
+    project_id: str | None = None,
 ) -> str:
     """The engine a client should start with in this project ("" when none is allowed)."""
     cfg = get_tts_config()
@@ -122,14 +144,30 @@ def effective_asr_engine(
     preference = permitted_asr_preference(
         runtime, user, runtime.account_access.get_asr_provider(user.id),
     )
+    p_id = (policy.project_id if policy is not None else None) or project_id
+    assigned_or_project_asr: set[str] = set()
+    if p_id:
+        assigned_or_project_asr = {
+            e.resource_id
+            for e in effective_project_resources(
+                runtime, user, p_id, ResourceType.ASR_ENGINE
+            )
+            if e.source in ("project", "assigned")
+        }
+        granted = granted | assigned_or_project_asr
+
     if policy is None:
-        return preference or cfg.asr_provider
+        if preference and (preference in granted or preference == cfg.asr_provider):
+            return preference
+        return cfg.asr_provider
     candidates = (
         (preference, preference in granted),
         (policy.default_asr_engine, policy.default_asr_engine in granted),
         (cfg.asr_provider, True),
     )
     for engine, permitted in candidates:
-        if engine and permitted and policy.allows_asr(engine):
+        if engine and permitted and (
+            policy.allows_asr(engine) or engine in assigned_or_project_asr
+        ):
             return engine
     return ""

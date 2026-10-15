@@ -1,10 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
 
-import { fetchAccountAccessOptions, type AccountAccessOption } from "../../api/auth";
 import {
+  fetchAccountAccessOptions,
+  getCurrentAccount,
+  type AccountAccessOption,
+} from "../../api/auth";
+import {
+  assignProjectResource,
   fetchProjectPolicy,
+  fetchProjectResources,
   saveProjectPolicy,
+  unassignProjectResource,
   type ProjectPolicyInput,
+  type ProjectResourcesResponse,
 } from "../../api/projects";
 import { errorMessage } from "../../utils/errorMessage";
 import { useModalDismiss } from "../useModalDismiss";
@@ -18,6 +26,12 @@ const EMPTY_POLICY: ProjectPolicyInput = {
   taiwanese_asr_engine: null,
   allowed_tts_voices: [],
   default_tts_voice: null,
+  allowed_characters: [],
+  default_character_id: null,
+  allowed_backgrounds: [],
+  default_background_id: null,
+  allowed_mascots: [],
+  default_mascot_id: null,
 };
 
 interface ProjectPolicyDialogProps {
@@ -126,7 +140,7 @@ function DefaultSelect({ label, value, options, disabled, emptyLabel, onChange }
   );
 }
 
-/** 專案的語音限制：能用哪些辨識引擎與聲音、預設用哪個。 */
+/** 專案的資源與語音設定：限制可用人物、背景、小助理、辨識引擎與聲音。 */
 export default function ProjectPolicyDialog({
   projectId,
   projectLabel,
@@ -136,6 +150,14 @@ export default function ProjectPolicyDialog({
   const [policy, setPolicy] = useState<ProjectPolicyInput>(EMPTY_POLICY);
   const [engines, setEngines] = useState<AccountAccessOption[]>([]);
   const [voices, setVoices] = useState<AccountAccessOption[]>([]);
+  const [characters, setCharacters] = useState<AccountAccessOption[]>([]);
+  const [backgrounds, setBackgrounds] = useState<AccountAccessOption[]>([]);
+  const [mascots, setMascots] = useState<AccountAccessOption[]>([]);
+  const [isRoot, setIsRoot] = useState(false);
+  const [assignedResources, setAssignedResources] = useState<ProjectResourcesResponse | null>(null);
+  const [assignType, setAssignType] = useState<string>("avatar_character");
+  const [assignId, setAssignId] = useState<string>("");
+  const [assigning, setAssigning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,22 +168,39 @@ export default function ProjectPolicyDialog({
   useEffect(() => {
     let active = true;
     setLoading(true);
-    // 選項沿用帳號授權的清單：受限管理者只看得到自己能指派的引擎與聲音。
-    Promise.all([fetchProjectPolicy(projectId), fetchAccountAccessOptions()])
-      .then(([loaded, options]) => {
+    Promise.all([
+      fetchProjectPolicy(projectId),
+      fetchAccountAccessOptions(),
+      getCurrentAccount().catch(() => null),
+      fetchProjectResources(projectId).catch(() => null),
+    ])
+      .then(([loaded, options, currentAccount, res]) => {
         if (!active) return;
         setPolicy({
-          allowed_asr_engines: loaded.allowed_asr_engines,
-          default_asr_engine: loaded.default_asr_engine,
-          taiwanese_asr_engine: loaded.taiwanese_asr_engine,
-          allowed_tts_voices: loaded.allowed_tts_voices,
-          default_tts_voice: loaded.default_tts_voice,
+          allowed_asr_engines: loaded.allowed_asr_engines ?? [],
+          default_asr_engine: loaded.default_asr_engine ?? null,
+          taiwanese_asr_engine: loaded.taiwanese_asr_engine ?? null,
+          allowed_tts_voices: loaded.allowed_tts_voices ?? [],
+          default_tts_voice: loaded.default_tts_voice ?? null,
+          allowed_characters: loaded.allowed_characters ?? [],
+          default_character_id: loaded.default_character_id ?? null,
+          allowed_backgrounds: loaded.allowed_backgrounds ?? [],
+          default_background_id: loaded.default_background_id ?? null,
+          allowed_mascots: loaded.allowed_mascots ?? [],
+          default_mascot_id: loaded.default_mascot_id ?? null,
         });
         setEngines(options.asr_engines ?? []);
-        setVoices(options.custom_voices);
+        setVoices(options.custom_voices ?? []);
+        setCharacters(options.avatar_characters ?? []);
+        setBackgrounds(options.avatar_backgrounds ?? []);
+        setMascots(options.avatar_mascots ?? []);
+        setIsRoot(currentAccount?.role === "root");
+        if (res) {
+          setAssignedResources(res);
+        }
       })
       .catch((reason) => {
-        if (active) setError(errorMessage(reason, "無法載入專案語音設定"));
+        if (active) setError(errorMessage(reason, "無法載入專案設定"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -173,15 +212,27 @@ export default function ProjectPolicyDialog({
 
   const engineOptions = withMissing(engines, policy.allowed_asr_engines);
   const voiceOptions = withMissing(voices, policy.allowed_tts_voices);
-  // 預設值只能從清單挑；不限制時可以從全部挑。
+  const characterOptions = withMissing(characters, policy.allowed_characters ?? []);
+  const backgroundOptions = withMissing(backgrounds, policy.allowed_backgrounds ?? []);
+  const mascotOptions = withMissing(mascots, policy.allowed_mascots ?? []);
+
   const engineChoices = policy.allowed_asr_engines.length
     ? engineOptions.filter((option) => policy.allowed_asr_engines.includes(option.id))
     : engines;
   const voiceChoices = policy.allowed_tts_voices.length
     ? voiceOptions.filter((option) => policy.allowed_tts_voices.includes(option.id))
     : voices;
+  const characterChoices = (policy.allowed_characters?.length ?? 0) > 0
+    ? characterOptions.filter((option) => policy.allowed_characters?.includes(option.id))
+    : characters;
+  const backgroundChoices = (policy.allowed_backgrounds?.length ?? 0) > 0
+    ? backgroundOptions.filter((option) => policy.allowed_backgrounds?.includes(option.id))
+    : backgrounds;
+  const mascotChoices = (policy.allowed_mascots?.length ?? 0) > 0
+    ? mascotOptions.filter((option) => policy.allowed_mascots?.includes(option.id))
+    : mascots;
   const taiwaneseChoices = engineChoices.filter((option) => BATCH_ASR_ENGINES.has(option.id));
-  const busy = loading || saving;
+  const busy = loading || saving || assigning;
 
   function toggleEngine(id: string) {
     setPolicy((current) => {
@@ -206,18 +257,100 @@ export default function ProjectPolicyDialog({
     });
   }
 
+  function toggleCharacter(id: string) {
+    setPolicy((current) => {
+      const allowed = toggled(current.allowed_characters ?? [], id);
+      return {
+        ...current,
+        allowed_characters: allowed,
+        default_character_id: keepInside(current.default_character_id ?? null, allowed),
+      };
+    });
+  }
+
+  function toggleBackground(id: string) {
+    setPolicy((current) => {
+      const allowed = toggled(current.allowed_backgrounds ?? [], id);
+      return {
+        ...current,
+        allowed_backgrounds: allowed,
+        default_background_id: keepInside(current.default_background_id ?? null, allowed),
+      };
+    });
+  }
+
+  function toggleMascot(id: string) {
+    setPolicy((current) => {
+      const allowed = toggled(current.allowed_mascots ?? [], id);
+      return {
+        ...current,
+        allowed_mascots: allowed,
+        default_mascot_id: keepInside(current.default_mascot_id ?? null, allowed),
+      };
+    });
+  }
+
+  async function handleAssign() {
+    if (!assignId) return;
+    setAssigning(true);
+    setError(null);
+    try {
+      await assignProjectResource(projectId, assignType, assignId);
+      const updated = await fetchProjectResources(projectId);
+      setAssignedResources(updated);
+      setAssignId("");
+    } catch (reason) {
+      setError(errorMessage(reason, "指派資源失敗"));
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  async function handleUnassign(type: string, id: string) {
+    setAssigning(true);
+    setError(null);
+    try {
+      await unassignProjectResource(projectId, type, id);
+      const updated = await fetchProjectResources(projectId);
+      setAssignedResources(updated);
+    } catch (reason) {
+      setError(errorMessage(reason, "解除指派失敗"));
+    } finally {
+      setAssigning(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
     try {
       await saveProjectPolicy(projectId, policy);
-      onSaved(`專案「${projectLabel}」的語音設定已更新`);
+      onSaved(`專案「${projectLabel}」的設定已更新`);
     } catch (reason) {
-      setError(errorMessage(reason, "儲存專案語音設定失敗"));
+      setError(errorMessage(reason, "儲存專案設定失敗"));
     } finally {
       setSaving(false);
     }
+  }
+
+  const assignedItems: Array<{ type: string; typeLabel: string; id: string; label: string }> = [];
+  if (assignedResources) {
+    (assignedResources.avatar_character ?? []).filter((c) => c.source === "assigned").forEach((c) => {
+      assignedItems.push({ type: "avatar_character", typeLabel: "人物", id: c.resource_id, label: c.label || c.resource_id });
+    });
+    (assignedResources.avatar_background ?? []).filter((b) => b.source === "assigned").forEach((b) => {
+      assignedItems.push({ type: "avatar_background", typeLabel: "背景", id: b.resource_id, label: b.label || b.resource_id });
+    });
+    (assignedResources.avatar_mascot ?? []).filter((m) => m.source === "assigned").forEach((m) => {
+      assignedItems.push({ type: "avatar_mascot", typeLabel: "小助理", id: m.resource_id, label: m.label || m.resource_id });
+    });
+    (assignedResources.custom_voice ?? []).filter((v) => v.source === "assigned").forEach((v) => {
+      assignedItems.push({ type: "custom_voice", typeLabel: "聲音", id: v.resource_id, label: v.label || v.resource_id });
+    });
+    (assignedResources.asr_engine ?? []).filter((a) => a.source === "assigned").forEach((a) => {
+      assignedItems.push({ type: "asr_engine", typeLabel: "ASR", id: a.resource_id, label: a.label || a.resource_id });
+    });
   }
 
   return (
@@ -234,11 +367,11 @@ export default function ProjectPolicyDialog({
       >
         <header className="border-b border-border px-6 py-5">
           <h2 id="project-policy-title" className="card-title">
-            語音設定：{projectLabel}
+            專案資源與語音設定：{projectLabel}
           </h2>
           <p className="mt-2 text-sm leading-6 text-content-muted">
-            限制這個專案能用的語音辨識引擎與聲音。實際能用的是帳號授權與這裡的交集；
-            清單留空代表不限制。
+            限制這個專案能用的人物、背景、小助理、語音辨識引擎與聲音。實際能用的是帳號授權與這裡的交集；
+            清單留空代表不限制。專案專屬資源與 ROOT 指派資源不受帳號授權限制。
           </p>
         </header>
 
@@ -256,6 +389,70 @@ export default function ProjectPolicyDialog({
             <p className="px-6 py-5 text-sm text-content-muted">載入中…</p>
           ) : (
             <>
+              {/* 人物設定 */}
+              <div className="space-y-4 border-b border-border px-6 py-5">
+                <Checklist
+                  legend="允許的虛擬人物"
+                  options={characterOptions}
+                  selected={policy.allowed_characters ?? []}
+                  disabled={busy}
+                  onToggle={toggleCharacter}
+                />
+                <DefaultSelect
+                  label="預設人物"
+                  value={policy.default_character_id ?? null}
+                  options={characterChoices}
+                  disabled={busy}
+                  emptyLabel="不指定（帳號預設人物）"
+                  onChange={(value) => setPolicy((current) => ({
+                    ...current, default_character_id: value,
+                  }))}
+                />
+              </div>
+
+              {/* 背景設定 */}
+              <div className="space-y-4 border-b border-border px-6 py-5">
+                <Checklist
+                  legend="允許的舞台背景"
+                  options={backgroundOptions}
+                  selected={policy.allowed_backgrounds ?? []}
+                  disabled={busy}
+                  onToggle={toggleBackground}
+                />
+                <DefaultSelect
+                  label="預設背景"
+                  value={policy.default_background_id ?? null}
+                  options={backgroundChoices}
+                  disabled={busy}
+                  emptyLabel="不指定（帳號預設背景）"
+                  onChange={(value) => setPolicy((current) => ({
+                    ...current, default_background_id: value,
+                  }))}
+                />
+              </div>
+
+              {/* 小助理設定 */}
+              <div className="space-y-4 border-b border-border px-6 py-5">
+                <Checklist
+                  legend="允許的小助理 (VRM / 影片)"
+                  options={mascotOptions}
+                  selected={policy.allowed_mascots ?? []}
+                  disabled={busy}
+                  onToggle={toggleMascot}
+                />
+                <DefaultSelect
+                  label="預設小助理"
+                  value={policy.default_mascot_id ?? null}
+                  options={mascotChoices}
+                  disabled={busy}
+                  emptyLabel="不指定（帳號預設小助理）"
+                  onChange={(value) => setPolicy((current) => ({
+                    ...current, default_mascot_id: value,
+                  }))}
+                />
+              </div>
+
+              {/* ASR 語音辨識 */}
               <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
                   legend="允許的語音辨識引擎"
@@ -288,7 +485,8 @@ export default function ProjectPolicyDialog({
                 </div>
               </div>
 
-              <div className="space-y-4 px-6 py-5">
+              {/* TTS 聲音 */}
+              <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
                   legend="允許的聲音"
                   options={voiceOptions}
@@ -310,6 +508,117 @@ export default function ProjectPolicyDialog({
                   限制聲音時，合成失敗只會退回清單裡的 Edge 聲音；清單沒有 Edge 聲音就直接回錯誤，
                   不會默默換成別的引擎。
                 </p>
+              </div>
+
+              {/* 資源指派專區 */}
+              <div className="space-y-4 bg-surface-sunken px-6 py-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-content">
+                      ROOT 資源指派（將全域資源指派給此專案）
+                    </h3>
+                    <p className="text-xs text-content-muted">
+                      指派給專案的資源，任何可存取此專案的使用者均可使用，不受個人帳號授權限制。
+                    </p>
+                  </div>
+                  {!isRoot && (
+                    <span className="rounded bg-surface-overlay border border-border px-2 py-0.5 text-xs text-content-muted">
+                      唯讀（僅 ROOT 可編輯）
+                    </span>
+                  )}
+                </div>
+
+                {assignedItems.length > 0 ? (
+                  <ul className="space-y-2">
+                    {assignedItems.map((item) => (
+                      <li
+                        key={`${item.type}-${item.id}`}
+                        className="flex items-center justify-between rounded-lg border border-border bg-surface-overlay px-3 py-2 text-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary font-medium">
+                            {item.typeLabel}
+                          </span>
+                          <span className="rounded bg-amber-500/10 text-amber-500 px-1.5 py-0.5 text-xs font-medium">
+                            ROOT 指派
+                          </span>
+                          <span className="font-medium">{item.label}</span>
+                          <span className="text-xs text-content-subtle font-mono">{item.id}</span>
+                        </div>
+                        {isRoot && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm text-danger hover:bg-danger/10"
+                            disabled={busy}
+                            onClick={() => handleUnassign(item.type, item.id)}
+                          >
+                            解除指派
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-content-muted italic">目前無指派資源</p>
+                )}
+
+                {isRoot && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
+                    <select
+                      className="input text-xs"
+                      value={assignType}
+                      disabled={busy}
+                      onChange={(e) => {
+                        setAssignType(e.target.value);
+                        setAssignId("");
+                      }}
+                    >
+                      <option value="avatar_character">人物</option>
+                      <option value="avatar_background">背景</option>
+                      <option value="avatar_mascot">小助理</option>
+                      <option value="custom_voice">聲音</option>
+                      <option value="asr_engine">ASR</option>
+                    </select>
+
+                    <select
+                      className="input text-xs"
+                      value={assignId}
+                      disabled={busy}
+                      onChange={(e) => setAssignId(e.target.value)}
+                    >
+                      <option value="">選擇要指派的資源…</option>
+                      {assignType === "avatar_character" &&
+                        characterOptions.map((c) => (
+                          <option key={c.id} value={c.id}>{c.label}</option>
+                        ))}
+                      {assignType === "avatar_background" &&
+                        backgroundOptions.map((b) => (
+                          <option key={b.id} value={b.id}>{b.label}</option>
+                        ))}
+                      {assignType === "avatar_mascot" &&
+                        mascotOptions.map((m) => (
+                          <option key={m.id} value={m.id}>{m.label}</option>
+                        ))}
+                      {assignType === "custom_voice" &&
+                        voiceOptions.map((v) => (
+                          <option key={v.id} value={v.id}>{v.label}</option>
+                        ))}
+                      {assignType === "asr_engine" &&
+                        engineOptions.map((e) => (
+                          <option key={e.id} value={e.id}>{e.label}</option>
+                        ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={busy || !assignId}
+                      onClick={handleAssign}
+                    >
+                      指派至專案
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}

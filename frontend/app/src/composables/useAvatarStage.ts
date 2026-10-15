@@ -111,18 +111,19 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     saveSettings({ backgroundId, backgroundUrl, backgroundFit });
   }
   function pickInitialCharacter(): string {
-    // 選過的人物優先，帳號預設只是還沒選過時的起點。
-    const preferred = preferSaved(
-      savedSettings().characterId,
-      (id) => characters.value.some((character) => character.id === id),
-      accountDefault("character_id", PREFERRED_CHARACTER_ID),
-    );
-    const selected = characters.value.some((character) => character.id === preferred)
-      ? preferred
+    const selected = bootstrap.pickPreferredCharacterId
+      ? bootstrap.pickPreferredCharacterId(settings.projectId, characters.value)
       : characters.value[0]?.id ?? "";
     settings.characterId = selected;
-    if (selected && selected !== preferred) {
-      addSelectionNotice(`預設人物 ${preferred} 未獲授權，已改用 ${selected}。`);
+    if (!settings.projectId) {
+      const preferred = preferSaved(
+        savedSettings().characterId,
+        (id) => characters.value.some((character) => character.id === id),
+        accountDefault("character_id", PREFERRED_CHARACTER_ID),
+      );
+      if (selected && selected !== preferred && !characters.value.some((character) => character.id === preferred)) {
+        addSelectionNotice(`預設人物 ${preferred} 未獲授權，已改用 ${selected}。`);
+      }
     } else if (!selected && vrmAvatarOptions.value.length === 0) {
       // 只授權 VRM 的帳號沒有 2D 角色是正常的，不該當成沒有人物。
       addSelectionNotice("目前帳號沒有可使用的虛擬人物。");
@@ -135,7 +136,7 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     try {
       await Promise.all([
         wasm.initWasm(),
-        avatarCatalog.load(),
+        avatarCatalog.load(settings.projectId || undefined),
         // 需要知道有沒有 VRM 才能判斷「沒有 2D 角色」是否為錯誤。
         vrmReady ?? Promise.resolve(),
       ]);

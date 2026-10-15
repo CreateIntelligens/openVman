@@ -15,7 +15,12 @@ from .models import (
     ProjectPolicyRecord,
     ResourceRecord,
     ResourceType,
+    ResourceVisibility,
     is_at_least_admin,
+)
+from .project_resources import (
+    effective_project_default,
+    effective_project_resources,
 )
 from .resources import (
     ResourceNotFoundError,
@@ -100,6 +105,10 @@ def _resolve_embed_tts_voice(
         voice_id = policy.default_tts_voice or (
             policy.allowed_tts_voices[0] if restricted else ""
         )
+        if not voice_id and policy.project_id:
+            voice_id = effective_project_default(
+                runtime, None, policy.project_id, ResourceType.CUSTOM_VOICE
+            ) or ""
         from_policy = bool(voice_id)
     if not voice_id or (not provider and not (restricted or from_policy)):
         # 金鑰沒設預設音色、專案也沒意見時不擋，交由下游服務用自己的預設值合成。
@@ -116,7 +125,17 @@ def _resolve_embed_tts_voice(
     registered_provider = _metadata_string(metadata, "provider")
     if registered_provider and provider and provider != registered_provider:
         raise _not_found()
-    if policy is not None and not policy.allows_voice(record.resource_id):
+    is_proj_or_assigned = False
+    p_id = policy.project_id if policy else key.project_id
+    if p_id:
+        if runtime.project_resource_assignments.is_assigned(
+            p_id, ResourceType.CUSTOM_VOICE, record.resource_id
+        ) or (
+            record.visibility is ResourceVisibility.PROJECT
+            and record.owner_project_id == p_id
+        ):
+            is_proj_or_assigned = True
+    if not is_proj_or_assigned and policy is not None and not policy.allows_voice(record.resource_id):
         raise _not_allowed()
     provider = registered_provider or provider
     if not provider or provider == "auto":
@@ -154,8 +173,29 @@ def _default_voice_id(
     runtime: AuthRuntime,
     policy: ProjectPolicyRecord | None,
     account_default: str,
+    project_id: str | None = None,
 ) -> str:
     """Project default → account default → first allowed voice, within both limits."""
+    pid = project_id or (policy.project_id if policy else None)
+    has_project_or_assigned = False
+    if pid:
+        if (
+            runtime.project_resource_assignments.list_for_project(
+                pid, resource_type=ResourceType.CUSTOM_VOICE
+            )
+            or runtime.resources.list_by_owner_project(
+                pid, resource_type=ResourceType.CUSTOM_VOICE
+            )
+        ):
+            has_project_or_assigned = True
+
+    if has_project_or_assigned and pid:
+        resolved = effective_project_default(
+            runtime, current.user, pid, ResourceType.CUSTOM_VOICE
+        )
+        if resolved:
+            return resolved
+
     candidates: list[str] = []
     if policy is not None and policy.default_tts_voice:
         candidates.append(policy.default_tts_voice)
@@ -163,7 +203,7 @@ def _default_voice_id(
         candidates.append(account_default)
     if policy is not None and policy.restricts_tts:
         candidates.extend(policy.allowed_tts_voices)
-    if policy is None and candidates:
+    if policy is None and not pid and candidates:
         # 沒有專案限制時照舊：直接用帳號預設，後面的授權檢查決定能不能用。
         return candidates[0]
     for candidate in candidates:
@@ -172,6 +212,7 @@ def _default_voice_id(
         ):
             return candidate
     return ""
+
 
 
 def resolve_tts_voice(
@@ -205,7 +246,11 @@ def resolve_tts_voice(
         defaults = runtime.account_access.get_defaults(current.user.id)
     if not voice_id:
         voice_id = _default_voice_id(
-            current, runtime, policy, defaults.voice_id if defaults else "",
+            current,
+            runtime,
+            policy,
+            defaults.voice_id if defaults else "",
+            project_id=project_id,
         )
         if not voice_id and is_unrestricted_admin and not (
             policy is not None and policy.restricts_tts
@@ -215,18 +260,37 @@ def resolve_tts_voice(
     if not voice_id:
         raise _not_found()
 
-    try:
-        record = resolve_resource(
-            runtime.resources,
-            current.user,
-            ResourceType.CUSTOM_VOICE,
-            voice_id,
-            admin_scopes=runtime.admin_scopes,
+    record: ResourceRecord | None = None
+    is_project_or_assigned = False
+    if project_id:
+        assigned = runtime.project_resource_assignments.is_assigned(
+            project_id, ResourceType.CUSTOM_VOICE, voice_id
         )
-    except ResourceNotFoundError as exc:
-        raise _not_found() from exc
-    if policy is not None and not policy.allows_voice(record.resource_id):
-        raise _not_allowed()
+        rec = runtime.resources.get(ResourceType.CUSTOM_VOICE, voice_id)
+        is_project_res = (
+            rec is not None
+            and rec.visibility is ResourceVisibility.PROJECT
+            and rec.owner_project_id == project_id
+        )
+        if assigned or is_project_res:
+            is_project_or_assigned = True
+            record = rec
+
+    if not is_project_or_assigned:
+        try:
+            record = resolve_resource(
+                runtime.resources,
+                current.user,
+                ResourceType.CUSTOM_VOICE,
+                voice_id,
+                admin_scopes=runtime.admin_scopes,
+            )
+        except ResourceNotFoundError as exc:
+            raise _not_found() from exc
+        if policy is not None and not policy.allows_voice(record.resource_id):
+            raise _not_allowed()
+
+    assert record is not None
 
     metadata = _voice_metadata(record)
     registered_provider = _metadata_string(metadata, "provider")
@@ -286,21 +350,42 @@ def embed_tts_providers(
     key = current.embed_key
     if key is None:
         return []
-    if policy is not None and policy.restricts_tts:
+    is_p_or_a = False
+    if runtime is not None and key.project_id and key.default_tts_voice:
+        rec = runtime.resources.get(ResourceType.CUSTOM_VOICE, key.default_tts_voice)
+        if runtime.project_resource_assignments.is_assigned(
+            key.project_id, ResourceType.CUSTOM_VOICE, key.default_tts_voice
+        ) or (
+            rec is not None
+            and rec.visibility is ResourceVisibility.PROJECT
+            and rec.owner_project_id == key.project_id
+        ):
+            is_p_or_a = True
+
+    if policy is not None and policy.restricts_tts and not is_p_or_a:
         if key.default_tts_voice and not policy.allows_voice(key.default_tts_voice):
             return []
     elif not key.default_tts_provider:
         return []
     if not key.default_tts_provider:
-        if policy is None or runtime is None:
+        if runtime is None:
             return []
+        p_id = policy.project_id if policy else key.project_id
+        if not p_id:
+            return []
+        entries = effective_project_resources(
+            runtime, None, p_id, ResourceType.CUSTOM_VOICE
+        )
         voices = [
             (_registered_provider(record), record.resource_id)
-            for voice_id in policy.allowed_tts_voices
-            if (record := runtime.resources.get(ResourceType.CUSTOM_VOICE, voice_id))
+            for entry in entries
+            if (record := runtime.resources.get(ResourceType.CUSTOM_VOICE, entry.resource_id))
             and _registered_provider(record) not in ("", "auto")
         ]
-        return _grouped(voices, policy.default_tts_voice or "")
+        preferred = effective_project_default(
+            runtime, None, p_id, ResourceType.CUSTOM_VOICE
+        ) or ""
+        return _grouped(voices, preferred)
     return [
         {
             "id": key.default_tts_provider,
@@ -318,6 +403,7 @@ def scoped_tts_providers(
     current: CurrentAccount,
     runtime: AuthRuntime,
     policy: ProjectPolicyRecord | None = None,
+    project_id: str | None = None,
 ) -> list[dict[str, object]]:
     """Group every accessible voice by its authoritative provider.
 
@@ -325,6 +411,29 @@ def scoped_tts_providers(
     """
     defaults = runtime.account_access.get_defaults(current.user.id)
     fallback_provider = defaults.voice_provider if defaults else ""
+    pid = project_id or (policy.project_id if policy else None)
+    if pid:
+        entries = effective_project_resources(
+            runtime, current.user, pid, ResourceType.CUSTOM_VOICE
+        )
+        voices: list[tuple[str, str]] = []
+        for entry in entries:
+            record = runtime.resources.get(ResourceType.CUSTOM_VOICE, entry.resource_id)
+            if record is None:
+                continue
+            provider = _registered_provider(record) or fallback_provider
+            if not provider or provider == "auto":
+                continue
+            voices.append((provider, record.resource_id))
+
+        preferred = (
+            effective_project_default(
+                runtime, current.user, pid, ResourceType.CUSTOM_VOICE
+            )
+            or (defaults.voice_id if defaults else "")
+        )
+        return _grouped(voices, preferred)
+
     voices: list[tuple[str, str]] = []
     for record in list_accessible_resources(
         runtime.resources,
@@ -332,20 +441,14 @@ def scoped_tts_providers(
         ResourceType.CUSTOM_VOICE,
         admin_scopes=runtime.admin_scopes,
     ):
-        if policy is not None and not policy.allows_voice(record.resource_id):
+        if record.visibility is ResourceVisibility.PROJECT:
             continue
         provider = _registered_provider(record) or fallback_provider
         if not provider or provider == "auto":
             continue
         voices.append((provider, record.resource_id))
 
-    preferred = (
-        policy.default_tts_voice
-        if policy is not None
-        and policy.default_tts_voice
-        and any(voice == policy.default_tts_voice for _, voice in voices)
-        else (defaults.voice_id if defaults else "")
-    )
+    preferred = defaults.voice_id if defaults else ""
     return _grouped(voices, preferred)
 
 

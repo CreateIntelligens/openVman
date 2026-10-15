@@ -19,6 +19,7 @@ def _resource_from_row(row: sqlite3.Row) -> ResourceRecord:
         visibility=ResourceVisibility(row["visibility"]),
         created_at=row["created_at"],
         metadata_json=row["metadata_json"],
+        owner_project_id=row["owner_project_id"] if "owner_project_id" in row.keys() else None,
     )
 
 
@@ -34,6 +35,7 @@ class ResourceRepository:
         visibility: ResourceVisibility,
         owner_user_id: str | None,
         metadata: dict[str, object] | None = None,
+        owner_project_id: str | None = None,
     ) -> ResourceRecord:
         normalized_id = resource_id.strip()
         if not normalized_id:
@@ -42,6 +44,8 @@ class ResourceRepository:
             raise ValueError("private resources require an owner")
         if visibility is ResourceVisibility.SYSTEM_PUBLIC and owner_user_id is not None:
             raise ValueError("system-public resources must not have an owner")
+        if visibility is ResourceVisibility.PROJECT and owner_user_id is not None:
+            raise ValueError("project resources must not have a user owner")
 
         try:
             with self.database.transaction(write=True) as connection:
@@ -49,8 +53,8 @@ class ResourceRepository:
                     """
                     INSERT INTO resources(
                         resource_type, resource_id, owner_user_id, visibility,
-                        created_at, metadata_json
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        created_at, metadata_json, owner_project_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         resource_type.value,
@@ -61,6 +65,7 @@ class ResourceRepository:
                         json.dumps(
                             metadata or {}, separators=(",", ":"), sort_keys=True
                         ),
+                        owner_project_id,
                     ),
                 )
         except sqlite3.IntegrityError as exc:
@@ -107,6 +112,34 @@ class ResourceRepository:
         if record is None:
             raise RepositoryError("upserted resource could not be reloaded")
         return record
+
+    def update_metadata(
+        self,
+        resource_type: ResourceType,
+        resource_id: str,
+        metadata: dict[str, object],
+    ) -> ResourceRecord:
+        normalized_id = resource_id.strip()
+        with self.database.transaction(write=True) as connection:
+            connection.execute(
+                """
+                UPDATE resources
+                SET metadata_json = ?
+                WHERE resource_type = ? AND resource_id = ?
+                """,
+                (
+                    json.dumps(
+                        metadata or {}, separators=(",", ":"), sort_keys=True
+                    ),
+                    resource_type.value,
+                    normalized_id,
+                ),
+            )
+        record = self.get(resource_type, normalized_id)
+        if record is None:
+            raise RepositoryError("updated resource could not be reloaded")
+        return record
+
 
     def get(
         self,
@@ -218,6 +251,15 @@ class ResourceRepository:
         resource_id: str,
     ) -> bool:
         with self.database.transaction(write=True) as connection:
+            if resource_type is ResourceType.PROJECT:
+                connection.execute(
+                    """
+                    UPDATE resources
+                    SET owner_project_id = NULL
+                    WHERE owner_project_id = ?
+                    """,
+                    (resource_id,),
+                )
             deleted = connection.execute(
                 """
                 DELETE FROM resources
@@ -226,3 +268,34 @@ class ResourceRepository:
                 (resource_type.value, resource_id),
             ).rowcount
         return deleted > 0
+
+    def list_by_owner_project(
+        self,
+        owner_project_id: str,
+        *,
+        resource_type: ResourceType | None = None,
+    ) -> list[ResourceRecord]:
+        query = "SELECT * FROM resources WHERE owner_project_id = ? AND visibility = 'project'"
+        params: list[str] = [owner_project_id]
+        if resource_type is not None:
+            query += " AND resource_type = ?"
+            params.append(resource_type.value)
+        query += " ORDER BY resource_type, resource_id"
+        with self.database.transaction() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [_resource_from_row(row) for row in rows]
+
+    def list_orphans(
+        self,
+        *,
+        resource_type: ResourceType | None = None,
+    ) -> list[ResourceRecord]:
+        query = "SELECT * FROM resources WHERE visibility = 'project' AND owner_project_id IS NULL"
+        params: list[str] = []
+        if resource_type is not None:
+            query += " AND resource_type = ?"
+            params.append(resource_type.value)
+        query += " ORDER BY resource_type, resource_id"
+        with self.database.transaction() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [_resource_from_row(row) for row in rows]

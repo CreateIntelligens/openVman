@@ -28,11 +28,40 @@ import {
   type MascotOption,
 } from '../data/mascotCatalog'
 import { bindSettingsToAccount, savedSettings } from '../stores/useSettingsStore'
-import { hasPref, STORAGE_KEYS } from '../utils/storageUtils'
+import { hasPref, readProjectPref, STORAGE_KEYS } from '../utils/storageUtils'
 import {
+  AVATAR_BACKGROUND_IDS,
   normalizeAvatarBackgroundId,
   type AvatarBackgroundFit,
 } from '../types/avatarBackground'
+
+export interface ProjectResourceItem {
+  id?: string
+  background_id?: string
+  provider?: string
+  voice_id?: string
+  name?: string
+  label?: string
+  source?: string
+  is_default?: boolean
+  assigned_at?: string | null
+  assigned_by?: string | null
+}
+
+export interface ProjectResourcesResponse {
+  avatar_character?: ProjectResourceItem[]
+  avatar_background?: ProjectResourceItem[]
+  avatar_mascot?: ProjectResourceItem[]
+  custom_voice?: ProjectResourceItem[]
+  asr_engine?: ProjectResourceItem[]
+  defaults?: {
+    avatar_character?: string | null
+    avatar_background?: string | null
+    avatar_mascot?: string | null
+    custom_voice?: string | null
+    asr_engine?: string | null
+  }
+}
 
 interface ProjectSummary {
   project_id: string
@@ -131,10 +160,64 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       ?? null;
   }
 
+  const currentProjectResources = ref<ProjectResourcesResponse | null>(null);
+
+  async function fetchProjectResources(projectId: string): Promise<ProjectResourcesResponse | null> {
+    if (!projectId) {
+      currentProjectResources.value = null;
+      return null;
+    }
+    try {
+      const res = await apiFetch(`/api/v1/projects/${encodeURIComponent(projectId)}/resources`);
+      if (!res.ok) {
+        currentProjectResources.value = null;
+        return null;
+      }
+      const data = (await res.json()) as ProjectResourcesResponse;
+      currentProjectResources.value = data;
+      return data;
+    } catch {
+      currentProjectResources.value = null;
+      return null;
+    }
+  }
+
+  function pickPreferredCharacterId(
+    projectId = settings.projectId,
+    items = characters.value,
+  ): string {
+    const isValid = (id: string) => items.some((c) => c.id === id);
+    // 1. 本專案存的偏好，或同專案舊偏好
+    if (projectId) {
+      const projectPref = readProjectPref(projectId, STORAGE_KEYS.CHARACTER_ID, "");
+      if (projectPref && isValid(projectPref)) return projectPref;
+    }
+    const saved = savedSettings();
+    const savedPid = saved.projectId ?? "";
+    const currentPid = projectId ?? "";
+    if (savedPid === currentPid) {
+      const savedChar = saved.characterId;
+      if (savedChar && isValid(savedChar)) return savedChar;
+    }
+    // 2. 專案預設
+    if (projectId) {
+      const projectDefault = currentProjectResources.value?.defaults?.avatar_character;
+      if (projectDefault && isValid(projectDefault)) return projectDefault;
+    }
+    // 3. 帳號預設
+    const accDefault = accountDefault("character_id", "");
+    if (accDefault && isValid(accDefault)) return accDefault;
+    // 4. 清單第一個
+    return items[0]?.id ?? "";
+  }
+
   async function fetchVrmAvatars(): Promise<void> {
+    const projectId = settings.projectId;
     let items: MascotOption[];
     try {
-      const res = await apiFetch("/api/v1/avatar/mascots");
+      const res = projectId
+        ? await apiFetch(`/api/v1/avatar/mascots?project_id=${encodeURIComponent(projectId)}`)
+        : await apiFetch("/api/v1/avatar/mascots");
       if (!res.ok) return;
       const data = (await res.json()) as VrmMascotsResponse;
       items = (data.mascots ?? [])
@@ -145,13 +228,47 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       return;
     }
     vrmAvatarOptions.value = items;
-    const preferred = preferSaved(
-      savedSettings().vrmAvatarId,
-      (id) => items.some((m) => m.id === id),
-      accountDefault("mascot_id", "") ?? "",
-    );
-    const selected = items.find((m) => m.id === preferred) ?? items[0];
-    settings.vrmAvatarId = selected?.id ?? "";
+    const isValid = (id: string) => items.some((m) => m.id === id);
+
+    // 1. 本專案存的偏好，或同專案舊偏好
+    let preferred = "";
+    if (projectId) {
+      const projectPref = readProjectPref(projectId, STORAGE_KEYS.VRM_AVATAR_ID, "");
+      if (isValid(projectPref)) preferred = projectPref;
+    }
+    const saved = savedSettings();
+    const savedPid = saved.projectId ?? "";
+    const currentPid = projectId ?? "";
+    if (!preferred && savedPid === currentPid) {
+      preferred = preferSaved(
+        savedSettings().vrmAvatarId,
+        (id) => hasPref(STORAGE_KEYS.VRM_AVATAR_ID) && isValid(id),
+        "",
+      );
+    }
+    if (preferred) {
+      settings.vrmAvatarId = preferred;
+      return;
+    }
+
+    // 2. 專案預設
+    if (projectId) {
+      const projectDefault = currentProjectResources.value?.defaults?.avatar_mascot;
+      if (projectDefault && isValid(projectDefault)) {
+        settings.vrmAvatarId = projectDefault;
+        return;
+      }
+    }
+
+    // 3. 帳號預設
+    const accDefault = accountDefault("mascot_id", "");
+    if (accDefault && isValid(accDefault)) {
+      settings.vrmAvatarId = accDefault;
+      return;
+    }
+
+    // 4. 清單第一個
+    settings.vrmAvatarId = items[0]?.id ?? "";
   }
 
   function stageBackgroundFitStyle(fit: AvatarBackgroundFit): Record<string, string> {
@@ -219,7 +336,34 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   async function fetchInitialProjectData(): Promise<void> {
     await fetchProjects();
     if (settings.projectId) {
-      await fetchPersonas(settings.projectId);
+      await fetchProjectResources(settings.projectId);
+      await Promise.allSettled([
+        fetchPersonas(settings.projectId),
+        fetchBackgrounds(),
+        fetchVrmAvatars(),
+        avatarCatalog.load(settings.projectId),
+      ]);
+      const nextChar = pickPreferredCharacterId(settings.projectId, characters.value);
+      if (nextChar) {
+        settings.characterId = nextChar;
+      }
+    }
+  }
+
+  async function switchProject(projectId: string): Promise<void> {
+    settings.projectId = projectId;
+    getChat().setProject(projectId);
+    if (!projectId) return;
+    await fetchProjectResources(projectId);
+    await Promise.allSettled([
+      fetchPersonas(projectId, { syncSelected: true }),
+      fetchBackgrounds(),
+      fetchVrmAvatars(),
+      avatarCatalog.load(projectId),
+    ]);
+    const nextChar = pickPreferredCharacterId(projectId, characters.value);
+    if (nextChar) {
+      settings.characterId = nextChar;
     }
   }
 
@@ -294,17 +438,68 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
 
   async function fetchBackgrounds(): Promise<void> {
     try {
-      const res = await apiFetch("/api/v1/backgrounds");
+      const projectId = settings.projectId;
+      const res = projectId
+        ? await apiFetch(`/api/v1/backgrounds?project_id=${encodeURIComponent(projectId)}`)
+        : await apiFetch("/api/v1/backgrounds");
       if (!res.ok) return;
       const data = await res.json();
       const items = data.backgrounds ?? [];
       backgrounds.value = items;
-      // 背景的預設值是 "dark"，光看值分不出是選的還是沒選過，所以看有沒有存過。
-      // 選過就不動它；失效的上傳背景由 normalizeAvatarBackgroundId 那條路處理。
-      if (hasPref(STORAGE_KEYS.BACKGROUND_ID)) return;
-      const preferred = accountDefault("background_id", "");
-      if (preferred && items.some((b: { background_id: string }) => b.background_id === preferred)) {
-        settings.backgroundId = normalizeAvatarBackgroundId(`uploaded:${preferred}`);
+
+      const isBgValid = (val: string) => {
+        if (!val) return false;
+        const stripped = val.startsWith("uploaded:") ? val.slice("uploaded:".length) : val;
+        if ((AVATAR_BACKGROUND_IDS as readonly string[]).includes(stripped)) return true;
+        return items.some((b: { background_id: string }) => b.background_id === stripped);
+      };
+      const formatBg = (val: string) => {
+        if ((AVATAR_BACKGROUND_IDS as readonly string[]).includes(val)) {
+          return normalizeAvatarBackgroundId(val);
+        }
+        return normalizeAvatarBackgroundId(val.startsWith("uploaded:") ? val : `uploaded:${val}`);
+      };
+
+      // 1. 本專案存的偏好，或同專案舊偏好
+      if (projectId) {
+        const projectPref = readProjectPref(projectId, STORAGE_KEYS.BACKGROUND_ID, "");
+        if (projectPref && isBgValid(projectPref)) {
+          settings.backgroundId = formatBg(projectPref);
+          return;
+        }
+      }
+      const saved = savedSettings();
+      const savedPid = saved.projectId ?? "";
+      const currentPid = projectId ?? "";
+      if (savedPid === currentPid && hasPref(STORAGE_KEYS.BACKGROUND_ID)) {
+        const savedBg = saved.backgroundId;
+        if (savedBg && isBgValid(savedBg)) {
+          settings.backgroundId = formatBg(savedBg);
+          return;
+        }
+      }
+
+      // 2. 專案預設
+      if (projectId) {
+        const projectDefault = currentProjectResources.value?.defaults?.avatar_background;
+        if (projectDefault && isBgValid(projectDefault)) {
+          settings.backgroundId = formatBg(projectDefault);
+          return;
+        }
+      }
+
+      // 3. 帳號預設
+      const accDefault = accountDefault("background_id", "");
+      if (accDefault && isBgValid(accDefault)) {
+        settings.backgroundId = formatBg(accDefault);
+        return;
+      }
+
+      // 4. 清單第一個 fallback（若有上傳背景取第一個，否則維持 "dark"）
+      if (items.length > 0 && items[0]?.background_id) {
+        settings.backgroundId = formatBg(items[0].background_id);
+      } else {
+        settings.backgroundId = "dark";
       }
     } catch {
       backgrounds.value = [];
@@ -322,8 +517,12 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     characters,
     selectionNotices,
     vrmAvatarOptions,
+    currentProjectResources,
     accountDefault,
     addSelectionNotice,
+    fetchProjectResources,
+    pickPreferredCharacterId,
+    switchProject,
     fetchVrmAvatars,
     fetchProjects,
     fetchInitialProjectData,

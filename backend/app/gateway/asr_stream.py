@@ -46,7 +46,8 @@ from app import language_routes as language_routes_mod
 from app.asr_glossary import project_asr_prompt, project_asr_vocabulary
 from app.auth.asr_selection import asr_user_choices, permitted_asr_preference
 from app.auth.dependencies import CurrentAccount, authenticate_websocket
-from app.auth.models import ProjectPolicyRecord, is_at_least_admin
+from app.auth.models import ProjectPolicyRecord, ResourceType, is_at_least_admin
+from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import get_auth_runtime
 from app.config import TTSRouterConfig, get_tts_config
 from app.http_client import SharedAsyncClient
@@ -165,27 +166,59 @@ async def _judge_final(project_id: str, routes: list[str], interim: str, final: 
     return text
 
 
-def _allowed(current, policy: ProjectPolicyRecord | None = None) -> str:
+def _assigned_or_project_asr(current, project_id: str) -> set[str]:
+    if not project_id:
+        return set()
+    runtime = get_auth_runtime()
+    try:
+        user = current.user if current.embed_key is None else None
+        return {
+            e.resource_id
+            for e in effective_project_resources(
+                runtime, user, project_id, ResourceType.ASR_ENGINE
+            )
+            if e.source in ("project", "assigned")
+        }
+    except Exception:
+        return set()
+
+
+def _allowed(
+    current,
+    policy: ProjectPolicyRecord | None = None,
+    project_id: str = "",
+) -> str:
     """Resolve the default streaming engine against grants and the project policy.
 
     帳號偏好優先；偏好被專案擋掉或沒選過時才看專案預設。偏好是批次引擎時回空字串
     （這個人選了批次，不能因為專案預設是串流就替他換）。
     """
     runtime = get_auth_runtime()
+    p_id = (policy.project_id if policy is not None else "") or project_id or (
+        current.embed_key.project_id if getattr(current, "embed_key", None) else ""
+    )
+    assigned_or_project = _assigned_or_project_asr(current, p_id)
+
     if current.embed_key is None:
         stored = runtime.account_access.get_asr_provider(current.user.id)
+        if stored and stored in assigned_or_project and stored in _STREAM_ENGINES:
+            return stored
         chosen = permitted_asr_preference(runtime, current.user, stored)
         if chosen and (policy is None or policy.allows_asr(chosen)):
             return chosen if chosen in _STREAM_ENGINES else ""
     if policy is None:
         return ""
     default = policy.default_asr_engine
-    if not default or default not in _STREAM_ENGINES or not policy.allows_asr(default):
+    if not default or default not in _STREAM_ENGINES:
+        return ""
+    if default in assigned_or_project:
+        return default
+    if not policy.allows_asr(default):
         return ""
     if current.embed_key is not None:
         # Embed 沒有帳號授權，專案有限制時以專案清單代替。
         return default if policy.restricts_asr else ""
-    if is_at_least_admin(current.user.role) or default in asr_user_choices(
+    if is_at_least_admin(getattr(current.user, "role", "user")) or default in asr_user_choices(
         runtime, current.user,
     ):
         return default
@@ -193,18 +226,27 @@ def _allowed(current, policy: ProjectPolicyRecord | None = None) -> str:
 
 
 def _engine_for(
-    current, requested: str | None, policy: ProjectPolicyRecord | None = None,
+    current,
+    requested: str | None,
+    policy: ProjectPolicyRecord | None = None,
+    project_id: str = "",
 ) -> str:
     """Resolve a connection-local engine without mutating the account choice."""
     if not requested:
-        return _allowed(current, policy)
+        return _allowed(current, policy, project_id=project_id)
     if current.embed_key is not None or requested not in _STREAM_ENGINES:
         return ""
+    p_id = (policy.project_id if policy is not None else "") or project_id or (
+        current.embed_key.project_id if getattr(current, "embed_key", None) else ""
+    )
+    assigned_or_project = _assigned_or_project_asr(current, p_id)
+    if requested in assigned_or_project:
+        return requested
     # 專案限制連管理者也要遵守：管理者能試任何串流引擎，是帳號授權層的例外，
     # 不是專案層的。
     if policy is not None and not policy.allows_asr(requested):
         return ""
-    if is_at_least_admin(current.user.role):
+    if is_at_least_admin(getattr(current.user, "role", "user")):
         return requested
     return permitted_asr_preference(
         get_auth_runtime(), current.user, requested,
@@ -357,7 +399,12 @@ async def asr_stream(websocket: WebSocket) -> None:
 
     project_id = websocket.query_params.get("project_id", "")
     policy = _project_policy(current, project_id)
-    engine = _engine_for(current, websocket.query_params.get("engine"), policy)
+    engine = _engine_for(
+        current,
+        websocket.query_params.get("engine"),
+        policy,
+        project_id=project_id,
+    )
     api_key = os.environ.get("GEMINI_API_KEY", "")
     cfg = get_tts_config()
     endpoint = _r2t2_stream_endpoint(cfg, engine) if engine in _R2T2_STREAM_ENGINES else None

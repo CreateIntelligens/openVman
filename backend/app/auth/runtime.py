@@ -16,6 +16,9 @@ from .database import AuthDatabase
 from .model_provider_repository import ModelProviderRepository
 from .embed_keys_repository import EmbedKeyRepository
 from .project_policy_repository import ProjectPolicyRepository
+from .project_resource_assignment_repository import (
+    ProjectResourceAssignmentRepository,
+)
 from .request_origins_repository import RequestOriginRepository
 from .resource_repository import ResourceRepository
 from .settings_repository import SystemSettingsRepository
@@ -41,6 +44,7 @@ class AuthRuntime:
     settings: SystemSettingsRepository
     model_providers: ModelProviderRepository
     project_policies: ProjectPolicyRepository
+    project_resource_assignments: ProjectResourceAssignmentRepository
     request_origins: RequestOriginRepository
     temporary_passwords: TemporaryPasswordCipher
     # 每個 runtime 各自一份，測試與重建 runtime 時不會共用失敗次數。
@@ -78,6 +82,9 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
             encryption_secret=config.model_provider_encryption_secret,
         ),
         project_policies=ProjectPolicyRepository(database),
+        project_resource_assignments=ProjectResourceAssignmentRepository(
+            database
+        ),
         request_origins=RequestOriginRepository(database),
         api_key_requests=(
             FailedAttemptLimiter(

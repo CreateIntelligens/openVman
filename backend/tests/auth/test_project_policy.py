@@ -214,6 +214,9 @@ def test_unset_policy_is_returned_as_unrestricted(env):
         "allowed_asr_engines": [], "default_asr_engine": None,
         "taiwanese_asr_engine": None, "allowed_tts_voices": [],
         "default_tts_voice": None, "updated_by": None, "updated_at": None,
+        "allowed_characters": [], "default_character_id": None,
+        "allowed_backgrounds": [], "default_background_id": None,
+        "allowed_mascots": [], "default_mascot_id": None,
     }
 
 

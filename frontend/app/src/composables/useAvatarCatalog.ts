@@ -33,7 +33,7 @@ export interface AvatarCatalog {
        loading: Readonly<Ref<boolean>>
        error: Readonly<Ref<string | null>>
        /** Fetch the catalog. Call explicitly — not run automatically in setup. */
-       load: () => Promise<void>
+       load: (projectId?: string) => Promise<void>
 }
 
 export function useAvatarCatalog(options: AvatarCatalogOptions = {}): AvatarCatalog {
@@ -44,11 +44,14 @@ export function useAvatarCatalog(options: AvatarCatalogOptions = {}): AvatarCata
        const loading = ref(false)
        const error = ref<string | null>(null)
 
-       async function load(): Promise<void> {
+       async function load(projectId?: string): Promise<void> {
               loading.value = true
               error.value = null
               try {
-                     const res = await doFetch(endpoint)
+                     const url = projectId
+                            ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}project_id=${encodeURIComponent(projectId)}`
+                            : endpoint
+                     const res = await doFetch(url)
                      if (!res.ok) {
                             // Keep the previous list to avoid flicker on transient failures.
                             error.value = fetchErrorMessage({ status: res.status })

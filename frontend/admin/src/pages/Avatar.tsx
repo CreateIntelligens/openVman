@@ -17,6 +17,7 @@ import {
   uploadAvatarCharacter,
   uploadAvatarMascot,
 } from "../api";
+import { fetchProjects, type ProjectSummary } from "../api/projects";
 import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
 import { useMascot } from "../context/MascotContext";
@@ -94,6 +95,7 @@ export default function Avatar() {
   const [characters, setCharacters] = useState<AvatarCharacter[]>([]);
   const [backgrounds, setBackgrounds] = useState<AvatarBackground[]>([]);
   const [mascots, setMascots] = useState<AvatarMascot[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [backgroundsLoading, setBackgroundsLoading] = useState(false);
@@ -106,15 +108,18 @@ export default function Avatar() {
 
   const [uploadCharId, setUploadCharId] = useState("");
   const [uploadLabel, setUploadLabel] = useState("");
+  const [uploadCharProjectId, setUploadCharProjectId] = useState("");
   const [uploading, setUploading] = useState(false);
   const videoRef = useRef<HTMLInputElement>(null);
   const dataRef = useRef<HTMLInputElement>(null);
   const [uploadBackgroundId, setUploadBackgroundId] = useState("");
   const [uploadBackgroundLabel, setUploadBackgroundLabel] = useState("");
+  const [uploadBgProjectId, setUploadBgProjectId] = useState("");
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
   const [uploadMascotId, setUploadMascotId] = useState("");
   const [uploadMascotLabel, setUploadMascotLabel] = useState("");
+  const [uploadMascotProjectId, setUploadMascotProjectId] = useState("");
   const [mascotUploading, setMascotUploading] = useState(false);
   const mascotModelRef = useRef<HTMLInputElement>(null);
   const mascotThumbnailRef = useRef<HTMLInputElement>(null);
@@ -134,6 +139,12 @@ export default function Avatar() {
   const [selectedMascotModelName, setSelectedMascotModelName] = useState<string>("");
   const [selectedMascotThumbnailName, setSelectedMascotThumbnailName] = useState<string>("");
 
+  useEffect(() => {
+    void fetchProjects()
+      .then((res) => setProjects(res.projects ?? []))
+      .catch(() => {});
+  }, []);
+
   function syncMascots(nextMascots: AvatarMascot[]): void {
     setMascots(nextMascots);
     setMascotOptions(nextMascots.map(toMascotOption));
@@ -142,6 +153,7 @@ export default function Avatar() {
   function resetUploadForm(): void {
     setUploadCharId("");
     setUploadLabel("");
+    setUploadCharProjectId("");
     setSelectedVideoName("");
     setSelectedDataName("");
     if (videoRef.current) videoRef.current.value = "";
@@ -151,6 +163,7 @@ export default function Avatar() {
   function resetBackgroundUploadForm(): void {
     setUploadBackgroundId("");
     setUploadBackgroundLabel("");
+    setUploadBgProjectId("");
     setSelectedImageName("");
     if (imageRef.current) imageRef.current.value = "";
   }
@@ -158,6 +171,7 @@ export default function Avatar() {
   function resetMascotUploadForm(): void {
     setUploadMascotId("");
     setUploadMascotLabel("");
+    setUploadMascotProjectId("");
     setSelectedMascotModelName("");
     setSelectedMascotThumbnailName("");
     if (mascotModelRef.current) mascotModelRef.current.value = "";
@@ -243,7 +257,13 @@ export default function Avatar() {
     setUploading(true);
     setStatus(null);
     try {
-      await uploadAvatarCharacter({ charId, label, video: videoFile, data: dataFile });
+      await uploadAvatarCharacter({
+        charId,
+        label,
+        video: videoFile,
+        data: dataFile,
+        projectId: uploadCharProjectId || undefined,
+      });
       resetUploadForm();
       setStatus({ type: "success", message: "Upload successful" });
       await load();
@@ -279,7 +299,12 @@ export default function Avatar() {
     setBackgroundUploading(true);
     setStatus(null);
     try {
-      await uploadAvatarBackground({ backgroundId, label, image });
+      await uploadAvatarBackground({
+        backgroundId,
+        label,
+        image,
+        projectId: uploadBgProjectId || undefined,
+      });
       resetBackgroundUploadForm();
       setStatus({ type: "success", message: "Background upload successful" });
       await loadBackgrounds();
@@ -305,7 +330,13 @@ export default function Avatar() {
     setMascotUploading(true);
     setStatus(null);
     try {
-      await uploadAvatarMascot({ mascotId, label, model, thumbnail });
+      await uploadAvatarMascot({
+        mascotId,
+        label,
+        model,
+        thumbnail,
+        projectId: uploadMascotProjectId || undefined,
+      });
       resetMascotUploadForm();
       setStatus({ type: "success", message: "Mascot upload successful" });
       await loadMascots();
@@ -472,6 +503,9 @@ export default function Avatar() {
           selectedDataName={selectedDataName}
           videoRef={videoRef}
           dataRef={dataRef}
+          projects={projects}
+          selectedProjectId={uploadCharProjectId}
+          onProjectIdChange={setUploadCharProjectId}
           onUploadIdChange={setUploadCharId}
           onUploadLabelChange={setUploadLabel}
           onVideoChange={setSelectedVideoName}
@@ -492,6 +526,9 @@ export default function Avatar() {
           uploadLabel={uploadBackgroundLabel}
           selectedImageName={selectedImageName}
           imageRef={imageRef}
+          projects={projects}
+          selectedProjectId={uploadBgProjectId}
+          onProjectIdChange={setUploadBgProjectId}
           onUploadIdChange={setUploadBackgroundId}
           onUploadLabelChange={setUploadBackgroundLabel}
           onImageChange={setSelectedImageName}
@@ -514,6 +551,9 @@ export default function Avatar() {
           selectedThumbnailName={selectedMascotThumbnailName}
           modelRef={mascotModelRef}
           thumbnailRef={mascotThumbnailRef}
+          projects={projects}
+          selectedProjectId={uploadMascotProjectId}
+          onProjectIdChange={setUploadMascotProjectId}
           onUploadIdChange={setUploadMascotId}
           onUploadLabelChange={setUploadMascotLabel}
           onModelChange={setSelectedMascotModelName}

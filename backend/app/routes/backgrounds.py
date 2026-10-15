@@ -19,8 +19,14 @@ from app.auth.dependencies import (
     get_current_account,
     require_admin,
 )
-from app.auth.models import ResourceType
-from app.auth.resources import list_accessible_resources
+from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+from app.auth.project_resources import effective_project_resources
+from app.auth.resources import (
+    ResourceAccess,
+    ResourceNotFoundError,
+    list_accessible_resources,
+    resolve_resource,
+)
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.avatar.background_store import (
     AvatarBackgroundStore,
@@ -66,22 +72,58 @@ def _normalize_background_id_or_400(background_id: str) -> str:
 
 @router.get("/api/v1/backgrounds", summary="列出 Avatar 背景")
 async def list_backgrounds(
+    project_id: str | None = None,
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ):
-    accessible_ids = {
-        resource.resource_id
-        for resource in list_accessible_resources(
-            runtime.resources,
-            current.user,
-            ResourceType.AVATAR_BACKGROUND,
+    if project_id:
+        try:
+            resolve_resource(
+                runtime.resources,
+                current.user,
+                ResourceType.PROJECT,
+                project_id,
+                access=ResourceAccess.READ,
+            )
+        except ResourceNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail=f"專案不存在或無權限存取：{project_id}",
+            )
+        entries = effective_project_resources(
+            runtime, current.user, project_id, ResourceType.AVATAR_BACKGROUND
         )
+        source_by_id = {e.resource_id: e.source for e in entries}
+        backgrounds = []
+        for bg in get_store().list_backgrounds():
+            bid = bg.get("background_id")
+            if bid in source_by_id:
+                backgrounds.append({**bg, "source": source_by_id[bid]})
+        return {"backgrounds": backgrounds}
+
+    is_root = current.user.role is AccountRole.ROOT
+    accessible = list_accessible_resources(
+        runtime.resources,
+        current.user,
+        ResourceType.AVATAR_BACKGROUND,
+    )
+    accessible_sources = {
+        resource.resource_id: (
+            "orphan"
+            if is_root
+            and resource.visibility is ResourceVisibility.PROJECT
+            and resource.owner_project_id is None
+            else "grant"
+        )
+        for resource in accessible
+        if resource.visibility is not ResourceVisibility.PROJECT
+        or (is_root and resource.owner_project_id is None)
     }
     return {
         "backgrounds": [
-            bg
+            {**bg, "source": accessible_sources[bg["background_id"]]}
             for bg in get_store().list_backgrounds()
-            if bg.get("background_id") in accessible_ids
+            if bg.get("background_id") in accessible_sources
         ]
     }
 
@@ -91,11 +133,48 @@ async def create_background(
     background_id: str = Form(...),
     label: str = Form(""),
     image: UploadFile = File(...),
+    project_id: str | None = Form(default=None),
     _admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ):
     cfg = get_tts_config()
     bid = _normalize_background_id_or_400(background_id)
+    norm_project_id = project_id.strip() if project_id and project_id.strip() else None
+    if norm_project_id:
+        project = runtime.resources.get(ResourceType.PROJECT, norm_project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"專案不存在：{norm_project_id}",
+            )
+        if _admin.user.role is not AccountRole.ROOT:
+            try:
+                resolve_resource(
+                    runtime.resources,
+                    _admin.user,
+                    ResourceType.PROJECT,
+                    norm_project_id,
+                    access=ResourceAccess.MUTATE,
+                )
+            except ResourceNotFoundError:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"您沒有專案 {norm_project_id} 的管理權限",
+                )
+
+    existing = runtime.resources.get(ResourceType.AVATAR_BACKGROUND, bid)
+    if existing is not None:
+        if existing.owner_project_id is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"背景 {bid} 已存在且為全域資源",
+            )
+        if existing.owner_project_id != norm_project_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"背景 {bid} 已存在於其他專案",
+            )
+
     image_bytes = await image.read()
 
     if len(image_bytes) > cfg.avatar_background_max_upload_bytes:
@@ -108,19 +187,32 @@ async def create_background(
             image_bytes=image_bytes,
             filename=image.filename or "",
         )
-        try:
-            runtime.resources.upsert_system_resource(
+        if existing is not None:
+            runtime.resources.update_metadata(
+                ResourceType.AVATAR_BACKGROUND,
+                bid,
+                {"label": label or bid},
+            )
+        else:
+            visibility = (
+                ResourceVisibility.PROJECT
+                if norm_project_id
+                else ResourceVisibility.SYSTEM_PUBLIC
+            )
+            runtime.resources.register(
                 resource_type=ResourceType.AVATAR_BACKGROUND,
                 resource_id=bid,
+                owner_user_id=None,
+                visibility=visibility,
+                owner_project_id=norm_project_id,
                 metadata={"label": label or bid},
             )
-        except Exception as exc:
-            logger.warning("failed to upsert background resource %s: %s", bid, exc)
     except InvalidBackgroundUpload as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except BackgroundExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"status": "ok", "background": background}
+
 
 
 @router.delete("/api/v1/backgrounds/{background_id}", summary="刪除 Avatar 背景")

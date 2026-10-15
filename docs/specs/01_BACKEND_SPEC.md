@@ -198,9 +198,11 @@ ws.send(JSON.stringify(payload));
 
 一般帳號的 TTS 清單包含跨 provider 的已授權聲音；合成時以聲音 metadata 驗證 provider，省略 provider 時由 voice 推導，省略 voice 時使用帳號預設。metadata 缺漏的舊聲音僅沿用管理員設定的預設 provider，不接受 provider／voice 不匹配；Embed key 維持綁定聲音限制。TTS 回應依實際 `Content-Type` 處理 WAV／MP3／raw PCM，不能從端點名稱推測檔案格式。完整欄位位置、狀態碼及標準庫範例見 [串接指南](../guides/integration-quickstart.md)。Brain 無新增對外契約，既有前台／後台呼叫可沿用，不需要 UI 改版。
 
-### 專案語音限制（`GET/PUT /api/v1/projects/{project_id}/policy`）
+### 專案資源限制與指派（`GET/PUT /api/v1/projects/{project_id}/policy`、`GET /api/v1/projects/{project_id}/resources`、`POST/DELETE /api/v1/projects/{project_id}/assignments`）
 
-帳號授權決定「這個人能用什麼」，專案限制決定「這個專案肯用什麼」；每次語音請求實際能用的是兩者交集。存在 Auth DB 的 `project_policies`（migration 20，主鍵 `project_id`，以 `(resource_type='project', project_id)` 外鍵指向 `resources`，刪專案時一併刪除）。欄位：
+帳號授權決定「這個人能用什麼」，專案限制決定「這個專案肯用什麼」；每次請求實際能用的是兩者交集加上專案專屬與 ROOT 指派資源。存在 Auth DB 的 `project_policies`（migration 20 與 23，主鍵 `project_id`，以 `(resource_type='project', project_id)` 外鍵指向 `resources`，刪專案時一併刪除）。
+
+專案政策欄位：
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
@@ -209,10 +211,28 @@ ws.send(JSON.stringify(payload));
 | `taiwanese_asr_engine` | `string \| null` | 台語分流使用的批次引擎；`null` 沿用 Breeze |
 | `allowed_tts_voices` | `string[]` | 允許的聲音資源 ID（provider 由聲音 metadata 決定）；空陣列＝不限制 |
 | `default_tts_voice` | `string \| null` | 專案預設聲音 |
+| `allowed_characters` | `string[]` | 允許的人物資源 ID（2D/VRM/Live2D）；空陣列＝不限制 |
+| `default_character_id` | `string \| null` | 專案預設人物 |
+| `allowed_backgrounds` | `string[]` | 允許的背景資源 ID；空陣列＝不限制 |
+| `default_background_id` | `string \| null` | 專案預設背景 |
+| `allowed_mascots` | `string[]` | 允許的小助理（Mascot）資源 ID；空陣列＝不限制 |
+| `default_mascot_id` | `string \| null` | 專案預設小助理 |
 
-- `GET`：能編輯專案內容（`ResourceAccess.EDIT`：管理者，或有該專案授權且可進後台的帳號）即可讀；沒有設定時回全空的「不限制」。
-- `PUT`：需 admin 以上並通過專案 `MUTATE` 解析；整份取代，全部留空等於移除限制。受限 admin 只能放入自己權限上限內的引擎與聲音（403 列出超出的項目）。引擎與聲音必須是已註冊資源、有清單時預設值必須在清單內、台語引擎必須是批次引擎，否則 422。
-- 引擎下架或聲音刪除不會把清單清空（JSON 不隨外鍵連動），讀取端照原樣當作限制：寧可擋下，也不因清單變空而變成「不限制」。
+資源歸屬與指派模型（Migration 23）：
+- `resources.owner_project_id`：資源可隸屬於單一專案（專案專屬），亦可為 NULL（全域資源）。
+- `project_resource_assignments`：ROOT 可直接將資源指派給特定專案（支援跨專案指派或全域資源指定）。外鍵在資源或專案刪除時 CASCADE 清除。
+- 專案有效資源計算：單一來源 `effective_project_resources(project_id, account)`。公式為 `grant ∪ project ∪ assigned`。全域資源仍需通過帳號授權與專案政策白名單檢驗；專案專屬與 ROOT 指派資源則無條件對該專案內所有授權成員開放，不受帳號授權上限或專案白名單排除限制。
+- 專案有效預設值：`effective_project_default(project_id, resource_type, account)`，優先順序為「專案政策預設值 → 帳號個人預設值 → 該類別第一個可用資源」。
+
+端點行為：
+- `GET /api/v1/projects/{project_id}/policy`：能編輯專案內容（`ResourceAccess.EDIT`）即可讀；沒有設定時回全空的「不限制」。
+- `PUT /api/v1/projects/{project_id}/policy`：需 admin 以上並通過專案 `MUTATE` 解析；整份取代。受限 admin 只能放入自己權限上限內的資源（但屬於該專案的專案專屬資源或 ROOT 指派資源不受 admin 上限限制）。
+- `GET /api/v1/projects/{project_id}/resources`：回傳該專案下的所有有效資源（`avatar_character`、`avatar_background`、`avatar_mascot`、`custom_voice`、`asr_engine`）與有效 `defaults`，每項資源標記 `source`（`project`、`assigned` 或 `grant`）。
+- `POST /api/v1/projects/{project_id}/assignments`：**僅限 ROOT**（非 ROOT 回 403）。指派特定資源給專案（body: `{"resource_type": "...", "resource_id": "..."}`）；資源不存在回 422；已存在回 200 冪等處理。
+- `DELETE /api/v1/projects/{project_id}/assignments/{resource_type}/{resource_id}`：**僅限 ROOT**（非 ROOT 回 403）。解除指派特定資源，不存在回 404。
+- 專案刪除保護：專案被刪除時，其專案專屬資源不會連帶刪除檔案或資料庫記錄，而是將 `owner_project_id` 置 NULL，成為只有 ROOT 可見的「孤兒資源」；指派關聯表記錄自動 CASCADE 刪除。
+- 靜態檔案授權（`/static/characters/`、`/static/backgrounds/`、`/static/mascots/`）：驗證呼叫者具備該資源所屬專案或任一指派專案的 `ResourceAccess.READ` 權限；Embed key 僅限綁定專案。
+
 
 套用位置（沒有專案、專案讀不到、或限制為空時，行為與改版前完全相同）：
 

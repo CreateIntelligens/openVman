@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 
 import type { AvatarCharacter } from "../../api";
+import { ResourceSourceBadge } from "./ResourceSourceBadge";
 import {
   assetCardClassName,
   assetGridStyle,
@@ -27,6 +28,9 @@ type CharactersPanelProps = {
   selectedDataName: string;
   videoRef: RefObject<HTMLInputElement>;
   dataRef: RefObject<HTMLInputElement>;
+  projects?: Array<{ project_id: string; label: string }>;
+  selectedProjectId?: string;
+  onProjectIdChange?: (value: string) => void;
   onUploadIdChange: (value: string) => void;
   onUploadLabelChange: (value: string) => void;
   onVideoChange: (fileName: string) => void;
@@ -47,6 +51,9 @@ export default function CharactersPanel({
   selectedDataName,
   videoRef,
   dataRef,
+  projects,
+  selectedProjectId,
+  onProjectIdChange,
   onUploadIdChange,
   onUploadLabelChange,
   onVideoChange,
@@ -78,6 +85,20 @@ export default function CharactersPanel({
             onChange={(e) => onUploadLabelChange(e.target.value)}
             className={inputClassName}
           />
+          {projects && projects.length > 0 && onProjectIdChange && (
+            <select
+              value={selectedProjectId || ""}
+              onChange={(e) => onProjectIdChange(e.target.value)}
+              className={inputClassName}
+            >
+              <option value="">全域資源（所有專案可用）</option>
+              {projects.map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  專案專屬：{p.label || p.project_id}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
@@ -159,9 +180,15 @@ export default function CharactersPanel({
                 />
               </div>
               <div className={cardBodyClassName}>
-                <p className="font-mono text-sm font-semibold text-content">
-                  {character.char_id}
-                </p>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="font-mono text-sm font-semibold text-content">
+                    {character.char_id}
+                  </p>
+                  <ResourceSourceBadge
+                    source={character.source}
+                    ownerProjectId={character.owner_project_id}
+                  />
+                </div>
                 <p className="text-sm text-content-muted">{character.label}</p>
                 <p className="text-xs text-content-subtle">
                   {formatSize(character.size_bytes)}

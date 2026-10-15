@@ -140,6 +140,9 @@ export interface AccountAccessOption {
   id: string;
   label: string;
   provider?: string | null;
+  owner_project_id?: string | null;
+  visibility?: "global" | "project";
+  source?: "grant" | "project" | "assigned" | "orphan";
 }
 
 export interface AccountAccessOptions {

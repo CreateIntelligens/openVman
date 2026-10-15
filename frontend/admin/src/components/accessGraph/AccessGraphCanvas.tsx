@@ -128,6 +128,7 @@ function fitViewport(
 
 function edgeClass(edge: GraphEdge): string {
   if (edge.isDefault) return "stroke-primary";
+  if (edge.kind === "assigned") return "stroke-emerald-500";
   if (edge.kind === "scope") return "stroke-info";
   return "stroke-content-subtle";
 }
@@ -142,16 +143,27 @@ function NodeShape({ node }: { node: GraphNode }) {
   switch (node.kind) {
     case "project":
       return (
-        <rect
-          x={-11}
-          y={-11}
-          width={22}
-          height={22}
-          rx={5}
-          className={node.missing ? "fill-surface-raised stroke-primary" : "fill-primary stroke-primary-700"}
-          strokeWidth={1.5}
-          strokeDasharray={dash}
-        />
+        <g>
+          <rect
+            x={-11}
+            y={-11}
+            width={22}
+            height={22}
+            rx={5}
+            className={node.missing ? "fill-surface-raised stroke-primary" : "fill-primary stroke-primary-700"}
+            strokeWidth={1.5}
+            strokeDasharray={dash}
+          />
+          {node.hasRestrictions && (
+            <circle
+              cx={9}
+              cy={-9}
+              r={4}
+              className="fill-amber-500 stroke-surface-overlay"
+              strokeWidth={1.5}
+            />
+          )}
+        </g>
       );
     case "character":
       return (
@@ -479,7 +491,13 @@ export default function AccessGraphCanvas({
                   y2={target.y}
                   className={edgeClass(edge)}
                   strokeWidth={edge.isDefault ? 2 : 1}
-                  strokeDasharray={edge.kind === "scope" && !edge.isDefault ? "5 4" : undefined}
+                  strokeDasharray={
+                    edge.kind === "assigned"
+                      ? "3 3"
+                      : edge.kind === "scope" && !edge.isDefault
+                        ? "5 4"
+                        : undefined
+                  }
                   vectorEffect="non-scaling-stroke"
                   opacity={active === null ? (edge.isDefault ? restOpacity : restOpacity * 0.6) : active ? 0.95 : 0.04}
                 />
@@ -554,6 +572,11 @@ export default function AccessGraphCanvas({
                     style={{ paintOrder: "stroke" }}
                   >
                     {node.label}
+                    {node.hasRestrictions && (
+                      <tspan className="fill-amber-500 font-medium" dx="0.4em">
+                        [限制]
+                      </tspan>
+                    )}
                     {badge && (
                       <tspan className="fill-primary font-medium" dx="0.4em">
                         {badge}

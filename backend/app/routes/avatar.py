@@ -9,8 +9,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
-from app.auth.models import ResourceType, ResourceVisibility
-from app.auth.resources import list_accessible_resources
+from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+from app.auth.project_resources import effective_project_resources
+from app.auth.resources import (
+    ResourceAccess,
+    ResourceNotFoundError,
+    list_accessible_resources,
+    resolve_resource,
+)
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.avatar.store import (
     AvatarStore,
@@ -101,22 +107,58 @@ def _guard_not_bound(char_id: str) -> None:
 
 @router.get("/api/v1/avatar", summary="列出 Avatar 角色")
 async def list_characters(
+    project_id: str | None = None,
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ):
-    accessible_ids = {
-        resource.resource_id
-        for resource in list_accessible_resources(
-            runtime.resources,
-            current.user,
-            ResourceType.AVATAR_CHARACTER,
+    if project_id:
+        try:
+            resolve_resource(
+                runtime.resources,
+                current.user,
+                ResourceType.PROJECT,
+                project_id,
+                access=ResourceAccess.READ,
+            )
+        except ResourceNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail=f"專案不存在或無權限存取：{project_id}",
+            )
+        entries = effective_project_resources(
+            runtime, current.user, project_id, ResourceType.AVATAR_CHARACTER
         )
+        source_by_id = {e.resource_id: e.source for e in entries}
+        characters = []
+        for character in get_store().list_characters():
+            cid = character.get("char_id")
+            if cid in source_by_id:
+                characters.append({**character, "source": source_by_id[cid]})
+        return {"characters": characters}
+
+    is_root = current.user.role is AccountRole.ROOT
+    accessible = list_accessible_resources(
+        runtime.resources,
+        current.user,
+        ResourceType.AVATAR_CHARACTER,
+    )
+    accessible_sources = {
+        resource.resource_id: (
+            "orphan"
+            if is_root
+            and resource.visibility is ResourceVisibility.PROJECT
+            and resource.owner_project_id is None
+            else "grant"
+        )
+        for resource in accessible
+        if resource.visibility is not ResourceVisibility.PROJECT
+        or (is_root and resource.owner_project_id is None)
     }
     return {
         "characters": [
-            character
+            {**character, "source": accessible_sources[character["char_id"]]}
             for character in get_store().list_characters()
-            if character.get("char_id") in accessible_ids
+            if character.get("char_id") in accessible_sources
         ]
     }
 
@@ -127,11 +169,35 @@ async def create_character(
     label: str = Form(""),
     video: UploadFile = File(...),
     data: UploadFile = File(...),
+    project_id: str | None = Form(default=None),
     _admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ):
     cfg = get_tts_config()
     cid = _normalize_char_id_or_400(char_id)
+    norm_project_id = project_id.strip() if project_id and project_id.strip() else None
+    if norm_project_id:
+        project = runtime.resources.get(ResourceType.PROJECT, norm_project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"專案不存在：{norm_project_id}",
+            )
+        if _admin.user.role is not AccountRole.ROOT:
+            try:
+                resolve_resource(
+                    runtime.resources,
+                    _admin.user,
+                    ResourceType.PROJECT,
+                    norm_project_id,
+                    access=ResourceAccess.MUTATE,
+                )
+            except ResourceNotFoundError:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"您沒有專案 {norm_project_id} 的管理權限",
+                )
+
 
     video_bytes, data_bytes = await _read_upload_pair(video, data)
     total = len(video_bytes) + len(data_bytes)
@@ -149,11 +215,18 @@ async def create_character(
             char_id=cid, label=label, video_bytes=video_bytes, data_bytes=data_bytes
         )
         try:
+            visibility = (
+                ResourceVisibility.PROJECT
+                if norm_project_id
+                else ResourceVisibility.SYSTEM_PUBLIC
+            )
             runtime.resources.register(
                 resource_type=ResourceType.AVATAR_CHARACTER,
                 resource_id=cid,
                 owner_user_id=None,
-                visibility=ResourceVisibility.SYSTEM_PUBLIC,
+                visibility=visibility,
+                owner_project_id=norm_project_id,
+                metadata={"label": label} if label else {},
             )
         except Exception:
             pass

@@ -40,20 +40,26 @@ _INITIAL_SCHEMA_STATEMENTS = (
         resource_id TEXT NOT NULL,
         owner_user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
         visibility TEXT NOT NULL CHECK (
-            visibility IN ('private', 'system_public')
+            visibility IN ('private', 'system_public', 'project')
         ),
         created_at TEXT NOT NULL,
         metadata_json TEXT NOT NULL DEFAULT '{}',
+        owner_project_id TEXT NULL,
         PRIMARY KEY (resource_type, resource_id),
         CHECK (
-            (visibility = 'private' AND owner_user_id IS NOT NULL)
-            OR (visibility = 'system_public' AND owner_user_id IS NULL)
+            (visibility = 'private' AND owner_user_id IS NOT NULL AND owner_project_id IS NULL)
+            OR (visibility = 'system_public' AND owner_user_id IS NULL AND owner_project_id IS NULL)
+            OR (visibility = 'project' AND owner_user_id IS NULL)
         )
     )
     """,
     """
     CREATE INDEX IF NOT EXISTS idx_resources_owner_visibility_type
     ON resources(owner_user_id, visibility, resource_type)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_resources_owner_project
+    ON resources(owner_project_id, resource_type)
     """,
 )
 
@@ -356,6 +362,12 @@ _PROJECT_POLICY_STATEMENTS = (
         taiwanese_asr_engine TEXT,
         allowed_tts_voices_json TEXT NOT NULL DEFAULT '[]',
         default_tts_voice TEXT,
+        allowed_characters_json TEXT NOT NULL DEFAULT '[]',
+        default_character_id TEXT,
+        allowed_backgrounds_json TEXT NOT NULL DEFAULT '[]',
+        default_background_id TEXT,
+        allowed_mascots_json TEXT NOT NULL DEFAULT '[]',
+        default_mascot_id TEXT,
         updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (resource_type, project_id)
@@ -386,6 +398,55 @@ _REQUEST_ORIGIN_STATEMENTS = (
     ON request_origins(last_seen_at)
     """,
 )
+
+_PROJECT_RESOURCE_SCOPE_SCHEMA_VERSION = 23
+_PROJECT_RESOURCE_SCOPE_MIGRATION_NAME = "project_resource_scope"
+
+_PROJECT_RESOURCE_SCOPE_RESOURCES_TABLE = """
+    CREATE TABLE resources_rebuilt (
+        resource_type TEXT NOT NULL CHECK (
+            resource_type IN (
+                'project',
+                'avatar_character',
+                'avatar_background',
+                'avatar_mascot',
+                'custom_voice',
+                'asr_engine'
+            )
+        ),
+        resource_id TEXT NOT NULL,
+        owner_user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
+        visibility TEXT NOT NULL CHECK (
+            visibility IN ('private', 'system_public', 'project')
+        ),
+        created_at TEXT NOT NULL,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        owner_project_id TEXT NULL,
+        PRIMARY KEY (resource_type, resource_id),
+        CHECK (
+            (visibility = 'private' AND owner_user_id IS NOT NULL AND owner_project_id IS NULL)
+            OR (visibility = 'system_public' AND owner_user_id IS NULL AND owner_project_id IS NULL)
+            OR (visibility = 'project' AND owner_user_id IS NULL)
+        )
+    )
+"""
+
+_PROJECT_RESOURCE_ASSIGNMENTS_TABLE = """
+    CREATE TABLE IF NOT EXISTS project_resource_assignments (
+        project_id TEXT NOT NULL,
+        resource_type TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        assigned_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        assigned_at TEXT NOT NULL,
+        project_resource_type TEXT NOT NULL DEFAULT 'project'
+            CHECK (project_resource_type = 'project'),
+        PRIMARY KEY (project_id, resource_type, resource_id),
+        FOREIGN KEY (project_resource_type, project_id)
+            REFERENCES resources(resource_type, resource_id) ON DELETE CASCADE,
+        FOREIGN KEY (resource_type, resource_id)
+            REFERENCES resources(resource_type, resource_id) ON DELETE CASCADE
+    )
+"""
 
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),

@@ -98,6 +98,17 @@ async function openApp(storage, api = {}) {
     }
     if (path.endsWith("/api/v1/tts/providers")) return json(PROVIDERS);
     if (path.endsWith("/api/v1/avatar/mascots")) return json({ mascots: MASCOTS });
+    if (path.endsWith("/api/v1/avatar")) {
+      return json({
+        characters: [
+          { char_id: "c1", label: "C1", has_video: true, has_data: true },
+          { char_id: "c2", label: "C2", has_video: true, has_data: true },
+        ],
+      });
+    }
+    if (path.endsWith("/api/v1/backgrounds")) {
+      return json({ backgrounds: [{ background_id: "bg-A" }, { background_id: "bg-B" }] });
+    }
     return json({}, 404);
   };
   generation += 1;
@@ -288,4 +299,348 @@ test("someone saved on the hidden live mode opens in standard mode", async () =>
   const storage = savedStorage({ "avatar.voice_mode": "live" });
   const { settings } = await openApp(storage);
   assert.equal(settings.voiceMode, "text");
+});
+
+test("switching project falls back to project default resources", async () => {
+  const storage = savedStorage({ "avatar.project_id": "proj-A" });
+  const { m, settings, boot } = await openApp(storage, {
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_character: "c1", avatar_background: "bg-A", avatar_mascot: "qqman" },
+      avatar_character: [{ resource_id: "c1", label: "C1", source: "project" }],
+      avatar_background: [{ resource_id: "bg-A", label: "BG-A", source: "project" }],
+      avatar_mascot: [{ resource_id: "qqman", label: "QQ", source: "project" }],
+    }),
+    "/api/v1/projects/proj-B/resources": () => json({
+      defaults: { avatar_character: "c2", avatar_background: "bg-B", avatar_mascot: "myvrm" },
+      avatar_character: [{ resource_id: "c2", label: "C2", source: "project" }],
+      avatar_background: [{ resource_id: "bg-B", label: "BG-B", source: "project" }],
+      avatar_mascot: [{ resource_id: "myvrm", label: "Mine", source: "project" }],
+    }),
+  });
+  await m.settingsReady();
+  await boot.fetchInitialProjectData();
+  assert.equal(settings.projectId, "proj-A");
+  assert.equal(settings.vrmAvatarId, "qqman");
+
+  // 切換到 proj-B
+  await boot.switchProject("proj-B");
+  assert.equal(settings.projectId, "proj-B");
+  assert.equal(settings.vrmAvatarId, "myvrm");
+});
+
+test("legacy saved preferences survive when projectId matches and reset on mismatched project", async () => {
+  // 1. 同專案時：舊格式偏好存了 characterId="c2"、vrmAvatarId="myvrm"、backgroundId="uploaded:bg-B"，且 projectId="proj-A"
+  const storage1 = savedStorage({
+    "avatar.project_id": "proj-A",
+    "avatar.character_id": "c2",
+    "avatar.vrm_avatar_id": "myvrm",
+    "avatar.background_id": "uploaded:bg-B",
+  });
+  const app1 = await openApp(storage1, {
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: {},
+      avatar_character: [
+        { resource_id: "c1", label: "C1", source: "project" },
+        { resource_id: "c2", label: "C2", source: "project" },
+      ],
+      avatar_mascot: [
+        { resource_id: "qqman", label: "QQ", source: "project" },
+        { resource_id: "myvrm", label: "Mine", source: "project" },
+      ],
+      avatar_background: [
+        { resource_id: "bg-A", label: "BG-A", source: "project" },
+        { resource_id: "bg-B", label: "BG-B", source: "project" },
+      ],
+    }),
+  });
+  await app1.m.settingsReady();
+  await app1.boot.fetchInitialProjectData();
+  await app1.boot.fetchBackgrounds();
+  assert.equal(app1.settings.characterId, "c2");
+  assert.equal(app1.settings.vrmAvatarId, "myvrm");
+  assert.equal(app1.settings.backgroundId, "uploaded:bg-B");
+
+  // 2. 專案不同時：舊偏好是 proj-B，進入 proj-A 時不沿用 proj-B 的偏好
+  const storage2 = savedStorage({
+    "avatar.project_id": "proj-B",
+    "avatar.character_id": "c2",
+    "avatar.vrm_avatar_id": "myvrm",
+    "avatar.background_id": "uploaded:bg-B",
+  });
+  const app2 = await openApp(storage2, {
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_character: "c1", avatar_mascot: "qqman", avatar_background: "bg-A" },
+      avatar_character: [
+        { resource_id: "c1", label: "C1", source: "project" },
+        { resource_id: "c2", label: "C2", source: "project" },
+      ],
+      avatar_mascot: [
+        { resource_id: "qqman", label: "QQ", source: "project" },
+        { resource_id: "myvrm", label: "Mine", source: "project" },
+      ],
+      avatar_background: [
+        { resource_id: "bg-A", label: "BG-A", source: "project" },
+        { resource_id: "bg-B", label: "BG-B", source: "project" },
+      ],
+    }),
+  });
+  await app2.m.settingsReady();
+  // 強制切到 proj-A
+  await app2.boot.switchProject("proj-A");
+  assert.equal(app2.settings.characterId, "c1");
+  assert.equal(app2.settings.vrmAvatarId, "qqman");
+  assert.equal(app2.settings.backgroundId, "uploaded:bg-A");
+});
+
+test("four-level selection order for mascots: project pref > project default > account default > catalog first", async () => {
+  // 1. 本專案存的偏好優先於專案預設
+  const storage1 = savedStorage({
+    "avatar.project_id": "proj-A",
+    "avatar.vrm_avatar_id::proj::proj-A": "myvrm",
+  });
+  const app1 = await openApp(storage1, {
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_mascot: "qqman" },
+      avatar_mascot: [
+        { resource_id: "qqman", label: "QQ", source: "project" },
+        { resource_id: "myvrm", label: "Mine", source: "project" },
+      ],
+    }),
+  });
+  await app1.m.settingsReady();
+  await app1.boot.fetchInitialProjectData();
+  assert.equal(app1.settings.vrmAvatarId, "myvrm");
+
+  // 2. 專案預設優先於帳號預設
+  const storage2 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app2 = await openApp(storage2, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, mascot_id: "qqman" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_mascot: "myvrm" },
+      avatar_mascot: [
+        { resource_id: "qqman", label: "QQ", source: "project" },
+        { resource_id: "myvrm", label: "Mine", source: "project" },
+      ],
+    }),
+  });
+  await app2.m.settingsReady();
+  await app2.boot.fetchInitialProjectData();
+  assert.equal(app2.settings.vrmAvatarId, "myvrm");
+
+  // 3. 帳號預設優先於清單第一個
+  const storage3 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app3 = await openApp(storage3, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, mascot_id: "myvrm" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: {},
+      avatar_mascot: [
+        { resource_id: "qqman", label: "QQ", source: "project" },
+        { resource_id: "myvrm", label: "Mine", source: "project" },
+      ],
+    }),
+  });
+  await app3.m.settingsReady();
+  await app3.boot.fetchInitialProjectData();
+  assert.equal(app3.settings.vrmAvatarId, "myvrm");
+
+  // 4. 清單第一個 fallback
+  const storage4 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app4 = await openApp(storage4, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, mascot_id: "" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: {},
+      avatar_mascot: [
+        { resource_id: "qqman", label: "QQ", source: "project" },
+        { resource_id: "myvrm", label: "Mine", source: "project" },
+      ],
+    }),
+  });
+  await app4.m.settingsReady();
+  await app4.boot.fetchInitialProjectData();
+  assert.equal(app4.settings.vrmAvatarId, "qqman");
+});
+
+test("four-level selection order for characters: project pref > project default > account default > catalog first", async () => {
+  // 1. 本專案存的偏好優先於專案預設
+  const storage1 = savedStorage({
+    "avatar.project_id": "proj-A",
+    "avatar.character_id::proj::proj-A": "c2",
+  });
+  const app1 = await openApp(storage1, {
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_character: "c1" },
+      avatar_character: [
+        { resource_id: "c1", label: "C1", source: "project" },
+        { resource_id: "c2", label: "C2", source: "project" },
+      ],
+    }),
+  });
+  await app1.m.settingsReady();
+  await app1.boot.fetchInitialProjectData();
+  assert.equal(app1.settings.characterId, "c2");
+
+  // 2. 專案預設優先於帳號預設
+  const storage2 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app2 = await openApp(storage2, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, character_id: "c1" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_character: "c2" },
+      avatar_character: [
+        { resource_id: "c1", label: "C1", source: "project" },
+        { resource_id: "c2", label: "C2", source: "project" },
+      ],
+    }),
+  });
+  await app2.m.settingsReady();
+  await app2.boot.fetchInitialProjectData();
+  assert.equal(app2.settings.characterId, "c2");
+
+  // 3. 帳號預設優先於清單第一個
+  const storage3 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app3 = await openApp(storage3, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, character_id: "c2" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: {},
+      avatar_character: [
+        { resource_id: "c1", label: "C1", source: "project" },
+        { resource_id: "c2", label: "C2", source: "project" },
+      ],
+    }),
+  });
+  await app3.m.settingsReady();
+  await app3.boot.fetchInitialProjectData();
+  assert.equal(app3.settings.characterId, "c2");
+
+  // 4. 清單第一個 fallback
+  const storage4 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app4 = await openApp(storage4, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, character_id: "" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: {},
+      avatar_character: [
+        { resource_id: "c1", label: "C1", source: "project" },
+        { resource_id: "c2", label: "C2", source: "project" },
+      ],
+    }),
+  });
+  await app4.m.settingsReady();
+  await app4.boot.fetchInitialProjectData();
+  assert.equal(app4.settings.characterId, "c1");
+});
+
+test("four-level selection order for backgrounds: project pref > project default > account default > catalog first", async () => {
+  // 1. 本專案存的偏好優先於專案預設
+  const storage1 = savedStorage({
+    "avatar.project_id": "proj-A",
+    "avatar.background_id::proj::proj-A": "uploaded:bg-B",
+  });
+  const app1 = await openApp(storage1, {
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_background: "bg-A" },
+      avatar_background: [
+        { resource_id: "bg-A", label: "BG-A", source: "project" },
+        { resource_id: "bg-B", label: "BG-B", source: "project" },
+      ],
+    }),
+  });
+  await app1.m.settingsReady();
+  await app1.boot.fetchInitialProjectData();
+  await app1.boot.fetchBackgrounds();
+  assert.equal(app1.settings.backgroundId, "uploaded:bg-B");
+
+  // 2. 專案預設優先於帳號預設
+  const storage2 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app2 = await openApp(storage2, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, background_id: "bg-A" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: { avatar_background: "bg-B" },
+      avatar_background: [
+        { resource_id: "bg-A", label: "BG-A", source: "project" },
+        { resource_id: "bg-B", label: "BG-B", source: "project" },
+      ],
+    }),
+  });
+  await app2.m.settingsReady();
+  await app2.boot.fetchInitialProjectData();
+  await app2.boot.fetchBackgrounds();
+  assert.equal(app2.settings.backgroundId, "uploaded:bg-B");
+
+  // 3. 帳號預設優先於清單第一個
+  const storage3 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app3 = await openApp(storage3, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, background_id: "bg-B" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: {},
+      avatar_background: [
+        { resource_id: "bg-A", label: "BG-A", source: "project" },
+        { resource_id: "bg-B", label: "BG-B", source: "project" },
+      ],
+    }),
+  });
+  await app3.m.settingsReady();
+  await app3.boot.fetchInitialProjectData();
+  await app3.boot.fetchBackgrounds();
+  assert.equal(app3.settings.backgroundId, "uploaded:bg-B");
+
+  // 4. 清單第一個 fallback
+  const storage4 = savedStorage({ "avatar.project_id": "proj-A" });
+  const app4 = await openApp(storage4, {
+    "/api/v1/auth/me": () => json({
+      id: ACCOUNT,
+      role: "user",
+      username: "u",
+      defaults: { ...DEFAULTS, background_id: "" },
+    }),
+    "/api/v1/projects/proj-A/resources": () => json({
+      defaults: {},
+      avatar_background: [
+        { resource_id: "bg-A", label: "BG-A", source: "project" },
+        { resource_id: "bg-B", label: "BG-B", source: "project" },
+      ],
+    }),
+  });
+  await app4.m.settingsReady();
+  await app4.boot.fetchInitialProjectData();
+  await app4.boot.fetchBackgrounds();
+  assert.equal(app4.settings.backgroundId, "uploaded:bg-A");
 });

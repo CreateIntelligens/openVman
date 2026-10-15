@@ -338,6 +338,8 @@ class AccountAccessOption(_StrictModel):
     id: str
     label: str
     provider: str | None = None
+    owner_project_id: str | None = None
+    visibility: str = "global"
 
 
 class AccountAccessOptions(_StrictModel):
@@ -678,6 +680,8 @@ def _resource_option(record: ResourceRecord) -> AccountAccessOption:
             if isinstance(provider, str) and provider.strip()
             else None
         ),
+        owner_project_id=record.owner_project_id,
+        visibility=record.visibility,
     )
 
 
@@ -685,13 +689,31 @@ def _scoped_options(
     runtime: AuthRuntime,
     scope: AdminScope,
     resource_type: ResourceType,
+    admin_user: UserRecord | None = None,
 ) -> list[AccountAccessOption]:
     """List assignable resources of one type, capped by the caller's scope."""
     records = runtime.resources.list_by_type(resource_type)
     if scope.scoped:
         allowed = scope.resource_ids(resource_type)
+        allowed_projects = scope.resource_ids(ResourceType.PROJECT)
         records = [
-            record for record in records if record.resource_id in allowed
+            record for record in records
+            if record.resource_id in allowed
+            and (
+                record.visibility != "project"
+                or (record.owner_project_id and record.owner_project_id in allowed_projects)
+            )
+        ]
+    elif admin_user is not None and admin_user.role is not AccountRole.ROOT:
+        my_projects = {
+            g.resource_id
+            for g in runtime.account_access.list_grants(admin_user.id)
+            if g.resource_type is ResourceType.PROJECT
+        }
+        records = [
+            record for record in records
+            if record.visibility != "project"
+            or (record.owner_project_id and record.owner_project_id in my_projects)
         ]
     return [_resource_option(record) for record in records]
 
@@ -705,20 +727,24 @@ def list_account_access_options(
     # 資源，送出後才被後端擋掉。
     scope = resolve_admin_scope(admin.user, runtime.admin_scopes)
     return AccountAccessOptions(
-        projects=_scoped_options(runtime, scope, ResourceType.PROJECT),
+        projects=_scoped_options(
+            runtime, scope, ResourceType.PROJECT, admin.user
+        ),
         avatar_characters=_scoped_options(
-            runtime, scope, ResourceType.AVATAR_CHARACTER,
+            runtime, scope, ResourceType.AVATAR_CHARACTER, admin.user
         ),
         custom_voices=_scoped_options(
-            runtime, scope, ResourceType.CUSTOM_VOICE,
+            runtime, scope, ResourceType.CUSTOM_VOICE, admin.user
         ),
         avatar_mascots=_scoped_options(
-            runtime, scope, ResourceType.AVATAR_MASCOT,
+            runtime, scope, ResourceType.AVATAR_MASCOT, admin.user
         ),
         avatar_backgrounds=_scoped_options(
-            runtime, scope, ResourceType.AVATAR_BACKGROUND,
+            runtime, scope, ResourceType.AVATAR_BACKGROUND, admin.user
         ),
-        asr_engines=_scoped_options(runtime, scope, ResourceType.ASR_ENGINE),
+        asr_engines=_scoped_options(
+            runtime, scope, ResourceType.ASR_ENGINE, admin.user
+        ),
     )
 
 

@@ -10,6 +10,7 @@ import {
   type TemporaryBatchAudit,
 } from "../api/auth";
 import { fetchProjectKnowledgeSettings } from "../api/knowledge";
+import { fetchProjectPolicy, fetchProjectResources } from "../api/projects";
 import AccessGraphCanvas, {
   type CenterRequest,
 } from "../components/accessGraph/AccessGraphCanvas";
@@ -101,6 +102,45 @@ async function loadLanguageRoutes(
   return routes;
 }
 
+async function loadProjectScopeData(
+  projectIds: string[],
+): Promise<{
+  restrictions: Record<string, boolean>;
+  assignments: Record<string, Array<{ type: "character" | "voice" | "asr"; id: string }>>;
+}> {
+  const [policies, resources] = await Promise.all([
+    Promise.allSettled(projectIds.map((id) => fetchProjectPolicy(id))),
+    Promise.allSettled(projectIds.map((id) => fetchProjectResources(id))),
+  ]);
+  const restrictions: Record<string, boolean> = {};
+  const assignments: Record<string, Array<{ type: "character" | "voice" | "asr"; id: string }>> = {};
+
+  projectIds.forEach((id, index) => {
+    const polRes = policies[index];
+    if (polRes.status === "fulfilled") {
+      const p = polRes.value;
+      const restricted = Boolean(
+        (p.allowed_characters?.length ?? 0) > 0 ||
+        (p.allowed_backgrounds?.length ?? 0) > 0 ||
+        (p.allowed_mascots?.length ?? 0) > 0 ||
+        (p.allowed_tts_voices?.length ?? 0) > 0 ||
+        (p.allowed_asr_engines?.length ?? 0) > 0,
+      );
+      restrictions[id] = restricted;
+    }
+    const resRes = resources[index];
+    if (resRes.status === "fulfilled") {
+      const r = resRes.value;
+      const list: Array<{ type: "character" | "voice" | "asr"; id: string }> = [];
+      (r.avatar_character ?? []).filter((c) => c.source === "assigned").forEach((c) => list.push({ type: "character", id: c.resource_id }));
+      (r.custom_voice ?? []).filter((v) => v.source === "assigned").forEach((v) => list.push({ type: "voice", id: v.resource_id }));
+      (r.asr_engine ?? []).filter((a) => a.source === "assigned").forEach((a) => list.push({ type: "asr", id: a.resource_id }));
+      assignments[id] = list;
+    }
+  });
+  return { restrictions, assignments };
+}
+
 function matches(node: GraphNode, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return false;
@@ -155,6 +195,8 @@ export default function AccessGraph() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<AccessGraphFilters>(loadFilters);
   const [languageRoutes, setLanguageRoutes] = useState<Record<string, LanguageRoutesResult>>({});
+  const [projectRestrictions, setProjectRestrictions] = useState<Record<string, boolean>>({});
+  const [projectAssignments, setProjectAssignments] = useState<Record<string, Array<{ type: "character" | "voice" | "asr"; id: string }>>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [centerRequest, setCenterRequest] = useState<CenterRequest | null>(null);
@@ -179,13 +221,19 @@ export default function AccessGraph() {
     saveFilters(filters);
   }, [filters]);
 
-  // 語言分流不擋圖：先畫圖，讀到再補上標記。
+  // 語言分流與專案限制／指派不擋圖：先畫圖，讀到再補上標記與線。
   useEffect(() => {
     const projectIds = data?.options.projects.map((project) => project.id) ?? [];
     if (projectIds.length === 0) return;
     let cancelled = false;
     void loadLanguageRoutes(projectIds).then((routes) => {
       if (!cancelled) setLanguageRoutes(routes);
+    });
+    void loadProjectScopeData(projectIds).then(({ restrictions, assignments }) => {
+      if (!cancelled) {
+        setProjectRestrictions(restrictions);
+        setProjectAssignments(assignments);
+      }
     });
     return () => {
       cancelled = true;
@@ -205,8 +253,10 @@ export default function AccessGraph() {
         temporaryBatches: data?.temporaryBatches ?? [],
         includeTemporary: true,
         languageRoutes,
+        projectRestrictions,
+        projectAssignments,
       }),
-    [data, languageRoutes],
+    [data, languageRoutes, projectRestrictions, projectAssignments],
   );
 
   // 存下來的專案或資源可能已經刪掉；資料讀到之前先不動。

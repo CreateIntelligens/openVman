@@ -15,7 +15,7 @@ import {
 
 export type AccountType = "formal" | "temporary";
 /** 連線種類；預設線不論來自授權、管理範圍或全權限帳號，都另外算一種。 */
-export type RelationKind = "grant" | "default" | "scope";
+export type RelationKind = "grant" | "default" | "scope" | "assigned";
 
 export interface AccessGraphFilters {
   layers: ResourceLayer[];
@@ -32,7 +32,7 @@ export interface AccessGraphFilters {
 export const RESOURCE_LAYERS: readonly ResourceLayer[] = ["character", "voice", "asr"];
 export const ACCOUNT_ROLES: readonly AccountRole[] = ["root", "admin", "user"];
 export const ACCOUNT_TYPES: readonly AccountType[] = ["formal", "temporary"];
-export const RELATION_KINDS: readonly RelationKind[] = ["grant", "default", "scope"];
+export const RELATION_KINDS: readonly RelationKind[] = ["grant", "default", "scope", "assigned"];
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   formal: "正式",
@@ -43,6 +43,7 @@ export const RELATION_LABELS: Record<RelationKind, string> = {
   grant: "授權",
   default: "預設",
   scope: "管理範圍",
+  assigned: "ROOT 指派",
 };
 
 export const DEFAULT_FILTERS: AccessGraphFilters = {
@@ -72,6 +73,7 @@ export function accountTypeOf(node: GraphNode): AccountType {
 
 /** 一條線屬於哪些種類：授權裡的預設專案同時是「授權」與「預設」。 */
 export function relationsOf(edge: GraphEdge): RelationKind[] {
+  if (edge.kind === "assigned") return ["assigned"];
   if (edge.kind === "full") return ["default"];
   const base: RelationKind = edge.kind === "scope" ? "scope" : "grant";
   return edge.isDefault ? [base, "default"] : [base];

@@ -45,15 +45,18 @@ export interface GraphNode {
   aliases?: string[];
   /** kind 為 project 時的語言分流。 */
   languageRoutes?: LanguageRoutesResult;
+  ownerProjectId?: string | null;
+  resourceSource?: "grant" | "project" | "assigned" | "orphan";
+  hasRestrictions?: boolean;
 }
 
-export type EdgeKind = "grant" | "scope" | "full";
+export type EdgeKind = "grant" | "scope" | "full" | "assigned";
 
 export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  /** grant：授權清單；scope：管理員範圍；full：全權限帳號，只畫出預設那一條。 */
+  /** grant：授權清單；scope：管理員範圍；full：全權限帳號，只畫出預設那一條；assigned：ROOT 指派至專案。 */
   kind: EdgeKind;
   isDefault: boolean;
 }
@@ -79,6 +82,8 @@ export interface BuildAccessGraphInput {
   /** 臨時帳號預設不畫：活動一場就是好幾批，會把正式帳號擠掉。 */
   includeTemporary?: boolean;
   languageRoutes?: Record<string, LanguageRoutesResult | undefined>;
+  projectRestrictions?: Record<string, boolean | undefined>;
+  projectAssignments?: Record<string, Array<{ type: ResourceLayer; id: string }> | undefined>;
 }
 
 export const accountNodeId = (id: string) => `account:${id}`;
@@ -198,6 +203,8 @@ export function buildAccessGraph({
   temporaryBatches = [],
   includeTemporary = false,
   languageRoutes = {},
+  projectRestrictions = {},
+  projectAssignments = {},
 }: BuildAccessGraphInput): AccessGraph {
   const activeLayers = new Set<ResourceLayer>(layers);
   const kinds: ResourceKind[] = [
@@ -233,8 +240,13 @@ export function buildAccessGraph({
         rawId: option.id,
         label: option.label || option.id,
         provider: option.provider ?? null,
-        ...(kind === "project" && languageRoutes[option.id]
-          ? { languageRoutes: languageRoutes[option.id] }
+        ownerProjectId: option.owner_project_id ?? null,
+        resourceSource: option.source ?? "grant",
+        ...(kind === "project"
+          ? {
+              ...(languageRoutes[option.id] ? { languageRoutes: languageRoutes[option.id] } : {}),
+              hasRestrictions: Boolean(projectRestrictions[option.id]),
+            }
           : {}),
       });
     }
@@ -302,6 +314,33 @@ export function buildAccessGraph({
       });
       for (const kind of kinds) {
         linkResources(batchId, kind, grantedIds(batch.grants, kind), "grant", defaultFrom(batch.defaults, kind));
+      }
+    }
+  }
+
+  if (projectAssignments) {
+    for (const [projectId, list] of Object.entries(projectAssignments)) {
+      if (!list) continue;
+      const projNodeId = resourceNodeId("project", projectId);
+      for (const item of list) {
+        if (!activeLayers.has(item.type)) continue;
+        const targetNodeId = resourceNodeId(item.type, item.id);
+        if (!byId.has(targetNodeId)) {
+          addNode({
+            id: targetNodeId,
+            kind: item.type,
+            rawId: item.id,
+            label: item.id,
+            missing: true,
+          });
+        }
+        edges.push({
+          id: `assigned:project:${projectId}->${targetNodeId}`,
+          source: projNodeId,
+          target: targetNodeId,
+          kind: "assigned",
+          isDefault: false,
+        });
       }
     }
   }

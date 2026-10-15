@@ -40,7 +40,7 @@
 
 ### 帶專案查詢
 
-專案可以在後台「專案與權限 → 專案 → 語音設定」限制能用的 ASR 引擎與聲音；實際能用的是帳號授權與專案限制的交集。呼叫 `GET /api/v1/me/capabilities?project_id=<project_id>` 時，`asr` 與 `tts.providers` 會改成這個專案能用的範圍，`asr.effective` 是這個專案會先用的引擎，並多一個 `project_policy`：
+專案可以在後台「專案與權限 → 專案 → 資源設定」限制能用的 ASR 引擎、聲音、人物、背景與小助理；實際能用的是帳號授權、專案專屬與 ROOT 指派資源的聯集。呼叫 `GET /api/v1/me/capabilities?project_id=<project_id>` 時，`asr` 與 `tts.providers` 會改成這個專案能用的範圍，`characters`、`backgrounds`、`mascots` 也會套用專案資源範圍，`asr.effective` 是這個專案會先用的引擎，並多一個 `project_policy`：
 
 ```json
 {
@@ -51,21 +51,51 @@
     "taiwanese_asr_engine": null,
     "allowed_tts_voices": [],
     "default_tts_voice": null,
-    "effective_tts_voice": "<voice-id>"
+    "effective_tts_voice": "<voice-id>",
+    "allowed_characters": [],
+    "default_character_id": null,
+    "allowed_backgrounds": [],
+    "default_background_id": null,
+    "allowed_mascots": [],
+    "default_mascot_id": null
   }
 }
 ```
 
 空陣列代表專案不限制。不帶 `project_id` 時沒有 `project_policy`，其他欄位與上例相同；專案讀不到回 404。之後的 ASR、TTS 請求記得帶同一個 `project_id`，限制才會套用：超出專案範圍的 ASR `provider` 回 403、聲音回 403。
 
+### 查詢專案所有有效資源（推薦）
+
+呼叫 `GET /api/v1/projects/{project_id}/resources` 可直接取得專案解析後的全部可用資源清單與有效預設值（含來源標記）：
+
+```json
+{
+  "avatar_character": [{"resource_id": "char-1", "label": "角色1", "source": "project"}],
+  "avatar_background": [{"resource_id": "bg-1", "label": "背景1", "source": "grant"}],
+  "avatar_mascot": [{"resource_id": "mascot-1", "label": "小助理1", "source": "assigned"}],
+  "custom_voice": [{"resource_id": "voice-1", "label": "Hayley", "source": "grant"}],
+  "asr_engine": [{"resource_id": "breeze", "label": "breeze", "source": "grant"}],
+  "defaults": {
+    "avatar_character": "char-1",
+    "avatar_background": "bg-1",
+    "avatar_mascot": "mascot-1",
+    "custom_voice": "voice-1",
+    "asr_engine": "breeze"
+  }
+}
+```
+
+其中 `source` 包含 `"project"`（專案專屬）、`"assigned"`（ROOT 指派）與 `"grant"`（帳號授權）。
+
 需要個別重新整理時可呼叫：
 
 | 資源 | 帳號授權清單 |
 |---|---|
-| 專案 | `GET /api/v1/projects` |
-| 角色 | `GET /api/v1/avatar` |
-| 吉祥物／小助理 | `GET /api/v1/avatar/mascots` |
-| 背景 | `GET /api/v1/backgrounds` |
+| 專案全部有效資源 | `GET /api/v1/projects/{project_id}/resources` |
+| 專案清單 | `GET /api/v1/projects` |
+| 角色 | `GET /api/v1/avatar`（選填 `project_id`） |
+| 吉祥物／小助理 | `GET /api/v1/avatar/mascots`（選填 `project_id`） |
+| 背景 | `GET /api/v1/backgrounds`（選填 `project_id`） |
 | TTS 供應商及聲音 | `GET /api/v1/tts/providers`（選填 `project_id`） |
 
 `GET /api/v1/characters` 是公開 SDK 清單；取得角色授權以 `/avatar` 或 capabilities 為準。
