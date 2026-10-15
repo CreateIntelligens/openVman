@@ -98,7 +98,7 @@ ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立�
 
 ## 升級與 session
 
-Schema migration 由 Backend 啟動流程管理。升級前應核對 [migration 程式](../../backend/app/auth/database.py) 與目標版本的變更，不把某次升級的版本號當成完整檢查清單。
+Schema migration 由 Backend 啟動流程管理。升級前應核對 migration（SQL 與版本清單在 [schema_migrations.py](../../backend/app/auth/schema_migrations.py)，執行與重建 users 表的步驟在 [database.py](../../backend/app/auth/database.py)）與目標版本的變更，不把某次升級的版本號當成完整檢查清單。
 
 角色、密碼與後台權限變更可能透過 `token_version` 撤銷既有 session；操作後需重新登入。既有兩角色資料庫升級為 ROOT 階層時，符合 `ROOT_USERNAME` 的帳號會原地升級，舊 session 失效。
 
