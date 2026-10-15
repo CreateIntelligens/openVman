@@ -41,6 +41,10 @@ export interface Account extends AccountProfile {
   token_version?: number;
   resource_counts?: Record<string, number>;
   grants?: AccountResourceGrants | null;
+  /** null：升級後還沒登入過。 */
+  last_login_at?: string | null;
+  /** 這個帳號所有 API key（含已撤銷）最近一次被使用的時間。 */
+  api_key_last_used_at?: string | null;
 }
 
 interface WrappedAccount {
@@ -109,6 +113,8 @@ function safeAccount(account: Account): Account {
       ? { ...account.resource_counts }
       : account.resource_counts,
     grants,
+    last_login_at: account.last_login_at,
+    api_key_last_used_at: account.api_key_last_used_at,
   };
 }
 

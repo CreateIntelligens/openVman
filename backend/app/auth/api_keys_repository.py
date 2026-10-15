@@ -246,3 +246,19 @@ class ApiKeyRepository:
                 (row["key_id"],),
             ).fetchone()
         return user, _record(updated)
+
+    def last_used_at_for_user(self, user_id: str) -> str | None:
+        """Latest use across every key the account ever had, revoked ones included.
+
+        後台用來判斷「這個帳號還有沒有在用」：撤銷前的使用紀錄一樣算數。
+        """
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT MAX(last_used_at) AS last_used_at
+                FROM account_api_keys
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ).fetchone()
+        return row["last_used_at"] if row is not None else None

@@ -14,6 +14,12 @@ import AccountAccessFields, {
 } from "../components/accounts/AccountAccessFields";
 import AccountPasswordResetDialog from "../components/accounts/AccountPasswordResetDialog";
 import AccountRoleDialog from "../components/accounts/AccountRoleDialog";
+import AccountRowMenu from "../components/accounts/AccountRowMenu";
+import {
+  formatFullTime,
+  formatRelative,
+  sortByLeastRecentActivity,
+} from "../components/accounts/accountActivity";
 import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
@@ -51,7 +57,7 @@ function getDeleteDisabledReason(account: Account, resourceCount: number): strin
     return "請先移除或轉移帳號擁有的私有資源";
   }
   if (!account.disabled) {
-    return "需先點擊「停用」帳號後才可刪除";
+    return "需先停用帳號才可刪除";
   }
   return undefined;
 }
@@ -80,6 +86,8 @@ export default function Accounts() {
   const [passwordResetAccount, setPasswordResetAccount] = useState<Account | null>(
     null,
   );
+  // 清理帳號時要先看最久沒人用的；預設維持後端的帳號名稱順序。
+  const [sortMode, setSortMode] = useState<"name" | "idle">("name");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,13 +359,25 @@ export default function Accounts() {
         )}
 
         {mainTab === "manage" && (
-          <section className="card mb-6 overflow-hidden">
+          // 不加 overflow-hidden：列上的「更多動作」選單要能超出卡片邊界。
+          <section className="card mb-6">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <div className="flex items-center gap-3">
                 <h2 className="card-title">正式帳號列表</h2>
                 <span className="chip">{accounts.length} 個帳號</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2 text-xs text-content-muted sm:text-sm">
+                  排序
+                  <select
+                    className="input w-auto py-1.5 text-xs sm:text-sm"
+                    value={sortMode}
+                    onChange={(event) => setSortMode(event.target.value as "name" | "idle")}
+                  >
+                    <option value="name">帳號名稱</option>
+                    <option value="idle">最久未使用優先</option>
+                  </select>
+                </label>
                 <button
                   className="btn btn-ghost text-xs sm:text-sm"
                   type="button"
@@ -375,11 +395,12 @@ export default function Accounts() {
                 </button>
               </div>
             </div>
-            {loading ? (
+            {/* 只有第一次載入才換成載入中：操作後重新整理若卸載整個列表，焦點會掉回 body。 */}
+            {loading && accounts.length === 0 ? (
               <div className="p-8 text-center text-sm text-content-muted" role="status">載入帳號中…</div>
             ) : (
               <div className="divide-y divide-border">
-                {accounts.map((account) => {
+                {(sortMode === "idle" ? sortByLeastRecentActivity(accounts) : accounts).map((account) => {
                   const isSelf = account.id === currentAccount?.id;
                   const isFormal = (
                     account.kind ?? account.account_type ?? "formal"
@@ -400,35 +421,16 @@ export default function Accounts() {
                   const editingScope = editingScopeAccountId === account.id;
                   return (
                     <article key={account.id} className="px-5 py-4">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">{account.username}</span>
                             <span className="chip">
                               {account.role === "root" ? "ROOT" : account.role}
                             </span>
-                            {canManage && (
-                              <>
-                                <span className="chip">
-                                  {grantCount > 0
-                                    ? `已授權 ${grantCount} 項`
-                                    : "尚未授權"}
-                                </span>
-                                <span className="chip">
-                                  {account.admin_portal_access
-                                    ? "可進管理後台"
-                                    : "不可進管理後台"}
-                                </span>
-                              </>
-                            )}
                             {isSelf && (
                               <span className="chip border-primary/30 text-primary">
                                 目前帳號
-                              </span>
-                            )}
-                            {account.kiosk && (
-                              <span className="chip border-primary/30 text-primary">
-                                展示機台
                               </span>
                             )}
                             {account.disabled && (
@@ -436,107 +438,149 @@ export default function Accounts() {
                                 已停用
                               </span>
                             )}
+                            {account.kiosk && (
+                              <span className="chip border-primary/30 text-primary">
+                                展示機台
+                              </span>
+                            )}
+                            {canManage && (
+                              <span className="chip" title="已授權的資源項目數">
+                                {grantCount > 0 ? `授權 ${grantCount} 項` : "未授權"}
+                              </span>
+                            )}
+                            {/* 管理員本來就能進後台；只有一般使用者被特別開放時才值得標出來。 */}
+                            {canManage && account.role === "user" && account.admin_portal_access && (
+                              <span className="chip">可進後台</span>
+                            )}
                           </div>
-                          <p className="mt-1 text-xs text-content-subtle">
-                            建立於 {new Date(account.created_at).toLocaleString("zh-TW")}
-                            {resourceCount > 0
-                              ? ` · 私有資源 ${resourceCount} 項`
-                              : ""}
+                          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-content-subtle">
+                            <span>
+                              {account.last_login_at ? (
+                                <>
+                                  最後登入{" "}
+                                  <time
+                                    dateTime={account.last_login_at}
+                                    title={formatFullTime(account.last_login_at)}
+                                  >
+                                    {formatRelative(account.last_login_at)}
+                                  </time>
+                                </>
+                              ) : (
+                                "從未登入"
+                              )}
+                            </span>
+                            {account.api_key_last_used_at && (
+                              <span>
+                                API 最近使用{" "}
+                                <time
+                                  dateTime={account.api_key_last_used_at}
+                                  title={formatFullTime(account.api_key_last_used_at)}
+                                >
+                                  {formatRelative(account.api_key_last_used_at)}
+                                </time>
+                              </span>
+                            )}
+                            <span>
+                              建立於{" "}
+                              <time
+                                dateTime={account.created_at}
+                                title={formatFullTime(account.created_at)}
+                              >
+                                {new Date(account.created_at).toLocaleDateString("zh-TW")}
+                              </time>
+                            </span>
+                            {resourceCount > 0 && <span>私有資源 {resourceCount} 項</span>}
                           </p>
                         </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          {canManage && (
-                            <>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                  className={editingAccess
-                                    ? "btn btn-primary"
-                                    : "btn btn-ghost"}
-                                  type="button"
-                                  aria-expanded={editingAccess}
-                                  onClick={() => setEditingAccountId(
-                                    editingAccess ? null : account.id,
-                                  )}
-                                >
-                                  資源權限
-                                </button>
-                                {canEditScope && (
-                                  <button
-                                    className={editingScope
-                                      ? "btn btn-primary"
-                                      : "btn btn-ghost"}
-                                    type="button"
-                                    aria-expanded={editingScope}
-                                    onClick={() => setEditingScopeAccountId(
-                                      editingScope ? null : account.id,
-                                    )}
-                                  >
-                                    資源上限
-                                  </button>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2 border-l border-border pl-3">
-                                {isRoot && (
-                                  <button
-                                    className="btn btn-ghost"
-                                    type="button"
-                                    onClick={() => setRoleChangeAccount(account)}
-                                  >
-                                    變更角色
-                                  </button>
-                                )}
-                                {isRoot && (
-                                  <button
-                                    className="btn btn-ghost"
-                                    type="button"
-                                    onClick={() => setPasswordResetAccount(account)}
-                                  >
-                                    重設密碼
-                                  </button>
-                                )}
-                                <button
-                                  className="btn btn-ghost"
-                                  type="button"
-                                  onClick={() => void runAction(
-                                    () => setAccountDisabled(account.id, !account.disabled),
-                                    account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
-                                  )}
-                                >
-                                  {account.disabled ? "啟用" : "停用"}
-                                </button>
-                                <button
-                                  className="btn btn-ghost"
-                                  type="button"
-                                  onClick={() => void runAction(
-                                    () => revokeAccountSessions(account.id),
-                                    "撤銷登入階段失敗",
-                                  )}
-                                >
-                                  登出所有裝置
-                                </button>
-                              </div>
-                              <div className="flex items-center border-l border-border pl-3">
-                                <button
-                                  className="btn btn-danger"
-                                  type="button"
-                                  disabled={!account.disabled || resourceCount > 0}
-                                  title={getDeleteDisabledReason(account, resourceCount)}
-                                  onClick={() => {
-                                    if (!window.confirm(
-                                      `確定刪除帳號「${account.username}」？`,
-                                    )) return;
-                                    void runAction(
-                                      () => deleteAccount(account.id),
-                                      "刪除帳號失敗",
-                                    );
-                                  }}
-                                >
-                                  刪除
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        {canManage && (
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                            <button
+                              className={editingAccess ? "btn btn-primary" : "btn btn-ghost"}
+                              type="button"
+                              aria-expanded={editingAccess}
+                              onClick={() => setEditingAccountId(
+                                editingAccess ? null : account.id,
+                              )}
+                            >
+                              資源權限
+                            </button>
+                            <AccountRowMenu
+                              accountName={account.username}
+                              groups={[
+                                {
+                                  id: "settings",
+                                  label: "帳號設定",
+                                  items: [
+                                    // 資源上限只對管理員有意義。
+                                    ...(canEditScope
+                                      ? [{
+                                        id: "scope",
+                                        label: editingScope ? "收起資源上限" : "資源上限",
+                                        onSelect: () => setEditingScopeAccountId(
+                                          editingScope ? null : account.id,
+                                        ),
+                                      }]
+                                      : []),
+                                    ...(isRoot
+                                      ? [
+                                        {
+                                          id: "role",
+                                          label: "變更角色",
+                                          onSelect: () => setRoleChangeAccount(account),
+                                        },
+                                        {
+                                          id: "password",
+                                          label: "重設密碼",
+                                          onSelect: () => setPasswordResetAccount(account),
+                                        },
+                                      ]
+                                      : []),
+                                  ],
+                                },
+                                {
+                                  id: "danger",
+                                  label: "安全與危險",
+                                  items: [
+                                    {
+                                      id: "revoke",
+                                      label: "登出所有裝置",
+                                      onSelect: () => void runAction(
+                                        () => revokeAccountSessions(account.id),
+                                        "撤銷登入階段失敗",
+                                      ),
+                                    },
+                                    {
+                                      id: "disable",
+                                      label: account.disabled ? "啟用" : "停用",
+                                      onSelect: () => void runAction(
+                                        () => setAccountDisabled(account.id, !account.disabled),
+                                        account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
+                                      ),
+                                    },
+                                    {
+                                      id: "delete",
+                                      label: "刪除",
+                                      danger: true,
+                                      disabledReason: getDeleteDisabledReason(
+                                        account,
+                                        resourceCount,
+                                      ),
+                                      onSelect: () => {
+                                        if (!window.confirm(
+                                          `確定刪除帳號「${account.username}」？`,
+                                        )) return;
+                                        void runAction(
+                                          () => deleteAccount(account.id),
+                                          "刪除帳號失敗",
+                                        );
+                                      },
+                                    },
+                                  ],
+                                },
+                              ]}
+                            />
+                          </div>
+                        )}
                       </div>
                       {editingScope && (
                         <AdminScopePanel

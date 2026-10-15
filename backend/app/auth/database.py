@@ -229,6 +229,9 @@ _ADMIN_PORTAL_ACCESS_SCHEMA_VERSION = 7
 _ADMIN_PORTAL_ACCESS_MIGRATION_NAME = "add_admin_portal_access"
 _KIOSK_SCHEMA_VERSION = 16
 _KIOSK_MIGRATION_NAME = "add_users_kiosk"
+# 後台要判斷哪些帳號已經沒人用；升級前沒有紀錄，所以既有帳號一律從 NULL 開始。
+_LAST_LOGIN_SCHEMA_VERSION = 22
+_LAST_LOGIN_MIGRATION_NAME = "add_users_last_login_at"
 _EMBED_KEY_SCHEMA_VERSION = 8
 _EMBED_KEY_MIGRATION_NAME = "embed_keys_and_daily_usage"
 
@@ -598,6 +601,39 @@ class AuthDatabase:
         self._redact_temporary_usernames()
         self._add_admin_portal_access()
         self._add_kiosk_flag()
+        self._add_last_login_at()
+
+    def _add_last_login_at(self) -> None:
+        """Add the nullable last-login timestamp after the ROOT rebuild of users.
+
+        跟 kiosk 一樣不能放進 _MIGRATIONS：ROOT 遷移重建 users 時會丟掉它。
+        """
+        with self.transaction(write=True) as connection:
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_LAST_LOGIN_SCHEMA_VERSION,),
+            ).fetchone()
+            if applied is not None:
+                return
+            user_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "last_login_at" not in user_columns:
+                connection.execute("ALTER TABLE users ADD COLUMN last_login_at TEXT")
+            connection.execute(
+                """
+                INSERT INTO schema_migrations(version, details_json)
+                VALUES (?, ?)
+                """,
+                (
+                    _LAST_LOGIN_SCHEMA_VERSION,
+                    json.dumps(
+                        {"name": _LAST_LOGIN_MIGRATION_NAME},
+                        separators=(",", ":"),
+                    ),
+                ),
+            )
 
     def _add_kiosk_flag(self) -> None:
         """Add the default-off kiosk flag after the ROOT rebuild of users.

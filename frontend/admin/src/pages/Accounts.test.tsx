@@ -1,15 +1,24 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { NavigationProvider } from "../context/NavigationContext";
 import { buildAdminPath, parseAdminRoute } from "../components/app/navigation";
-import { fireEvent, render as renderComponent, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  fireEvent,
+  render as renderComponent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Accounts from "./Accounts";
 import {
   createAccount,
+  deleteAccount,
   fetchAccountAccessOptions,
   listAccounts,
   resetAccountPassword,
+  revokeAccountSessions,
+  setAccountDisabled,
   updateAccountRole,
   type Account,
 } from "../api/auth";
@@ -40,6 +49,10 @@ vi.mock("../context/AuthContext", () => ({
 
 vi.mock("../components/accounts/FormalAccountAccessPanel", () => ({
   default: () => null,
+}));
+
+vi.mock("../components/accounts/AdminScopePanel", () => ({
+  default: () => <section>資源上限面板</section>,
 }));
 
 vi.mock("../components/accounts/TemporaryBatchPanel", () => ({
@@ -293,25 +306,18 @@ describe("Accounts", () => {
     const adminRow = screen.getByText("operator").closest("article");
     const userRow = screen.getByText("viewer").closest("article");
     expect(rootRow?.querySelectorAll("button")).toHaveLength(0);
-    expect(rowButtonLabels(adminRow)).toEqual([
-      // 管理員也能有自己的可用資源，同樣只有 ROOT 設得了。
-      "資源權限",
+    // 每列只攤開一個主要動作，其餘收進「更多動作」選單。
+    expect(rowButtonLabels(adminRow)).toEqual(["資源權限", "更多動作：operator"]);
+    expect(menuGroups(adminRow)).toEqual({
       // ROOT 才看得到的資源上限入口，只對管理員帳號出現。
-      "資源上限",
-      "變更角色",
-      "重設密碼",
-      "停用",
-      "登出所有裝置",
-      "刪除",
-    ]);
-    expect(rowButtonLabels(userRow)).toEqual([
-      "資源權限",
-      "變更角色",
-      "重設密碼",
-      "停用",
-      "登出所有裝置",
-      "刪除",
-    ]);
+      帳號設定: ["資源上限", "變更角色", "重設密碼"],
+      安全與危險: ["登出所有裝置", "停用", "刪除"],
+    });
+    expect(rowButtonLabels(userRow)).toEqual(["資源權限", "更多動作：viewer"]);
+    expect(menuGroups(userRow)).toEqual({
+      帳號設定: ["變更角色", "重設密碼"],
+      安全與危險: ["登出所有裝置", "停用", "刪除"],
+    });
   });
 
   it("keeps ROOT-only controls away from administrators", async () => {
@@ -349,17 +355,16 @@ describe("Accounts", () => {
     // 變更角色／重設密碼仍是 ROOT 專屬，不出現在這裡。
     expect(rowButtonLabels(rowByUsername("delegate"))).toEqual([
       "資源權限",
-      "資源上限",
-      "停用",
-      "登出所有裝置",
-      "刪除",
+      "更多動作：delegate",
     ]);
-    expect(rowButtonLabels(rowByUsername("own-user"))).toEqual([
-      "資源權限",
-      "停用",
-      "登出所有裝置",
-      "刪除",
-    ]);
+    expect(menuGroups(rowByUsername("delegate"))).toEqual({
+      帳號設定: ["資源上限"],
+      安全與危險: ["登出所有裝置", "停用", "刪除"],
+    });
+    // 一般使用者沒有資源上限，帳號設定整組為空就不顯示。
+    expect(menuGroups(rowByUsername("own-user"))).toEqual({
+      安全與危險: ["登出所有裝置", "停用", "刪除"],
+    });
   });
 
   it("lets ROOT pick the target role and blocks a no-op change", async () => {
@@ -510,6 +515,180 @@ describe("Accounts", () => {
       (screen.getByLabelText("再次輸入新密碼") as HTMLInputElement).value,
     ).toBe("");
   });
+
+  describe("row menu", () => {
+    beforeEach(() => {
+      authState.account = { id: "root-a", username: "ai360", role: "root" };
+    });
+
+    it("opens with the first item focused and walks items with the keyboard", async () => {
+      vi.mocked(listAccounts).mockResolvedValue([
+        formalAccount("admin-b", "operator", "admin"),
+      ]);
+      render(<Accounts />);
+      switchToManageTab();
+      const row = (await screen.findByText("operator")).closest("article");
+      const trigger = menuTrigger(row);
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+
+      fireEvent.keyDown(trigger, { key: "ArrowDown" });
+      const menu = within(row as HTMLElement).getByRole("menu");
+      const items = within(menu).getAllByRole("menuitem");
+      expect(trigger.getAttribute("aria-expanded")).toBe("true");
+      await waitFor(() => expect(document.activeElement).toBe(items[0]));
+
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(items[1]);
+      fireEvent.keyDown(menu, { key: "End" });
+      expect(document.activeElement).toBe(items[items.length - 1]);
+      // 到底再往下會繞回第一項。
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(items[0]);
+      fireEvent.keyDown(menu, { key: "ArrowUp" });
+      expect(document.activeElement).toBe(items[items.length - 1]);
+      fireEvent.keyDown(menu, { key: "Home" });
+      expect(document.activeElement).toBe(items[0]);
+
+      fireEvent.keyDown(menu, { key: "Escape" });
+      expect(within(row as HTMLElement).queryByRole("menu")).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("opens on ArrowUp at the last item and closes on an outside click", async () => {
+      vi.mocked(listAccounts).mockResolvedValue([
+        formalAccount("user-b", "viewer", "user"),
+      ]);
+      render(<Accounts />);
+      switchToManageTab();
+      const row = (await screen.findByText("viewer")).closest("article");
+      const trigger = menuTrigger(row);
+
+      fireEvent.keyDown(trigger, { key: "ArrowUp" });
+      const items = within(row as HTMLElement).getAllByRole("menuitem");
+      await waitFor(() => expect(document.activeElement).toBe(items[items.length - 1]));
+
+      // 點選單裡面不會關。
+      fireEvent.pointerDown(within(row as HTMLElement).getByRole("menu"));
+      expect(within(row as HTMLElement).queryByRole("menu")).not.toBeNull();
+      fireEvent.pointerDown(document.body);
+      expect(within(row as HTMLElement).queryByRole("menu")).toBeNull();
+    });
+
+    it("still runs disable, revoke and delete from the menu", async () => {
+      const active = formalAccount("user-b", "viewer", "user");
+      const disabled = { ...formalAccount("user-c", "retired", "user"), disabled: true };
+      vi.mocked(listAccounts).mockResolvedValue([active, disabled]);
+      vi.mocked(setAccountDisabled).mockResolvedValue({ ...active, disabled: true });
+      vi.mocked(revokeAccountSessions).mockResolvedValue(undefined);
+      vi.mocked(deleteAccount).mockResolvedValue(undefined);
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      render(<Accounts />);
+      switchToManageTab();
+      const activeRow = (await screen.findByText("viewer")).closest("article");
+
+      clickRowButton(activeRow, "停用");
+      await waitFor(() => expect(setAccountDisabled).toHaveBeenCalledWith("user-b", true));
+      expect(within(activeRow as HTMLElement).queryByRole("menu")).toBeNull();
+      expect(document.activeElement).toBe(menuTrigger(activeRow));
+
+      clickRowButton(activeRow, "登出所有裝置");
+      await waitFor(() => expect(revokeAccountSessions).toHaveBeenCalledWith("user-b"));
+
+      // 還沒停用的帳號：刪除看得到但不能按，原因直接寫在項目下。
+      const activeMenu = openRowMenu(activeRow);
+      const blockedDelete = within(activeMenu).getByRole("menuitem", { name: /^刪除/ });
+      expect(blockedDelete.getAttribute("aria-disabled")).toBe("true");
+      expect(blockedDelete.textContent).toContain("需先停用帳號才可刪除");
+      fireEvent.click(blockedDelete);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(deleteAccount).not.toHaveBeenCalled();
+      fireEvent.keyDown(activeMenu, { key: "Escape" });
+
+      const disabledRow = rowByUsername("retired");
+      clickRowButton(disabledRow, "啟用");
+      await waitFor(() => expect(setAccountDisabled).toHaveBeenCalledWith("user-c", false));
+      clickRowButton(disabledRow, "刪除");
+      expect(confirm).toHaveBeenCalledWith("確定刪除帳號「retired」？");
+      await waitFor(() => expect(deleteAccount).toHaveBeenCalledWith("user-c"));
+      confirm.mockRestore();
+    });
+
+    it("toggles the admin scope panel from the menu", async () => {
+      vi.mocked(listAccounts).mockResolvedValue([
+        formalAccount("admin-b", "operator", "admin"),
+      ]);
+      render(<Accounts />);
+      switchToManageTab();
+      const row = (await screen.findByText("operator")).closest("article");
+
+      clickRowButton(row, "資源上限");
+      expect(await screen.findByText("資源上限面板")).toBeTruthy();
+      clickRowButton(row, "收起資源上限");
+      expect(screen.queryByText("資源上限面板")).toBeNull();
+    });
+  });
+
+  describe("activity", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ now: new Date("2026-10-15T12:00:00Z"), toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows relative last login, never-logged-in and API key use", async () => {
+      vi.mocked(listAccounts).mockResolvedValue([
+        {
+          ...formalAccount("user-a", "alice", "user", "admin-a"),
+          last_login_at: "2026-10-12T12:00:00Z",
+          api_key_last_used_at: "2026-10-15T09:00:00Z",
+        },
+        { ...formalAccount("user-b", "bob", "user", "admin-a"), last_login_at: null },
+      ]);
+      render(<Accounts />);
+      switchToManageTab();
+
+      const alice = rowByUsername((await screen.findByText("alice")).textContent ?? "");
+      const login = within(alice as HTMLElement).getByText("3 天前");
+      expect(login.tagName).toBe("TIME");
+      expect(login.getAttribute("dateTime")).toBe("2026-10-12T12:00:00Z");
+      expect(login.getAttribute("title")).toBe(
+        new Date("2026-10-12T12:00:00Z").toLocaleString("zh-TW"),
+      );
+      expect(alice?.textContent).toContain("API 最近使用");
+      expect(within(alice as HTMLElement).getByText("3 小時前")).toBeTruthy();
+
+      const bob = rowByUsername("bob");
+      expect(bob?.textContent).toContain("從未登入");
+      expect(bob?.textContent).not.toContain("API 最近使用");
+    });
+
+    it("sorts the least recently used accounts first", async () => {
+      vi.mocked(listAccounts).mockResolvedValue([
+        { ...formalAccount("user-a", "alice", "user"), last_login_at: "2026-10-14T00:00:00Z" },
+        {
+          ...formalAccount("user-b", "bob", "user"),
+          last_login_at: "2026-01-01T00:00:00Z",
+          // API 仍在用，就不算閒置。
+          api_key_last_used_at: "2026-10-15T00:00:00Z",
+        },
+        { ...formalAccount("user-c", "carol", "user"), last_login_at: "2026-05-01T00:00:00Z" },
+        formalAccount("user-d", "dave", "user"),
+      ]);
+      render(<Accounts />);
+      switchToManageTab();
+      await screen.findByText("alice");
+
+      const order = () => Array.from(document.querySelectorAll("article span.font-medium"))
+        .map((element) => element.textContent);
+      expect(order()).toEqual(["alice", "bob", "carol", "dave"]);
+      fireEvent.change(screen.getByLabelText("排序"), { target: { value: "idle" } });
+      expect(order()).toEqual(["dave", "carol", "alice", "bob"]);
+    });
+  });
 });
 
 function formalAccount(
@@ -546,7 +725,7 @@ function formalAccount(
 
 function rowButtonLabels(row: Element | null): string[] {
   return Array.from(row?.querySelectorAll("button") ?? []).map(
-    (button) => button.textContent?.trim() ?? "",
+    (button) => button.getAttribute("aria-label") ?? button.textContent?.trim() ?? "",
   );
 }
 
@@ -558,14 +737,41 @@ function rowByUsername(username: string): Element | null {
   return label.closest("article");
 }
 
+function menuTrigger(row: Element | null): HTMLButtonElement {
+  const trigger = row?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]');
+  if (!trigger) throw new Error("找不到更多動作按鈕");
+  return trigger;
+}
+
+function openRowMenu(row: Element | null): HTMLElement {
+  fireEvent.click(menuTrigger(row));
+  return within(row as HTMLElement).getByRole("menu");
+}
+
+/** 打開選單、讀出各組項目，再關掉，讓斷言不影響後續操作。 */
+function menuGroups(row: Element | null): Record<string, string[]> {
+  const menu = openRowMenu(row);
+  const groups: Record<string, string[]> = {};
+  for (const group of within(menu).getAllByRole("group")) {
+    const heading = document.getElementById(group.getAttribute("aria-labelledby") ?? "");
+    groups[heading?.textContent ?? ""] = within(group)
+      .getAllByRole("menuitem")
+      .map((item) => item.firstElementChild?.textContent?.trim() ?? "");
+  }
+  fireEvent.keyDown(menu, { key: "Escape" });
+  return groups;
+}
+
 function clickRowButton(row: Element | null, label: string): void {
   const button = Array.from(row?.querySelectorAll("button") ?? []).find(
     (candidate) => candidate.textContent?.trim() === label,
   );
-  if (!(button instanceof HTMLButtonElement)) {
-    throw new Error(`找不到操作按鈕：${label}`);
+  if (button instanceof HTMLButtonElement) {
+    fireEvent.click(button);
+    return;
   }
-  fireEvent.click(button);
+  const menu = openRowMenu(row);
+  fireEvent.click(within(menu).getByRole("menuitem", { name: new RegExp(`^${label}`) }));
 }
 
 function switchToManageTab(): void {

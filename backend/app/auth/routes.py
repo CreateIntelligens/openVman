@@ -253,6 +253,9 @@ class AccountProfile(_StrictModel):
 class AdminAccountProfile(AccountProfile):
     resource_counts: dict[str, int]
     grants: AccountResourceGrantsView | None
+    # 後台清理帳號用：None 表示升級後還沒登入過／從沒用過 API key。
+    last_login_at: str | None = None
+    api_key_last_used_at: str | None = None
 
     @classmethod
     def from_record(
@@ -269,6 +272,8 @@ class AdminAccountProfile(AccountProfile):
                 if grant_records
                 else None
             ),
+            last_login_at=user.last_login_at,
+            api_key_last_used_at=runtime.api_keys.last_used_at_for_user(user.id),
         )
 
 
@@ -407,6 +412,7 @@ def _formal_login(
             detail="此帳號沒有進入管理後台的權限",
         )
 
+    runtime.users.record_login(user.id, now=datetime.now(timezone.utc))
     token = runtime.tokens.issue(user)
     _set_session_cookie(response, token, runtime)
     return LoginResponse(
@@ -483,6 +489,7 @@ def _temporary_login(
     except TemporaryCredentialNotFoundError as exc:
         raise HTTPException(status_code=401, detail=_INVALID_CREDENTIALS) from exc
 
+    runtime.users.record_login(user.id, now=now)
     expires_at = datetime.fromisoformat(credential.expires_at or "")
     remaining_seconds = max(1, ceil((expires_at - now).total_seconds()))
     token = runtime.tokens.issue(user, now=now, expires_at=expires_at)

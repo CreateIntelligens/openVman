@@ -84,6 +84,8 @@ class UserRecord:
     # 展示機台：前台登入後一律進訪客模式（藏設定與登出），現場人員輸入本帳號
     # 密碼才能解鎖。只影響前台行為，不是權限，所以切換時不撤銷既有 session。
     kiosk: bool = False
+    # None 表示升級後還沒登入過；只在登入成功時寫，不代表 API key 的使用。
+    last_login_at: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

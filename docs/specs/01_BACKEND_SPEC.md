@@ -530,6 +530,12 @@ Brain Live 的內部 WebSocket 也沿用這些身分標頭及 `X-OpenVMan-User-I
 由既有的 migration 機制（v8）建立。所有設定都掛在金鑰上，不引入新的環境變數。
 
 
+### 帳號最後登入時間（2026-10-15）
+
+- `users.last_login_at`（TEXT，可為 NULL，ISO 8601 UTC），由 migration 22（`add_users_last_login_at`）在 ROOT 重建 `users` 之後補上，跟 `kiosk` 一樣不放進 `_MIGRATIONS`。NULL 表示升級後還沒登入過。
+- 寫入時機只有登入成功：`/api/v1/auth/login`、`/admin-login`、`/temporary-login`、`/admin-temporary-login`。密碼錯、停用、沒有後台權限（403）、臨時批次過期都不寫；不改 `updated_at`、不寫 `auth_audit_events`。改自己密碼（`POST /api/v1/auth/password`）會換發 session 但不算登入。API key 與 Embed key 驗證不寫這欄。
+- 後台帳號 payload（`GET /api/v1/users` 與 `/api/v1/users/...` 各操作的回應）帶 `last_login_at` 與 `api_key_last_used_at`；後者是該帳號所有 API key（含已撤銷）`account_api_keys.last_used_at` 的最大值，沒用過為 `null`。`/api/v1/auth/me` 與登入回應不帶這兩欄。
+
 ### 展示機台帳號與密碼確認（2026-10-06）
 
 - `users.kiosk`（0／1，預設 0）。帳號 payload（`/api/v1/auth/me`、登入與臨時登入回應、`GET /api/v1/users`）帶 `kiosk`；前台據此一律進入訪客模式。

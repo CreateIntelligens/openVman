@@ -352,6 +352,18 @@ class UserRepository:
             raise RepositoryError("updated account could not be reloaded")
         return user
 
+    def record_login(self, user_id: str, *, now: datetime) -> None:
+        """Stamp a successful sign-in without touching updated_at or the audit log.
+
+        updated_at 代表「帳號被改過」，登入不算；每次登入都寫稽核會把表灌爆，
+        而後台只需要最後一次的時間來判斷帳號還有沒有人用。
+        """
+        with self.database.transaction(write=True) as connection:
+            connection.execute(
+                "UPDATE users SET last_login_at = ? WHERE id = ?",
+                (now.isoformat(), user_id),
+            )
+
     def revoke_sessions(
         self,
         user_id: str,

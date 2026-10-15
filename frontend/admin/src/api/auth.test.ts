@@ -117,6 +117,8 @@ describe("cookie auth API", () => {
         created_at: "2026-08-24T00:00:00Z",
         password: "plaintext-must-not-survive",
         password_hash: "bcrypt-must-not-survive",
+        last_login_at: "2026-10-01T08:00:00+00:00",
+        api_key_last_used_at: null,
         defaults: {
           project_id: "project-a",
           character_id: "character-a",
@@ -133,6 +135,9 @@ describe("cookie auth API", () => {
     const accounts = await listAccounts();
 
     expect(accounts[0].role).toBe("root");
+    // 後台清理帳號要用的活動時間不能被白名單過濾掉。
+    expect(accounts[0].last_login_at).toBe("2026-10-01T08:00:00+00:00");
+    expect(accounts[0].api_key_last_used_at).toBeNull();
     expect(
       Object.prototype.hasOwnProperty.call(accounts[0], "password"),
     ).toBe(false);
