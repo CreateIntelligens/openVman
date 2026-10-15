@@ -144,7 +144,11 @@ export default function TtsPreviewPanel() {
               value={provider}
               disabled={loading || busy || !providers.length}
               placeholder="選擇供應商"
-              options={providers.map((item) => ({ value: item.id, label: item.name }))}
+              options={providers.map((item) => ({
+                value: item.id,
+                label: item.name,
+                in_project_scope: item.in_project_scope,
+              }))}
               onChange={(id) => {
                 resetPlaybackState();
                 setProvider(id);
@@ -159,7 +163,15 @@ export default function TtsPreviewPanel() {
               value={voice}
               disabled={loading || busy || !activeProvider}
               placeholder="選擇聲音"
-              options={(activeProvider?.voices || []).map((value) => ({ value, label: value }))}
+              options={(activeProvider?.voices || []).map((value) => {
+                const voiceItem = activeProvider?.voice_items?.find((item) => item.id === value);
+                const inScope = voiceItem ? voiceItem.in_project_scope : activeProvider?.in_project_scope;
+                return {
+                  value,
+                  label: value,
+                  in_project_scope: inScope,
+                };
+              })}
               onChange={(value) => {
                 resetPlaybackState();
                 setVoice(value);

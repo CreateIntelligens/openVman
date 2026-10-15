@@ -17,6 +17,7 @@ import {
 interface Character {
   id: string
   name: string
+  in_project_scope?: boolean
 }
 
 type AvatarRenderMode = '2d' | '3d'
@@ -37,11 +38,13 @@ export interface AvatarBackgroundSummary {
   background_id: string
   label: string
   url: string
+  in_project_scope?: boolean
 }
 
 export interface VrmCharacterSummary {
   id: string
   label: string
+  in_project_scope?: boolean
 }
 
 const props = defineProps<{
@@ -57,7 +60,7 @@ const props = defineProps<{
   ttsVoice: string
   ttsProviders: TtsProvider[]
   /** 這個帳號被授權的語音辨識引擎；空陣列代表不能自選。 */
-  asrEngines: { id: string; label: string }[]
+  asrEngines: { id: string; label: string; in_project_scope?: boolean }[]
   asrProvider: string
   projects: ProjectSummary[]
   currentProjectId: string
@@ -108,6 +111,7 @@ type BackgroundOption = {
   label: string
   url: string
   swatchUrl?: string
+  in_project_scope?: boolean
 }
 
 const builtInBackgroundOptions: { id: BuiltInAvatarBackgroundId; label: string; url: string }[] = [
@@ -150,6 +154,7 @@ const backgroundOptions = computed<BackgroundOption[]>(() => [
     label: background.label,
     url: background.url,
     swatchUrl: background.url,
+    in_project_scope: background.in_project_scope,
   })),
 ])
 
@@ -284,22 +289,28 @@ const characterOptions = computed(() =>
     ...props.characters.map((c) => ({
       value: toOpenVmanCharacterValue(c.id),
       label: `${c.name} · openVman 2D`,
+      in_project_scope: c.in_project_scope,
     })),
     ...props.vrmCharacters.map((v) => ({
       value: toVrmCharacterValue(v.id),
       label: `${v.label} · VRM`,
+      in_project_scope: v.in_project_scope,
     })),
   ]
 )
 
 const ttsProviderOptions = computed(() =>
-  props.ttsProviders.map((p) => ({ value: p.id, label: p.name }))
+  props.ttsProviders.map((p) => ({ value: p.id, label: p.name, in_project_scope: p.in_project_scope }))
 )
 
 // 不再有「預設（依系統設定）」選項：後台的全站預設拔掉了（2026-09-24），沒選過的人
 // 直接顯示實際在用的引擎。在用的那個沒授權給這個帳號時也列出來，選單才不會空白。
 const asrProviderOptions = computed(() => {
-  const options = props.asrEngines.map((e) => ({ value: e.id, label: e.label }))
+  const options = props.asrEngines.map((e) => ({
+    value: e.id,
+    label: e.label,
+    in_project_scope: e.in_project_scope,
+  }))
   const current = props.asrProvider
   if (!current || options.some((o) => o.value === current)) return options
   return [{ value: current, label: ASR_ENGINE_LABELS[current] ?? current }, ...options]
@@ -307,7 +318,20 @@ const asrProviderOptions = computed(() => {
 
 const ttsVoiceOptions = computed(() => {
   if (!activeTtsProvider.value) return []
-  return activeTtsProvider.value.voices.map((v) => ({ value: v, label: v }))
+  const provider = activeTtsProvider.value
+  const voiceItemMap = new Map<string, boolean>()
+  if (provider.voice_items) {
+    for (const item of provider.voice_items) {
+      if (item.in_project_scope !== undefined) {
+        voiceItemMap.set(item.id, item.in_project_scope)
+      }
+    }
+  }
+  return provider.voices.map((v) => ({
+    value: v,
+    label: v,
+    in_project_scope: voiceItemMap.has(v) ? voiceItemMap.get(v) : provider.in_project_scope,
+  }))
 })
 const projectDisabled = computed(() => Boolean(props.disabled) || props.projects.length === 0)
 const personaDisabled = computed(() =>
@@ -516,7 +540,10 @@ function handleDialogClick(event: MouseEvent): void {
                   v-for="option in backgroundOptions"
                   :key="option.id"
                   class="background-option"
-                  :class="{ 'background-option--active': draftBackgroundId === option.id }"
+                  :class="{
+                    'background-option--active': draftBackgroundId === option.id,
+                    'background-option--out-of-scope': option.in_project_scope === false,
+                  }"
                 >
                   <input
                     type="radio"
@@ -529,7 +556,15 @@ function handleDialogClick(event: MouseEvent): void {
                     :class="backgroundSwatchClass(option)"
                     :style="backgroundSwatchStyle(option)"
                   />
-                  <span class="background-option__label">{{ option.label }}</span>
+                  <span class="background-option__content">
+                    <span class="background-option__label">{{ option.label }}</span>
+                    <small
+                      v-if="option.in_project_scope === false"
+                      class="background-option__scope-note"
+                    >
+                      不在專案範圍內，一般使用者無法使用
+                    </small>
+                  </span>
                 </label>
               </div>
               <input

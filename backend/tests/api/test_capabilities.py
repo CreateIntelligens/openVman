@@ -383,7 +383,9 @@ def test_project_id_narrows_asr_and_tts_to_the_project_policy(env):
     # 偏好 r2t2-live 被專案擋掉，改用專案預設。
     assert payload["asr"]["value"] == "r2t2-live"
     assert payload["asr"]["effective"] == "r2t2"
-    assert payload["asr"]["batch"] == [{"id": "r2t2", "configured": False}]
+    assert payload["asr"]["batch"] == [
+        {"id": "r2t2", "configured": False, "in_project_scope": True}
+    ]
     assert payload["asr"]["stream"] == []
     assert {
         provider["id"]: provider["voices"]
@@ -413,8 +415,26 @@ def test_project_id_without_policy_reports_unrestricted_lists(env):
     scoped = env.client.get(
         _PATH, params={"project_id": "project-a"}, headers=_headers(env),
     ).json()
-    assert scoped["asr"] == plain["asr"]
-    assert scoped["tts"] == plain["tts"]
+    plain_asr_with_scope = {
+        **plain["asr"],
+        "batch": [{**item, "in_project_scope": True} for item in plain["asr"]["batch"]],
+        "stream": [{**item, "in_project_scope": True} for item in plain["asr"]["stream"]],
+        "browser": [{**item, "in_project_scope": True} for item in plain["asr"]["browser"]],
+    }
+    assert scoped["asr"] == plain_asr_with_scope
+    plain_tts_with_scope = {
+        "providers": [
+            {
+                **provider,
+                "in_project_scope": True,
+                "voice_items": [
+                    {"id": v, "in_project_scope": True} for v in provider["voices"]
+                ],
+            }
+            for provider in plain["tts"]["providers"]
+        ]
+    }
+    assert scoped["tts"] == plain_tts_with_scope
     assert scoped["project_policy"]["allowed_asr_engines"] == []
     assert scoped["project_policy"]["effective_tts_voice"] == "voice-a"
 

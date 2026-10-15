@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .models import (
+    AccountRole,
     ResourceType,
     ResourceVisibility,
     UserRecord,
@@ -20,6 +21,7 @@ class ProjectResourceEntry:
     resource_id: str
     source: Literal["grant", "project", "assigned"]
     label: str = ""
+    in_project_scope: bool = True
 
 
 def _extract_label(metadata_json: str, default: str) -> str:
@@ -52,7 +54,9 @@ def effective_project_resources(
     policy = runtime.project_policies.get(project_id)
 
     # 1. grant
+    is_root = account is not None and account.role is AccountRole.ROOT
     grant_ids: set[str] = set()
+    in_scope_grant_ids: set[str] = set()
     if account is None:
         # Embed key: 專案有清單時以清單代替帳號授權
         if policy is not None:
@@ -75,6 +79,7 @@ def effective_project_resources(
                 and policy.restricts_mascots
             ):
                 grant_ids = set(policy.allowed_mascots)
+        in_scope_grant_ids = grant_ids
     else:
         accessible_records = list_accessible_resources(
             runtime.resources,
@@ -89,38 +94,44 @@ def effective_project_resources(
         }
         if policy is None:
             grant_ids = accessible_system_public
+            in_scope_grant_ids = accessible_system_public
         else:
             if resource_type is ResourceType.CUSTOM_VOICE and policy.restricts_tts:
-                grant_ids = accessible_system_public & set(
+                in_scope_grant_ids = accessible_system_public & set(
                     policy.allowed_tts_voices
                 )
             elif resource_type is ResourceType.ASR_ENGINE and policy.restricts_asr:
-                grant_ids = accessible_system_public & set(
+                in_scope_grant_ids = accessible_system_public & set(
                     policy.allowed_asr_engines
                 )
             elif (
                 resource_type is ResourceType.AVATAR_CHARACTER
                 and policy.restricts_characters
             ):
-                grant_ids = accessible_system_public & set(
+                in_scope_grant_ids = accessible_system_public & set(
                     policy.allowed_characters
                 )
             elif (
                 resource_type is ResourceType.AVATAR_BACKGROUND
                 and policy.restricts_backgrounds
             ):
-                grant_ids = accessible_system_public & set(
+                in_scope_grant_ids = accessible_system_public & set(
                     policy.allowed_backgrounds
                 )
             elif (
                 resource_type is ResourceType.AVATAR_MASCOT
                 and policy.restricts_mascots
             ):
-                grant_ids = accessible_system_public & set(
+                in_scope_grant_ids = accessible_system_public & set(
                     policy.allowed_mascots
                 )
             else:
+                in_scope_grant_ids = accessible_system_public
+
+            if is_root:
                 grant_ids = accessible_system_public
+            else:
+                grant_ids = in_scope_grant_ids
 
     # 2. project
     project_records = runtime.resources.list_by_owner_project(
@@ -153,11 +164,17 @@ def effective_project_resources(
 
         record = runtime.resources.get(resource_type, rid)
         label = _extract_label(record.metadata_json if record else "{}", rid)
+        in_project_scope = (
+            rid in assigned_ids
+            or rid in project_ids
+            or rid in in_scope_grant_ids
+        )
         entries.append(
             ProjectResourceEntry(
                 resource_id=rid,
                 source=source,
                 label=label,
+                in_project_scope=in_project_scope,
             )
         )
     return entries
@@ -216,6 +233,7 @@ def effective_project_default(
             if acct_val and acct_val in available_ids:
                 return acct_val
 
-    # 3. 可用清單第一個
-    return available_entries[0].resource_id
+    # 3. 可用清單第一個（若有專案範圍內的項目優先採用，避免 ROOT 預設走到清單外項目）
+    in_scope_entries = [e for e in available_entries if e.in_project_scope]
+    return (in_scope_entries or available_entries)[0].resource_id
 

@@ -25,6 +25,7 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     vrmAvatarOptions.value.map((mascot: MascotOption) => ({
       id: mascot.id,
       label: mascot.label,
+      in_project_scope: mascot.in_project_scope,
     })),
   );
   const stageAvatarWidgetSrc = computed(() => {

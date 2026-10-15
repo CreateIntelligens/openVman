@@ -1,10 +1,18 @@
 import { apiFetch, fetchJson, parseErrorMessage } from "./common";
 
+export interface TtsVoiceItem {
+  id: string;
+  name?: string;
+  in_project_scope?: boolean;
+}
+
 export interface TtsProvider {
   id: string;
   name: string;
   default_voice: string;
   voices: string[];
+  voice_items?: TtsVoiceItem[];
+  in_project_scope?: boolean;
 }
 
 export interface SpeechResult {
@@ -12,8 +20,11 @@ export interface SpeechResult {
   fallback?: string;
 }
 
-export async function fetchTtsProviders(): Promise<TtsProvider[]> {
-  return fetchJson<TtsProvider[]>("/api/v1/tts/providers");
+export async function fetchTtsProviders(projectId?: string): Promise<TtsProvider[]> {
+  const url = projectId
+    ? `/api/v1/tts/providers?project_id=${encodeURIComponent(projectId)}`
+    : "/api/v1/tts/providers";
+  return fetchJson<TtsProvider[]>(url);
 }
 
 export interface SpeechPreview {

@@ -109,17 +109,26 @@ async def list_mascots(
         char_entries = effective_project_resources(
             runtime, current.user, project_id, ResourceType.AVATAR_CHARACTER
         )
-        mascot_source_by_id = {e.resource_id: e.source for e in mascot_entries}
-        char_source_by_id = {e.resource_id: e.source for e in char_entries}
-        mascots = [
-            {**mascot, "source": mascot_source_by_id[mascot["mascot_id"]]}
-            for mascot in store.list_mascots()
-            if mascot.get("mascot_id") in mascot_source_by_id
-            and (
-                mascot.get("engine") != VIDEO_ENGINE
-                or mascot.get("character_id") in char_source_by_id
-            )
-        ]
+        mascot_entry_by_id = {e.resource_id: e for e in mascot_entries}
+        char_entry_by_id = {e.resource_id: e for e in char_entries}
+        mascots = []
+        for mascot in store.list_mascots():
+            mid = mascot.get("mascot_id")
+            if mid in mascot_entry_by_id:
+                m_entry = mascot_entry_by_id[mid]
+                if (
+                    mascot.get("engine") != VIDEO_ENGINE
+                    or mascot.get("character_id") in char_entry_by_id
+                ):
+                    c_entry = char_entry_by_id.get(mascot.get("character_id"))
+                    in_scope = m_entry.in_project_scope and (
+                        c_entry.in_project_scope if c_entry else True
+                    )
+                    mascots.append({
+                        **mascot,
+                        "source": m_entry.source,
+                        "in_project_scope": in_scope,
+                    })
         covered = {
             m.get("character_id")
             for m in mascots
@@ -128,13 +137,15 @@ async def list_mascots(
         for character in get_character_store().list_characters():
             char_id = character.get("char_id")
             if (
-                char_id in char_source_by_id
+                char_id in char_entry_by_id
                 and char_id not in covered
                 and character.get("has_video")
                 and character.get("has_data")
             ):
+                c_entry = char_entry_by_id[char_id]
                 item = store.video_mascot_from_character(character)
-                item["source"] = char_source_by_id[char_id]
+                item["source"] = c_entry.source
+                item["in_project_scope"] = c_entry.in_project_scope
                 mascots.append(item)
         return {"mascots": mascots}
 

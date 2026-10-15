@@ -128,12 +128,17 @@ async def list_characters(
         entries = effective_project_resources(
             runtime, current.user, project_id, ResourceType.AVATAR_CHARACTER
         )
-        source_by_id = {e.resource_id: e.source for e in entries}
+        entry_by_id = {e.resource_id: e for e in entries}
         characters = []
         for character in get_store().list_characters():
             cid = character.get("char_id")
-            if cid in source_by_id:
-                characters.append({**character, "source": source_by_id[cid]})
+            if cid in entry_by_id:
+                entry = entry_by_id[cid]
+                characters.append({
+                    **character,
+                    "source": entry.source,
+                    "in_project_scope": entry.in_project_scope,
+                })
         return {"characters": characters}
 
     is_root = current.user.role is AccountRole.ROOT

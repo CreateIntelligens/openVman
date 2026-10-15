@@ -16,7 +16,10 @@ from app import language_routes as language_routes_mod
 from app import voice_policy
 from app.auth import voice_access
 from app.auth.dependencies import CurrentAccount, get_current_account
-from app.auth.models import ProjectPolicyRecord
+from app.auth.models import (
+    AccountRole,
+    ProjectPolicyRecord,
+)
 from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
@@ -89,15 +92,24 @@ class SpeechRequest(BaseModel):
     project_id: str = ""
 
 
-def _cache_scope(project_id: str | None, policy: ProjectPolicyRecord | None) -> str:
+def _cache_scope(
+    project_id: str | None,
+    policy: ProjectPolicyRecord | None,
+    *,
+    is_root: bool = False,
+) -> str:
     """Cache namespace for a request.
 
     同一段文字、同一個聲音在每個專案合成出來都一樣，key 本來就含聲音；但快取存的
     可能是 Edge 備援的結果。有聲音限制的專案備援規則不同（可能禁止 Edge 或指定別
     的 Edge 聲音），所以各自一份，避免拿到別的專案備援出來的聲音。沒限制的專案
-    共用原本的 key，命中率不變。
+    共用原本的 key，命中率不變。ROOT 不受專案清單限制、聲音失敗時也照常退回
+    Edge，用同一個聲音合成出來的結果可能是成員不准用的 Edge 備援，所以 ROOT 在
+    有限制的專案一律另存一份，不論聲音在不在清單內。
     """
     if project_id and policy is not None and policy.restricts_tts:
+        if is_root:
+            return f"project:{project_id}:root"
         return f"project:{project_id}"
     return ""
 
@@ -117,7 +129,13 @@ async def create_speech(
         requested_voice=body.voice,
         project_id=project_id,
     )
-    edge_fallback_voice = voice_access.tts_fallback_voice(runtime, policy)
+    is_root = (
+        current.embed_key is None
+        and getattr(getattr(current, "user", None), "role", None) is AccountRole.ROOT
+    )
+    edge_fallback_voice = voice_access.tts_fallback_voice(
+        runtime, policy, is_root=is_root
+    )
     provider = authorized.provider if authorized else body.provider
     voice = authorized.runtime_key if authorized else body.voice
     svc = _get_service()
@@ -131,7 +149,10 @@ async def create_speech(
 
     if cfg.tts_cache_enabled:
         cache_key = make_cache_key(
-            cleaned_text, voice, provider, scope=_cache_scope(project_id, policy),
+            cleaned_text,
+            voice,
+            provider,
+            scope=_cache_scope(project_id, policy, is_root=is_root),
         )
         cached = await cache_get(cache_key)
         if cached is not None:
@@ -260,7 +281,13 @@ async def tts_stream_endpoint(
         current, body.project_id, language_routes_mod.parse_requested(body.language_routes),
     )
     project_id, policy = voice_policy.request_policy(runtime, current, body.project_id)
-    edge_fallback_voice = voice_access.tts_fallback_voice(runtime, policy)
+    is_root = (
+        current.embed_key is None
+        and getattr(getattr(current, "user", None), "role", None) is AccountRole.ROOT
+    )
+    edge_fallback_voice = voice_access.tts_fallback_voice(
+        runtime, policy, is_root=is_root
+    )
     override = (
         language_routes_mod.taiwanese_tts_provider(body.provider)
         if language_routes_mod.TAIWANESE in routes
@@ -270,9 +297,12 @@ async def tts_stream_endpoint(
     override_voice = ""
     if override and policy is not None and policy.restricts_tts:
         # 專案限制了聲音：台語只能換到清單裡 VoxCPM／CosyVoice 的聲音；清單裡沒有
-        # 就不換，照一般流程用專案允許的聲音唸。
+        # 就不換，照一般流程用專案允許的聲音唸。ROOT 豁免不受限。
         picked = voice_access.project_voice_for_providers(
-            runtime, policy, language_routes_mod.TAIWANESE_TTS_PROVIDERS,
+            runtime,
+            policy,
+            language_routes_mod.TAIWANESE_TTS_PROVIDERS,
+            is_root=is_root,
         )
         override, override_voice = picked if picked else (None, "")
     if override:

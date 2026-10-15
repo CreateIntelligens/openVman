@@ -4,26 +4,26 @@ export function ResourceSourceBadge({
   source,
   ownerProjectId,
 }: {
-  source?: "system" | "project" | "assigned" | "orphan";
+  source?: "system" | "grant" | "project" | "assigned" | "orphan";
   ownerProjectId?: string | null;
 }): ReactNode {
   if (source === "project") {
     return (
-      <span className="inline-flex items-center rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-500">
+      <span className="inline-flex items-center rounded bg-info/10 px-1.5 py-0.5 text-xs font-medium text-info">
         專案專屬{ownerProjectId ? ` · ${ownerProjectId}` : ""}
       </span>
     );
   }
   if (source === "assigned") {
     return (
-      <span className="inline-flex items-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-500">
+      <span className="inline-flex items-center rounded bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success">
         ROOT 指派
       </span>
     );
   }
   if (source === "orphan") {
     return (
-      <span className="inline-flex items-center rounded bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-500">
+      <span className="inline-flex items-center rounded bg-warn/10 px-1.5 py-0.5 text-xs font-medium text-warn">
         孤兒資源
       </span>
     );

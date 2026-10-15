@@ -80,6 +80,7 @@ export interface ProjectResourceItem {
   resource_id: string;
   label: string;
   source: "grant" | "project" | "assigned" | "orphan";
+  in_project_scope?: boolean;
   is_default?: boolean;
   assigned_at?: string | null;
   assigned_by?: string | null;

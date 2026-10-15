@@ -28,7 +28,7 @@ const LINE_STYLES: Record<RelationKind, { className: string; width: number; dash
   grant: { className: "stroke-content-subtle", width: 1.2 },
   default: { className: "stroke-primary", width: 2.6 },
   scope: { className: "stroke-info", width: 1.2, dash: "4 3" },
-  assigned: { className: "stroke-emerald-500", width: 1.6, dash: "4 2" },
+  assigned: { className: "stroke-success", width: 1.6, dash: "4 2" },
 };
 
 export function NodeSymbol({ kind }: { kind: SymbolKey }) {

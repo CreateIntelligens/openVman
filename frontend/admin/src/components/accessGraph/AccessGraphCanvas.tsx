@@ -128,7 +128,7 @@ function fitViewport(
 
 function edgeClass(edge: GraphEdge): string {
   if (edge.isDefault) return "stroke-primary";
-  if (edge.kind === "assigned") return "stroke-emerald-500";
+  if (edge.kind === "assigned") return "stroke-success";
   if (edge.kind === "scope") return "stroke-info";
   return "stroke-content-subtle";
 }
@@ -159,7 +159,7 @@ function NodeShape({ node }: { node: GraphNode }) {
               cx={9}
               cy={-9}
               r={4}
-              className="fill-amber-500 stroke-surface-overlay"
+              className="fill-warn stroke-surface-overlay"
               strokeWidth={1.5}
             />
           )}
@@ -573,7 +573,7 @@ export default function AccessGraphCanvas({
                   >
                     {node.label}
                     {node.hasRestrictions && (
-                      <tspan className="fill-amber-500 font-medium" dx="0.4em">
+                      <tspan className="fill-warn font-medium" dx="0.4em">
                         [限制]
                       </tspan>
                     )}

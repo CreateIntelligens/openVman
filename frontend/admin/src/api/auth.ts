@@ -143,6 +143,7 @@ export interface AccountAccessOption {
   owner_project_id?: string | null;
   visibility?: "global" | "project";
   source?: "grant" | "project" | "assigned" | "orphan";
+  in_project_scope?: boolean;
 }
 
 export interface AccountAccessOptions {

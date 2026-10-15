@@ -30,7 +30,11 @@ export const TtsControls: React.FC<TtsControlsProps> = ({
         <Select
           value={ttsProvider}
           onChange={onTtsProviderChange}
-          options={ttsProviders.map((p) => ({ value: p.id, label: p.name }))}
+          options={ttsProviders.map((p) => ({
+            value: p.id,
+            label: p.name,
+            in_project_scope: p.in_project_scope,
+          }))}
           className="w-[6.875rem] text-xs [&>button]:py-1 [&>button]:h-8"
         />
       </div>
@@ -42,7 +46,15 @@ export const TtsControls: React.FC<TtsControlsProps> = ({
           <Select
             value={ttsVoice || activeTtsProvider.default_voice}
             onChange={onTtsVoiceChange}
-            options={activeTtsProvider.voices.map((v) => ({ value: v, label: v }))}
+            options={activeTtsProvider.voices.map((v) => {
+              const voiceItem = activeTtsProvider.voice_items?.find((item) => item.id === v);
+              const inScope = voiceItem ? voiceItem.in_project_scope : activeTtsProvider.in_project_scope;
+              return {
+                value: v,
+                label: v,
+                in_project_scope: inScope,
+              };
+            })}
             className="w-[8.75rem] text-xs [&>button]:py-1 [&>button]:h-8"
           />
         </div>

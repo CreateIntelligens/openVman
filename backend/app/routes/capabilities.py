@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from app import project_routes, voice_policy
 from app.auth.dependencies import CurrentAccount, get_current_account
-from app.auth.models import ResourceType
+from app.auth.models import AccountRole, ResourceType
 from app.auth.project_resources import effective_project_resources
 from app.auth.resources import (
     ResourceAccess,
@@ -52,11 +52,13 @@ class CapabilityDefaults(BaseModel):
 class ServerAsrCapability(BaseModel):
     id: str
     configured: bool
+    in_project_scope: bool | None = None
 
 
 class BrowserAsrCapability(BaseModel):
     id: str
     configured: None = None
+    in_project_scope: bool | None = None
 
 
 class AsrCapabilities(BaseModel):
@@ -180,6 +182,7 @@ async def get_capabilities(
     tts_providers = await admin.get_tts_providers(
         current, runtime, project_id=project_id,
     )
+    is_root = current.user.role is AccountRole.ROOT
     asr = get_my_asr_provider(current, runtime)
     assigned_asr: list[str] = []
     if project_id:
@@ -191,13 +194,20 @@ async def get_capabilities(
             if e.source in ("project", "assigned")
         ]
     base_allowed = asr.allowed
-    if policy is not None:
+    if policy is not None and not is_root:
         asr_allowed = [engine for engine in base_allowed if policy.allows_asr(engine)]
     else:
         asr_allowed = list(base_allowed)
     for engine in assigned_asr:
         if engine not in asr_allowed:
             asr_allowed.append(engine)
+
+    in_scope_asr: set[str] = set()
+    if project_id:
+        if policy is not None and policy.restricts_asr:
+            in_scope_asr = set(policy.allowed_asr_engines) | set(assigned_asr)
+        else:
+            in_scope_asr = set(asr_allowed)
 
     asr_effective = (
         voice_policy.effective_asr_engine(
@@ -230,23 +240,35 @@ async def get_capabilities(
             allowed=asr_allowed,
             batch=[
                 ServerAsrCapability(
-                    id=engine, configured=engine in batch_configured,
+                    id=engine,
+                    configured=engine in batch_configured,
+                    in_project_scope=(engine in in_scope_asr) if project_id else None,
                 )
                 for engine in asr_allowed if engine in SERVER_ASR_PROVIDERS
             ],
             stream=[
                 ServerAsrCapability(
-                    id=engine, configured=engine in stream_configured,
+                    id=engine,
+                    configured=engine in stream_configured,
+                    in_project_scope=(engine in in_scope_asr) if project_id else None,
                 )
                 for engine in asr_allowed if engine in STREAM_ASR_PROVIDERS
             ],
             browser=[
-                BrowserAsrCapability(id=BROWSER_ASR_PROVIDER)
+                BrowserAsrCapability(
+                    id=BROWSER_ASR_PROVIDER,
+                    in_project_scope=(BROWSER_ASR_PROVIDER in in_scope_asr) if project_id else None,
+                )
                 for engine in asr_allowed if engine == BROWSER_ASR_PROVIDER
             ],
         ),
     )
     payload = capabilities.model_dump(mode="json")
+    if not project_id:
+        for group in ("batch", "stream", "browser"):
+            for item in payload["asr"][group]:
+                item.pop("in_project_scope", None)
+
     if policy is None:
         payload.pop("project_policy")
         return JSONResponse(content=payload)

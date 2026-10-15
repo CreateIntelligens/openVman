@@ -17,6 +17,7 @@ export interface AvatarCharacter {
        has_data: boolean
        size_bytes: number
        updated_at: string
+       in_project_scope?: boolean
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -35,6 +36,7 @@ function normalizeCharacter(raw: unknown): AvatarCharacter | null {
               has_data: rec.has_data === true,
               size_bytes: typeof rec.size_bytes === 'number' ? rec.size_bytes : 0,
               updated_at: typeof rec.updated_at === 'string' ? rec.updated_at : '',
+              in_project_scope: typeof rec.in_project_scope === 'boolean' ? rec.in_project_scope : undefined,
        }
 }
 

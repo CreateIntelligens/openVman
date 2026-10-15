@@ -54,7 +54,12 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
         :class="`mascot-switcher__mark--${currentMascot?.engine ?? '2d'}`"
         aria-hidden="true"
       />
-      <span class="mascot-switcher__label">{{ currentMascot?.label ?? "小助理" }}</span>
+      <span
+        class="mascot-switcher__label"
+        :class="{ 'mascot-switcher__label--out-of-scope': currentMascot?.in_project_scope === false }"
+      >
+        {{ currentMascot?.label ?? "小助理" }}
+      </span>
     </button>
 
     <Transition name="mascot-menu">
@@ -69,7 +74,10 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
           :key="mascot.id"
           type="button"
           class="mascot-switcher__option"
-          :class="{ 'mascot-switcher__option--active': mascot.id === currentMascotId }"
+          :class="{
+            'mascot-switcher__option--active': mascot.id === currentMascotId,
+            'mascot-switcher__option--out-of-scope': mascot.in_project_scope === false,
+          }"
           :aria-selected="mascot.id === currentMascotId"
           role="option"
           @click.stop="selectMascot(mascot.id)"
@@ -82,6 +90,12 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
           <span class="mascot-switcher__option-text">
             <strong>{{ mascot.label }}</strong>
             <small>{{ mascot.engine.toUpperCase() }}</small>
+            <small
+              v-if="mascot.in_project_scope === false"
+              class="mascot-switcher__scope-note"
+            >
+              不在專案範圍內，一般使用者無法使用
+            </small>
           </span>
         </button>
       </div>
@@ -228,6 +242,21 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
   color: var(--text-soft);
   font-size: 0.68rem;
   font-weight: 700;
+}
+
+.mascot-switcher__label--out-of-scope {
+  color: rgb(var(--ov-color-danger));
+}
+
+.mascot-switcher__option--out-of-scope .mascot-switcher__option-text strong {
+  color: rgb(var(--ov-color-danger));
+}
+
+.mascot-switcher__scope-note {
+  display: block;
+  font-size: 0.68rem;
+  color: rgb(var(--ov-color-danger));
+  margin-top: 0.15rem;
 }
 
 .mascot-menu-enter-active,

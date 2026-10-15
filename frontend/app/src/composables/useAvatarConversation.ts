@@ -24,8 +24,9 @@ interface ConversationOptions {
   ttsProviders: Ref<TtsProvider[]>;
   statusToastRef: Ref<InstanceType<typeof StatusToast> | null>;
   fetchPersonas: (projectId: string, options: { syncSelected: boolean }) => Promise<void>;
+  getProjectDefaultVoice?: () => { provider?: string; voice?: string } | string | null | undefined;
 }
-export function useAvatarConversation({ settings, stage, languageRoutes, turnTiming, ttsProviders, statusToastRef, fetchPersonas }: ConversationOptions) {
+export function useAvatarConversation({ settings, stage, languageRoutes, turnTiming, ttsProviders, statusToastRef, fetchPersonas, getProjectDefaultVoice }: ConversationOptions) {
   const { wasm, fatalError, rendererDisabled, bootstrapRenderer,
     driveStageAvatarMouth, stopStageAvatarMouth } = stage;
   const isStarted = ref(false);
@@ -101,6 +102,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
 
   const ttsStreamer = useTtsStreamer({
     ttsProviders: () => ttsProviders.value,
+    getProjectDefaultVoice,
     onFirstAudio: () => {
       turnTiming.mark("first_audio");
       ttsPending.value = false;
@@ -128,6 +130,11 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     },
     onFallback: (fallback) => {
       statusToastRef.value?.show(fallback.message);
+      if (fallback.reason === "project_scope_forbidden" && replySpeakOptions) {
+        if (fallback.provider) replySpeakOptions.provider = fallback.provider;
+        const voiceName = fallback.message.replace(/^這個聲音在本專案不可用，已改用\s*/, "").trim();
+        if (voiceName) replySpeakOptions.voice = voiceName;
+      }
     },
   });
   function showSubtitle(text: string): void {

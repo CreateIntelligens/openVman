@@ -37,14 +37,22 @@ type SpeakOptions = {
   voice?: string;
   /** 併入串流請求的欄位，例如 project_id、language_routes（台語分流時後端改用 VoxCPM）。 */
   extraBody?: Record<string, string>;
+  _retried403?: boolean;
 };
 type TtsBodyBuilder = (text: string, opts: SpeakOptions) => Record<string, string>;
+
+export interface TtsVoiceItem {
+  id: string;
+  in_project_scope?: boolean;
+}
 
 export interface TtsProvider {
   id: string;
   name: string;
   default_voice: string;
   voices: string[];
+  in_project_scope?: boolean;
+  voice_items?: TtsVoiceItem[];
 }
 
 export interface TtsStreamerOptions {
@@ -70,6 +78,8 @@ export interface TtsStreamerOptions {
   shouldUseStream?: (provider: string) => boolean;
   /** Available backend TTS providers, used to route auto mode to IndexTTS streaming. */
   ttsProviders?: () => TtsProvider[];
+  /** Optional project default voice or getter to retrieve it for 403 fallback. */
+  getProjectDefaultVoice?: () => { provider?: string; voice?: string } | string | null | undefined;
   /** Build the request body for the streaming endpoint. */
   buildStreamBody?: TtsBodyBuilder;
   /** Build the request body for the speech endpoint. */
@@ -182,6 +192,57 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
           signal: abort.signal,
         },
       );
+
+      if (response.status === 403) {
+        let fallbackVoice = "";
+        let fallbackProvider = "";
+        const def = options.getProjectDefaultVoice?.();
+        if (typeof def === "string" && def) {
+          fallbackVoice = def;
+        } else if (def && typeof def === "object") {
+          fallbackVoice = def.voice ?? "";
+          fallbackProvider = def.provider ?? "";
+        }
+
+        const providers = options.ttsProviders?.() ?? [];
+        if (!fallbackVoice) {
+          const inScopeProvider = providers.find((p) => p.in_project_scope !== false);
+          if (inScopeProvider) {
+            const inScopeVoice =
+              inScopeProvider.voice_items?.find((vi) => vi.in_project_scope !== false)?.id ??
+              inScopeProvider.default_voice ??
+              inScopeProvider.voices[0];
+            if (inScopeVoice) {
+              fallbackVoice = inScopeVoice;
+              fallbackProvider = inScopeProvider.id;
+            }
+          }
+        } else if (!fallbackProvider) {
+          const found = providers.find(
+            (p) =>
+              p.voices.includes(fallbackVoice) ||
+              p.voice_items?.some((vi) => vi.id === fallbackVoice),
+          );
+          if (found) fallbackProvider = found.id;
+        }
+
+        const currentVoice = opts.voice ?? opts.character ?? "";
+        if (fallbackVoice && currentVoice !== fallbackVoice && !opts._retried403) {
+          const message = `這個聲音在本專案不可用，已改用 ${fallbackVoice}`;
+          options.onFallback?.({
+            provider: fallbackProvider || provider,
+            reason: "project_scope_forbidden",
+            message,
+          });
+          return await speak(text, {
+            ...opts,
+            voice: fallbackVoice,
+            character: fallbackVoice,
+            provider: fallbackProvider || provider,
+            _retried403: true,
+          });
+        }
+      }
 
       if (!response.ok) {
         throw new Error(`TTS request failed: ${response.status} ${response.statusText}`);

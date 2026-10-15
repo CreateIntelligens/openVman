@@ -392,12 +392,20 @@ def test_tts_default_prefers_project_then_account_then_list(env):
 
 def test_tts_policy_binds_unrestricted_admins_too(env):
     _policy(env, allowed_tts_voices=["cosy-a"])
-    admin = CurrentAccount(user=env.root, transport=AuthTransport.BEARER)
+    admin_user = env.runtime.users.create(
+        username="unrestricted-admin", password_hash="unused", role=AccountRole.ADMIN,
+        created_by=env.root.id,
+    )
+    admin = CurrentAccount(user=admin_user, transport=AuthTransport.BEARER)
     assert _resolve(env, admin).resource_id == "cosy-a"
     with pytest.raises(HTTPException) as caught:
         _resolve(env, admin, voice="index-a")
     assert caught.value.status_code == 403
     assert _resolve(env, admin, project_id=None) is None
+
+    # ROOT 豁免不受專案清單限制
+    root = CurrentAccount(user=env.root, transport=AuthTransport.BEARER)
+    assert _resolve(env, root, voice="index-a").resource_id == "index-a"
 
 
 def test_embed_inherits_project_voice_policy(env):

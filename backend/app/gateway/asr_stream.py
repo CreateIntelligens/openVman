@@ -46,7 +46,12 @@ from app import language_routes as language_routes_mod
 from app.asr_glossary import project_asr_prompt, project_asr_vocabulary
 from app.auth.asr_selection import asr_user_choices, permitted_asr_preference
 from app.auth.dependencies import CurrentAccount, authenticate_websocket
-from app.auth.models import ProjectPolicyRecord, ResourceType, is_at_least_admin
+from app.auth.models import (
+    AccountRole,
+    ProjectPolicyRecord,
+    ResourceType,
+    is_at_least_admin,
+)
 from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import get_auth_runtime
 from app.config import TTSRouterConfig, get_tts_config
@@ -199,19 +204,23 @@ def _allowed(
     )
     assigned_or_project = _assigned_or_project_asr(current, p_id)
 
+    is_root = (
+        current.embed_key is None
+        and getattr(getattr(current, "user", None), "role", None) is AccountRole.ROOT
+    )
     if current.embed_key is None:
         stored = runtime.account_access.get_asr_provider(current.user.id)
         if stored and stored in assigned_or_project and stored in _STREAM_ENGINES:
             return stored
         chosen = permitted_asr_preference(runtime, current.user, stored)
-        if chosen and (policy is None or policy.allows_asr(chosen)):
+        if chosen and (is_root or policy is None or policy.allows_asr(chosen)):
             return chosen if chosen in _STREAM_ENGINES else ""
     if policy is None:
         return ""
     default = policy.default_asr_engine
     if not default or default not in _STREAM_ENGINES:
         return ""
-    if default in assigned_or_project:
+    if default in assigned_or_project or is_root:
         return default
     if not policy.allows_asr(default):
         return ""
@@ -242,9 +251,13 @@ def _engine_for(
     assigned_or_project = _assigned_or_project_asr(current, p_id)
     if requested in assigned_or_project:
         return requested
+    is_root = (
+        current.embed_key is None
+        and getattr(getattr(current, "user", None), "role", None) is AccountRole.ROOT
+    )
     # 專案限制連管理者也要遵守：管理者能試任何串流引擎，是帳號授權層的例外，
-    # 不是專案層的。
-    if policy is not None and not policy.allows_asr(requested):
+    # 不是專案層的。ROOT 豁免專案限制。
+    if not is_root and policy is not None and not policy.allows_asr(requested):
         return ""
     if is_at_least_admin(getattr(current.user, "role", "user")):
         return requested

@@ -7,6 +7,10 @@ const api = vi.hoisted(() => ({
   fetchProjectPolicy: vi.fn(),
   saveProjectPolicy: vi.fn(),
   fetchAccountAccessOptions: vi.fn(),
+  getCurrentAccount: vi.fn(),
+  fetchProjectResources: vi.fn(),
+  assignProjectResource: vi.fn(),
+  unassignProjectResource: vi.fn(),
 }));
 
 vi.mock("../../api/projects", async () => {
@@ -15,12 +19,19 @@ vi.mock("../../api/projects", async () => {
     ...actual,
     fetchProjectPolicy: api.fetchProjectPolicy,
     saveProjectPolicy: api.saveProjectPolicy,
+    fetchProjectResources: api.fetchProjectResources,
+    assignProjectResource: api.assignProjectResource,
+    unassignProjectResource: api.unassignProjectResource,
   };
 });
 
 vi.mock("../../api/auth", async () => {
   const actual = await vi.importActual<typeof import("../../api/auth")>("../../api/auth");
-  return { ...actual, fetchAccountAccessOptions: api.fetchAccountAccessOptions };
+  return {
+    ...actual,
+    fetchAccountAccessOptions: api.fetchAccountAccessOptions,
+    getCurrentAccount: api.getCurrentAccount,
+  };
 });
 
 const UNRESTRICTED = {
@@ -59,6 +70,17 @@ describe("ProjectPolicyDialog", () => {
     vi.clearAllMocks();
     api.fetchProjectPolicy.mockResolvedValue(UNRESTRICTED);
     api.saveProjectPolicy.mockImplementation(async (_id, policy) => ({ ...UNRESTRICTED, ...policy }));
+    api.getCurrentAccount.mockResolvedValue({ id: "admin-1", username: "admin", role: "admin" });
+    api.fetchProjectResources.mockResolvedValue({
+      project_id: "proj-a",
+      avatar_character: [],
+      avatar_background: [],
+      avatar_mascot: [],
+      custom_voice: [],
+      asr_engine: [],
+    });
+    api.assignProjectResource.mockResolvedValue({});
+    api.unassignProjectResource.mockResolvedValue({});
     api.fetchAccountAccessOptions.mockResolvedValue({
       projects: [],
       avatar_characters: [
@@ -141,5 +163,196 @@ describe("ProjectPolicyDialog", () => {
     renderDialog();
     fireEvent.click(await screen.findByRole("button", { name: "儲存" }));
     expect((await screen.findByRole("alert")).textContent).toContain("default_tts_voice");
+  });
+
+  it("renders assignment section as read-only for non-ROOT admin", async () => {
+    api.getCurrentAccount.mockResolvedValue({ id: "admin-1", username: "admin", role: "admin" });
+    api.fetchProjectResources.mockResolvedValue({
+      project_id: "proj-a",
+      avatar_character: [
+        { resource_id: "c-assigned-1", label: "特派角色 1", source: "assigned", in_project_scope: true },
+      ],
+      avatar_background: [],
+      avatar_mascot: [],
+      custom_voice: [],
+      asr_engine: [],
+    });
+
+    renderDialog();
+    expect(await screen.findByText("唯讀（僅 ROOT 可編輯）")).toBeTruthy();
+    expect(screen.getByText("c-assigned-1")).toBeTruthy();
+    expect(screen.getAllByText("特派角色 1").length).toBeGreaterThan(0);
+    expect(screen.getByText("ROOT 指派")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "解除指派" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "指派至專案" })).toBeNull();
+    expect(screen.queryByLabelText("指派類型")).toBeNull();
+  });
+
+  it("allows ROOT to assign and unassign resources with correct resource_type values", async () => {
+    api.getCurrentAccount.mockResolvedValue({ id: "root-1", username: "root", role: "root" });
+    api.fetchProjectResources.mockResolvedValue({
+      project_id: "proj-a",
+      avatar_character: [
+        { resource_id: "0713", label: "角色 0713", source: "assigned", in_project_scope: true },
+      ],
+      avatar_background: [],
+      avatar_mascot: [],
+      custom_voice: [],
+      asr_engine: [],
+    });
+
+    renderDialog();
+    expect(await screen.findByText("ROOT 資源指派（將全域資源指派給此專案）")).toBeTruthy();
+    expect(screen.queryByText("唯讀（僅 ROOT 可編輯）")).toBeNull();
+
+    // 驗證類型選項符合後端定義
+    const typeSelect = screen.getByLabelText("指派類型") as HTMLSelectElement;
+    expect(Array.from(typeSelect.options).map((o) => o.value)).toEqual([
+      "avatar_character",
+      "avatar_background",
+      "avatar_mascot",
+      "custom_voice",
+      "asr_engine",
+    ]);
+
+    // 解除指派
+    fireEvent.click(screen.getByRole("button", { name: "解除指派" }));
+    await waitFor(() => {
+      expect(api.unassignProjectResource).toHaveBeenCalledWith("proj-a", "avatar_character", "0713");
+    });
+
+    // 指派聲音 (custom_voice)
+    fireEvent.change(typeSelect, { target: { value: "custom_voice" } });
+    const voiceResourceSelect = screen.getByLabelText("指派資源");
+    fireEvent.change(voiceResourceSelect, { target: { value: "hayley" } });
+    fireEvent.click(screen.getByRole("button", { name: "指派至專案" }));
+    await waitFor(() => {
+      expect(api.assignProjectResource).toHaveBeenCalledWith("proj-a", "custom_voice", "hayley");
+    });
+
+    // 指派 ASR 引擎 (asr_engine)
+    fireEvent.change(typeSelect, { target: { value: "asr_engine" } });
+    const asrResourceSelect = screen.getByLabelText("指派資源");
+    fireEvent.change(asrResourceSelect, { target: { value: "breeze" } });
+    fireEvent.click(screen.getByRole("button", { name: "指派至專案" }));
+    await waitFor(() => {
+      expect(api.assignProjectResource).toHaveBeenCalledWith("proj-a", "asr_engine", "breeze");
+    });
+
+    // 指派人物 (avatar_character)
+    fireEvent.change(typeSelect, { target: { value: "avatar_character" } });
+    const charResourceSelect = screen.getByLabelText("指派資源");
+    fireEvent.change(charResourceSelect, { target: { value: "0714" } });
+    fireEvent.click(screen.getByRole("button", { name: "指派至專案" }));
+    await waitFor(() => {
+      expect(api.assignProjectResource).toHaveBeenCalledWith("proj-a", "avatar_character", "0714");
+    });
+
+    // 指派背景 (avatar_background)
+    fireEvent.change(typeSelect, { target: { value: "avatar_background" } });
+    const bgResourceSelect = screen.getByLabelText("指派資源");
+    fireEvent.change(bgResourceSelect, { target: { value: "bg-office" } });
+    fireEvent.click(screen.getByRole("button", { name: "指派至專案" }));
+    await waitFor(() => {
+      expect(api.assignProjectResource).toHaveBeenCalledWith("proj-a", "avatar_background", "bg-office");
+    });
+
+    // 指派小助理 (avatar_mascot)
+    fireEvent.change(typeSelect, { target: { value: "avatar_mascot" } });
+    const mascotResourceSelect = screen.getByLabelText("指派資源");
+    fireEvent.change(mascotResourceSelect, { target: { value: "qqman" } });
+    fireEvent.click(screen.getByRole("button", { name: "指派至專案" }));
+    await waitFor(() => {
+      expect(api.assignProjectResource).toHaveBeenCalledWith("proj-a", "avatar_mascot", "qqman");
+    });
+  });
+
+  it("includes /projects/{id}/resources in options so non-ROOT admins can set project's own resources as project defaults", async () => {
+    api.getCurrentAccount.mockResolvedValue({ id: "admin-1", username: "admin", role: "admin" });
+    api.fetchProjectResources.mockResolvedValue({
+      project_id: "proj-a",
+      avatar_character: [
+        { resource_id: "proj-char-local", label: "專案自訂角色", source: "project", in_project_scope: true },
+      ],
+      avatar_background: [
+        { resource_id: "proj-bg-local", label: "專案自訂背景", source: "project", in_project_scope: true },
+      ],
+      avatar_mascot: [
+        { resource_id: "proj-mascot-local", label: "專案自訂小助理", source: "project", in_project_scope: true },
+      ],
+      custom_voice: [
+        { resource_id: "proj-voice-assigned", label: "專案指派聲音", source: "assigned", in_project_scope: true },
+      ],
+      asr_engine: [],
+    });
+
+    renderDialog();
+    expect(await screen.findByText("允許的虛擬人物")).toBeTruthy();
+
+    // 檢查預設角色下拉選單包含專案自訂角色
+    const charSelect = screen.getByLabelText("預設人物") as HTMLSelectElement;
+    expect(Array.from(charSelect.options).map((o) => o.value)).toContain("proj-char-local");
+    fireEvent.change(charSelect, { target: { value: "proj-char-local" } });
+
+    // 即使勾選了其他角色形成允許清單，專案資源不會被 keepInside 清除
+    fireEvent.click(screen.getByLabelText("角色 0713"));
+    expect(charSelect.value).toBe("proj-char-local");
+
+    // 檢查預設背景下拉選單包含專案背景
+    const bgSelect = screen.getByLabelText("預設背景") as HTMLSelectElement;
+    expect(Array.from(bgSelect.options).map((o) => o.value)).toContain("proj-bg-local");
+    fireEvent.change(bgSelect, { target: { value: "proj-bg-local" } });
+
+    // 檢查預設小助理下拉選單包含專案小助理
+    const mascotSelect = screen.getByLabelText("預設小助理") as HTMLSelectElement;
+    expect(Array.from(mascotSelect.options).map((o) => o.value)).toContain("proj-mascot-local");
+    fireEvent.change(mascotSelect, { target: { value: "proj-mascot-local" } });
+
+    // 檢查預設聲音包含指派聲音
+    const voiceSelect = screen.getByLabelText("預設聲音") as HTMLSelectElement;
+    expect(Array.from(voiceSelect.options).map((o) => o.value)).toContain("proj-voice-assigned");
+    fireEvent.change(voiceSelect, { target: { value: "proj-voice-assigned" } });
+
+    // 儲存並驗證送出的 defaults
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+    await waitFor(() => {
+      expect(api.saveProjectPolicy).toHaveBeenCalledWith("proj-a", expect.objectContaining({
+        default_character_id: "proj-char-local",
+        default_background_id: "proj-bg-local",
+        default_mascot_id: "proj-mascot-local",
+        default_tts_voice: "proj-voice-assigned",
+        allowed_characters: ["0713"],
+      }));
+    });
+  });
+
+  it("displays items with in_project_scope === false with danger style and scope note", async () => {
+    api.getCurrentAccount.mockResolvedValue({ id: "root-1", username: "root", role: "root" });
+    api.fetchAccountAccessOptions.mockResolvedValue({
+      projects: [],
+      avatar_characters: [
+        { id: "0713", label: "角色 0713", in_project_scope: false },
+        { id: "0714", label: "角色 0714", in_project_scope: true },
+      ],
+      avatar_backgrounds: [],
+      avatar_mascots: [],
+      custom_voices: [],
+      asr_engines: [],
+    });
+
+    renderDialog();
+    expect(await screen.findByText("允許的虛擬人物")).toBeTruthy();
+
+    // 在勾選清單中應出現提示與 text-danger
+    const checkbox = screen.getByLabelText(/角色 0713/);
+    const outOfScopeLabel = checkbox.closest("label");
+    expect(outOfScopeLabel?.className).toContain("text-danger");
+    expect(screen.getAllByText("（不在專案範圍內，一般使用者無法使用）").length).toBeGreaterThan(0);
+
+    // 在預設選單中選擇該項目時，顯示說明與 text-danger
+    const charSelect = screen.getByLabelText("預設人物") as HTMLSelectElement;
+    fireEvent.change(charSelect, { target: { value: "0713" } });
+    expect(charSelect.className).toContain("text-danger");
+    expect(screen.getByText("不在專案範圍內，一般使用者無法使用")).toBeTruthy();
   });
 });

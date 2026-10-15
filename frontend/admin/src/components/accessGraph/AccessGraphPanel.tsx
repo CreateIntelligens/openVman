@@ -356,9 +356,9 @@ function ProjectResourcesSection({ projectId }: { projectId: string }) {
   const sourceChip = (source: string) => {
     switch (source) {
       case "project":
-        return <span className="rounded bg-primary/10 text-primary px-1.5 py-0.5 text-xs font-medium">專案專屬</span>;
+        return <span className="rounded bg-info/10 text-info px-1.5 py-0.5 text-xs font-medium">專案專屬</span>;
       case "assigned":
-        return <span className="rounded bg-amber-500/10 text-amber-500 px-1.5 py-0.5 text-xs font-medium">ROOT 指派</span>;
+        return <span className="rounded bg-success/10 text-success px-1.5 py-0.5 text-xs font-medium">ROOT 指派</span>;
       case "grant":
         return <span className="rounded bg-surface-sunken text-content-muted px-1.5 py-0.5 text-xs font-medium">帳號授權</span>;
       default:

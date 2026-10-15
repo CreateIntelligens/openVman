@@ -32,12 +32,16 @@ const AUTH_WHITELIST = [
   "/api/v1/auth/temporary-login",
 ]
 
-// 單一資產沒被授權（403）只代表這個檔案不能用，不代表整個帳號沒權限。
-// 讓它觸發全域 forbidden 會把整頁換成「權限不足」，人物就再也不會出現。
-const ASSET_PATH_PREFIXES = [
+// 單一資產、合成語音與辨識的 403 只代表「這個檔案／這個聲音或引擎在本專案不能用」，
+// 不代表整個帳號沒權限；讓它觸發全域 forbidden 會把整頁換成「權限不足」。
+// 語音那幾條由呼叫端自己退回專案預設並提示。其餘 403 照舊換成整頁。
+const LOCAL_FORBIDDEN_PREFIXES = [
   "/static/characters/",
   "/static/mascots/",
   "/static/backgrounds/",
+  "/api/v1/tts/",
+  "/v1/audio/speech",
+  "/api/v1/asr/",
 ]
 
 function requestPath(input: RequestInfo | URL): string {
@@ -48,17 +52,21 @@ function requestPath(input: RequestInfo | URL): string {
       : input.url
 }
 
-function isAuthEndpoint(input: RequestInfo | URL): boolean {
+function normalizePath(input: RequestInfo | URL): string {
   const url = requestPath(input)
-  return AUTH_WHITELIST.some((path) => url.includes(path))
+  return url.startsWith("http")
+    ? new URL(url).pathname
+    : url.split("?")[0]
 }
 
-function isAssetRequest(input: RequestInfo | URL): boolean {
-  const url = requestPath(input)
-  const path = url.startsWith("http")
-    ? new URL(url).pathname
-    : url
-  return ASSET_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))
+function isAuthEndpoint(input: RequestInfo | URL): boolean {
+  const path = normalizePath(input)
+  return AUTH_WHITELIST.some((endpoint) => path === endpoint || path.startsWith(`${endpoint}/`))
+}
+
+function isLocalForbidden(input: RequestInfo | URL): boolean {
+  const path = normalizePath(input)
+  return LOCAL_FORBIDDEN_PREFIXES.some((prefix) => path.startsWith(prefix))
 }
 
 export async function apiFetch(
@@ -68,7 +76,7 @@ export async function apiFetch(
   const response = await fetch(input, { ...init, credentials: "include" })
   if (!isAuthEndpoint(input)) {
     if (response.status === 401) unauthorizedHandler?.()
-    if (response.status === 403 && !isAssetRequest(input)) forbiddenHandler?.()
+    if (response.status === 403 && !isLocalForbidden(input)) forbiddenHandler?.()
   }
   return response
 }

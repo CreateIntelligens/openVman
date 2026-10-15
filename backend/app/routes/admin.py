@@ -12,7 +12,12 @@ from app.auth.dependencies import (
     get_current_account,
     require_root,
 )
-from app.auth.models import AccountType, ResourceType, is_at_least_admin
+from app.auth.models import (
+    AccountRole,
+    AccountType,
+    ResourceType,
+    is_at_least_admin,
+)
 from app.auth.resources import resolve_admin_scope
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.voice_access import embed_tts_providers, scoped_tts_providers
@@ -289,7 +294,8 @@ async def get_tts_providers(
         ):
             has_project_override = True
 
-    if not (
+    # ROOT 帶專案時要拿到已註冊的聲音與 in_project_scope 標記，完整型錄沒有這個欄位。
+    if (bool(_project) and current.user.role is AccountRole.ROOT) or not (
         current.user.account_type is AccountType.FORMAL
         and is_at_least_admin(current.user.role)
     ) or resolve_admin_scope(current.user, runtime.admin_scopes).scoped or (

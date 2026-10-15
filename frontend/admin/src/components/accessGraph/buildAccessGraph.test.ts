@@ -210,6 +210,60 @@ describe("buildAccessGraph", () => {
   it("treats a user with project grants as grant-based", () => {
     expect(accessModeOf(alice, undefined)).toBe("grants");
   });
+
+  it("records resourceSource on nodes based on option source or defaults to grant", () => {
+    const customOptions: AccountAccessOptions = {
+      projects: [{ id: "p-hk", label: "鶴記" }],
+      avatar_characters: [
+        { id: "c-grant", label: "授權角色", source: "grant" },
+        { id: "c-proj", label: "專案角色", source: "project" },
+        { id: "c-assigned", label: "指派角色", source: "assigned" },
+        { id: "c-orphan", label: "孤立角色", source: "orphan" },
+        { id: "c-default", label: "預設角色" },
+      ],
+      custom_voices: [],
+      asr_engines: [],
+    };
+    const graph = buildAccessGraph({
+      accounts: [alice],
+      options: customOptions,
+      layers: ["character"],
+    });
+
+    expect(graph.byId.get("character:c-grant")?.resourceSource).toBe("grant");
+    expect(graph.byId.get("character:c-proj")?.resourceSource).toBe("project");
+    expect(graph.byId.get("character:c-assigned")?.resourceSource).toBe("assigned");
+    expect(graph.byId.get("character:c-orphan")?.resourceSource).toBe("orphan");
+    expect(graph.byId.get("character:c-default")?.resourceSource).toBe("grant");
+  });
+
+  it("draws assigned edges from project to resources when layer is active", () => {
+    const graph = buildAccessGraph({
+      accounts: [alice],
+      options,
+      layers: ["character"],
+      projectAssignments: {
+        "p-hk": [
+          { type: "character", id: "c-assigned" },
+          { type: "voice", id: "v-assigned" },
+        ],
+      },
+    });
+
+    const assignedEdges = graph.edges.filter((e) => e.kind === "assigned");
+    expect(assignedEdges).toHaveLength(1);
+    expect(assignedEdges[0]).toEqual({
+      id: "assigned:project:p-hk->character:c-assigned",
+      source: "project:p-hk",
+      target: "character:c-assigned",
+      kind: "assigned",
+      isDefault: false,
+    });
+    expect(graph.neighbors.get("project:p-hk")?.has("character:c-assigned")).toBe(true);
+    expect(graph.neighbors.get("character:c-assigned")?.has("project:p-hk")).toBe(true);
+    expect(graph.byId.get("character:c-assigned")?.missing).toBe(true);
+    expect(graph.byId.has("voice:v-assigned")).toBe(false);
+  });
 });
 
 function batch(overrides: Partial<TemporaryBatchAudit> & Pick<TemporaryBatchAudit, "batch_id">): TemporaryBatchAudit {

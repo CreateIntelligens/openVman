@@ -513,6 +513,7 @@ def get_project_resources(
                 "label": e.label,
                 "source": e.source,
                 "is_default": e.resource_id == default_id,
+                "in_project_scope": e.in_project_scope,
             }
             if e.resource_id in assignments:
                 a = assignments[e.resource_id]

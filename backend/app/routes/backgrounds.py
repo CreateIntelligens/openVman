@@ -93,12 +93,17 @@ async def list_backgrounds(
         entries = effective_project_resources(
             runtime, current.user, project_id, ResourceType.AVATAR_BACKGROUND
         )
-        source_by_id = {e.resource_id: e.source for e in entries}
+        entry_by_id = {e.resource_id: e for e in entries}
         backgrounds = []
         for bg in get_store().list_backgrounds():
             bid = bg.get("background_id")
-            if bid in source_by_id:
-                backgrounds.append({**bg, "source": source_by_id[bid]})
+            if bid in entry_by_id:
+                entry = entry_by_id[bid]
+                backgrounds.append({
+                    **bg,
+                    "source": entry.source,
+                    "in_project_scope": entry.in_project_scope,
+                })
         return {"backgrounds": backgrounds}
 
     is_root = current.user.role is AccountRole.ROOT

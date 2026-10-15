@@ -11,6 +11,7 @@ from app.providers.voice_catalog import PROVIDER_NAMES
 
 from .dependencies import CurrentAccount
 from .models import (
+    AccountRole,
     AccountType,
     ProjectPolicyRecord,
     ResourceRecord,
@@ -287,7 +288,8 @@ def resolve_tts_voice(
             )
         except ResourceNotFoundError as exc:
             raise _not_found() from exc
-        if policy is not None and not policy.allows_voice(record.resource_id):
+        is_root = current.embed_key is None and current.user.role is AccountRole.ROOT
+        if not is_root and policy is not None and not policy.allows_voice(record.resource_id):
             raise _not_allowed()
 
     assert record is not None
@@ -334,6 +336,33 @@ def _grouped(
             "voices": ids,
         }
         for provider, ids in voices_by_provider.items()
+    ]
+
+
+def _grouped_scoped(
+    voices: list[tuple[str, str, bool]],
+    default_voice: str,
+) -> list[dict[str, object]]:
+    voices_by_provider: dict[str, list[tuple[str, bool]]] = {}
+    for provider, voice_id, in_scope in voices:
+        voices_by_provider.setdefault(provider, []).append((voice_id, in_scope))
+    return [
+        {
+            "id": provider,
+            "name": PROVIDER_NAMES.get(provider, provider),
+            "default_voice": (
+                default_voice
+                if any(v == default_voice for v, _ in items)
+                else (items[0][0] if items else "")
+            ),
+            "voices": [v for v, _ in items],
+            "in_project_scope": any(in_scope for _, in_scope in items),
+            "voice_items": [
+                {"id": v, "in_project_scope": in_scope}
+                for v, in_scope in items
+            ],
+        }
+        for provider, items in voices_by_provider.items()
     ]
 
 
@@ -416,7 +445,7 @@ def scoped_tts_providers(
         entries = effective_project_resources(
             runtime, current.user, pid, ResourceType.CUSTOM_VOICE
         )
-        voices: list[tuple[str, str]] = []
+        voices: list[tuple[str, str, bool]] = []
         for entry in entries:
             record = runtime.resources.get(ResourceType.CUSTOM_VOICE, entry.resource_id)
             if record is None:
@@ -424,15 +453,19 @@ def scoped_tts_providers(
             provider = _registered_provider(record) or fallback_provider
             if not provider or provider == "auto":
                 continue
-            voices.append((provider, record.resource_id))
+            voices.append((provider, record.resource_id, entry.in_project_scope))
 
         preferred = (
             effective_project_default(
-                runtime, current.user, pid, ResourceType.CUSTOM_VOICE
+                runtime,
+                current.user,
+                pid,
+                ResourceType.CUSTOM_VOICE,
+                available_entries=entries,
             )
             or (defaults.voice_id if defaults else "")
         )
-        return _grouped(voices, preferred)
+        return _grouped_scoped(voices, preferred)
 
     voices: list[tuple[str, str]] = []
     for record in list_accessible_resources(
@@ -455,12 +488,15 @@ def scoped_tts_providers(
 def tts_fallback_voice(
     runtime: AuthRuntime,
     policy: ProjectPolicyRecord | None,
+    is_root: bool = False,
 ) -> str | None:
     """The Edge voice a failed provider may fall back to.
 
-    回傳 ""：照舊退回 Edge 的預設聲音（專案沒限制）。回傳 None：專案清單裡沒有
+    回傳 ""：照舊退回 Edge 的預設聲音（專案沒限制或 ROOT 豁免）。回傳 None：專案清單裡沒有
     Edge 的聲音，不准默默換成 Edge——寧可回錯誤，也不要讓專案沒開的引擎出聲。
     """
+    if is_root:
+        return ""
     if policy is None or not policy.restricts_tts:
         return ""
     for voice_id in policy.allowed_tts_voices:
@@ -474,10 +510,11 @@ def project_voice_for_providers(
     runtime: AuthRuntime,
     policy: ProjectPolicyRecord,
     providers: tuple[str, ...],
+    is_root: bool = False,
 ) -> tuple[str, str] | None:
     """First project-allowed voice served by one of ``providers``, in that order.
 
-    台語分流換引擎時用：專案有限制就只能換到清單裡的聲音，找不到就不換。
+    台語分流換引擎時用：專案有限制就只能換到清單裡的聲音，找不到就不換。ROOT 豁免不受限。
     """
     records = [
         record
@@ -488,4 +525,6 @@ def project_voice_for_providers(
         for record in records:
             if _registered_provider(record) == provider:
                 return provider, _runtime_key(record)
+    if is_root and providers:
+        return providers[0], ""
     return None

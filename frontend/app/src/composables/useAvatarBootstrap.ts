@@ -37,6 +37,7 @@ import {
 
 export interface ProjectResourceItem {
   id?: string
+  resource_id?: string
   background_id?: string
   provider?: string
   voice_id?: string
@@ -46,6 +47,7 @@ export interface ProjectResourceItem {
   is_default?: boolean
   assigned_at?: string | null
   assigned_by?: string | null
+  in_project_scope?: boolean
 }
 
 export interface ProjectResourcesResponse {
@@ -113,6 +115,7 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       .map((c) => ({
         id: c.char_id,
         name: c.label && c.label !== c.char_id ? c.label : `角色 ${c.char_id}`,
+        in_project_scope: c.in_project_scope,
       }));
     return loaded;
   });
@@ -342,6 +345,7 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
         fetchBackgrounds(),
         fetchVrmAvatars(),
         avatarCatalog.load(settings.projectId),
+        fetchTtsProviders(),
       ]);
       const nextChar = pickPreferredCharacterId(settings.projectId, characters.value);
       if (nextChar) {
@@ -360,6 +364,7 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       fetchBackgrounds(),
       fetchVrmAvatars(),
       avatarCatalog.load(projectId),
+      fetchTtsProviders(),
     ]);
     const nextChar = pickPreferredCharacterId(projectId, characters.value);
     if (nextChar) {
@@ -412,7 +417,10 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     settings.ttsProvider = "";
     settings.ttsVoice = "";
     try {
-      const res = await apiFetch("/api/v1/tts/providers");
+      const projectId = settings.projectId;
+      const res = projectId
+        ? await apiFetch(`/api/v1/tts/providers?project_id=${encodeURIComponent(projectId)}`)
+        : await apiFetch("/api/v1/tts/providers");
       if (!res.ok) return;
       const items = await res.json() as TtsProvider[];
       ttsProviders.value = items;

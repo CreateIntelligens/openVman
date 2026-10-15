@@ -14,8 +14,20 @@
       @click="open ? close() : openList()"
       @keydown="handleKeydown"
     >
-      <span class="custom-select__value" :class="{ 'custom-select__value--placeholder': !selected }">
+      <span
+        class="custom-select__value"
+        :class="{
+          'custom-select__value--placeholder': !selected,
+          'custom-select__value--out-of-scope': selected?.in_project_scope === false,
+        }"
+      >
         {{ selected?.label ?? placeholder ?? '' }}
+        <span
+          v-if="selected?.in_project_scope === false"
+          class="custom-select__value-scope-note"
+        >
+          （不在專案範圍內，一般使用者無法使用）
+        </span>
       </span>
       <svg
         class="custom-select__arrow"
@@ -48,13 +60,20 @@
         :class="{
           'custom-select__option--selected': option.value === modelValue,
           'custom-select__option--focused': index === focusedIndex,
+          'custom-select__option--out-of-scope': option.in_project_scope === false,
         }"
         role="option"
         :aria-selected="option.value === modelValue"
         @mousedown.prevent="choose(option.value)"
         @mouseenter="focusedIndex = index"
       >
-        {{ option.label }}
+        <span class="custom-select__option-label">{{ option.label }}</span>
+        <span
+          v-if="option.in_project_scope === false"
+          class="custom-select__option-scope-note"
+        >
+          不在專案範圍內，一般使用者無法使用
+        </span>
       </div>
       <div v-if="!options.length" class="custom-select__empty">沒有可選的項目</div>
     </div>
@@ -78,6 +97,7 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 export interface SelectOption {
   value: string
   label: string
+  in_project_scope?: boolean
 }
 
 const props = defineProps<{
@@ -354,5 +374,39 @@ onBeforeUnmount(stopListening)
   padding: 0.5rem 0.875rem;
   color: var(--text-soft);
   font-size: 0.9rem;
+}
+
+.custom-select__value--out-of-scope {
+  color: rgb(var(--ov-color-danger));
+}
+
+.custom-select__value-scope-note {
+  font-size: 0.8rem;
+  color: rgb(var(--ov-color-danger));
+  margin-left: 0.25rem;
+}
+
+.custom-select__option--out-of-scope {
+  color: rgb(var(--ov-color-danger));
+}
+
+.custom-select__option--out-of-scope .custom-select__option-label {
+  color: rgb(var(--ov-color-danger));
+}
+
+.custom-select__option--out-of-scope.custom-select__option--selected {
+  color: rgb(var(--ov-color-danger));
+}
+
+.custom-select__option--out-of-scope.custom-select__option--focused {
+  color: rgb(var(--ov-color-danger));
+}
+
+.custom-select__option-scope-note {
+  display: block;
+  font-size: 0.75rem;
+  color: rgb(var(--ov-color-danger));
+  margin-top: 0.125rem;
+  line-height: 1.2;
 }
 </style>

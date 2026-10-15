@@ -15,7 +15,12 @@ from dataclasses import dataclass
 from app import language_routes as language_routes_mod
 from app.auth.asr_selection import asr_user_choices, permitted_asr_preference
 from app.auth.dependencies import CurrentAccount
-from app.auth.models import ProjectPolicyRecord, ResourceType, UserRecord
+from app.auth.models import (
+    AccountRole,
+    ProjectPolicyRecord,
+    ResourceType,
+    UserRecord,
+)
 from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import AuthRuntime
 from app.auth.settings_repository import SERVER_ASR_PROVIDERS
@@ -91,13 +96,14 @@ def batch_asr_scope(
         preference = permitted_asr_preference(
             runtime, user, runtime.account_access.get_asr_provider(user.id),
         )
+    is_root = not embed and user is not None and user.role is AccountRole.ROOT
     implicit = granted | {cfg.asr_provider} | assigned_or_project_asr
-    allowed = (
-        policy.narrow_asr(implicit) if policy is not None else implicit
-    ) | assigned_or_project_asr
-    explicit = (
-        policy.narrow_asr(granted) if policy is not None else granted
-    ) | assigned_or_project_asr
+    if is_root or policy is None:
+        allowed = implicit
+        explicit = granted | assigned_or_project_asr
+    else:
+        allowed = policy.narrow_asr(implicit) | assigned_or_project_asr
+        explicit = policy.narrow_asr(granted) | assigned_or_project_asr
 
     # 偏好 → 專案預設 → 部署預設；每一個都要落在 allowed 裡才算數。
     candidates = (
@@ -118,10 +124,12 @@ def batch_asr_scope(
         configured_taiwanese or language_routes_mod.TAIWANESE_ASR_ENGINE
     )
     # 沒設專案限制也沒指定台語引擎時維持舊行為（一律 Breeze，備援清單會濾掉沒授權的）；
-    # 一旦專案有意見，台語引擎也得落在允許範圍內，否則就不強制換引擎。
+    # 一旦專案有意見，台語引擎也得落在允許範圍內，否則就不強制換引擎。ROOT 豁免專案限制。
     if (
-        configured_taiwanese or (policy is not None and policy.restricts_asr)
-    ) and taiwanese not in allowed:
+        not is_root
+        and (configured_taiwanese or (policy is not None and policy.restricts_asr))
+        and taiwanese not in allowed
+    ):
         taiwanese = None
     return BatchAsrScope(
         explicit=frozenset(explicit),
@@ -156,6 +164,7 @@ def effective_asr_engine(
         }
         granted = granted | assigned_or_project_asr
 
+    is_root = user.role is AccountRole.ROOT
     if policy is None:
         if preference and (preference in granted or preference == cfg.asr_provider):
             return preference
@@ -167,7 +176,7 @@ def effective_asr_engine(
     )
     for engine, permitted in candidates:
         if engine and permitted and (
-            policy.allows_asr(engine) or engine in assigned_or_project_asr
+            is_root or policy.allows_asr(engine) or engine in assigned_or_project_asr
         ):
             return engine
     return ""

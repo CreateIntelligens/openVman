@@ -223,6 +223,13 @@
   background-color: #0f172a;
 }
 
+.background-option__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .background-option__label {
   min-width: 0;
   color: var(--text);
@@ -230,6 +237,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.background-option--out-of-scope .background-option__label {
+  color: rgb(var(--ov-color-danger));
+}
+
+.background-option__scope-note {
+  font-size: 0.75rem;
+  color: rgb(var(--ov-color-danger));
+  margin-top: 0.125rem;
+  line-height: 1.2;
 }
 
 .background-url-input {

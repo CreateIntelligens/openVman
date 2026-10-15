@@ -235,12 +235,26 @@ const statusToastRef = ref<InstanceType<typeof StatusToast> | null>(null);
 const showMessage = (message: string, options?: { persistent: boolean }) =>
   statusToastRef.value?.show(message, options);
 const preferences = useAsrPreferences(showMessage);
-const { asrEngines, asrProviderShown, handleAsrProviderChange } = preferences;
+const { asrEngines: rawAsrEngines, asrProviderShown, handleAsrProviderChange } = preferences;
 const languageRoutes = useLanguageRoutes(() => settings.projectId);
 // Catalog and timing callbacks are evaluated after every domain has been composed.
 const bootstrap = useAvatarBootstrap({ settings, chat: () => conversation.chat });
 const { projects, personas, personasLoading, ttsProviders, backgrounds,
   characters, selectionNotices } = bootstrap;
+const asrEngines = computed(() => {
+  const projectAsr = bootstrap.currentProjectResources.value?.asr_engine;
+  if (!projectAsr || projectAsr.length === 0) return rawAsrEngines.value;
+  const scopeMap = new Map<string, boolean>();
+  for (const item of projectAsr) {
+    if (item.resource_id && item.in_project_scope !== undefined) {
+      scopeMap.set(item.resource_id, item.in_project_scope);
+    }
+  }
+  return rawAsrEngines.value.map((e) => ({
+    ...e,
+    in_project_scope: scopeMap.has(e.id) ? scopeMap.get(e.id) : undefined,
+  }));
+});
 const stage = useAvatarStage(settings, bootstrap);
 const { wasm, fatalError, rendererBootstrapState, rendererDisabled,
   rendererErrorMessage, loadingText, chatPlaceholder, stageAvatarFrameRef,
@@ -256,7 +270,8 @@ const turnTiming = useTurnTiming({ context: () => ({
   tts_voice: settings.ttsVoice,
 }) });
 const conversation = useAvatarConversation({ settings, stage, languageRoutes,
-  turnTiming, ttsProviders, statusToastRef, fetchPersonas: bootstrap.fetchPersonas });
+  turnTiming, ttsProviders, statusToastRef, fetchPersonas: bootstrap.fetchPersonas,
+  getProjectDefaultVoice: () => bootstrap.currentProjectResources.value?.defaults?.custom_voice });
 const { chat, canSend, isTyping, avatarResponding, handleStart, resetForNextVisitor, handleSend,
   handleComposerSend, handleStopResponse, handleSettingsApply,
   handleFatalRetry } = conversation;

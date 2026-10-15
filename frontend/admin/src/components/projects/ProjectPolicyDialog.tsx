@@ -56,13 +56,48 @@ function toggled(list: string[], id: string): string[] {
   return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
 }
 
-/** 預設值必須落在清單內；清單變了就把落在外面的預設清掉，免得送出後才被擋。 */
-function keepInside(value: string | null, list: string[]): string | null {
-  return value && (list.length === 0 || list.includes(value)) ? value : null;
+/** 預設值必須落在清單內（或是專案資源／ROOT 指派）；清單變了就把落在外面的預設清掉，免得送出後才被擋。 */
+function keepInside(value: string | null, list: string[], specialAllowed?: Set<string>): string | null {
+  if (!value) return null;
+  if (list.length === 0 || list.includes(value) || specialAllowed?.has(value)) {
+    return value;
+  }
+  return null;
 }
 
 function summary(list: string[]): string {
   return list.length === 0 ? "不限制" : `${list.length} 項`;
+}
+
+export function mergeProjectResources(
+  baseOptions: AccountAccessOption[],
+  projectItems?: import("../../api/projects").ProjectResourceItem[],
+): AccountAccessOption[] {
+  const map = new Map<string, AccountAccessOption>();
+  for (const opt of baseOptions) {
+    map.set(opt.id, { ...opt });
+  }
+  if (projectItems) {
+    for (const item of projectItems) {
+      const existing = map.get(item.resource_id);
+      if (existing) {
+        map.set(item.resource_id, {
+          ...existing,
+          label: existing.label || item.label || item.resource_id,
+          source: item.source,
+          in_project_scope: item.in_project_scope,
+        });
+      } else {
+        map.set(item.resource_id, {
+          id: item.resource_id,
+          label: item.label || item.resource_id,
+          source: item.source,
+          in_project_scope: item.in_project_scope,
+        });
+      }
+    }
+  }
+  return Array.from(map.values());
 }
 
 interface ChecklistProps {
@@ -88,25 +123,37 @@ function Checklist({ legend, options, selected, disabled, onToggle }: ChecklistP
         </p>
       )}
       <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-        {options.map((option) => (
-          <li key={option.id}>
-            <label className="flex cursor-pointer items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                checked={selected.includes(option.id)}
-                disabled={disabled}
-                onChange={() => onToggle(option.id)}
-              />
-              <span className="min-w-0 break-words">
-                {option.label}
-                {option.provider && (
-                  <span className="ml-1 text-xs text-content-subtle">{option.provider}</span>
-                )}
-              </span>
-            </label>
-          </li>
-        ))}
+        {options.map((option) => {
+          const isOutOfScope = option.in_project_scope === false;
+          return (
+            <li key={option.id}>
+              <label
+                className={`flex cursor-pointer items-start gap-2 text-sm ${
+                  isOutOfScope ? "text-danger" : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                  checked={selected.includes(option.id)}
+                  disabled={disabled}
+                  onChange={() => onToggle(option.id)}
+                />
+                <span className="min-w-0 break-words">
+                  {option.label}
+                  {option.provider && (
+                    <span className="ml-1 text-xs text-content-subtle">{option.provider}</span>
+                  )}
+                  {isOutOfScope && (
+                    <span className="ml-1 text-xs text-danger font-medium">
+                      （不在專案範圍內，一般使用者無法使用）
+                    </span>
+                  )}
+                </span>
+              </label>
+            </li>
+          );
+        })}
       </ul>
     </fieldset>
   );
@@ -122,20 +169,34 @@ interface DefaultSelectProps {
 }
 
 function DefaultSelect({ label, value, options, disabled, emptyLabel, onChange }: DefaultSelectProps) {
+  const selectedOption = options.find((option) => option.id === value);
+  const isOutOfScope = selectedOption?.in_project_scope === false;
   return (
-    <label className="block text-sm font-medium">
+    <label className={`block text-sm font-medium ${isOutOfScope ? "text-danger" : ""}`}>
       {label}
       <select
-        className="input mt-2"
+        className={`input mt-2 ${isOutOfScope ? "text-danger" : ""}`}
         value={value ?? ""}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
-          <option key={option.id} value={option.id}>{option.label}</option>
+          <option
+            key={option.id}
+            value={option.id}
+            className={option.in_project_scope === false ? "text-danger" : ""}
+          >
+            {option.label}
+            {option.in_project_scope === false ? "（不在專案範圍內，一般使用者無法使用）" : ""}
+          </option>
         ))}
       </select>
+      {isOutOfScope && (
+        <span className="mt-1 block text-xs text-danger font-normal">
+          不在專案範圍內，一般使用者無法使用
+        </span>
+      )}
     </label>
   );
 }
@@ -189,11 +250,11 @@ export default function ProjectPolicyDialog({
           allowed_mascots: loaded.allowed_mascots ?? [],
           default_mascot_id: loaded.default_mascot_id ?? null,
         });
-        setEngines(options.asr_engines ?? []);
-        setVoices(options.custom_voices ?? []);
-        setCharacters(options.avatar_characters ?? []);
-        setBackgrounds(options.avatar_backgrounds ?? []);
-        setMascots(options.avatar_mascots ?? []);
+        setEngines(mergeProjectResources(options.asr_engines ?? [], res?.asr_engine));
+        setVoices(mergeProjectResources(options.custom_voices ?? [], res?.custom_voice));
+        setCharacters(mergeProjectResources(options.avatar_characters ?? [], res?.avatar_character));
+        setBackgrounds(mergeProjectResources(options.avatar_backgrounds ?? [], res?.avatar_background));
+        setMascots(mergeProjectResources(options.avatar_mascots ?? [], res?.avatar_mascot));
         setIsRoot(currentAccount?.role === "root");
         if (res) {
           setAssignedResources(res);
@@ -216,23 +277,31 @@ export default function ProjectPolicyDialog({
   const backgroundOptions = withMissing(backgrounds, policy.allowed_backgrounds ?? []);
   const mascotOptions = withMissing(mascots, policy.allowed_mascots ?? []);
 
+  const isSpecial = (opt: AccountAccessOption) => opt.source === "project" || opt.source === "assigned";
+
   const engineChoices = policy.allowed_asr_engines.length
-    ? engineOptions.filter((option) => policy.allowed_asr_engines.includes(option.id))
+    ? engineOptions.filter((option) => policy.allowed_asr_engines.includes(option.id) || isSpecial(option))
     : engines;
   const voiceChoices = policy.allowed_tts_voices.length
-    ? voiceOptions.filter((option) => policy.allowed_tts_voices.includes(option.id))
+    ? voiceOptions.filter((option) => policy.allowed_tts_voices.includes(option.id) || isSpecial(option))
     : voices;
   const characterChoices = (policy.allowed_characters?.length ?? 0) > 0
-    ? characterOptions.filter((option) => policy.allowed_characters?.includes(option.id))
+    ? characterOptions.filter((option) => policy.allowed_characters?.includes(option.id) || isSpecial(option))
     : characters;
   const backgroundChoices = (policy.allowed_backgrounds?.length ?? 0) > 0
-    ? backgroundOptions.filter((option) => policy.allowed_backgrounds?.includes(option.id))
+    ? backgroundOptions.filter((option) => policy.allowed_backgrounds?.includes(option.id) || isSpecial(option))
     : backgrounds;
   const mascotChoices = (policy.allowed_mascots?.length ?? 0) > 0
-    ? mascotOptions.filter((option) => policy.allowed_mascots?.includes(option.id))
+    ? mascotOptions.filter((option) => policy.allowed_mascots?.includes(option.id) || isSpecial(option))
     : mascots;
   const taiwaneseChoices = engineChoices.filter((option) => BATCH_ASR_ENGINES.has(option.id));
   const busy = loading || saving || assigning;
+
+  const specialEngines = new Set(engines.filter(isSpecial).map((o) => o.id));
+  const specialVoices = new Set(voices.filter(isSpecial).map((o) => o.id));
+  const specialCharacters = new Set(characters.filter(isSpecial).map((o) => o.id));
+  const specialBackgrounds = new Set(backgrounds.filter(isSpecial).map((o) => o.id));
+  const specialMascots = new Set(mascots.filter(isSpecial).map((o) => o.id));
 
   function toggleEngine(id: string) {
     setPolicy((current) => {
@@ -240,8 +309,8 @@ export default function ProjectPolicyDialog({
       return {
         ...current,
         allowed_asr_engines: allowed,
-        default_asr_engine: keepInside(current.default_asr_engine, allowed),
-        taiwanese_asr_engine: keepInside(current.taiwanese_asr_engine, allowed),
+        default_asr_engine: keepInside(current.default_asr_engine, allowed, specialEngines),
+        taiwanese_asr_engine: keepInside(current.taiwanese_asr_engine, allowed, specialEngines),
       };
     });
   }
@@ -252,7 +321,7 @@ export default function ProjectPolicyDialog({
       return {
         ...current,
         allowed_tts_voices: allowed,
-        default_tts_voice: keepInside(current.default_tts_voice, allowed),
+        default_tts_voice: keepInside(current.default_tts_voice, allowed, specialVoices),
       };
     });
   }
@@ -263,7 +332,7 @@ export default function ProjectPolicyDialog({
       return {
         ...current,
         allowed_characters: allowed,
-        default_character_id: keepInside(current.default_character_id ?? null, allowed),
+        default_character_id: keepInside(current.default_character_id ?? null, allowed, specialCharacters),
       };
     });
   }
@@ -274,7 +343,7 @@ export default function ProjectPolicyDialog({
       return {
         ...current,
         allowed_backgrounds: allowed,
-        default_background_id: keepInside(current.default_background_id ?? null, allowed),
+        default_background_id: keepInside(current.default_background_id ?? null, allowed, specialBackgrounds),
       };
     });
   }
@@ -285,7 +354,7 @@ export default function ProjectPolicyDialog({
       return {
         ...current,
         allowed_mascots: allowed,
-        default_mascot_id: keepInside(current.default_mascot_id ?? null, allowed),
+        default_mascot_id: keepInside(current.default_mascot_id ?? null, allowed, specialMascots),
       };
     });
   }
@@ -298,6 +367,11 @@ export default function ProjectPolicyDialog({
       await assignProjectResource(projectId, assignType, assignId);
       const updated = await fetchProjectResources(projectId);
       setAssignedResources(updated);
+      setCharacters((prev) => mergeProjectResources(prev, updated.avatar_character));
+      setBackgrounds((prev) => mergeProjectResources(prev, updated.avatar_background));
+      setMascots((prev) => mergeProjectResources(prev, updated.avatar_mascot));
+      setVoices((prev) => mergeProjectResources(prev, updated.custom_voice));
+      setEngines((prev) => mergeProjectResources(prev, updated.asr_engine));
       setAssignId("");
     } catch (reason) {
       setError(errorMessage(reason, "指派資源失敗"));
@@ -313,6 +387,11 @@ export default function ProjectPolicyDialog({
       await unassignProjectResource(projectId, type, id);
       const updated = await fetchProjectResources(projectId);
       setAssignedResources(updated);
+      setCharacters((prev) => mergeProjectResources(prev, updated.avatar_character));
+      setBackgrounds((prev) => mergeProjectResources(prev, updated.avatar_background));
+      setMascots((prev) => mergeProjectResources(prev, updated.avatar_mascot));
+      setVoices((prev) => mergeProjectResources(prev, updated.custom_voice));
+      setEngines((prev) => mergeProjectResources(prev, updated.asr_engine));
     } catch (reason) {
       setError(errorMessage(reason, "解除指派失敗"));
     } finally {
@@ -539,7 +618,7 @@ export default function ProjectPolicyDialog({
                           <span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary font-medium">
                             {item.typeLabel}
                           </span>
-                          <span className="rounded bg-amber-500/10 text-amber-500 px-1.5 py-0.5 text-xs font-medium">
+                          <span className="rounded bg-success/10 text-success px-1.5 py-0.5 text-xs font-medium">
                             ROOT 指派
                           </span>
                           <span className="font-medium">{item.label}</span>
@@ -565,6 +644,7 @@ export default function ProjectPolicyDialog({
                 {isRoot && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
                     <select
+                      aria-label="指派類型"
                       className="input text-xs"
                       value={assignType}
                       disabled={busy}
@@ -581,6 +661,7 @@ export default function ProjectPolicyDialog({
                     </select>
 
                     <select
+                      aria-label="指派資源"
                       className="input text-xs"
                       value={assignId}
                       disabled={busy}
@@ -611,7 +692,7 @@ export default function ProjectPolicyDialog({
 
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-primary btn-sm"
                       disabled={busy || !assignId}
                       onClick={handleAssign}
                     >

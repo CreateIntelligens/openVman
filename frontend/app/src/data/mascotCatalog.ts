@@ -9,6 +9,7 @@ export interface MascotOption {
   vrmUrl?: string
   characterId?: string
   fit?: MascotFit
+  in_project_scope?: boolean
 }
 
 export interface MascotApiRecord {
@@ -19,6 +20,7 @@ export interface MascotApiRecord {
   vrm_url: string
   character_id?: string
   fit: "" | MascotFit
+  in_project_scope?: boolean
 }
 
 export const DEFAULT_MASCOT_ID = "haru-live2d"
@@ -57,6 +59,7 @@ export function toMascotOption(record: MascotApiRecord): MascotOption {
     vrmUrl: record.vrm_url || undefined,
     characterId: record.character_id || undefined,
     fit: record.fit || undefined,
+    in_project_scope: record.in_project_scope,
   }
 }
 

@@ -223,11 +223,14 @@ ws.send(JSON.stringify(payload));
 - `project_resource_assignments`：ROOT 可直接將資源指派給特定專案（支援跨專案指派或全域資源指定）。外鍵在資源或專案刪除時 CASCADE 清除。
 - 專案有效資源計算：單一來源 `effective_project_resources(project_id, account)`。公式為 `grant ∪ project ∪ assigned`。全域資源仍需通過帳號授權與專案政策白名單檢驗；專案專屬與 ROOT 指派資源則無條件對該專案內所有授權成員開放，不受帳號授權上限或專案白名單排除限制。
 - 專案有效預設值：`effective_project_default(project_id, resource_type, account)`，優先順序為「專案政策預設值 → 帳號個人預設值 → 該類別第一個可用資源」。
+- ROOT 專案白名單豁免：ROOT 帳號在呼叫 TTS（聲音解析）、批次 ASR、串流 ASR 與虛擬人資源（人物、背景、小助理）時，不受 `project_policies` 允許清單排除限制，可使用系統所有可用資源；但專案政策若有設定預設值（`default_*`），ROOT 依然適用專案預設值。admin、一般帳號與 Embed key 維持交集與白名單限制。
+- 資源範圍標記（`in_project_scope`）：帶 `project_id` 的列表 API（`/api/v1/me/capabilities`、`/api/v1/tts/providers`、`/api/v1/projects/{id}/resources`、`/api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/avatar/mascots`）中，對 ROOT 回傳全部可用項目並每項標記布林值 `in_project_scope`（代表若以一般成員身分是否落在有效專案範圍內）；非 ROOT 帳號則僅回傳專案範圍內項目且 `in_project_scope` 恆為 `true`。
+- 快取隔離：`/v1/audio/speech` 的語音合成快取鍵納入專案範圍維度，確保 ROOT 合成的專案範圍外語音不會被快取提供給一般專案成員。
 
 端點行為：
 - `GET /api/v1/projects/{project_id}/policy`：能編輯專案內容（`ResourceAccess.EDIT`）即可讀；沒有設定時回全空的「不限制」。
 - `PUT /api/v1/projects/{project_id}/policy`：需 admin 以上並通過專案 `MUTATE` 解析；整份取代。受限 admin 只能放入自己權限上限內的資源（但屬於該專案的專案專屬資源或 ROOT 指派資源不受 admin 上限限制）。
-- `GET /api/v1/projects/{project_id}/resources`：回傳該專案下的所有有效資源（`avatar_character`、`avatar_background`、`avatar_mascot`、`custom_voice`、`asr_engine`）與有效 `defaults`，每項資源標記 `source`（`project`、`assigned` 或 `grant`）。
+- `GET /api/v1/projects/{project_id}/resources`：回傳該專案下的所有有效資源（`avatar_character`、`avatar_background`、`avatar_mascot`、`custom_voice`、`asr_engine`）與有效 `defaults`，每項資源標記 `source`（`project`、`assigned` 或 `grant`）與 `in_project_scope`。
 - `POST /api/v1/projects/{project_id}/assignments`：**僅限 ROOT**（非 ROOT 回 403）。指派特定資源給專案（body: `{"resource_type": "...", "resource_id": "..."}`）；資源不存在回 422；已存在回 200 冪等處理。
 - `DELETE /api/v1/projects/{project_id}/assignments/{resource_type}/{resource_id}`：**僅限 ROOT**（非 ROOT 回 403）。解除指派特定資源，不存在回 404。
 - 專案刪除保護：專案被刪除時，其專案專屬資源不會連帶刪除檔案或資料庫記錄，而是將 `owner_project_id` 置 NULL，成為只有 ROOT 可見的「孤兒資源」；指派關聯表記錄自動 CASCADE 刪除。

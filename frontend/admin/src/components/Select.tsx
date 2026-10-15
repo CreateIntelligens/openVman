@@ -9,6 +9,7 @@ import {
 export interface SelectOption {
   value: string;
   label: string;
+  in_project_scope?: boolean;
 }
 
 interface SelectProps {
@@ -154,11 +155,16 @@ export default function Select({
         disabled={disabled}
         className="w-full flex items-center justify-between gap-2 bg-surface-raised text-content border border-border rounded-lg px-3 py-2 text-sm font-medium cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span className="truncate">
+        <span className={`truncate ${selectedOption?.in_project_scope === false ? "text-danger" : ""}`}>
           {label && (
             <span className="mr-1.5 text-content-subtle font-normal">{label}</span>
           )}
           {displayLabel}
+          {selectedOption?.in_project_scope === false && (
+            <span className="ml-1 text-xs text-danger font-normal">
+              （不在專案範圍內，一般使用者無法使用）
+            </span>
+          )}
         </span>
         <span className={`material-symbols-outlined text-[1rem] text-content-subtle transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""}`}>
           expand_more
@@ -181,26 +187,39 @@ export default function Select({
               {label}
             </div>
           )}
-          {options.map((option, i) => (
-            <div
-              key={option.value}
-              id={`${listboxId}-option-${i}`}
-              role="option"
-              aria-selected={option.value === value}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange(option.value);
-                setOpen(false);
-              }}
-              onMouseEnter={() => setFocusedIndex(i)}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${getOptionClassName(
-                option.value,
-                i,
-              )}`}
-            >
-              {option.label}
-            </div>
-          ))}
+          {options.map((option, i) => {
+            const isOutOfScope = option.in_project_scope === false;
+            return (
+              <div
+                key={option.value}
+                id={`${listboxId}-option-${i}`}
+                role="option"
+                aria-selected={option.value === value}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                onMouseEnter={() => setFocusedIndex(i)}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${
+                  isOutOfScope
+                    ? option.value === value
+                      ? "bg-danger/15 text-danger font-semibold"
+                      : i === focusedIndex
+                        ? "bg-surface-sunken text-danger"
+                        : "text-danger hover:bg-surface-sunken"
+                    : getOptionClassName(option.value, i)
+                }`}
+              >
+                <span>{option.label}</span>
+                {isOutOfScope && (
+                  <span className="ml-1 text-xs text-danger font-normal">
+                    （不在專案範圍內，一般使用者無法使用）
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
