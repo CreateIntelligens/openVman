@@ -173,10 +173,12 @@ _EVENT_STREAM_RESPONSES: dict[int | str, dict[str, Any]] = {
     },
 }
 _PROJECT_CONTEXT_RESPONSES: dict[int | str, dict[str, Any]] = {
-    404: {
+    404: {"description": "專案不存在或沒有權限"},
+    422: {
         "description": (
-            "沒帶 project_id（query 或 JSON body 擇一），專案不存在或沒有權限，"
-            "或 query 與 body 的 project_id 不一致。Embed key 由金鑰綁定專案，可省略。"
+            "沒帶 project_id（query 或 JSON body 擇一），或 query 與 body 的 "
+            "project_id 不一致；在其他欄位驗證之前回應。"
+            "Embed key 由金鑰綁定專案，可省略。"
         ),
     },
 }
@@ -185,6 +187,10 @@ _PROJECT_CONTEXT_RESPONSES: dict[int | str, dict[str, Any]] = {
 CLIENT_CLOSED_REQUEST = 499
 
 _T = TypeVar("_T")
+
+
+class _InvalidProjectId(Exception):
+    """The request did not name exactly one project."""
 
 
 class _ClientDisconnected(Exception):
@@ -274,7 +280,7 @@ async def _request_project_id(request: Request) -> str | None:
     if not candidates:
         return None
     if len(set(candidates)) != 1:
-        raise ResourceNotFoundError
+        raise _InvalidProjectId("project_id in query and body must match")
     return candidates[0]
 
 
@@ -328,9 +334,11 @@ async def _authorize_project_context(
         and supplied_project_id is not None
         and supplied_project_id != explicit_project_id
     ):
-        raise ResourceNotFoundError
+        raise _InvalidProjectId("project_id in query and body must match")
     if resolved_project_id is None:
-        raise ResourceNotFoundError
+        # 缺欄位是請求格式問題，回 422 才不會讓串接方以為專案不存在；
+        # 專案看不到仍是 404，不洩漏存在與否。
+        raise _InvalidProjectId("project_id is required")
 
     runtime = get_auth_runtime()
     access = _project_access(path, request.method)
@@ -436,6 +444,8 @@ async def proxy_to_brain(
             status_code=404,
             content={"detail": "Resource not found"},
         )
+    except _InvalidProjectId as exc:
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
     headers = _trusted_upstream_headers(
         request,
         current=current,

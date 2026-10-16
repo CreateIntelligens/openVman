@@ -41,7 +41,8 @@
 
 ### Fixed
 
-- **[2026-10-16]** **OpenAPI 與實際回應不一致（VH-371）**：`POST /api/v1/chat/stream` 的 200 標成 `application/json`，實際是 `text/event-stream`；專案範圍的代理路由（`/api/v1/chat`、知識庫、記憶等）沒帶 `project_id` 時回 404，OpenAPI 沒列；帳號 API key 超過每分鐘上限回 429，OpenAPI 也沒列。原因是 Backend 代理路由只有預設的 JSON 回應，合併 Brain 的 schema 時又整份蓋掉 Brain 的 `responses`。現在 `chat/stream` 只列 `text/event-stream` 並說明 `sentence`／`done`／`error` 事件，需要專案的代理路由列出 404 與原因，所有接受 API key 的操作列出 429 與 `Retry-After`，合併時改為逐個狀態碼合併（Brain 的 422 不再被蓋掉）。執行行為不變；串接指南的錯誤表補上缺 `project_id` 與限流的適用範圍。
+- **[2026-10-16]** **專案範圍的 API 沒帶 `project_id` 回 404「Resource not found」（VH-371）**：串接方會以為專案不存在，而且這項檢查在欄位驗證之前，連空訊息也看不到 422。現在沒帶 `project_id` 回 422 `project_id is required`，query 與 body 的值不一致回 422 `project_id in query and body must match`；專案不存在或看不到仍回 404，不洩漏存在與否。OpenAPI 與串接指南同步。
+- **[2026-10-16]** **OpenAPI 與實際回應不一致（VH-371）**：`POST /api/v1/chat/stream` 的 200 標成 `application/json`，實際是 `text/event-stream`；專案範圍的代理路由（`/api/v1/chat`、知識庫、記憶等）沒帶 `project_id` 時回 404，OpenAPI 沒列；帳號 API key 超過每分鐘上限回 429，OpenAPI 也沒列。原因是 Backend 代理路由只有預設的 JSON 回應，合併 Brain 的 schema 時又整份蓋掉 Brain 的 `responses`。現在 `chat/stream` 只列 `text/event-stream` 並說明 `sentence`／`done`／`error` 事件，需要專案的代理路由列出 404 與原因（缺 `project_id` 後來改為 422，見上一則），所有接受 API key 的操作列出 429 與 `Retry-After`，合併時改為逐個狀態碼合併（Brain 的 422 不再被蓋掉）。執行行為不變；串接指南的錯誤表補上缺 `project_id` 與限流的適用範圍。
 
 - **[2026-10-16]** **專案資源範圍程式碼優化與請求數收斂**：
   - 前台 TTS 403 退回重構：`useTtsStreamer.ts` 的 `onFallback` 回呼直接帶入結構化 `{ voice, provider, reason }` 物件，避免 `useAvatarConversation.ts` 以脆弱的正則表達式解析錯誤文字。

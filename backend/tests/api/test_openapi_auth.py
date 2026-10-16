@@ -75,7 +75,7 @@ def test_chat_stream_documents_event_stream_only():
     assert "sentence" in responses["200"]["description"]
 
 
-def test_project_scoped_proxy_routes_document_missing_project_404():
+def test_project_scoped_proxy_routes_document_project_errors():
     paths = _brain_proxy_schema()["paths"]
     for path, method in (
         ("/api/v1/chat", "post"),
@@ -83,10 +83,11 @@ def test_project_scoped_proxy_routes_document_missing_project_404():
         ("/api/v1/knowledge/documents", "get"),
         ("/api/v1/memories", "post"),
     ):
-        assert "project_id" in paths[path][method]["responses"]["404"][
-            "description"
-        ], path
+        responses = paths[path][method]["responses"]
+        assert "404" in responses, path
+        assert "project_id" in responses["422"]["description"], path
     assert "404" not in paths["/api/v1/health"]["get"]["responses"]
+    assert "422" not in paths["/api/v1/health"]["get"]["responses"]
     assert "404" not in paths["/api/v1/projects"]["get"]["responses"]
 
 

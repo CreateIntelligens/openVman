@@ -400,3 +400,30 @@ def test_readable_but_not_editable_project_says_403(monkeypatch) -> None:
 
     assert granted.status_code == 403
     assert hidden.status_code == 404
+
+
+def test_missing_or_conflicting_project_id_says_422(monkeypatch) -> None:
+    # VH-371：缺 project_id 原本回 404「Resource not found」，串接方以為專案不存在，
+    # 而且連空訊息的欄位驗證都到不了。缺欄位與兩處不一致是請求格式問題，改回 422。
+    from tests.api.test_main import _authenticated_client, _load_main
+
+    module, _ = _load_main(monkeypatch)
+    client, _ = _authenticated_client(module)
+
+    missing = client.post("/api/v1/chat", json={"message": ""})
+    conflicting = client.post(
+        "/api/v1/chat",
+        params={"project_id": "default"},
+        json={"message": "hi", "project_id": "other"},
+    )
+    hidden = client.post(
+        "/api/v1/chat", json={"message": "hi", "project_id": "no-such-project"},
+    )
+
+    assert missing.status_code == 422
+    assert missing.json() == {"detail": "project_id is required"}
+    assert conflicting.status_code == 422
+    assert conflicting.json() == {
+        "detail": "project_id in query and body must match",
+    }
+    assert hidden.status_code == 404
