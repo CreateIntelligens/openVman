@@ -80,6 +80,39 @@ class AddMemoryRequest(BaseModel):
     metadata: dict[str, Any] = {}
 
 
+class ChatResponse(BaseModel):
+    """Documents the /chat reply; the route returns a dict and is not filtered by it."""
+
+    model_config = {"extra": "allow"}
+
+    status: str = Field("ok", description="固定為 ok")
+    reply: str = Field(..., description="回答文字（已清理，可直接顯示或送 TTS）")
+    session_id: str = Field(..., description="這一輪寫入的對話；下一輪帶回同一個值以延續上下文")
+    trace_id: str = Field(..., description="追查用的請求 ID")
+    answer_source: str = Field(
+        ..., description="回答依據：qa（問答節點）、knowledge（知識文件）、none（沒有引用知識庫）",
+    )
+    knowledge_searched: bool = Field(..., description="這一輪是否查過知識庫")
+    no_answer: bool = Field(
+        ...,
+        description=(
+            "查了知識庫但沒有可用答案，或回答本身在說查不到。整合方可據此改播固定的拒答句。"
+            "網路搜尋與記憶的引用不算知識庫命中"
+        ),
+    )
+    citations: list[dict[str, Any]] = Field(default_factory=list, description="引用來源（知識文件、網路、記憶）")
+    history: list[dict[str, Any]] = Field(default_factory=list, description="這個 session 目前的對話紀錄")
+    pii_pending: bool = Field(False, description="回答含待確認的個資提示")
+    request_context: dict[str, Any] = Field(
+        default_factory=dict, description="照抄請求帶入的 metadata 等脈絡",
+    )
+    image_id: str | None = Field(None, description="第一個引用附帶的圖片 ID（有才出現）")
+    url: str | None = Field(None, description="第一個引用的來源網址（有才出現）")
+    tool_steps: list[dict[str, Any]] = Field(default_factory=list, description="這一輪呼叫過的工具")
+    response_time_s: float | None = Field(None, description="生成耗時（秒）")
+    usage: dict[str, Any] = Field(default_factory=dict, description="這一輪的模型用量摘要")
+
+
 class ChatRequest(BaseModel):
     decision_debug: bool = Field(False, strict=True, description="Return transient decision diagnostics for this turn")
     message: str = Field(..., description="User message content")

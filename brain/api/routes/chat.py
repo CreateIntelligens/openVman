@@ -44,7 +44,8 @@ from protocol.message_envelope import (
     merge_metadata,
 )
 from protocol.protocol_events import ProtocolValidationError
-from protocol.schemas import ChatRequest, ChatTurnAcceptRequest
+from protocol.schemas import ChatRequest, ChatResponse, ChatTurnAcceptRequest
+from safety.guardrails import RequestRateLimitedError
 from safety.internal_auth import (
     PRINCIPAL_ID_HEADER,
     PRINCIPAL_TYPE_HEADER,
@@ -117,6 +118,19 @@ def _handle_generation_error(exc: Exception, action: str, request: Request) -> N
         record_generation_failure(action, "llm_failure", str(exc))
         error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
         raise HTTPException(status_code=502, detail=error_payload) from exc
+
+    # 限流也是 ValueError，但它不是請求內容有問題：標成 INVALID_REQUEST 會叫串接端
+    # 改寫問題，實際上該等一下再送。
+    if isinstance(exc, RequestRateLimitedError):
+        record_generation_failure(action, "rate_limited", str(exc))
+        error_payload = build_protocol_error(
+            "LLM_OVERLOAD", str(exc), retry_after_ms=exc.retry_after_seconds * 1000,
+        )
+        raise HTTPException(
+            status_code=429,
+            detail=error_payload,
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        ) from exc
 
     if isinstance(exc, (ValueError, ProtocolValidationError)):
         # 這條路以前不記 log，錯誤訊息只進 metrics，出事時得靠推理拼回來。
@@ -252,7 +266,16 @@ async def _generate_chat_response(
     return response
 
 
-@router.post("/chat", summary="非串流對話")
+@router.post(
+    "/chat",
+    summary="非串流對話",
+    responses={
+        200: {
+            "model": ChatResponse,
+            "description": "回答。沒有回答語言欄位：要念台語請依 ASR 回傳的 language 決定 TTS",
+        },
+    },
+)
 async def chat(request: Request, payload: ChatRequest):
     # 用戶端斷線（數位人被打斷、整合方 abort fetch）就停止生成：不再開下一次 LLM
     # 呼叫或工具輪，也不寫對話紀錄。已送出的那一次 LLM 請求收不回來。

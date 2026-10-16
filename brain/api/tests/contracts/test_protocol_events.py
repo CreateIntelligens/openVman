@@ -50,6 +50,7 @@ def test_load_protocol_contract_exposes_versioned_machine_readable_schemas():
         "BRAIN_UNAVAILABLE",
         "AUTH_FAILED",
         "SESSION_EXPIRED",
+        "INVALID_REQUEST",
         "INTERNAL_ERROR",
     ]
 

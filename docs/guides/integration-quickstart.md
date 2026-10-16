@@ -131,6 +131,18 @@
 
 `no_answer` 有兩種情況會是 true：完全沒檢索到任何段落；或檢索到了段落，但回覆本身在說資料裡沒有答案。知識庫檢索為了接住錯字與跨語言問法，門檻刻意放寬，沾到邊的段落也會被帶回來，例如在醫院專案問「火星上有幾座醫院？」會檢索到院內服務的 QA。所以有引用時，後端會再請決策模型看一次回覆，判斷它是不是在說查不到（每輪約多 0.1–0.2 秒；判斷逾時或失敗時只看有沒有引用）。2026-10-14 實測 10 句真實回覆（中英文、答出來與查不到各半）全對。這時 `answer_source` 仍照實標出檢索到的是 QA 或一般文件。
 
+### 用台語念回答
+
+`/api/v1/chat` 的回應沒有「回答語言」欄位；這一輪是不是台語，以 `/api/v1/asr/transcribe` 回應的 `language` 為準（`nan` 是台語）。ASR 要判斷台語，請求要帶 `project_id`，且該專案在知識庫設定開了台語分流；沒帶或沒權限時當成沒有專案，只辨識華語、不套詞表。
+
+Brain 對台語提問的回答一律寫成繁體中文文字（台語沒有通行的書寫）。`/api/v1/tts/stream` 帶 `project_id` 與 `speech_language: "nan"`、且專案分流含台語時，會把非台語引擎換成 VoxCPM；但 VoxCPM 照文字念，念出來多半是華語。要穩定念出台語，請直接指定 `provider: "cosyvoice"` 與已授權的 CosyVoice 聲音：CosyVoice 會先把漢字轉成台文再合成，只能整段合成（不逐句串流）。`/v1/audio/speech` 沒有 `speech_language`，只能直接指定 `provider` 與 `voice`。
+
+### 機台與伺服器代理
+
+- 憑證：伺服器端代理（例如機台後端、Edge Function）用帳號 API key，最好為這個用途開專屬帳號，只授權需要的專案與聲音。Embed key 是給公開網頁用的，每個請求都要帶白名單內的 `Origin`，而且不能呼叫 `/api/v1/asr/transcribe`。
+- 對話紀錄：用 API key 呼叫 `/api/v1/chat` 的對話會出現在後台該專案的對話紀錄，但紀錄沒有呼叫者欄位，不能依 key 篩選。要分出機台的對話，請自訂 `session_id` 前綴（例如 `kiosk-<機台>-<日期>`）或用專屬人設；`metadata` 只保存 `speech_language`。一個 session 最多 100 輪、閒置 30 天失效，機台要定期換新的 `session_id`。
+- 拒答句：Vman 沒有固定拒答句的設定，`no_answer: true` 時由你改播自己的內容。要讓對嘴引擎跟著動，請用 `/api/v1/tts/stream` 帶 `"format": "pcm16k"` 先合成一次存起來（16 kHz、單聲道、s16le raw PCM，不論引擎都一樣），播放與對嘴都用同一份。
+
 ### 打斷對話
 
 使用者打斷數位人時，直接中斷 `POST /api/v1/chat` 的 HTTP 請求（瀏覽器 `AbortController.abort()`、HTTP 用戶端關閉連線）即可。Backend 發現連線斷了就關掉往 Brain 的請求，Brain 不再開始下一次 LLM 呼叫或下一輪工具，也不寫入這一輪。已送給模型的那一次請求收不回來，所以中斷後仍可能有幾秒的模型用量。你不會收到回應；Backend 的 log 會記成 499。
@@ -223,11 +235,12 @@ with httpx.stream(
 
 | 狀態碼 | 意思 |
 |---|---|
+| 400 | 對話請求被拒：空訊息、超過長度上限或內容檢查擋下。`detail` 是 `{"event": "server_error", "error_code": "INVALID_REQUEST", "message": ...}`，改內容再送，不必重試或當成服務故障（`chat/stream` 在串流中以 `error` 事件帶同樣的 `{status: 400, detail}`） |
 | 401 | key 錯誤、過期、撤銷，或帳號停用 |
 | 403 | 帳號沒有這個資源或動作的權限（例如看得到專案但不能改、聲音不在授權或專案限制內） |
 | 404 | 專案、角色等資源不存在，或這個帳號看不到 |
 | 422 | 參數格式不對，例如不支援的引擎名稱。對話、知識庫、記憶、對話紀錄、人設、搜尋等專案範圍的 API（`/api/v1/chat`、`/api/v1/chat/stream`、`/api/v1/knowledge/*`、`/api/v1/memories`、`/api/v1/sessions`、`/api/v1/personas`、`/api/v1/search`、`/api/v1/embed`）沒帶 `project_id`（query 或 JSON body 擇一）回 `{"detail": "project_id is required"}`，兩處都帶但不一致回 `project_id in query and body must match`；這項檢查在其他欄位驗證之前。Embed key 由金鑰綁定專案，可以省略 |
-| 429 | 超過每把 key 每分鐘的上限（部署設定 `API_KEY_RATE_LIMIT_PER_MINUTE`，預設 300），依 `Retry-After` 秒數後重試 |
+| 429 | 超過每把 key 每分鐘的上限（部署設定 `API_KEY_RATE_LIMIT_PER_MINUTE`，預設 300），或對話超過同一專案、來源與頻道每分鐘上限（預設 90，`detail.error_code` 為 `LLM_OVERLOAD`）；依 `Retry-After` 秒數後重試 |
 | 502／503 | 指定的上游引擎失敗或未設定 |
 
 錯誤 body 為 `{"detail": ...}`。多台機台共用一把 key 時共用同一個上限。限流只算用帳號 API key 驗證的請求，以 60 秒滑動視窗計數，所以先前的呼叫也會算進去；登入 session、Embed key（另有自己的額度）與不需驗證的公開路由（例如 `GET /api/v1/characters`、`GET /api/v1/health`）不計。OpenAPI 在每個接受 API key 的操作都列出 429。

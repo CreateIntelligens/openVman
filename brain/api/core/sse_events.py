@@ -68,7 +68,9 @@ def protocol_error_code_for_exception(message: str) -> str:
     normalized = message.strip()
     if normalized.startswith("session 已"):
         return "SESSION_EXPIRED"
-    return "BRAIN_UNAVAILABLE"
+    # 走到這裡的是請求本身被拒（空訊息、超過長度、guardrail）。標成
+    # BRAIN_UNAVAILABLE 會讓串接端以為服務掛了，前台還會跳整頁錯誤。
+    return "INVALID_REQUEST"
 
 
 def build_exception_protocol_error(exc: Exception) -> dict[str, object]:

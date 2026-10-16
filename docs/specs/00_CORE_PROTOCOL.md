@@ -131,6 +131,7 @@ Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 
 | `BRAIN_UNAVAILABLE` | 大腦層無法連線 | 顯示故障提示，通知管理員 |
 | `AUTH_FAILED` | 認證失敗 | 斷開連線，提示重新認證 |
 | `SESSION_EXPIRED` | Session 逾期 | 自動重新 `client_init` |
+| `INVALID_REQUEST` | 請求被拒：空訊息、超過長度上限或內容檢查擋下（HTTP 400） | 顯示提示，不重試、不視為服務故障 |
 | `INTERNAL_ERROR` | 未預期的內部錯誤 | 顯示通用錯誤訊息 |
 
 **4.4 心跳探測 (Ping)**

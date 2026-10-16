@@ -45,3 +45,10 @@ test("the toast and the fatal overlay use the friendly text", () => {
   assert.match(overlay, /fatalErrorTitle\(code\)/);
   assert.equal(fatalErrorTitle("BRAIN_UNAVAILABLE"), "暫時無法使用");
 });
+
+test("a rejected request reads as something to rephrase, not an outage", () => {
+  // 空訊息被拒時 Brain 以前標成 BRAIN_UNAVAILABLE，來賓看到「服務暫時無法使用」。
+  const text = serverErrorText("INVALID_REQUEST", "message 不可為空");
+  assert.notEqual(text, serverErrorText("BRAIN_UNAVAILABLE"));
+  assert.notEqual(text, serverErrorText("SOMETHING_NEW"));
+});

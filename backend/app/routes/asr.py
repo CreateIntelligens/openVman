@@ -196,10 +196,31 @@ async def _transcribe_routed(
 )
 async def transcribe_for_account(
     account: CurrentAccount = Depends(get_current_account),
-    file: UploadFile = File(...),
-    project_id: str = Form(""),
-    language_routes: str | None = Form(None),
-    provider: Annotated[str, Form()] = "",
+    file: UploadFile = File(..., description="一句話的錄音（wav、webm、mp3 等）"),
+    project_id: str = Form(
+        "",
+        description=(
+            "要套用的專案：帶了且讀得到才會用該專案的詞表與語言分流（例如台語）。"
+            "沒帶或沒權限時不報錯，當成沒有專案：沒有詞表、只辨識華語"
+        ),
+    ),
+    language_routes: str | None = Form(
+        None,
+        description=(
+            "逗號分隔的語言代碼（zh、nan、en…），只能縮小專案在知識庫設定開的分流，不能多開。"
+            "分流含 nan 時改用專案的台語引擎（預設 breeze）並判斷是否為台語，"
+            "回應的 language 為 nan 代表這句是台語"
+        ),
+    ),
+    provider: Annotated[
+        str,
+        Form(
+            description=(
+                "指定批次引擎（breeze、r2t2、openai、sensevoice 等），須在帳號授權與專案清單內；"
+                "指定時只跑這個引擎、不備援，也不依台語分流換引擎。省略時依帳號偏好、專案預設、部署預設"
+            ),
+        ),
+    ] = "",
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> JSONResponse:
     """Transcribe a clip for an ordinary signed-in user.

@@ -114,3 +114,35 @@ def test_brain_merge_keeps_brain_responses_and_backend_overrides():
     assert operation["requestBody"] == {"$ref": "ChatRequest"}
     assert set(operation["responses"]) == {"200", "404", "422"}
     assert set(operation["responses"]["200"]["content"]) == {"text/event-stream"}
+
+
+def test_brain_response_model_replaces_the_proxy_placeholder():
+    # /api/v1/chat 的 200 以前是空 schema：代理路由只有 FastAPI 的預設回應，
+    # 合併時又整個蓋掉 Brain 寫好的 ChatResponse。
+    placeholder = {
+        "description": "Successful Response",
+        "content": {"application/json": {"schema": {}}},
+    }
+    documented = {
+        "description": "回答",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ChatResponse"}}},
+    }
+    local = {"paths": {"/api/v1/chat": {"post": {"responses": {
+        "200": placeholder, "400": {"description": "內容被拒"},
+    }}}}}
+    brain = {"paths": {"/brain/chat": {"post": {"responses": {
+        "200": documented, "422": {"description": "Validation Error"},
+    }}}}}
+    responses = _merge_brain_openapi(local, brain)["paths"]["/api/v1/chat"]["post"][
+        "responses"
+    ]
+    assert responses["200"] == documented
+    assert set(responses) == {"200", "400", "422"}
+
+
+def test_chat_routes_document_rejection_and_rate_limit():
+    paths = _brain_proxy_schema()["paths"]
+    for path in ("/api/v1/chat", "/api/v1/chat/stream"):
+        responses = paths[path]["post"]["responses"]
+        assert "INVALID_REQUEST" in responses["400"]["description"], path
+        assert "Retry-After" in responses["429"]["headers"], path

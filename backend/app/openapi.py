@@ -85,6 +85,30 @@ def _with_account_authentication(schema: dict) -> dict:
     return schema
 
 
+def _is_placeholder_response(response: object) -> bool:
+    """FastAPI's default 200 for a route that declares nothing about its body."""
+    if not isinstance(response, dict):
+        return False
+    content = response.get("content")
+    return (
+        response.get("description") == "Successful Response"
+        and isinstance(content, dict)
+        and all(
+            isinstance(media, dict) and media.get("schema") in ({}, None)
+            for media in content.values()
+        )
+    )
+
+
+def _merge_responses(brain: dict, local: dict) -> dict:
+    merged = {**brain, **local}
+    # 代理路由沒有回應模型，只有 FastAPI 預設的空 schema；Brain 有寫的就用 Brain 的。
+    for code, local_response in local.items():
+        if code in brain and _is_placeholder_response(local_response):
+            merged[code] = brain[code]
+    return merged
+
+
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
     merged = base_schema.copy()
 
@@ -110,10 +134,9 @@ def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
                     if isinstance(brain_value.get("responses"), dict) and isinstance(
                         local_value.get("responses"), dict,
                     ):
-                        operation["responses"] = {
-                            **brain_value["responses"],
-                            **local_value["responses"],
-                        }
+                        operation["responses"] = _merge_responses(
+                            brain_value["responses"], local_value["responses"],
+                        )
                     merged_path_item[key] = operation
                 else:
                     merged_path_item[key] = local_value

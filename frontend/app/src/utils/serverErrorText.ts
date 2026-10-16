@@ -11,6 +11,7 @@ const BY_CODE: Record<string, string> = {
   GATEWAY_TIMEOUT: "查資料花了太久時間，請再問一次。",
   UPLOAD_FAILED: "檔案沒有上傳成功，請換個檔案或稍後再試。",
   INTERNAL_ERROR: "剛剛出了點狀況，請再問一次。",
+  INVALID_REQUEST: "這句話無法送出，請換個說法再試一次。",
   BRAIN_UNAVAILABLE: "服務暫時無法使用，請稍後再試，或請現場人員協助。",
   AUTH_FAILED: "登入已經失效，請重新登入。",
   CONNECTION_FAILED: "連線沒有成功，請確認網路後再試。",

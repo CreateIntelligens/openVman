@@ -45,6 +45,7 @@ _TAG_MEMORY = ["Brain / Memory & Sessions"]
 _TAG_KNOWLEDGE = ["Brain / Knowledge"]
 _TAG_PROTOCOL = ["Brain / Protocol"]
 _PUBLIC_BRAIN_PATHS = frozenset({f"{_PUBLIC_API_PREFIX}/health"})
+_CHAT_PATHS = frozenset({f"{_PUBLIC_API_PREFIX}/chat", f"{_PUBLIC_API_PREFIX}/chat/stream"})
 
 _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/health", "methods": ["GET"], "tags": _TAG_BRAIN_SYSTEM, "summary": "Brain Health"},
@@ -167,9 +168,33 @@ _EVENT_STREAM_RESPONSES: dict[int | str, dict[str, Any]] = {
     200: {
         "description": (
             "text/event-stream。`sentence` 事件逐句帶 `{index, text}`；"
-            "`done` 帶與 `/api/v1/chat` 相同的完整回應；"
+            "`done` 帶與 `/api/v1/chat` 相同的完整回應（欄位見 ChatResponse）；"
             "`error` 帶 `{status, detail}`。收到 `done` 或 `error` 後串流結束。"
         ),
+    },
+}
+_CHAT_RESPONSES: dict[int | str, dict[str, Any]] = {
+    400: {
+        "description": (
+            "內容被拒：空訊息、超過長度上限或內容檢查擋下。detail 為 "
+            "`{event: \"server_error\", error_code: \"INVALID_REQUEST\", message}`；"
+            "session 已達輪數上限時 error_code 為 SESSION_EXPIRED。改內容或換新的 "
+            "session_id 再送，不必當成服務故障。`chat/stream` 在串流中以 `error` 事件"
+            "帶同樣的 `{status, detail}`"
+        ),
+    },
+    429: {
+        "description": (
+            "請求太頻繁：帳號 API key 每分鐘上限（API_KEY_RATE_LIMIT_PER_MINUTE，預設 300），"
+            "或同一專案、來源與頻道的對話每分鐘上限（預設 90，detail.error_code 為 "
+            "LLM_OVERLOAD）。依 Retry-After 秒數後重試"
+        ),
+        "headers": {
+            "Retry-After": {
+                "description": "距離可再呼叫的秒數",
+                "schema": {"type": "integer"},
+            },
+        },
     },
 }
 _PROJECT_CONTEXT_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -558,6 +583,8 @@ def _documented_responses(route_def: dict[str, Any]) -> dict[int | str, dict[str
     responses: dict[int | str, dict[str, Any]] = {}
     if route_def.get("response_class") == "event_stream":
         responses.update(_EVENT_STREAM_RESPONSES)
+    if route_def["path"] in _CHAT_PATHS:
+        responses.update(_CHAT_RESPONSES)
     brain_path = route_def["path"].removeprefix(f"{_PUBLIC_API_PREFIX}/")
     if route_def["path"] not in _PUBLIC_BRAIN_PATHS and _requires_project_context(
         brain_path

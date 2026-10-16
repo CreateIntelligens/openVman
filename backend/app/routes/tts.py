@@ -10,7 +10,7 @@ from typing import Literal
 import httpx
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app import language_routes as language_routes_mod
 from app import voice_policy
@@ -181,20 +181,50 @@ async def create_speech(
 
 
 class TtsStreamRequest(BaseModel):
-    text: str
-    character: str = ""
-    provider: str = ""
-    voice: str = ""
-    # 語言分流：有台語分流時 TTS 原本不是 VoxCPM／CosyVoice 就改用 VoxCPM。
-    project_id: str = ""
+    text: str = Field(..., description="要念的文字")
+    character: str = Field(
+        "", description="舊欄位，等同 voice；新串接請用 voice",
+    )
+    provider: str = Field(
+        "",
+        description=(
+            "TTS 引擎（indextts、voxcpm、cosyvoice、gemini-tts、edge-tts 等，"
+            "可用的引擎與聲音見 GET /api/v1/tts/providers）。省略時由 voice 推導或用帳號預設"
+        ),
+    )
+    voice: str = Field(
+        "",
+        description="聲音 ID，須在帳號授權與專案清單內；省略時用專案預設、再來是帳號預設",
+    )
+    project_id: str = Field(
+        "",
+        description=(
+            "套用該專案的聲音限制與語言分流。用帳號 API key 時要帶，台語自動分流才會生效"
+        ),
+    )
     # 逗號分隔字串或陣列都收。
-    language_routes: list[str] | str | None = None
-    # 這一輪使用者語音被 ASR 判成的語言；只有 "nan"（真的講台語）才換 VoxCPM。
+    language_routes: list[str] | str | None = Field(
+        None,
+        description="語言代碼（zh、nan…），只能縮小專案在知識庫設定開的分流；逗號分隔字串或陣列",
+    )
     # 打字、快速問答、講華語都沒有這個值，照使用者選的 TTS。
-    speech_language: str = ""
-    # 空字串＝照引擎原樣回傳（前台虛擬人依賴這個行為）；"pcm16k"＝不論引擎都轉成
-    # 16 kHz mono s16le raw PCM 串流，給 MatesX 等只吃這種格式的對嘴引擎。
-    format: Literal["", "pcm16k"] = ""
+    speech_language: str = Field(
+        "",
+        description=(
+            "這一輪使用者語音被 ASR 判成的語言，照抄 /api/v1/asr/transcribe 回應的 language。"
+            "只有 nan 會觸發台語分流：專案分流含 nan 且 provider 不是 voxcpm／cosyvoice 時改用 "
+            "VoxCPM，但 VoxCPM 照文字念，Brain 的台語回答是華語文字，念出來多半是華語。"
+            "要穩定念台語請直接指定 provider=cosyvoice 與已授權的 voice（CosyVoice 會轉台文，只能整段合成）"
+        ),
+    )
+    # 空字串＝照引擎原樣回傳（前台虛擬人依賴這個行為）。
+    format: Literal["", "pcm16k"] = Field(
+        "",
+        description=(
+            "空字串照引擎原樣回傳（WAV／MP3／PCM，看 Content-Type）；pcm16k 一律轉成 "
+            "16 kHz、單聲道、s16le raw PCM 串流，給只吃這種格式的對嘴引擎"
+        ),
+    )
 
 
 def _stream_audio(

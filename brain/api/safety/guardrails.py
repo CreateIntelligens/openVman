@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
+from math import ceil
 from threading import Lock
 from time import monotonic
 
@@ -103,6 +104,14 @@ def enforce_session_limits(session_id: str | None, persona_id: str, project_id: 
         raise ValueError(f"session 已達 {cfg.max_session_rounds} 輪上限")
 
 
+class RequestRateLimitedError(ValueError):
+    """Too many requests for one project/client/channel inside the window."""
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__("請求過於頻繁，請稍後再試")
+        self.retry_after_seconds = retry_after_seconds
+
+
 def _enforce_rate_limit(action: str, context: RequestContext) -> None:
     cfg = get_settings()
     limit = max(1, cfg.request_rate_limit_per_minute)
@@ -115,5 +124,5 @@ def _enforce_rate_limit(action: str, context: RequestContext) -> None:
         while timestamps and timestamps[0] < window_start:
             timestamps.popleft()
         if len(timestamps) >= limit:
-            raise ValueError("請求過於頻繁，請稍後再試")
+            raise RequestRateLimitedError(max(1, ceil(timestamps[0] + 60 - now)))
         timestamps.append(now)
