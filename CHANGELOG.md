@@ -41,6 +41,8 @@
 
 ### Fixed
 
+- **[2026-10-16]** **虛擬人前台看不到專案專屬人物**：開機時繪製流程在專案決定前就先抓一次不帶 `project_id` 的 `/api/v1/avatar`，專案決定後再帶專案抓一次；前一次較晚回來時會把清單蓋掉，專案專屬人物（例如 AWS-dev 的 `local_01`）就從選單消失。`useAvatarCatalog` 改成只採用最後發出的請求結果。人物選單的 2D 項目也拿掉每一項都一樣的「· openVman 2D」，只顯示人物名稱（VRM 仍標「· VRM」）。
+
 - **[2026-10-15]** **專案資源範圍第一輪 Review 修正與契約統一**：
   - 修復上傳專案資源時使用不存在的 `ResourceAccess.WRITE` 錯誤，全數改用 `ResourceAccess.MUTATE` 並補齊非 ROOT 管理員上傳測試。
   - 修復 `/api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/mascots` 列表在帶 `?project_id=` 時未檢查專案讀取權限之漏洞（未授權專案一律回 404）。

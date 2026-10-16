@@ -21,6 +21,5 @@ test("frontend wraps the vendor engine behind the openVman runtime name", () => 
   assert.match(runtime, /export function useOpenVmanAvatarRuntime\(\)/);
   assert.match(app, /useOpenVmanAvatarRuntime/);
   assert.doesNotMatch(app, /useMatesX/);
-  assert.match(settings, /· openVman 2D/);
   assert.doesNotMatch(settings, /· MatesX/);
 });

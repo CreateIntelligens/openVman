@@ -288,7 +288,7 @@ const characterOptions = computed(() =>
   [
     ...props.characters.map((c) => ({
       value: toOpenVmanCharacterValue(c.id),
-      label: `${c.name} · openVman 2D`,
+      label: c.name,
       in_project_scope: c.in_project_scope,
     })),
     ...props.vrmCharacters.map((v) => ({

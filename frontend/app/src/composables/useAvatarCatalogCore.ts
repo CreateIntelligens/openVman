@@ -64,3 +64,17 @@ export function fetchErrorMessage(failure: { status: number } | unknown): string
        }
        return '無法載入角色清單'
 }
+
+/**
+ * Keep only the newest of overlapping catalog requests.
+ *
+ * 開機時繪製流程在專案決定前就先抓一次（不帶專案），專案決定後又帶專案抓一次；
+ * 前一次較晚回來時會把專案專屬的人物蓋掉，所以只採用最後發出的那次。
+ */
+export function createLatestRequestGuard(): { start: () => number; isLatest: (ticket: number) => boolean } {
+       let latest = 0
+       return {
+              start: () => ++latest,
+              isLatest: (ticket: number) => ticket === latest,
+       }
+}

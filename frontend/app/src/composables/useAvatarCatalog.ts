@@ -14,6 +14,7 @@ import { ref, readonly, type Ref } from 'vue'
 import { apiFetch } from '../api/http'
 import {
        DEFAULT_AVATAR_CATALOG_ENDPOINT,
+       createLatestRequestGuard,
        parseAvatarCatalog,
        fetchErrorMessage,
        type AvatarCharacter,
@@ -43,8 +44,10 @@ export function useAvatarCatalog(options: AvatarCatalogOptions = {}): AvatarCata
        const characters = ref<AvatarCharacter[]>([])
        const loading = ref(false)
        const error = ref<string | null>(null)
+       const guard = createLatestRequestGuard()
 
        async function load(projectId?: string): Promise<void> {
+              const ticket = guard.start()
               loading.value = true
               error.value = null
               try {
@@ -52,17 +55,19 @@ export function useAvatarCatalog(options: AvatarCatalogOptions = {}): AvatarCata
                             ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}project_id=${encodeURIComponent(projectId)}`
                             : endpoint
                      const res = await doFetch(url)
+                     if (!guard.isLatest(ticket)) return
                      if (!res.ok) {
                             // Keep the previous list to avoid flicker on transient failures.
                             error.value = fetchErrorMessage({ status: res.status })
                             return
                      }
                      const body = await res.json().catch(() => null)
+                     if (!guard.isLatest(ticket)) return
                      characters.value = parseAvatarCatalog(body)
               } catch (err) {
-                     error.value = fetchErrorMessage(err)
+                     if (guard.isLatest(ticket)) error.value = fetchErrorMessage(err)
               } finally {
-                     loading.value = false
+                     if (guard.isLatest(ticket)) loading.value = false
               }
        }
 

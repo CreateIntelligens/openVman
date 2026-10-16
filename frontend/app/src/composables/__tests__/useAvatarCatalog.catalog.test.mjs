@@ -18,7 +18,7 @@ const compiled = ts.transpileModule(source, {
 }).outputText;
 
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
-const { DEFAULT_AVATAR_CATALOG_ENDPOINT, parseAvatarCatalog, fetchErrorMessage } =
+const { DEFAULT_AVATAR_CATALOG_ENDPOINT, parseAvatarCatalog, fetchErrorMessage, createLatestRequestGuard } =
   await import(moduleUrl);
 
 test("the catalog defaults to the backend avatar endpoint", () => {
@@ -69,4 +69,13 @@ test("fetchErrorMessage describes an HTTP status failure", () => {
 
 test("fetchErrorMessage describes a thrown network error", () => {
   assert.match(fetchErrorMessage(new Error("boom")), /boom/);
+});
+
+test("only the newest overlapping catalog request may apply its result", () => {
+  // 開機時「不帶專案」的請求先發、較晚回來，不可蓋掉帶專案的清單。
+  const guard = createLatestRequestGuard();
+  const withoutProject = guard.start();
+  const withProject = guard.start();
+  assert.equal(guard.isLatest(withoutProject), false);
+  assert.equal(guard.isLatest(withProject), true);
 });
