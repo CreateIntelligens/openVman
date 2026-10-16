@@ -157,7 +157,6 @@
       @tts-provider-change="handleTtsChange"
       @asr-provider-change="handleAsrProviderChange"
       @tts-voice-change="handleTtsVoiceChange"
-      @project-preview-change="handleProjectPreviewChange"
       @project-change="handleProjectChange"
       @persona-change="handlePersonaChange"
       @voice-mode-change="handleVoiceModeChange"
@@ -332,7 +331,7 @@ function handleEnterKiosk(): void {
   visitor.enterDeviceKiosk();
   started.value = false;
 }
-const { handleTtsChange, handleTtsVoiceChange, handleProjectPreviewChange,
+const { handleTtsChange, handleTtsVoiceChange,
   handleProjectChange, handlePersonaChange, handleVoiceModeChange,
   handleReplyModeChange } = useAvatarSettings(settings, bootstrap, showSettings, stage.syncCharacter);
 

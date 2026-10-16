@@ -101,7 +101,6 @@ const emit = defineEmits<{
   asrProviderChange: [provider: string]
   ttsVoiceChange: [voice: string]
   projectChange: [projectId: string]
-  projectPreviewChange: [projectId: string]
   personaChange: [personaId: string]
   voiceModeChange: [mode: 'live' | 'text']
   replyModeChange: [mode: ReplyMode]
@@ -328,10 +327,16 @@ function backgroundSwatchStyle(option: BackgroundOption): Record<string, string>
 }
 
 function handleProjectDraftChange(): void {
-  // 換專案時人設跟著新專案重挑；切回原本的專案就整組回到目前的設定。
-  if (draftProjectId.value === props.currentProjectId) forget('projectId')
-  forget('personaId')
-  emit('projectPreviewChange', draftProjectId.value)
+  // 人物、聲音、ASR、背景的清單都依專案而定。以前換專案只當草稿、只預覽人設，
+  // 其他選單停在舊專案，要關掉重開才會換。改成選了就套用，依專案而定的欄位
+  // 放掉草稿，跟著新專案的清單與預設走。
+  const projectId = draftProjectId.value
+  if (projectId !== props.currentProjectId) emit('projectChange', projectId)
+  forget(
+    'projectId', 'personaId', 'charId', 'vrmId', 'renderMode',
+    'ttsProvider', 'ttsVoice', 'asrProvider',
+    'backgroundId', 'backgroundUrl', 'backgroundFit',
+  )
 }
 
 function applyAndClose(): void {

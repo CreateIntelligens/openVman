@@ -16,10 +16,6 @@ export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>,
     saveSettings({ ttsProvider: settings.ttsProvider, ttsVoice: voice });
   }
 
-  function handleProjectPreviewChange(projectId: string): void {
-    void fetchPersonas(projectId, { syncSelected: false });
-  }
-
   function handleProjectChange(projectId: string): void {
     if (!projectId) return;
     saveSettings({ projectId });
@@ -46,5 +42,5 @@ export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>,
     void fetchBackgrounds();
   });
 
-  return { handleTtsChange, handleTtsVoiceChange, handleProjectPreviewChange, handleProjectChange, handlePersonaChange, handleVoiceModeChange, handleReplyModeChange };
+  return { handleTtsChange, handleTtsVoiceChange, handleProjectChange, handlePersonaChange, handleVoiceModeChange, handleReplyModeChange };
 }

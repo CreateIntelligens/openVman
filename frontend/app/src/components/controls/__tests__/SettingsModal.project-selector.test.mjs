@@ -107,3 +107,17 @@ test("background changes apply without forcing chat reconnect", () => {
   assert.match(source, /const applyLabel = computed/);
   assert.doesNotMatch(source, /{{ isDirty \? '套用並重新連線' : '關閉' }}/);
 });
+
+test("choosing a project applies it so the other menus load that project's lists", () => {
+  // 2026-10-16 使用者回報：設定裡換專案，人物、聲音等選單沒跟著換，要關掉重開。
+  // 以前換專案只當草稿、只預覽人設；清單都依目前專案載入，所以要立即套用。
+  const start = source.indexOf("function handleProjectDraftChange()");
+  const body = source.slice(start, source.indexOf("\n}\n", start));
+  const emitAt = body.indexOf("emit('projectChange', projectId)");
+  assert.notEqual(emitAt, -1, "選了專案要立即送出 projectChange");
+  assert.ok(emitAt < body.indexOf("forget("), "先套用專案，再放掉依專案而定的草稿");
+  for (const key of ["charId", "ttsProvider", "ttsVoice", "asrProvider", "personaId", "backgroundId"]) {
+    assert.match(body, new RegExp(`'${key}'`), `${key} 要改跟新專案的清單`);
+  }
+  assert.doesNotMatch(source, /projectPreviewChange/);
+});
