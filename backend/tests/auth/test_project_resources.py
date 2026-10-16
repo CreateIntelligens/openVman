@@ -940,3 +940,27 @@ def test_duplicate_upload_409_conflict_and_reupload_update(env, monkeypatch):
     rec = env.runtime.resources.get(ResourceType.AVATAR_BACKGROUND, "bg-proj-1")
     assert rec is not None
     assert json.loads(rec.metadata_json).get("label") == "Updated Label"
+
+
+def test_unscoped_avatar_list_shows_project_characters_only_to_root(env, monkeypatch):
+    """後台資源管理頁不帶專案：ROOT 要看到各專案的專屬人物並知道屬於哪個專案。"""
+    from app.routes import avatar as avatar_routes
+
+    monkeypatch.setattr(
+        avatar_routes.get_store(),
+        "list_characters",
+        lambda: [
+            {"char_id": "char-global-1", "label": "Global Char 1"},
+            {"char_id": "char-proj-1", "label": "Project Char 1"},
+        ],
+    )
+
+    root = env.client.get("/api/v1/avatar", headers=_headers(env, env.root)).json()
+    root_chars = {c["char_id"]: c for c in root["characters"]}
+    assert root_chars["char-proj-1"]["source"] == "project"
+    assert root_chars["char-proj-1"]["owner_project_id"] == "proj-1"
+    assert root_chars["char-global-1"]["source"] == "grant"
+    assert root_chars["char-global-1"]["owner_project_id"] is None
+
+    member = env.client.get("/api/v1/avatar", headers=_headers(env, env.member)).json()
+    assert "char-proj-1" not in {c["char_id"] for c in member["characters"]}

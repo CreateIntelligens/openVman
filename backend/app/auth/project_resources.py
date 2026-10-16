@@ -237,3 +237,24 @@ def effective_project_default(
     in_scope_entries = [e for e in available_entries if e.in_project_scope]
     return (in_scope_entries or available_entries)[0].resource_id
 
+
+
+def unscoped_resource_sources(
+    runtime: AuthRuntime,
+    account: UserRecord,
+    resource_type: ResourceType,
+) -> dict[str, tuple[str, str | None]]:
+    """Resources an account sees in a list without a project: id → (source, owner project).
+
+    一般帳號只看得到全域資源。ROOT 的資源管理頁要看到全部，包含各專案的專屬資源
+    （source="project"，附擁有的專案）與擁有專案已刪除的孤兒資源（source="orphan"）。
+    """
+    is_root = account.role is AccountRole.ROOT
+    sources: dict[str, tuple[str, str | None]] = {}
+    for resource in list_accessible_resources(runtime.resources, account, resource_type):
+        if resource.visibility is not ResourceVisibility.PROJECT:
+            sources[resource.resource_id] = ("grant", None)
+        elif is_root:
+            owner = resource.owner_project_id
+            sources[resource.resource_id] = ("project" if owner else "orphan", owner)
+    return sources

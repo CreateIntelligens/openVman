@@ -10,11 +10,13 @@ from pydantic import BaseModel, Field
 
 from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
 from app.auth.models import AccountRole, ResourceType, ResourceVisibility
-from app.auth.project_resources import effective_project_resources
+from app.auth.project_resources import (
+    effective_project_resources,
+    unscoped_resource_sources,
+)
 from app.auth.resources import (
     ResourceAccess,
     ResourceNotFoundError,
-    list_accessible_resources,
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
@@ -23,7 +25,6 @@ from app.avatar.store import (
     CharacterExists,
     CharacterNotFound,
 )
-from app.config import get_tts_config
 from app.avatar.validation import (
     InvalidCharId,
     InvalidUpload,
@@ -31,6 +32,7 @@ from app.avatar.validation import (
     validate_data_bytes,
     validate_video_bytes,
 )
+from app.config import get_tts_config
 
 logger = logging.getLogger("backend.avatar")
 router = APIRouter()
@@ -141,29 +143,18 @@ async def list_characters(
                 })
         return {"characters": characters}
 
-    is_root = current.user.role is AccountRole.ROOT
-    accessible = list_accessible_resources(
-        runtime.resources,
-        current.user,
-        ResourceType.AVATAR_CHARACTER,
+    sources = unscoped_resource_sources(
+        runtime, current.user, ResourceType.AVATAR_CHARACTER,
     )
-    accessible_sources = {
-        resource.resource_id: (
-            "orphan"
-            if is_root
-            and resource.visibility is ResourceVisibility.PROJECT
-            and resource.owner_project_id is None
-            else "grant"
-        )
-        for resource in accessible
-        if resource.visibility is not ResourceVisibility.PROJECT
-        or (is_root and resource.owner_project_id is None)
-    }
     return {
         "characters": [
-            {**character, "source": accessible_sources[character["char_id"]]}
+            {
+                **character,
+                "source": sources[character["char_id"]][0],
+                "owner_project_id": sources[character["char_id"]][1],
+            }
             for character in get_store().list_characters()
-            if character.get("char_id") in accessible_sources
+            if character.get("char_id") in sources
         ]
     }
 

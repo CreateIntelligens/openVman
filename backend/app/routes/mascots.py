@@ -21,11 +21,13 @@ from app.auth.dependencies import (
     require_admin,
 )
 from app.auth.models import AccountRole, ResourceType, ResourceVisibility
-from app.auth.project_resources import effective_project_resources
+from app.auth.project_resources import (
+    effective_project_resources,
+    unscoped_resource_sources,
+)
 from app.auth.resources import (
     ResourceAccess,
     ResourceNotFoundError,
-    list_accessible_resources,
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
@@ -149,45 +151,19 @@ async def list_mascots(
                 mascots.append(item)
         return {"mascots": mascots}
 
-    is_root = current.user.role is AccountRole.ROOT
-    accessible_mascots = list_accessible_resources(
-        runtime.resources,
-        current.user,
-        ResourceType.AVATAR_MASCOT,
+    accessible_mascot_sources = unscoped_resource_sources(
+        runtime, current.user, ResourceType.AVATAR_MASCOT,
     )
-    accessible_mascot_sources = {
-        resource.resource_id: (
-            "orphan"
-            if is_root
-            and resource.visibility is ResourceVisibility.PROJECT
-            and resource.owner_project_id is None
-            else "grant"
-        )
-        for resource in accessible_mascots
-        if resource.visibility is not ResourceVisibility.PROJECT
-        or (is_root and resource.owner_project_id is None)
-    }
-
-    accessible_characters = list_accessible_resources(
-        runtime.resources,
-        current.user,
-        ResourceType.AVATAR_CHARACTER,
+    accessible_char_sources = unscoped_resource_sources(
+        runtime, current.user, ResourceType.AVATAR_CHARACTER,
     )
-    accessible_char_sources = {
-        resource.resource_id: (
-            "orphan"
-            if is_root
-            and resource.visibility is ResourceVisibility.PROJECT
-            and resource.owner_project_id is None
-            else "grant"
-        )
-        for resource in accessible_characters
-        if resource.visibility is not ResourceVisibility.PROJECT
-        or (is_root and resource.owner_project_id is None)
-    }
 
     mascots = [
-        {**mascot, "source": accessible_mascot_sources[mascot["mascot_id"]]}
+        {
+            **mascot,
+            "source": accessible_mascot_sources[mascot["mascot_id"]][0],
+            "owner_project_id": accessible_mascot_sources[mascot["mascot_id"]][1],
+        }
         for mascot in store.list_mascots()
         if mascot.get("mascot_id") in accessible_mascot_sources
         and (

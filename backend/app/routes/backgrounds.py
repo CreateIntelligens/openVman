@@ -20,11 +20,13 @@ from app.auth.dependencies import (
     require_admin,
 )
 from app.auth.models import AccountRole, ResourceType, ResourceVisibility
-from app.auth.project_resources import effective_project_resources
+from app.auth.project_resources import (
+    effective_project_resources,
+    unscoped_resource_sources,
+)
 from app.auth.resources import (
     ResourceAccess,
     ResourceNotFoundError,
-    list_accessible_resources,
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
@@ -106,29 +108,18 @@ async def list_backgrounds(
                 })
         return {"backgrounds": backgrounds}
 
-    is_root = current.user.role is AccountRole.ROOT
-    accessible = list_accessible_resources(
-        runtime.resources,
-        current.user,
-        ResourceType.AVATAR_BACKGROUND,
+    sources = unscoped_resource_sources(
+        runtime, current.user, ResourceType.AVATAR_BACKGROUND,
     )
-    accessible_sources = {
-        resource.resource_id: (
-            "orphan"
-            if is_root
-            and resource.visibility is ResourceVisibility.PROJECT
-            and resource.owner_project_id is None
-            else "grant"
-        )
-        for resource in accessible
-        if resource.visibility is not ResourceVisibility.PROJECT
-        or (is_root and resource.owner_project_id is None)
-    }
     return {
         "backgrounds": [
-            {**bg, "source": accessible_sources[bg["background_id"]]}
+            {
+                **bg,
+                "source": sources[bg["background_id"]][0],
+                "owner_project_id": sources[bg["background_id"]][1],
+            }
             for bg in get_store().list_backgrounds()
-            if bg.get("background_id") in accessible_sources
+            if bg.get("background_id") in sources
         ]
     }
 

@@ -41,6 +41,8 @@
 
 ### Fixed
 
+- **[2026-10-16]** **後台 Avatar 管理頁看不到專案專屬的人物、背景、小助理**：管理頁列表不帶 `project_id`，後端此時連 ROOT 也只列全域與孤兒資源，例如 AWS-dev 的 `local_01` 不會出現。`GET /api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/avatar/mascots` 不帶專案時，ROOT 改為也列出各專案的專屬資源（`source="project"`），每項新增 `owner_project_id`；非 ROOT 帳號不變，仍只看得到全域資源。計算集中在 `project_resources.unscoped_resource_sources`。
+
 - **[2026-10-16]** **虛擬人前台看不到專案專屬人物**：開機時繪製流程在專案決定前就先抓一次不帶 `project_id` 的 `/api/v1/avatar`，專案決定後再帶專案抓一次；前一次較晚回來時會把清單蓋掉，專案專屬人物（例如 AWS-dev 的 `local_01`）就從選單消失。`useAvatarCatalog` 改成只採用最後發出的請求結果。人物選單的 2D 項目也拿掉每一項都一樣的「· openVman 2D」，只顯示人物名稱（VRM 仍標「· VRM」）。
 
 - **[2026-10-15]** **專案資源範圍第一輪 Review 修正與契約統一**：
