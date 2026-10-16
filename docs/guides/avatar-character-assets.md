@@ -1,6 +1,6 @@
 # 2D 人物素材：格式要求、上架與驗收
 
-前台與 Avatar SDK 用 DHLiveMini2（`frontend/app/public/js/DHLiveMini2.js`、`public/wasm/DHLiveMini2.wasm`）播放 2D 人物。每個人物是一個資料夾，放在 backend 的 `avatar_assets_dir`（正式機為 `data/avatar/<char_id>/`），經 `GET /static/characters/<char_id>/<檔名>` 提供，讀取權限依人物資源判斷（全域、專案專屬、ROOT 指派，見 `docs/specs/01_BACKEND_SPEC.md`「專案資源範圍」）。
+前台與 Avatar SDK 用 DHLiveMini2（`frontend/app/public/js/OpenVmanAvatarRuntime.js`、`public/wasm/DHLiveMini2.wasm`）播放 2D 人物。每個人物是一個資料夾，放在 backend 的 `avatar_assets_dir`（正式機為 `data/avatar/<char_id>/`），經 `GET /static/characters/<char_id>/<檔名>` 提供，讀取權限依人物資源判斷（全域、專案專屬、ROOT 指派，見 `docs/specs/01_BACKEND_SPEC.md`「專案資源範圍」）。
 
 素材的製作管線不在本 repo；本文只記 openVman 這端要求的格式、上架方式與如何驗收。
 
@@ -21,6 +21,10 @@
 1. 幀同步標記：引擎每格讀影片右上角 2×2 像素（`(width − 2, 0)`）的灰階平均，以 `round(avg / 40)` 當作 `幀號 % 7`。製作時每格右上角要寫入 `(幀號 % 7) × 40` 的灰階。VP9 低碼率會把太小的標記糊掉（2026-10-16 local_01 有 3 格讀錯，皆在開頭關鍵幀附近），標記區塊建議比 2×2 大，或提高該區域品質。
 2. 臉部姿態資料：每格的姿態資料必須讓嘴型網格落在 180×180 的嘴型貼圖範圍內。資料錯了，網格會整塊被裁掉，嘴型貼圖是全透明的：人物照常顯示、待機正常，只有講話時嘴巴不動。2026-10-16 local_01 第一版就是這個情況，由素材製作管線修正後解決。
 
+顯示修復集中在共用 TypeScript 模組 `frontend/shared/avatar/avatarFrameSyncRepair.ts`，由前台與 SDK 的 runtime adapter 安裝及卸載，不手動拆改 WASM 工具產生的引擎內容。讀取 2×2 標記時，先保留原始 RGBA 供引擎判斷幀號，再依左側與下側乾淨邊界重建右上角 16×16 背景，外緣 4 像素逐步融合原始畫面，避免複製另一塊背景造成方形亮度接縫。標記本體建議不超過 8×8，壓縮污染須留在修復區域內，修復邊界須保留背景；不要放人物或文字。修復使用 `putImageData`，不受影片繪製的 `globalCompositeOperation = "copy"` 影響。前台、Avatar SDK 與 SDK 嵌入 widget 共用此修正；3D VRM 不使用這項標記。
+
+引擎入口統一命名為 `OpenVmanAvatarRuntime.js`，其來源仍為 DHLiveMini2／Emscripten；WASM 檔名維持 `DHLiveMini2.wasm`。SDK 公開路徑 `/static/sdk/runtime/OpenVmanAvatarRuntime.js` 不變；前台 Nginx 將舊 `/js/DHLiveMini2.js` 轉送至新檔，讓仍留有舊 app bundle 的瀏覽器能載入。
+
 ## 上架
 
 用後台 Avatar 頁或 `POST /api/v1/avatar`（admin 以上）上傳：form `char_id`、`label`、`video`（`01.webm`）、`data`（`combined_data.json.gz`），選填 `project_id`。
@@ -35,3 +39,4 @@
 2. 幀同步標記：解出每格右上角 2×2，`round(avg/40)` 應等於 `幀號 % 7`；讀錯的格數越少越好。
 3. 權限：專案專屬人物用專案成員讀 `01.webm`／`combined_data.json.gz` 應 200；非成員 403；未登入 404；公開清單不出現。
 4. 實際播放：在前台選這個人物、送一句話，確認嘴巴開合跟著聲音。替換素材後瀏覽器可能留著舊檔，要強制重新整理。
+5. 標記修復：以淺色背景檢查待機及講話時右上角不再閃爍、修復區域沒有明顯接縫，且其餘人物畫面完整。前台與外部 SDK 都要驗證；舊頁面須強制重新整理以更新引擎。

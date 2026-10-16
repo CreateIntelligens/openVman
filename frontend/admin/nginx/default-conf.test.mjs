@@ -80,7 +80,7 @@ describe("nginx default config", () => {
       /location = \/static\/sdk\/runtime\/OpenVmanAvatarRuntime\.wasm \{[\s\S]*application\/wasm/,
     );
     expect(source).toMatch(
-      /location = \/static\/sdk\/runtime\/OpenVmanAvatarRuntime\.js \{[\s\S]*DHLiveMini2\.js/,
+      /location = \/static\/sdk\/runtime\/OpenVmanAvatarRuntime\.js \{[\s\S]*proxy_pass \$avatar\/js\/OpenVmanAvatarRuntime\.js;/,
     );
     expect(source.match(/proxy_hide_header Access-Control-Allow-Origin;/g)).toHaveLength(2);
   });

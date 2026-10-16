@@ -1,5 +1,9 @@
 import { inflate } from "pako";
 
+import {
+  installFrameSyncMarkerRepair,
+  type FrameSyncMarkerRepair,
+} from "../../shared/avatar/avatarFrameSyncRepair";
 import { OpenVmanAvatarError } from "./errors";
 import {
   installIdleLipSyncBypass,
@@ -30,20 +34,25 @@ export class AvatarRuntime {
   private chunkIndex = 0;
   private readonly instance: AvatarRuntimeInstance;
   private readonly idleLipSyncBypass: IdleLipSyncBypass | null;
+  private readonly frameSyncMarkerRepair: FrameSyncMarkerRepair | null;
 
   private constructor(
     instance: AvatarRuntimeInstance,
     idleLipSyncBypass: IdleLipSyncBypass | null,
+    frameSyncMarkerRepair: FrameSyncMarkerRepair | null,
   ) {
     this.instance = instance;
     this.idleLipSyncBypass = idleLipSyncBypass;
+    this.frameSyncMarkerRepair = frameSyncMarkerRepair;
   }
 
   static async create(baseUrl: string): Promise<AvatarRuntime> {
     await loadRuntimeScript(`${baseUrl}/static/sdk/runtime/OpenVmanAvatarRuntime.js`);
     const idleLipSyncBypass = installIdleLipSyncBypass();
+    const frameSyncMarkerRepair = installFrameSyncMarkerRepair();
     if (!window.createQtAppInstance) {
       idleLipSyncBypass?.restore();
+      frameSyncMarkerRepair?.restore();
       throw new OpenVmanAvatarError(
         "RESOURCE_LOAD_FAILED",
         "Avatar runtime factory is unavailable.",
@@ -56,9 +65,10 @@ export class AvatarRuntime {
           : path,
         onRuntimeInitialized() {},
       });
-      return new AvatarRuntime(instance, idleLipSyncBypass);
+      return new AvatarRuntime(instance, idleLipSyncBypass, frameSyncMarkerRepair);
     } catch (error) {
       idleLipSyncBypass?.restore();
+      frameSyncMarkerRepair?.restore();
       throw error;
     }
   }
@@ -131,6 +141,7 @@ export class AvatarRuntime {
   dispose(): void {
     this.idleLipSyncBypass?.resetSpeaking();
     this.idleLipSyncBypass?.restore();
+    this.frameSyncMarkerRepair?.restore();
   }
 
   pushAudio(pcm: Int16Array): void {

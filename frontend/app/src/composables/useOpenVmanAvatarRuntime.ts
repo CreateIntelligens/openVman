@@ -1,6 +1,10 @@
 import { inflate } from 'pako'
 import { onUnmounted, readonly, ref } from 'vue'
 
+import {
+  installFrameSyncMarkerRepair,
+  type FrameSyncMarkerRepair,
+} from '../../../shared/avatar/avatarFrameSyncRepair'
 import type { OpenVmanAvatarRuntimeInstance } from '../types/openVmanAvatarRuntime'
 import {
   installIdleLipSyncBypass,
@@ -11,7 +15,8 @@ let runtimeInstance: OpenVmanAvatarRuntimeInstance | null = null
 let runtimeInitPromise: Promise<OpenVmanAvatarRuntimeInstance> | null = null
 let runtimeScriptPromise: Promise<void> | null = null
 let idleLipSyncBypass: IdleLipSyncBypass | null = null
-// DHLiveMini2.js 載入時用 const 抓住當下的 #canvas_video，之後不再重查。
+let frameSyncMarkerRepair: FrameSyncMarkerRepair | null = null
+// OpenVmanAvatarRuntime.js 載入時用 const 抓住當下的 #canvas_video，之後不再重查。
 let vendorCanvas: HTMLElement | null = null
 // runtime 是模組層級的單例，可能同時被多個元件使用。用引用計數決定何時真正
 // 拆掉 canvas patch：最後一個使用者卸載才還原，否則會扯掉還在用的人的嘴型。
@@ -115,7 +120,7 @@ async function ensureAvatarRuntimeScript(): Promise<void> {
     }
 
     const script = document.createElement('script')
-    script.src = '/js/DHLiveMini2.js'
+    script.src = '/js/OpenVmanAvatarRuntime.js'
     script.async = true
     script.dataset.dhliveMini2 = 'true'
     script.onload = () => settleRuntimeScriptLoad(resolve, reject)
@@ -151,6 +156,8 @@ export function useOpenVmanAvatarRuntime() {
       return new Promise<OpenVmanAvatarRuntimeInstance>(() => {})
     }
     if (runtimeInstance) {
+      idleLipSyncBypass ??= installIdleLipSyncBypass()
+      frameSyncMarkerRepair ??= installFrameSyncMarkerRepair()
       isReady.value = true
       error.value = null
       return runtimeInstance
@@ -161,6 +168,7 @@ export function useOpenVmanAvatarRuntime() {
     try {
       await ensureAvatarRuntimeScript()
       idleLipSyncBypass ??= installIdleLipSyncBypass()
+      frameSyncMarkerRepair ??= installFrameSyncMarkerRepair()
       if (typeof window.createQtAppInstance !== 'function') {
         throw new Error('[OpenVmanAvatarRuntime] Runtime factory is unavailable')
       }
@@ -330,6 +338,8 @@ export function useOpenVmanAvatarRuntime() {
       // 要換回去，否則 patch 與它的 closure 會跟著 canvas 一直活著。
       idleLipSyncBypass?.restore()
       idleLipSyncBypass = null
+      frameSyncMarkerRepair?.restore()
+      frameSyncMarkerRepair = null
     }
   })
 

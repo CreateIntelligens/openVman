@@ -9,10 +9,22 @@ import { build } from "esbuild";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // 每個測試各自打包一份，模組層級的單例（runtime、腳本 promise）才不會互相污染。
-async function loadRuntimeModule() {
+async function loadRuntimeModule({ captureLifecycle = false } = {}) {
   const { outputFiles } = await build({
     entryPoints: [resolve(__dirname, "../useOpenVmanAvatarRuntime.ts")],
     bundle: true, write: false, platform: "node", format: "esm", logLevel: "error",
+    plugins: captureLifecycle ? [{
+      name: "capture-lifecycle",
+      setup(builder) {
+        builder.onResolve({ filter: /^vue$/ }, () => ({ path: "vue", namespace: "lifecycle" }));
+        builder.onLoad({ filter: /.*/, namespace: "lifecycle" }, () => ({
+          contents: `export const ref = value => ({ value });
+            export const readonly = value => value;
+            export const onUnmounted = callback => globalThis.__runtimeUnmounts.push(callback);`,
+          loader: "js",
+        }));
+      },
+    }] : [],
   });
   return import(
     `data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString("base64")}#${Math.random()}`
@@ -104,6 +116,29 @@ function fakeVideo({ play } = {}) {
 }
 
 const characterPayload = (name) => gzipSync(Buffer.from(JSON.stringify({ name })));
+
+test("a consumer reusing the connected canvas reinstalls and restores display repair", async (t) => {
+  const context = { clearRect() {}, drawImage() {}, getImageData() {} };
+  const originalReader = context.getImageData;
+  const canvas = { width: 720, height: 1280, isConnected: true, getContext: () => context };
+  const { document } = createFakeDom();
+  document.getElementById = () => canvas;
+  const globals = installGlobals(t, { document, runtime: createFakeRuntime(), video: fakeVideo() });
+  globals.makeFactoryAvailable();
+  const previous = globalThis.__runtimeUnmounts;
+  globalThis.__runtimeUnmounts = [];
+  t.after(() => { globalThis.__runtimeUnmounts = previous; });
+  const { useOpenVmanAvatarRuntime } = await loadRuntimeModule({ captureLifecycle: true });
+  await useOpenVmanAvatarRuntime().initWasm();
+  assert.notEqual(context.getImageData, originalReader);
+  globalThis.__runtimeUnmounts.shift()();
+  assert.equal(context.getImageData, originalReader);
+
+  await useOpenVmanAvatarRuntime().initWasm();
+  assert.notEqual(context.getImageData, originalReader);
+  globalThis.__runtimeUnmounts.shift()();
+  assert.equal(context.getImageData, originalReader);
+});
 
 function deferred() {
   let resolvePromise;
