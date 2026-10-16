@@ -46,43 +46,61 @@ export function parseVrmCharacterValue(value: string): string {
   return value.startsWith("vrm:") ? value.slice(4) : value;
 }
 
+/** 專案範圍內（黑字）排前面、範圍外（紅字）往後；同組內維持原本順序。 */
+export function scopeFirst<T extends { in_project_scope?: boolean }>(items: T[]): T[] {
+  return [
+    ...items.filter((item) => item.in_project_scope !== false),
+    ...items.filter((item) => item.in_project_scope === false),
+  ];
+}
+
+// 只有編號、沒取名字的人物（000～007 這類範例人物）。
+const UNNAMED_CHARACTER = /^\d+$/;
+
 export function buildCharacterOptions(
   characters: CharacterItem[],
   vrmCharacters: VrmCharacterItem[],
 ): SelectOption[] {
+  const named = characters.filter((c) => !UNNAMED_CHARACTER.test(c.name.trim()));
+  const unnamed = characters.filter((c) => UNNAMED_CHARACTER.test(c.name.trim()));
+  const toOption = (c: CharacterItem): SelectOption => ({
+    value: toOpenVmanCharacterValue(c.id),
+    label: c.name,
+    in_project_scope: c.in_project_scope,
+  });
+  // 有名字的人物在前（範圍內優先），編號範例人物與 3D 一律放最後，不搶版面。
   return [
-    ...characters.map((c) => ({
-      value: toOpenVmanCharacterValue(c.id),
-      label: c.name,
-      in_project_scope: c.in_project_scope,
-    })),
-    ...vrmCharacters.map((v) => ({
-      value: toVrmCharacterValue(v.id),
-      label: `${v.label} · VRM`,
-      in_project_scope: v.in_project_scope,
-    })),
+    ...scopeFirst(named).map(toOption),
+    ...scopeFirst([
+      ...unnamed.map(toOption),
+      ...vrmCharacters.map((v) => ({
+        value: toVrmCharacterValue(v.id),
+        label: `${v.label} · VRM`,
+        in_project_scope: v.in_project_scope,
+      })),
+    ]),
   ];
 }
 
 export function buildTtsProviderOptions(
   ttsProviders: Array<{ id: string; name: string; in_project_scope?: boolean }>,
 ): SelectOption[] {
-  return ttsProviders.map((p) => ({
+  return scopeFirst(ttsProviders.map((p) => ({
     value: p.id,
     label: p.name,
     in_project_scope: p.in_project_scope,
-  }));
+  })));
 }
 
 export function buildAsrProviderOptions(
   asrEngines: Array<{ id: string; label: string; in_project_scope?: boolean }>,
   currentProvider?: string,
 ): SelectOption[] {
-  const options = asrEngines.map((e) => ({
+  const options = scopeFirst(asrEngines.map((e) => ({
     value: e.id,
     label: e.label,
     in_project_scope: e.in_project_scope,
-  }));
+  })));
   if (!currentProvider || options.some((o) => o.value === currentProvider)) {
     return options;
   }
@@ -108,11 +126,11 @@ export function buildTtsVoiceOptions(
       }
     }
   }
-  return activeProvider.voices.map((v) => ({
+  return scopeFirst(activeProvider.voices.map((v) => ({
     value: v,
     label: v,
     in_project_scope: voiceItemMap.has(v) ? voiceItemMap.get(v) : activeProvider.in_project_scope,
-  }));
+  })));
 }
 
 export interface BackgroundOption {
@@ -129,7 +147,7 @@ export function buildBackgroundOptions(
 ): BackgroundOption[] {
   return [
     ...builtIn,
-    ...uploaded.map((bg) => ({
+    ...scopeFirst(uploaded).map((bg) => ({
       id: `uploaded:${bg.background_id}` as AvatarBackgroundId,
       label: bg.label,
       url: bg.url,

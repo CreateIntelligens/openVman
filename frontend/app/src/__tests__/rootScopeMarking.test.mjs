@@ -336,3 +336,41 @@ test("useAvatarBootstrap passes project_id to fetchTtsProviders when project is 
   const bootSource = read("composables/useAvatarBootstrap.ts");
   assert.match(bootSource, /const res = projectId\s*\?\s*await apiFetch\(`\/api\/v1\/tts\/providers\?project_id=\${encodeURIComponent\(projectId\)}`\)\s*:\s*await apiFetch\("\/api\/v1\/tts\/providers"\)/);
 });
+
+test("menus list in-scope options first and park numbered sample characters and VRM last", async () => {
+  // 2026-10-16 使用者回報：紅字（範圍外）跟黑字混在一起；000～007 這類只有編號的
+  // 範例人物和 3D 很礙眼。黑字在前、紅字往後，編號人物與 3D 統一放最後。
+  const optionsSource = read("utils/settingsOptions.ts");
+  const compiled = transpileModule(optionsSource).replace(
+    /import\s*\{\s*ASR_ENGINE_LABELS\s*\}\s*from\s*['"]@shared\/speech['"];?/,
+    "const ASR_ENGINE_LABELS = {};",
+  );
+  const { buildCharacterOptions, buildTtsVoiceOptions } = await import(
+    `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`
+  );
+
+  const characters = buildCharacterOptions(
+    [
+      { id: "001", name: "001", in_project_scope: true },
+      { id: "0713", name: "ESG-AIKKA雀斑", in_project_scope: false },
+      { id: "1014", name: "AWS 初階虛擬人", in_project_scope: true },
+      { id: "009", name: "專業解說員", in_project_scope: false },
+      { id: "002", name: "002", in_project_scope: false },
+    ],
+    [{ id: "qqman", label: "QQ", in_project_scope: false }],
+  );
+  assert.deepEqual(characters.map((o) => o.label), [
+    "AWS 初階虛擬人", "ESG-AIKKA雀斑", "專業解說員", "001", "002", "QQ · VRM",
+  ]);
+
+  const voices = buildTtsVoiceOptions({
+    voices: ["out-1", "in-1", "out-2", "in-2"],
+    voice_items: [
+      { id: "out-1", in_project_scope: false },
+      { id: "in-1", in_project_scope: true },
+      { id: "out-2", in_project_scope: false },
+      { id: "in-2", in_project_scope: true },
+    ],
+  });
+  assert.deepEqual(voices.map((o) => o.value), ["in-1", "in-2", "out-1", "out-2"]);
+});
