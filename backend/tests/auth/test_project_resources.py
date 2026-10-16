@@ -982,3 +982,30 @@ def test_old_grant_does_not_open_a_resource_moved_into_another_project(env):
         )
 
     assert env.client.get(url, headers=_headers(env, env.member)).status_code == 403
+
+
+def test_root_still_picks_other_projects_characters_out_of_scope(env):
+    # 2026-10-16 人物全改成專案專屬後，ROOT 在 AWS-dev 看不到 default 的 009：
+    # 以前全域人物靠授權列出，專屬人物只在自己的專案出現。ROOT 要能選，標範圍外。
+    env.runtime.resources.register(
+        resource_type=ResourceType.AVATAR_CHARACTER,
+        resource_id="char-p2-owned",
+        owner_user_id=None,
+        visibility=ResourceVisibility.PROJECT,
+        owner_project_id="proj-2",
+    )
+    root_entries = {
+        e.resource_id: e
+        for e in effective_project_resources(
+            env.runtime, env.root, "proj-1", ResourceType.AVATAR_CHARACTER,
+        )
+    }
+    member_ids = {
+        e.resource_id
+        for e in effective_project_resources(
+            env.runtime, env.member, "proj-1", ResourceType.AVATAR_CHARACTER,
+        )
+    }
+
+    assert root_entries["char-p2-owned"].in_project_scope is False
+    assert "char-p2-owned" not in member_ids

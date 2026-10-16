@@ -45,7 +45,8 @@ def effective_project_resources(
 ) -> list[ProjectResourceEntry]:
     """Compute effective resources for an account (or embed key) in a project.
 
-    grant    = 全域資源 ∩ 帳號可用（沿用 list_accessible_resources，ROOT／不受限 admin＝全部）
+    grant    = 全域資源 ∩ 帳號可用（沿用 list_accessible_resources，ROOT／不受限 admin＝全部）；
+               ROOT 另含其他專案的專屬資源與孤兒，標成範圍外
                ∩ 專案清單（清單為空＝不限制）
     project  = resources.owner_project_id == project_id 的資源（不看帳號授權、不看專案清單）
     assigned = project_resource_assignments 裡這個專案的項目（不看帳號授權、不看專案清單）
@@ -132,6 +133,16 @@ def effective_project_resources(
                 grant_ids = accessible_system_public
             else:
                 grant_ids = in_scope_grant_ids
+
+        if is_root:
+            # ROOT 在任何專案都能選所有資源，別的專案的專屬資源與孤兒標成範圍外。
+            # 2026-10-16 人物全改成專案專屬後，只看全域資源會讓 ROOT 在 AWS-dev
+            # 看不到 default 的 009 等人物。
+            grant_ids = grant_ids | {
+                r.resource_id
+                for r in accessible_records
+                if r.visibility is ResourceVisibility.PROJECT
+            }
 
     # 2. project
     project_records = runtime.resources.list_by_owner_project(
