@@ -228,15 +228,15 @@ assigned = project_resource_assignments 裡這個專案的項目（不看帳號�
 
 ### 驗收（部署後在正式機）
 
-1. 在 AWS-dev（`aws-dev-8c0eed86fa`）把人物 1014 設為專案預設：emily0320 與 ROOT 進 AWS-dev 都看到 1014；切到其他專案時 1014 不會因此變成預設。
-2. 用 ROOT 把某個 voice-e2e-test 沒授權的聲音指派給鶴記dev（`dev-c0c8fdff34`）：voice-e2e-test 在鶴記dev 能選到並合成，在其他專案仍看不到；移除指派後立即看不到。
+1. 在 AWS-dev把人物 1014 設為專案預設：emily0320 與 ROOT 進 AWS-dev 都看到 1014；切到其他專案時 1014 不會因此變成預設。
+2. 用 ROOT 把某個 voice-e2e-test 沒授權的聲音指派給鶴記dev：voice-e2e-test 在鶴記dev 能選到並合成，在其他專案仍看不到；移除指派後立即看不到。
 3. 上傳一個「屬於 AWS-dev」的測試人物：只在 AWS-dev 出現、公開 `/api/v1/characters` 不列；測完刪除。
 4. 第一期語音限制的既有行為不變（照 `docs/specs/01_BACKEND_SPEC.md` 的套用位置抽測 ASR、TTS 各一條）。
 5. 測試產生的對話、指派、測試人物全部清掉。
 
 ### 工作方式
 
-- 在 `/home/human/openVman/.worktree/project-resource-scope`（分支 `feat/project-resource-scope`）開發，不要用工具內建的 worktree 隔離（會開在 `.claude/worktrees/`）。
+- 在 `.worktree/project-resource-scope`（分支 `feat/project-resource-scope`）開發，不要用工具內建的 worktree 隔離（會開在 `.claude/worktrees/`）。
 - 依階段分 commit；不要自行 commit 或 push，做完回報 `git diff --stat`、測試數字與預設決定，由使用者確認。
 - 遵守 `AGENTS.md`（兩個 Python 執行環境分開、文件與 CHANGELOG 同步）與使用者全域規則（pnpm、不用 px、Python import 分組）。
 
@@ -343,7 +343,7 @@ assigned = project_resource_assignments 裡這個專案的項目（不看帳號�
 
 ## 目前狀態與剩餘工作（2026-10-16，給接手者）
 
-### 已上線（正式機 146.5gao.ai）
+### 已上線（正式機）
 
 | commit | 內容 | 驗證 |
 |---|---|---|
@@ -352,12 +352,12 @@ assigned = project_resource_assignments 裡這個專案的項目（不看帳號�
 
 部署前備份：backend 容器內 `/data/auth/accounts-before-project-resources-20261015T102800Z.db`。
 
-正式機目前的專案設定：AWS-dev（`aws-dev-8c0eed86fa`）ASR 預設 `gemini-live`、台語 `breeze`；聲音清單 14 個（`hayley`；`voxcpm2-gemini-` 的 fenrir／alnilam／sadaltager／autonoe／despina／erinome；Gemini TTS 同名六個；cosyvoice `young-female-02`），預設 `hayley`。人物尚未設專案預設（1014 只是 emily0320 的帳號預設）。
+正式機目前的專案設定：AWS-devASR 預設 `gemini-live`、台語 `breeze`；聲音清單 14 個（`hayley`；`voxcpm2-gemini-` 的 fenrir／alnilam／sadaltager／autonoe／despina／erinome；Gemini TTS 同名六個；cosyvoice `young-female-02`），預設 `hayley`。人物尚未設專案預設（1014 只是 emily0320 的帳號預設）。
 
 ### 剩餘工作（依優先順序）
 
-1. [已完成] 正式機驗收（「實作規格 → 驗收」五項），2026-10-16 以 backend 容器內簽發的 45 分鐘 session 經 `https://146.5gao.ai/openvman` 實測：
-   - AWS-dev 設 `default_character_id=1014`（使用者決定保留）：emily0320 與 ROOT 的 `/projects/aws-dev-8c0eed86fa/resources` 預設皆為 1014。ROOT 在鶴記dev 預設是自己的帳號預設 0713，沒有被 AWS-dev 帶走；emily0320 在其他專案也是 1014，原因是她的帳號預設本來就是 1014，不是外溢。
+1. [已完成] 正式機驗收（「實作規格 → 驗收」五項），2026-10-16 以 backend 容器內簽發的 45 分鐘 session 經正式機對外網址實測：
+   - AWS-dev 設 `default_character_id=1014`（使用者決定保留）：emily0320 與 ROOT 的 `/projects/<AWS-dev>/resources` 預設皆為 1014。ROOT 在鶴記dev 預設是自己的帳號預設 0713，沒有被 AWS-dev 帶走；emily0320 在其他專案也是 1014，原因是她的帳號預設本來就是 1014，不是外溢。
    - ROOT 把 `zh-TW-YunJheNeural` 指派給鶴記dev：指派前 voice-e2e-test 看不到、合成回 404；指派後清單出現（source=assigned）、合成 200（edge-tts，無 fallback）；同時間 emily0320 在 AWS-dev 仍看不到。解除指派後立即看不到、合成回 404。voice-e2e-test 只屬於鶴記dev，「其他專案看不到」改用 emily0320 驗。
    - 專案專屬人物：沿用 local_01（AWS-dev 專屬，正式人物不刪）。emily0320 在 AWS-dev 看得到（source=project），voice-e2e-test 在鶴記dev 看不到，公開 `GET /api/v1/characters` 的 15 筆不含 local_01。
    - 第一期語音限制：emily0320 在 AWS-dev 用清單內 hayley 合成 200、清單外 young-male-02 回 403 `Voice not allowed for this project`。ASR 暫時把 AWS-dev `allowed_asr_engines` 設為 `gemini-live, breeze`：指定 openai 回 403 `ASR provider not allowed`、指定 breeze 轉寫 200；測完還原為不限制。
@@ -375,7 +375,7 @@ assigned = project_resource_assignments 裡這個專案的項目（不看帳號�
 
 ### 接手規則
 
-- 在 `/home/human/openVman/.worktree/<名稱>` 開 worktree，不要用工具內建隔離（會開在 `.claude/worktrees/`）。
+- 在 `.worktree/<名稱>` 開 worktree，不要用工具內建隔離（會開在 `.claude/worktrees/`）。
 - 不要自行 commit 或 push；完成後回報 `git diff --stat`、新增測試檔與數量、全部測試數字（後端 `python -m pytest tests/ -q`、repo 根目錄 `python -m pytest tests/test_entry_boundaries.py -q`、contracts `--check`、admin `pnpm test`／`pnpm build`、app `npm test`／`npm run type-check`／`npm run build`、`git diff --check`）。
 - 每項改動同步 `CHANGELOG.md` 與相關文件（`docs/specs/01_BACKEND_SPEC.md`「專案資源範圍」、`docs/operations/account-administration.md`）。
 
