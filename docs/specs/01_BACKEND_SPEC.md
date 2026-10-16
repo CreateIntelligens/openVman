@@ -225,7 +225,7 @@ ws.send(JSON.stringify(payload));
 - 專案有效預設值：`effective_project_default(project_id, resource_type, account)`，優先順序為「專案政策預設值 → 帳號個人預設值 → 該類別第一個可用資源」。
 - ROOT 專案白名單豁免：ROOT 帳號在呼叫 TTS（聲音解析）、批次 ASR、串流 ASR 與虛擬人資源（人物、背景、小助理）時，不受 `project_policies` 允許清單排除限制，可使用系統所有可用資源；但專案政策若有設定預設值（`default_*`），ROOT 依然適用專案預設值。admin、一般帳號與 Embed key 維持交集與白名單限制。
 - 資源範圍標記（`in_project_scope`）：帶 `project_id` 的列表 API（`/api/v1/me/capabilities`、`/api/v1/tts/providers`、`/api/v1/projects/{id}/resources`、`/api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/avatar/mascots`）中，對 ROOT 回傳全部可用項目並每項標記布林值 `in_project_scope`（代表若以一般成員身分是否落在有效專案範圍內）；非 ROOT 帳號則僅回傳專案範圍內項目且 `in_project_scope` 恆為 `true`。
-- 快取隔離：`/v1/audio/speech` 的語音合成快取鍵納入專案範圍維度，確保 ROOT 合成的專案範圍外語音不會被快取提供給一般專案成員。
+- 快取隔離：有聲音限制的專案中，ROOT 的 `/v1/audio/speech` 結果一律存在獨立命名空間 `project:<id>:root`，不論聲音是否在清單內。ROOT 合成失敗時仍會退回 Edge，若與成員共用 `project:<id>` 會讓成員拿到專案不允許的 Edge 備援音訊。沒有聲音限制的專案維持共用 key。
 
 端點行為：
 - `GET /api/v1/projects/{project_id}/policy`：能編輯專案內容（`ResourceAccess.EDIT`）即可讀；沒有設定時回全空的「不限制」。
