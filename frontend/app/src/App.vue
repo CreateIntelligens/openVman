@@ -334,15 +334,16 @@ function handleEnterKiosk(): void {
 }
 const { handleTtsChange, handleTtsVoiceChange, handleProjectPreviewChange,
   handleProjectChange, handlePersonaChange, handleVoiceModeChange,
-  handleReplyModeChange } = useAvatarSettings(settings, bootstrap, showSettings);
+  handleReplyModeChange } = useAvatarSettings(settings, bootstrap, showSettings, stage.syncCharacter);
 
 onMounted(async () => {
   await settingsReady();
   const vrmReady = bootstrap.fetchVrmAvatars();
+  const projectReady = bootstrap.fetchInitialProjectData();
   void Promise.allSettled([
     vrmReady, bootstrap.fetchTtsProviders(), bootstrap.fetchBackgrounds(),
-    bootstrap.fetchInitialProjectData(), camera.fetchVisionHealth(),
-    stage.bootstrapRenderer(vrmReady),
+    projectReady, camera.fetchVisionHealth(),
+    stage.bootstrapRenderer(vrmReady, projectReady),
   ]);
 });
 </script>

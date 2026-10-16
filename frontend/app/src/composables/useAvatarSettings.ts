@@ -2,7 +2,7 @@ import { watch, type Ref } from "vue";
 import { saveSettings, type useSettingsStore } from "../stores/useSettingsStore";
 import type { ReplyMode } from "../types/replyMode";
 import type { useAvatarBootstrap } from "./useAvatarBootstrap";
-export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>, bootstrap: ReturnType<typeof useAvatarBootstrap>, showSettings: Ref<boolean>) {
+export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>, bootstrap: ReturnType<typeof useAvatarBootstrap>, showSettings: Ref<boolean>, syncStageCharacter?: () => void) {
   const { fetchPersonas, fetchBackgrounds } = bootstrap;
   // 引擎與聲音是一組，一律成對存：只存一半，另一個分頁存的另一半會跟它拼成
   // 不合法的組合，下次開啟就退回預設。
@@ -24,7 +24,8 @@ export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>,
     if (!projectId) return;
     saveSettings({ projectId });
     if (bootstrap.switchProject) {
-      void bootstrap.switchProject(projectId);
+      // 換專案會依新專案重挑人物，只改設定值的話舞台還是上一個專案的人物。
+      void bootstrap.switchProject(projectId).then(() => syncStageCharacter?.());
     }
   }
 

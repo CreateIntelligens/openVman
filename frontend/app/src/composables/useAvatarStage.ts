@@ -1,4 +1,4 @@
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { useStageAvatarBridge } from "./useStageAvatarBridge";
 import { useOpenVmanAvatarRuntime } from "./useOpenVmanAvatarRuntime";
 import type { useAvatarBootstrap } from "./useAvatarBootstrap";
@@ -6,6 +6,10 @@ import { buildMascotWidgetSrc, type MascotOption } from "../data/mascotCatalog";
 import { savedSettings, saveSettings, type useSettingsStore } from "../stores/useSettingsStore";
 import { isUploadedAvatarBackgroundId, type AvatarBackgroundId,
   type AvatarBackgroundFit } from "../types/avatarBackground";
+const RENDERER_RETRY_DELAYS_MS = [2000, 4000, 8000];
+const RUNTIME_RELOAD_KEY = "openvman.avatar.runtime_reload_at";
+const RUNTIME_RELOAD_COOLDOWN_MS = 5 * 60 * 1000;
+
 export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bootstrap: ReturnType<typeof useAvatarBootstrap>) {
   const rendererBootstrapState = ref<"loading" | "ready" | "error">("loading");
   const fatalError = ref<{ code: string; message: string } | null>(null);
@@ -132,46 +136,112 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     return selected;
   }
 
-  async function bootstrapRenderer(vrmReady?: Promise<unknown>): Promise<void> {
-    rendererBootstrapState.value = "loading";
+  class NoCharacterError extends Error {}
+
+  // 開場偶爾載不到（腳本、WASM 或角色資料暫時失敗），以前只能整頁重新整理。
+  // 先自己退避重試；仍失敗且連引擎都沒起來時，整頁重新載入一次（引擎每頁只能
+  // 建一次，這是唯一確定救得回來的方式），之後才顯示錯誤讓使用者按重試。
+  let bootstrapRun = 0;
+  onUnmounted(() => {
+    bootstrapRun += 1;
+  });
+
+  async function bootstrapOnce(
+    vrmReady?: Promise<unknown>,
+    projectReady?: Promise<unknown>,
+  ): Promise<void> {
+    // 等專案決定再挑人物：專案還沒回來時拿不分專案的清單挑，會載到帳號預設，
+    // 之後專案偏好與專案預設改了設定值卻沒人重新載入，舞台跟選單對不上。
+    await Promise.all([
+      wasm.initWasm(),
+      // 專案資料失敗時照舊用不分專案的清單，不要每次重試都卡在同一個失敗上。
+      (projectReady ?? Promise.resolve()).catch(() => undefined),
+      // 需要知道有沒有 VRM 才能判斷「沒有 2D 角色」是否為錯誤。
+      vrmReady ?? Promise.resolve(),
+    ]);
+    await avatarCatalog.load(settings.projectId || undefined);
+    if (avatarCatalog.error.value) {
+      // 2D 清單暫時載不到：不拿空清單去挑人物（會把選擇當成失效），也不因此切到 3D。
+      // 本來就用 3D 的人不需要 2D 清單；用 2D 的人看錯誤畫面按重試。
+      if (settings.renderMode === "3d" && vrmAvatarOptions.value.length > 0) return;
+      throw new Error(avatarCatalog.error.value);
+    }
+    const characterId = pickInitialCharacter();
+    if (!characterId) {
+      // 帳號可能只被授權 VRM。這種情況切到 3D 舞台，而不是視為載入失敗；
+      // 只改這次的生效值，不存——之後被授權 2D 時仍照使用者存的模式。
+      if (vrmAvatarOptions.value.length > 0) {
+        settings.renderMode = "3d";
+        return;
+      }
+      throw new NoCharacterError("帳號沒有可使用的虛擬人物");
+    }
+    await wasm.loadCharacter(characterId);
+  }
+
+  function reloadOnceForRuntime(): boolean {
+    if (typeof window === "undefined") return false;
     try {
-      await Promise.all([
-        wasm.initWasm(),
-        avatarCatalog.load(settings.projectId || undefined),
-        // 需要知道有沒有 VRM 才能判斷「沒有 2D 角色」是否為錯誤。
-        vrmReady ?? Promise.resolve(),
-      ]);
-      if (avatarCatalog.error.value) {
-        // 2D 清單暫時載不到：不拿空清單去挑人物（會把選擇當成失效），也不因此切到 3D。
-        // 本來就用 3D 的人不需要 2D 清單；用 2D 的人看錯誤畫面按重試。
-        if (settings.renderMode === "3d" && vrmAvatarOptions.value.length > 0) {
-          rendererBootstrapState.value = "ready";
-          return;
+      const last = Number(window.sessionStorage.getItem(RUNTIME_RELOAD_KEY) ?? 0);
+      if (Date.now() - last < RUNTIME_RELOAD_COOLDOWN_MS) return false;
+      window.sessionStorage.setItem(RUNTIME_RELOAD_KEY, String(Date.now()));
+    } catch {
+      // 記不住重新載入過就不冒險，免得無限重新整理。
+      return false;
+    }
+    window.location.reload();
+    return true;
+  }
+
+  async function bootstrapRenderer(
+    vrmReady?: Promise<unknown>,
+    projectReady?: Promise<unknown>,
+  ): Promise<void> {
+    const run = ++bootstrapRun;
+    rendererBootstrapState.value = "loading";
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await bootstrapOnce(vrmReady, projectReady);
+        if (run !== bootstrapRun) return;
+        rendererBootstrapState.value = "ready";
+        return;
+      } catch (error) {
+        if (run !== bootstrapRun) return;
+        const delay = RENDERER_RETRY_DELAYS_MS[attempt];
+        if (delay !== undefined && !(error instanceof NoCharacterError)) {
+          console.warn("[App] avatar renderer bootstrap failed, retrying:", error);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          if (run !== bootstrapRun) return;
+          continue;
         }
-        throw new Error(avatarCatalog.error.value);
+        if (!wasm.isReady.value && reloadOnceForRuntime()) return;
+        rendererBootstrapState.value = "error";
+        console.error("[App] avatar renderer bootstrap failed:", error);
+        fatalError.value = {
+          code: "AVATAR_RENDERER",
+          message: "虛擬人載入失敗，請檢查網路後重試。",
+        };
+        return;
       }
-      const characterId = pickInitialCharacter();
-      if (!characterId) {
-        // 帳號可能只被授權 VRM。這種情況切到 3D 舞台，而不是視為載入失敗；
-        // 只改這次的生效值，不存——之後被授權 2D 時仍照使用者存的模式。
-        if (vrmAvatarOptions.value.length > 0) {
-          settings.renderMode = "3d";
-          rendererBootstrapState.value = "ready";
-          return;
-        }
-        throw new Error("帳號沒有可使用的虛擬人物");
-      }
-      await wasm.loadCharacter(characterId);
-      rendererBootstrapState.value = "ready";
-    } catch (error) {
-      rendererBootstrapState.value = "error";
-      console.error("[App] avatar renderer bootstrap failed:", error);
-      fatalError.value = {
-        code: "AVATAR_RENDERER",
-        message: "虛擬人載入失敗，請檢查網路後重試。",
-      };
     }
   }
 
-  return { wasm, fatalError, rendererBootstrapState, rendererDisabled, rendererErrorMessage, loadingText, chatPlaceholder, stageAvatarFrameRef, driveStageAvatarMouth, stopStageAvatarMouth, triggerStageAvatarGesture, vrmCharacterOptions, stageAvatarWidgetSrc, stageBackgroundClass, stageBackgroundStyle, handleCharChange, handleRenderModeChange, handleVrmAvatarChange, handleBackgroundChange, bootstrapRenderer };
+  /** 專案切換後設定值換了人物，舞台跟著載入；開場與手動切換各自處理。 */
+  function syncCharacter(): void {
+    const charId = settings.characterId;
+    if (
+      settings.renderMode !== "2d"
+      || rendererBootstrapState.value !== "ready"
+      || !wasm.isReady.value
+      || !charId
+      || wasm.currentCharId.value === charId
+    ) return;
+    wasm.clearAudio();
+    wasm.resetSpeaking();
+    void wasm.loadCharacter(charId).catch(() => {
+      // 錯誤已記在 wasm.error，舞台會顯示；這裡不重複處理。
+    });
+  }
+
+  return { wasm, fatalError, rendererBootstrapState, rendererDisabled, rendererErrorMessage, loadingText, chatPlaceholder, stageAvatarFrameRef, driveStageAvatarMouth, stopStageAvatarMouth, triggerStageAvatarGesture, vrmCharacterOptions, stageAvatarWidgetSrc, stageBackgroundClass, stageBackgroundStyle, handleCharChange, handleRenderModeChange, handleVrmAvatarChange, handleBackgroundChange, bootstrapRenderer, syncCharacter };
 }

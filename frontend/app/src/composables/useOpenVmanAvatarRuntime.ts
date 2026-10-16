@@ -102,6 +102,7 @@ async function ensureAvatarRuntimeScript(): Promise<void> {
       existing.addEventListener(
         'error',
         () => {
+          existing.remove()
           reject(
             new Error(
               '[OpenVmanAvatarRuntime] Failed to load vendor runtime',
@@ -119,6 +120,9 @@ async function ensureAvatarRuntimeScript(): Promise<void> {
     script.dataset.dhliveMini2 = 'true'
     script.onload = () => settleRuntimeScriptLoad(resolve, reject)
     script.onerror = () => {
+      // 失敗的 <script> 留在頁面上，下次重試會走 existing 分支等一個早就發生過的
+      // load／error 事件，永遠不會結束：只有整頁重新整理才救得回來。
+      script.remove()
       reject(
         new Error('[OpenVmanAvatarRuntime] Failed to load vendor runtime'),
       )
@@ -138,6 +142,7 @@ export function useOpenVmanAvatarRuntime() {
   const error = ref<string | null>(null)
   const currentCharId = ref<string | null>(null)
   let chunkIndex = 0
+  let latestLoad = 0
 
   async function initWasm(): Promise<OpenVmanAvatarRuntimeInstance> {
     if (vendorCanvasDetached()) {
@@ -216,6 +221,9 @@ export function useOpenVmanAvatarRuntime() {
       throw new Error('[OpenVmanAvatarRuntime] characterVideo is unavailable')
     }
 
+    // 換角色的請求可能重疊（開場挑人物與使用者切換同時發生），只讓最後一個
+    // 決定 currentCharId 與載入狀態，否則先結束的那個會提早把 isLoading 關掉。
+    const loadId = ++latestLoad
     isLoading.value = true
     error.value = null
 
@@ -229,6 +237,8 @@ export function useOpenVmanAvatarRuntime() {
       const payload = new Uint8Array(await response.arrayBuffer())
       assertCharacterPayload(payload, dataUrl)
       const characterData = decodeCharacterPayload(payload)
+      // 較晚發出的載入已經接手：舊角色的資料不能再寫進 WASM 蓋掉它。
+      if (loadId !== latestLoad) return
       const encoded = new TextEncoder().encode(characterData)
       const pointer = runtime._malloc(encoded.length + 1)
       // _processSecret 失敗時也必須歸還這塊記憶體，否則每次重試都漏一段 heap；
@@ -245,26 +255,26 @@ export function useOpenVmanAvatarRuntime() {
       window.characterVideo.muted = true
       window.characterVideo.playsInline = true
       window.characterVideo.load()
-
-      try {
-        await window.characterVideo.play()
-      } catch (playbackError) {
+      // 角色資料已進 WASM，播放不必擋住載入狀態：分頁在背景時 play() 可能一直
+      // 不結束，畫面就會卡在「切換展示角色中」。
+      window.characterVideo.play().catch((playbackError: unknown) => {
         console.warn(
           '[OpenVmanAvatarRuntime] Video playback was interrupted or blocked:',
           playbackError,
         )
-      }
+      })
 
       currentCharId.value = charId
       chunkIndex = 0
       console.log(`[OpenVmanAvatarRuntime] Character ${charId} loaded`)
     } catch (caughtError) {
+      if (loadId !== latestLoad) return
       const described = describeWasmError(caughtError, runtime)
       error.value = described
       console.error('[OpenVmanAvatarRuntime] loadCharacter failed:', described, caughtError)
       throw caughtError
     } finally {
-      isLoading.value = false
+      if (loadId === latestLoad) isLoading.value = false
     }
   }
 
