@@ -67,7 +67,7 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/personas/clone", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Clone Persona"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas/avatar", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Bind Persona Avatar"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat"},
-    {"path": f"{_PUBLIC_API_PREFIX}/chat/stream", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat (SSE sentence stream)"},
+    {"path": f"{_PUBLIC_API_PREFIX}/chat/stream", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat (SSE sentence stream)", "response_class": "event_stream"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat/accept", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Accept Chat Turn"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat/history", "methods": ["GET"], "tags": _TAG_CHAT, "summary": "Chat History"},
     {"path": f"{_PUBLIC_API_PREFIX}/embed", "methods": ["POST"], "tags": _TAG_SEARCH, "summary": "Embed Text"},
@@ -155,6 +155,31 @@ _BACKEND_OWNED_PREFIXES = (
 )
 
 _http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
+
+
+class _EventStreamResponse(StreamingResponse):
+    """Documents the SSE media type; the proxy returns Brain's stream as-is."""
+
+    media_type = "text/event-stream"
+
+
+_EVENT_STREAM_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {
+        "description": (
+            "text/event-stream。`sentence` 事件逐句帶 `{index, text}`；"
+            "`done` 帶與 `/api/v1/chat` 相同的完整回應；"
+            "`error` 帶 `{status, detail}`。收到 `done` 或 `error` 後串流結束。"
+        ),
+    },
+}
+_PROJECT_CONTEXT_RESPONSES: dict[int | str, dict[str, Any]] = {
+    404: {
+        "description": (
+            "沒帶 project_id（query 或 JSON body 擇一），專案不存在或沒有權限，"
+            "或 query 與 body 的 project_id 不一致。Embed key 由金鑰綁定專案，可省略。"
+        ),
+    },
+}
 
 # nginx 的慣例：用戶端先斷線、伺服器沒回應。對方已經不在，這個狀態碼只會進 log。
 CLIENT_CLOSED_REQUEST = 499
@@ -519,6 +544,18 @@ async def documented_brain_proxy(request: Request) -> Response:
     return await _proxy_to_brain(request, _request_brain_path(request))
 
 
+def _documented_responses(route_def: dict[str, Any]) -> dict[int | str, dict[str, Any]]:
+    responses: dict[int | str, dict[str, Any]] = {}
+    if route_def.get("response_class") == "event_stream":
+        responses.update(_EVENT_STREAM_RESPONSES)
+    brain_path = route_def["path"].removeprefix(f"{_PUBLIC_API_PREFIX}/")
+    if route_def["path"] not in _PUBLIC_BRAIN_PATHS and _requires_project_context(
+        brain_path
+    ):
+        responses.update(_PROJECT_CONTEXT_RESPONSES)
+    return responses
+
+
 for route_def in _BRAIN_ROUTE_DEFS:
     router.add_api_route(
         route_def["path"],
@@ -526,6 +563,12 @@ for route_def in _BRAIN_ROUTE_DEFS:
         methods=route_def["methods"],
         tags=route_def["tags"],
         summary=route_def["summary"],
+        responses=_documented_responses(route_def),
+        response_class=(
+            _EventStreamResponse
+            if route_def.get("response_class") == "event_stream"
+            else JSONResponse
+        ),
         name=f"mirror_{route_def['methods'][0].lower()}_{route_def['path']}",
         dependencies=(
             []

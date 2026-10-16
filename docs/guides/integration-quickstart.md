@@ -225,12 +225,12 @@ with httpx.stream(
 |---|---|
 | 401 | key 錯誤、過期、撤銷，或帳號停用 |
 | 403 | 帳號沒有這個資源或動作的權限（例如看得到專案但不能改、聲音不在授權或專案限制內） |
-| 404 | 專案、角色等資源不存在，或這個帳號看不到 |
+| 404 | 專案、角色等資源不存在，或這個帳號看不到。對話、知識庫、記憶、對話紀錄、人設、搜尋等專案範圍的 API（`/api/v1/chat`、`/api/v1/chat/stream`、`/api/v1/knowledge/*`、`/api/v1/memories`、`/api/v1/sessions`、`/api/v1/personas`、`/api/v1/search`、`/api/v1/embed`）沒帶 `project_id`（query 或 JSON body 擇一，兩處都帶時須一致）也回 404，且在檢查其他欄位之前就回，所以空訊息也看不到 422；Embed key 由金鑰綁定專案，可以省略 |
 | 422 | 參數格式不對，例如不支援的引擎名稱 |
 | 429 | 超過每把 key 每分鐘的上限（部署設定 `API_KEY_RATE_LIMIT_PER_MINUTE`，預設 300），依 `Retry-After` 秒數後重試 |
 | 502／503 | 指定的上游引擎失敗或未設定 |
 
-錯誤 body 為 `{"detail": ...}`。多台機台共用一把 key 時共用同一個上限。
+錯誤 body 為 `{"detail": ...}`。多台機台共用一把 key 時共用同一個上限。限流只算用帳號 API key 驗證的請求，以 60 秒滑動視窗計數，所以先前的呼叫也會算進去；登入 session、Embed key（另有自己的額度）與不需驗證的公開路由（例如 `GET /api/v1/characters`、`GET /api/v1/health`）不計。OpenAPI 在每個接受 API key 的操作都列出 429。
 
 ## 瀏覽器前端直接呼叫（CORS）
 

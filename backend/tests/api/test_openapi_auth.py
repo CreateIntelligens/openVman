@@ -2,7 +2,11 @@
 
 from copy import deepcopy
 
-from app.openapi import _with_account_authentication
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
+from app.brain_proxy import router as brain_router
+from app.openapi import _merge_brain_openapi, _with_account_authentication
 
 
 def test_auth_contract_distinguishes_session_management_and_embed_routes():
@@ -35,8 +39,12 @@ def test_auth_contract_distinguishes_session_management_and_embed_routes():
         {"InternalToken": []},
     ]
     assert set(paths["/api/v1/asr/transcribe"]["post"]["responses"]) == {
-        "401", "403",
+        "401", "403", "429",
     }
+    assert "429" in paths["/api/v1/chat"]["post"]["responses"]
+    # 管理 API key 只收登入 token、登入路由免驗證，都不經 API key 限流。
+    assert "429" not in paths["/api/v1/api-keys"]["post"]["responses"]
+    assert "responses" not in paths["/api/v1/auth/login"]["post"]
     schemes = result["components"]["securitySchemes"]
     assert schemes["AccountBearer"]["scheme"] == "bearer"
     assert schemes["AccountCookie"]["name"] == "openvman_session"
@@ -51,3 +59,57 @@ def test_auth_annotation_preserves_domain_responses():
     assert result["paths"]["/api/v1/projects"]["get"]["responses"]["403"] == {
         "description": "Project denied",
     }
+
+
+def _brain_proxy_schema() -> dict:
+    app = FastAPI()
+    app.include_router(brain_router)
+    return get_openapi(title="t", version="1", routes=app.routes)
+
+
+def test_chat_stream_documents_event_stream_only():
+    responses = _brain_proxy_schema()["paths"]["/api/v1/chat/stream"]["post"][
+        "responses"
+    ]
+    assert set(responses["200"]["content"]) == {"text/event-stream"}
+    assert "sentence" in responses["200"]["description"]
+
+
+def test_project_scoped_proxy_routes_document_missing_project_404():
+    paths = _brain_proxy_schema()["paths"]
+    for path, method in (
+        ("/api/v1/chat", "post"),
+        ("/api/v1/chat/stream", "post"),
+        ("/api/v1/knowledge/documents", "get"),
+        ("/api/v1/memories", "post"),
+    ):
+        assert "project_id" in paths[path][method]["responses"]["404"][
+            "description"
+        ], path
+    assert "404" not in paths["/api/v1/health"]["get"]["responses"]
+    assert "404" not in paths["/api/v1/projects"]["get"]["responses"]
+
+
+def test_brain_merge_keeps_brain_responses_and_backend_overrides():
+    local = {"paths": {"/api/v1/chat/stream": {"post": {
+        "summary": "Backend",
+        "responses": {
+            "200": {"content": {"text/event-stream": {}}},
+            "404": {"description": "project"},
+        },
+    }}}}
+    brain = {"paths": {"/brain/chat/stream": {"post": {
+        "summary": "Brain",
+        "requestBody": {"$ref": "ChatRequest"},
+        "responses": {
+            "200": {"content": {"application/json": {}}},
+            "422": {"description": "Validation Error"},
+        },
+    }}}}
+    operation = _merge_brain_openapi(local, brain)["paths"][
+        "/api/v1/chat/stream"
+    ]["post"]
+    assert operation["summary"] == "Backend"
+    assert operation["requestBody"] == {"$ref": "ChatRequest"}
+    assert set(operation["responses"]) == {"200", "404", "422"}
+    assert set(operation["responses"]["200"]["content"]) == {"text/event-stream"}

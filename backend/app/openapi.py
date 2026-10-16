@@ -17,6 +17,20 @@ from app.http_client import SharedAsyncClient
 logger = logging.getLogger("backend")
 _health_http = SharedAsyncClient()
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
+# 限流掛在帳號 API key 驗證上，登入 session、Embed key 與免驗證的公開路由不計。
+_API_KEY_RATE_LIMITED = {
+    "description": (
+        "以帳號 API key 呼叫時，同一把 key 在 60 秒滑動視窗內超過 "
+        "API_KEY_RATE_LIMIT_PER_MINUTE 次（預設 300）；"
+        "Retry-After 標頭為需等待的秒數。"
+    ),
+    "headers": {
+        "Retry-After": {
+            "description": "距離可再呼叫的秒數",
+            "schema": {"type": "integer"},
+        },
+    },
+}
 
 
 def _with_account_authentication(schema: dict) -> dict:
@@ -66,6 +80,8 @@ def _with_account_authentication(schema: dict) -> dict:
             operation["responses"].setdefault(
                 "403", {"description": "帳號／資源權限不足或驗證方式不允許"},
             )
+            if scheme == "AccountBearer":
+                operation["responses"].setdefault("429", _API_KEY_RATE_LIMITED)
     return schema
 
 
@@ -88,7 +104,17 @@ def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
                 if isinstance(brain_value, dict) and isinstance(local_value, dict):
                     # Brain fills missing schema fields while the Backend's
                     # public route metadata remains authoritative.
-                    merged_path_item[key] = {**brain_value, **local_value}
+                    operation = {**brain_value, **local_value}
+                    # 狀態碼逐一合併：Brain 的 422 等回應要留著，Backend
+                    # 自己宣告的（專案 404、SSE 200）蓋過同碼的 Brain 版本。
+                    if isinstance(brain_value.get("responses"), dict) and isinstance(
+                        local_value.get("responses"), dict,
+                    ):
+                        operation["responses"] = {
+                            **brain_value["responses"],
+                            **local_value["responses"],
+                        }
+                    merged_path_item[key] = operation
                 else:
                     merged_path_item[key] = local_value
             merged_paths[mapped_path] = merged_path_item

@@ -26,7 +26,9 @@ Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 
 
 **來源紀錄**：每個帶外部 Origin 的請求（preflight 與自己網域除外）依「來源 × 主體（`api_key`／`embed_key`／`user`／`anonymous`）× 主體 ID」彙總寫入 Auth DB `request_origins`（migration 21），記第一次／最後一次時間、最後路徑與次數；不設外鍵，key 撤銷後紀錄仍在。ROOT 以 `GET /api/v1/admin/request-origins?limit=` 查詢。
 
-**限流**：每把帳號 API key 每分鐘最多 `API_KEY_RATE_LIMIT_PER_MINUTE`（預設 300，0 不限）個請求，超過回 429 與 `Retry-After`。計數只放記憶體（backend 單 worker），重啟歸零。Embed key 沿用自己的每分鐘與每日額度。
+**限流**：每把帳號 API key 每分鐘最多 `API_KEY_RATE_LIMIT_PER_MINUTE`（預設 300，0 不限）個請求，超過回 429 與 `Retry-After`。計數掛在 API key 驗證上，60 秒滑動視窗；登入 session 與免驗證的公開路由（`GET /api/v1/characters` 等）不計。計數只放記憶體（backend 單 worker），重啟歸零。Embed key 沿用自己的每分鐘與每日額度。OpenAPI 由 `app/openapi.py` 在每個 `AccountBearer` 操作補上 429（`SessionBearer` 的 `/api/v1/api-keys` 與公開路由不補）。
+
+**OpenAPI 合併**：`/openapi.json` 由 Backend 路由與 Brain 的 `/brain/openapi.json` 合併；同一操作的欄位以 Backend 為準，`responses` 逐個狀態碼合併（保留 Brain 的 422 等，Backend 宣告的同碼蓋過）。代理路由在 `app/brain_proxy.py` 的 `_BRAIN_ROUTE_DEFS` 宣告：`POST /api/v1/chat/stream` 的 200 只列 `text/event-stream`；需要專案的路由（`_PROJECT_SCOPED_PREFIXES`）列出 404，涵蓋沒帶 `project_id`、專案看不到、query 與 body 不一致。
 
 **看得到但不能改的專案回 403**：Brain 代理路徑需要專案編輯權（刪對話、改知識庫等）而帳號只有讀取授權時回 403；看不到的專案仍回 404，不洩漏存在與否。
 
