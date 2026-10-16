@@ -43,6 +43,7 @@
 
 計畫保留原始狀態；Draft 不表示已確認完成。實驗保留支撐結論的最小資料集，重現工具與必要證據維持在原目錄；已退場實驗刪除逐筆 dump 時，在報告註明限制。
 
+- [專案的資源範圍](plans/project-resource-scope.md)（Draft）：人物、聲音、ASR 分全域與專案專屬，ROOT 可直接指派資源給專案，專案預設優先於帳號預設。
 - [帳號 API 金鑰](plans/account-api-keys.md)（Draft）：沿用帳號權限的服務串接憑證、後台管理與每把 key 的用量歸屬。
 - [串接能力探索與單次 ASR 選擇](plans/integration-capabilities-asr.md)（Draft）：能力探索契約、語音授權、單次引擎選擇與串接驗證。
 
