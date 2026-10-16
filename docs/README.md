@@ -30,6 +30,7 @@
 ## 整合指南
 
 - [帳號 API key 與 ASR 整合](guides/account-api-keys.md)
+- [2D 人物素材：格式要求、上架與驗收](guides/avatar-character-assets.md)：DHLiveMini2 依賴的影格數、幀同步標記與姿態矩陣，專案專屬人物的上傳方式。
 - [能力探索與語音串接快速開始](guides/integration-quickstart.md)：帳號能力清單、單次 ASR／TTS 選擇、Python 標準庫範例及音訊格式。
 - [後台 Canonical Routes 現況](guides/admin-canonical-routes.md)
 - [前台費茨法則評估](guides/frontend-fitts-law-audit.md)
