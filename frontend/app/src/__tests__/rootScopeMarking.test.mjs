@@ -296,6 +296,9 @@ test("SettingsModal maps in_project_scope across Voice, ASR, Character, and Back
   );
   assert.equal(charOptions.find((c) => c.value === "matesx:char-1")?.in_project_scope, false);
   assert.equal(charOptions.find((c) => c.value === "vrm:vrm-1")?.in_project_scope, true);
+  // 2D 只顯示人物名稱；VRM 與 2D 同一個選單，才需要標「· VRM」區分。
+  assert.equal(charOptions.find((c) => c.value === "matesx:char-1")?.label, "角色1");
+  assert.equal(charOptions.find((c) => c.value === "vrm:vrm-1")?.label, "VRM1 · VRM");
 
   // 4. Background: 內建與上傳背景正確保留 in_project_scope
   const bgOptions = buildBackgroundOptions(

@@ -62,7 +62,8 @@ test("settings modal exposes stage background controls", () => {
   assert.match(source, /v-for="option in backgroundFitOptions"/);
   assert.match(source, /v-model="draftBackgroundId"/);
   assert.match(source, /v-model="draftBackgroundFit"/);
-  assert.match(source, /uploaded:\$\{background\.background_id\}/);
+  // 上傳背景的選項由 utils/settingsOptions.ts 組（行為測試在 rootScopeMarking.test.mjs）。
+  assert.match(source, /buildBackgroundOptions\(builtInBackgroundOptions, props\.backgrounds\)/);
   assert.match(source, /resolvedDraftBackgroundUrl/);
 });
 
@@ -77,9 +78,8 @@ test("character selector lists 2D characters by name and marks VRM avatars", () 
   assert.match(source, /toVrmCharacterValue/);
   assert.match(source, /draftCharacterValue/);
   assert.match(source, /v-model="draftCharacterValue"/);
-  assert.match(source, /label: c\.name,/);
+  assert.match(source, /buildCharacterOptions\(props\.characters, props\.vrmCharacters\)/);
   assert.doesNotMatch(source, /openVman 2D/);
-  assert.match(source, /label: `\$\{v\.label\} · VRM`/);
   assert.doesNotMatch(source, /· 2D/);
   assert.doesNotMatch(source, /· 3D/);
   assert.doesNotMatch(source, />顯示模式</);

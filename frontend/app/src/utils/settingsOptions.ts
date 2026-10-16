@@ -53,7 +53,7 @@ export function buildCharacterOptions(
   return [
     ...characters.map((c) => ({
       value: toOpenVmanCharacterValue(c.id),
-      label: `${c.name} · openVman 2D`,
+      label: c.name,
       in_project_scope: c.in_project_scope,
     })),
     ...vrmCharacters.map((v) => ({
@@ -115,10 +115,18 @@ export function buildTtsVoiceOptions(
   }));
 }
 
+export interface BackgroundOption {
+  id: AvatarBackgroundId;
+  label: string;
+  url: string;
+  swatchUrl?: string;
+  in_project_scope?: boolean;
+}
+
 export function buildBackgroundOptions(
-  builtIn: Array<{ id: AvatarBackgroundId; label: string; url?: string; in_project_scope?: boolean }>,
+  builtIn: ReadonlyArray<{ id: AvatarBackgroundId; label: string; url: string }>,
   uploaded: BackgroundItem[],
-) {
+): BackgroundOption[] {
   return [
     ...builtIn,
     ...uploaded.map((bg) => ({

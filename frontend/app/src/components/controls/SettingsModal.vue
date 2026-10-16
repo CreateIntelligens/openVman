@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { ASR_ENGINE_LABELS } from '@shared/speech'
 import CustomSelect from './CustomSelect.vue'
+import {
+  type BackgroundOption,
+  buildAsrProviderOptions,
+  buildBackgroundOptions,
+  buildCharacterOptions,
+  buildTtsProviderOptions,
+  buildTtsVoiceOptions,
+  parseOpenVmanCharacterValue,
+  parseVrmCharacterValue,
+  toOpenVmanCharacterValue,
+  toVrmCharacterValue,
+} from '../../utils/settingsOptions'
 import { LANGUAGE_ROUTE_LABELS } from "../../composables/useLanguageRoutes";
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
@@ -106,14 +117,6 @@ const emit = defineEmits<{
   leaveKiosk: []
 }>()
 
-type BackgroundOption = {
-  id: AvatarBackgroundId
-  label: string
-  url: string
-  swatchUrl?: string
-  in_project_scope?: boolean
-}
-
 const builtInBackgroundOptions: { id: BuiltInAvatarBackgroundId; label: string; url: string }[] = [
   { id: 'dark', label: '深色', url: '' },
   { id: 'clinic', label: '診間', url: '' },
@@ -127,36 +130,9 @@ const backgroundFitOptions: { id: AvatarBackgroundFit; label: string; descriptio
   { id: 'repeat', label: '平鋪', description: '重複小圖' },
 ]
 
-const LEGACY_2D_CHARACTER_PREFIX = 'matesx:'
-
-function toOpenVmanCharacterValue(charId: string): string {
-  return `${LEGACY_2D_CHARACTER_PREFIX}${charId}`
-}
-
-function parseOpenVmanCharacterValue(value: string): string {
-  return value.startsWith(LEGACY_2D_CHARACTER_PREFIX)
-    ? value.slice(LEGACY_2D_CHARACTER_PREFIX.length)
-    : value
-}
-
-function toVrmCharacterValue(vrmId: string): string {
-  return `vrm:${vrmId}`
-}
-
-function parseVrmCharacterValue(value: string): string {
-  return value.startsWith('vrm:') ? value.slice(4) : value
-}
-
-const backgroundOptions = computed<BackgroundOption[]>(() => [
-  ...builtInBackgroundOptions,
-  ...props.backgrounds.map((background) => ({
-    id: `uploaded:${background.background_id}` as AvatarBackgroundId,
-    label: background.label,
-    url: background.url,
-    swatchUrl: background.url,
-    in_project_scope: background.in_project_scope,
-  })),
-])
+const backgroundOptions = computed<BackgroundOption[]>(() =>
+  buildBackgroundOptions(builtInBackgroundOptions, props.backgrounds)
+)
 
 type DraftFields = {
   projectId: string
@@ -285,54 +261,18 @@ const personaOptions = computed(() =>
 )
 
 const characterOptions = computed(() =>
-  [
-    ...props.characters.map((c) => ({
-      value: toOpenVmanCharacterValue(c.id),
-      label: c.name,
-      in_project_scope: c.in_project_scope,
-    })),
-    ...props.vrmCharacters.map((v) => ({
-      value: toVrmCharacterValue(v.id),
-      label: `${v.label} · VRM`,
-      in_project_scope: v.in_project_scope,
-    })),
-  ]
+  buildCharacterOptions(props.characters, props.vrmCharacters)
 )
 
-const ttsProviderOptions = computed(() =>
-  props.ttsProviders.map((p) => ({ value: p.id, label: p.name, in_project_scope: p.in_project_scope }))
-)
+const ttsProviderOptions = computed(() => buildTtsProviderOptions(props.ttsProviders))
 
 // 不再有「預設（依系統設定）」選項：後台的全站預設拔掉了（2026-09-24），沒選過的人
 // 直接顯示實際在用的引擎。在用的那個沒授權給這個帳號時也列出來，選單才不會空白。
-const asrProviderOptions = computed(() => {
-  const options = props.asrEngines.map((e) => ({
-    value: e.id,
-    label: e.label,
-    in_project_scope: e.in_project_scope,
-  }))
-  const current = props.asrProvider
-  if (!current || options.some((o) => o.value === current)) return options
-  return [{ value: current, label: ASR_ENGINE_LABELS[current] ?? current }, ...options]
-})
+const asrProviderOptions = computed(() =>
+  buildAsrProviderOptions(props.asrEngines, props.asrProvider)
+)
 
-const ttsVoiceOptions = computed(() => {
-  if (!activeTtsProvider.value) return []
-  const provider = activeTtsProvider.value
-  const voiceItemMap = new Map<string, boolean>()
-  if (provider.voice_items) {
-    for (const item of provider.voice_items) {
-      if (item.in_project_scope !== undefined) {
-        voiceItemMap.set(item.id, item.in_project_scope)
-      }
-    }
-  }
-  return provider.voices.map((v) => ({
-    value: v,
-    label: v,
-    in_project_scope: voiceItemMap.has(v) ? voiceItemMap.get(v) : provider.in_project_scope,
-  }))
-})
+const ttsVoiceOptions = computed(() => buildTtsVoiceOptions(activeTtsProvider.value))
 const projectDisabled = computed(() => Boolean(props.disabled) || props.projects.length === 0)
 const personaDisabled = computed(() =>
   Boolean(props.disabled) || Boolean(props.personasLoading) || !draftProjectId.value
