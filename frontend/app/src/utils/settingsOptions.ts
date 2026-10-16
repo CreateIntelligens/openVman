@@ -1,0 +1,132 @@
+import { ASR_ENGINE_LABELS } from "@shared/speech";
+import type { AvatarBackgroundId } from "../types/avatarBackground";
+
+export interface SelectOption {
+  value: string;
+  label: string;
+  in_project_scope?: boolean;
+}
+
+export interface CharacterItem {
+  id: string;
+  name: string;
+  in_project_scope?: boolean;
+}
+
+export interface VrmCharacterItem {
+  id: string;
+  label: string;
+  in_project_scope?: boolean;
+}
+
+export interface BackgroundItem {
+  background_id: string;
+  label: string;
+  url: string;
+  in_project_scope?: boolean;
+}
+
+export const LEGACY_2D_CHARACTER_PREFIX = "matesx:";
+
+export function toOpenVmanCharacterValue(charId: string): string {
+  return `${LEGACY_2D_CHARACTER_PREFIX}${charId}`;
+}
+
+export function toVrmCharacterValue(vrmId: string): string {
+  return `vrm:${vrmId}`;
+}
+
+export function parseOpenVmanCharacterValue(value: string): string {
+  return value.startsWith(LEGACY_2D_CHARACTER_PREFIX)
+    ? value.slice(LEGACY_2D_CHARACTER_PREFIX.length)
+    : value;
+}
+
+export function parseVrmCharacterValue(value: string): string {
+  return value.startsWith("vrm:") ? value.slice(4) : value;
+}
+
+export function buildCharacterOptions(
+  characters: CharacterItem[],
+  vrmCharacters: VrmCharacterItem[],
+): SelectOption[] {
+  return [
+    ...characters.map((c) => ({
+      value: toOpenVmanCharacterValue(c.id),
+      label: `${c.name} · openVman 2D`,
+      in_project_scope: c.in_project_scope,
+    })),
+    ...vrmCharacters.map((v) => ({
+      value: toVrmCharacterValue(v.id),
+      label: `${v.label} · VRM`,
+      in_project_scope: v.in_project_scope,
+    })),
+  ];
+}
+
+export function buildTtsProviderOptions(
+  ttsProviders: Array<{ id: string; name: string; in_project_scope?: boolean }>,
+): SelectOption[] {
+  return ttsProviders.map((p) => ({
+    value: p.id,
+    label: p.name,
+    in_project_scope: p.in_project_scope,
+  }));
+}
+
+export function buildAsrProviderOptions(
+  asrEngines: Array<{ id: string; label: string; in_project_scope?: boolean }>,
+  currentProvider?: string,
+): SelectOption[] {
+  const options = asrEngines.map((e) => ({
+    value: e.id,
+    label: e.label,
+    in_project_scope: e.in_project_scope,
+  }));
+  if (!currentProvider || options.some((o) => o.value === currentProvider)) {
+    return options;
+  }
+  return [
+    { value: currentProvider, label: ASR_ENGINE_LABELS[currentProvider] ?? currentProvider },
+    ...options,
+  ];
+}
+
+export function buildTtsVoiceOptions(
+  activeProvider?: {
+    voices: string[];
+    voice_items?: Array<{ id: string; in_project_scope?: boolean }>;
+    in_project_scope?: boolean;
+  },
+): SelectOption[] {
+  if (!activeProvider) return [];
+  const voiceItemMap = new Map<string, boolean>();
+  if (activeProvider.voice_items) {
+    for (const item of activeProvider.voice_items) {
+      if (item.in_project_scope !== undefined) {
+        voiceItemMap.set(item.id, item.in_project_scope);
+      }
+    }
+  }
+  return activeProvider.voices.map((v) => ({
+    value: v,
+    label: v,
+    in_project_scope: voiceItemMap.has(v) ? voiceItemMap.get(v) : activeProvider.in_project_scope,
+  }));
+}
+
+export function buildBackgroundOptions(
+  builtIn: Array<{ id: AvatarBackgroundId; label: string; url?: string; in_project_scope?: boolean }>,
+  uploaded: BackgroundItem[],
+) {
+  return [
+    ...builtIn,
+    ...uploaded.map((bg) => ({
+      id: `uploaded:${bg.background_id}` as AvatarBackgroundId,
+      label: bg.label,
+      url: bg.url,
+      swatchUrl: bg.url,
+      in_project_scope: bg.in_project_scope,
+    })),
+  ];
+}

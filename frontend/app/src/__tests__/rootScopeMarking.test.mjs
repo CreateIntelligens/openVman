@@ -251,27 +251,62 @@ test("CustomSelect renders out-of-scope items with theme danger token and note",
   assert.doesNotMatch(customSelectSource, /#ff0000|#f00|red;|#[0-9a-fA-F]{6}/);
 });
 
-test("SettingsModal maps in_project_scope across Voice, ASR, Character, and Background menus", () => {
+test("SettingsModal maps in_project_scope across Voice, ASR, Character, and Background menus via data mappers", async () => {
+  const optionsSource = read("utils/settingsOptions.ts");
+  const compiled = transpileModule(optionsSource).replace(
+    /import\s*\{\s*ASR_ENGINE_LABELS\s*\}\s*from\s*['"]@shared\/speech['"];?/,
+    "const ASR_ENGINE_LABELS = { 'gemini-live': 'Gemini Live', 'breeze': 'Breeze ASR' };",
+  );
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const {
+    buildCharacterOptions,
+    buildTtsProviderOptions,
+    buildAsrProviderOptions,
+    buildTtsVoiceOptions,
+    buildBackgroundOptions,
+  } = await import(moduleUrl);
+
+  // 1. Voice: provider 及 voice_items 各自繼承或覆寫 in_project_scope
+  const voiceOptions = buildTtsVoiceOptions({
+    id: "indextts",
+    name: "IndexTTS",
+    voices: ["voice-in", "voice-out"],
+    voice_items: [
+      { id: "voice-in", in_project_scope: true },
+      { id: "voice-out", in_project_scope: false },
+    ],
+    in_project_scope: true,
+  });
+  assert.equal(voiceOptions.length, 2);
+  assert.equal(voiceOptions.find((v) => v.value === "voice-in")?.in_project_scope, true);
+  assert.equal(voiceOptions.find((v) => v.value === "voice-out")?.in_project_scope, false);
+
+  // 2. ASR: 保留各引擎的 in_project_scope
+  const asrOptions = buildAsrProviderOptions([
+    { id: "gemini-live", label: "Gemini Live", in_project_scope: true },
+    { id: "breeze", label: "Breeze ASR", in_project_scope: false },
+  ]);
+  assert.equal(asrOptions.find((a) => a.value === "gemini-live")?.in_project_scope, true);
+  assert.equal(asrOptions.find((a) => a.value === "breeze")?.in_project_scope, false);
+
+  // 3. Character: 2D 與 VRM 角色保留 in_project_scope
+  const charOptions = buildCharacterOptions(
+    [{ id: "char-1", name: "角色1", in_project_scope: false }],
+    [{ id: "vrm-1", label: "VRM1", in_project_scope: true }],
+  );
+  assert.equal(charOptions.find((c) => c.value === "matesx:char-1")?.in_project_scope, false);
+  assert.equal(charOptions.find((c) => c.value === "vrm:vrm-1")?.in_project_scope, true);
+
+  // 4. Background: 內建與上傳背景正確保留 in_project_scope
+  const bgOptions = buildBackgroundOptions(
+    [{ id: "default", label: "預設背景", in_project_scope: true }],
+    [{ background_id: "bg-custom", label: "自訂背景", url: "/bg.png", in_project_scope: false }],
+  );
+  assert.equal(bgOptions.find((b) => b.id === "default")?.in_project_scope, true);
+  assert.equal(bgOptions.find((b) => b.id === "uploaded:bg-custom")?.in_project_scope, false);
+
+  // 5. 確保元件模板有掛上提示文案
   const modalSource = read("components/controls/SettingsModal.vue");
-
-  // 1. Voice
-  assert.match(modalSource, /const ttsVoiceOptions = computed/);
-  assert.match(modalSource, /in_project_scope:\s*voiceItemMap\.has\(v\)\s*\?\s*voiceItemMap\.get\(v\)\s*:\s*provider\.in_project_scope/);
-
-  // 2. ASR
-  assert.match(modalSource, /const asrProviderOptions = computed/);
-  assert.match(modalSource, /in_project_scope:\s*e\.in_project_scope/);
-
-  // 3. Character (2D and VRM)
-  assert.match(modalSource, /const characterOptions = computed/);
-  assert.match(modalSource, /in_project_scope:\s*c\.in_project_scope/);
-  assert.match(modalSource, /in_project_scope:\s*v\.in_project_scope/);
-
-  // 4. Background
-  assert.match(modalSource, /const backgroundOptions = computed/);
-  assert.match(modalSource, /in_project_scope:\s*background\.in_project_scope/);
-  assert.match(modalSource, /'background-option--out-of-scope':\s*option\.in_project_scope === false/);
-  assert.match(modalSource, /class="background-option__scope-note"/);
   assert.match(modalSource, /不在專案範圍內，一般使用者無法使用/);
 });
 

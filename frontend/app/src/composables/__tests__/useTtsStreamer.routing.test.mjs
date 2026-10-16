@@ -298,3 +298,38 @@ test("TTS response with X-TTS-Fallback-Reason triggers onFallback with reason an
     fetchMock.restore();
   }
 });
+
+test("403 project scope fallback triggers onFallback carrying voice field directly without regex parsing", async () => {
+  let fallbackEvent = null;
+  const fetchMock = installFetch((_input, init) => {
+    const body = JSON.parse(init?.body ?? "{}");
+    if (body.character === "out-of-scope-voice" || body.voice === "out-of-scope-voice") {
+      return new Response(JSON.stringify({ detail: "Forbidden" }), { status: 403, statusText: "Forbidden" });
+    }
+    return new Response(new Uint8Array(44 + 4), {
+      status: 200,
+      headers: { "Content-Type": "audio/wav" },
+    });
+  });
+
+  try {
+    const streamer = useTtsStreamer({
+      onPcmChunk: () => {},
+      getProjectDefaultVoice: () => "project-default-voice",
+      ttsProviders: () => [
+        { id: "indextts", name: "IndexTTS", default_voice: "project-default-voice", voices: ["project-default-voice"] },
+      ],
+      onFallback: (fb) => {
+        fallbackEvent = fb;
+      },
+    });
+
+    await streamer.speak("你好", { provider: "indextts", voice: "out-of-scope-voice" });
+    assert.ok(fallbackEvent, "fallback should be reported on 403");
+    assert.equal(fallbackEvent.reason, "project_scope_forbidden");
+    assert.equal(fallbackEvent.voice, "project-default-voice");
+    assert.equal(fallbackEvent.provider, "indextts");
+  } finally {
+    fetchMock.restore();
+  }
+});

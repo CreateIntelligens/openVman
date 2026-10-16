@@ -55,6 +55,13 @@ export interface TtsProvider {
   voice_items?: TtsVoiceItem[];
 }
 
+export interface TtsFallbackEvent {
+  provider: string;
+  reason: string;
+  message: string;
+  voice?: string;
+}
+
 export interface TtsStreamerOptions {
   /** Called with each PCM chunk (16 kHz mono, Int16 LE) as it arrives. */
   onPcmChunk: (pcm: Int16Array) => void | Promise<void>;
@@ -64,8 +71,8 @@ export interface TtsStreamerOptions {
   onEnd?: () => void;
   /** Called when the request fails or is aborted with an error. */
   onError?: (err: unknown) => void;
-  /** Called when backend TTS falls back to another provider (D10). */
-  onFallback?: (fallback: { provider: string; reason: string; message: string }) => void;
+  /** Called when backend TTS falls back to another provider or project scope voice (D10). */
+  onFallback?: (fallback: TtsFallbackEvent) => void;
   /** Default character for IndexTTS when speak() is called without one. */
   defaultCharacter?: string;
   /** Override the streaming TTS endpoint. */
@@ -172,6 +179,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     controller = abort;
 
     const provider = opts.provider ?? '';
+    const currentVoice = opts.voice ?? opts.character ?? '';
 
     try {
       const useStream = shouldUseStream(provider);
@@ -226,13 +234,13 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
           if (found) fallbackProvider = found.id;
         }
 
-        const currentVoice = opts.voice ?? opts.character ?? "";
         if (fallbackVoice && currentVoice !== fallbackVoice && !opts._retried403) {
           const message = `這個聲音在本專案不可用，已改用 ${fallbackVoice}`;
           options.onFallback?.({
             provider: fallbackProvider || provider,
             reason: "project_scope_forbidden",
             message,
+            voice: fallbackVoice,
           });
           return await speak(text, {
             ...opts,
@@ -256,7 +264,12 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
         const message = actualProvider
           ? `語音引擎已自動切換為 ${actualProvider}（原因：${reason}）`
           : `語音引擎已自動切換（原因：${reason}）`;
-        options.onFallback?.({ provider: actualProvider, reason, message });
+        options.onFallback?.({
+          provider: actualProvider,
+          reason,
+          message,
+          voice: currentVoice,
+        });
       }
 
       const emitPcmChunk = createPcmEmitter(options);

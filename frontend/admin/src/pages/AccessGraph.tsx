@@ -10,7 +10,11 @@ import {
   type TemporaryBatchAudit,
 } from "../api/auth";
 import { fetchProjectKnowledgeSettings } from "../api/knowledge";
-import { fetchProjectPolicy, fetchProjectResources } from "../api/projects";
+import {
+  fetchProjectPolicy,
+  fetchProjectResources,
+  type ProjectResourcesResponse,
+} from "../api/projects";
 import AccessGraphCanvas, {
   type CenterRequest,
 } from "../components/accessGraph/AccessGraphCanvas";
@@ -102,18 +106,24 @@ async function loadLanguageRoutes(
   return routes;
 }
 
-async function loadProjectScopeData(
+function parseAssignedResources(
+  r: ProjectResourcesResponse,
+): Array<{ type: "character" | "voice" | "asr"; id: string }> {
+  const list: Array<{ type: "character" | "voice" | "asr"; id: string }> = [];
+  (r.avatar_character ?? []).filter((c) => c.source === "assigned").forEach((c) => list.push({ type: "character", id: c.resource_id }));
+  (r.custom_voice ?? []).filter((v) => v.source === "assigned").forEach((v) => list.push({ type: "voice", id: v.resource_id }));
+  (r.asr_engine ?? []).filter((a) => a.source === "assigned").forEach((a) => list.push({ type: "asr", id: a.resource_id }));
+  return list;
+}
+
+/** 每個專案查一次 policy，取得是否有專案限制。不在初始時預先讀取所有專案的 resources。 */
+async function loadProjectRestrictions(
   projectIds: string[],
-): Promise<{
-  restrictions: Record<string, boolean>;
-  assignments: Record<string, Array<{ type: "character" | "voice" | "asr"; id: string }>>;
-}> {
-  const [policies, resources] = await Promise.all([
-    Promise.allSettled(projectIds.map((id) => fetchProjectPolicy(id))),
-    Promise.allSettled(projectIds.map((id) => fetchProjectResources(id))),
-  ]);
+): Promise<Record<string, boolean>> {
+  const policies = await Promise.allSettled(
+    projectIds.map((id) => fetchProjectPolicy(id)),
+  );
   const restrictions: Record<string, boolean> = {};
-  const assignments: Record<string, Array<{ type: "character" | "voice" | "asr"; id: string }>> = {};
 
   projectIds.forEach((id, index) => {
     const polRes = policies[index];
@@ -128,17 +138,8 @@ async function loadProjectScopeData(
       );
       restrictions[id] = restricted;
     }
-    const resRes = resources[index];
-    if (resRes.status === "fulfilled") {
-      const r = resRes.value;
-      const list: Array<{ type: "character" | "voice" | "asr"; id: string }> = [];
-      (r.avatar_character ?? []).filter((c) => c.source === "assigned").forEach((c) => list.push({ type: "character", id: c.resource_id }));
-      (r.custom_voice ?? []).filter((v) => v.source === "assigned").forEach((v) => list.push({ type: "voice", id: v.resource_id }));
-      (r.asr_engine ?? []).filter((a) => a.source === "assigned").forEach((a) => list.push({ type: "asr", id: a.resource_id }));
-      assignments[id] = list;
-    }
   });
-  return { restrictions, assignments };
+  return restrictions;
 }
 
 function matches(node: GraphNode, query: string): boolean {
@@ -206,6 +207,7 @@ export default function AccessGraph() {
     setError(null);
     try {
       setData(await loadGraphData());
+      setProjectAssignments({});
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "讀取權限資料失敗");
     } finally {
@@ -221,7 +223,7 @@ export default function AccessGraph() {
     saveFilters(filters);
   }, [filters]);
 
-  // 語言分流與專案限制／指派不擋圖：先畫圖，讀到再補上標記與線。
+  // 語言分流與專案限制不擋圖：先畫圖，讀到再補上標記。
   useEffect(() => {
     const projectIds = data?.options.projects.map((project) => project.id) ?? [];
     if (projectIds.length === 0) return;
@@ -229,10 +231,9 @@ export default function AccessGraph() {
     void loadLanguageRoutes(projectIds).then((routes) => {
       if (!cancelled) setLanguageRoutes(routes);
     });
-    void loadProjectScopeData(projectIds).then(({ restrictions, assignments }) => {
+    void loadProjectRestrictions(projectIds).then((restrictions) => {
       if (!cancelled) {
         setProjectRestrictions(restrictions);
-        setProjectAssignments(assignments);
       }
     });
     return () => {
@@ -332,6 +333,32 @@ export default function AccessGraph() {
   );
 
   const selectedNode = selectedId ? fullGraph.byId.get(selectedId) ?? null : null;
+
+  // 點開專案時才載入該專案的 /resources（解析 assigned 資源連線），避免初始化全量請求
+  useEffect(() => {
+    if (!selectedNode || selectedNode.kind !== "project") return;
+    const projectId = selectedNode.rawId;
+    if (projectAssignments[projectId] !== undefined) return;
+    let cancelled = false;
+    fetchProjectResources(projectId)
+      .then((r) => {
+        if (cancelled) return;
+        setProjectAssignments((prev) => ({
+          ...prev,
+          [projectId]: parseAssignedResources(r),
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProjectAssignments((prev) => ({
+          ...prev,
+          [projectId]: [],
+        }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedNode, projectAssignments]);
   const results = useMemo(() => {
     if (!query.trim()) return [];
     const found = fullGraph.nodes.filter((node) => matches(node, query));

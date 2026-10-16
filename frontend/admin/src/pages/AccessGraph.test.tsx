@@ -10,6 +10,7 @@ import {
   type TemporaryBatchAudit,
 } from "../api/auth";
 import { fetchProjectKnowledgeSettings } from "../api/knowledge";
+import { fetchProjectPolicy, fetchProjectResources } from "../api/projects";
 import { NavigationProvider } from "../context/NavigationContext";
 import AccessGraph from "./AccessGraph";
 
@@ -22,6 +23,11 @@ vi.mock("../api/auth", () => ({
 
 vi.mock("../api/knowledge", () => ({
   fetchProjectKnowledgeSettings: vi.fn(),
+}));
+
+vi.mock("../api/projects", () => ({
+  fetchProjectPolicy: vi.fn(),
+  fetchProjectResources: vi.fn(),
 }));
 
 const batches: TemporaryBatchAudit[] = [
@@ -144,6 +150,36 @@ describe("AccessGraph page", () => {
     vi.mocked(fetchProjectKnowledgeSettings).mockImplementation(async (projectId: string) => {
       if (projectId === "p-hk") return { language_routes: ["zh", "nan"] };
       return { language_routes: ["zh"] };
+    });
+    vi.mocked(fetchProjectPolicy).mockResolvedValue({
+      project_id: "p-hk",
+      allowed_characters: [],
+      allowed_backgrounds: [],
+      allowed_mascots: [],
+      allowed_tts_voices: [],
+      allowed_asr_engines: [],
+      default_tts_voice: null,
+      default_asr_engine: null,
+      taiwanese_asr_engine: null,
+      default_character_id: null,
+      default_background_id: null,
+      default_mascot_id: null,
+      updated_by: null,
+      updated_at: null,
+    });
+    vi.mocked(fetchProjectResources).mockResolvedValue({
+      avatar_character: [],
+      avatar_background: [],
+      avatar_mascot: [],
+      custom_voice: [],
+      asr_engine: [],
+      defaults: {
+        avatar_character: null,
+        avatar_background: null,
+        avatar_mascot: null,
+        custom_voice: null,
+        asr_engine: null,
+      },
     });
   });
 
@@ -387,5 +423,57 @@ describe("AccessGraph page", () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("沒有權限"));
+  });
+
+  it("does not fetch project resources on initial load, but fetches on demand when a project is selected", async () => {
+    vi.mocked(fetchProjectResources).mockImplementation(async (projectId: string) => {
+      if (projectId === "p-hk") {
+        return {
+          avatar_character: [],
+          avatar_background: [],
+          avatar_mascot: [],
+          custom_voice: [
+            { resource_id: "v-assigned", label: "指派聲音", source: "assigned" },
+          ],
+          asr_engine: [],
+          defaults: {
+            avatar_character: null,
+            avatar_background: null,
+            avatar_mascot: null,
+            custom_voice: null,
+            asr_engine: null,
+          },
+        };
+      }
+      return {
+        avatar_character: [],
+        avatar_background: [],
+        avatar_mascot: [],
+        custom_voice: [],
+        asr_engine: [],
+        defaults: {
+          avatar_character: null,
+          avatar_background: null,
+          avatar_mascot: null,
+          custom_voice: null,
+          asr_engine: null,
+        },
+      };
+    });
+
+    renderPage();
+    await screen.findByRole("button", { name: /帳號 clerk/ });
+
+    // 初始載入只打 policy，不打 resources
+    expect(fetchProjectResources).not.toHaveBeenCalled();
+
+    // 點開專案
+    const projectNode = screen.getByRole("button", { name: /專案 鶴記/ });
+    fireEvent.keyDown(projectNode, { key: "Enter" });
+
+    // 點開後才按需發起 fetchProjectResources
+    await waitFor(() => {
+      expect(fetchProjectResources).toHaveBeenCalledWith("p-hk");
+    });
   });
 });

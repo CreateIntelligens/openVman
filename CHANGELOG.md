@@ -41,6 +41,11 @@
 
 ### Fixed
 
+- **[2026-10-16]** **專案資源範圍程式碼優化與請求數收斂**：
+  - 前台 TTS 403 退回重構：`useTtsStreamer.ts` 的 `onFallback` 回呼直接帶入結構化 `{ voice, provider, reason }` 物件，避免 `useAvatarConversation.ts` 以脆弱的正則表達式解析錯誤文字。
+  - 前台測試品質重構：抽取 `settingsOptions.ts` 純函式（`buildCharacterOptions`、`buildTtsVoiceOptions` 等），將原先在 `rootScopeMarking.test.mjs` 中依賴原始碼模板文字的正則比對改為資料轉換單元測試。
+  - 後台權限圖譜請求數最佳化：`AccessGraph.tsx` 初始化時僅查詢各專案政策限制（`fetchProjectPolicy`），移除初始化對所有專案的 `fetchProjectResources` 併行請求；改為使用者點開專案節點時按需非同步載入資源與指派連線，並新增單元測試驗證按需載入行為。
+
 - **[2026-10-16]** **後台 Avatar 管理頁看不到專案專屬的人物、背景、小助理**：管理頁列表不帶 `project_id`，後端此時連 ROOT 也只列全域與孤兒資源，例如 AWS-dev 的 `local_01` 不會出現。`GET /api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/avatar/mascots` 不帶專案時，ROOT 改為也列出各專案的專屬資源（`source="project"`），每項新增 `owner_project_id`；非 ROOT 帳號不變，仍只看得到全域資源。計算集中在 `project_resources.unscoped_resource_sources`。
 
 - **[2026-10-16]** **虛擬人前台看不到專案專屬人物**：開機時繪製流程在專案決定前就先抓一次不帶 `project_id` 的 `/api/v1/avatar`，專案決定後再帶專案抓一次；前一次較晚回來時會把清單蓋掉，專案專屬人物（例如 AWS-dev 的 `local_01`）就從選單消失。`useAvatarCatalog` 改成只採用最後發出的請求結果。人物選單的 2D 項目也拿掉每一項都一樣的「· openVman 2D」，只顯示人物名稱（VRM 仍標「· VRM」）。

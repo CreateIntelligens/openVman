@@ -132,8 +132,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       statusToastRef.value?.show(fallback.message);
       if (fallback.reason === "project_scope_forbidden" && replySpeakOptions) {
         if (fallback.provider) replySpeakOptions.provider = fallback.provider;
-        const voiceName = fallback.message.replace(/^這個聲音在本專案不可用，已改用\s*/, "").trim();
-        if (voiceName) replySpeakOptions.voice = voiceName;
+        if (fallback.voice) replySpeakOptions.voice = fallback.voice;
       }
     },
   });
