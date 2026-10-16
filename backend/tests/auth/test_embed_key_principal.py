@@ -509,3 +509,30 @@ def test_session_principal_headers_identify_the_account(embed_env):
 
     assert headers["X-Principal-Type"] == "user"
     assert headers["X-Principal-Id"] == user.id
+
+
+def test_character_list_shows_the_key_projects_own_characters(embed_env, tmp_path):
+    # 2026-10-16 人物全部改成專案專屬後，公開清單對 SDK 是空的；帶 Embed key 的網站
+    # 要看得到自己專案的人物，別的專案的人物與金鑰沒允許的仍不列。
+    from app.auth.models import ResourceType, ResourceVisibility
+
+    _module, client, key, runtime = embed_env
+    for char_id, owner in (("proj-own", "default"), ("proj-other", "other"), ("proj-extra", "default")):
+        char_dir = tmp_path / "characters" / char_id
+        char_dir.mkdir(parents=True, exist_ok=True)
+        (char_dir / "01.webm").write_bytes(b"webm")
+        (char_dir / "combined_data.json.gz").write_bytes(b"\x1f\x8bdata")
+        runtime.resources.register(
+            resource_type=ResourceType.AVATAR_CHARACTER,
+            resource_id=char_id,
+            owner_user_id=None,
+            visibility=ResourceVisibility.PROJECT,
+            owner_project_id=owner,
+        )
+    runtime.embed_keys.update(key.key_id, allowed_character_ids=["proj-own", "proj-other"])
+
+    anonymous = client.get("/api/v1/characters").json()["characters"]
+    embedded = client.get("/api/v1/characters", headers=_headers(key.key_id)).json()["characters"]
+
+    assert [c["char_id"] for c in anonymous] == []
+    assert [c["char_id"] for c in embedded] == ["proj-own"]

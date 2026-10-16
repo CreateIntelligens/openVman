@@ -71,16 +71,18 @@ def _check_resource_access(
             detail=f"Access denied to {resource_type.value}/{resource_id}",
         )
 
-    # 一般帳號：先看自身 grant / ownership / public
-    try:
-        return resolve_resource(
-            runtime.resources,
-            current.user,
-            resource_type,
-            resource_id,
-        )
-    except ResourceNotFoundError:
-        pass
+    # 一般帳號：先看自身 grant / ownership / public。專案專屬資源只看專案：
+    # 資源從全域改成專案專屬時，帳號身上的舊授權不能再讓別的專案讀到檔案。
+    if record.visibility is not ResourceVisibility.PROJECT:
+        try:
+            return resolve_resource(
+                runtime.resources,
+                current.user,
+                resource_type,
+                resource_id,
+            )
+        except ResourceNotFoundError:
+            pass
 
     # 專案來源檢查：該資源屬於、或被指派給任一個該帳號能讀的專案
     candidate_projects: set[str] = set()

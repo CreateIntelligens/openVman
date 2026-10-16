@@ -964,3 +964,21 @@ def test_unscoped_avatar_list_shows_project_characters_only_to_root(env, monkeyp
 
     member = env.client.get("/api/v1/avatar", headers=_headers(env, env.member)).json()
     assert "char-proj-1" not in {c["char_id"] for c in member["characters"]}
+
+
+def test_old_grant_does_not_open_a_resource_moved_into_another_project(env):
+    # 2026-10-16：全域人物改成 ESG 專屬後，醫院帳號身上留著以前的直接授權，
+    # 選單看不到了，直接輸入素材網址卻還是 200。專案專屬資源只看專案。
+    char_dir = env.tmp_path / "avatar" / "char-global-1"
+    char_dir.mkdir(parents=True, exist_ok=True)
+    (char_dir / "01.webm").write_bytes(b"webm")
+    url = "/static/characters/char-global-1/01.webm"
+    assert env.client.get(url, headers=_headers(env, env.member)).status_code == 200
+
+    with env.runtime.database.transaction(write=True) as connection:
+        connection.execute(
+            "UPDATE resources SET visibility = 'project', owner_project_id = 'proj-2'"
+            " WHERE resource_type = 'avatar_character' AND resource_id = 'char-global-1'"
+        )
+
+    assert env.client.get(url, headers=_headers(env, env.member)).status_code == 403
