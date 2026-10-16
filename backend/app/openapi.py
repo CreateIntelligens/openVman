@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import logging
+from collections.abc import Callable
 from copy import deepcopy
+import logging
+from time import monotonic
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -17,6 +19,7 @@ from app.http_client import SharedAsyncClient
 logger = logging.getLogger("backend")
 _health_http = SharedAsyncClient()
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
+_BRAIN_SCHEMA_TTL_SECONDS = 300
 # 限流掛在帳號 API key 驗證上，登入 session、Embed key 與免驗證的公開路由不計。
 _API_KEY_RATE_LIMITED = {
     "description": (
@@ -171,42 +174,69 @@ async def _fetch_brain_openapi() -> dict | None:
 
 
 class BackendOpenAPI:
-    """Keep schema initialization state specific to the assembled application."""
+    """Keep schema initialization state specific to the assembled application.
 
-    def __init__(self, app: FastAPI) -> None:
+    合併後的文件只快取一段時間：Backend 與 Brain 各自部署，Backend 先換新版時
+    抓到的是舊 Brain 的 schema；只抓一次的話要等下次 Backend 重啟才會更新，
+    啟動當下 Brain 連不上則永遠少掉 Brain 的部分。
+    """
+
+    def __init__(self, app: FastAPI, *, clock: Callable[[], float] = monotonic) -> None:
         self.app = app
         self._built = False
+        self._clock = clock
+        self._built_at: float | None = None
+        self._refreshing = False
+
+    def _stale(self) -> bool:
+        return (
+            self._built_at is None
+            or self._clock() - self._built_at >= _BRAIN_SCHEMA_TTL_SECONDS
+        )
 
     async def build(self) -> dict:
         app = self.app
-        if app.openapi_schema is not None:
+        if app.openapi_schema is not None and not self._stale():
             return app.openapi_schema
         local_schema = get_openapi(
             title=app.title, version=app.version, routes=app.routes,
         )
-        if not self._built:
-            brain_schema = await _fetch_brain_openapi()
-            self._built = True
-            if brain_schema is not None:
-                app.openapi_schema = _with_account_authentication(
-                    _merge_brain_openapi(local_schema, brain_schema),
-                )
-                return app.openapi_schema
-        app.openapi_schema = _with_account_authentication(local_schema)
+        brain_schema = await _fetch_brain_openapi()
+        self._built = True
+        self._built_at = self._clock()
+        if brain_schema is not None:
+            app.openapi_schema = _with_account_authentication(
+                _merge_brain_openapi(local_schema, brain_schema),
+            )
+        elif app.openapi_schema is None:
+            # Brain 暫時連不上時保留上一份合併結果，沒有才退回只有 Backend 的版本。
+            app.openapi_schema = _with_account_authentication(local_schema)
         return app.openapi_schema
+
+    async def _refresh(self) -> None:
+        self._refreshing = True
+        try:
+            await self.build()
+        finally:
+            self._refreshing = False
 
     def schema(self) -> dict:
         app = self.app
-        if app.openapi_schema is not None:
-            return app.openapi_schema
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
-        if loop is not None and loop.is_running():
+        running = loop is not None and loop.is_running()
+        if app.openapi_schema is not None:
+            # 過期就在背景重抓，這次先回舊的，不讓 /openapi.json 等 Brain。
+            if running and self._stale() and not self._refreshing:
+                loop.create_task(self._refresh())
+            return app.openapi_schema
+        if running:
             local_schema = get_openapi(
                 title=app.title, version=app.version, routes=app.routes,
             )
-            loop.create_task(self.build())
+            if not self._refreshing:
+                loop.create_task(self._refresh())
             return _with_account_authentication(local_schema)
         return asyncio.run(self.build())

@@ -146,3 +146,38 @@ def test_chat_routes_document_rejection_and_rate_limit():
         responses = paths[path]["post"]["responses"]
         assert "INVALID_REQUEST" in responses["400"]["description"], path
         assert "Retry-After" in responses["429"]["headers"], path
+
+
+def test_merged_schema_picks_up_a_brain_deployed_after_the_backend(monkeypatch):
+    # 2026-10-16：Backend 先換新版、Brain 晚 15 分鐘才換，/openapi.json 一直是舊 Brain
+    # 的 schema（沒有 ChatResponse），因為合併結果只在啟動時算一次。
+    import asyncio
+
+    import app.openapi as openapi_module
+
+    brain = {"version": "old"}
+
+    async def fake_fetch():
+        if brain["version"] is None:
+            return None
+        name = "ChatResponse" if brain["version"] == "new" else "OldOnly"
+        return {"paths": {}, "components": {"schemas": {name: {"type": "object"}}}}
+
+    monkeypatch.setattr(openapi_module, "_fetch_brain_openapi", fake_fetch)
+    now = {"t": 0.0}
+    builder = openapi_module.BackendOpenAPI(FastAPI(), clock=lambda: now["t"])
+
+    first = asyncio.run(builder.build())
+    assert "OldOnly" in first["components"]["schemas"]
+
+    brain["version"] = "new"
+    now["t"] = 100.0
+    assert "OldOnly" in asyncio.run(builder.build())["components"]["schemas"], "快取期間不重抓"
+
+    now["t"] = 301.0
+    assert "ChatResponse" in asyncio.run(builder.build())["components"]["schemas"]
+
+    brain["version"] = None
+    now["t"] = 700.0
+    kept = asyncio.run(builder.build())
+    assert "ChatResponse" in kept["components"]["schemas"], "Brain 連不上時保留上一份合併結果"
