@@ -1,0 +1,14 @@
+# Pinned to the versions the parity-verified image was built with.
+# mediapipe itself is installed with --no-deps in the Dockerfile: its wheel
+# metadata also demands jax, jaxlib, sounddevice and the non-headless
+# opencv-contrib-python, none of which the face mesh solution loads.
+absl-py==2.5.1
+arq==0.28.0
+attrs==26.1.0
+cryptography==50.0.2
+flatbuffers==25.12.19
+matplotlib==3.11.2
+numpy==2.5.4
+opencv-python-headless==5.0.0.93
+protobuf==4.25.9
+redis==5.3.1
