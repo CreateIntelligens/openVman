@@ -282,3 +282,23 @@ def test_engine_order_is_validated(env, fields, message):
         env.runtime.project_policies.replace(
             project_id="p1", updated_by=env.root.id, **fields,
         )
+
+
+def test_engine_order_columns_are_added_to_an_existing_database(env):
+    """正式機已套用 23 的資料庫也要拿到順位欄位（schema 25 獨立一版）。"""
+    from app.auth.schema_migrations import _PROJECT_ENGINE_ORDER_SCHEMA_VERSION
+
+    database = env.runtime.project_policies.database
+    with database.transaction(write=True) as connection:
+        connection.execute(
+            "DELETE FROM schema_migrations WHERE version = ?",
+            (_PROJECT_ENGINE_ORDER_SCHEMA_VERSION,),
+        )
+    database.initialize()
+    with database.transaction() as connection:
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(project_policies)")}
+        versions = {row["version"] for row in connection.execute("SELECT version FROM schema_migrations")}
+    assert {"tts_engine_order_json", "asr_engine_order_json"} <= columns
+    assert _PROJECT_ENGINE_ORDER_SCHEMA_VERSION in versions
+    # 再跑一次不會炸。
+    database.initialize()

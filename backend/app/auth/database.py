@@ -25,6 +25,8 @@ from .schema_migrations import (
     _PROJECT_RESOURCE_ASSIGNMENTS_TABLE,
     _PROJECT_RESOURCE_SCOPE_MIGRATION_NAME,
     _PROJECT_RESOURCE_SCOPE_RESOURCES_TABLE,
+    _PROJECT_ENGINE_ORDER_MIGRATION_NAME,
+    _PROJECT_ENGINE_ORDER_SCHEMA_VERSION,
     _PROJECT_RESOURCE_SCOPE_SCHEMA_VERSION,
     _ROOT_ACCOUNT_MIGRATION_NAME,
     _ROOT_ACCOUNT_SCHEMA_VERSION,
@@ -152,6 +154,39 @@ class AuthDatabase:
         self._add_kiosk_flag()
         self._add_last_login_at()
         self._migrate_project_resource_scope()
+        self._add_project_engine_order()
+
+    def _add_project_engine_order(self) -> None:
+        """Add the per-project TTS / batch ASR engine order columns (schema 25)."""
+        with self.transaction(write=True) as connection:
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_PROJECT_ENGINE_ORDER_SCHEMA_VERSION,),
+            ).fetchone()
+            if applied is not None:
+                return
+            policy_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(project_policies)").fetchall()
+            }
+            for column in ("tts_engine_order_json", "asr_engine_order_json"):
+                if column not in policy_columns:
+                    connection.execute(
+                        f"ALTER TABLE project_policies ADD COLUMN {column} TEXT NOT NULL DEFAULT '[]'"
+                    )
+            connection.execute(
+                """
+                INSERT INTO schema_migrations(version, details_json)
+                VALUES (?, ?)
+                """,
+                (
+                    _PROJECT_ENGINE_ORDER_SCHEMA_VERSION,
+                    json.dumps(
+                        {"name": _PROJECT_ENGINE_ORDER_MIGRATION_NAME},
+                        separators=(",", ":"),
+                    ),
+                ),
+            )
 
     def _migrate_project_resource_scope(self) -> None:
         """Allow visibility='project' on resources and add per-project resources and assignments."""
@@ -249,14 +284,6 @@ class AuthDatabase:
                 if "default_mascot_id" not in policy_columns:
                     tx_conn.execute(
                         "ALTER TABLE project_policies ADD COLUMN default_mascot_id TEXT"
-                    )
-                if "tts_engine_order_json" not in policy_columns:
-                    tx_conn.execute(
-                        "ALTER TABLE project_policies ADD COLUMN tts_engine_order_json TEXT NOT NULL DEFAULT '[]'"
-                    )
-                if "asr_engine_order_json" not in policy_columns:
-                    tx_conn.execute(
-                        "ALTER TABLE project_policies ADD COLUMN asr_engine_order_json TEXT NOT NULL DEFAULT '[]'"
                     )
 
                 tx_conn.execute(_PROJECT_RESOURCE_ASSIGNMENTS_TABLE)
