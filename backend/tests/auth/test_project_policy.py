@@ -217,6 +217,7 @@ def test_unset_policy_is_returned_as_unrestricted(env):
         "allowed_characters": [], "default_character_id": None,
         "allowed_backgrounds": [], "default_background_id": None,
         "allowed_mascots": [], "default_mascot_id": None,
+        "tts_engine_order": [], "asr_engine_order": [],
     }
 
 
@@ -249,3 +250,35 @@ def test_scoped_admin_stays_inside_its_ceiling(env):
     assert "asr_engine/openai" in outside.json()["detail"]
     # 範圍外的專案對受限 admin 來說等同不存在。
     assert _put(env, env.admin, project_id="p2").status_code == 404
+
+
+def test_engine_order_round_trips(env):
+    record = env.runtime.project_policies.replace(
+        project_id="p1",
+        tts_engine_order=["voxcpm", " cosyvoice ", "voxcpm", "edge-tts"],
+        asr_engine_order=["sensevoice", "breeze"],
+        updated_by=env.root.id,
+    )
+    assert record.tts_engine_order == ("voxcpm", "cosyvoice", "edge-tts")
+    assert record.asr_engine_order == ("sensevoice", "breeze")
+    stored = env.runtime.project_policies.get("p1")
+    assert stored.tts_engine_order == ("voxcpm", "cosyvoice", "edge-tts")
+    assert stored.asr_engine_order == ("sensevoice", "breeze")
+    # 只有順位也算有設定：清掉後整列消失。
+    env.runtime.project_policies.replace(project_id="p1", updated_by=env.root.id)
+    assert env.runtime.project_policies.get("p1").tts_engine_order == ()
+
+
+@pytest.mark.parametrize(("fields", "message"), [
+    ({"tts_engine_order": ["indextts", "polly"]}, "unknown engines"),
+    ({"asr_engine_order": ["gemini-live"]}, "batch ASR"),
+    (
+        {"allowed_asr_engines": ["breeze"], "asr_engine_order": ["sensevoice"]},
+        "subset of allowed_asr_engines",
+    ),
+])
+def test_engine_order_is_validated(env, fields, message):
+    with pytest.raises(InvalidProjectPolicyError, match=message):
+        env.runtime.project_policies.replace(
+            project_id="p1", updated_by=env.root.id, **fields,
+        )

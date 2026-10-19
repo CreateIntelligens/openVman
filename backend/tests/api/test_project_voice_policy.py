@@ -505,6 +505,7 @@ class _FakeService:
     def __init__(self):
         self.calls: list[tuple] = []
         self.streams: list[str] = []
+        self.orders: list[tuple] = []
         # 這些 provider 的整段合成會失敗，看得出有沒有退回 Edge。
         self.failing = {"indextts", "cosyvoice"}
         self.edge_adapter = SimpleNamespace(
@@ -530,7 +531,8 @@ class _FakeService:
         self.calls.append(("voxcpm-stream", request.voice_hint, None))
         raise VoxCPMHTTPError(status_code=503, detail="GPU busy")
 
-    def synthesize(self, request, *, provider="", edge_fallback_voice="", partners=()):
+    def synthesize(self, request, *, provider="", edge_fallback_voice="", partners=(), order=()):
+        self.orders.append(order)
         self.calls.append((provider, request.voice_hint, edge_fallback_voice))
         for partner, partner_voice in partners:
             if provider in self.failing and partner not in self.failing:
@@ -779,3 +781,28 @@ def test_mandarin_turns_do_not_get_a_taiwanese_partner(env, tts_client, monkeypa
     assert response.status_code == 200
     # 華語指定 CosyVoice 失敗照舊退 Edge，不換成照字唸的 VoxCPM。
     assert [call[0] for call in tts_client.service.calls] == ["cosyvoice"]
+
+
+def test_project_tts_order_reaches_the_auto_chain(env, tts_client):
+    _policy(env, tts_engine_order=["voxcpm", "cosyvoice"])
+    response = tts_client.post(
+        "/v1/audio/speech", json={"input": "你好", "project_id": "p1"},
+    )
+    assert response.status_code == 200
+    assert tts_client.service.orders[-1] == ("voxcpm", "cosyvoice")
+
+
+def test_project_tts_order_decides_which_taiwanese_engine_goes_first(
+    env, tts_client, monkeypatch,
+):
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    _policy(env, tts_engine_order=["voxcpm", "cosyvoice"])
+    _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    # 順位把 VoxCPM 排前面：台語這一輪先走 VoxCPM 串流（假服務的串流會失敗，再換 CosyVoice）。
+    assert tts_client.service.calls[0][0] == "voxcpm-stream"
+    assert tts_client.service.calls[1][0] == "cosyvoice"

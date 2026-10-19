@@ -86,15 +86,25 @@ class TTSRouterService:
 
     def build_chain(
         self, request: SynthesizeRequest | None = None,
+        order: tuple[str, ...] = (),
     ) -> list[RouteTarget]:
-        """Build the ordered fallback chain based on config."""
+        """Build the ordered fallback chain based on config.
+
+        ``order`` is a project's own engine order: only those engines, in that
+        order (an admin who lists two engines means "never the others here").
+        Empty keeps the deployment chain.
+        """
+        routes = self._provider_routes()
+        if order:
+            by_name = {target_id: route for route in routes for target_id in (route[0],)}
+            routes = tuple(by_name[name] for name in order if name in by_name)
         return [
             RouteTarget(
                 target=target_id,
                 adapter=adapter,
                 error_classifier=classifier,
             )
-            for target_id, adapter, classifier in self._provider_routes()
+            for target_id, adapter, classifier in routes
             if adapter.enabled or (
                 target_id == "gemini-tts" and request is not None
                 and self._gemini.enabled_for(request)
@@ -108,6 +118,7 @@ class TTSRouterService:
         provider: str = "",
         edge_fallback_voice: str | None = "",
         partners: tuple[tuple[str, str], ...] = (),
+        order: tuple[str, ...] = (),
     ) -> SynthesisOutput:
         """Run the fallback chain and return the first successful result.
 
@@ -122,13 +133,14 @@ class TTSRouterService:
 
         Raises RuntimeError if all attempts fail.
         """
-        chain = self.build_chain(request)
+        chain = self.build_chain(request, order if not (provider and provider != "auto") else ())
         if not chain:
             raise RuntimeError("TTS fallback chain 為空：無可用的 provider")
 
         if provider and provider != "auto":
+            # 指定了引擎就照指定的走；專案順位只管沒指定的請求。
             return self._synthesize_targeted(
-                request, provider, chain, edge_fallback_voice, partners,
+                request, provider, self.build_chain(request), edge_fallback_voice, partners,
             )
 
         return self._synthesize_chain(request, chain)

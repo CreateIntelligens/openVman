@@ -89,3 +89,28 @@ def test_edge_is_still_the_last_resort_when_the_partner_fails_too() -> None:
     assert output.result.provider == "edge-tts"
     assert svc._cosyvoice.synthesize.call_args.args[0].voice_hint == "young-male-01"
     assert svc._edge.synthesize.call_args.args[0].voice_hint == "zh-TW-YunJheNeural"
+
+
+def test_project_order_replaces_the_deployment_chain_for_auto_requests() -> None:
+    svc = TTSRouterService(_taiwanese_config())
+    svc._voxcpm.synthesize = MagicMock(side_effect=RuntimeError("vox down"))  # type: ignore[method-assign]
+    svc._cosyvoice.synthesize = MagicMock(return_value=_ok_result("cosyvoice"))  # type: ignore[method-assign]
+    svc._edge.synthesize = MagicMock(return_value=_ok_result("edge-tts"))  # type: ignore[method-assign]
+
+    chain = [t.target for t in svc.build_chain(order=("voxcpm", "cosyvoice"))]
+    assert chain == ["voxcpm", "cosyvoice"]
+
+    output = svc.synthesize(SynthesizeRequest(text="你好"), order=("voxcpm", "cosyvoice"))
+    assert output.result.provider == "cosyvoice"
+    # 順位裡沒有 Edge：就算有在跑也不會輪到它。
+    svc._edge.synthesize.assert_not_called()
+
+
+def test_project_order_does_not_override_an_explicit_provider() -> None:
+    svc = TTSRouterService(_taiwanese_config())
+    svc._cosyvoice.synthesize = MagicMock(return_value=_ok_result("cosyvoice"))  # type: ignore[method-assign]
+    svc._voxcpm.synthesize = MagicMock(return_value=_ok_result("voxcpm"))  # type: ignore[method-assign]
+    output = svc.synthesize(
+        SynthesizeRequest(text="你好"), provider="cosyvoice", order=("voxcpm",),
+    )
+    assert output.result.provider == "cosyvoice"

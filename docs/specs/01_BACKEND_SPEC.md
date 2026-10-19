@@ -204,6 +204,8 @@ ws.send(JSON.stringify(payload));
 
 ### 專案資源限制與指派（`GET/PUT /api/v1/projects/{project_id}/policy`、`GET /api/v1/projects/{project_id}/resources`、`POST/DELETE /api/v1/projects/{project_id}/assignments`）
 
+**引擎順位（2026-10-19）**：政策另有 `tts_engine_order`、`asr_engine_order` 兩個有序清單。`tts_engine_order` 只影響沒指定 `provider`／`voice` 的請求：`service.synthesize(order=...)` 把備援鏈換成「只有列出的引擎、照該順序」（空的用部署鏈）；`/tts/stream` 沒指定引擎時取順位中第一個在跑的引擎走它的串流分支，最後的整段合成鏈也照順位；台語分流時 `_taiwanese_providers` 依順位決定 CosyVoice／VoxCPM 誰先。指定了引擎的請求照原本的指定引擎邏輯，不受順位影響。`asr_engine_order` 給批次辨識（`/api/v1/asr/transcribe`、語音對話、後台試辨識）：`ingestion_audio.transcribe(order=...)` 的鏈是「呼叫端指定的引擎 → 順位」，不再接部署鏈；仍受允許清單與引擎是否設定齊全過濾。驗證：TTS 順位只能列 `indextts、voxcpm、cosyvoice、gemini-tts、gcp-tts、aws-polly、edge-tts`；ASR 順位只能列批次引擎，且專案有允許清單時必須是其子集。串流 ASR 引擎仍是帳號偏好，不在專案順位內。
+
 帳號授權決定「這個人能用什麼」，專案限制決定「這個專案肯用什麼」；每次請求實際能用的是兩者交集加上專案專屬與 ROOT 指派資源。存在 Auth DB 的 `project_policies`（migration 20 與 23，主鍵 `project_id`，以 `(resource_type='project', project_id)` 外鍵指向 `resources`，刪專案時一併刪除）。
 
 專案政策欄位：

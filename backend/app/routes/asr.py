@@ -123,6 +123,7 @@ async def _transcribe_routed(
     taiwanese_engine: str | None,
     allowed_providers: set[str] | None = None,
     strict_provider: bool = False,
+    engine_order: tuple[str, ...] = (),
 ) -> dict:
     """Transcribe with the project's glossary and language routes, as a real chat turn does."""
     from app.gateway.ingestion_audio import transcribe
@@ -135,6 +136,8 @@ async def _transcribe_routed(
         {"allowed_providers": allowed_providers}
         if allowed_providers is not None else {}
     )
+    if engine_order:
+        scope["order"] = engine_order
     # 只量轉寫本身，不含上傳與轉檔：比的是引擎誰快，網路時間算進去會讓同一個引擎在
     # 不同網路下看起來像兩回事。
     started = monotonic()
@@ -276,6 +279,7 @@ async def transcribe_for_account(
             taiwanese_engine=None if requested else scope.taiwanese,
             allowed_providers=providers,
             strict_provider=bool(requested),
+            engine_order=tuple(policy.asr_engine_order) if policy is not None else (),
         ))
     except HTTPException:
         raise

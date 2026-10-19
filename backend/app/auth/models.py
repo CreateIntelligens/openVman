@@ -151,6 +151,11 @@ class ProjectPolicyRecord:
     default_background_id: str | None = None
     allowed_mascots: tuple[str, ...] = ()
     default_mascot_id: str | None = None
+    #: TTS 引擎順位：請求沒指定引擎與聲音時照這個順序試，台語分流也照它挑
+    #: CosyVoice／VoxCPM 誰先；空的就用部署的鏈。
+    tts_engine_order: tuple[str, ...] = ()
+    #: 批次 ASR 備援順位：呼叫端指定的引擎之後照這個順序試；空的就用部署的鏈。
+    asr_engine_order: tuple[str, ...] = ()
     updated_by: str | None = None
     updated_at: str | None = None
 

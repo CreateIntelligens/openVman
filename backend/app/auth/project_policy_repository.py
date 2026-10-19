@@ -12,6 +12,11 @@ from .models import ProjectPolicyRecord, ResourceType
 from .repository_errors import InvalidProjectPolicyError
 from .settings_repository import SERVER_ASR_PROVIDERS
 
+#: 後端 TTS 備援鏈認得的引擎名（與 service._provider_routes 一致）。
+TTS_ENGINES = (
+    "indextts", "voxcpm", "cosyvoice", "gemini-tts", "gcp-tts", "aws-polly", "edge-tts",
+)
+
 
 def _normalized_ids(values: Iterable[str]) -> tuple[str, ...]:
     seen: list[str] = []
@@ -51,6 +56,8 @@ def _policy_from_row(row: sqlite3.Row) -> ProjectPolicyRecord:
         default_background_id=row["default_background_id"] or None,
         allowed_mascots=_json_ids(row["allowed_mascots_json"]),
         default_mascot_id=row["default_mascot_id"] or None,
+        tts_engine_order=_json_ids(row["tts_engine_order_json"]),
+        asr_engine_order=_json_ids(row["asr_engine_order_json"]),
         updated_by=row["updated_by"],
         updated_at=row["updated_at"],
     )
@@ -129,6 +136,8 @@ class ProjectPolicyRepository:
         default_background_id: str | None = None,
         allowed_mascots: Iterable[str] = (),
         default_mascot_id: str | None = None,
+        tts_engine_order: Iterable[str] = (),
+        asr_engine_order: Iterable[str] = (),
         updated_by: str | None,
     ) -> ProjectPolicyRecord:
         engines = _normalized_ids(allowed_asr_engines)
@@ -142,6 +151,26 @@ class ProjectPolicyRepository:
         bg_default = _optional(default_background_id)
         mascots = _normalized_ids(allowed_mascots)
         mascot_default = _optional(default_mascot_id)
+        tts_order = _normalized_ids(tts_engine_order)
+        asr_order = _normalized_ids(asr_engine_order)
+        unknown_tts = [name for name in tts_order if name not in TTS_ENGINES]
+        if unknown_tts:
+            raise InvalidProjectPolicyError(
+                "tts_engine_order has unknown engines: " + ", ".join(unknown_tts)
+            )
+        unknown_asr = [name for name in asr_order if name not in SERVER_ASR_PROVIDERS]
+        if unknown_asr:
+            raise InvalidProjectPolicyError(
+                "asr_engine_order must list batch ASR engines: " + ", ".join(unknown_asr)
+            )
+        if engines:
+            # 順位是在允許清單裡排序，不能偷渡清單外的引擎。
+            outside = [name for name in asr_order if name not in engines]
+            if outside:
+                raise InvalidProjectPolicyError(
+                    "asr_engine_order must be a subset of allowed_asr_engines: "
+                    + ", ".join(outside)
+                )
 
         with self.database.transaction(write=True) as connection:
             project = connection.execute(
@@ -275,6 +304,8 @@ class ProjectPolicyRepository:
                 or char_default
                 or bg_default
                 or mascot_default
+                or tts_order
+                or asr_order
             ):
                 # 全部清空等於「不限制」：刪掉整列，之後讀到的就是沒有設定的狀態。
                 connection.execute(
@@ -292,8 +323,9 @@ class ProjectPolicyRepository:
                     default_tts_voice, allowed_characters_json,
                     default_character_id, allowed_backgrounds_json,
                     default_background_id, allowed_mascots_json,
-                    default_mascot_id, updated_by, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    default_mascot_id, tts_engine_order_json,
+                    asr_engine_order_json, updated_by, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id) DO UPDATE SET
                     allowed_asr_engines_json = excluded.allowed_asr_engines_json,
                     default_asr_engine = excluded.default_asr_engine,
@@ -306,6 +338,8 @@ class ProjectPolicyRepository:
                     default_background_id = excluded.default_background_id,
                     allowed_mascots_json = excluded.allowed_mascots_json,
                     default_mascot_id = excluded.default_mascot_id,
+                    tts_engine_order_json = excluded.tts_engine_order_json,
+                    asr_engine_order_json = excluded.asr_engine_order_json,
                     updated_by = excluded.updated_by,
                     updated_at = excluded.updated_at
                 """,
@@ -322,6 +356,8 @@ class ProjectPolicyRepository:
                     bg_default,
                     json.dumps(list(mascots), separators=(",", ":")),
                     mascot_default,
+                    json.dumps(list(tts_order), separators=(",", ":")),
+                    json.dumps(list(asr_order), separators=(",", ":")),
                     updated_by,
                     now,
                 ),
@@ -339,6 +375,8 @@ class ProjectPolicyRepository:
             default_background_id=bg_default,
             allowed_mascots=mascots,
             default_mascot_id=mascot_default,
+            tts_engine_order=tts_order,
+            asr_engine_order=asr_order,
             updated_by=updated_by,
             updated_at=now,
         )

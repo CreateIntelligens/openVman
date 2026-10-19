@@ -368,6 +368,8 @@ _PROJECT_POLICY_STATEMENTS = (
         default_background_id TEXT,
         allowed_mascots_json TEXT NOT NULL DEFAULT '[]',
         default_mascot_id TEXT,
+        tts_engine_order_json TEXT NOT NULL DEFAULT '[]',
+        asr_engine_order_json TEXT NOT NULL DEFAULT '[]',
         updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (resource_type, project_id)

@@ -250,6 +250,14 @@ class AuthDatabase:
                     tx_conn.execute(
                         "ALTER TABLE project_policies ADD COLUMN default_mascot_id TEXT"
                     )
+                if "tts_engine_order_json" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN tts_engine_order_json TEXT NOT NULL DEFAULT '[]'"
+                    )
+                if "asr_engine_order_json" not in policy_columns:
+                    tx_conn.execute(
+                        "ALTER TABLE project_policies ADD COLUMN asr_engine_order_json TEXT NOT NULL DEFAULT '[]'"
+                    )
 
                 tx_conn.execute(_PROJECT_RESOURCE_ASSIGNMENTS_TABLE)
                 tx_conn.execute(

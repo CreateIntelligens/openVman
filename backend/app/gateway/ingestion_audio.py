@@ -254,7 +254,9 @@ _OPT_IN_TRANSCRIBERS = frozenset({"r2t2-dev"})
 _LANGUAGE_AWARE_TRANSCRIBERS = frozenset({"r2t2", "r2t2-dev"})
 
 
-def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
+def _resolve_chain(
+    cfg, preferred: str | None = None, order: tuple[str, ...] | list[str] = (),
+) -> list[str]:
     """Ordered ASR providers to try: the preferred one, then the rest.
 
     一台 GPU 節點重啟就讓每一輪語音變成「音訊轉錄失敗」送進 prompt，模型會
@@ -266,8 +268,10 @@ def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
     的那家掛掉時仍有備援。不認得的名字（例如瀏覽器端的 browser）直接忽略：
     它根本不會走到這裡，音檔不會送上來。
     """
+    # 專案設了順位：指定的引擎之後只照順位試，不再接部署的鏈。
+    rest = (*order,) if order else (cfg.asr_provider, *_TRANSCRIBERS)
     configured = [
-        name for name in (preferred, cfg.asr_provider, *_TRANSCRIBERS)
+        name for name in (preferred, *rest)
         if name in _TRANSCRIBERS
         # dev 機只在自己被選時用，不當別人的備援：它慢就讓這一句多等，不該拖累其他人。
         and (name not in _OPT_IN_TRANSCRIBERS or name in (preferred, cfg.asr_provider))
@@ -334,6 +338,7 @@ async def transcribe(
     routes: list[str] | None = None,
     *,
     allowed_providers: set[str] | None = None,
+    order: tuple[str, ...] | list[str] = (),
 ) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
 
@@ -347,7 +352,7 @@ async def transcribe(
     Returns IngestionResult with content_type="audio_transcription".
     """
     cfg = get_tts_config()
-    configured = _resolve_chain(cfg, preferred)
+    configured = _resolve_chain(cfg, preferred, order)
     if allowed_providers is not None:
         configured = [name for name in configured if name in allowed_providers]
     chain = _skip_unreachable(configured)

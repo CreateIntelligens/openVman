@@ -493,3 +493,33 @@ class TestPreferredProvider:
 
         assert "xiaomi" not in ingestion_audio._TRANSCRIBERS
         assert chain == ["breeze"]
+
+
+class TestProjectEngineOrder:
+    """專案設了批次 ASR 順位：指定的引擎之後只照順位試，不接部署的鏈。"""
+
+    def test_order_replaces_the_deployment_chain(self):
+        cfg = _asr_cfg(
+            "breeze",
+            asr_breeze_url="http://asr:8801",
+            asr_sensevoice_url="http://asr:50002",
+            asr_r2t2_url="http://asr:8040",
+        )
+        assert ingestion_audio._resolve_chain(cfg, order=("sensevoice", "r2t2")) == [
+            "sensevoice", "r2t2",
+        ]
+
+    def test_the_callers_choice_still_leads(self):
+        cfg = _asr_cfg(
+            "breeze",
+            asr_breeze_url="http://asr:8801",
+            asr_sensevoice_url="http://asr:50002",
+            asr_r2t2_url="http://asr:8040",
+        )
+        assert ingestion_audio._resolve_chain(cfg, "r2t2", order=("sensevoice", "breeze")) == [
+            "r2t2", "sensevoice", "breeze",
+        ]
+
+    def test_unconfigured_engines_in_the_order_are_skipped(self):
+        cfg = _asr_cfg("breeze", asr_breeze_url="http://asr:8801")
+        assert ingestion_audio._resolve_chain(cfg, order=("sensevoice", "breeze")) == ["breeze"]

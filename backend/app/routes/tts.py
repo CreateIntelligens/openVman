@@ -178,6 +178,7 @@ async def create_speech(
     try:
         output = svc.synthesize(
             request, provider=provider, edge_fallback_voice=edge_fallback_voice,
+            order=_project_engine_order(policy),
         )
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
@@ -256,17 +257,47 @@ _INDEXTTS_LANGUAGES = frozenset({"zh", "en"})
 TTS_PROVIDER_HEADER = "X-TTS-Provider"
 
 
-def _taiwanese_providers(requested: str | None) -> tuple[str, ...]:
+def _project_engine_order(policy) -> tuple[str, ...]:
+    return tuple(getattr(policy, "tts_engine_order", ()) or ())
+
+
+#: /tts/stream 有獨立分支的引擎；順位排到其他家（GCP、Polly）時當它們不在，
+#: 交給最後的整段合成鏈依順位處理。
+_STREAM_ADAPTERS = {
+    VOXCPM_PROVIDER_NAME: "voxcpm_adapter",
+    COSYVOICE_PROVIDER_NAME: "cosyvoice_adapter",
+    GEMINI_PROVIDER_NAME: "gemini_adapter",
+    voice_access.EDGE_TTS_PROVIDER: "edge_adapter",
+}
+
+
+def _stream_engine_running(name: str, cfg) -> bool:
+    if name == INDEXTTS_PROVIDER:
+        return bool(cfg.tts_indextts_url)
+    attribute = _STREAM_ADAPTERS.get(name)
+    if attribute is None:
+        return False
+    adapter = getattr(_get_service(), attribute, None)
+    return bool(adapter is not None and getattr(adapter, "enabled", False))
+
+
+def _taiwanese_providers(
+    requested: str | None, order: tuple[str, ...] = (),
+) -> tuple[str, ...]:
     """Running engines for a Taiwanese turn, CosyVoice first; empty to keep the current one.
 
     CosyVoice 會把漢字轉成台文再唸；VoxCPM 照字唸，Brain 的台語回答是華語文字，
-    唸出來多半是華語。原本就指定其中一個時不換。
+    唸出來多半是華語。原本就指定其中一個時不換。專案有引擎順位時，兩家誰先照順位。
     """
     if requested in language_routes_mod.TAIWANESE_TTS_PROVIDERS:
         return ()
     svc = _get_service()
+    candidates = list(language_routes_mod.TAIWANESE_TTS_PROVIDERS)
+    if order:
+        ranked = [name for name in order if name in candidates]
+        candidates = ranked + [name for name in candidates if name not in ranked]
     return tuple(
-        name for name in language_routes_mod.TAIWANESE_TTS_PROVIDERS
+        name for name in candidates
         if getattr(svc, f"{name}_adapter").enabled
     )
 
@@ -428,7 +459,7 @@ async def tts_stream_endpoint(
     language = (body.speech_language or body.language).strip()
     switched = None
     if language == language_routes_mod.TAIWANESE and language_routes_mod.TAIWANESE in routes:
-        providers = _taiwanese_providers(body.provider)
+        providers = _taiwanese_providers(body.provider, _project_engine_order(policy))
         if providers:
             switched = _switch_voice(runtime, policy, providers, is_root=is_root)
     if switched:
@@ -505,6 +536,14 @@ async def tts_stream_endpoint(
             return _stream_audio(
                 stream, GEMINI_STREAM_CONTENT_TYPE, body.format, GEMINI_PROVIDER_NAME,
             )
+
+    # 專案設了引擎順位：沒指定引擎時由順位第一個（有在跑的）決定走哪條串流分支。
+    engine_order = _project_engine_order(policy)
+    if not provider and engine_order:
+        for name in engine_order:
+            if _stream_engine_running(name, cfg):
+                provider = name
+                break
 
     # provider 未指定（auto）且沒有 IndexTTS 時，VoxCPM 是 fallback 鏈的第一站，
     # 直接走它的串流端點，否則 auto 會掉到整段合成的路徑，前端要等好幾秒。
@@ -606,6 +645,7 @@ async def tts_stream_endpoint(
             ),
             provider=provider,
             edge_fallback_voice=edge_fallback_voice,
+            order=engine_order,
         )
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})

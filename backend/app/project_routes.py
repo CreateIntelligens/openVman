@@ -326,6 +326,14 @@ class ProjectPolicyPayload(_StrictModel):
     default_background_id: str | None = None
     allowed_mascots: list[str] = Field(default_factory=list)
     default_mascot_id: str | None = None
+    tts_engine_order: list[str] = Field(
+        default_factory=list,
+        description="沒指定引擎與聲音時的 TTS 嘗試順序（indextts、voxcpm、cosyvoice、gemini-tts、gcp-tts、aws-polly、edge-tts）；空的用部署順序",
+    )
+    asr_engine_order: list[str] = Field(
+        default_factory=list,
+        description="批次 ASR 備援順序（呼叫端指定的引擎之後）；有允許清單時必須是其子集；空的用部署順序",
+    )
 
 
 class ProjectPolicyProfile(ProjectPolicyPayload):
@@ -348,6 +356,8 @@ class ProjectPolicyProfile(ProjectPolicyPayload):
             default_background_id=record.default_background_id,
             allowed_mascots=list(record.allowed_mascots),
             default_mascot_id=record.default_mascot_id,
+            tts_engine_order=list(record.tts_engine_order),
+            asr_engine_order=list(record.asr_engine_order),
             updated_by=record.updated_by,
             updated_at=record.updated_at,
         )
@@ -452,6 +462,8 @@ def put_project_policy(
             default_background_id=body.default_background_id,
             allowed_mascots=body.allowed_mascots,
             default_mascot_id=body.default_mascot_id,
+            tts_engine_order=body.tts_engine_order,
+            asr_engine_order=body.asr_engine_order,
             updated_by=current.user.id,
         )
     except InvalidProjectPolicyError as exc:
