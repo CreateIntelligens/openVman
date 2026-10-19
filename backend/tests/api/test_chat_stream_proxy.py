@@ -18,6 +18,15 @@ from app.client_disconnect import ClientDisconnectMiddleware
 
 _FIRST = b'event: sentence\ndata: {"index": 0, "text": "\xe7\xac\xac\xe4\xb8\x80\xe5\x8f\xa5\xe3\x80\x82"}\n\n'
 _DONE = b'event: done\ndata: {"reply": "\xe7\xac\xac\xe4\xb8\x80\xe5\x8f\xa5\xe3\x80\x82"}\n\n'
+# Backend 轉出去前替每句加上念的版本（tts_text）；位元組因此不同，但事件仍一個個即時轉發。
+_FIRST_OUT = (
+    b'event: sentence\ndata: {"index": 0, "text": "\xe7\xac\xac\xe4\xb8\x80\xe5\x8f\xa5\xe3\x80\x82", '
+    b'"tts_text": "\xe7\xac\xac\xe4\xb8\x80\xe5\x8f\xa5\xe3\x80\x82"}\n\n'
+)
+_DONE_OUT = (
+    b'event: done\ndata: {"reply": "\xe7\xac\xac\xe4\xb8\x80\xe5\x8f\xa5\xe3\x80\x82", '
+    b'"tts_text": "\xe7\xac\xac\xe4\xb8\x80\xe5\x8f\xa5\xe3\x80\x82"}\n\n'
+)
 
 
 def _mock_cfg() -> MagicMock:
@@ -107,7 +116,7 @@ def test_each_event_is_forwarded_before_brain_sends_the_next() -> None:
         upstream, client = _upstream(brain_events())
 
         def on_body(message: dict[str, Any]) -> None:
-            if message.get("body") == _FIRST:
+            if message.get("body") == _FIRST_OUT:
                 first_forwarded.set()
 
         with (
@@ -125,7 +134,7 @@ def test_each_event_is_forwarded_before_brain_sends_the_next() -> None:
     assert start["status"] == 200
     assert (b"content-type", b"text/event-stream; charset=utf-8") in start["headers"]
     bodies = [m["body"] for m in sent if m["type"] == "http.response.body" and m.get("body")]
-    assert bodies == [_FIRST, _DONE]
+    assert bodies == [_FIRST_OUT, _DONE_OUT]
     upstream.aclose.assert_awaited()
 
 
@@ -145,7 +154,7 @@ def test_client_leaving_mid_stream_closes_the_brain_stream() -> None:
         upstream, client = _upstream(brain_events())
 
         def on_body(message: dict[str, Any]) -> None:
-            if message.get("body") == _FIRST:
+            if message.get("body") == _FIRST_OUT:
                 leave.set()
 
         with (
@@ -158,7 +167,7 @@ def test_client_leaving_mid_stream_closes_the_brain_stream() -> None:
 
     bodies, upstream, brain_stopped = asyncio.run(run())
 
-    assert bodies == [_FIRST]
+    assert bodies == [_FIRST_OUT]
     # 關掉往 Brain 的串流，Brain 才看得到斷線、停止生成。
     upstream.aclose.assert_awaited()
     assert brain_stopped

@@ -4,6 +4,7 @@
 
 ### Added
 
+- **[2026-10-19]** **chat 回應加 `tts_text`**：`POST /api/v1/chat`、`/chat/accept` 的 JSON 與 `/chat/stream` 的 `sentence`／`done` 事件多帶 `tts_text`——`reply`（或該句）去掉 markdown 與 emoji、電話與長數字轉逐字讀法、保留繁體的版本，給自己接 TTS 的整合方直接送引擎；本服務的 `/tts/stream` 行為不變。由 Backend 代理層加入（`app/chat_tts_text.py`），只做本地正規化，逐句串流不多一次往返。
 - **[2026-10-19]** **影片一鍵轉虛擬人素材包（`avatar-pipeline` 服務）**：新增獨立 compose 服務 `avatar-pipeline/`（arq worker，MediaPipe + ffmpeg，無 torch），把無聲正面影片轉成 `01.webm` + `combined_data.json.gz`，與既有素材包逐幀、逐欄位相同。後台新增 `POST /api/v1/avatar/jobs`（multipart：`char_id`、`label`、`video`、`project_id`）排程轉換，`GET /api/v1/avatar/jobs`、`GET /api/v1/avatar/jobs/{job_id}` 追進度，轉完自動建成角色並登錄到指定專案，`DELETE /api/v1/avatar/jobs/{job_id}` 清掉紀錄。佇列 `vman:avatar-pipeline`、狀態 key `vman:avatar-pipeline:job:<id>`；加密金鑰只放 `avatar-pipeline/.env`（`AVATAR_BUNDLE_KEY`）。backend 新增 `AVATAR_JOBS_DIR`（預設 `/data/avatar-jobs`）與 `AVATAR_SOURCE_MAX_UPLOAD_BYTES`（預設 512MB）。CI 的 `docker-publish` 矩陣加入 `avatar-pipeline`（amd64 + arm64）。
 
 - **[2026-10-19]** **正式專案可綁定專屬 Gemini 金鑰**：ROOT 以 `GET`／`PUT`／`DELETE /api/v1/projects/{project_id}/gemini-credential` 查看、儲存／更換或改回共用設定（後台專案頁新增對應設定）；Auth DB migration 24 新增 `project_gemini_credentials`，金鑰加密保存在 Backend，API 與後台只回名稱、遮罩、來源與設定狀態。未綁定的專案沿用共用 Gemini 設定；已綁定的專案在金鑰失效、無法解密或查詢失敗時不改用共用金鑰。Brain 主對話與模型探索、Gemini Live、語音語言判斷與背景 Gemini 呼叫，以及 Backend 的 Gemini 串流 ASR、台語判斷與 Gemini TTS 都依專案選用金鑰；金鑰切換、TTS 快取與用量依專案隔離，Live 每段會話固定開始時的金鑰。綁定專屬金鑰的專案 TTS 直接呼叫 Google（模型由新增的 `TTS_GEMINI_MODEL` 設定，預設 `gemini-3.8-flash-tts`），不經 Gemini TTS Console；錯誤訊息不帶金鑰，串流在出錯或提前關閉時都會釋放上游連線。
