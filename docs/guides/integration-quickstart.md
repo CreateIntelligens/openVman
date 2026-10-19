@@ -125,7 +125,7 @@
 |---|---|
 | `answer_source` | `qa`：引用到 QA 文件（QA CSV 匯入或 QA 筆記）；`knowledge`：引用到知識庫其他文件、沒有 QA；`none`：沒有知識庫引用 |
 | `knowledge_searched` | 這一輪有沒有查知識庫 |
-| `no_answer` | 查了知識庫但沒有任何引用（`knowledge_searched` 且 `answer_source` 為 `none`） |
+| `no_answer` | 查了知識庫但沒有答案：完全沒有知識庫引用，或有引用但決策模型判定回覆在說資料裡查不到（這時 `answer_source` 仍是引用的來源，可能是 `qa` 或 `knowledge`） |
 
 要在知識庫沒有答案時改顯示固定拒答句，以 `no_answer: true` 判斷。沒查知識庫（例如打招呼、閒聊）時 `no_answer` 是 false、`answer_source` 是 `none`。網路搜尋與記憶的引用不算知識庫命中：專案開了網路搜尋時，只靠網路回答的一輪也是 `no_answer: true`。帶 `turn_id` 的可合併回合在 `POST /api/v1/chat/accept` 回應中有相同的值。
 
