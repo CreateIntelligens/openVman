@@ -489,7 +489,7 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
         raise AssertionError("cache_put should not be called on cache hit")
 
     class BrokenService:
-        def synthesize(self, request, provider="", edge_fallback_voice=""):
+        def synthesize(self, request, provider="", edge_fallback_voice="", partners=()):
             raise AssertionError("synthesize should not run on cache hit")
 
     module.tts_routes.cache_get = _fake_cache_get
@@ -554,7 +554,7 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
             # Edge disabled → fallback 走 buffered service chain（本測試的情境）。
             self.edge_adapter = types.SimpleNamespace(enabled=False)
 
-        def synthesize(self, request, provider="", edge_fallback_voice=""):
+        def synthesize(self, request, provider="", edge_fallback_voice="", partners=()):
             self.requests.append(request)
             return types.SimpleNamespace(
                 result=types.SimpleNamespace(
@@ -642,7 +642,7 @@ def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
                 )[1],
             )
 
-        def synthesize(self, request, provider="", edge_fallback_voice=""):
+        def synthesize(self, request, provider="", edge_fallback_voice="", partners=()):
             self.synthesize_called = True
             raise AssertionError("buffered synthesize 不應被呼叫")
 
@@ -1025,7 +1025,7 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
         def __init__(self):
             self.edge_adapter = types.SimpleNamespace(enabled=True)
 
-        def synthesize(self, request, provider="", edge_fallback_voice=""):
+        def synthesize(self, request, provider="", edge_fallback_voice="", partners=()):
             captured["provider"] = provider
             return types.SimpleNamespace(
                 result=types.SimpleNamespace(
@@ -1995,7 +1995,7 @@ def test_tts_stream_pcm16k_decodes_edge_and_cosyvoice_mp3(monkeypatch):
         cosyvoice_adapter = types.SimpleNamespace(enabled=False)
         edge_adapter = types.SimpleNamespace(enabled=True, synthesize_stream=_edge_stream)
 
-        def synthesize(self, request, provider="", edge_fallback_voice=""):
+        def synthesize(self, request, provider="", edge_fallback_voice="", partners=()):
             return types.SimpleNamespace(
                 result=types.SimpleNamespace(audio_bytes=mp3, content_type="audio/mpeg", provider="cosyvoice"),
             )

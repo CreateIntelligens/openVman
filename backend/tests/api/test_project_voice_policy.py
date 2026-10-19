@@ -510,17 +510,34 @@ class _FakeService:
         self.edge_adapter = SimpleNamespace(
             enabled=True, synthesize_stream=self._stream,
         )
-        self.voxcpm_adapter = SimpleNamespace(enabled=False)
+        self.voxcpm_adapter = SimpleNamespace(
+            enabled=False, default_voice="voxcpm2-cosy-young-female-01",
+            open_stream=self._voxcpm_stream,
+        )
         # CosyVoice 預設關著：台語分流照舊退到 VoxCPM；要測 CosyVoice 的測試自己打開。
-        self.cosyvoice_adapter = SimpleNamespace(enabled=False)
+        self.cosyvoice_adapter = SimpleNamespace(
+            enabled=False, default_voice="young-female-02",
+        )
         self.gemini_adapter = SimpleNamespace(enabled=False)
 
     def _stream(self, request):
         self.streams.append(request.voice_hint)
         return iter([b"edge"])
 
-    def synthesize(self, request, *, provider="", edge_fallback_voice=""):
+    async def _voxcpm_stream(self, request, sample_rate=None):
+        from app.providers.voxcpm_adapter import VoxCPMHTTPError
+
+        self.calls.append(("voxcpm-stream", request.voice_hint, None))
+        raise VoxCPMHTTPError(status_code=503, detail="GPU busy")
+
+    def synthesize(self, request, *, provider="", edge_fallback_voice="", partners=()):
         self.calls.append((provider, request.voice_hint, edge_fallback_voice))
+        for partner, partner_voice in partners:
+            if provider in self.failing and partner not in self.failing:
+                self.calls.append((partner, partner_voice, edge_fallback_voice))
+                return SimpleNamespace(
+                    result=_ok(partner), fallback=True, fallback_reason="down",
+                )
         if provider not in self.failing:
             return SimpleNamespace(
                 result=_ok(provider), fallback=False, fallback_reason="",
@@ -715,3 +732,50 @@ def test_a_selected_taiwanese_language_switches_typed_turns(env, tts_client, mon
     response = _stream(tts_client, provider="edge-tts", voice="edge-a", language="nan")
     assert response.headers["X-TTS-Provider"] == "cosyvoice"
     assert tts_client.service.calls[0][:2] == ("cosyvoice", "")
+
+
+def test_taiwanese_cosyvoice_outage_switches_to_voxcpm_in_the_same_voice(
+    env, tts_client, monkeypatch,
+):
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    response = _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    assert response.status_code == 200
+    # 假服務的 CosyVoice 一定失敗：先換 VoxCPM 的同名聲音，不是 Edge。
+    assert tts_client.service.calls == [
+        ("cosyvoice", "", ""),
+        ("voxcpm", "voxcpm2-cosy-young-female-02", ""),
+    ]
+    assert response.headers["X-TTS-Provider"] == "voxcpm"
+    assert tts_client.service.streams == []
+
+
+def test_taiwanese_voxcpm_outage_switches_to_cosyvoice(env, tts_client, monkeypatch):
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    tts_client.service.failing = {"indextts"}
+    response = _stream(tts_client, provider="voxcpm", voice="vox-a", speech_language="nan")
+    assert response.status_code == 200
+    # vox-upstream 不是 voxcpm2-cosy-* 系列，對不到同名聲音：CosyVoice 用它的預設。
+    assert tts_client.service.calls == [
+        ("voxcpm-stream", "vox-upstream", None),
+        ("cosyvoice", "", ""),
+    ]
+    assert response.headers["X-TTS-Provider"] == "cosyvoice"
+
+
+def test_mandarin_turns_do_not_get_a_taiwanese_partner(env, tts_client, monkeypatch):
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    response = _stream(tts_client, provider="cosyvoice", voice="cosy-a")
+    assert response.status_code == 200
+    # 華語指定 CosyVoice 失敗照舊退 Edge，不換成照字唸的 VoxCPM。
+    assert [call[0] for call in tts_client.service.calls] == ["cosyvoice"]

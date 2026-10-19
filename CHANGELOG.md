@@ -45,6 +45,7 @@
 
 ### Fixed
 
+- **[2026-10-19]** **`/api/v1/tts/providers` 各引擎的 `default_voice`**：帳號／專案沒有偏好該引擎的聲音時，原本顯示清單第一個（字母排序下 CosyVoice 是 `child-female-01`），但實際念的是部署預設（`young-female-02`）。現在依序取專案／帳號偏好 → 部署預設（`TTS_COSYVOICE_DEFAULT_VOICE`、`TTS_VOXCPM_DEFAULT_VOICE`、`TTS_INDEXTTS_DEFAULT_CHARACTER`、Edge 聲音）→ 清單第一個。
 - **[2026-10-19]** **前台 runtime 載入與登入頁競態**：`OpenVmanAvatarRuntime.js` 不再在載入當下就抓 `#canvas_video`，改成每次繪圖前查、缺 canvas 的那一幀安靜跳過。先前 session 失效（401）讓 App 切到登入頁、卸掉 canvas 時腳本才載完，會在第 31 行炸掉、`createQtAppInstance` 永遠不存在，之後的重試又等同一個已經 load 過的 `<script>`，舞台卡在載入中直到手動重新整理。TS 端載入失敗也會移除那個 `<script>` 標籤，讓重試真的重載。
 - **[2026-10-19]** **TTS 依語言選引擎與需求不一致（VH-384）**：台語自動切換以前改用 VoxCPM，但 VoxCPM 照字唸，Brain 的台語回答是華語文字，唸出來是華語；國語、英文沒有依語言路由，只是剛好用專案預設聲音；使用者選台語但打字時不會切換；`/api/v1/tts/stream` 也看不出用了哪個引擎。現在 `/api/v1/tts/stream` 的語言取 ASR 的 `speech_language`，沒有時用新增的 `language`（使用者選的語言）：台語（專案分流含台語）改用 CosyVoice（會轉成台文，停用時改 VoxCPM），國語、英文在呼叫端沒指定 provider 與 voice 時用 IndexTTS；回應一律帶 `X-TTS-Provider`。CosyVoice 預設聲音改成 `young-female-02`（Hayley，與 IndexTTS 的 hayley 同一位），前台講台語時也改切 CosyVoice。CosyVoice 只能整段合成，台語第一聲約 1.8 秒（9 字）到 3.2 秒（30 字）。
 - **[2026-10-19]** **Brain 對話限流實際上是整個專案共用**：限流依專案、來源 IP 與頻道計數，但 Brain 只收 Backend 的請求，來源 IP 永遠是 Backend，同一專案所有人、所有機台共用每分鐘 90 次。現在依 Backend 驗證後傳來的呼叫者（每把 API key、Embed key、每個登入帳號）各自計數，沒有呼叫者時才用 IP。
@@ -82,6 +83,7 @@
 
 ### Changed
 
+- **[2026-10-19]** **台語 TTS 引擎互為備援**：`POST /api/v1/tts/stream` 台語這一輪 CosyVoice 失敗先改 VoxCPM、VoxCPM 失敗先改 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設，專案限制聲音時只換到清單裡的聲音），兩家都失敗才退 Edge；`X-TTS-Provider` 照實標最後念的引擎。`TTSRouterService.synthesize` 新增 `partners`。華語指定 CosyVoice 的行為不變。
 - **[2026-10-19]** **2D 人物幀同步改用 requestVideoFrameCallback**：新增共用模組 `frontend/shared/avatar/avatarFrameClock.ts`，以瀏覽器回報的 `mediaTime` 直接算出畫面上那一幀（25 fps 下即幀序），runtime 不再每幀讀右上角 2×2 角標做 GPU 回讀；角落修補改在 runtime 複製影片幀後直接進行。沒有 rVFC 的瀏覽器、以及換角色後第一幀還沒畫出來前，照舊走角標路徑。素材包仍打角標，舊版 runtime 與舊素材不受影響。
 - **[2026-10-15]** **主機 nginx 可讓其他專案掛路徑而不改 repo**：`infra/nginx/native/openvman.conf.template`（與參考檔 `146-openvman.conf`）在 HTTPS server 區塊的兜底 location 之前加入 `include /etc/nginx/openvman-extra/*.conf;`。其他專案（例如 `/arwin/`）把自己的 `location` 放在主機的 `/etc/nginx/openvman-extra/`，不進 openVman 版控；資料夾空的或不存在時行為不變。做法見 `infra/nginx/native/README.md`。
 

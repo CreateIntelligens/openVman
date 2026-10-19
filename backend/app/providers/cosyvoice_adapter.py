@@ -50,6 +50,11 @@ class CosyVoiceAdapter:
         self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_SECONDS)
 
     @property
+    def default_voice(self) -> str:
+        """The voice used when a request carries none."""
+        return self._default_voice
+
+    @property
     def provider_name(self) -> str:
         return COSYVOICE_PROVIDER_NAME
 

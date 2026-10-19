@@ -7,7 +7,10 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException
 
+from app.config import get_tts_config
+from app.providers.cosyvoice_adapter import COSYVOICE_DEFAULT_VOICE, COSYVOICE_PROVIDER_NAME
 from app.providers.voice_catalog import PROVIDER_NAMES
+from app.providers.voxcpm_adapter import VOXCPM_DEFAULT_VOICE, VOXCPM_PROVIDER_NAME
 
 from .dependencies import CurrentAccount
 from .models import (
@@ -321,6 +324,33 @@ def resolve_tts_voice(
     )
 
 
+def deployment_default_voice(provider: str) -> str:
+    """The voice ``provider`` speaks with when a request names none.
+
+    清單裡沒有帳號／專案偏好的引擎，預設要顯示部署真的會念的那個聲音，
+    不能拿清單第一個（字母排序常是 child-female-01）充數。
+    """
+    cfg = get_tts_config()
+    if provider == COSYVOICE_PROVIDER_NAME:
+        return cfg.tts_cosyvoice_default_voice or COSYVOICE_DEFAULT_VOICE
+    if provider == VOXCPM_PROVIDER_NAME:
+        return cfg.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
+    if provider == "indextts":
+        return cfg.tts_indextts_default_character
+    if provider == EDGE_TTS_PROVIDER:
+        return cfg.edge_tts_voice
+    return ""
+
+
+def _default_for(provider: str, preferred: str, ids: list[str]) -> str:
+    if preferred in ids:
+        return preferred
+    deployment = deployment_default_voice(provider)
+    if deployment in ids:
+        return deployment
+    return ids[0] if ids else ""
+
+
 def _grouped(
     voices: list[tuple[str, str]],
     default_voice: str,
@@ -332,7 +362,7 @@ def _grouped(
         {
             "id": provider,
             "name": PROVIDER_NAMES.get(provider, provider),
-            "default_voice": default_voice if default_voice in ids else ids[0],
+            "default_voice": _default_for(provider, default_voice, ids),
             "voices": ids,
         }
         for provider, ids in voices_by_provider.items()
@@ -350,11 +380,7 @@ def _grouped_scoped(
         {
             "id": provider,
             "name": PROVIDER_NAMES.get(provider, provider),
-            "default_voice": (
-                default_voice
-                if any(v == default_voice for v, _ in items)
-                else (items[0][0] if items else "")
-            ),
+            "default_voice": _default_for(provider, default_voice, [v for v, _ in items]),
             "voices": [v for v, _ in items],
             "in_project_scope": any(in_scope for _, in_scope in items),
             "voice_items": [

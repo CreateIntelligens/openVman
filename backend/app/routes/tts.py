@@ -24,6 +24,7 @@ from app.auth.models import (
 from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
+from app.observability import record_fallback_hop
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
 from app.providers.gemini_tts_adapter import (
@@ -282,6 +283,43 @@ def _switch_voice(runtime, policy, providers: tuple[str, ...], *, is_root: bool)
     )
 
 
+#: VoxCPM 的 CosyVoice 系列聲音用這個前綴接 CosyVoice 的 voice id，兩邊是同一個人。
+_VOXCPM_COSY_PREFIX = "voxcpm2-cosy-"
+
+
+def _taiwanese_partners(
+    runtime, policy, provider: str, voice: str, *, is_root: bool,
+) -> tuple[tuple[str, str], ...]:
+    """The other Taiwanese engine, in the same voice, to try before Edge.
+
+    CosyVoice 掛了（例如節點 GPU 記憶體不足）不該直接退到 Edge 的華語音色，
+    先換 VoxCPM 念同一個人；反過來亦然。聲音對不到才用那家的預設；專案限制
+    了聲音就只能換到清單裡那家的聲音。
+    """
+    svc = _get_service()
+    if provider == COSYVOICE_PROVIDER_NAME:
+        partner, adapter = VOXCPM_PROVIDER_NAME, svc.voxcpm_adapter
+        source = voice or getattr(svc.cosyvoice_adapter, "default_voice", "")
+        mapped = f"{_VOXCPM_COSY_PREFIX}{source}" if source else ""
+    elif provider == VOXCPM_PROVIDER_NAME:
+        partner, adapter = COSYVOICE_PROVIDER_NAME, svc.cosyvoice_adapter
+        source = voice or getattr(svc.voxcpm_adapter, "default_voice", "")
+        mapped = source.removeprefix(_VOXCPM_COSY_PREFIX) if source.startswith(_VOXCPM_COSY_PREFIX) else ""
+    else:
+        return ()
+    if not adapter.enabled:
+        return ()
+    if policy is not None and policy.restricts_tts:
+        picked = voice_access.project_voice_for_providers(
+            runtime, policy, (partner,), is_root=is_root,
+        )
+        if picked is None:
+            return ()
+        if picked[1] and picked[1] != mapped:
+            mapped = picked[1]
+    return ((partner, mapped),)
+
+
 def _stream_audio(
     stream: AsyncIterator[bytes],
     media_type: str,
@@ -420,6 +458,11 @@ async def tts_stream_endpoint(
             if picked:
                 provider = INDEXTTS_PROVIDER
                 voice = character = picked[1] or cfg.tts_indextts_default_character
+    # 台語這一輪才互備：華語指定 CosyVoice 失敗，換成 VoxCPM 照字唸不是使用者要的。
+    partners = (
+        _taiwanese_partners(runtime, policy, provider, voice, is_root=is_root)
+        if language == language_routes_mod.TAIWANESE else ()
+    )
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
@@ -485,6 +528,23 @@ async def tts_stream_endpoint(
             except (VoxCPMHTTPError, RuntimeError) as exc:
                 # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
                 logger.warning("tts_stream voxcpm error: %s", exc)
+                if partners:
+                    partner, partner_voice = partners[0]
+                    record_fallback_hop(
+                        from_target=VOXCPM_PROVIDER_NAME, to_target=partner,
+                        reason="provider_unavailable",
+                    )
+                    try:
+                        output = _get_service().synthesize(
+                            SynthesizeRequest(
+                                text=cleaned, voice_hint=partner_voice, usage_scope=scope,
+                            ),
+                            provider=partner,
+                            edge_fallback_voice=edge_fallback_voice,
+                        )
+                    except RuntimeError as partner_exc:
+                        return JSONResponse(status_code=502, content={"error": str(partner_exc)})
+                    return _buffered_audio(output.result, body.format, partner)
 
     # 明確指定的非串流 provider（CosyVoice 等）直接走整段合成。不這樣做的話
     # 會掉進下面的 IndexTTS／Edge 串流，回的是別的引擎的聲音——CosyVoice 是
@@ -498,6 +558,7 @@ async def tts_stream_endpoint(
                 ),
                 provider=provider,
                 edge_fallback_voice=edge_fallback_voice,
+                partners=partners,
             )
         except RuntimeError as exc:
             return JSONResponse(status_code=502, content={"error": str(exc)})

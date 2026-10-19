@@ -149,7 +149,7 @@ Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/tts/health`
 
 連線由 `TTS_COSYVOICE_URL` 啟用，`/voices` 與 `/synthesize` 都需要 `TTS_COSYVOICE_API_KEY` 的 Bearer token（與 VoxCPM360 不同，後者的 `/voices` 不驗證）。`TTS_COSYVOICE_DEFAULT_VOICE` 可覆寫預設聲線，`TTS_COSYVOICE_EXCLUDED_VOICES` 濾掉不想出現在選單的 voice_id。錯誤碼歸類與 VoxCPM360 相同。
 
-服務端的串流端點用自訂的 JSON-line＋WAV chunk 格式，與本服務的 PCM 串流不相容，因此 CosyVoice 只走整段合成；`POST /api/v1/tts/stream` 指名 `provider=cosyvoice` 時會直接回完整 MP3，不落入 IndexTTS／Edge-TTS 的串流 fallback——那會把台語請求默默換成華語音色。
+服務端的串流端點用自訂的 JSON-line＋WAV chunk 格式，與本服務的 PCM 串流不相容，因此 CosyVoice 只走整段合成；`POST /api/v1/tts/stream` 指名 `provider=cosyvoice` 時會直接回完整 MP3，不落入 IndexTTS／Edge-TTS 的串流 fallback——那會把台語請求默默換成華語音色。台語這一輪（`speech_language`／`language` 為 `nan` 且專案分流含台語）兩個台語引擎互為備援：CosyVoice 失敗先換 VoxCPM、VoxCPM 失敗先換 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設；專案限制了聲音則只能換到清單裡那家的聲音），都失敗才退 Edge；華語指定 CosyVoice 失敗仍只退 Edge。`service.synthesize(partners=...)` 實作，fallback hop 一樣記進指標。
 
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 

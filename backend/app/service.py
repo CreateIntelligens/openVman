@@ -107,6 +107,7 @@ class TTSRouterService:
         *,
         provider: str = "",
         edge_fallback_voice: str | None = "",
+        partners: tuple[tuple[str, str], ...] = (),
     ) -> SynthesisOutput:
         """Run the fallback chain and return the first successful result.
 
@@ -115,6 +116,9 @@ class TTSRouterService:
         *edge_fallback_voice* ("" = Edge's own default) and marks the output
         with ``fallback=True``. ``None`` forbids that fallback (the project
         policy does not allow Edge), so the provider's failure is raised.
+        *partners* are ``(provider, voice)`` pairs tried before Edge — the
+        other Taiwanese engine with the matching voice, so a CosyVoice outage
+        is answered by VoxCPM in the same voice rather than by Edge in Mandarin.
 
         Raises RuntimeError if all attempts fail.
         """
@@ -124,7 +128,7 @@ class TTSRouterService:
 
         if provider and provider != "auto":
             return self._synthesize_targeted(
-                request, provider, chain, edge_fallback_voice,
+                request, provider, chain, edge_fallback_voice, partners,
             )
 
         return self._synthesize_chain(request, chain)
@@ -217,8 +221,9 @@ class TTSRouterService:
         provider: str,
         chain: list[RouteTarget],
         edge_fallback_voice: str | None = "",
+        partners: tuple[tuple[str, str], ...] = (),
     ) -> SynthesisOutput:
-        """Try a specific provider, fall back to Edge-TTS on failure."""
+        """Try a specific provider, then its partners, then Edge-TTS."""
         target = next(
             (t for t in chain if t.adapter.provider_name == provider), None,
         )
@@ -228,6 +233,25 @@ class TTSRouterService:
         result, reason, primary_error = self._try_synthesize(target, request)
         if result is not None:
             return SynthesisOutput(result=result)
+
+        previous = target
+        for partner_name, partner_voice in partners:
+            partner = next(
+                (t for t in chain if t.adapter.provider_name == partner_name), None,
+            )
+            if partner is None or partner is target:
+                continue
+            record_fallback_hop(
+                from_target=previous.target, to_target=partner.target, reason=reason,
+            )
+            partner_result, reason, _ = self._try_synthesize(
+                partner, replace(request, voice_hint=partner_voice),
+            )
+            if partner_result is not None:
+                return SynthesisOutput(
+                    result=partner_result, fallback=True, fallback_reason=primary_error,
+                )
+            previous = partner
 
         # Fallback to Edge-TTS
         edge = next(
@@ -241,7 +265,7 @@ class TTSRouterService:
             )
 
         record_fallback_hop(
-            from_target=target.target, to_target=edge.target, reason=reason,
+            from_target=previous.target, to_target=edge.target, reason=reason,
         )
 
         edge_request = replace(request, voice_hint=edge_fallback_voice)
