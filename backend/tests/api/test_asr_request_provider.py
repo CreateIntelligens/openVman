@@ -234,7 +234,7 @@ def test_explicit_provider_is_not_overridden_by_taiwanese_route(setup, monkeypat
     async def routes(*args):
         return ["zh", "nan"]
 
-    async def heard(*args):
+    async def heard(*args, **kwargs):
         return SimpleNamespace(language="nan", result="nan", ms=1)
 
     monkeypatch.setattr(asr.language_routes_mod, "effective_routes", routes)

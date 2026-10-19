@@ -216,7 +216,10 @@ async def get_capabilities(
         if (policy is not None or project_id) else asr.effective
     )
     batch_configured = set(configured_providers())
-    stream_configured = set(configured_stream_engines())
+    stream_configured = set(
+        configured_stream_engines(project_id)
+        if project_id else configured_stream_engines()
+    )
     defaults = runtime.account_access.get_defaults(current.user.id)
 
     capabilities = AccountCapabilities(

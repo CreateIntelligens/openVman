@@ -11,6 +11,7 @@ from typing import Any
 # 標 noqa 的匯入裡有些名稱已移到同目錄模組使用，留著讓既有的
 # `from live.gemini_live import ...` 繼續可用。
 from config import BrainSettings, get_settings
+from core.gemini_credentials import GeminiCredential, resolve_gemini_credential
 from core.turn_decisions import (  # noqa: F401
     TurnDecision,
     run_turn_decision_async,
@@ -82,7 +83,8 @@ class GeminiLiveSession:
         self.principal_id = principal_id
         self._system_instruction = system_instruction
         self.config = config or get_settings()
-        self._transport_factory = transport_factory or (lambda cfg: GeminiLiveWebSocketTransport(cfg))
+        self._gemini_credential: GeminiCredential | None = None
+        self._transport_factory = transport_factory
         self._context = LiveSessionContext(
             relay_session_id=relay_session_id,
             session_id=self.session_id,
@@ -94,6 +96,7 @@ class GeminiLiveSession:
             principal_id=principal_id,
             config=self.config,
             event_sink=event_sink,
+            gemini_credential=lambda: self._gemini_credential,
         )
         self._tools = GeminiLiveToolExecutor(
             self.config,
@@ -144,7 +147,16 @@ class GeminiLiveSession:
             if self._unavailable:
                 raise RuntimeError("Gemini Live transport is unavailable")
 
-            transport = self._transport_factory(self.config)
+            if self._transport_factory is None:
+                if self._gemini_credential is None:
+                    self._gemini_credential = await asyncio.to_thread(
+                        resolve_gemini_credential, self.project_id,
+                    )
+                transport = GeminiLiveWebSocketTransport(
+                    self.config, api_key=self._gemini_credential.api_key,
+                )
+            else:
+                transport = self._transport_factory(self.config)
             await transport.connect()
             await transport.send_json({"setup": self._build_setup_message()})
             await self._wait_for_setup_complete(transport)

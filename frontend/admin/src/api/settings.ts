@@ -11,9 +11,9 @@ export interface AsrEngines {
   stream: string[];
 }
 
-/** 這個部署設定齊全的引擎；沒設定的選了也只會被備援接走或連不上。 */
-export async function fetchAsrEngines(): Promise<AsrEngines> {
-  const res = await apiFetch(apiUrl(ENGINES_PATH));
+/** 這個專案設定齊全的引擎；Gemini 也計入專案專屬金鑰。 */
+export async function fetchAsrEngines(projectId?: string): Promise<AsrEngines> {
+  const res = await apiFetch(apiUrl(ENGINES_PATH, projectId ? { project_id: projectId } : {}));
   if (!res.ok) throw new Error(await parseErrorMessage(res));
   const body = (await res.json()) as Partial<AsrEngines>;
   return { engines: body.engines ?? [], stream: body.stream ?? [] };

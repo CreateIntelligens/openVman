@@ -194,13 +194,19 @@ class LanguageCheck:
     ms: int
 
 
-async def detect_taiwanese(file_path: str) -> LanguageCheck:
+async def detect_taiwanese(
+    file_path: str, *, project_id: str = "",
+) -> LanguageCheck:
     """Ask Brain whether the clip is Taiwanese, giving up after the configured limit."""
     cfg = get_tts_config()
     limit = cfg.asr_language_check_timeout_seconds
     started = time.monotonic()
     try:
-        language = await asyncio.wait_for(_ask_brain_language(file_path, cfg), timeout=limit)
+        check = (
+            _ask_brain_language(file_path, cfg, project_id=project_id)
+            if project_id else _ask_brain_language(file_path, cfg)
+        )
+        language = await asyncio.wait_for(check, timeout=limit)
         result = language or "failed"
     except asyncio.TimeoutError:
         # 使用者在等這句的回答；判斷不出來就當不是台語，不能讓整輪卡住。
@@ -209,7 +215,9 @@ async def detect_taiwanese(file_path: str) -> LanguageCheck:
     return LanguageCheck(language, result, round((time.monotonic() - started) * 1000))
 
 
-async def _ask_brain_language(file_path: str, cfg) -> str | None:
+async def _ask_brain_language(
+    file_path: str, cfg, *, project_id: str = "",
+) -> str | None:
     try:
         wav_bytes = await asyncio.to_thread(_to_wav_bytes, file_path)
         response = await _http.get().post(
@@ -219,6 +227,7 @@ async def _ask_brain_language(file_path: str, cfg) -> str | None:
                 _INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token,
                 "Content-Type": "audio/wav",
             },
+            **({"params": {"project_id": project_id}} if project_id else {}),
             timeout=35.0,
         )
         response.raise_for_status()

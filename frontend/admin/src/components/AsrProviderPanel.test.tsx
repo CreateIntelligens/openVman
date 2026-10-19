@@ -9,21 +9,24 @@ import { summarizeGlossary } from "./asr/GlossaryEditor";
 import { streamTestUrl } from "./asr/StreamTester";
 import { streamClip } from "./asr/streamClip";
 
+const activeProjectState = vi.hoisted(() => ({ projectId: "proj-1" }));
+
 vi.mock("../api/settings", () => ({ previewAsr: vi.fn(), fetchAsrEngines: vi.fn() }));
 vi.mock("../api/knowledge", () => ({
   fetchKnowledgeSettings: vi.fn(),
   fetchKnowledgeDocument: vi.fn(),
   saveKnowledgeDocument: vi.fn(),
 }));
-vi.mock("../api", () => ({ getActiveProjectId: () => "proj-1" }));
+vi.mock("../api", () => ({ getActiveProjectId: () => activeProjectState.projectId }));
 vi.mock("./asr/streamClip", () => ({ streamClip: vi.fn() }));
 vi.mock("../hooks/useVad", () => ({
   useVad: () => ({ speaking: false, starting: false, supported: true }),
 }));
 
 beforeEach(() => {
+  activeProjectState.projectId = "proj-1";
   vi.mocked(previewAsr).mockReset();
-  vi.mocked(fetchAsrEngines).mockResolvedValue({
+  vi.mocked(fetchAsrEngines).mockReset().mockResolvedValue({
     engines: ["breeze", "r2t2", "r2t2-dev", "sensevoice"], stream: ["gemini-live"],
   });
   vi.mocked(streamClip).mockReset();
@@ -50,6 +53,36 @@ function engineButton(label: RegExp) {
 }
 
 describe("AsrProviderPanel", () => {
+  it("依當前專案查詢引擎，切換到有專屬金鑰的專案時列出 Gemini", async () => {
+    vi.mocked(fetchAsrEngines).mockImplementation(async (projectId) => ({
+      engines: ["breeze"], stream: projectId === "proj-gemini" ? ["gemini-live"] : [],
+    }));
+    const { rerender } = render(<AsrProviderPanel />);
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Gemini Live$/ })).toBeNull());
+    expect(fetchAsrEngines).toHaveBeenLastCalledWith("proj-1");
+
+    activeProjectState.projectId = "proj-gemini";
+    rerender(<AsrProviderPanel />);
+    expect(await screen.findByRole("button", { name: /^Gemini Live$/ })).toBeTruthy();
+    expect(fetchAsrEngines).toHaveBeenLastCalledWith("proj-gemini");
+  });
+
+  it("切換專案後忽略上一個專案較晚回來的引擎設定", async () => {
+    let resolvePrevious: (engines: { engines: string[]; stream: string[] }) => void = () => {};
+    vi.mocked(fetchAsrEngines)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolvePrevious = resolve; }))
+      .mockResolvedValueOnce({ engines: ["breeze"], stream: ["gemini-live"] });
+    const { rerender } = render(<AsrProviderPanel />);
+    activeProjectState.projectId = "proj-gemini";
+    rerender(<AsrProviderPanel />);
+    await waitFor(() => expect(fetchAsrEngines).toHaveBeenLastCalledWith("proj-gemini"));
+    await screen.findByRole("button", { name: /^Gemini Live$/ });
+
+    resolvePrevious({ engines: ["breeze"], stream: [] });
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^SenseVoice-Small$/ })).toBeNull());
+    expect(engineButton(/^Gemini Live$/)).toBeTruthy();
+  });
+
   it("讀出專案詞表並分開算詞與誤聽對照", async () => {
     render(<AsrProviderPanel />);
     expect(await screen.findByText("1 個詞・1 條誤聽對照")).toBeTruthy();
@@ -201,6 +234,7 @@ describe("AsrProviderPanel", () => {
     expect(await screen.findByText("串流聽到的")).toBeTruthy();
     const [url, sent] = vi.mocked(streamClip).mock.calls[0];
     expect(new URL(url).searchParams.get("engine")).toBe("gemini-live");
+    expect(new URL(url).searchParams.get("project_id")).toBe("proj-1");
     expect(new URL(url).searchParams.get("language_routes")).toBe("zh,en,nan");
     expect(sent).toBe(clip);
     // Gemini 不會自己關線，只能等靜下來。

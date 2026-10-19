@@ -302,6 +302,27 @@ def test_audio_language_endpoint_returns_verdict_and_survives_failure(monkeypatc
     assert failed.json() == {"language": None}
 
 
+def test_audio_language_endpoint_binds_project_before_worker_thread(monkeypatch):
+    from core.gemini_credentials import current_model_project
+    from core.usage import current_usage_scope
+    import memory.language_detect as language_detect
+
+    seen = []
+
+    def detect(wav):
+        seen.append((wav, current_model_project(), current_usage_scope().project_id))
+        return "nan"
+
+    monkeypatch.setattr(language_detect, "detect_audio_language", detect)
+    with _client() as client:
+        response = client.post(
+            "/brain/internal/audio-language?project_id=alpha",
+            content=b"RIFFfake", headers=_internal_headers(),
+        )
+    assert response.json() == {"language": "nan"}
+    assert seen == [(b"RIFFfake", "alpha", "alpha")]
+
+
 def test_internal_live_bridge_passes_speech_language_to_history_and_live():
     """前台 ASR 聽出台語時帶 speech_language：存進訊息語言，也交給 Live 查台語文件。"""
     fake_session = FakeLiveSession()

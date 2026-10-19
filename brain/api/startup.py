@@ -81,20 +81,22 @@ def _warmup_retrieval_path(project_id: str = "default") -> None:
             )
 
 
-def _warmup_audio_language() -> None:
-    """Import google-genai, build the shared client and open its connection.
+def _warmup_audio_language(project_id: str = "default") -> None:
+    """Import google-genai and warm the selected project's resolved client.
 
     台語判斷只能等 2.5 秒；部署重啟後第一句要付載入套件、建 client、跟 Gemini
     建連線，實測 2.5 秒（之後 1.2 秒），第一個講台語的人會被當成講華語。
     models.get 不花 token。
     """
     cfg = get_settings()
-    if not cfg.gemini_api_key:
-        return
+    from core.gemini_credentials import resolve_gemini_credential
     from memory.language_detect import _audio_language_client
 
     try:
-        _audio_language_client(cfg.gemini_api_key).models.get(
+        credential = resolve_gemini_credential(project_id)
+        if not credential.api_key:
+            return
+        _audio_language_client(credential.api_key).models.get(
             model=cfg.live_audio_language_id_model,
         )
     except Exception as exc:  # noqa: BLE001 - 預熱失敗只是第一句慢，不擋啟動
@@ -110,6 +112,8 @@ async def warmup_resources() -> None:
         project_ids = _warmup_project_ids()
         await asyncio.to_thread(get_embedder)
         for project_id in project_ids:
+            if project_id != "default":
+                await asyncio.to_thread(_warmup_audio_language, project_id)
             ensure_workspace_scaffold(project_id)
             await asyncio.to_thread(ensure_tables, project_id)
             # _warmup_retrieval_path 內部已逐表吞掉預熱失敗、不會 raise。

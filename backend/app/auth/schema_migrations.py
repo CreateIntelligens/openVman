@@ -537,4 +537,25 @@ _MIGRATIONS = (
         "request_origins",
         _REQUEST_ORIGIN_STATEMENTS,
     ),
+    (
+        24,
+        "project_gemini_credentials",
+        (
+            """
+            CREATE TABLE IF NOT EXISTS project_gemini_credentials (
+                project_id TEXT PRIMARY KEY,
+                credential_id TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                ciphertext TEXT NOT NULL,
+                updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+                updated_at TEXT NOT NULL,
+                project_resource_type TEXT NOT NULL DEFAULT 'project'
+                    CHECK (project_resource_type = 'project'),
+                FOREIGN KEY (project_resource_type, project_id)
+                    REFERENCES resources(resource_type, resource_id)
+                    ON DELETE CASCADE
+            )
+            """,
+        ),
+    ),
 )

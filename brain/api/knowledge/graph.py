@@ -7,19 +7,21 @@ graph artefacts live under ``<workspace>/graphify-out/``.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import asyncio
-from collections.abc import Iterator
 from graphify.analyze import god_nodes, surprising_connections
 from graphify.build import build_from_json
 from graphify.cluster import cluster, score_all
 from graphify.detect import detect
 from graphify.export import to_canvas, to_html, to_json, to_obsidian
 from graphify.extract import collect_files, extract as ast_extract
+
+from core.gemini_credentials import project_model_entry
 from infra.datetime_utils import ensure_utc
 from infra.db import get_db
 from infra.pipeline import CheckpointStore, run_pipeline, PipelineConfig
@@ -319,6 +321,7 @@ class _GraphSink:
         }
 
 
+@project_model_entry("knowledge_graph")
 def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
 
     """Rebuild the knowledge graph for a project.

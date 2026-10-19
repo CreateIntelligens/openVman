@@ -16,6 +16,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from config import get_settings
+from core.gemini_credentials import project_model_entry
 from knowledge.workspace import get_workspace_root
 from memory.dreaming.paths import dreams_dir, resolve_timezone as _get_tz
 from memory.dreaming.recall_tracker import rotate_traces
@@ -66,6 +67,7 @@ def _parse_cron(expr: str) -> CronSpec:
 # Public API
 # ---------------------------------------------------------------------------
 
+@project_model_entry("dreaming")
 def run_dreaming_cycle(
     project_id: str = "default",
     *,

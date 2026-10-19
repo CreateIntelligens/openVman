@@ -220,3 +220,12 @@ def fresh_provider_health():
     provider_health().clear()
     yield
     provider_health().clear()
+
+
+@pytest.fixture(autouse=True)
+def fresh_project_model_settings():
+    from core.gemini_credentials import clear_project_provider_cache
+
+    clear_project_provider_cache()
+    yield
+    clear_project_provider_cache()

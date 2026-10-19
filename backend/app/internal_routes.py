@@ -113,13 +113,16 @@ def _check_internal_auth(token: str) -> None:
 
 @router.get("/api/v1/internal/model-providers")
 async def internal_model_provider_configuration(
+    project_id: str | None = None,
     x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
 ) -> dict[str, Any]:
     _check_internal_auth(x_internal_token)
     from app.auth.runtime import get_auth_runtime
     from app.auth.model_provider_routes import internal_runtime_configuration
 
-    return internal_runtime_configuration(get_auth_runtime())
+    return internal_runtime_configuration(
+        get_auth_runtime(), project_id=project_id,
+    )
 
 
 @router.get("/api/v1/internal/a2a/peers")

@@ -18,6 +18,7 @@ from core.fallback_chain import (
     has_admin_api_key,
     health_id,
 )
+from core.gemini_credentials import current_model_project, resolve_gemini_credential
 from core.generation_cancel import (
     GenerationCancelled,
     is_cancelled,
@@ -126,14 +127,18 @@ def _record_llm_usage(
     model: str,
     usage: LLMUsage | None,
     latency_ms: float,
+    hop: RouteHop | None = None,
 ) -> None:
     # 沒回 usage 也記一筆零值，之後才看得出哪個 provider 不回報。
+    raw: dict[str, Any] = {} if usage is not None else {"usage_missing": True}
+    if hop is not None and hop.credential_source:
+        raw.update(credential_source=hop.credential_source, credential_id=hop.credential_id)
     record_usage_event(
         provider=provider,
         model=model,
         usage=usage,
         latency_ms=latency_ms,
-        raw=None if usage is not None else {"usage_missing": True},
+        raw=raw or None,
     )
 
 
@@ -256,7 +261,7 @@ def stream_chat_turn(
             )
             router.mark_success(hop.api_key)
             provider_health().record_success(health_id(hop.provider, hop.model, hop.api_key))
-            _record_llm_usage(hop.provider, hop.model, reply.usage, _now_ms() - t0)
+            _record_llm_usage(hop.provider, hop.model, reply.usage, _now_ms() - t0, hop)
             record_route_attempt(
                 trace_id=tid,
                 provider=hop.provider,
@@ -278,10 +283,13 @@ def stream_chat_turn(
 
 def _get_gemini_client() -> Any:
     """Helper to lazily initialize the Gemini client if config supports it."""
+    project_id = current_model_project()
+    gemini_key = (
+        resolve_gemini_credential(project_id).api_key if project_id is not None
+        else get_settings().resolve_api_key_for_provider("gemini")
+    )
     try:
         from google import genai
-        cfg = get_settings()
-        gemini_key = cfg.resolve_api_key_for_provider("gemini")
         if gemini_key:
             return genai.Client(api_key=gemini_key)
     except Exception:
@@ -301,6 +309,10 @@ def _resolve_chain_or_routes(
     chain = build_fallback_chain(trace_id, client=client)
     if chain:
         return chain, []
+
+    if current_model_project() is not None:
+        # Legacy routes are process-global and can contain another project's shared key.
+        raise RuntimeError("無可用的專案 LLM route")
 
     routes = get_provider_router().iter_routes()
     if not routes:
@@ -422,6 +434,7 @@ def _create_sync_completion(
                 hop.model,
                 usage_from_response(getattr(response, "usage", None)),
                 _now_ms() - t0,
+                hop,
             )
             record_route_attempt(
                 trace_id=tid,
@@ -464,6 +477,8 @@ def _apply_model_override(
             base_url=hop.base_url,
             hop_index=hop.hop_index,
             trace_id=hop.trace_id,
+            credential_source=hop.credential_source,
+            credential_id=hop.credential_id,
         )
         for hop in chain
     ]

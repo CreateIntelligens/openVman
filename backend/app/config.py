@@ -63,6 +63,10 @@ class TTSRouterConfig(BaseSettings):
 
     # --- Gemini TTS Console ---
     tts_gemini_url: str = Field(default="", validation_alias="TTS_GEMINI_URL")
+    tts_gemini_model: str = Field(
+        default="gemini-3.8-flash-tts", validation_alias="TTS_GEMINI_MODEL",
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+    )
 
     # --- VoxCPM360 (CastAgent-compatible /api/v1/tts/*) ---
     tts_voxcpm_url: str = Field(default="", validation_alias="TTS_VOXCPM_URL")

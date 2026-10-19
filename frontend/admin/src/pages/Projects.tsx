@@ -3,6 +3,7 @@ import { useState } from "react";
 import { isAtLeastAdmin } from "../api/auth";
 import type { ProjectSummary } from "../api/projects";
 import ConfirmModal from "../components/ConfirmModal";
+import ProjectGeminiCredentialDialog from "../components/projects/ProjectGeminiCredentialDialog";
 import ProjectPolicyDialog from "../components/projects/ProjectPolicyDialog";
 import StatusAlert from "../components/StatusAlert";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +12,7 @@ import { useProjectsAdmin } from "../hooks/useProjectsAdmin";
 export default function Projects() {
   const { account } = useAuth();
   const canManageProjects = account ? isAtLeastAdmin(account.role) : false;
+  const canManageGeminiCredentials = account?.role === "root";
   const {
     canCreateProject,
     creating,
@@ -29,6 +31,7 @@ export default function Projects() {
     status,
   } = useProjectsAdmin();
   const [policyTarget, setPolicyTarget] = useState<ProjectSummary | null>(null);
+  const [geminiTarget, setGeminiTarget] = useState<ProjectSummary | null>(null);
 
   return (
     <div className="page-scroll">
@@ -149,6 +152,15 @@ export default function Projects() {
                     >
                       語音設定
                     </button>
+                    {canManageGeminiCredentials && (
+                      <button
+                        type="button"
+                        onClick={() => setGeminiTarget(project)}
+                        className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
+                      >
+                        Gemini 金鑰
+                      </button>
+                    )}
                     {project.project_id !== "default" && (
                       <button
                         onClick={() => setDeleteTargetId(project.project_id)}
@@ -183,6 +195,14 @@ export default function Projects() {
             setPolicyTarget(null);
             setStatus({ type: "success", message });
           }}
+        />
+      )}
+
+      {canManageGeminiCredentials && geminiTarget && (
+        <ProjectGeminiCredentialDialog
+          projectId={geminiTarget.project_id}
+          projectLabel={geminiTarget.label || geminiTarget.project_id}
+          onClose={() => setGeminiTarget(null)}
         />
       )}
 

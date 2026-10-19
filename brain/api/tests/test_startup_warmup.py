@@ -20,7 +20,7 @@ def _reset_warmup_state():
 def _no_gemini_warmup(monkeypatch, request):
     """其他預熱測試不該真的連 Gemini；測台語判斷預熱的測試自己換掉 client。"""
     if "audio_language" not in request.node.name:
-        monkeypatch.setattr(_load_startup(), "_warmup_audio_language", lambda: None)
+        monkeypatch.setattr(_load_startup(), "_warmup_audio_language", lambda project_id="default": None)
 
 
 def test_warmup_project_ids_include_projects_with_knowledge_state(monkeypatch):
@@ -190,6 +190,10 @@ def _audio_settings(monkeypatch, startup, key="k1"):
     monkeypatch.setattr(startup, "get_settings", lambda: types.SimpleNamespace(
         gemini_api_key=key, live_audio_language_id_model="gemini-3.5-flash-lite",
     ))
+    from core.gemini_credentials import GeminiCredential
+
+    monkeypatch.setattr("core.gemini_credentials.resolve_gemini_credential",
+                        lambda project_id: GeminiCredential(key))
 
 
 def test_warmup_audio_language_opens_the_shared_client(monkeypatch):

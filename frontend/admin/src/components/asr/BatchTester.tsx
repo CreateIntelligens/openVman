@@ -87,7 +87,7 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAsrEngines()
+    fetchAsrEngines(projectId)
       .then((configured) => {
         if (cancelled) return;
         const usable: string[] = [
@@ -106,7 +106,7 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [browserSupported, projectId]);
 
   const browserOn = listening && browserSupported && engines.includes(BROWSER_ASR);
   const spoken = routes.filter((route) => route !== "nan");

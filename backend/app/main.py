@@ -7,6 +7,9 @@ from app.auth.api_key_routes import router as api_key_router
 from app.auth.embed_key_routes import router as embed_key_router
 from app.auth.model_provider_routes import router as model_provider_router
 from app.auth.middleware import FailClosedAuthMiddleware
+from app.auth.project_gemini_credential_routes import (
+    router as project_gemini_credential_router,
+)
 from app.auth.routes import (
     auth_router,
     settings_router,
@@ -57,6 +60,7 @@ app.include_router(api_key_router)
 app.include_router(users_router)
 app.include_router(settings_router)
 app.include_router(model_provider_router)
+app.include_router(project_gemini_credential_router)
 app.include_router(embed_key_router)
 app.include_router(temporary_accounts_router)
 app.include_router(admin_routes.router)

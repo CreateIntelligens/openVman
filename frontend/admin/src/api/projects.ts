@@ -39,6 +39,43 @@ export function deleteProject(projectId: string) {
   );
 }
 
+export interface ProjectGeminiCredential {
+  project_id: string;
+  source: "project" | "shared";
+  label: string | null;
+  configured: boolean;
+  masked: string | null;
+  credential_id: string | null;
+  updated_at: string | null;
+  runtime_refreshed?: boolean;
+}
+
+function projectGeminiCredentialPath(projectId: string) {
+  return `${projectPath(projectId)}/gemini-credential`;
+}
+
+export function fetchProjectGeminiCredential(projectId: string) {
+  return fetchJson<ProjectGeminiCredential>(apiUrl(projectGeminiCredentialPath(projectId)));
+}
+
+export function saveProjectGeminiCredential(
+  projectId: string,
+  credential: { label: string; api_key: string },
+) {
+  return jsonRequest<ProjectGeminiCredential>(
+    "PUT",
+    projectGeminiCredentialPath(projectId),
+    { ...credential },
+  );
+}
+
+export function deleteProjectGeminiCredential(projectId: string) {
+  return fetchJson<ProjectGeminiCredential>(
+    apiUrl(projectGeminiCredentialPath(projectId)),
+    { method: "DELETE" },
+  );
+}
+
 /** 專案層的資源與語音限制；空清單代表「不限制」，實際可用的是帳號授權與這份清單的交集。 */
 export interface ProjectPolicyInput {
   allowed_asr_engines: string[];

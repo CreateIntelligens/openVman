@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from core.gemini_credentials import project_model_scope
 from memory.embedder import encode_query_with_fallback
 from memory.retrieval import search_records
 from protocol.message_envelope import build_message_envelope
@@ -40,7 +41,8 @@ async def search(request: Request, payload: SearchRequest):
 
     try:
         enforce_guardrails("search", query, envelope.context)
-        expansion_terms = _maybe_expand_query(query, payload, envelope.context.trace_id)
+        with project_model_scope(envelope.context.project_id, kind="query_expansion"):
+            expansion_terms = _maybe_expand_query(query, payload, envelope.context.trace_id)
         embedding_route = encode_query_with_fallback(
             query,
             project_id=envelope.context.project_id,

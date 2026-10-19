@@ -15,6 +15,7 @@ from time import monotonic
 from typing import Any
 
 from config import get_settings
+from core.gemini_credentials import project_model_entry
 from infra.db import (
     get_db,
     get_memories_table,
@@ -58,6 +59,7 @@ def maybe_run_memory_maintenance(force: bool = False, project_id: str = "default
         return result
 
 
+@project_model_entry("memory_maintenance")
 def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
     """Summarize archived logs and rewrite the memories table without duplicates."""
     ensure_workspace_scaffold(project_id)
@@ -153,6 +155,7 @@ def _normalize_memory_record_identities(
 _SUMMARY_SECTION_HEADER = "# 記憶摘要"
 
 
+@project_model_entry("memory_summary")
 def write_summary_and_reindex(
     *,
     persona_id: str,

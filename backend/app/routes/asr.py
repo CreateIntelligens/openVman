@@ -151,7 +151,12 @@ async def _transcribe_routed(
                 tmp_path, trace_id, preferred, prompt=prompt, routes=routes,
                 **scope,
             ),
-            language_routes_mod.detect_taiwanese(tmp_path),
+            language_routes_mod.detect_taiwanese(
+                tmp_path,
+                project_id=language_routes_mod.resolve_project(
+                    account, project_id,
+                ) or "",
+            ),
         )
         speech_language = heard.language if heard.language == language_routes_mod.TAIWANESE else None
         language_check = {"result": heard.result, "ms": heard.ms}
@@ -312,6 +317,7 @@ async def get_language_routes(
 )
 async def list_asr_engines(
     admin: CurrentAccount = Depends(require_admin),
+    project_id: str = "",
 ) -> JSONResponse:
     """Engines the admin test bench can actually reach, so dead ones are not offered.
 
@@ -323,7 +329,9 @@ async def list_asr_engines(
 
     return JSONResponse(content={
         "engines": configured_providers(),
-        "stream": configured_stream_engines(),
+        "stream": configured_stream_engines(
+            language_routes_mod.resolve_project(admin, project_id),
+        ) if project_id else configured_stream_engines(),
     })
 
 

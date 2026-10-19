@@ -13,6 +13,7 @@ import httpx
 import websockets
 
 from app.config import TTSRouterConfig, get_tts_config
+from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.session_manager import Session
 
 logger = logging.getLogger("backend.gemini_live")
@@ -37,16 +38,25 @@ class JsonTransport(Protocol):
 class GeminiLiveWebSocketTransport:
     """Minimal JSON transport for Gemini Live's raw websocket API."""
 
-    def __init__(self, config: TTSRouterConfig) -> None:
+    def __init__(
+        self, config: TTSRouterConfig, *, project_id: str | None = None,
+    ) -> None:
         self._config = config
+        self._project_id = project_id
+        self._api_key: str | None = None
         self._ws: Any | None = None
 
     async def connect(self) -> None:
-        if not self._config.gemini_api_key:
+        if self._api_key is None:
+            self._api_key = (
+                resolve_gemini_credential(self._project_id).api_key
+                if self._project_id else self._config.gemini_api_key
+            )
+        if not self._api_key:
             raise RuntimeError("GEMINI_API_KEY is not configured")
         self._ws = await websockets.connect(
             _GEMINI_LIVE_WS_URL,
-            additional_headers={"x-goog-api-key": self._config.gemini_api_key},
+            additional_headers={"x-goog-api-key": self._api_key},
             open_timeout=10,
             max_size=4 * 1024 * 1024,
         )
@@ -88,7 +98,11 @@ class GeminiLivePipeline:
     ) -> None:
         self.session = session
         self.config = config or get_tts_config()
-        self._transport_factory = transport_factory or (lambda cfg: GeminiLiveWebSocketTransport(cfg))
+        self._transport_factory = transport_factory or (
+            lambda cfg: GeminiLiveWebSocketTransport(
+                cfg, project_id=str(session.metadata.get("project_id") or "") or None,
+            )
+        )
         self._brain_http_factory = brain_http_factory or (
             lambda: httpx.AsyncClient(timeout=httpx.Timeout(connect=5, read=25, write=10, pool=5))
         )

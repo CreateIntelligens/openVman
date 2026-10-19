@@ -84,7 +84,9 @@ class TTSRouterService:
         """VoxCPM adapter, exposed for the /tts/stream targeted path."""
         return self._voxcpm
 
-    def build_chain(self) -> list[RouteTarget]:
+    def build_chain(
+        self, request: SynthesizeRequest | None = None,
+    ) -> list[RouteTarget]:
         """Build the ordered fallback chain based on config."""
         return [
             RouteTarget(
@@ -93,7 +95,10 @@ class TTSRouterService:
                 error_classifier=classifier,
             )
             for target_id, adapter, classifier in self._provider_routes()
-            if adapter.enabled
+            if adapter.enabled or (
+                target_id == "gemini-tts" and request is not None
+                and self._gemini.enabled_for(request)
+            )
         ]
 
     def synthesize(
@@ -113,7 +118,7 @@ class TTSRouterService:
 
         Raises RuntimeError if all attempts fail.
         """
-        chain = self.build_chain()
+        chain = self.build_chain(request)
         if not chain:
             raise RuntimeError("TTS fallback chain 為空：無可用的 provider")
 
@@ -156,7 +161,14 @@ class TTSRouterService:
                 units=len(request.text),
                 latency_ms=latency_ms,
                 scope=request.usage_scope,
-                raw={"route_target": target.target, "locale": request.locale},
+                raw={
+                    "route_target": target.target, "locale": request.locale,
+                    **{
+                        key: result.raw_metadata[key]
+                        for key in ("credential_id", "credential_source", "model")
+                        if key in result.raw_metadata
+                    },
+                },
             )
             return result, "", ""
         except Exception as exc:

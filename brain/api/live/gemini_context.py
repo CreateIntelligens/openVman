@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.gemini_credentials import GeminiCredential
 
 
 EventSink = Callable[[dict[str, Any]], Awaitable[None]]
@@ -23,6 +27,7 @@ class LiveSessionContext:
     principal_id: str
     config: Any
     event_sink: EventSink | None = None
+    gemini_credential: Callable[[], GeminiCredential | None] | None = None
 
     async def emit(self, event: dict[str, Any]) -> None:
         if self.event_sink is not None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from collections.abc import AsyncIterator
 from typing import Literal
@@ -20,6 +21,7 @@ from app.auth.models import (
     AccountRole,
     ProjectPolicyRecord,
 )
+from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
@@ -143,16 +145,29 @@ async def create_speech(
     request = SynthesizeRequest(
         text=cleaned_text,
         voice_hint=voice,
-        usage_scope=usage_scope_for(current, channel="http"),
+        usage_scope=usage_scope_for(
+            current, project_id=project_id or "", channel="http",
+        ),
     )
     cache_key: str | None = None
 
     if cfg.tts_cache_enabled:
+        cache_scope = _cache_scope(project_id, policy, is_root=is_root)
+        if project_id and provider in ("", "auto", "gemini-tts"):
+            credential = resolve_gemini_credential(project_id, runtime)
+            if credential.source == "project" or provider == "gemini-tts":
+                fingerprint = hashlib.sha256(
+                    credential.api_key.encode("utf-8"),
+                ).hexdigest()[:12]
+                cache_scope += (
+                    f"|project:{project_id}:gemini:"
+                    f"{credential.credential_id}:{fingerprint}"
+                )
         cache_key = make_cache_key(
             cleaned_text,
             voice,
             provider,
-            scope=_cache_scope(project_id, policy, is_root=is_root),
+            scope=cache_scope,
         )
         cached = await cache_get(cache_key)
         if cached is not None:
@@ -353,7 +368,9 @@ async def tts_stream_endpoint(
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
-    scope = usage_scope_for(current, channel="http")
+    scope = usage_scope_for(
+        current, project_id=project_id or "", channel="http",
+    )
 
     def _meter_stream(stream_provider: str) -> None:
         """串流路徑不經過 service 的 fallback chain，所以在這裡自行記帳。
@@ -376,11 +393,12 @@ async def tts_stream_endpoint(
     if provider == "gemini-tts":
         svc = _get_service()
         gemini = svc.gemini_adapter
-        if gemini.enabled:
+        gemini_request = SynthesizeRequest(
+            text=cleaned, voice_hint=voice, usage_scope=scope,
+        )
+        if gemini.enabled_for(gemini_request):
             try:
-                stream = await gemini.open_stream(
-                    SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope)
-                )
+                stream = await gemini.open_stream(gemini_request)
             except GeminiTTSHTTPError as exc:
                 return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
             except RuntimeError as exc:

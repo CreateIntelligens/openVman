@@ -10,9 +10,14 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
-from typing import Callable
+from time import monotonic
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.gemini_credentials import GeminiCredential
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +252,7 @@ _AUDIO_LANGUAGE_PROMPT = (
 )
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=32)
 def _audio_language_client(api_key: str):
     """One client per key: building it each call cost 0.1–0.18 s of the 2.5 s the backend waits."""
     from google import genai
@@ -260,7 +265,10 @@ def _audio_language_client(api_key: str):
     )
 
 
-def detect_audio_language(wav_bytes: bytes) -> str:
+def detect_audio_language(
+    wav_bytes: bytes, *, project_id: str | None = None,
+    credential: GeminiCredential | None = None,
+) -> str:
     """Ask Gemini which language an utterance is in; other is folded into zh.
 
     合成台語 8 句＋華英西 5 句：3.5-flash-lite 12/13（台語全對）、p50 1.4 秒（scripts/experiments/taigi）。
@@ -268,9 +276,19 @@ def detect_audio_language(wav_bytes: bytes) -> str:
     from google.genai import types
 
     from config import get_settings
+    from core.gemini_credentials import (
+        current_model_project,
+        resolve_gemini_credential,
+    )
+    from core.usage import LLMUsage, UsageScope, current_usage_scope
+    from infra.usage_ledger import record_usage_event
 
     cfg = get_settings()
-    response = _audio_language_client(cfg.gemini_api_key).models.generate_content(
+    credential = credential or resolve_gemini_credential(project_id)
+    if not credential.api_key:
+        raise RuntimeError("Gemini audio language credential is not configured")
+    started = monotonic()
+    response = _audio_language_client(credential.api_key).models.generate_content(
         model=cfg.live_audio_language_id_model,
         contents=[
             types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
@@ -279,6 +297,23 @@ def detect_audio_language(wav_bytes: bytes) -> str:
         config=types.GenerateContentConfig(
             response_mime_type="application/json", temperature=0,
         ),
+    )
+    usage = getattr(response, "usage_metadata", None)
+    selected_project = current_model_project(project_id)
+    scope = current_usage_scope()
+    if selected_project is not None and (scope is None or scope.project_id != selected_project):
+        scope = UsageScope(kind="audio_language", project_id=selected_project)
+    record_usage_event(
+        provider="gemini", model=cfg.live_audio_language_id_model,
+        kind="audio_language",
+        scope=scope,
+        latency_ms=(monotonic() - started) * 1000,
+        usage=LLMUsage(
+            input_tokens=int(getattr(usage, "prompt_token_count", 0) or 0),
+            output_tokens=int(getattr(usage, "candidates_token_count", 0) or 0),
+            total_tokens=int(getattr(usage, "total_token_count", 0) or 0),
+        ),
+        raw=credential.metadata(),
     )
     language = str(json.loads(response.text or "{}").get("language", "")).strip()
     return language if language in LANGUAGES else DEFAULT_LANGUAGE

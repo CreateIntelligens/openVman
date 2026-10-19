@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 import logging
+from collections.abc import AsyncIterator
 from time import monotonic
 
 import httpx
 
+from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.config import TTSRouterConfig
+from app.providers import project_gemini_tts
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 
 logger = logging.getLogger("provider.gemini")
@@ -39,6 +41,9 @@ class GeminiTTSAdapter:
     def enabled(self) -> bool:
         return bool(self._url)
 
+    def enabled_for(self, request: SynthesizeRequest) -> bool:
+        return self.enabled or self._project_credential(request) is not None
+
     def _build_payload(
         self,
         request: SynthesizeRequest,
@@ -53,6 +58,14 @@ class GeminiTTSAdapter:
             payload["stream"] = True
         return payload
 
+    @staticmethod
+    def _project_credential(request: SynthesizeRequest):
+        project_id = request.usage_scope.get("project_id")
+        if not project_id:
+            return None
+        credential = resolve_gemini_credential(str(project_id))
+        return credential if credential.source == "project" else None
+
     async def open_stream(
         self, request: SynthesizeRequest,
     ) -> AsyncIterator[bytes]:
@@ -63,6 +76,11 @@ class GeminiTTSAdapter:
         StreamingResponse（也就是送出 200 headers）之前就捕捉到錯誤，
         避免「headers 已送出、body 迭代中途才發現是 502」的中斷。
         """
+        credential = self._project_credential(request)
+        if credential is not None:
+            return await project_gemini_tts.open_stream(
+                request, credential, self._config.tts_gemini_model,
+            )
         if not self._url:
             raise RuntimeError("Gemini TTS URL is not configured")
 
@@ -93,6 +111,11 @@ class GeminiTTSAdapter:
 
     def synthesize(self, request: SynthesizeRequest) -> NormalizedTTSResult:
         """POST to /api/tts on the Gemini TTS Console server."""
+        credential = self._project_credential(request)
+        if credential is not None:
+            return project_gemini_tts.synthesize(
+                request, credential, self._config.tts_gemini_model, self._client,
+            )
         if not self._url:
             raise RuntimeError("Gemini TTS URL is not configured")
 

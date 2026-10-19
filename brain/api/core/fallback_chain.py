@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from config import get_settings
+from core.gemini_credentials import (
+    clear_project_provider_cache,
+    current_model_project,
+    project_provider_document,
+    resolve_gemini_credential,
+)
 from core.model_provider_config import RefreshingValue, fetch_section
 from core.provider_health import HopId, provider_health
 from safety.observability import log_event
@@ -48,6 +54,8 @@ class RouteHop:
     base_url: str
     hop_index: int
     trace_id: str
+    credential_source: str = ""
+    credential_id: str = ""
 
 
 def build_fallback_chain(trace_id: str, client: Any | None = None) -> list[RouteHop]:
@@ -62,7 +70,9 @@ def build_fallback_chain(trace_id: str, client: Any | None = None) -> list[Route
     until then (or while Backend has never answered) LLM_FALLBACK_CHAIN rules.
     """
     cfg = get_settings()
+    project_id = current_model_project()
     admin = _admin_chat()
+    credential = resolve_gemini_credential(project_id) if project_id is not None else None
     entries = list(admin.chain) if admin.chain is not None else _environment_chain(admin.key_overrides)
     source = "admin" if admin.chain is not None else "environment"
     # 一把可用 key 都沒有（全停用、金鑰全清掉）時，照 .env 原樣跑，
@@ -72,6 +82,14 @@ def build_fallback_chain(trace_id: str, client: Any | None = None) -> list[Route
             logger.warning("admin chat provider settings leave no usable key; using environment chain")
         entries = _environment_chain({})
         source = "environment"
+
+    if credential is not None:
+        entries = [
+            _ChainEntry(entry.provider, entry.model,
+                        credential.api_key if entry.provider == "gemini" else entry.api_key,
+                        entry.base_url)
+            for entry in entries
+        ]
 
     from core.models_config import fallback_chain
 
@@ -100,6 +118,8 @@ def build_fallback_chain(trace_id: str, client: Any | None = None) -> list[Route
                 base_url=entry.base_url,
                 hop_index=len(hops),
                 trace_id=trace_id,
+                credential_source=credential.source if credential and entry.provider == "gemini" else "",
+                credential_id=credential.credential_id if credential and entry.provider == "gemini" else "",
             )
         )
 
@@ -142,6 +162,9 @@ def has_admin_api_key() -> bool:
 
 
 def _admin_chat() -> _AdminChat:
+    project_id = current_model_project()
+    if project_id is not None:
+        return _parse_admin_chat(project_provider_document(project_id)["chat_llm"])
     return _ADMIN_CHAT.get(_fetch_admin_chat, default=_NO_ADMIN_CHAT)
 
 
@@ -184,7 +207,7 @@ def _parse_admin_chat(section: Any) -> _AdminChat:
             raise ValueError("chat_llm provider entry is invalid")
         # Backend 看不到金鑰、但 Brain 自己的部署設定有時（兩邊 .env 分開放），
         # 用 Brain 的；後台明確清除的金鑰（source=admin）不補，該供應商就略過。
-        if not api_key and raw.get("credential_source") != "admin":
+        if not api_key and raw.get("credential_source") not in {"admin", "project"}:
             api_key = cfg.resolve_api_key_for_provider(provider)
         entries.append(_ChainEntry(provider, model, api_key, endpoint))
     return _AdminChat(tuple(entries), {})
@@ -192,4 +215,5 @@ def _parse_admin_chat(section: Any) -> _AdminChat:
 
 def clear_admin_chain_cache() -> None:
     _ADMIN_CHAT.clear()
+    clear_project_provider_cache()
 

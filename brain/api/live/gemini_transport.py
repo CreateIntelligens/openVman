@@ -31,16 +31,16 @@ class JsonTransport(Protocol):
 class GeminiLiveWebSocketTransport:
     """Minimal JSON transport for Gemini Live's raw websocket API."""
 
-    def __init__(self, config: BrainSettings) -> None:
-        self._config = config
+    def __init__(self, config: BrainSettings, *, api_key: str | None = None) -> None:
+        self._api_key = config.gemini_api_key if api_key is None else api_key
         self._ws: Any | None = None
 
     async def connect(self) -> None:
-        if not self._config.gemini_api_key:
+        if not self._api_key:
             raise RuntimeError("GEMINI_API_KEY is not configured")
         self._ws = await websockets.connect(
             _GEMINI_LIVE_WS_URL,
-            additional_headers={"x-goog-api-key": self._config.gemini_api_key},
+            additional_headers={"x-goog-api-key": self._api_key},
             open_timeout=10,
             max_size=4 * 1024 * 1024,
         )

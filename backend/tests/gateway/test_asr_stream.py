@@ -66,6 +66,13 @@ def _client(monkeypatch, *, allowed=True, embed=False, judge=None):
         lambda runtime, user, stored: stored if allowed else "",
     )
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        asr_stream, "resolve_gemini_credential",
+        lambda project_id, runtime=None: types.SimpleNamespace(
+            api_key="test-key", source="shared",
+            credential_id="gemini", configured=True,
+        ),
+    )
     monkeypatch.setenv("ASR_FINAL_JUDGE_LOG", str(tmp_log(monkeypatch)))
     usage: list[dict] = []
     monkeypatch.setattr(asr_stream, "record_usage_event", lambda **kw: usage.append(kw))

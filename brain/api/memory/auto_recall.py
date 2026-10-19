@@ -6,11 +6,13 @@ import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from contextvars import copy_context
 from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 
 from config import get_settings
+from core.gemini_credentials import project_model_entry
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +203,7 @@ def _jev_filter(query: str, results: list[dict[str, Any]], config: Any) -> list[
 # 3.6 Core recall execution
 # ------------------------------------------------------------------
 
+@project_model_entry("recall")
 def _run_recall(
     query: str,
     persona_id: str,
@@ -309,7 +312,7 @@ def run_auto_recall(
         # Execute with timeout
         timeout_s = config.auto_recall_timeout_ms / 1000.0
         future = _executor.submit(
-            _run_recall, query, persona_id, project_id, config,
+            copy_context().run, _run_recall, query, persona_id, project_id, config,
             skip_jev_filter=skip_jev_filter,
         )
         try:

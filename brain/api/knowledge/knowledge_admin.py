@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from core.gemini_credentials import project_model_entry
 from knowledge.doc_meta import (
     delete_document_meta,
     get_document_meta,
@@ -133,6 +134,7 @@ def _write_normalization_backup(
     return backup_rel
 
 
+@project_model_entry("knowledge")
 def preview_workspace_document_normalization(
     relative_path: str,
     project_id: str = "default",
@@ -186,6 +188,7 @@ def apply_workspace_document_normalization(
     return summary
 
 
+@project_model_entry("knowledge")
 def renormalize_workspace_document(relative_path: str, project_id: str = "default") -> dict[str, Any]:
     """Re-run LLM normalization over an existing knowledge/ document, in place.
 
@@ -563,6 +566,7 @@ def list_raw_files(project_id: str = "default") -> list[str]:
     )
 
 
+@project_model_entry("knowledge")
 def commit_raw_documents(
     project_id: str = "default",
     on_progress: Callable[[str, str], None] | None = None,

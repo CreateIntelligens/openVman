@@ -53,6 +53,7 @@ from app.auth.models import (
     is_at_least_admin,
 )
 from app.auth.project_resources import effective_project_resources
+from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.runtime import get_auth_runtime
 from app.config import TTSRouterConfig, get_tts_config
 from app.http_client import SharedAsyncClient
@@ -276,16 +277,20 @@ def _project_policy(current, project_id: str) -> ProjectPolicyRecord | None:
     return get_auth_runtime().project_policies.get(resolved)
 
 
-def configured_stream_engines() -> list[str]:
+def configured_stream_engines(project_id: str | None = None) -> list[str]:
     """Streaming engines whose URL and key are set, in the order the admin bench lists them."""
     cfg = get_tts_config()
+    gemini_configured = (
+        resolve_gemini_credential(project_id).configured
+        if project_id else bool(os.environ.get("GEMINI_API_KEY"))
+    )
     return [
         engine for engine in (
             GEMINI_STREAM_ASR_ENGINE, R2T2_STREAM_ASR_ENGINE, R2T2_DEV_STREAM_ASR_ENGINE,
         )
         if (
             _r2t2_stream_endpoint(cfg, engine) if engine in _R2T2_STREAM_ENGINES
-            else os.environ.get("GEMINI_API_KEY")
+            else gemini_configured
         )
     ]
 
@@ -418,7 +423,20 @@ async def asr_stream(websocket: WebSocket) -> None:
         policy,
         project_id=project_id,
     )
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    resolved_project = (policy.project_id if policy is not None else "")
+    credential = None
+    if engine == GEMINI_STREAM_ASR_ENGINE:
+        try:
+            credential = resolve_gemini_credential(
+                resolved_project or None, get_auth_runtime(),
+            )
+        except HTTPException:
+            await websocket.send_json({
+                "type": "error", "code": "project_credential_unavailable",
+            })
+            await websocket.close(code=1011)
+            return
+    api_key = credential.api_key if credential is not None else ""
     cfg = get_tts_config()
     endpoint = _r2t2_stream_endpoint(cfg, engine) if engine in _R2T2_STREAM_ENGINES else None
     configured = bool(endpoint) if engine in _R2T2_STREAM_ENGINES else bool(api_key)
@@ -541,6 +559,15 @@ async def asr_stream(websocket: WebSocket) -> None:
                 kind="asr",
                 unit_type=UNIT_SECONDS,
                 units=round(seconds, 2),
-                scope=usage_scope_for(current, channel="ws"),
-                raw={"streaming": True, "wall_seconds": round(time.monotonic() - started, 1)},
+                scope=usage_scope_for(
+                    current, project_id=resolved_project, channel="ws",
+                ),
+                raw={
+                    "streaming": True,
+                    "wall_seconds": round(time.monotonic() - started, 1),
+                    **({
+                        "credential_id": credential.credential_id,
+                        "credential_source": credential.source,
+                    } if credential is not None else {}),
+                },
             )

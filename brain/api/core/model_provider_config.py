@@ -8,8 +8,9 @@ last answer they got when Backend is briefly unreachable.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from time import monotonic
-from typing import Any, Callable, Final, Generic, TypeVar
+from typing import Any, Final, Generic, TypeVar
 
 import httpx
 
@@ -34,6 +35,18 @@ def fetch_section(
     get: Callable[..., httpx.Response] = httpx.get,
     **request: Any,
 ) -> Any:
+    body = fetch_document(timeout=timeout, get=get, **request)
+    if section not in body:
+        raise ModelProviderConfigUnavailable(f"model provider document has no {section} section")
+    return body[section]
+
+
+def fetch_document(
+    *,
+    timeout: float,
+    get: Callable[..., httpx.Response] = httpx.get,
+    **request: Any,
+) -> dict[str, Any]:
     cfg = get_settings()
     if not cfg.gateway_internal_token or not cfg.gateway_base_url:
         raise ModelProviderConfigUnavailable("internal model provider configuration is unavailable")
@@ -45,9 +58,9 @@ def fetch_section(
     )
     response.raise_for_status()
     body = response.json()
-    if not isinstance(body, dict) or section not in body:
-        raise ModelProviderConfigUnavailable(f"model provider document has no {section} section")
-    return body[section]
+    if not isinstance(body, dict):
+        raise ModelProviderConfigUnavailable("model provider document must be an object")
+    return body
 
 
 class RefreshingValue(Generic[T]):
@@ -103,5 +116,6 @@ __all__ = [
     "INTERNAL_TOKEN_HEADER",
     "ModelProviderConfigUnavailable",
     "RefreshingValue",
+    "fetch_document",
     "fetch_section",
 ]

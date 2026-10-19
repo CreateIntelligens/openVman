@@ -102,9 +102,26 @@ class GeminiLiveAudio:
         只寫訊息語言、不影響回答；判斷不是台語或失敗就保留文字判斷的結果。
         """
         try:
-            language = await asyncio.to_thread(
-                detect_audio_language, pcm_to_wav(pcm, self._utterance_rate),
+            from core.usage import usage_scope
+
+            credential = (
+                self._context.gemini_credential()
+                if self._context.gemini_credential else None
             )
+            kwargs: dict[str, Any] = (
+                {"credential": credential} if credential is not None else {}
+            )
+            context = self._context
+            with usage_scope(
+                kind="audio_language", project_id=context.project_id,
+                user_id=context.user_id, role=context.role,
+                principal_type=context.principal_type, principal_id=context.principal_id,
+                session_id=context.session_id, persona_id=context.persona_id,
+                channel="live",
+            ):
+                language = await asyncio.to_thread(
+                    detect_audio_language, pcm_to_wav(pcm, self._utterance_rate), **kwargs,
+                )
             if language == TAIWANESE:
                 from memory.memory import update_session_message_language
 
@@ -178,10 +195,15 @@ class GeminiLiveAudio:
                     scope=self._usage_scope(),
                     unit_type=UNIT_SECONDS,
                     units=seconds,
-                    raw={"direction": direction},
+                    raw={"direction": direction, **self._credential_metadata()},
                 )
             except Exception as exc:
                 logger.warning("Gemini Live usage ledger write failed: %s", exc)
+
+    def _credential_metadata(self) -> dict[str, str]:
+        getter = self._context.gemini_credential
+        credential = getter() if getter is not None else None
+        return credential.metadata() if credential is not None else {}
 
     def _usage_scope(self):
         from core.usage import UsageScope

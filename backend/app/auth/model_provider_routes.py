@@ -27,6 +27,7 @@ from .model_provider_repository import (
     CategoryUpdate,
     InvalidModelProviderSettings,
 )
+from .project_gemini_credentials import GeminiCredential, resolve_gemini_credential
 from .runtime import AuthRuntime, get_auth_runtime
 
 logger = logging.getLogger(__name__)
@@ -309,7 +310,9 @@ def _decision_runtime(runtime: AuthRuntime) -> dict[str, Any]:
     return {"order": [provider["id"] for provider in providers], "providers": providers}
 
 
-def _chat_llm_runtime(runtime: AuthRuntime) -> dict[str, Any]:
+def _chat_llm_runtime(
+    runtime: AuthRuntime, gemini: GeminiCredential,
+) -> dict[str, Any]:
     settings, configured = _effective(runtime, CHAT_LLM)
     # 沒人存過就讓 Brain 照自己的 LLM_FALLBACK_CHAIN 跑，部署後行為完全不變。
     # 但金鑰是各類共用的：後台存過（含刻意清除）的 key 仍要蓋過 Brain 的 .env，
@@ -323,6 +326,8 @@ def _chat_llm_runtime(runtime: AuthRuntime) -> dict[str, Any]:
             )
             if status.source == "admin":
                 overrides[credential_id] = _credential_value(runtime, credential_id)
+        if gemini.source == "project":
+            overrides["gemini"] = gemini.api_key
         return {"configured": False, "credential_overrides": overrides}
     providers = []
     for hop_id in settings.order:
@@ -338,14 +343,40 @@ def _chat_llm_runtime(runtime: AuthRuntime) -> dict[str, Any]:
             "provider": hop.credential_id,
             "endpoint": hop_endpoint(runtime.config, CHAT_LLM, hop),
             "model": _model(runtime, CHAT_LLM, settings, hop.id),
-            "api_key": _credential_value(runtime, hop.credential_id),
-            "credential_source": status.source,
+            "api_key": (
+                gemini.api_key if hop.credential_id == "gemini"
+                else _credential_value(runtime, hop.credential_id)
+            ),
+            "credential_source": (
+                "project"
+                if hop.credential_id == "gemini" and gemini.source == "project"
+                else status.source
+            ),
         })
-    return {"configured": True, "order": [provider["id"] for provider in providers], "providers": providers}
+    result = {
+        "configured": True,
+        "order": [provider["id"] for provider in providers],
+        "providers": providers,
+    }
+    if gemini.source == "project":
+        result["credential_overrides"] = {"gemini": gemini.api_key}
+    return result
 
 
-def internal_runtime_configuration(runtime: AuthRuntime) -> dict[str, Any]:
-    return {"decision": _decision_runtime(runtime), "chat_llm": _chat_llm_runtime(runtime)}
+def internal_runtime_configuration(
+    runtime: AuthRuntime, project_id: str | None = None,
+) -> dict[str, Any]:
+    gemini = resolve_gemini_credential(project_id, runtime)
+    return {
+        "decision": _decision_runtime(runtime),
+        "chat_llm": _chat_llm_runtime(runtime, gemini),
+        "gemini_credential": {
+            "api_key": gemini.api_key,
+            "source": gemini.source,
+            "credential_id": gemini.credential_id,
+            "configured": gemini.configured,
+        },
+    }
 
 
 __all__ = ["internal_runtime_configuration", "router"]
