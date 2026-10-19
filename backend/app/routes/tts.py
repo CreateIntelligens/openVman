@@ -27,6 +27,7 @@ from app.config import get_tts_config
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
 from app.providers.gemini_tts_adapter import (
+    GEMINI_PROVIDER_NAME,
     GEMINI_STREAM_CONTENT_TYPE,
     GeminiTTSHTTPError,
 )
@@ -222,14 +223,20 @@ class TtsStreamRequest(BaseModel):
         None,
         description="語言代碼（zh、nan…），只能縮小專案在知識庫設定開的分流；逗號分隔字串或陣列",
     )
-    # 打字、快速問答、講華語都沒有這個值，照使用者選的 TTS。
     speech_language: str = Field(
         "",
         description=(
-            "這一輪使用者語音被 ASR 判成的語言，照抄 /api/v1/asr/transcribe 回應的 language。"
-            "只有 nan 會觸發台語分流：專案分流含 nan 且 provider 不是 voxcpm／cosyvoice 時改用 "
-            "VoxCPM，但 VoxCPM 照文字念，Brain 的台語回答是華語文字，念出來多半是華語。"
-            "要穩定念台語請直接指定 provider=cosyvoice 與已授權的 voice（CosyVoice 會轉台文，只能整段合成）"
+            "這一輪使用者語音被 ASR 判成的語言，照抄 /api/v1/asr/transcribe 回應的 language；"
+            "有值時優先於 language"
+        ),
+    )
+    language: str = Field(
+        "",
+        description=(
+            "使用者在介面選的語言（zh、en、nan…），打字輸入時用它決定引擎。語言決定引擎："
+            "nan（專案分流需含台語）改用 CosyVoice（會把漢字轉成台文，整段合成；CosyVoice "
+            "不可用時改 VoxCPM），zh、en 在沒指定 provider 與 voice 時用 IndexTTS。"
+            "明確指定 provider 或 voice 時，只有台語會換引擎"
         ),
     )
     # 空字串＝照引擎原樣回傳（前台虛擬人依賴這個行為）。
@@ -242,25 +249,70 @@ class TtsStreamRequest(BaseModel):
     )
 
 
+INDEXTTS_PROVIDER = "indextts"
+# 需求 VH-384：國語、英文用 IndexTTS。
+_INDEXTTS_LANGUAGES = frozenset({"zh", "en"})
+TTS_PROVIDER_HEADER = "X-TTS-Provider"
+
+
+def _taiwanese_providers(requested: str | None) -> tuple[str, ...]:
+    """Running engines for a Taiwanese turn, CosyVoice first; empty to keep the current one.
+
+    CosyVoice 會把漢字轉成台文再唸；VoxCPM 照字唸，Brain 的台語回答是華語文字，
+    唸出來多半是華語。原本就指定其中一個時不換。
+    """
+    if requested in language_routes_mod.TAIWANESE_TTS_PROVIDERS:
+        return ()
+    svc = _get_service()
+    return tuple(
+        name for name in language_routes_mod.TAIWANESE_TTS_PROVIDERS
+        if getattr(svc, f"{name}_adapter").enabled
+    )
+
+
+def _switch_voice(runtime, policy, providers: tuple[str, ...], *, is_root: bool):
+    """(provider, voice) when language routing moves to ``providers``; voice "" = deployment default.
+
+    專案限制了聲音時只能換到清單裡這些引擎的聲音，清單裡沒有就回 None、不換。
+    """
+    if policy is None or not policy.restricts_tts:
+        return providers[0], ""
+    return voice_access.project_voice_for_providers(
+        runtime, policy, providers, is_root=is_root,
+    )
+
+
 def _stream_audio(
     stream: AsyncIterator[bytes],
     media_type: str,
     output_format: str,
+    provider: str,
 ) -> StreamingResponse:
     if output_format == PCM16K_FORMAT:
-        return StreamingResponse(
+        response = StreamingResponse(
             convert_to_pcm16k(stream, media_type),
             media_type=PCM16K_CONTENT_TYPE,
         )
-    return StreamingResponse(stream, media_type=media_type)
+    else:
+        response = StreamingResponse(stream, media_type=media_type)
+    # /tts/stream 只看 Content-Type 分不出引擎，驗收與排障都靠這個標頭。
+    response.headers[TTS_PROVIDER_HEADER] = provider
+    return response
 
 
-def _buffered_audio(result: NormalizedTTSResult, output_format: str) -> Response:
+def _buffered_audio(
+    result: NormalizedTTSResult, output_format: str, provider: str,
+) -> Response:
+    provider = result.provider or provider
     if output_format == PCM16K_FORMAT:
         return _stream_audio(
-            iter_bytes(result.audio_bytes), result.content_type, output_format,
+            iter_bytes(result.audio_bytes), result.content_type, output_format, provider,
         )
-    return Response(content=result.audio_bytes, media_type=result.content_type)
+    return Response(
+        content=result.audio_bytes,
+        media_type=result.content_type,
+        headers={TTS_PROVIDER_HEADER: provider},
+    )
 
 
 async def _proxy_indextts_stream(
@@ -333,27 +385,18 @@ async def tts_stream_endpoint(
     edge_fallback_voice = voice_access.tts_fallback_voice(
         runtime, policy, is_root=is_root
     )
-    override = (
-        language_routes_mod.taiwanese_tts_provider(body.provider)
-        if language_routes_mod.TAIWANESE in routes
-        and body.speech_language == language_routes_mod.TAIWANESE
-        else None
-    )
-    override_voice = ""
-    if override and policy is not None and policy.restricts_tts:
-        # 專案限制了聲音：台語只能換到清單裡 VoxCPM／CosyVoice 的聲音；清單裡沒有
-        # 就不換，照一般流程用專案允許的聲音唸。ROOT 豁免不受限。
-        picked = voice_access.project_voice_for_providers(
-            runtime,
-            policy,
-            language_routes_mod.TAIWANESE_TTS_PROVIDERS,
-            is_root=is_root,
-        )
-        override, override_voice = picked if picked else (None, "")
-    if override:
-        # 台語分流：原本不是 VoxCPM／CosyVoice 就改用 VoxCPM 的部署預設聲音。先於帳號的
-        # 聲音授權判斷，否則只開了別家聲音的帳號會在換家前就被擋下。
-        provider, voice, character = override, override_voice, override_voice
+    # VH-384：依偵測（ASR）或選擇的語言決定引擎，台語 → CosyVoice／VoxCPM，國語、
+    # 英文 → IndexTTS。偵測到的語言優先，打字時才看使用者選的語言。
+    language = (body.speech_language or body.language).strip()
+    switched = None
+    if language == language_routes_mod.TAIWANESE and language_routes_mod.TAIWANESE in routes:
+        providers = _taiwanese_providers(body.provider)
+        if providers:
+            switched = _switch_voice(runtime, policy, providers, is_root=is_root)
+    if switched:
+        # 台語換引擎先於帳號的聲音授權判斷，否則只開了別家聲音的帳號會在換家前就被擋下。
+        provider, voice = switched
+        character = voice
     else:
         authorized = voice_access.resolve_tts_voice(
             current,
@@ -365,6 +408,18 @@ async def tts_stream_endpoint(
         provider = authorized.provider if authorized else body.provider
         character = authorized.runtime_key if authorized else (body.character or cfg.tts_indextts_default_character)
         voice = authorized.runtime_key if authorized else body.voice
+        explicit = body.provider.strip() or body.voice.strip() or body.character.strip()
+        # 帳號／專案預設本來就是 IndexTTS 的聲音就照用，不換成部署預設。
+        if (
+            language in _INDEXTTS_LANGUAGES
+            and not explicit
+            and cfg.tts_indextts_url
+            and provider != INDEXTTS_PROVIDER
+        ):
+            picked = _switch_voice(runtime, policy, (INDEXTTS_PROVIDER,), is_root=is_root)
+            if picked:
+                provider = INDEXTTS_PROVIDER
+                voice = character = picked[1] or cfg.tts_indextts_default_character
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
@@ -390,7 +445,7 @@ async def tts_stream_endpoint(
 
     # Gemini TTS Console 支援 stream=true，邊生成邊吐 raw PCM（24000Hz），
     # 避免等整段合成完的高延遲。content-type 帶 rate 讓前端知道要重採樣。
-    if provider == "gemini-tts":
+    if provider == GEMINI_PROVIDER_NAME:
         svc = _get_service()
         gemini = svc.gemini_adapter
         gemini_request = SynthesizeRequest(
@@ -403,8 +458,10 @@ async def tts_stream_endpoint(
                 return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
             except RuntimeError as exc:
                 return JSONResponse(status_code=502, content={"error": str(exc)})
-            _meter_stream("gemini-tts")
-            return _stream_audio(stream, GEMINI_STREAM_CONTENT_TYPE, body.format)
+            _meter_stream(GEMINI_PROVIDER_NAME)
+            return _stream_audio(
+                stream, GEMINI_STREAM_CONTENT_TYPE, body.format, GEMINI_PROVIDER_NAME,
+            )
 
     # provider 未指定（auto）且沒有 IndexTTS 時，VoxCPM 是 fallback 鏈的第一站，
     # 直接走它的串流端點，否則 auto 會掉到整段合成的路徑，前端要等好幾秒。
@@ -422,7 +479,9 @@ async def tts_stream_endpoint(
                     sample_rate=16000 if body.format == "pcm16k" else None,
                 )
                 _meter_stream(VOXCPM_PROVIDER_NAME)
-                return _stream_audio(stream, VOXCPM_STREAM_CONTENT_TYPE, body.format)
+                return _stream_audio(
+                    stream, VOXCPM_STREAM_CONTENT_TYPE, body.format, VOXCPM_PROVIDER_NAME,
+                )
             except (VoxCPMHTTPError, RuntimeError) as exc:
                 # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
                 logger.warning("tts_stream voxcpm error: %s", exc)
@@ -442,11 +501,11 @@ async def tts_stream_endpoint(
             )
         except RuntimeError as exc:
             return JSONResponse(status_code=502, content={"error": str(exc)})
-        return _buffered_audio(output.result, body.format)
+        return _buffered_audio(output.result, body.format, provider)
 
     # Primary: proxy stream directly from IndexTTS — 只在沒指定或指定 IndexTTS 時。明確指定
     # Edge（或 VoxCPM 掛掉往下退）卻先送 IndexTTS，IndexTTS 沒在跑時會回 200 空音檔。
-    if cfg.tts_indextts_url and provider in ("", "indextts"):
+    if cfg.tts_indextts_url and provider in ("", INDEXTTS_PROVIDER):
         indextts_stream_url = cfg.tts_indextts_url.rstrip("/") + "/tts_stream"
         proxied = await _proxy_indextts_stream(
             indextts_stream_url=indextts_stream_url,
@@ -454,12 +513,13 @@ async def tts_stream_endpoint(
             character=character,
         )
         if proxied is not None:
-            _meter_stream("indextts")
-            if body.format:
-                return _stream_audio(
-                    proxied.body_iterator, proxied.media_type or "audio/wav", body.format,
-                )
-            return proxied
+            _meter_stream(INDEXTTS_PROVIDER)
+            return _stream_audio(
+                proxied.body_iterator,
+                proxied.media_type or "audio/wav",
+                body.format,
+                INDEXTTS_PROVIDER,
+            )
 
     svc = _get_service()
 
@@ -474,8 +534,8 @@ async def tts_stream_endpoint(
         stream = edge.synthesize_stream(
             SynthesizeRequest(text=cleaned, voice_hint=edge_voice, usage_scope=scope)
         )
-        _meter_stream("edge-tts")
-        return _stream_audio(stream, "audio/mpeg", body.format)
+        _meter_stream(voice_access.EDGE_TTS_PROVIDER)
+        return _stream_audio(stream, "audio/mpeg", body.format, voice_access.EDGE_TTS_PROVIDER)
 
     # Fallback (buffered): 其餘 provider 仍走 service chain 一次性回傳。
     try:
@@ -489,4 +549,4 @@ async def tts_stream_endpoint(
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
-    return _buffered_audio(output.result, body.format)
+    return _buffered_audio(output.result, body.format, provider)

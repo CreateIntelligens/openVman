@@ -97,7 +97,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | 串流 ASR | Confucius4-R2T2 串流（`r2t2-live`）、Gemini Live（`gemini-live`） | `ASR_R2T2_STREAM_URL`、`ASR_R2T2_SECRET_KEY`、`GEMINI_API_KEY` |
 | 開發節點 | `r2t2-dev`、`r2t2-dev-live`（帳號選了才用，不進備援） | `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_STREAM_URL`、`ASR_R2T2_DEV_SECRET_KEY` |
 | 瀏覽器 | 瀏覽器內建辨識（`browser`） | 無 |
-| TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語分流改用 VoxCPM 或 CosyVoice） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
+| TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語改用 CosyVoice，停用時 VoxCPM；國語、英文在沒指定聲音時用 IndexTTS） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
 
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
 - 專案可在「專案與權限 → 專案 → 資源與語音設定」限制能用的人物、背景、小助理、ASR 引擎與聲音、指定預設值與台語分流引擎；一般帳號實際能用的是帳號授權與專案限制的交集加上專案專屬與 ROOT 指派資源；ROOT 帳號則豁免於專案白名單限制（但仍套用專案預設值），選單中超出專案範圍之項目以紅字加註提示。規則見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。

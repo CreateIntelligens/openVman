@@ -177,7 +177,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     speechQueue.push(text);
   }
 
-  /** TTS 參數：使用者真的講台語（且有台語分流）才換 VoxCPM，後端會再核對一次。 */
+  /** TTS 參數：使用者真的講台語（且有台語分流）才換 CosyVoice，後端會再核對一次。 */
   function languageRoutesSpeakOptions(speechLanguage: string | null) {
     const { provider, switched } = languageRoutes.ttsProviderFor(
       settings.ttsProvider,

@@ -560,6 +560,7 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
                 result=types.SimpleNamespace(
                     audio_bytes=b"fallback-wav",
                     content_type="audio/wav",
+                    provider="edge-tts",
                 )
             )
 
@@ -1004,8 +1005,9 @@ def test_tts_providers_includes_cosyvoice_when_configured(monkeypatch):
         {
             "id": "cosyvoice",
             "name": "CosyVoice",
-            "default_voice": "young-male-02",
-            "voices": ["young-male-02", "teen-female-01"],
+            # 預設聲音是 Hayley（young-female-02）；上游清單沒列時補在最前面。
+            "default_voice": "young-female-02",
+            "voices": ["young-female-02", "young-male-02", "teen-female-01"],
         },
     ]
 
@@ -1029,6 +1031,7 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
                 result=types.SimpleNamespace(
                     audio_bytes=b"taigi-mp3",
                     content_type="audio/mpeg",
+                    provider="cosyvoice",
                 ),
             )
 
@@ -1726,7 +1729,9 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
 
     monkeypatch.setattr(module.tts_routes.language_routes_mod, "effective_routes", fake_routes)
     monkeypatch.setattr("app.auth.voice_access.resolve_tts_voice", must_not_authorize)
-    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: types.SimpleNamespace(voxcpm_adapter=FakeVox()))
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: types.SimpleNamespace(
+        voxcpm_adapter=FakeVox(), cosyvoice_adapter=types.SimpleNamespace(enabled=False),
+    ))
     async def _clean(text):
         return text
     monkeypatch.setattr(module.tts_routes, "prepare_tts_text_async", _clean)
@@ -1985,11 +1990,12 @@ def test_tts_stream_pcm16k_decodes_edge_and_cosyvoice_mp3(monkeypatch):
 
     class Service:
         voxcpm_adapter = types.SimpleNamespace(enabled=False)
+        cosyvoice_adapter = types.SimpleNamespace(enabled=False)
         edge_adapter = types.SimpleNamespace(enabled=True, synthesize_stream=_edge_stream)
 
         def synthesize(self, request, provider="", edge_fallback_voice=""):
             return types.SimpleNamespace(
-                result=types.SimpleNamespace(audio_bytes=mp3, content_type="audio/mpeg"),
+                result=types.SimpleNamespace(audio_bytes=mp3, content_type="audio/mpeg", provider="cosyvoice"),
             )
 
     _, client = _pcm16k_client(monkeypatch, Service(), tts_indextts_url="")

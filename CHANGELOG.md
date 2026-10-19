@@ -41,6 +41,8 @@
 
 ### Fixed
 
+- **[2026-10-19]** **TTS 依語言選引擎與需求不一致（VH-384）**：台語自動切換以前改用 VoxCPM，但 VoxCPM 照字唸，Brain 的台語回答是華語文字，唸出來是華語；國語、英文沒有依語言路由，只是剛好用專案預設聲音；使用者選台語但打字時不會切換；`/api/v1/tts/stream` 也看不出用了哪個引擎。現在 `/api/v1/tts/stream` 的語言取 ASR 的 `speech_language`，沒有時用新增的 `language`（使用者選的語言）：台語（專案分流含台語）改用 CosyVoice（會轉成台文，停用時改 VoxCPM），國語、英文在呼叫端沒指定 provider 與 voice 時用 IndexTTS；回應一律帶 `X-TTS-Provider`。CosyVoice 預設聲音改成 `young-female-02`（Hayley，與 IndexTTS 的 hayley 同一位），前台講台語時也改切 CosyVoice。CosyVoice 只能整段合成，台語第一聲約 1.8 秒（9 字）到 3.2 秒（30 字）。
+- **[2026-10-19]** **Brain 對話限流實際上是整個專案共用**：限流依專案、來源 IP 與頻道計數，但 Brain 只收 Backend 的請求，來源 IP 永遠是 Backend，同一專案所有人、所有機台共用每分鐘 90 次。現在依 Backend 驗證後傳來的呼叫者（每把 API key、Embed key、每個登入帳號）各自計數，沒有呼叫者時才用 IP。
 - **[2026-10-16]** **Brain 晚於 Backend 部署時，`/openapi.json` 停在舊的 Brain schema**：Backend 只在啟動時合併一次 Brain 的 OpenAPI，Backend 先換新版、Brain 後換時，`/api/v1/chat` 的 `ChatResponse` 等新欄位要等 Backend 下次重啟才出現；啟動當下 Brain 連不上則一直只有 Backend 的部分。現在合併結果快取 5 分鐘，過期時在背景重抓（這次先回舊的，不讓請求等 Brain），Brain 連不上時保留上一份合併結果。
 - **[2026-10-16]** **前台設定選單紅字與黑字混在一起，編號範例人物與 3D 很佔位**：人物、TTS 引擎、聲音、ASR、上傳背景的選單改成專案範圍內（黑字）在前、範圍外（紅字）在後，同組維持原本順序；人物選單另外把只有編號、沒取名字的範例人物（000～007）與 3D（VRM）統一放到最後。
 - **[2026-10-16]** **2D 人物右上角幀同步標記閃爍與修復接縫**：新增共用 TypeScript 模組 `avatarFrameSyncRepair.ts`，由前台及 SDK adapter 管理生命週期；保留原始同步讀值後，以左側及下側乾淨邊界重建右上角 16×16 背景，外緣逐步融合，避免直接複製鄰近背景留下方形色塊。`putImageData` 保留其他人物像素與 RGBA，不受 `copy` 合成模式影響。WASM 工具產生的 JS 內容維持原樣，載入入口改名為 `OpenVmanAvatarRuntime.js`，舊前台 JS 路徑由 Nginx 相容轉送；SDK 公開路徑維持不變。前台、SDK 及嵌入 widget 共用修正，3D VRM 不需變更。補同步讀值、雙向漸層、融合邊界、畫布狀態、小尺寸畫布與卸載還原回歸測試，SDK Docker builder 納入共用 TS 模組，Nginx 路徑回歸測試納入後台預設測試指令。

@@ -45,13 +45,6 @@ def test_embed_key_uses_its_own_project(routes):
     assert asyncio.run(lr.effective_routes(_account("proj-hospital"), "proj-hekee", None)) == ["zh", "nan"]
 
 
-def test_taiwanese_tts_switches_only_away_from_other_providers():
-    assert lr.taiwanese_tts_provider("gemini-tts") == "voxcpm"
-    assert lr.taiwanese_tts_provider("") == "voxcpm"
-    assert lr.taiwanese_tts_provider("voxcpm") is None
-    assert lr.taiwanese_tts_provider("cosyvoice") is None
-
-
 def test_parse_requested():
     assert lr.parse_requested(None) is None
     assert lr.parse_requested("zh, nan,") == ["zh", "nan"]

@@ -30,7 +30,8 @@ CHINESE = "zh"
 TAIWANESE = "nan"
 KNOWN_ROUTES = ("zh", "en", "es", "nan", "ja", "ko")
 TAIWANESE_ASR_ENGINE = "breeze"
-TAIWANESE_TTS_PROVIDERS = ("voxcpm", "cosyvoice")
+# 依序嘗試：CosyVoice 會把漢字轉成台文再唸，VoxCPM 照字唸（Brain 的台語回答是華語文字）。
+TAIWANESE_TTS_PROVIDERS = ("cosyvoice", "voxcpm")
 
 # 指定正確語言時 .37、.35 五種語言全對（串流、批次都一樣）；.37 不會自己判斷（zhen 也當
 # Chinese，西日韓會被當成中文解碼），.35 的 zhen 能自己分中英西、日文不行（2026-10-05 實測）。
@@ -143,13 +144,6 @@ def r2t2_outputs_chinese(language: str) -> bool:
     指定日文時轉繁會把「学校」改成「學校」，只有中文或自動判斷才轉。
     """
     return language in (R2T2_CHINESE, R2T2_AUTO)
-
-
-def taiwanese_tts_provider(provider: str | None) -> str | None:
-    """Provider to use when the Taiwanese route is on, or None to keep the current one."""
-    if provider in TAIWANESE_TTS_PROVIDERS:
-        return None
-    return TAIWANESE_TTS_PROVIDERS[0]
 
 
 def _is_speech_wav(file_path: str) -> bool:

@@ -186,7 +186,7 @@ _CHAT_RESPONSES: dict[int | str, dict[str, Any]] = {
     429: {
         "description": (
             "請求太頻繁：帳號 API key 每分鐘上限（API_KEY_RATE_LIMIT_PER_MINUTE，預設 300），"
-            "或同一專案、來源與頻道的對話每分鐘上限（預設 90，detail.error_code 為 "
+            "或同一呼叫者在同一專案的對話每分鐘上限（預設 90，detail.error_code 為 "
             "LLM_OVERLOAD）。依 Retry-After 秒數後重試"
         ),
         "headers": {

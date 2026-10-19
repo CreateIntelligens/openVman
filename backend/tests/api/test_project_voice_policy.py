@@ -505,6 +505,8 @@ class _FakeService:
             enabled=True, synthesize_stream=self._stream,
         )
         self.voxcpm_adapter = SimpleNamespace(enabled=False)
+        # CosyVoice 預設關著：台語分流照舊退到 VoxCPM；要測 CosyVoice 的測試自己打開。
+        self.cosyvoice_adapter = SimpleNamespace(enabled=False)
         self.gemini_adapter = SimpleNamespace(enabled=False)
 
     def _stream(self, request):
@@ -575,7 +577,20 @@ def test_stream_rejects_voice_outside_project(env, tts_client):
     assert _stream(tts_client, provider="indextts", voice="index-a").status_code == 403
 
 
-def test_taiwanese_override_without_policy_uses_voxcpm_default(
+def test_taiwanese_override_without_policy_uses_cosyvoice_default(
+    env, tts_client, monkeypatch,
+):
+    # VH-384：台語改用 CosyVoice（會把漢字轉台文），聲音用部署預設。
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.cosyvoice_adapter.enabled = True
+    _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    assert tts_client.service.calls[0][:2] == ("cosyvoice", "")
+
+
+def test_taiwanese_override_keeps_the_voice_when_no_taiwanese_engine_runs(
     env, tts_client, monkeypatch,
 ):
     async def routes(*args):
@@ -583,8 +598,9 @@ def test_taiwanese_override_without_policy_uses_voxcpm_default(
 
     monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
     _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
-    # VoxCPM 停用時往下走到 Edge 串流，聲音是部署預設（空字串）。
-    assert tts_client.service.streams == [""]
+    # CosyVoice、VoxCPM 都沒啟用：不換引擎，照原本的聲音。
+    assert "cosyvoice" not in [call[0] for call in tts_client.service.calls]
+    assert tts_client.service.streams == ["index-a"]
 
 
 def test_taiwanese_override_stays_inside_project(env, tts_client, monkeypatch):
@@ -592,12 +608,17 @@ def test_taiwanese_override_stays_inside_project(env, tts_client, monkeypatch):
         return ["zh", "nan"]
 
     monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.cosyvoice_adapter.enabled = True
+    _policy(env, allowed_tts_voices=["index-a", "vox-a", "cosy-a"])
+    _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    # 清單裡同時有 CosyVoice 與 VoxCPM 的聲音：先用 CosyVoice（假服務的 CosyVoice 會失敗，只看選了誰）。
+    assert tts_client.service.calls[0][:2] == ("cosyvoice", "cosy-upstream")
+
+    tts_client.service.calls.clear()
     _policy(env, allowed_tts_voices=["index-a", "vox-a"])
-    response = _stream(
-        tts_client, provider="indextts", voice="index-a", speech_language="nan",
-    )
-    assert response.status_code == 200
-    assert tts_client.service.calls == [("voxcpm", "vox-upstream", None)]
+    _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    # 清單裡唯一的台語聲音在沒啟用的 VoxCPM 上：不換過去再失敗，照原本的聲音唸。
+    assert tts_client.service.calls == [("indextts", "index-a", None)]
 
     tts_client.service.calls.clear()
     _policy(env, allowed_tts_voices=["index-a"])
@@ -631,3 +652,60 @@ def test_speech_cache_key_is_scoped_only_for_restricted_projects(env, tts_client
         "你好", "index-a", "indextts", scope="project:p1",
     )
     assert tts_client.service.calls[-1] == ("indextts", "index-a", None)
+
+
+@pytest.fixture
+def indextts_up(monkeypatch, request):
+    """IndexTTS configured; records which character the stream was opened with."""
+    from fastapi.responses import StreamingResponse
+
+    from app.config import get_tts_config
+
+    monkeypatch.setenv("TTS_INDEXTTS_URL", "http://indextts.test")
+    monkeypatch.setenv("TTS_INDEXTTS_DEFAULT_CHARACTER", "hayley")
+    get_tts_config.cache_clear()
+    request.addfinalizer(get_tts_config.cache_clear)
+    opened: list[str] = []
+
+    async def fake_proxy(*, indextts_stream_url, text, character):
+        opened.append(character)
+        return StreamingResponse(iter([b"RIFF"]), media_type="audio/wav")
+
+    monkeypatch.setattr(tts, "_proxy_indextts_stream", fake_proxy)
+    return opened
+
+
+def test_mandarin_and_english_use_indextts_when_no_voice_is_chosen(env, tts_client, indextts_up):
+    # VH-384：國語、英文 → IndexTTS。沒指定引擎或聲音時依語言決定，不跟著帳號預設走。
+    # 帳號預設本來就是 IndexTTS 的聲音：照用。
+    response = _stream(tts_client, language="zh")
+    assert response.headers["X-TTS-Provider"] == "indextts"
+    assert indextts_up == ["index-a"]
+
+    # 專案預設是 Edge：國語、英文改用專案清單裡的 IndexTTS 聲音。
+    indextts_up.clear()
+    _policy(env, allowed_tts_voices=["edge-a", "index-a"], default_tts_voice="edge-a")
+    for language in ("zh", "en"):
+        response = _stream(tts_client, language=language)
+        assert response.status_code == 200
+        assert response.headers["X-TTS-Provider"] == "indextts"
+    assert indextts_up == ["index-a", "index-a"]
+
+
+def test_an_explicit_engine_is_kept_for_mandarin(env, tts_client, indextts_up):
+    response = _stream(tts_client, provider="edge-tts", voice="edge-a", language="zh")
+    assert response.headers["X-TTS-Provider"] == "edge-tts"
+    assert indextts_up == []
+
+
+def test_a_selected_taiwanese_language_switches_typed_turns(env, tts_client, monkeypatch):
+    # 使用者在介面選台語、但用打字輸入：沒有 ASR 的 speech_language，看 language。
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.failing.discard("cosyvoice")
+    response = _stream(tts_client, provider="edge-tts", voice="edge-a", language="nan")
+    assert response.headers["X-TTS-Provider"] == "cosyvoice"
+    assert tts_client.service.calls[0][:2] == ("cosyvoice", "")

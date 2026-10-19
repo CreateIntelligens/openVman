@@ -22,8 +22,9 @@ from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 logger = logging.getLogger("provider.cosyvoice")
 
 COSYVOICE_PROVIDER_NAME = "cosyvoice"
-# 無 TTS_COSYVOICE_DEFAULT_VOICE 時的保底語音（青年男聲，音域窄、平穩）。
-COSYVOICE_DEFAULT_VOICE = "young-male-02"
+# 無 TTS_COSYVOICE_DEFAULT_VOICE 時的保底語音：Hayley（青年女聲），與 IndexTTS 的
+# hayley 同一位。台語自動切到 CosyVoice 時沒指定聲音就用它（VH-384）。
+COSYVOICE_DEFAULT_VOICE = "young-female-02"
 # 服務端以 ffmpeg 轉 mp3 後回傳；此值只作為 cache metadata。
 COSYVOICE_SAMPLE_RATE = 24000
 COSYVOICE_CONTENT_TYPE = "audio/mpeg"

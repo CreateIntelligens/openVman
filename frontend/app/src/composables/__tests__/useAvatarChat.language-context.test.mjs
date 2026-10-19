@@ -76,7 +76,7 @@ test("Taiwanese, independent visual reply, Mandarin and typed replies keep their
     { source: "text", speechLanguage: null },
   ]);
   assert.deepEqual(replies.map(({ tts }) => tts), [
-    { provider: "voxcpm", switched: true },
+    { provider: "cosyvoice", switched: true },
     { provider: "gemini-tts", switched: false },
     { provider: "gemini-tts", switched: false },
     { provider: "gemini-tts", switched: false },

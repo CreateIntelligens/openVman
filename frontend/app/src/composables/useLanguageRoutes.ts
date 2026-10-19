@@ -22,7 +22,8 @@ export const LANGUAGE_ROUTE_LABELS: Record<string, string> = {
   ko: '한국어',
 }
 export const TAIWANESE_ROUTE = 'nan'
-const TAIWANESE_TTS_PROVIDERS = ['voxcpm', 'cosyvoice']
+// 第一個是台語自動切換的目標：CosyVoice 會把漢字轉成台文再唸。
+const TAIWANESE_TTS_PROVIDERS = ['cosyvoice', 'voxcpm']
 
 function readOffMap(): Record<string, string[]> {
   try {
@@ -78,7 +79,8 @@ export function useLanguageRoutes(projectId: () => string) {
 
   /**
    * 這一輪要用的 TTS provider：台語分流開著、而且使用者這句是語音被判成台語，
-   * 才換 VoxCPM；打字、快速問答、講華語都照原本選的。原本就是 VoxCPM／CosyVoice 不動。
+   * 才換 CosyVoice（會把漢字轉成台文；VoxCPM 照字唸，Brain 的台語回答是華語文字，
+   * 唸出來會是華語）。打字、快速問答、講華語都照原本選的。原本就是 VoxCPM／CosyVoice 不動。
    */
   function ttsProviderFor(
     provider: string,
@@ -91,7 +93,7 @@ export function useLanguageRoutes(projectId: () => string) {
     ) {
       return { provider, switched: false }
     }
-    return { provider: 'voxcpm', switched: true }
+    return { provider: TAIWANESE_TTS_PROVIDERS[0], switched: true }
   }
 
   return { available, active, taiwaneseOn, toggle, load, asrFormFields, ttsProviderFor }
