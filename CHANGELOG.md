@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **[2026-10-19]** **後台 Avatar 響應式版面**：手機下將上傳欄位、檔案選擇器、素材分頁與卡片操作按鈕直向排列，`md` 起回到橫向；角色、背景、小助理卡片採可縮至零的網格欄位，長名稱與轉換進度可換行。共用頂列的專案選單可縮短名稱，展開清單限制在手機視窗內，保留既有手機導覽抽屜。
+
 ### Added
 
 - **[2026-10-19]** **chat 回應加 `tts_text`**：`POST /api/v1/chat`、`/chat/accept` 的 JSON 與 `/chat/stream` 的 `sentence`／`done` 事件多帶 `tts_text`——`reply`（或該句）去掉 markdown 與 emoji、電話與長數字轉逐字讀法、保留繁體的版本，給自己接 TTS 的整合方直接送引擎；本服務的 `/tts/stream` 行為不變。由 Backend 代理層加入（`app/chat_tts_text.py`），只做本地正規化，逐句串流不多一次往返。

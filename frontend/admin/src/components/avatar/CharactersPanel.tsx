@@ -4,11 +4,14 @@ import type { AvatarCharacter } from "../../api";
 import { ResourceSourceBadge } from "./ResourceSourceBadge";
 import {
   assetCardClassName,
-  assetGridStyle,
+  assetGridClassName,
   cardActionsClassName,
   cardBodyClassName,
   dangerActionClassName,
+  fileFieldClassName,
   filePickerClassName,
+  fileRowClassName,
+  formRowClassName,
   formPanelClassName,
   formatSize,
   inputClassName,
@@ -70,7 +73,7 @@ export default function CharactersPanel({
           <span className="material-symbols-outlined text-base">upload</span>
           Upload new character
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className={formRowClassName}>
           <input
             type="text"
             placeholder="Character ID (char_id)"
@@ -100,14 +103,14 @@ export default function CharactersPanel({
             </select>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
+        <div className={fileRowClassName}>
+          <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
               Video (.webm):
             </span>
             <label className={filePickerClassName(selectedVideoName)}>
               <span className="material-symbols-outlined text-sm">movie</span>
-              <span className="max-w-[12rem] truncate">
+              <span className="min-w-0 truncate">
                 {selectedVideoName || "Select WebM"}
               </span>
               <input
@@ -121,7 +124,7 @@ export default function CharactersPanel({
             </label>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
               Data (.gz):
             </span>
@@ -132,7 +135,7 @@ export default function CharactersPanel({
               >
                 folder_zip
               </span>
-              <span className="max-w-[12rem] truncate">
+              <span className="min-w-0 truncate">
                 {selectedDataName || "Select GZ data"}
               </span>
               <input
@@ -166,7 +169,7 @@ export default function CharactersPanel({
       )}
 
       {!loading && characters.length > 0 && (
-        <div className="grid gap-4" style={assetGridStyle}>
+        <div className={assetGridClassName}>
           {characters.map((character) => (
             <div key={character.char_id} className={assetCardClassName}>
               <div className={mediaPreviewClassName}>
@@ -180,8 +183,8 @@ export default function CharactersPanel({
                 />
               </div>
               <div className={cardBodyClassName}>
-                <div className="flex items-center justify-between gap-1">
-                  <p className="font-mono text-sm font-semibold text-content">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-1">
+                  <p className="min-w-0 font-mono text-sm font-semibold text-content">
                     {character.char_id}
                   </p>
                   <ResourceSourceBadge

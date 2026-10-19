@@ -60,7 +60,7 @@ function errorMessage(error: unknown): string {
 
 function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {
   return [
-    "px-3 py-1.5 text-sm font-medium transition-all duration-200 rounded-md",
+    "whitespace-nowrap px-3 py-1.5 text-sm font-medium transition-all duration-200 rounded-md",
     tab === activeTab
       ? "bg-surface-raised text-content shadow-sm border border-border/60 "
       : "text-content-muted hover:text-content hover:bg-surface-sunken dark:hover:bg-surface-sunken/50",
@@ -460,7 +460,7 @@ export default function Avatar() {
   return (
     <div
       data-testid="avatar-page"
-      className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto bg-surface p-6 dark:bg-background-dark"
+      className="flex h-full min-h-0 min-w-0 flex-col gap-6 overflow-y-auto [overflow-wrap:anywhere] bg-surface p-4 md:p-6 dark:bg-background-dark"
     >
       <div className="flex items-center gap-2">
         <span className="material-symbols-outlined text-content-muted">face</span>
@@ -469,7 +469,7 @@ export default function Avatar() {
 
       {status && <StatusAlert type={status.type} message={status.message} />}
 
-      <div className="flex w-fit rounded-lg bg-surface-sunken p-1 dark:bg-surface/40 border border-border/50 ">
+      <div className="flex w-full shrink-0 flex-col rounded-lg md:w-fit md:flex-row bg-surface-sunken p-1 dark:bg-surface/40 border border-border/50 ">
         <button
           type="button"
           onClick={() => handleTabChange("characters")}

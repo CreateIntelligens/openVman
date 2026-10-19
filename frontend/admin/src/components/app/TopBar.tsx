@@ -59,10 +59,10 @@ export default function TopBar({
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface/95 px-4 backdrop-blur">
+    <header className="sticky top-0 z-30 flex h-14 min-w-0 shrink-0 items-center gap-2 md:gap-3 border-b border-border bg-surface/95 px-4 backdrop-blur">
       <button
         onClick={onOpenMobileNav}
-        className="flex h-9 w-9 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content md:hidden"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content md:hidden"
         aria-label="開啟導覽"
       >
         <span className="material-symbols-outlined text-[1.25rem]">menu</span>
@@ -83,7 +83,7 @@ export default function TopBar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 text-sm font-medium text-content md:hidden">
+      <div className="flex min-w-0 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium text-content md:hidden">
         {activeTab && <span className="material-symbols-outlined text-[1rem] text-primary">{activeTab.icon}</span>}
         <span>{activeTab?.label}</span>
       </div>
@@ -92,7 +92,7 @@ export default function TopBar({
         專案
       </span>
 
-      <div ref={wrapRef} className="relative ml-auto md:ml-0 md:mr-auto">
+      <div ref={wrapRef} className="ml-auto min-w-0 flex-1 md:relative md:ml-0 md:mr-auto md:flex-initial">
         <button
           onClick={() => setOpen((v) => !v)}
           disabled={loadingProjects && projects.length === 0}
@@ -100,13 +100,13 @@ export default function TopBar({
           aria-haspopup="listbox"
           aria-controls="project-switcher-list"
           aria-label={`目前專案：${displayLabel}`}
-          className="btn btn-ghost h-9 bg-surface-raised px-3 hover:border-border-strong"
+          className="btn btn-ghost h-9 w-full min-w-0 whitespace-nowrap bg-surface-raised px-3 hover:border-border-strong"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded bg-primary/15 text-[0.6875rem] font-bold text-primary">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/15 text-[0.6875rem] font-bold text-primary">
             {displayLabel.slice(0, 2).toUpperCase()}
           </span>
-          <span className="max-w-[8rem] truncate">{displayLabel}</span>
-          <span className="material-symbols-outlined text-[1rem] text-content-subtle">unfold_more</span>
+          <span className="min-w-0 max-w-[8rem] truncate">{displayLabel}</span>
+          <span className="material-symbols-outlined shrink-0 text-[1rem] text-content-subtle">unfold_more</span>
         </button>
 
         {open && (
@@ -114,7 +114,7 @@ export default function TopBar({
             id="project-switcher-list"
             role="listbox"
             aria-label="切換專案"
-            className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[14rem] overflow-hidden rounded-lg border border-border-strong bg-surface-overlay shadow-lg md:left-0 md:right-auto"
+            className="absolute right-4 top-[calc(100%+0.375rem)] z-50 w-[calc(100%-2rem)] md:w-64 overflow-hidden rounded-lg border border-border-strong bg-surface-overlay shadow-lg md:left-0 md:right-auto"
           >
             <div className="border-b border-border px-3 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-content-subtle">
               切換專案
@@ -191,7 +191,7 @@ export default function TopBar({
         onClick={onToggleTheme}
         title={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
         aria-label={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
-        className="flex h-9 w-9 items-center justify-center rounded-md text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
       >
         <span className="material-symbols-outlined text-[1.125rem]">
           {theme === "dark" ? "light_mode" : "dark_mode"}

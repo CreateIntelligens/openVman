@@ -5,11 +5,14 @@ import { ResourceSourceBadge } from "./ResourceSourceBadge";
 import { MASCOT_ENGINE_LABELS } from "../../data/mascotCatalog";
 import {
   assetCardClassName,
-  assetGridStyle,
+  assetGridClassName,
   cardActionsClassName,
   cardBodyClassName,
   dangerActionClassName,
+  fileFieldClassName,
   filePickerClassName,
+  fileRowClassName,
+  formRowClassName,
   formPanelClassName,
   formatSize,
   inputClassName,
@@ -108,7 +111,7 @@ export default function MascotsPanel({
           <span className="material-symbols-outlined text-base">view_in_ar</span>
           Upload mascot
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className={formRowClassName}>
           <input
             type="text"
             placeholder="Mascot ID"
@@ -138,8 +141,8 @@ export default function MascotsPanel({
             </select>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
+        <div className={fileRowClassName}>
+          <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
               Model (.vrm):
             </span>
@@ -147,7 +150,7 @@ export default function MascotsPanel({
               <span className="material-symbols-outlined text-sm">
                 deployed_code
               </span>
-              <span className="max-w-[15rem] truncate">
+              <span className="min-w-0 truncate">
                 {selectedModelName || "Select VRM"}
               </span>
               <input
@@ -161,13 +164,13 @@ export default function MascotsPanel({
             </label>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
               Thumbnail (Image):
             </span>
             <label className={filePickerClassName(selectedThumbnailName)}>
               <span className="material-symbols-outlined text-sm">image</span>
-              <span className="max-w-[15rem] truncate">
+              <span className="min-w-0 truncate">
                 {selectedThumbnailName || "Select Image"}
               </span>
               <input
@@ -202,7 +205,7 @@ export default function MascotsPanel({
       )}
 
       {!loading && mascots.length > 0 && (
-        <div className="grid gap-4" style={assetGridStyle}>
+        <div className={assetGridClassName}>
           {mascots.map((mascot) => {
             const selected = mascot.mascot_id === selectedMascotId;
             return (
@@ -227,8 +230,8 @@ export default function MascotsPanel({
                   )}
                 </div>
                 <div className={cardBodyClassName}>
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="font-mono text-sm font-semibold text-content">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-1">
+                    <p className="min-w-0 font-mono text-sm font-semibold text-content">
                       {mascot.mascot_id}
                     </p>
                     <ResourceSourceBadge
