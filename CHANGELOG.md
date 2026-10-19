@@ -82,6 +82,7 @@
 
 ### Changed
 
+- **[2026-10-19]** **2D 人物幀同步改用 requestVideoFrameCallback**：新增共用模組 `frontend/shared/avatar/avatarFrameClock.ts`，以瀏覽器回報的 `mediaTime` 直接算出畫面上那一幀（25 fps 下即幀序），runtime 不再每幀讀右上角 2×2 角標做 GPU 回讀；角落修補改在 runtime 複製影片幀後直接進行。沒有 rVFC 的瀏覽器、以及換角色後第一幀還沒畫出來前，照舊走角標路徑。素材包仍打角標，舊版 runtime 與舊素材不受影響。
 - **[2026-10-15]** **主機 nginx 可讓其他專案掛路徑而不改 repo**：`infra/nginx/native/openvman.conf.template`（與參考檔 `146-openvman.conf`）在 HTTPS server 區塊的兜底 location 之前加入 `include /etc/nginx/openvman-extra/*.conf;`。其他專案（例如 `/arwin/`）把自己的 `location` 放在主機的 `/etc/nginx/openvman-extra/`，不進 openVman 版控；資料夾空的或不存在時行為不變。做法見 `infra/nginx/native/README.md`。
 
 - **[2026-10-15]** **Auth DB migration 拆檔**：各 migration 的 SQL 與版本清單從 `backend/app/auth/database.py` 移到新的 `schema_migrations.py`，`database.py` 只留連線設定與套用 migration 的流程（加入 migration 22 後超過單檔 1000 行上限，CI 的 `test_entry_boundaries` 擋下）。行為與 schema 不變。

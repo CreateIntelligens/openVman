@@ -36,6 +36,21 @@ export function reconstructFrameSyncCorner(
   return result;
 }
 
+/** Paint the reconstructed corner over the marker on the canvas. */
+export function repairFrameSyncCorner(
+  context: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  read: CanvasRenderingContext2D["getImageData"] = context.getImageData,
+): void {
+  const size = Math.min(REPAIR_SIZE, canvas.width - 1, canvas.height - 1);
+  if (size <= 0) return;
+  const samples = read.call(context, canvas.width - size - 1, 0, size + 1, size + 1);
+  const repaired = context.createImageData(size, size);
+  repaired.data.set(reconstructFrameSyncCorner(samples.data, size));
+  // Pixel writes ignore "copy" compositing and preserve the remaining avatar.
+  context.putImageData(repaired, canvas.width - size, 0);
+}
+
 export function installFrameSyncMarkerRepair(
   canvas = document.getElementById("canvas_video") as HTMLCanvasElement | null,
 ): FrameSyncMarkerRepair | null {
@@ -46,17 +61,8 @@ export function installFrameSyncMarkerRepair(
   const readPixels: typeof context.getImageData = (x, y, width, height, settings) => {
     const original = originalGetImageData.call(context, x, y, width, height, settings);
     if (x === canvas.width - 2 && y === 0 && width === 2 && height === 2) {
-      const size = Math.min(REPAIR_SIZE, canvas.width - 1, canvas.height - 1);
-      if (size > 0) {
-        // Use the native reader here so sampling never re-enters this hook.
-        const samples = originalGetImageData.call(
-          context, canvas.width - size - 1, 0, size + 1, size + 1,
-        );
-        const repaired = context.createImageData(size, size);
-        repaired.data.set(reconstructFrameSyncCorner(samples.data, size));
-        // Pixel writes ignore "copy" compositing and preserve the remaining avatar.
-        context.putImageData(repaired, canvas.width - size, 0);
-      }
+      // Use the native reader here so sampling never re-enters this hook.
+      repairFrameSyncCorner(context, canvas, originalGetImageData);
     }
     // The WASM adapter must receive the original marker, even after display repair.
     return original;
