@@ -436,7 +436,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 * **Backend 端行為**（細節見 `01_BACKEND_SPEC.md`）：
   - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，至少留一條）；語音請求帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。Backend 讀專案分流快取 30 秒；Brain 暫時查不到時沿用上次查到的設定，從沒查到過才當沒有分流。
   - 交集含台語時，前台語音走批次 `POST /api/v1/asr/transcribe`，ASR 一律改用 Breeze（台語直接翻成華語、華語也準），同時呼叫 Brain `POST /brain/internal/audio-language`；判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時當不是台語。上傳的已是 16 kHz 單聲道 PCM16 WAV 時不再跑 ffmpeg。回應多 `language`（台語時為 `nan`）與 `language_check: {"result", "ms"}`（`result` 為語言代碼、`timeout` 或 `failed`，用來分辨「判成華語」與「沒判出來」）。整句重複的轉錄會收成一次再回。瀏覽器內建辨識在台語分流時停用。
-  - TTS（`POST /api/v1/tts/stream` 帶 `project_id`、`language_routes`、`speech_language`）：交集含台語、且這一輪語音被判成台語（`speech_language=nan`）、原本又不是 VoxCPM／CosyVoice 時，才改用 VoxCPM 部署預設聲音，並跳過帳號的聲音授權判斷；打字、快速問答、講華語一律照使用者選的 TTS。
+  - TTS（`POST /api/v1/tts/stream` 帶 `project_id`、`language_routes`、`speech_language`／`language`）：語言取 ASR 判斷的 `speech_language`，沒有時用使用者選的 `language`。交集含台語、語言是 `nan`、原本又不是 CosyVoice／VoxCPM 時，改用 CosyVoice 部署預設聲音（CosyVoice 停用時改 VoxCPM），並跳過帳號的聲音授權判斷；CosyVoice 會把漢字轉成台文，VoxCPM 照字唸會唸成華語。語言是 `zh`、`en` 且呼叫端沒指定 provider 與 voice 時改用 IndexTTS（VH-384）。回應帶 `X-TTS-Provider` 標出實際引擎。
 
 #### 14.5 ASR 詞表
 
@@ -472,7 +472,7 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 * 長度限制：單輪 `message` 最多 `MAX_INPUT_LENGTH`（預設 500）字，超過直接回 400，不截斷。
 * Prompt injection：`ENABLE_CONTENT_FILTER` 與 `BLOCK_PROMPT_INJECTION` 皆開啟時，對對話與新增記憶以規則比對覆寫系統指令、要求揭露隱藏 prompt、繞過安全限制與越獄角色等模式，命中即回 400。
 * Channel 必須在 `ALLOWED_CHANNELS`（預設 `web,api,kiosk,admin,system`）；`persona_id`、`session_id` 須符合識別字格式。
-* 限流：同一 action、專案、client IP 與 channel 每分鐘最多 `REQUEST_RATE_LIMIT_PER_MINUTE`（預設 90）次。
+* 限流：同一 action、專案、呼叫者與 channel 每分鐘最多 `REQUEST_RATE_LIMIT_PER_MINUTE`（預設 90）次，超過回 429、`LLM_OVERLOAD` 與 `Retry-After`。呼叫者是 Backend 驗證後傳來的 `X-Principal-Type`／`X-Principal-Id`（每把 API key、Embed key、每個登入帳號各自計），沒有時才用 client IP；Brain 只收 Backend 的請求，只看 IP 等於整個專案共用。
 * 工具與檢索結果一律視為不可信資料（`trust_boundary: untrusted_reference_data`）。
 
 **16.3 個資偵測**

@@ -8,6 +8,12 @@ from uuid import uuid4
 
 from fastapi import Request
 
+from safety.internal_auth import (
+    PRINCIPAL_ID_HEADER,
+    PRINCIPAL_TYPE_HEADER,
+    USER_ID_HEADER,
+)
+
 
 @dataclass(slots=True)
 class RequestContext:
@@ -20,6 +26,9 @@ class RequestContext:
     project_id: str
     client_ip: str
     metadata: dict[str, Any]
+    # Backend 驗過身分後帶來的呼叫者（api_key:<id>、embed_key:<id>、user:<id>）。
+    # Brain 只收 Backend 的請求，client_ip 永遠是 Backend，限流要靠這個分人。
+    principal: str = ""
 
 
 ALLOWED_ROLES = frozenset({"system", "user", "assistant", "tool", "control"})
@@ -84,8 +93,22 @@ def build_message_envelope(
         or "default",
         client_ip=request.client.host if request.client else "",
         metadata=merge_metadata(body.get("metadata"), message_payload.get("metadata")),
+        principal=_principal(request),
     )
     return MessageEnvelope(content=content, context=context)
+
+
+def _principal(request: Any) -> str:
+    """Caller identity Backend forwarded, with the same fallbacks as trusted_request_context."""
+    headers = dict(getattr(request, "headers", None) or {})
+    principal_id = (
+        read_text(headers, PRINCIPAL_ID_HEADER.lower())
+        or read_text(headers, USER_ID_HEADER.lower())
+    )
+    if not principal_id:
+        return ""
+    principal_type = read_text(headers, PRINCIPAL_TYPE_HEADER.lower()) or "user"
+    return f"{principal_type}:{principal_id}"
 
 
 def serialize_context(context: RequestContext) -> dict[str, Any]:

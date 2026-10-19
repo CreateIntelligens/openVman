@@ -35,6 +35,7 @@ _PROMPT_INJECTION_RULES = {
 }
 _rate_limit_lock = Lock()
 _recent_requests: dict[str, deque[float]] = defaultdict(deque)
+_SWEEP_THRESHOLD = 1024
 
 
 def validate_request_context(context: RequestContext) -> None:
@@ -115,14 +116,31 @@ class RequestRateLimitedError(ValueError):
 def _enforce_rate_limit(action: str, context: RequestContext) -> None:
     cfg = get_settings()
     limit = max(1, cfg.request_rate_limit_per_minute)
-    key = f"{action}:{context.project_id}:{context.client_ip or 'unknown'}:{context.channel}"
+    # 依呼叫者計數：每把 API key、Embed key、每個登入帳號各自一份額度。沒有呼叫者
+    # （直接打 Brain 的內部呼叫）才退回來源 IP；以前只看 IP，經 Backend 進來的
+    # 全部是 Backend 的 IP，整個專案共用同一份額度。
+    caller = context.principal or context.client_ip or "unknown"
+    key = f"{action}:{context.project_id}:{caller}:{context.channel}"
     now = monotonic()
     window_start = now - 60
 
     with _rate_limit_lock:
+        _sweep_idle_callers(window_start)
         timestamps = _recent_requests[key]
         while timestamps and timestamps[0] < window_start:
             timestamps.popleft()
         if len(timestamps) >= limit:
             raise RequestRateLimitedError(max(1, ceil(timestamps[0] + 60 - now)))
         timestamps.append(now)
+
+
+def _sweep_idle_callers(window_start: float) -> None:
+    """Forget callers with nothing inside the window once the table gets large.
+
+    依呼叫者計數後，每把 key、每個帳號都各佔一筆，不清就跟著使用者數一路長大。
+    """
+    if len(_recent_requests) < _SWEEP_THRESHOLD:
+        return
+    idle = [key for key, stamps in _recent_requests.items() if not stamps or stamps[-1] < window_start]
+    for key in idle:
+        del _recent_requests[key]
