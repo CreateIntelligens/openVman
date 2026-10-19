@@ -158,6 +158,16 @@ class TTSRouterConfig(BaseSettings):
         default=100 * 1024 * 1024,
         validation_alias="AVATAR_MASCOT_MAX_UPLOAD_BYTES",
     )
+    # 影片轉素材包的工作目錄；backend 與 avatar-pipeline 容器掛同一個 /data，
+    # 路徑才能直接交給 worker。
+    avatar_jobs_dir: str = Field(
+        default="/data/avatar-jobs",
+        validation_alias="AVATAR_JOBS_DIR",
+    )
+    avatar_source_max_upload_bytes: int = Field(
+        default=512 * 1024 * 1024,
+        validation_alias="AVATAR_SOURCE_MAX_UPLOAD_BYTES",
+    )
     docling_serve_url: str = Field(default="", validation_alias="DOCLING_SERVE_URL")
     docling_timeout_ms: int = Field(default=5000, validation_alias="DOCLING_TIMEOUT_MS")
     docling_api_key: str = Field(default="", validation_alias="DOCLING_API_KEY")

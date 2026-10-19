@@ -10,6 +10,7 @@ Three-tier decoupled system: Frontend (senses) → Backend (nervous) → Brain (
 | Brain API | `brain/api/` | FastAPI (Python) | - |
 | Frontend (avatar) | `frontend/app/` | Vue 3 + Vite | - |
 | Admin UI | `frontend/admin/` | React + Vite + Tailwind | 8786 |
+| Avatar pipeline | `avatar-pipeline/` | arq worker (Python, MediaPipe, ffmpeg) | - |
 
 Infrastructure: Redis, Prometheus, Grafana, IndexTTS (GPU), optional VLM (GPU profile).
 

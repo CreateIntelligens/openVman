@@ -147,6 +147,11 @@ jobs:
             context: .
             file: ./frontend/app/Dockerfile
             platforms: linux/amd64,linux/arm64
+          # mediapipe 0.10.14 ships manylinux aarch64 wheels, so this stays dual-arch.
+          - image: avatar-pipeline
+            context: ./avatar-pipeline
+            file: ./avatar-pipeline/Dockerfile
+            platforms: linux/amd64,linux/arm64
           # CUDA/PyTorch images are amd64-only until ARM64 GPU dependencies
           # are available and verified for the production runtime.
           - image: api

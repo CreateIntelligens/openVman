@@ -28,6 +28,7 @@ import {
 } from "../data/mascotCatalog";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 import BackgroundsPanel from "../components/avatar/BackgroundsPanel";
+import CharacterJobsPanel from "../components/avatar/CharacterJobsPanel";
 import CharactersPanel from "../components/avatar/CharactersPanel";
 import MascotsPanel from "../components/avatar/MascotsPanel";
 import { useMascotSnapshotQueue } from "../hooks/useMascotSnapshotQueue";
@@ -491,6 +492,10 @@ export default function Avatar() {
           Mascots
         </button>
       </div>
+
+      {activeTab === "characters" && (
+        <CharacterJobsPanel projects={projects} onCharacterCreated={load} />
+      )}
 
       {activeTab === "characters" && (
         <CharactersPanel

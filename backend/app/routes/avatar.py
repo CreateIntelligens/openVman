@@ -20,6 +20,7 @@ from app.auth.resources import (
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
+from app.avatar import jobs as avatar_jobs
 from app.avatar.store import (
     AvatarStore,
     CharacterExists,
@@ -71,6 +72,32 @@ def _normalize_char_id_or_400(char_id: str) -> str:
 
 async def _read_upload_pair(video: UploadFile, data: UploadFile) -> tuple[bytes, bytes]:
     return await video.read(), await data.read()
+
+
+def _resolve_upload_project(
+    runtime: AuthRuntime, admin: CurrentAccount, project_id: str | None,
+) -> str | None:
+    """Normalize the target project and check the admin may write to it."""
+    norm_project_id = project_id.strip() if project_id and project_id.strip() else None
+    if not norm_project_id:
+        return None
+    if runtime.resources.get(ResourceType.PROJECT, norm_project_id) is None:
+        raise HTTPException(status_code=404, detail=f"專案不存在：{norm_project_id}")
+    if admin.user.role is not AccountRole.ROOT:
+        try:
+            resolve_resource(
+                runtime.resources,
+                admin.user,
+                ResourceType.PROJECT,
+                norm_project_id,
+                access=ResourceAccess.MUTATE,
+            )
+        except ResourceNotFoundError:
+            raise HTTPException(
+                status_code=403,
+                detail=f"您沒有專案 {norm_project_id} 的管理權限",
+            )
+    return norm_project_id
 
 
 def _personas_bound_to(char_id: str) -> list[str]:
@@ -171,29 +198,7 @@ async def create_character(
 ):
     cfg = get_tts_config()
     cid = _normalize_char_id_or_400(char_id)
-    norm_project_id = project_id.strip() if project_id and project_id.strip() else None
-    if norm_project_id:
-        project = runtime.resources.get(ResourceType.PROJECT, norm_project_id)
-        if project is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"專案不存在：{norm_project_id}",
-            )
-        if _admin.user.role is not AccountRole.ROOT:
-            try:
-                resolve_resource(
-                    runtime.resources,
-                    _admin.user,
-                    ResourceType.PROJECT,
-                    norm_project_id,
-                    access=ResourceAccess.MUTATE,
-                )
-            except ResourceNotFoundError:
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"您沒有專案 {norm_project_id} 的管理權限",
-                )
-
+    norm_project_id = _resolve_upload_project(runtime, _admin, project_id)
 
     video_bytes, data_bytes = await _read_upload_pair(video, data)
     total = len(video_bytes) + len(data_bytes)
@@ -229,6 +234,93 @@ async def create_character(
     except CharacterExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"status": "ok", "character": character}
+
+
+@router.post("/api/v1/avatar/jobs", summary="從影片產生 Avatar 角色")
+async def create_character_job(
+    char_id: str = Form(...),
+    label: str = Form(""),
+    video: UploadFile = File(...),
+    project_id: str | None = Form(default=None),
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+):
+    """把一段無聲正面影片交給 avatar-pipeline，轉好後自動建成角色。
+
+    回傳 job_id；用 GET /api/v1/avatar/jobs/{job_id} 追進度，state 變成 done
+    時角色已經建好並登錄到指定專案。
+    """
+    cfg = get_tts_config()
+    cid = _normalize_char_id_or_400(char_id)
+    norm_project_id = _resolve_upload_project(runtime, _admin, project_id)
+    if get_store().exists(cid):
+        raise HTTPException(status_code=409, detail=f"角色已存在：{cid}")
+
+    source_bytes = await video.read()
+    if len(source_bytes) > cfg.avatar_source_max_upload_bytes:
+        raise HTTPException(status_code=413, detail="上傳影片過大")
+    try:
+        job = await avatar_jobs.submit_job(
+            char_id=cid,
+            label=label,
+            project_id=norm_project_id,
+            visibility=(
+                ResourceVisibility.PROJECT
+                if norm_project_id
+                else ResourceVisibility.SYSTEM_PUBLIC
+            ),
+            created_by=_admin.user.id,
+            source_name=video.filename or "source.mp4",
+            source_bytes=source_bytes,
+        )
+    except avatar_jobs.InvalidSource as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except avatar_jobs.QueueUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"status": "queued", "job": job}
+
+
+@router.get("/api/v1/avatar/jobs", summary="列出影片轉換工作")
+async def list_character_jobs(
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+):
+    try:
+        jobs = await avatar_jobs.list_jobs(store=get_store(), runtime=runtime)
+    except avatar_jobs.QueueUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"jobs": jobs}
+
+
+@router.get("/api/v1/avatar/jobs/{job_id}", summary="查詢影片轉換工作")
+async def get_character_job(
+    job_id: str,
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+):
+    try:
+        job = await avatar_jobs.get_job(job_id, store=get_store(), runtime=runtime)
+    except avatar_jobs.QueueUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"工作不存在：{job_id}")
+    return {"job": job}
+
+
+@router.delete("/api/v1/avatar/jobs/{job_id}", summary="刪除影片轉換工作紀錄")
+async def delete_character_job(
+    job_id: str,
+    _admin: CurrentAccount = Depends(require_admin),
+):
+    try:
+        removed = await avatar_jobs.delete_job(job_id)
+    except avatar_jobs.QueueUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"工作不存在：{job_id}")
+    return {"status": "ok"}
 
 
 @router.delete("/api/v1/avatar/{char_id}", summary="刪除 Avatar 角色")

@@ -32,6 +32,7 @@ x-backend-runtime: &backend-runtime
     - AVATAR_ASSETS_DIR=/data/avatar
     - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
     - AVATAR_MASCOTS_DIR=/data/mascots
+    - AVATAR_JOBS_DIR=/data/avatar-jobs
 
 services:
   api:
@@ -296,6 +297,27 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  # 影片 → 虛擬人素材包。backend 把工作排進 Redis，這裡一次跑一件，產物寫回
+  # 同一個 /data；image 只在 avatar-pipeline/ 變動時重建。
+  avatar-pipeline:
+    <<: *shared
+    user: "${UID:-1000}:${GID:-1000}"
+    image: "${DOCKERHUB_USERNAME:-tbdavid2019}/openvman-avatar-pipeline:${OPENVMAN_IMAGE_TAG:-latest}"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    volumes:
+      - ./data:/data
+    # 金鑰只放這個檔；沒有檔案時整個 stack 照常起來，只有轉換工作會失敗。
+    env_file:
+      - path: ./avatar-pipeline/.env
+        required: false
+    environment:
+      - TZ=Asia/Taipei
+      - REDIS_URL=redis://redis:6379
+    depends_on:
       redis:
         condition: service_started
 

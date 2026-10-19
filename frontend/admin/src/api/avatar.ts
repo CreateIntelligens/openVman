@@ -104,6 +104,65 @@ export async function uploadAvatarCharacter(
   });
 }
 
+export type AvatarJobState = "queued" | "running" | "done" | "failed";
+
+export interface AvatarJob {
+  job_id: string;
+  state: AvatarJobState;
+  stage?: string;
+  done?: number;
+  total?: number;
+  error?: string;
+  char_id: string;
+  label: string;
+  project_id?: string | null;
+  source_name?: string;
+  created_at?: number;
+  updated_at?: number;
+  frame_count?: number;
+  width?: number;
+  height?: number;
+  character?: AvatarCharacter;
+}
+
+export interface AvatarJobListResponse {
+  jobs: AvatarJob[];
+}
+
+interface SubmitJobArgs {
+  charId: string;
+  label: string;
+  video: File;
+  projectId?: string;
+}
+
+/** 把說話影片交給 avatar-pipeline 轉成素材包；回傳排進佇列的工作。 */
+export async function submitAvatarCharacterJob(
+  args: SubmitJobArgs,
+): Promise<{ status: string; job: AvatarJob }> {
+  const form = new FormData();
+  form.append("char_id", args.charId);
+  form.append("label", args.label);
+  form.append("video", args.video);
+  if (args.projectId) {
+    form.append("project_id", args.projectId);
+  }
+  return fetchJson<{ status: string; job: AvatarJob }>(apiUrl(`${AVATAR_PATH}/jobs`), {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function fetchAvatarCharacterJobs(): Promise<AvatarJobListResponse> {
+  return fetchJson<AvatarJobListResponse>(apiUrl(`${AVATAR_PATH}/jobs`));
+}
+
+export async function deleteAvatarCharacterJob(jobId: string): Promise<{ status: string }> {
+  return fetchJson<{ status: string }>(apiUrl(`${AVATAR_PATH}/jobs/${encodeURIComponent(jobId)}`), {
+    method: "DELETE",
+  });
+}
+
 export async function deleteAvatarCharacter(
   charId: string,
 ): Promise<{ status: string; char_id: string }> {

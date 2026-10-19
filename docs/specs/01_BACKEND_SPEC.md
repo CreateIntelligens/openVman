@@ -248,6 +248,12 @@ ws.send(JSON.stringify(payload));
 - Embed key：沒有帳號授權，專案有限制時以專案清單代替帳號授權（批次備援、串流預設引擎、聲音）；仍不可明確指定 ASR provider 或串流 `engine`。金鑰設定的聲音不在清單內時回 403，`/api/v1/tts/providers` 也不列。
 - `/api/v1/tts/providers` 與 `/api/v1/me/capabilities` 接受選填 `project_id`，見下節。
 
+### 影片轉素材包（`POST/GET /api/v1/avatar/jobs`、`GET/DELETE /api/v1/avatar/jobs/{job_id}`，管理員）
+
+管理員上傳一段無聲正面說話影片（multipart：`char_id`、`label`、`video`、選填 `project_id`；`.mp4`／`.mov`／`.m4v`／`.webm`，上限 `AVATAR_SOURCE_MAX_UPLOAD_BYTES`，預設 512MB），Backend 先做與直接上傳素材包相同的 `char_id` 與專案權限檢查（已存在回 409），把影片寫到 `AVATAR_JOBS_DIR/<job_id>/`，在 Redis 建立工作紀錄 `vman:avatar-pipeline:job:<job_id>`（24 小時），再排進 arq 佇列 `vman:avatar-pipeline`（函式 `build_avatar_bundle`）。Redis 或佇列不可用時回 503，不做同步備援，因為一件要跑數十秒到數分鐘。
+
+`avatar-pipeline` 容器把進度（`state`：queued／running／done／failed，`stage`、`done`、`total`、`error`）合併寫回同一筆紀錄，產物寫在 `<job_id>/out/`。Backend 在管理員讀取該工作（單筆或列表）且 `state` 為 `done` 時才收尾：把 `01.webm` 與 `combined_data.json.gz` 搬進角色 store、依提交時記下的 `project_id`／可見性登錄 `avatar_character` 資源、刪掉工作目錄，並在紀錄標記已登錄，之後再讀不重複建立。收尾不重做權限檢查，權限以提交當下為準。`DELETE` 只接受 done／failed 的工作（排隊中或執行中回 409，否則 worker 之後會對不存在的輸入失敗並留下沒有 `char_id` 的紀錄）。
+
 ### 後台試辨識（`POST /api/v1/asr/preview`，管理員）
 
 multipart：`file`、`provider`（`SERVER_ASR_PROVIDERS` 之一，空白用部署預設）、選填 `project_id`、`language_routes`（逗號分隔）。帶了專案就跟 `/api/v1/asr/transcribe` 走同一個 `_transcribe_routed()`：套專案詞表、依分流在台語時同時跑台語判斷；差別是引擎照 `provider`，不換成 Breeze，才比得出各家聽台語的差別。回傳 `text`、`provider`（實際辨識的引擎）、`elapsed_seconds`、`language`、`language_check`、`language_routes`、`glossary`（實際送給引擎的詞表）。

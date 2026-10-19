@@ -12,6 +12,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
 | `avatar` | `frontend/app/` | Vue 3、Vite | 虛擬人前台：角色舞台、語音輸入、播放與對嘴 |
 | `backend` | `backend/` | FastAPI | 對外 API、帳號與權限、ASR／TTS 路由、Gemini Live 中繼、Brain 代理 |
 | `gateway-worker` | `backend/app/gateway/` | arq + Redis | 文件轉換、爬蟲與其他非同步媒體處理 |
+| `avatar-pipeline` | `avatar-pipeline/` | arq + MediaPipe + ffmpeg | 把說話影片轉成虛擬人素材包（`01.webm` + `combined_data.json.gz`），一次一件 |
 | `api` | `brain/api/` | FastAPI | Brain：LLM 路由、RAG、記憶、工具、用量帳本；僅供內部呼叫 |
 | `embedding` | `brain/embedding/` | EmbeddingGemma 2（GPU） | 向量嵌入服務，Brain 與其他 stack 共用 |
 | `redis` | — | Redis 7 | gateway 佇列、快取與跨 worker 狀態 |
@@ -25,7 +26,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
                              ├── /admin/      → 管理後台
                              ├── /api/        → backend ──> api（Brain）──> embedding、LanceDB
                              │                    ├──> ASR／TTS 外部節點、Gemini Live
-                             │                    └──> redis ──> gateway-worker
+                             │                    └──> redis ──> gateway-worker、avatar-pipeline
                              └── /grafana/    → grafana ──> prometheus
 ```
 
@@ -63,7 +64,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | Knowledge | 知識庫 | 文件上傳與轉換、問答節點與快速問答、語言分流、知識圖譜、多選批次移動／設定語言／刪除 |
 | | 記憶管理、工作區 | 長期記憶、編輯 workspace 文件 |
 | Character | 角色管理 | 人設 |
-| | Avatar | 2D 角色、背景，以及嵌入網站右下角的小助理 |
+| | Avatar | 2D 角色（可直接上傳素材包，或上傳說話影片交給 `avatar-pipeline` 轉換、轉完自動建成角色）、背景，以及嵌入網站右下角的小助理 |
 | | 工具與技能 | Brain 工具與 skills 狀態 |
 | System | 專案與權限（`/admin/access`） | 分頁：專案（建立與列出專案）；帳號（正式帳號、臨時帳號批次、資源與引擎授權、展示機台旗標）；API 金鑰（`/admin/access/api-keys`，可獨立設定期限、撤銷與查使用紀錄）；權限圖譜（`/admin/access/graph`，唯讀的帳號 ↔ 專案授權網路圖，可疊加人物、聲音、辨識引擎與臨時帳號圖層，並依專案、資源、角色、帳號類型與連線種類篩選）；Embed 金鑰（外部網站嵌入 Avatar 用的金鑰）。一般帳號只看得到專案與 API 金鑰 |
 | | 模型供應商 | 全站模型順序與金鑰，僅 ROOT |
@@ -117,7 +118,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 ### 環境變數
 
-所有服務共用根目錄唯一一份 `.env`：compose 的 `${VAR}` 插值與 `api`、`backend`、`gateway-worker` 的 `env_file` 都讀它。
+所有服務共用根目錄唯一一份 `.env`：compose 的 `${VAR}` 插值與 `api`、`backend`、`gateway-worker` 的 `env_file` 都讀它。例外是 `avatar-pipeline`，它只讀 `avatar-pipeline/.env`（素材包加密金鑰 `AVATAR_BUNDLE_KEY`，見 [avatar-pipeline/README.md](avatar-pipeline/README.md)）。
 
 ```bash
 cp .env.example .env
