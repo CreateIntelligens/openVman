@@ -27,8 +27,14 @@ export interface FrameClock {
 
 type DrawImage = CanvasRenderingContext2D["drawImage"];
 
+// 前台的 d.ts 才宣告 window.characterVideo；這個模組 admin 也會編譯，自己收窄。
+function vendorVideo(): HTMLVideoElement | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as Window & { characterVideo?: HTMLVideoElement }).characterVideo;
+}
+
 export function installFrameClock(
-  video = typeof window !== "undefined" ? window.characterVideo : undefined,
+  video = vendorVideo(),
   canvas = document.getElementById("canvas_video") as HTMLCanvasElement | null,
   fps = DEFAULT_FPS,
 ): FrameClock | null {
