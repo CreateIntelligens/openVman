@@ -25,6 +25,12 @@ from app.auth.resources import (
     resolve_resource,
 )
 from app.auth.runtime import get_auth_runtime
+from app.chat_tts_text import (
+    TTS_TEXT_PATHS,
+    TTS_TEXT_STREAM_PATHS,
+    annotate_json_body,
+    annotate_sse,
+)
 from app.client_disconnect import wait_for_client_disconnect
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
@@ -497,8 +503,11 @@ async def proxy_to_brain(
 
         # SSE / streaming responses — forward chunks via StreamingResponse.
         if "text/event-stream" in content_type:
+            body_stream = _stream_upstream_bytes(upstream)
+            if normalized_path in TTS_TEXT_STREAM_PATHS and upstream.status_code == 200:
+                body_stream = annotate_sse(body_stream)
             return StreamingResponse(
-                _stream_upstream_bytes(upstream),
+                body_stream,
                 status_code=upstream.status_code,
                 media_type="text/event-stream",
                 headers=resp_headers,
@@ -509,6 +518,15 @@ async def proxy_to_brain(
             content = await _unless_client_gone(request, upstream.aread())
         finally:
             await upstream.aclose()
+
+        if (
+            normalized_path in TTS_TEXT_PATHS
+            and upstream.status_code == 200
+            and "json" in content_type
+        ):
+            content = annotate_json_body(content)
+            # 長度變了；讓 Response 自己重算。
+            resp_headers.pop("content-length", None)
 
         return Response(
             content=content,

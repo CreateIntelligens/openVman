@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import json
+
 import asyncio
 import logging
 import os
@@ -176,7 +178,8 @@ def test_connected_client_gets_brain_reply_without_waiting_for_a_poll() -> None:
     response, elapsed = _proxy(_LeavingRequest(leave_after=None), client)
 
     assert response.status_code == 200
-    assert response.body == b'{"reply":"ok"}'
+    # /chat 的回應會多帶念的版本 tts_text。
+    assert json.loads(response.body) == {"reply": "ok", "tts_text": "ok"}
     # 回應到了就回，不等下一次斷線輪詢（0.25 秒）。
     assert elapsed < 0.2
 

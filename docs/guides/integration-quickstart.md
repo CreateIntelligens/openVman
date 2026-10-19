@@ -123,6 +123,7 @@
 
 | 欄位 | 說明 |
 |---|---|
+| `tts_text` | `reply` 的「念的版本」：去掉 markdown 與 emoji，電話與長數字轉成逐字讀法，保留繁體。自己接 TTS 的整合方送這個欄位，不要送 `reply`；用本服務的 `/api/v1/tts/stream` 則送哪個都一樣（它內部會再整理一次） |
 | `answer_source` | `qa`：引用到 QA 文件（QA CSV 匯入或 QA 筆記）；`knowledge`：引用到知識庫其他文件、沒有 QA；`none`：沒有知識庫引用 |
 | `knowledge_searched` | 這一輪有沒有查知識庫 |
 | `no_answer` | 查了知識庫但沒有答案：完全沒有知識庫引用，或有引用但決策模型判定回覆在說資料裡查不到（這時 `answer_source` 仍是引用的來源，可能是 `qa` 或 `knowledge`） |
@@ -167,8 +168,8 @@ ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流
 
 | 事件 | `data` | 說明 |
 |---|---|---|
-| `sentence` | `{"index": 0, "text": "營業時間是早上九點。"}` | 最終回答每完成一句就送一次，`index` 從 0 起算。查知識庫等工具輪的文字不會送出 |
-| `done` | 與 `/chat` 回應相同的 JSON（`reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer`、`session_id`、`trace_id`、`history`、`pii_pending`、`image_id`／`url` 等） | 最後一個事件，之後串流結束 |
+| `sentence` | `{"index": 0, "text": "營業時間是早上九點。"}` | 最終回答每完成一句就送一次，`index` 從 0 起算。查知識庫等工具輪的文字不會送出；另帶 `tts_text`（這一句念的版本，同 `/chat` 的欄位） |
+| `done` | 與 `/chat` 回應相同的 JSON（`reply`、`tts_text`、`citations`、`answer_source`、`knowledge_searched`、`no_answer`、`session_id`、`trace_id`、`history`、`pii_pending`、`image_id`／`url` 等） | 最後一個事件，之後串流結束 |
 | `error` | `{"status": 502, "detail": ...}` | `status` 與 `detail` 就是 `/chat` 遇到同一個錯誤時的 HTTP 狀態碼與錯誤 `detail`（可能是字串，也可能是含 `error_code`、`retry_after_ms` 的物件）。之後串流結束，不會再有 `done` |
 
 句尾的判斷：中日文 `。！？；…`；英文 `. ! ?` 後面接空白或文字結束；換行。`3.5`、`HIPPO-50.html` 這類小數、型號與網址不會被切開，最後一段沒有句尾符號的文字在結束前補送。句子保留原文的空白與換行（換行後的那句以換行開頭），所有 `sentence.text` 依序接起來就等於 `done.reply`；送 TTS 前可以自己 trim。
