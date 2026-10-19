@@ -39,6 +39,11 @@ class EnqueueResult:
     mode: str  # "queued" | "sync"
 
 
+async def get_arq_pool() -> ArqRedis | None:  # type: ignore[name-defined]
+    """The shared arq pool; callers pick a queue with ``_queue_name``."""
+    return await _get_arq_pool()
+
+
 async def _get_arq_pool() -> ArqRedis | None:  # type: ignore[name-defined]
     global _arq_pool
     if not _HAS_ARQ:
