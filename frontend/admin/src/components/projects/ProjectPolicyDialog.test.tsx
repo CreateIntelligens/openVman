@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProjectPolicyDialog from "./ProjectPolicyDialog";
@@ -37,9 +37,11 @@ vi.mock("../../api/auth", async () => {
 const UNRESTRICTED = {
   project_id: "proj-a",
   allowed_asr_engines: [],
+  asr_engine_order: [],
   default_asr_engine: null,
   taiwanese_asr_engine: null,
   allowed_tts_voices: [],
+  tts_engine_order: [],
   default_tts_voice: null,
   allowed_characters: [],
   default_character_id: null,
@@ -134,9 +136,11 @@ describe("ProjectPolicyDialog", () => {
 
     await waitFor(() => expect(api.saveProjectPolicy).toHaveBeenCalledWith("proj-a", {
       allowed_asr_engines: ["breeze"],
+      asr_engine_order: [],
       default_asr_engine: null,
       taiwanese_asr_engine: "breeze",
       allowed_tts_voices: ["edge-yun"],
+      tts_engine_order: [],
       default_tts_voice: "edge-yun",
       allowed_characters: ["0713"],
       default_character_id: "0713",
@@ -146,6 +150,126 @@ describe("ProjectPolicyDialog", () => {
       default_mascot_id: null,
     }));
     expect(onSaved).toHaveBeenCalledWith("專案「示例專案」的設定已更新");
+  });
+
+  it("renders both engine orders from the loaded policy", async () => {
+    api.fetchProjectPolicy.mockResolvedValue({
+      ...UNRESTRICTED,
+      tts_engine_order: ["cosyvoice", "voxcpm", "gemini-tts"],
+      asr_engine_order: ["r2t2-dev", "sensevoice", "openai"],
+    });
+    renderDialog();
+
+    const tts = await screen.findByRole("list", { name: "TTS 引擎順位清單" });
+    const asr = screen.getByRole("list", { name: "批次 ASR 引擎順位清單" });
+    expect(within(tts).getAllByRole("listitem").map((row) => row.firstChild?.textContent))
+      .toEqual(["1. CosyVoice", "2. VoxCPM", "3. Gemini TTS"]);
+    expect(within(asr).getAllByRole("listitem").map((row) => row.firstChild?.textContent))
+      .toEqual(["1. R2T2 dev", "2. SenseVoice", "3. OpenAI"]);
+    expect(screen.getByText("沒指定引擎與聲音時照這個順序試；空白用部署順序")).toBeTruthy();
+    expect(screen.getByText("指定引擎之後的備援順序；空白用部署順序")).toBeTruthy();
+  });
+
+  it("adds, moves and removes engines in both orders and saves the edited order", async () => {
+    api.fetchProjectPolicy.mockResolvedValue({
+      ...UNRESTRICTED,
+      tts_engine_order: ["indextts", "voxcpm"],
+      asr_engine_order: ["breeze", "openai"],
+    });
+    renderDialog();
+    await screen.findByRole("list", { name: "TTS 引擎順位清單" });
+
+    for (const { label, first, second, added, addedId } of [
+      { label: "TTS 引擎順位", first: "IndexTTS", second: "VoxCPM", added: "CosyVoice", addedId: "cosyvoice" },
+      { label: "批次 ASR 引擎順位", first: "Breeze", second: "OpenAI", added: "R2T2", addedId: "r2t2" },
+    ]) {
+      const list = within(screen.getByRole("list", { name: `${label}清單` }));
+      const select = screen.getByRole("combobox", { name: `新增${label}` });
+      expect((list.getByRole("button", { name: `${first}上移` }) as HTMLButtonElement).disabled).toBe(true);
+      expect((list.getByRole("button", { name: `${second}下移` }) as HTMLButtonElement).disabled).toBe(true);
+      expect(within(select).queryByRole("option", { name: first })).toBeNull();
+      fireEvent.change(select, { target: { value: addedId } });
+      expect(list.getAllByRole("listitem").map((row) => row.firstChild?.textContent))
+        .toEqual([`1. ${first}`, `2. ${second}`, `3. ${added}`]);
+      expect(within(select).queryByRole("option", { name: added })).toBeNull();
+
+      fireEvent.click(list.getByRole("button", { name: `${first}下移` }));
+      expect(list.getAllByRole("listitem").map((row) => row.firstChild?.textContent))
+        .toEqual([`1. ${second}`, `2. ${first}`, `3. ${added}`]);
+      fireEvent.click(list.getByRole("button", { name: `${added}上移` }));
+      expect(list.getAllByRole("listitem").map((row) => row.firstChild?.textContent))
+        .toEqual([`1. ${second}`, `2. ${added}`, `3. ${first}`]);
+      fireEvent.click(list.getByRole("button", { name: `${second}移除` }));
+      expect(list.getAllByRole("listitem").map((row) => row.firstChild?.textContent))
+        .toEqual([`1. ${added}`, `2. ${first}`]);
+      expect(within(select).getByRole("option", { name: second })).toBeTruthy();
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+    await waitFor(() => expect(api.saveProjectPolicy).toHaveBeenCalledWith("proj-a", expect.objectContaining({
+      tts_engine_order: ["cosyvoice", "indextts"],
+      asr_engine_order: ["r2t2", "breeze"],
+    })));
+  });
+
+  it("offers exactly the supported engine ids when unrestricted and saves empty orders", async () => {
+    renderDialog();
+    const tts = await screen.findByRole("combobox", { name: "新增TTS 引擎順位" }) as HTMLSelectElement;
+    const asr = screen.getByRole("combobox", { name: "新增批次 ASR 引擎順位" }) as HTMLSelectElement;
+    expect(Array.from(tts.options).map((option) => [option.value, option.textContent])).toEqual([
+      ["", "選擇要新增的引擎…"],
+      ["indextts", "IndexTTS"], ["voxcpm", "VoxCPM"], ["cosyvoice", "CosyVoice"],
+      ["gemini-tts", "Gemini TTS"], ["gcp-tts", "GCP TTS"], ["aws-polly", "AWS Polly"], ["edge-tts", "Edge TTS"],
+    ]);
+    expect(Array.from(asr.options).map((option) => [option.value, option.textContent])).toEqual([
+      ["", "選擇要新增的引擎…"],
+      ["breeze", "Breeze"], ["r2t2", "R2T2"], ["r2t2-dev", "R2T2 dev"], ["sensevoice", "SenseVoice"], ["openai", "OpenAI"],
+    ]);
+    fireEvent.change(tts, { target: { value: "indextts" } });
+    fireEvent.change(asr, { target: { value: "breeze" } });
+    fireEvent.click(screen.getByRole("button", { name: "IndexTTS移除" }));
+    fireEvent.click(screen.getByRole("button", { name: "Breeze移除" }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+    await waitFor(() => expect(api.saveProjectPolicy).toHaveBeenCalledWith("proj-a", expect.objectContaining({
+      tts_engine_order: [],
+      asr_engine_order: [],
+    })));
+  });
+
+  it("limits batch ASR additions and prunes the order when the allowlist shrinks", async () => {
+    api.fetchProjectPolicy.mockResolvedValue({
+      ...UNRESTRICTED,
+      allowed_asr_engines: ["breeze", "openai", "gemini-live"],
+      asr_engine_order: ["openai", "breeze"],
+    });
+    renderDialog();
+    const select = await screen.findByRole("combobox", { name: "新增批次 ASR 引擎順位" }) as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.value)).toEqual([""]);
+    expect(select.disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("Whisper"));
+    const list = within(screen.getByRole("list", { name: "批次 ASR 引擎順位清單" }));
+    expect(list.getAllByRole("listitem").map((row) => row.firstChild?.textContent)).toEqual(["1. Breeze"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+    await waitFor(() => expect(api.saveProjectPolicy).toHaveBeenCalledWith("proj-a", expect.objectContaining({
+      allowed_asr_engines: ["breeze", "gemini-live"],
+      asr_engine_order: ["breeze"],
+    })));
+  });
+
+  it("prunes when an unrestricted allowlist becomes restricted and keeps the order when restrictions clear", async () => {
+    api.fetchProjectPolicy.mockResolvedValue({
+      ...UNRESTRICTED,
+      asr_engine_order: ["openai", "breeze"],
+    });
+    renderDialog();
+    fireEvent.click(await screen.findByLabelText("Breeze"));
+    const list = within(screen.getByRole("list", { name: "批次 ASR 引擎順位清單" }));
+    expect(list.getAllByRole("listitem").map((row) => row.firstChild?.textContent)).toEqual(["1. Breeze"]);
+    fireEvent.click(screen.getByLabelText("Breeze"));
+    expect(list.getAllByRole("listitem").map((row) => row.firstChild?.textContent)).toEqual(["1. Breeze"]);
+    const select = screen.getByRole("combobox", { name: "新增批次 ASR 引擎順位" });
+    expect(within(select).getByRole("option", { name: "OpenAI" })).toBeTruthy();
   });
 
   it("lists stale ids so they can be removed", async () => {

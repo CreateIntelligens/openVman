@@ -76,12 +76,14 @@ export function deleteProjectGeminiCredential(projectId: string) {
   );
 }
 
-/** 專案層的資源與語音限制；空清單代表「不限制」，實際可用的是帳號授權與這份清單的交集。 */
+/** 專案層的資源與語音限制；順位留空沿用部署順序，允許清單留空代表「不限制」。 */
 export interface ProjectPolicyInput {
   allowed_asr_engines: string[];
+  asr_engine_order: string[];
   default_asr_engine: string | null;
   taiwanese_asr_engine: string | null;
   allowed_tts_voices: string[];
+  tts_engine_order: string[];
   default_tts_voice: string | null;
   allowed_characters?: string[];
   default_character_id?: string | null;

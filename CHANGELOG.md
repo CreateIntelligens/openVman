@@ -8,6 +8,7 @@
 
 ### Added
 
+- **[2026-10-19]** **後台專案引擎順位**：資源與語音設定可新增、上移、下移及移除 TTS 與批次 ASR 引擎順位，留空沿用部署順序；縮限允許的 ASR 引擎時同步移除順位中不再允許的項目。
 - **[2026-10-19]** **chat 回應加 `tts_text`**：`POST /api/v1/chat`、`/chat/accept` 的 JSON 與 `/chat/stream` 的 `sentence`／`done` 事件多帶 `tts_text`——`reply`（或該句）去掉 markdown 與 emoji、電話與長數字轉逐字讀法、保留繁體的版本，給自己接 TTS 的整合方直接送引擎；本服務的 `/tts/stream` 行為不變。由 Backend 代理層加入（`app/chat_tts_text.py`），只做本地正規化，逐句串流不多一次往返。
 - **[2026-10-19]** **影片一鍵轉虛擬人素材包（`avatar-pipeline` 服務）**：新增獨立 compose 服務 `avatar-pipeline/`（arq worker，MediaPipe + ffmpeg，無 torch），把無聲正面影片轉成 `01.webm` + `combined_data.json.gz`，與既有素材包逐幀、逐欄位相同。後台新增 `POST /api/v1/avatar/jobs`（multipart：`char_id`、`label`、`video`、`project_id`）排程轉換，`GET /api/v1/avatar/jobs`、`GET /api/v1/avatar/jobs/{job_id}` 追進度，轉完自動建成角色並登錄到指定專案，`DELETE /api/v1/avatar/jobs/{job_id}` 清掉紀錄。佇列 `vman:avatar-pipeline`、狀態 key `vman:avatar-pipeline:job:<id>`；加密金鑰只放 `avatar-pipeline/.env`（`AVATAR_BUNDLE_KEY`）。backend 新增 `AVATAR_JOBS_DIR`（預設 `/data/avatar-jobs`）與 `AVATAR_SOURCE_MAX_UPLOAD_BYTES`（預設 512MB）。CI 的 `docker-publish` 矩陣加入 `avatar-pipeline`（amd64 + arm64）。
 
