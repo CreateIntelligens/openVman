@@ -224,8 +224,13 @@ def fresh_provider_health():
 
 @pytest.fixture(autouse=True)
 def fresh_project_model_settings():
-    from core.gemini_credentials import clear_project_provider_cache
+    # 只在模組已載入時清：沒載入就沒有快取。直接 import 會連帶載入 httpx，
+    # CI 的契約檢查環境只裝 pytest 與 pydantic，整個測試會在收集階段失敗。
+    def clear() -> None:
+        module = sys.modules.get("core.gemini_credentials")
+        if module is not None:
+            module.clear_project_provider_cache()
 
-    clear_project_provider_cache()
+    clear()
     yield
-    clear_project_provider_cache()
+    clear()
