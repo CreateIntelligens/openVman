@@ -1507,7 +1507,7 @@ def _routed_asr_fixture(monkeypatch, module, routes):
     async def _glossary(account, project_id):
         return "沉水泵 DIVA" if project_id else ""
 
-    async def _detect(path):
+    async def _detect(path, *, project_id=""):
         return module.asr_routes.language_routes_mod.LanguageCheck("nan", "nan", 812)
 
     import app.gateway.ingestion_audio as ingestion_audio
@@ -1666,7 +1666,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
         calls["routes_args"] = (project_id, requested)
         return ["zh", "nan"]
 
-    async def fake_detect(path):
+    async def fake_detect(path, *, project_id=""):
         return module.asr_routes.language_routes_mod.LanguageCheck("nan", "nan", 1234)
 
     async def fake_prompt(current, project_id):
@@ -1877,7 +1877,9 @@ def _gemini_service(chunks):
         return _gen()
 
     return types.SimpleNamespace(
-        gemini_adapter=types.SimpleNamespace(enabled=True, open_stream=_open_stream),
+        gemini_adapter=types.SimpleNamespace(
+            enabled=True, enabled_for=lambda request: True, open_stream=_open_stream,
+        ),
         voxcpm_adapter=types.SimpleNamespace(enabled=False),
         edge_adapter=types.SimpleNamespace(enabled=False),
     )

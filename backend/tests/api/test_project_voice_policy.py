@@ -107,7 +107,10 @@ def env(monkeypatch):
     async def no_usage(*args, **kwargs):
         pass
 
-    async def heard(*args):
+    heard_projects: list[str] = []
+
+    async def heard(*args, project_id=""):
+        heard_projects.append(project_id)
         return SimpleNamespace(language="nan", result="nan", ms=1)
 
     monkeypatch.setattr(asr.language_routes_mod, "effective_routes", routes)
@@ -133,6 +136,7 @@ def env(monkeypatch):
     env = SimpleNamespace(
         runtime=runtime, root=root, owner=owner, token=token, app=app,
         attempts=attempts, failing=failing, routes=["zh"],
+        heard_projects=heard_projects,
         account=CurrentAccount(user=owner, transport=AuthTransport.API_KEY),
     )
     return env
@@ -234,6 +238,8 @@ def test_taiwanese_route_uses_the_projects_engine(env):
     assert response.json()["provider"] == "openai"
     assert response.json()["language"] == "nan"
     assert env.attempts == ["openai"]
+    # 台語判斷帶專案，Brain 才會用該專案的 Gemini 金鑰。
+    assert env.heard_projects == ["p1"]
 
 
 def test_taiwanese_engine_must_be_allowed(env):

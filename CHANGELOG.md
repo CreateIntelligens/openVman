@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-10-19]** **正式專案可綁定專屬 Gemini 金鑰**：ROOT 以 `GET`／`PUT`／`DELETE /api/v1/projects/{project_id}/gemini-credential` 查看、儲存／更換或改回共用設定（後台專案頁新增對應設定）；Auth DB migration 24 新增 `project_gemini_credentials`，金鑰加密保存在 Backend，API 與後台只回名稱、遮罩、來源與設定狀態。未綁定的專案沿用共用 Gemini 設定；已綁定的專案在金鑰失效、無法解密或查詢失敗時不改用共用金鑰。Brain 主對話與模型探索、Gemini Live、語音語言判斷與背景 Gemini 呼叫，以及 Backend 的 Gemini 串流 ASR、台語判斷與 Gemini TTS 都依專案選用金鑰；金鑰切換、TTS 快取與用量依專案隔離，Live 每段會話固定開始時的金鑰。綁定專屬金鑰的專案 TTS 直接呼叫 Google（模型由新增的 `TTS_GEMINI_MODEL` 設定，預設 `gemini-3.8-flash-tts`），不經 Gemini TTS Console；錯誤訊息不帶金鑰，串流在出錯或提前關閉時都會釋放上游連線。
+
 - **[2026-10-15]** **ROOT 專案資源豁免與範圍標示（`in_project_scope`）**：
   - 後端：ROOT 帳號豁免於 `project_policies` 的白名單限制（涵蓋 TTS 聲音、批次與串流 ASR、人物、背景、小助理），但專案預設值仍適用；admin、一般帳號與 Embed key 維持受限。
   - 資源清單標示：帶 `project_id` 的資源列表 API（`/api/v1/me/capabilities`、`/api/v1/tts/providers`、`/api/v1/projects/{id}/resources`、`/api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/avatar/mascots`）對 ROOT 回傳全部可用資源，每項附加布林值 `in_project_scope`（標示是否屬於一般專案成員可用範圍）；非 ROOT 僅回傳範圍內資源且 `in_project_scope` 恆為 `true`。

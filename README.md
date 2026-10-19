@@ -82,6 +82,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 - 模型路由：主對話依序嘗試 Gemini、OpenAI、Groq、NEN 中啟用的供應商；後台沒存過設定時照 `LLM_PROVIDER`／`LLM_FALLBACK_CHAIN`。
 - 決策輔助：本地 Guard Agent 規則先判；規則無法判斷時依後台順序呼叫 Clef 主／備援、Jev、OpenAI Decisions。
 - 模型供應商：ROOT 在後台「System → 模型供應商」調整主對話與決策的順序、啟用狀態、主對話模型名稱，以及各家 API key（加密存放，每家一把、各類共用），約 10 秒內生效。
+- 專案專屬 Gemini 金鑰：ROOT 可在專案設定替正式專案綁定自己的 Gemini 金鑰（加密存放，後台只顯示名稱與遮罩），該專案的 Gemini 對話、TTS 與 Live 都改用它；金鑰失效時不會改借共用金鑰，用量依專案分開記。沒綁定的專案照共用設定。
 - 前台決策 Debug：admin／root 的正式登入可在虛擬人舞台開啟當輪判讀面板（一般、臨時帳號與 embed 金鑰看不到，伺服器端也不回傳），預設只顯示一行摘要（供應商・耗時・語氣），按「詳細」才展開情緒／語氣、檢索、語言及信心度；預設關閉，診斷不持久化。
 - 每輪決策：文字回合以一個 batch 評估檢索來源、多語言、回覆語言與當輪語氣；全部決策服務失效時沿用既有對話流程。門檻、資料邊界與 Live 限制見 [Brain 文件](brain/README.md#每輪對話決策)。
 - 隱私：使用者每句話在背景問 Clef 有沒有個資（只問自家的 Clef，不送外部服務），記錄稽核事件並在後台對話顯示提醒，不改寫內容（`PRIVACY_FILTER_ENABLED`，預設關）。

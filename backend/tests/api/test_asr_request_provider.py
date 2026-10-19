@@ -293,6 +293,13 @@ def test_bearer_stream_override_works_without_changing_batch_preference(
 ):
     app, runtime, root, owner, keys, _attempts = setup
     monkeypatch.setenv("GEMINI_API_KEY", "test-only")
+    monkeypatch.setattr(
+        asr_stream, "resolve_gemini_credential",
+        lambda project_id, runtime=None: SimpleNamespace(
+            api_key="test-only", source="shared",
+            credential_id="gemini", configured=True,
+        ),
+    )
     connections = []
 
     class Upstream:
