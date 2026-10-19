@@ -69,6 +69,11 @@ function settleRuntimeScriptLoad(
     resolve()
     return
   }
+  // script 載入成功但執行到一半丟例外時，標籤會留在頁面上；下次重試走 existing
+  // 分支等一個早已發生過的 load 事件，永遠等不到。拿掉它，讓重試重新載一次。
+  document
+    .querySelector('script[data-dhlive-mini2="true"]')
+    ?.remove()
   reject(
     new Error(
       '[OpenVmanAvatarRuntime] Vendor runtime loaded without createQtAppInstance',

@@ -26,11 +26,23 @@ characterVideo.crossOrigin = "";
 characterVideo.style.display = 'none';
 document.body.appendChild(characterVideo);
 
-// 获取视频和画布元素
-const canvas_video = document.getElementById('canvas_video');
-const ctx_video = canvas_video.getContext('2d', {
-    willReadFrequently: true
-});
+// 画布可能在脚本载入时还不在页面上（例如 401 把 App 切到登录页），
+// 所以延后到每次绘制前再查，缺画布时跳过那一帧而不是整个脚本崩掉。
+let canvas_video = null;
+let ctx_video = null;
+function resolveVideoCanvas() {
+    if (!canvas_video || !canvas_video.isConnected) {
+        const found = document.getElementById('canvas_video');
+        if (found && found !== canvas_video) {
+            canvas_video = found;
+            ctx_video = found.getContext('2d', {
+                willReadFrequently: true
+            });
+        }
+    }
+    return ctx_video !== null;
+}
+resolveVideoCanvas();
 
 const resizedCanvas = document.createElement('canvas');
 const resizedCtx = resizedCanvas.getContext('2d', {
@@ -573,6 +585,9 @@ var createQtAppInstance = ( () => {
                     return currentFrame
                 }
                 let realFrame = -1;
+                if (!resolveVideoCanvas()) {
+                    return realFrame
+                }
                 if (characterVideo.readyState >= 2) {
                     const currentFrame = Math.floor(characterVideo.currentTime * 25);
                     if (canvas_video.width !== characterVideo.videoWidth || canvas_video.height !== characterVideo.videoHeight) {
@@ -596,6 +611,9 @@ var createQtAppInstance = ( () => {
                 let rect_h = $3;
                 rect_w = rect_w - rect_x;
                 rect_h = rect_h - rect_y;
+                if (!resolveVideoCanvas()) {
+                    return
+                }
                 resizedCtx.clearRect(0, 0, 180, 180);
                 resizedCtx.drawImage(canvas_video, rect_x, rect_y, rect_w, rect_h, 0, 0, 180, 180);
                 if (!imageDataPtr) {
@@ -614,6 +632,9 @@ var createQtAppInstance = ( () => {
                 let rect_h = $3;
                 rect_w = rect_w - rect_x;
                 rect_h = rect_h - rect_y;
+                if (!resolveVideoCanvas()) {
+                    return
+                }
                 ctx_video.clearRect(rect_x, rect_y, rect_w, rect_h);
                 const pixelPtr = Module._getPixelData();
                 const pixelData = new Uint8Array(Module.HEAPU8.buffer,pixelPtr,180 * 180 * 4);

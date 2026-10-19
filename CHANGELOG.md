@@ -43,6 +43,7 @@
 
 ### Fixed
 
+- **[2026-10-19]** **前台 runtime 載入與登入頁競態**：`OpenVmanAvatarRuntime.js` 不再在載入當下就抓 `#canvas_video`，改成每次繪圖前查、缺 canvas 的那一幀安靜跳過。先前 session 失效（401）讓 App 切到登入頁、卸掉 canvas 時腳本才載完，會在第 31 行炸掉、`createQtAppInstance` 永遠不存在，之後的重試又等同一個已經 load 過的 `<script>`，舞台卡在載入中直到手動重新整理。TS 端載入失敗也會移除那個 `<script>` 標籤，讓重試真的重載。
 - **[2026-10-19]** **TTS 依語言選引擎與需求不一致（VH-384）**：台語自動切換以前改用 VoxCPM，但 VoxCPM 照字唸，Brain 的台語回答是華語文字，唸出來是華語；國語、英文沒有依語言路由，只是剛好用專案預設聲音；使用者選台語但打字時不會切換；`/api/v1/tts/stream` 也看不出用了哪個引擎。現在 `/api/v1/tts/stream` 的語言取 ASR 的 `speech_language`，沒有時用新增的 `language`（使用者選的語言）：台語（專案分流含台語）改用 CosyVoice（會轉成台文，停用時改 VoxCPM），國語、英文在呼叫端沒指定 provider 與 voice 時用 IndexTTS；回應一律帶 `X-TTS-Provider`。CosyVoice 預設聲音改成 `young-female-02`（Hayley，與 IndexTTS 的 hayley 同一位），前台講台語時也改切 CosyVoice。CosyVoice 只能整段合成，台語第一聲約 1.8 秒（9 字）到 3.2 秒（30 字）。
 - **[2026-10-19]** **Brain 對話限流實際上是整個專案共用**：限流依專案、來源 IP 與頻道計數，但 Brain 只收 Backend 的請求，來源 IP 永遠是 Backend，同一專案所有人、所有機台共用每分鐘 90 次。現在依 Backend 驗證後傳來的呼叫者（每把 API key、Embed key、每個登入帳號）各自計數，沒有呼叫者時才用 IP。
 - **[2026-10-16]** **Brain 晚於 Backend 部署時，`/openapi.json` 停在舊的 Brain schema**：Backend 只在啟動時合併一次 Brain 的 OpenAPI，Backend 先換新版、Brain 後換時，`/api/v1/chat` 的 `ChatResponse` 等新欄位要等 Backend 下次重啟才出現；啟動當下 Brain 連不上則一直只有 Backend 的部分。現在合併結果快取 5 分鐘，過期時在背景重抓（這次先回舊的，不讓請求等 Brain），Brain 連不上時保留上一份合併結果。

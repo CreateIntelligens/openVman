@@ -77,6 +77,7 @@ function renderFrame({ width = 64, height = 40, markerSize = 8, frame = 0, backg
       currentTime: (frame + 0.1) / 25,
     },
     ctx_video: context,
+    resolveVideoCanvas: () => true,
     console,
   });
   vm.runInContext(callbacks, scope);
