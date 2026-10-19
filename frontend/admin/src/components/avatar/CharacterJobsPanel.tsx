@@ -8,7 +8,10 @@ import {
 } from "../../api";
 import {
   dangerActionClassName,
+  fileFieldClassName,
   filePickerClassName,
+  fileRowClassName,
+  formRowClassName,
   formPanelClassName,
   inputClassName,
   uploadButtonClassName,
@@ -156,7 +159,7 @@ export default function CharacterJobsPanel({
       <p className="text-xs text-content-subtle">
         上傳一段無聲、正面說話的影片（.mp4／.mov／.webm），轉換完成後自動建成角色。
       </p>
-      <div className="flex flex-wrap gap-3">
+      <div className={formRowClassName}>
         <input
           type="text"
           placeholder="Character ID (char_id)"
@@ -186,12 +189,12 @@ export default function CharacterJobsPanel({
           </select>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className={fileRowClassName}>
+        <div className={fileFieldClassName}>
           <span className="text-xs font-medium text-content-muted">Source video:</span>
           <label className={filePickerClassName(videoName)}>
             <span className="material-symbols-outlined text-sm">videocam</span>
-            <span className="max-w-[12rem] truncate">{videoName || "Select video"}</span>
+            <span className="min-w-0 truncate">{videoName || "Select video"}</span>
             <input
               ref={videoRef}
               type="file"
@@ -211,8 +214,8 @@ export default function CharacterJobsPanel({
           role="status"
           className={
             status.type === "error"
-              ? "text-xs text-red-600 dark:text-red-400"
-              : "text-xs text-primary-600 dark:text-primary"
+              ? "min-w-0 text-xs [overflow-wrap:anywhere] text-red-600 dark:text-red-400"
+              : "min-w-0 text-xs [overflow-wrap:anywhere] text-primary-600 dark:text-primary"
           }
         >
           {status.message}
@@ -224,11 +227,11 @@ export default function CharacterJobsPanel({
           {jobs.map((job) => (
             <li
               key={job.job_id}
-              className="flex flex-wrap items-center gap-3 rounded border border-border bg-surface px-3 py-2 text-xs"
+              className="flex min-w-0 flex-col items-stretch gap-3 rounded border border-border bg-surface px-3 py-2 text-xs [overflow-wrap:anywhere] md:flex-row md:flex-wrap md:items-center"
             >
-              <span className="font-mono text-sm font-semibold text-content">{job.char_id}</span>
-              <span className="text-content-muted">{job.label}</span>
-              <span className="min-w-[8rem] flex-1">
+              <span className="min-w-0 font-mono text-sm font-semibold text-content">{job.char_id}</span>
+              <span className="min-w-0 text-content-muted md:flex-1">{job.label}</span>
+              <span className="min-w-0 w-full md:w-auto md:flex-1">
                 <span className="block text-content-muted">{stageText(job)}</span>
                 {isActive(job) && (
                   <span className="mt-1 block h-1 w-full overflow-hidden rounded bg-surface-sunken">
@@ -251,7 +254,7 @@ export default function CharacterJobsPanel({
                 <button
                   onClick={() => handleDismiss(job.job_id)}
                   aria-label={`Dismiss job ${job.char_id}`}
-                  className={`${dangerActionClassName} max-w-[5rem] px-2`}
+                  className={`${dangerActionClassName} w-full px-2 md:w-auto md:flex-none`}
                 >
                   Dismiss
                 </button>

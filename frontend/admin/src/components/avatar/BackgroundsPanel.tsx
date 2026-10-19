@@ -4,11 +4,14 @@ import type { AvatarBackground } from "../../api";
 import { ResourceSourceBadge } from "./ResourceSourceBadge";
 import {
   assetCardClassName,
-  assetGridStyle,
+  assetGridClassName,
   cardActionsClassName,
   cardBodyClassName,
   dangerActionClassName,
+  fileFieldClassName,
   filePickerClassName,
+  fileRowClassName,
+  formRowClassName,
   formPanelClassName,
   formatSize,
   inputClassName,
@@ -64,7 +67,7 @@ export default function BackgroundsPanel({
           <span className="material-symbols-outlined text-base">image</span>
           Upload background
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className={formRowClassName}>
           <input
             type="text"
             placeholder="Background ID"
@@ -94,14 +97,14 @@ export default function BackgroundsPanel({
             </select>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
+        <div className={fileRowClassName}>
+          <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
               Image (.png, .jpg, .webp):
             </span>
             <label className={filePickerClassName(selectedImageName)}>
               <span className="material-symbols-outlined text-sm">image</span>
-              <span className="max-w-[15rem] truncate">
+              <span className="min-w-0 truncate">
                 {selectedImageName || "Select background image"}
               </span>
               <input
@@ -135,7 +138,7 @@ export default function BackgroundsPanel({
       )}
 
       {!loading && backgrounds.length > 0 && (
-        <div className="grid gap-4" style={assetGridStyle}>
+        <div className={assetGridClassName}>
           {backgrounds.map((background) => (
             <div key={background.background_id} className={assetCardClassName}>
               <div className={mediaPreviewClassName}>
@@ -146,8 +149,8 @@ export default function BackgroundsPanel({
                 />
               </div>
               <div className={cardBodyClassName}>
-                <div className="flex items-center justify-between gap-1">
-                  <p className="font-mono text-sm font-semibold text-content">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-1">
+                  <p className="min-w-0 font-mono text-sm font-semibold text-content">
                     {background.background_id}
                   </p>
                   <ResourceSourceBadge

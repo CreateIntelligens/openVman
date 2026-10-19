@@ -158,6 +158,8 @@ describe("AccessGraph page", () => {
       allowed_mascots: [],
       allowed_tts_voices: [],
       allowed_asr_engines: [],
+      asr_engine_order: [],
+      tts_engine_order: [],
       default_tts_voice: null,
       default_asr_engine: null,
       taiwanese_asr_engine: null,

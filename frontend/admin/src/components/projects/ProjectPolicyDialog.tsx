@@ -20,11 +20,31 @@ import { useModalDismiss } from "../useModalDismiss";
 // 跟後端 SERVER_ASR_PROVIDERS 一致：台語分流走批次辨識，只能選這些。
 export const BATCH_ASR_ENGINES = new Set(["breeze", "r2t2", "r2t2-dev", "sensevoice", "openai"]);
 
+const TTS_ENGINE_LABELS: Record<string, string> = {
+  indextts: "IndexTTS",
+  voxcpm: "VoxCPM",
+  cosyvoice: "CosyVoice",
+  "gemini-tts": "Gemini TTS",
+  "gcp-tts": "GCP TTS",
+  "aws-polly": "AWS Polly",
+  "edge-tts": "Edge TTS",
+};
+
+const ASR_ENGINE_LABELS: Record<string, string> = {
+  breeze: "Breeze",
+  r2t2: "R2T2",
+  "r2t2-dev": "R2T2 dev",
+  sensevoice: "SenseVoice",
+  openai: "OpenAI",
+};
+
 const EMPTY_POLICY: ProjectPolicyInput = {
   allowed_asr_engines: [],
+  asr_engine_order: [],
   default_asr_engine: null,
   taiwanese_asr_engine: null,
   allowed_tts_voices: [],
+  tts_engine_order: [],
   default_tts_voice: null,
   allowed_characters: [],
   default_character_id: null,
@@ -201,6 +221,79 @@ function DefaultSelect({ label, value, options, disabled, emptyLabel, onChange }
   );
 }
 
+interface EngineOrderEditorProps {
+  label: string;
+  help: string;
+  labels: Record<string, string>;
+  options: string[];
+  order: string[];
+  disabled: boolean;
+  onChange: (order: string[]) => void;
+}
+
+function EngineOrderEditor({
+  label, help, labels, options, order, disabled, onChange,
+}: EngineOrderEditorProps) {
+  const available = options.filter((id) => !order.includes(id));
+
+  function move(index: number, offset: number) {
+    const next = [...order];
+    [next[index], next[index + offset]] = [next[index + offset], next[index]];
+    onChange(next);
+  }
+
+  return (
+    <fieldset disabled={disabled}>
+      <legend className="text-sm font-medium">{label}</legend>
+      <p className="mt-1 text-xs leading-5 text-content-muted">{help}</p>
+      <select
+        aria-label={`新增${label}`}
+        className="input mt-2"
+        value=""
+        disabled={disabled || available.length === 0}
+        onChange={(event) => {
+          if (event.target.value) onChange([...order, event.target.value]);
+        }}
+      >
+        <option value="">選擇要新增的引擎…</option>
+        {available.map((id) => <option key={id} value={id}>{labels[id] ?? id}</option>)}
+      </select>
+      <ol aria-label={`${label}清單`} className="mt-2 space-y-2">
+        {order.map((id, index) => (
+          <li
+            key={id}
+            className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+          >
+            <span className="min-w-0 break-words">{index + 1}. {labels[id] ?? id}</span>
+            <div className="ml-auto flex shrink-0 gap-1 whitespace-nowrap">
+              <button
+                type="button"
+                className="btn btn-ghost px-2 py-1 text-xs"
+                aria-label={`${labels[id] ?? id}上移`}
+                disabled={disabled || index === 0}
+                onClick={() => move(index, -1)}
+              >上移</button>
+              <button
+                type="button"
+                className="btn btn-ghost px-2 py-1 text-xs"
+                aria-label={`${labels[id] ?? id}下移`}
+                disabled={disabled || index === order.length - 1}
+                onClick={() => move(index, 1)}
+              >下移</button>
+              <button
+                type="button"
+                className="btn btn-ghost px-2 py-1 text-xs text-danger"
+                aria-label={`${labels[id] ?? id}移除`}
+                onClick={() => onChange(order.filter((item) => item !== id))}
+              >移除</button>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </fieldset>
+  );
+}
+
 /** 專案的資源與語音設定：限制可用人物、背景、小助理、辨識引擎與聲音。 */
 export default function ProjectPolicyDialog({
   projectId,
@@ -239,9 +332,11 @@ export default function ProjectPolicyDialog({
         if (!active) return;
         setPolicy({
           allowed_asr_engines: loaded.allowed_asr_engines ?? [],
+          asr_engine_order: loaded.asr_engine_order ?? [],
           default_asr_engine: loaded.default_asr_engine ?? null,
           taiwanese_asr_engine: loaded.taiwanese_asr_engine ?? null,
           allowed_tts_voices: loaded.allowed_tts_voices ?? [],
+          tts_engine_order: loaded.tts_engine_order ?? [],
           default_tts_voice: loaded.default_tts_voice ?? null,
           allowed_characters: loaded.allowed_characters ?? [],
           default_character_id: loaded.default_character_id ?? null,
@@ -309,6 +404,9 @@ export default function ProjectPolicyDialog({
       return {
         ...current,
         allowed_asr_engines: allowed,
+        asr_engine_order: allowed.length
+          ? current.asr_engine_order.filter((engine) => allowed.includes(engine))
+          : current.asr_engine_order,
         default_asr_engine: keepInside(current.default_asr_engine, allowed, specialEngines),
         taiwanese_asr_engine: keepInside(current.taiwanese_asr_engine, allowed, specialEngines),
       };
@@ -562,6 +660,17 @@ export default function ProjectPolicyDialog({
                     }))}
                   />
                 </div>
+                <EngineOrderEditor
+                  label="批次 ASR 引擎順位"
+                  help="指定引擎之後的備援順序；空白用部署順序"
+                  labels={ASR_ENGINE_LABELS}
+                  options={Object.keys(ASR_ENGINE_LABELS).filter((id) => (
+                    policy.allowed_asr_engines.length === 0 || policy.allowed_asr_engines.includes(id)
+                  ))}
+                  order={policy.asr_engine_order}
+                  disabled={busy}
+                  onChange={(order) => setPolicy((current) => ({ ...current, asr_engine_order: order }))}
+                />
               </div>
 
               {/* TTS 聲音 */}
@@ -587,6 +696,15 @@ export default function ProjectPolicyDialog({
                   限制聲音時，合成失敗只會退回清單裡的 Edge 聲音；清單沒有 Edge 聲音就直接回錯誤，
                   不會默默換成別的引擎。
                 </p>
+                <EngineOrderEditor
+                  label="TTS 引擎順位"
+                  help="沒指定引擎與聲音時照這個順序試；空白用部署順序"
+                  labels={TTS_ENGINE_LABELS}
+                  options={Object.keys(TTS_ENGINE_LABELS)}
+                  order={policy.tts_engine_order}
+                  disabled={busy}
+                  onChange={(order) => setPolicy((current) => ({ ...current, tts_engine_order: order }))}
+                />
               </div>
 
               {/* 資源指派專區 */}
