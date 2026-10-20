@@ -29,6 +29,7 @@ vi.mock("./api/metrics", () => ({
 
 vi.mock("./api/auth", () => ({
   AdminPortalAccessError: class AdminPortalAccessError extends Error {},
+  AdminSessionUnavailableError: class AdminSessionUnavailableError extends Error {},
   getCurrentAccount: vi.fn().mockResolvedValue({
     id: "admin-1",
     username: "admin",

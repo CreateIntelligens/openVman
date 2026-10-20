@@ -175,21 +175,21 @@ export default function Tools() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
-        <div>
+      <header className="page-header">
+        <div className="page-heading">
           <h1 className="page-title">工具與技能</h1>
           <p className="page-subtitle">
             管理技能插件及查看已註冊工具
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="page-actions">
           <button
             onClick={handleReloadAll}
             disabled={busy}
             title="重新掃描技能檔案並刷新清單"
-            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-bold transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+            className="btn btn-primary"
           >
-            <span className="material-symbols-outlined text-sm">sync</span>
+            <span className="material-symbols-outlined text-[1.125rem]">sync</span>
             <span>{reloading ? "重新載入中..." : loading ? "載入中..." : "重新載入"}</span>
           </button>
         </div>

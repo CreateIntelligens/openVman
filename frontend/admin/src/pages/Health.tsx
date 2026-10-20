@@ -17,19 +17,19 @@ export default function Health() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
-        <div>
+      <header className="page-header">
+        <div className="page-heading">
           <h2 className="page-title">系統健康</h2>
           <p className="page-subtitle">Real-time status of your brain infrastructure</p>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-content-subtle">auto-refresh in {countdown}s</span>
+        <div className="page-actions">
+          <span className="whitespace-nowrap text-xs text-content-subtle">auto-refresh in {countdown}s</span>
           <button
             onClick={load}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-bold transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+            className="btn btn-primary"
           >
-            <span className="material-symbols-outlined text-sm">refresh</span>
+            <span className="material-symbols-outlined text-[1.125rem]">refresh</span>
             <span>{loading ? "載入中…" : "重新整理"}</span>
           </button>
         </div>

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api/auth", () => ({
   AdminPortalAccessError: class AdminPortalAccessError extends Error {},
+  AdminSessionUnavailableError: class AdminSessionUnavailableError extends Error {},
   getCurrentAccount: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock("../api/auth", () => ({
 
 import {
   AdminPortalAccessError,
+  AdminSessionUnavailableError,
   getCurrentAccount,
   login,
   logout,
@@ -31,6 +33,8 @@ function Probe() {
   return (
     <div>
       <span>{auth.loading ? "loading" : auth.account?.username ?? "guest"}</span>
+      {auth.unavailable && <span role="alert">{auth.unavailable}</span>}
+      <button type="button" onClick={auth.retry}>retry</button>
       <button
         type="button"
         onClick={() => void auth.login("alice", "password-123").catch(() => undefined)}
@@ -104,6 +108,22 @@ describe("AuthProvider", () => {
     await waitFor(() => expect(login).toHaveBeenCalledOnce());
     expect(screen.getByText("guest")).toBeTruthy();
     expect(window.location.pathname).toBe("/admin/login");
+  });
+
+  it("keeps the session and offers a retry when the bootstrap request cannot reach the server", async () => {
+    vi.mocked(getCurrentAccount).mockRejectedValueOnce(
+      new AdminSessionUnavailableError("連不上伺服器，請稍後再試。"),
+    );
+    render(<AuthProvider><Probe /></AuthProvider>);
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByText("guest")).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/chat");
+
+    fireEvent.click(screen.getByRole("button", { name: "retry" }));
+
+    expect(await screen.findByText("alice")).toBeTruthy();
+    expect(getCurrentAccount).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the normal frontend session when Admin portal bootstrap is denied", async () => {

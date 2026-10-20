@@ -289,6 +289,23 @@ describe("ProjectPolicyDialog", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("default_tts_voice");
   });
 
+  it("blocks saving until the current policy has loaded, and recovers on retry", async () => {
+    // 讀失敗時表單是空清單，而空清單代表「不限制」；一存就把專案限制解掉。
+    api.fetchProjectPolicy.mockRejectedValueOnce(new Error("連不上伺服器"));
+    renderDialog();
+
+    expect((await screen.findByRole("alert")).textContent).toContain("連不上伺服器");
+    expect((screen.getByRole("button", { name: "儲存" }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "重新讀取" }));
+
+    await waitFor(() => {
+      expect((screen.getByRole("button", { name: "儲存" }) as HTMLButtonElement).disabled).toBe(false);
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(api.fetchProjectPolicy).toHaveBeenCalledTimes(2);
+  });
+
   it("renders assignment section as read-only for non-ROOT admin", async () => {
     api.getCurrentAccount.mockResolvedValue({ id: "admin-1", username: "admin", role: "admin" });
     api.fetchProjectResources.mockResolvedValue({

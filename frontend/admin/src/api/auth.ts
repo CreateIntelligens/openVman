@@ -3,6 +3,7 @@ import {
   apiUrl,
   fetchJson,
   itemPath,
+  parseErrorMessage,
   parseJson,
 } from "./common";
 
@@ -225,6 +226,9 @@ interface TemporaryBatchListResponse {
 
 export class AdminPortalAccessError extends Error {}
 
+/** 問不到登入狀態（連不上、5xx），不代表登入失效。 */
+export class AdminSessionUnavailableError extends Error {}
+
 function accountFromResponse(payload: LoginResponse): AccountProfile {
   const account = payload.account ?? payload.user ?? payload;
   if (!account.id || !account.username || !account.role) {
@@ -263,9 +267,21 @@ export async function logout(): Promise<void> {
 }
 
 export async function getCurrentAccount(): Promise<AccountProfile> {
-  const response = await apiFetch(apiUrl("/auth/admin-me"));
+  let response: Response;
+  try {
+    response = await apiFetch(apiUrl("/auth/admin-me"));
+  } catch (error) {
+    if (error instanceof DOMException) throw error;
+    throw new AdminSessionUnavailableError(
+      error instanceof Error ? error.message : "連不上伺服器，請稍後再試。",
+    );
+  }
   if (response.status === 403) {
     throw new AdminPortalAccessError("此帳號沒有進入管理後台的權限");
+  }
+  // 後端重啟或代理 502 時 cookie 還在；當成登出會把人踢回登入頁重打密碼。
+  if (response.status >= 500) {
+    throw new AdminSessionUnavailableError(await parseErrorMessage(response));
   }
   const payload = await parseJson<LoginResponse>(response);
   return accountFromResponse(payload);

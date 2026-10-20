@@ -130,7 +130,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-content-muted hover:bg-surface-sunken transition-colors"
+        className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-content-muted hover:bg-surface-sunken transition-colors"
         title="使用者用哪種語言問，就查那個語言的文件"
       >
         <span className="material-symbols-outlined text-[1rem]">translate</span>

@@ -9,6 +9,10 @@ import {
   type MascotOption,
 } from "../../data/mascotCatalog";
 import { dataUrlToFile } from "../../utils/dataUrlToFile";
+import {
+  BOTTOM_BAR_CLEARANCE_VAR,
+  readBottomBarClearance,
+} from "../../hooks/useBottomBarClearance";
 
 const MASCOT_DEFAULT_MARGIN_REM = 1;
 const MASCOT_SNAPSHOT_MIN_BYTES = 6000;
@@ -198,11 +202,12 @@ export default function MascotWidget() {
       window.innerWidth,
       margin,
     );
+    // 底邊要再讓出頁面底部操作列的高度，拖到最下面也不會壓住送出鈕。
     const bottom = clampInset(
       window.innerHeight - top - height,
       height,
       window.innerHeight,
-      margin,
+      margin + readBottomBarClearance(),
     );
     setPosition({ right, bottom });
   }, []);
@@ -243,7 +248,8 @@ export default function MascotWidget() {
       onClick={() => {
         openMascot();
       }}
-      className="mascot-trigger fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-raised text-primary shadow-lg transition-colors hover:bg-surface-sunken"
+      className="mascot-trigger fixed right-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-raised text-primary shadow-lg transition-colors hover:bg-surface-sunken"
+      style={{ bottom: `calc(var(${BOTTOM_BAR_CLEARANCE_VAR}, 0rem) + ${MASCOT_DEFAULT_MARGIN_REM}rem)` }}
     >
       <svg
         viewBox="0 0 24 24"
@@ -267,7 +273,10 @@ export default function MascotWidget() {
 
   const style: CSSProperties = position
     ? { right: toRem(position.right), bottom: toRem(position.bottom) }
-    : { right: `${MASCOT_DEFAULT_MARGIN_REM}rem`, bottom: `${MASCOT_DEFAULT_MARGIN_REM}rem` };
+    : {
+      right: `${MASCOT_DEFAULT_MARGIN_REM}rem`,
+      bottom: `calc(var(${BOTTOM_BAR_CLEARANCE_VAR}, 0rem) + ${MASCOT_DEFAULT_MARGIN_REM}rem)`,
+    };
 
   return (
     <>

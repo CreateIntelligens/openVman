@@ -10,6 +10,7 @@ import AppSidebar from "./components/app/AppSidebar";
 import {
   AdminPortalDeniedState,
   AuthLoadingState,
+  AuthUnavailableState,
   ForbiddenState,
   LoginScreen,
 } from "./components/auth/AuthStates";
@@ -338,7 +339,7 @@ function AuthenticatedApp() {
 }
 
 function AuthGate() {
-  const { account, loading, forbidden } = useAuth();
+  const { account, loading, forbidden, unavailable } = useAuth();
 
   useEffect(() => {
     if (!loading && account && window.location.pathname === publicAdminPath("/admin/login")) {
@@ -347,6 +348,7 @@ function AuthGate() {
   }, [account, loading]);
 
   if (loading) return <AuthLoadingState />;
+  if (unavailable && !account) return <AuthUnavailableState />;
   if (forbidden && !account) return <AdminPortalDeniedState />;
   if (!account) return <LoginScreen />;
   if (forbidden) {

@@ -54,7 +54,7 @@ export default function KnowledgeHeader({
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface-sunken p-0.5 dark:bg-surface-sunken/40 sm:ml-3">
           <button
             onClick={() => setActiveTab("documents")}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+            className={`whitespace-nowrap px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
               activeTab === "documents"
                 ? "bg-surface-raised text-primary shadow-sm"
                 : "text-content-subtle hover:text-content"
@@ -64,7 +64,7 @@ export default function KnowledgeHeader({
           </button>
           <button
             onClick={() => setActiveTab("graph")}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+            className={`whitespace-nowrap px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
               activeTab === "graph"
                 ? "bg-surface-raised text-primary shadow-sm"
                 : "text-content-subtle hover:text-content"
@@ -75,11 +75,11 @@ export default function KnowledgeHeader({
         </div>
       </div>
       {activeTab === "documents" && (
-        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
           <LanguageRoutesButton projectId={projectId} />
           <button
             onClick={onToggleSourcePanel}
-            className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
           >
             <span className="material-symbols-outlined text-[1rem]">add</span>
             新增來源
@@ -88,7 +88,7 @@ export default function KnowledgeHeader({
             onClick={onCommit}
             disabled={committing}
             title="採納 raw 區的上傳檔案進知識庫，並重建索引與圖譜"
-            className="flex items-center gap-1.5 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
           >
             <span className={`material-symbols-outlined text-[1rem] ${committing ? "animate-spin" : ""}`}>
               library_add
@@ -98,7 +98,7 @@ export default function KnowledgeHeader({
           <button
             onClick={onReindex}
             disabled={reindexing}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             <span className={`material-symbols-outlined text-[1rem] ${reindexing ? "animate-spin" : ""}`}>
               sync

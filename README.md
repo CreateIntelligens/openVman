@@ -54,7 +54,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 ### 管理後台
 
-後台每頁都有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/access/accounts/temporary`），以 `?project=<id>` 指定專案，公開子路徑部署時加 `/openvman` 前綴。完整路由表見 [Canonical Routes](docs/guides/admin-canonical-routes.md)。
+後台每頁都有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/access/accounts/temporary`），以 `?project=<id>` 指定專案，公開子路徑部署時加 `/openvman` 前綴。完整路由表見 [Canonical Routes](docs/guides/admin-canonical-routes.md)。開站時若後端暫時連不上（連線失敗或 5xx），畫面提供重試而保留登入狀態，只有 401 才回登入頁。
 
 | 群組 | 頁面 | 用途 |
 |---|---|---|
@@ -66,7 +66,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | Character | 角色管理 | 人設 |
 | | Avatar | 2D 角色（可直接上傳素材包，或上傳說話影片交給 `avatar-pipeline` 轉換、轉完自動建成角色）、背景，以及嵌入網站右下角的小助理 |
 | | 工具與技能 | Brain 工具與 skills 狀態 |
-| System | 專案與權限（`/admin/access`） | 分頁：專案（建立與列出專案）；帳號（正式帳號列表可搜尋、建立管理員時可一併設登入預設值與資源上限、臨時帳號批次、資源與引擎授權（人物依擁有的專案、聲音依引擎分區段，可收合、整段勾選、搜尋與只看已選；管理員帳號會標明不受清單限制；未儲存就切換會先提示）、展示機台旗標）；側欄切回任一頁都回到上次停的子分頁；API 金鑰（`/admin/access/api-keys`，可獨立設定期限、撤銷與查使用紀錄）；權限圖譜（`/admin/access/graph`，唯讀的帳號 ↔ 專案授權網路圖，可疊加人物、聲音、辨識引擎與臨時帳號圖層，並依專案、資源、角色、帳號類型與連線種類篩選）；Embed 金鑰（外部網站嵌入 Avatar 用的金鑰）。一般帳號只看得到專案與 API 金鑰 |
+| System | 專案與權限（`/admin/access`） | 分頁：專案（建立與列出專案）；帳號（正式帳號列表可搜尋、建立管理員時可一併設登入預設值與資源上限、臨時帳號批次、資源與引擎授權（人物依擁有的專案、聲音依引擎分區段，可收合、整段勾選、搜尋與只看已選；管理員帳號會標明不受清單限制；未儲存就切換帳號或收合面板會先提示，搜尋時編輯中的那一列保留）、展示機台旗標）；側欄切回任一頁都回到上次停的子分頁；API 金鑰（`/admin/access/api-keys`，可獨立設定期限、撤銷與查使用紀錄）；權限圖譜（`/admin/access/graph`，唯讀的帳號 ↔ 專案授權網路圖，可疊加人物、聲音、辨識引擎與臨時帳號圖層，並依專案、資源、角色、帳號類型與連線種類篩選）；Embed 金鑰（外部網站嵌入 Avatar 用的金鑰）。一般帳號只看得到專案與 API 金鑰 |
 | | 模型供應商 | 全站模型順序與金鑰，僅 ROOT |
 | | 用量 | 依帳號、專案、session 彙總的模型與 token 用量 |
 | | 系統狀態（`/admin/system`） | 分頁：健康（服務健康檢查）、監控（Grafana 儀表板，`/admin/system/monitoring`） |
@@ -102,7 +102,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語改用 CosyVoice，停用時 VoxCPM；國語、英文在沒指定聲音時用 IndexTTS） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
 
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
-- 專案可在「專案與權限 → 專案 → 資源與語音設定」限制能用的人物、背景、小助理、ASR 引擎與聲音、指定預設值與台語分流引擎，並自訂 TTS 與批次 ASR 的引擎順位（沒指定引擎時照順位試，台語分流也照它挑 CosyVoice／VoxCPM 誰先）；一般帳號實際能用的是帳號授權與專案限制的交集加上專案專屬與 ROOT 指派資源；ROOT 帳號則豁免於專案白名單限制（但仍套用專案預設值），選單中超出專案範圍之項目以紅字加註提示。規則見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
+- 專案可在「專案與權限 → 專案 → 資源與語音設定」限制能用的人物、背景、小助理、ASR 引擎與聲音、指定預設值與台語分流引擎，並自訂 TTS 與批次 ASR 的引擎順位（沒指定引擎時照順位試，台語分流也照它挑 CosyVoice／VoxCPM 誰先）；一般帳號實際能用的是帳號授權與專案限制的交集加上專案專屬與 ROOT 指派資源；ROOT 帳號則豁免於專案白名單限制（但仍套用專案預設值），選單中超出專案範圍之項目以紅字加註提示。讀不到目前設定時對話框不開放儲存，避免以空清單（不限制）覆蓋原有限制。規則見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
 - 專案可設定語言分流與 ASR 詞表；未明確指定單次 ASR provider 時，開啟台語分流的專案改用 Breeze（或專案指定的台語引擎）批次辨識並判斷是否為台語，明確指定則保留該引擎。
 - TTS 依帳號授權選擇供應商與聲音，主要節點失敗時自動改用下一家。
 

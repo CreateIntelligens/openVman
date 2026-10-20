@@ -505,14 +505,14 @@ export default function Usage() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 flex items-start justify-between gap-4 px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10 transition-colors">
-        <div className="min-w-0">
+      <header className="page-header">
+        <div className="page-heading">
           <h1 className="page-title">用量</h1>
           <p className="page-subtitle">
             查看 LLM 與語音的呼叫次數、Token 消耗與延遲，並追溯每個對話回合的成本。
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="page-actions">
           <button
             type="button"
             onClick={() => void reload()}

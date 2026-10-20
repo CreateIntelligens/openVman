@@ -10,6 +10,7 @@ import {
 
 import {
   AdminPortalAccessError,
+  AdminSessionUnavailableError,
   getCurrentAccount,
   login as loginRequest,
   logout as logoutRequest,
@@ -27,6 +28,9 @@ interface AuthContextValue {
   account: AccountProfile | null;
   loading: boolean;
   forbidden: boolean;
+  /** 開站時問不到登入狀態的原因；有值時畫面顯示重試，不導向登入。 */
+  unavailable: string | null;
+  retry: () => void;
   login: (username: string, password: string) => Promise<void>;
   loginTemporary: (password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -48,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   setStorageScope(account?.id ?? "");
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
 
   const expireSession = useCallback(() => {
     setAccount(null);
@@ -62,6 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const clearUnauthorized = setUnauthorizedHandler(expireSession);
     const clearForbiddenHandler = setForbiddenHandler(() => setForbidden(true));
     let active = true;
+    setLoading(true);
+    setUnavailable(null);
 
     getCurrentAccount()
       .then((profile) => {
@@ -72,6 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (reason instanceof AdminPortalAccessError) {
           setAccount(null);
           setForbidden(true);
+          return;
+        }
+        if (reason instanceof AdminSessionUnavailableError) {
+          setUnavailable(reason.message);
           return;
         }
         expireSession();
@@ -85,7 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearUnauthorized();
       clearForbiddenHandler();
     };
-  }, [expireSession]);
+  }, [bootstrapAttempt, expireSession]);
+
+  const retry = useCallback(() => {
+    setBootstrapAttempt((attempt) => attempt + 1);
+  }, []);
 
   const handleAuthenticated = useCallback((profile: AccountProfile) => {
     setAccount(profile);
@@ -124,12 +140,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       account,
       loading,
       forbidden,
+      unavailable,
+      retry,
       login,
       loginTemporary,
       logout,
       clearForbidden,
     }),
-    [account, clearForbidden, forbidden, loading, login, loginTemporary, logout],
+    [account, clearForbidden, forbidden, loading, login, loginTemporary, logout, retry, unavailable],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

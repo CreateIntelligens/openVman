@@ -87,11 +87,13 @@ export default function Search() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="sticky top-0 z-10 px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10">
-        <h1 className="page-title">知識庫搜尋</h1>
-        <p className="page-subtitle">
-          顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。
-        </p>
+      <header className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">知識庫搜尋</h1>
+          <p className="page-subtitle">
+            顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。
+          </p>
+        </div>
       </header>
 
       <div className="p-8 max-w-5xl space-y-8">

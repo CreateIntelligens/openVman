@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent } from "react";
 
 import type { SkillInfo, TtsProvider } from "../../api";
 import type { MyAsrProvider } from "../../api/asr";
@@ -9,6 +9,7 @@ import { AsrControls } from "./AsrControls";
 import { SlashDropdown } from "./SlashDropdown";
 import { AsrButton } from "./AsrButton";
 import PrivacyWarningToggle from "./PrivacyWarningToggle";
+import { useBottomBarClearance } from "../../hooks/useBottomBarClearance";
 
 interface ChatInputProps {
   mode: "text" | "live";
@@ -143,6 +144,8 @@ export default function ChatInput(props: ChatInputProps) {
     liveCameraButtonClassName = "bg-primary text-content-inverse hover:opacity-90";
   }
   const hasSlashMatches = slashEnabled && slashOpen && slashMatches.length > 0;
+  const barRef = useRef<HTMLDivElement>(null);
+  useBottomBarClearance(barRef);
 
   const handleSlashKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (!hasSlashMatches) {
@@ -194,7 +197,7 @@ export default function ChatInput(props: ChatInputProps) {
   };
 
   return (
-    <div className="shrink-0 bg-surface px-4 py-4">
+    <div ref={barRef} className="shrink-0 bg-surface px-4 py-4">
       <div className="relative mx-auto flex max-w-3xl flex-col gap-3">
         <div className="absolute bottom-full left-0 right-0 mb-3 flex flex-col gap-2">
           {ttsFallbackToast && (

@@ -124,28 +124,26 @@ export default function Memory() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="page-title">記憶管理</h1>
-            <p className="page-subtitle">
-              瀏覽、新增並管理精選記憶紀錄。
-            </p>
-          </div>
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            {(["browse", "add"] as Tab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab
-                    ? "bg-primary text-white"
-                    : "text-content-muted hover:text-content "
-                  }`}
-              >
-                {tab === "browse" ? "瀏覽" : "新增"}
-              </button>
-            ))}
-          </div>
+      <header className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">記憶管理</h1>
+          <p className="page-subtitle">
+            瀏覽、新增並管理精選記憶紀錄。
+          </p>
+        </div>
+        <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
+          {(["browse", "add"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`whitespace-nowrap px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab
+                  ? "bg-primary text-white"
+                  : "text-content-muted hover:text-content "
+                }`}
+            >
+              {tab === "browse" ? "瀏覽" : "新增"}
+            </button>
+          ))}
         </div>
       </header>
 

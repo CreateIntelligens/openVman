@@ -50,9 +50,19 @@ vi.mock("../context/AuthContext", () => ({
   useAuth: () => authState,
 }));
 
+const guard = vi.hoisted(() => ({ block: false, requests: 0 }));
+
 vi.mock("../context/NavigationGuardContext", () => ({
-  // 守衛本身在 NavigationGuardContext.test 驗；這裡直接放行，專心測帳號頁。
-  useNavigationGuard: () => ({ hasUnsavedChanges: false, requestNavigation: (go: () => void) => go() }),
+  // 守衛本身在 NavigationGuardContext.test 驗；這裡預設放行，block 時模擬使用者按了「留下」。
+  useNavigationGuard: () => ({
+    hasUnsavedChanges: guard.block,
+    requestNavigation: (go: () => void) => {
+      guard.requests += 1;
+      if (guard.block) return false;
+      go();
+      return true;
+    },
+  }),
   useUnsavedChanges: () => {},
 }));
 
@@ -90,6 +100,8 @@ describe("Accounts", () => {
   beforeEach(() => {
   window.history.replaceState(null, "", "/admin/access/accounts");
     vi.clearAllMocks();
+    guard.block = false;
+    guard.requests = 0;
     authState.account = {
       id: "admin-a",
       username: "admin",
@@ -672,6 +684,43 @@ describe("Accounts", () => {
       expect(confirm).toHaveBeenCalledWith("確定刪除帳號「retired」？");
       await waitFor(() => expect(deleteAccount).toHaveBeenCalledWith("user-c"));
       confirm.mockRestore();
+    });
+
+    it("asks before collapsing an admin scope panel that has unsaved changes", async () => {
+      vi.mocked(listAccounts).mockResolvedValue([
+        formalAccount("admin-b", "operator", "admin"),
+      ]);
+      render(<Accounts />);
+      switchToManageTab();
+      const row = (await screen.findByText("operator")).closest("article");
+      clickRowButton(row, "資源上限");
+      expect(await screen.findByText("資源上限面板")).toBeTruthy();
+
+      guard.block = true;
+      clickRowButton(row, "收起資源上限");
+
+      expect(guard.requests).toBeGreaterThan(0);
+      expect(screen.getByText("資源上限面板")).toBeTruthy();
+    });
+
+    it("keeps the row being edited when a search would filter it out", async () => {
+      vi.mocked(listAccounts).mockResolvedValue([
+        formalAccount("admin-b", "operator", "admin"),
+        formalAccount("user-c", "carol", "user"),
+      ]);
+      render(<Accounts />);
+      switchToManageTab();
+      const row = (await screen.findByText("operator")).closest("article");
+      clickRowButton(row, "資源上限");
+      expect(await screen.findByText("資源上限面板")).toBeTruthy();
+
+      fireEvent.change(screen.getByRole("searchbox", { name: "搜尋帳號" }), {
+        target: { value: "carol" },
+      });
+
+      expect(screen.getByText("carol")).toBeTruthy();
+      expect(screen.getByText("operator")).toBeTruthy();
+      expect(screen.getByText("資源上限面板")).toBeTruthy();
     });
 
     it("toggles the admin scope panel from the menu", async () => {

@@ -300,6 +300,10 @@ export default function ProjectPolicyDialog({
   const [assignId, setAssignId] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
   const [loading, setLoading] = useState(true);
+  // 讀到目前的設定才准儲存：讀失敗時表單裡是空清單，而空清單對後端代表
+  // 「不限制」，一按儲存就把專案的限制整個解掉。
+  const [loaded, setLoaded] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dismiss = useModalDismiss(() => {
@@ -309,6 +313,8 @@ export default function ProjectPolicyDialog({
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setLoaded(false);
+    setError(null);
     Promise.all([
       fetchProjectPolicy(projectId),
       fetchAccountAccessOptions(),
@@ -341,6 +347,7 @@ export default function ProjectPolicyDialog({
         if (res) {
           setAssignedResources(res);
         }
+        setLoaded(true);
       })
       .catch((reason) => {
         if (active) setError(errorMessage(reason, "無法載入專案設定"));
@@ -351,7 +358,7 @@ export default function ProjectPolicyDialog({
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [projectId, loadAttempt]);
 
   const engineOptions = withMissing(engines, policy.allowed_asr_engines);
   const voiceOptions = withMissing(voices, policy.allowed_tts_voices);
@@ -377,7 +384,7 @@ export default function ProjectPolicyDialog({
     ? mascotOptions.filter((option) => policy.allowed_mascots?.includes(option.id) || isSpecial(option))
     : mascots;
   const taiwaneseChoices = engineChoices.filter((option) => BATCH_ASR_ENGINES.has(option.id));
-  const busy = loading || saving || assigning;
+  const busy = loading || saving || assigning || !loaded;
 
   const specialEngines = new Set(engines.filter(isSpecial).map((o) => o.id));
   const specialVoices = new Set(voices.filter(isSpecial).map((o) => o.id));
@@ -542,10 +549,20 @@ export default function ProjectPolicyDialog({
         <form onSubmit={submit}>
           {error && (
             <div
-              className="mx-6 mt-5 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+              className="mx-6 mt-5 flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
               role="alert"
             >
-              {error}
+              <span>{error}</span>
+              {!loaded && (
+                <button
+                  className="btn btn-ghost px-2 py-1 text-xs"
+                  type="button"
+                  onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+                  disabled={loading}
+                >
+                  重新讀取
+                </button>
+              )}
             </div>
           )}
 

@@ -475,7 +475,11 @@ export default function Accounts() {
             ) : (
               <div className="divide-y divide-border">
                 {(sortMode === "idle" ? sortByLeastRecentActivity(accounts) : accounts)
-                  .filter((account) => matchesAccountQuery(account, accountQuery))
+                  // 正在編輯的列不隨搜尋消失：濾掉會連面板一起卸載，草稿就丟了。
+                  .filter((account) =>
+                    account.id === editingAccountId
+                    || account.id === editingScopeAccountId
+                    || matchesAccountQuery(account, accountQuery))
                   .map((account) => {
                   const isSelf = account.id === currentAccount?.id;
                   const isFormal = (
@@ -592,8 +596,8 @@ export default function Accounts() {
                                       ? [{
                                         id: "scope",
                                         label: editingScope ? "收起資源上限" : "資源上限",
-                                        onSelect: () => setEditingScopeAccountId(
-                                          editingScope ? null : account.id,
+                                        onSelect: () => requestNavigation(() =>
+                                          setEditingScopeAccountId(editingScope ? null : account.id),
                                         ),
                                       }]
                                       : []),
@@ -661,14 +665,14 @@ export default function Accounts() {
                       {editingScope && (
                         <AdminScopePanel
                           account={account}
-                          onCancel={() => setEditingScopeAccountId(null)}
+                          onCancel={() => requestNavigation(() => setEditingScopeAccountId(null))}
                           onSaved={() => setEditingScopeAccountId(null)}
                         />
                       )}
                       {editingAccess && (
                         <FormalAccountAccessPanel
                           account={account}
-                          onCancel={() => setEditingAccountId(null)}
+                          onCancel={() => requestNavigation(() => setEditingAccountId(null))}
                           onSaved={(updated) => {
                             replaceAccount(updated);
                             setEditingAccountId(null);

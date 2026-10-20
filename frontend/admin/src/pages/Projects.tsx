@@ -35,14 +35,14 @@ export default function Projects() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10 transition-colors">
-        <div>
+      <header className="page-header">
+        <div className="page-heading">
           <h2 className="page-title">專案管理</h2>
           <p className="page-subtitle">
             管理多專案隔離，每個專案有獨立的 knowledge、persona、memory 空間。
           </p>
         </div>
-        <div className="text-xs text-content-subtle">
+        <div className="whitespace-nowrap text-xs text-content-subtle">
           {projects.length} project{projects.length !== 1 ? "s" : ""}
         </div>
       </header>
@@ -94,8 +94,8 @@ export default function Projects() {
 
         {/* Project list */}
         <section className="rounded-3xl border border-border bg-surface dark:bg-surface-sunken/40 p-6 shadow-sm dark:shadow-none transition-all">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-content-subtle">
                 All Projects
               </p>
@@ -104,7 +104,7 @@ export default function Projects() {
             <button
               onClick={() => void loadProjects()}
               disabled={loading}
-              className="rounded-lg border border-border px-4 py-2 text-xs text-content-muted hover:bg-surface-raised dark:hover:bg-surface-overlay hover:border-border-strong hover:text-content transition-all shadow-sm dark:shadow-none disabled:opacity-50"
+              className="shrink-0 whitespace-nowrap rounded-lg border border-border px-4 py-2 text-xs text-content-muted hover:bg-surface-raised dark:hover:bg-surface-overlay hover:border-border-strong hover:text-content transition-all shadow-sm dark:shadow-none disabled:opacity-50"
             >
               {loading ? "載入中…" : "重新整理"}
             </button>

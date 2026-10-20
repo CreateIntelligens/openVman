@@ -129,6 +129,30 @@ export function LoginScreen() {
   );
 }
 
+export function AuthUnavailableState() {
+  const { unavailable, retry } = useAuth();
+
+  return (
+    <main className="flex h-dvh items-center justify-center bg-surface p-6 text-content">
+      <section className="max-w-lg rounded-xl border border-border bg-surface-raised p-8 text-center shadow-lg">
+        <span className="material-symbols-outlined text-[2.5rem] text-warn">cloud_off</span>
+        <h1 className="mt-4 text-xl font-semibold">暫時連不上伺服器</h1>
+        <p className="mt-2 text-sm text-content-muted" role="alert">
+          {unavailable}
+        </p>
+        <p className="mt-2 text-sm text-content-muted">
+          登入狀態還在，服務恢復後按重試即可繼續。
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button className="btn btn-primary" type="button" onClick={retry}>
+            重試
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export function AdminPortalDeniedState() {
   const { logout } = useAuth();
 

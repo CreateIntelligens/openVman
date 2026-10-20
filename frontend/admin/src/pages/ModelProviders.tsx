@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import StatusAlert from "../components/StatusAlert";
 import { useAdminSubView } from "../hooks/useAdminSubView";
+import { useBottomBarClearance } from "../hooks/useBottomBarClearance";
 import {
   fetchModelProviderSettings,
   resetModelProviderHealth,
@@ -114,6 +115,8 @@ export default function ModelProviders() {
   const [resetCategories, setResetCategories] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const saveBarRef = useRef<HTMLDivElement>(null);
+  useBottomBarClearance(saveBarRef);
   const [resetting, setResetting] = useState<string | null>(null);
   const [notice, setNotice] = useState<PageNotice>(null);
 
@@ -284,8 +287,8 @@ export default function ModelProviders() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-surface-raised/90 px-8 py-4 backdrop-blur-md">
-        <div>
+      <header className="page-header">
+        <div className="page-heading">
           <h1 className="page-title">模型供應商</h1>
           <p className="page-subtitle">全站各類模型使用哪幾家、優先順序與 API 金鑰。只有 ROOT 能修改。</p>
         </div>
@@ -293,7 +296,7 @@ export default function ModelProviders() {
           type="button"
           onClick={() => void load()}
           disabled={busy}
-          className="rounded-lg border border-border px-4 py-2 text-sm text-content-muted transition-colors hover:border-border-strong hover:bg-surface hover:text-content disabled:opacity-50"
+          className="btn btn-ghost shrink-0"
         >
           {loading ? "載入中…" : "重新載入"}
         </button>
@@ -566,7 +569,7 @@ export default function ModelProviders() {
         )}
 
         {/* 金鑰分頁有六組，存檔鈕放最底會被推出視窗；固定在捲動區底部。 */}
-        <div className="sticky bottom-0 z-10 -mx-6 flex justify-end border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-md md:-mx-8 md:px-8">
+        <div ref={saveBarRef} className="sticky bottom-0 z-10 -mx-6 flex justify-end border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-md md:-mx-8 md:px-8">
           <button
             type="button"
             onClick={() => void save()}
