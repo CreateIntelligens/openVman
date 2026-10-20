@@ -111,6 +111,20 @@ export default function Accounts() {
   // 建立管理員時一起設資源上限，不必建完再從更多選單找。
   const [newAdminScoped, setNewAdminScoped] = useState(false);
   const [newAdminScope, setNewAdminScope] = useState<AdminScopeResources>(EMPTY_SCOPE_RESOURCES);
+  // 受限 admin 開出來的 admin 不能不設限（後端沒有上限列就是看得到全部）：
+  // 切到管理員角色時先勾上並預選建立者自己看得到的全部，再讓他往下縮。
+  useEffect(() => {
+    if (role !== "admin" || isRoot || !accessForm.options) return;
+    const visible = accessForm.options;
+    setNewAdminScoped(true);
+    setNewAdminScope({
+      projects: visible.projects.map((option) => option.id),
+      avatar_characters: visible.avatar_characters.map((option) => option.id),
+      custom_voices: visible.custom_voices.map((option) => option.id),
+      avatar_mascots: (visible.avatar_mascots ?? []).map((option) => option.id),
+      avatar_backgrounds: (visible.avatar_backgrounds ?? []).map((option) => option.id),
+    });
+  }, [role, isRoot, accessForm.options]);
 
   const reload = useCallback(async () => {
     setLoading(true);

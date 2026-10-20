@@ -269,6 +269,25 @@ describe("Accounts", () => {
     expect(screen.getByText("臨時帳號批次")).toBeTruthy();
   });
 
+  it("a scoped admin creating an admin always writes a scope, preselected to what the creator sees", async () => {
+    vi.mocked(createAccount).mockResolvedValue({ id: "admin-child", username: "kid", role: "admin" } as never);
+    render(<Accounts />);
+    await screen.findByText(/可檢視並編輯下方授權的專案/);
+    fireEvent.change(screen.getByLabelText("帳號"), { target: { value: "kid" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "correct horse battery staple" } });
+    fireEvent.change(screen.getByLabelText("角色"), { target: { value: "admin" } });
+    const scopeBox = (await screen.findByLabelText(/限制可用資源/)) as HTMLInputElement;
+    await waitFor(() => expect(scopeBox.checked).toBe(true));
+    expect(scopeBox.disabled).toBe(true);
+    const submit = screen.getByRole("button", { name: "建立正式帳號" });
+    await waitFor(() => expect(submit.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(submit);
+    await waitFor(() => expect(updateAdminScope).toHaveBeenCalledWith("admin-child", {
+      scoped: true,
+      resources: expect.objectContaining({ projects: ["project-a"], avatar_characters: ["character-a"] }),
+    }));
+  });
+
   it("lets ROOT create an administrator without scoped access", async () => {
     authState.account = {
       id: "root-a",
