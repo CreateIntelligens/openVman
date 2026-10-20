@@ -2,10 +2,6 @@ import { inflate } from 'pako'
 import { onUnmounted, readonly, ref } from 'vue'
 
 import {
-  installFrameClock,
-  type FrameClock,
-} from '../../../shared/avatar/avatarFrameClock'
-import {
   installFrameSyncMarkerRepair,
   type FrameSyncMarkerRepair,
 } from '../../../shared/avatar/avatarFrameSyncRepair'
@@ -20,7 +16,6 @@ let runtimeInitPromise: Promise<OpenVmanAvatarRuntimeInstance> | null = null
 let runtimeScriptPromise: Promise<void> | null = null
 let idleLipSyncBypass: IdleLipSyncBypass | null = null
 let frameSyncMarkerRepair: FrameSyncMarkerRepair | null = null
-let frameClock: FrameClock | null = null
 // OpenVmanAvatarRuntime.js 載入時用 const 抓住當下的 #canvas_video，之後不再重查。
 let vendorCanvas: HTMLElement | null = null
 // runtime 是模組層級的單例，可能同時被多個元件使用。用引用計數決定何時真正
@@ -168,7 +163,6 @@ export function useOpenVmanAvatarRuntime() {
     if (runtimeInstance) {
       idleLipSyncBypass ??= installIdleLipSyncBypass()
       frameSyncMarkerRepair ??= installFrameSyncMarkerRepair()
-      frameClock ??= installFrameClock()
       isReady.value = true
       error.value = null
       return runtimeInstance
@@ -180,7 +174,6 @@ export function useOpenVmanAvatarRuntime() {
       await ensureAvatarRuntimeScript()
       idleLipSyncBypass ??= installIdleLipSyncBypass()
       frameSyncMarkerRepair ??= installFrameSyncMarkerRepair()
-      frameClock ??= installFrameClock()
       if (typeof window.createQtAppInstance !== 'function') {
         throw new Error('[OpenVmanAvatarRuntime] Runtime factory is unavailable')
       }
@@ -348,9 +341,6 @@ export function useOpenVmanAvatarRuntime() {
     if (activeConsumers === 0) {
       // canvas 的 clearRect / drawImage 被我們換掉了，最後一個使用者離開時
       // 要換回去，否則 patch 與它的 closure 會跟著 canvas 一直活著。
-      // 幀時鐘最晚裝、包在最外層，要最先拆，否則裡層的 patch 認不出自己。
-      frameClock?.restore()
-      frameClock = null
       idleLipSyncBypass?.restore()
       idleLipSyncBypass = null
       frameSyncMarkerRepair?.restore()

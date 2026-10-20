@@ -597,16 +597,8 @@ var createQtAppInstance = ( () => {
                     ctx_video.globalCompositeOperation = "copy";
                     ctx_video.clearRect(0, 0, canvas_video.width, canvas_video.height);
                     ctx_video.drawImage(characterVideo, 0, 0, canvas_video.width, canvas_video.height);
-                    // 前台装了 requestVideoFrameCallback 的帧时钟时直接用它，不再读角标。
-                    const clockFrame = typeof window !== "undefined" && typeof window.openVmanFrameClock === "function"
-                        ? window.openVmanFrameClock(characterVideo)
-                        : -1;
-                    if (clockFrame >= 0) {
-                        realFrame = clockFrame
-                    } else {
-                        const currentFrame0 = getAccurateFrameIndex(ctx_video, canvas_video.width);
-                        realFrame = findRealFrame(currentFrame, currentFrame0)
-                    }
+                    const currentFrame0 = getAccurateFrameIndex(ctx_video, canvas_video.width);
+                    realFrame = findRealFrame(currentFrame, currentFrame0)
                     // console.log("realFrame: ", realFrame, currentFrame, currentFrame0, characterVideo.currentTime);
                 }
                 return realFrame
