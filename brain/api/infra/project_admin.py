@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from infra.project_context import (
+    DEFAULT_PROJECT_ALIAS,
+    default_project_id,
     generate_project_id,
     get_data_root,
     normalize_project_id,
@@ -22,6 +24,9 @@ def list_projects() -> list[dict[str, Any]]:
     projects: list[dict[str, Any]] = []
     for path in sorted(root.iterdir()):
         if not path.is_dir():
+            continue
+        # 預設專案改成別的 ID 後，舊的 default 目錄已經不會被讀到，不列出來。
+        if path.name == DEFAULT_PROJECT_ALIAS and default_project_id() != DEFAULT_PROJECT_ALIAS:
             continue
         try:
             pid = normalize_project_id(path.name)
@@ -58,10 +63,11 @@ def create_project(label: str) -> dict[str, Any]:
 
 
 def delete_project(project_id: str) -> dict[str, Any]:
-    """Delete a project. The 'default' project cannot be deleted."""
+    """Delete a project. The deployment's default project cannot be deleted."""
     pid = normalize_project_id(project_id)
-    if pid == "default":
-        raise ValueError("default 專案不可刪除")
+    # "default" 是預設專案的別名，比對解析後的 ID，才不會經由別名刪到預設專案。
+    if pid == default_project_id():
+        raise ValueError("預設專案不可刪除")
 
     ctx = resolve_project_context(pid)
     if not ctx.project_root.exists():
@@ -113,6 +119,8 @@ def _build_project_info(project_id: str) -> dict[str, Any]:
         "has_session_db": has_db,
         "has_lancedb": has_lancedb,
         "project_root": str(ctx.project_root),
+        # 沒帶專案的請求落在這裡；前端找不到上次選的專案時也退回它。
+        "is_default": project_id == default_project_id(),
     }
 
 

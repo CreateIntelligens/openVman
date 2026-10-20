@@ -427,3 +427,70 @@ def test_missing_or_conflicting_project_id_says_422(monkeypatch) -> None:
         "detail": "project_id in query and body must match",
     }
     assert hidden.status_code == 404
+
+
+def test_default_alias_is_authorized_as_the_configured_default_project(monkeypatch) -> None:
+    # 2026-10-20：default 專案拔掉，DEFAULT_PROJECT_ID 指向醫院專案。帶 "default" 的請求
+    # 要用醫院專案的授權判斷，不能拿已刪掉的 default 授權，也不能因此變成 404。
+    from datetime import datetime, timezone
+
+    from app.auth.models import ResourceType, ResourceVisibility
+    from app.auth.runtime import get_auth_runtime
+    from tests.api.test_main import _authenticated_client, _load_main
+
+    module, _ = _load_main(monkeypatch)
+    monkeypatch.setattr("app.project_ids.default_project_id", lambda: "hospital")
+    _authenticated_client(module)
+    user_client, _ = _authenticated_client(module, admin=False)
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("test-admin")
+    user = runtime.users.get_by_username("test-user")
+    runtime.resources.register(
+        resource_type=ResourceType.PROJECT, resource_id="hospital",
+        owner_user_id=admin.id, visibility=ResourceVisibility.PRIVATE,
+    )
+    with runtime.database.transaction(write=True) as connection:
+        connection.execute(
+            "INSERT INTO resource_grants(grantee_user_id, resource_type, resource_id,"
+            " granted_by, created_at) VALUES (?, 'project', 'hospital', ?, ?)",
+            (user.id, admin.id, datetime.now(timezone.utc).isoformat()),
+        )
+
+    via_alias = user_client.delete("/api/v1/sessions/s-1", params={"project_id": "default"})
+    mixed = user_client.post(
+        "/api/v1/chat",
+        params={"project_id": "default"},
+        json={"message": "", "project_id": "hospital"},
+    )
+
+    # 看得到醫院專案、只是不能刪對話：403，而不是查無專案的 404。
+    assert via_alias.status_code == 403
+    # 別名與正式 ID 指的是同一個專案，不算 query／body 不一致。
+    assert mixed.json() != {"detail": "project_id in query and body must match"}
+
+
+def test_canonical_project_id_maps_only_the_default_alias(monkeypatch) -> None:
+    from app import project_ids
+
+    monkeypatch.setattr(project_ids, "default_project_id", lambda: "hospital")
+    assert project_ids.canonical_project_id("default") == "hospital"
+    assert project_ids.canonical_project_id(" default ") == "hospital"
+    assert project_ids.canonical_project_id("other") == "other"
+    assert project_ids.canonical_project_id("") == ""
+    assert project_ids.canonical_project_id(None) == ""
+
+
+def test_voice_requests_resolve_the_default_alias_before_checking_access(monkeypatch) -> None:
+    from app import language_routes
+
+    seen = []
+    monkeypatch.setattr("app.project_ids.default_project_id", lambda: "hospital")
+    monkeypatch.setattr(
+        language_routes, "resolve_resource",
+        lambda resources, user, resource_type, project_id, access: seen.append(project_id),
+    )
+    monkeypatch.setattr(language_routes, "get_auth_runtime", lambda: MagicMock())
+    current = MagicMock(embed_key=None)
+
+    assert language_routes.resolve_project(current, "default") == "hospital"
+    assert seen == ["hospital"]

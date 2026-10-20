@@ -27,6 +27,22 @@ class TestNormalizeProjectId:
         assert normalize_project_id(None) == "default"
         assert normalize_project_id("  ") == "default"
 
+    def test_default_alias_and_empty_resolve_to_configured_project(self, monkeypatch):
+        from config import get_settings
+
+        monkeypatch.setattr(get_settings(), "default_project_id", "proj-hospital")
+        assert normalize_project_id(None) == "proj-hospital"
+        assert normalize_project_id("") == "proj-hospital"
+        assert normalize_project_id("default") == "proj-hospital"
+        assert normalize_project_id("other") == "other"
+        assert resolve_project_context("default").project_root.name == "proj-hospital"
+
+    def test_invalid_configured_default_falls_back_to_alias(self, monkeypatch):
+        from config import get_settings
+
+        monkeypatch.setattr(get_settings(), "default_project_id", "bad id/with slash")
+        assert normalize_project_id(None) == "default"
+
     def test_valid_ids(self):
         assert normalize_project_id("my-project") == "my-project"
         assert normalize_project_id("Project_1.0") == "Project_1.0"
@@ -106,3 +122,22 @@ class TestEmbeddingIndexStatePath:
         )
 
         assert path.name.startswith("knowledge_index_state__emb_")
+
+
+def test_startup_migration_marks_the_configured_default_without_recreating_default(
+    tmp_path, monkeypatch,
+):
+    import scripts.migrate_to_projects as migration
+    from config import get_settings
+
+    monkeypatch.setattr("infra.project_context._DATA_ROOT", tmp_path / "projects")
+    monkeypatch.setattr(get_settings(), "default_project_id", "proj-hospital")
+    # 舊資料搬移的各步驟碰的是真實路徑，這裡只驗 marker 落點。
+    for step in ("_migrate_workspace", "_migrate_lancedb", "_migrate_sessions_db",
+                 "_migrate_index_state", "_migrate_learnings"):
+        monkeypatch.setattr(migration, step, lambda: False)
+
+    migration.run_migration()
+
+    assert (tmp_path / "projects" / "proj-hospital" / ".migrated").exists()
+    assert not (tmp_path / "projects" / "default").exists()

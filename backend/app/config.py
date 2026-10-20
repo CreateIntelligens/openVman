@@ -401,6 +401,11 @@ class TTSRouterConfig(BaseSettings):
         default="default",
         validation_alias="A2A_DEFAULT_PROJECT_ID",
     )
+    # 沒指定專案時用的專案；"default" 是它的保留別名（見 app/project_ids.py）。
+    default_project_id: str = Field(
+        default="default",
+        validation_alias="DEFAULT_PROJECT_ID",
+    )
     a2a_default_persona_id: str = Field(
         default="",
         validation_alias="A2A_DEFAULT_PERSONA_ID",

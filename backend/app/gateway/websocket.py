@@ -26,6 +26,7 @@ from app.observability import (
     record_ws_reconnect,
     set_active_sessions,
 )
+from app.project_ids import DEFAULT_PROJECT_ALIAS, canonical_project_id
 from app.session_manager import Session, SessionManager
 
 logger = logging.getLogger("backend")
@@ -176,12 +177,14 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
     session.metadata["chat_mode"] = chat_mode
 
     runtime = get_auth_runtime()
-    requested_project_id = str(capabilities.get("project_id", "")).strip()
+    requested_project_id = canonical_project_id(str(capabilities.get("project_id", "")))
     if requested_project_id:
         project_id = requested_project_id
     else:
         defaults = runtime.account_access.get_defaults(current.user.id)
-        project_id = defaults.project_id if defaults is not None else "default"
+        project_id = canonical_project_id(
+            defaults.project_id if defaults is not None else DEFAULT_PROJECT_ALIAS
+        )
     try:
         if not project_id:
             raise ResourceNotFoundError

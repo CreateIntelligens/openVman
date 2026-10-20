@@ -33,6 +33,8 @@ class BrainSettings(BaseSettings):
 
     # === 環境 ===
     env: str = "dev"  # dev | prod
+    # 沒帶 project_id 的請求落在哪個專案；"default" 是它的保留別名。
+    default_project_id: str = Field(default="default", validation_alias="DEFAULT_PROJECT_ID")
 
     # === LLM 設定 ===
     llm_provider: str = "gemini"

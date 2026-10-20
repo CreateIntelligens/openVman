@@ -30,9 +30,26 @@ class ProjectContext:
     index_state_path: Path
 
 
+DEFAULT_PROJECT_ALIAS = "default"
+
+
+def default_project_id() -> str:
+    """部署的預設專案；沒設 ``DEFAULT_PROJECT_ID`` 時就是 "default" 本身。"""
+    configured = (get_settings().default_project_id or "").strip()
+    if not configured or not _PROJECT_ID_RE.match(configured):
+        return DEFAULT_PROJECT_ALIAS
+    return configured
+
+
 def normalize_project_id(project_id: str | None) -> str:
-    """Validate and normalize a project ID. Empty/None -> 'default'."""
-    text = (project_id or "").strip() or "default"
+    """Validate and normalize a project ID.
+
+    空值與保留別名 "default" 都解析成部署的預設專案（``DEFAULT_PROJECT_ID``）。
+    程式裡大量以 "default" 當預設參數，靠這裡統一導向，不必逐一改寫。
+    """
+    text = (project_id or "").strip() or DEFAULT_PROJECT_ALIAS
+    if text == DEFAULT_PROJECT_ALIAS:
+        text = default_project_id()
     if not _PROJECT_ID_RE.match(text):
         raise ValueError("project_id 格式不合法 (僅允許英數字、點、底線、連字號，1-64 字元)")
     return text

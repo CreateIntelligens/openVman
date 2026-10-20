@@ -202,6 +202,10 @@ ws.send(JSON.stringify(payload));
 
 一般帳號的 TTS 清單包含跨 provider 的已授權聲音；合成時以聲音 metadata 驗證 provider，省略 provider 時由 voice 推導，省略 voice 時使用帳號預設。metadata 缺漏的舊聲音僅沿用管理員設定的預設 provider，不接受 provider／voice 不匹配；Embed key 維持綁定聲音限制。TTS 回應依實際 `Content-Type` 處理 WAV／MP3／raw PCM，不能從端點名稱推測檔案格式。完整欄位位置、狀態碼及標準庫範例見 [串接指南](../guides/integration-quickstart.md)。Brain 無新增對外契約，既有前台／後台呼叫可沿用，不需要 UI 改版。
 
+### 預設專案與 `default` 別名
+
+`DEFAULT_PROJECT_ID`（根目錄 `.env`，Brain 與 Backend 同讀，未設定時為 `default`）指定部署的預設專案。`project_id` 為 `default` 一律視為這個專案的別名：Brain 在 `infra.project_context.normalize_project_id` 解析（空值同樣落在預設專案），Backend 在 Brain 代理的專案授權、語音請求的專案解析、WebSocket 與 A2A 的預設值處先換成正式 ID（`app/project_ids.py`），授權與專案限制查的都是正式 ID。預設專案不可刪除，`GET /api/v1/projects` 以 `is_default: true` 標出；預設專案改成其他 ID 後，殘留的 `default` 目錄不再列出。Backend 在完全沒帶 `project_id` 的語音請求上仍不套專案限制，與以前相同。
+
 ### 專案資源限制與指派（`GET/PUT /api/v1/projects/{project_id}/policy`、`GET /api/v1/projects/{project_id}/resources`、`POST/DELETE /api/v1/projects/{project_id}/assignments`）
 
 **引擎順位（2026-10-19）**：政策另有 `tts_engine_order`、`asr_engine_order` 兩個有序清單。`tts_engine_order` 只影響沒指定 `provider`／`voice` 的請求：`service.synthesize(order=...)` 把備援鏈換成「只有列出的引擎、照該順序」（空的用部署鏈）；`/tts/stream` 沒指定引擎時取順位中第一個在跑的引擎走它的串流分支，最後的整段合成鏈也照順位；台語分流時 `_taiwanese_providers` 依順位決定 CosyVoice／VoxCPM 誰先。指定了引擎的請求照原本的指定引擎邏輯，不受順位影響。`asr_engine_order` 給批次辨識（`/api/v1/asr/transcribe`、語音對話、後台試辨識）：`ingestion_audio.transcribe(order=...)` 的鏈是「呼叫端指定的引擎 → 順位」，不再接部署鏈；仍受允許清單與引擎是否設定齊全過濾。驗證：TTS 順位只能列 `indextts、voxcpm、cosyvoice、gemini-tts、gcp-tts、aws-polly、edge-tts`；ASR 順位只能列批次引擎，且專案有允許清單時必須是其子集。串流 ASR 引擎仍是帳號偏好，不在專案順位內。

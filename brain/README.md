@@ -30,7 +30,7 @@ Edge nginx 對 `/brain/` 一律回 404。除了 `GET /brain/health` 與 `GET /br
 
 `startup.lifespan` 依序：
 
-1. 建立 default 專案 workspace scaffold，執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）。
+1. 建立預設專案（`DEFAULT_PROJECT_ID`，未設定時為 `default`）的 workspace scaffold，執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`，舊資料搬進預設專案）。
 2. 背景預熱：先預熱台語語音判斷的 Gemini client，再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning。
 3. `DREAMING_ENABLED` 時啟動 dreaming 排程；啟動每日對話備份排程。
 

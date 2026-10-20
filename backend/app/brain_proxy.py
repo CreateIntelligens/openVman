@@ -34,6 +34,7 @@ from app.chat_tts_text import (
 from app.client_disconnect import wait_for_client_disconnect
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
+from app.project_ids import canonical_project_id
 
 logger = logging.getLogger("backend.brain_proxy")
 
@@ -293,7 +294,7 @@ def _resolved_project_id(request: Request) -> str | None:
 
 async def _request_project_id(request: Request) -> str | None:
     candidates: list[str] = []
-    query_project_id = request.query_params.get("project_id", "").strip()
+    query_project_id = canonical_project_id(request.query_params.get("project_id"))
     if query_project_id:
         candidates.append(query_project_id)
 
@@ -306,7 +307,7 @@ async def _request_project_id(request: Request) -> str | None:
         if isinstance(payload, dict):
             body_project_id = payload.get("project_id")
             if isinstance(body_project_id, str) and body_project_id.strip():
-                candidates.append(body_project_id.strip())
+                candidates.append(canonical_project_id(body_project_id))
 
     if not candidates:
         return None
@@ -359,6 +360,8 @@ async def _authorize_project_context(
         return current.embed_key.project_id
 
     supplied_project_id = await _request_project_id(request)
+    if explicit_project_id is not None:
+        explicit_project_id = canonical_project_id(explicit_project_id) or None
     resolved_project_id = explicit_project_id or supplied_project_id
     if (
         explicit_project_id is not None

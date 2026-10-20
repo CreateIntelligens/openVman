@@ -17,6 +17,7 @@ from app.gateway.a2a_client import A2AClient
 from app.gateway.a2a_queue import A2AWorkQueue
 from app.gateway.a2a_store import A2ACredentialStore, A2ACredentials, compute_key_fingerprint
 from app.gateway.redis_pool import get_redis
+from app.project_ids import DEFAULT_PROJECT_ALIAS, canonical_project_id
 
 logger = logging.getLogger("backend.gateway.a2a_bridge")
 
@@ -500,7 +501,9 @@ class A2ABridgeDaemon:
 
         payload = {
             "message": prompt_with_guard,
-            "project_id": self.config.a2a_default_project_id or "default",
+            "project_id": canonical_project_id(
+                self.config.a2a_default_project_id or DEFAULT_PROJECT_ALIAS
+            ),
             "session_id": f"a2a-{requester_id}-{context_id or task_id}",
             "stream": False,
         }

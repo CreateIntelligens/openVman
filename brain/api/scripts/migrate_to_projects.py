@@ -20,14 +20,20 @@ logger = logging.getLogger(__name__)
 
 _API_ROOT = Path(__file__).resolve().parents[1]
 _DATA_ROOT = _API_ROOT.parent / "data"
-_DEFAULT_PROJECT = _DATA_ROOT / "projects" / "default"
 
-_MIGRATION_MARKER = _DEFAULT_PROJECT / ".migrated"
+
+
+def _default_project() -> Path:
+    """舊版單專案資料搬進部署的預設專案（DEFAULT_PROJECT_ID），不寫死 default 目錄。"""
+    from infra.project_context import resolve_project_context
+
+    return resolve_project_context(None).project_root
 
 
 def run_migration() -> None:
     """Execute all migration steps.  Safe to call multiple times."""
-    if _MIGRATION_MARKER.exists():
+    marker = _default_project() / ".migrated"
+    if marker.exists():
         return
 
     migrated_any = False
@@ -39,36 +45,36 @@ def run_migration() -> None:
     migrated_any |= _migrate_learnings()
 
     # Write marker so future startups skip entirely
-    _DEFAULT_PROJECT.mkdir(parents=True, exist_ok=True)
-    _MIGRATION_MARKER.write_text("1", encoding="utf-8")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("1", encoding="utf-8")
 
     if migrated_any:
-        logger.info("資料遷移完成 → data/projects/default/")
+        logger.info("資料遷移完成 → %s", _default_project())
     else:
         logger.info("無需遷移（已是新目錄結構或首次啟動）")
 
 
 def _migrate_workspace() -> bool:
     src = _DATA_ROOT / "workspace"
-    dst = _DEFAULT_PROJECT / "workspace"
+    dst = _default_project() / "workspace"
     return _move_if_needed(src, dst, "workspace")
 
 
 def _migrate_lancedb() -> bool:
     src = Path.home() / ".openclaw" / "lancedb"
-    dst = _DEFAULT_PROJECT / "lancedb"
+    dst = _default_project() / "lancedb"
     return _move_if_needed(src, dst, "lancedb")
 
 
 def _migrate_sessions_db() -> bool:
     src = Path("/data/sessions.db")
-    dst = _DEFAULT_PROJECT / "sessions.db"
+    dst = _default_project() / "sessions.db"
     return _move_if_needed(src, dst, "sessions.db")
 
 
 def _migrate_index_state() -> bool:
     src = Path("/data/knowledge_index_state.json")
-    dst = _DEFAULT_PROJECT / "knowledge_index_state.json"
+    dst = _default_project() / "knowledge_index_state.json"
     return _move_if_needed(src, dst, "knowledge_index_state.json")
 
 

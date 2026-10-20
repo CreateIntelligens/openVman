@@ -5,6 +5,8 @@ export interface ProjectSummary {
   label: string;
   document_count: number;
   persona_count: number;
+  /** 部署的預設專案（DEFAULT_PROJECT_ID）；沒帶專案的請求落在這裡。 */
+  is_default?: boolean;
 }
 
 export interface ProjectsResponse {

@@ -23,6 +23,7 @@ from app.auth.resources import ResourceAccess, resolve_resource
 from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
+from app.project_ids import canonical_project_id
 
 logger = logging.getLogger("language_routes")
 
@@ -56,7 +57,7 @@ def resolve_project(current: CurrentAccount, supplied_project_id: str) -> str | 
     """
     if current.embed_key is not None:
         return current.embed_key.project_id
-    project_id = (supplied_project_id or "").strip()
+    project_id = canonical_project_id(supplied_project_id)
     if not project_id:
         return None
     try:

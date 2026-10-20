@@ -66,8 +66,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       );
       if (!valid && response.projects.length > 0) {
         const fallback =
-          response.projects.find((project) => project.project_id === "default")
-            ?.project_id ?? response.projects[0].project_id;
+          response.projects.find((project) => project.is_default)?.project_id
+          ?? response.projects.find((project) => project.project_id === "default")?.project_id
+          ?? response.projects[0].project_id;
         setProjectId(fallback);
       }
       setHasLoadedProjects(true);

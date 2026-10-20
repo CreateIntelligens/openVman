@@ -70,6 +70,8 @@ interface ProjectSummary {
   label: string
   document_count?: number
   persona_count?: number
+  /** 部署的預設專案（DEFAULT_PROJECT_ID）。 */
+  is_default?: boolean
 }
 
 interface VrmMascotsResponse {
@@ -121,7 +123,7 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   });
 
   function pickFallbackProjectId(items: ProjectSummary[]): string {
-    return items[0]?.project_id ?? "";
+    return (items.find((project) => project.is_default) ?? items[0])?.project_id ?? "";
   }
 
   function addSelectionNotice(message: string): void {
@@ -312,6 +314,7 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
         label: p.label || p.project_id,
         document_count: p.document_count,
         persona_count: p.persona_count,
+        is_default: p.is_default,
       }));
       projects.value = items;
       const preferred = preferSaved(

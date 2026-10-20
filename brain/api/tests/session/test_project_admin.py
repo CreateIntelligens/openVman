@@ -102,8 +102,30 @@ class TestDeleteProject:
         )
 
     def test_default_cannot_be_deleted(self):
-        with pytest.raises(ValueError, match="default"):
+        with pytest.raises(ValueError, match="預設專案"):
             delete_project("default")
+
+    def test_configured_default_cannot_be_deleted_by_id_or_alias(self, monkeypatch):
+        from config import get_settings
+
+        created = create_project("醫院")
+        monkeypatch.setattr(get_settings(), "default_project_id", created["project_id"])
+        with pytest.raises(ValueError, match="預設專案"):
+            delete_project(created["project_id"])
+        with pytest.raises(ValueError, match="預設專案"):
+            delete_project("default")
+
+    def test_leftover_default_directory_is_hidden_once_another_project_is_default(
+        self, monkeypatch, tmp_path,
+    ):
+        from config import get_settings
+
+        created = create_project("醫院")
+        (tmp_path / "projects" / "default" / "workspace").mkdir(parents=True)
+        monkeypatch.setattr(get_settings(), "default_project_id", created["project_id"])
+        ids = [p["project_id"] for p in list_projects()]
+        assert ids.count(created["project_id"]) == 1
+        assert "default" not in ids
 
     def test_nonexistent_raises(self):
         with pytest.raises(ValueError, match="不存在"):
@@ -118,6 +140,16 @@ class TestGetProjectInfo:
         assert info["label"] == "Info Test"
         assert isinstance(info["document_count"], int)
         assert isinstance(info["persona_count"], int)
+        assert info["is_default"] is False
+
+    def test_marks_the_configured_default_project(self, monkeypatch):
+        from config import get_settings
+
+        created = create_project("醫院")
+        other = create_project("其他")
+        monkeypatch.setattr(get_settings(), "default_project_id", created["project_id"])
+        flags = {p["project_id"]: p["is_default"] for p in list_projects()}
+        assert flags == {created["project_id"]: True, other["project_id"]: False}
 
     def test_nonexistent_raises(self):
         with pytest.raises(ValueError, match="不存在"):
