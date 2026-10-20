@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import {
+  isAtLeastAdmin,
   updateAccountAccess,
   type Account,
   type AccountAccessInput,
@@ -66,7 +67,9 @@ export default function FormalAccountAccessPanel({
         <div>
           <h3 className="card-title">可用資源</h3>
           <p className="mt-1 text-xs text-content-muted">
-            此帳號只能讀取勾選項目與自己建立的私有資源；儲存後立即生效。
+            {isAtLeastAdmin(account.role)
+              ? "管理員看得到全部資源；這裡只設定登入預設值與可分配的專案專屬資源。儲存後立即生效。"
+              : "此帳號只能讀取勾選項目與自己建立的私有資源；儲存後立即生效。"}
           </p>
         </div>
         <button className="btn btn-ghost self-start" type="button" onClick={onCancel}>
@@ -84,7 +87,7 @@ export default function FormalAccountAccessPanel({
       )}
 
       <div className="mt-4">
-        <AccountAccessFields form={accessForm} />
+        <AccountAccessFields form={accessForm} role={account.role} />
       </div>
 
       <div className="mt-4 flex justify-end gap-2">

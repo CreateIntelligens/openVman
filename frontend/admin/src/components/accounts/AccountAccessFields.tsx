@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   fetchAccountAccessOptions,
+  isAtLeastAdmin,
   type AccountAccessInput,
   type AccountAccessOption,
   type AccountAccessOptions,
+  type AccountRole,
 } from "../../api/auth";
 import {
   groupAccessOptions,
@@ -382,25 +384,42 @@ function defaultOptionValue(
 
 export default function AccountAccessFields({
   form,
+  role,
 }: {
   form: AccountAccessForm;
+  /** 帳號角色；管理員與 ROOT 不受授權清單限制，畫面要講明白，不能讓人以為存了會生效。 */
+  role?: AccountRole;
 }) {
+  const unrestricted = role !== undefined && isAtLeastAdmin(role);
   return (
     <div className="border-y border-border">
-      <label className="flex cursor-pointer items-start gap-3 border-b border-border bg-surface-sunken px-5 py-4">
-        <input
-          className="mt-1 h-4 w-4 accent-primary"
-          type="checkbox"
-          checked={form.access.admin_portal_access}
-          onChange={(event) => form.setAdminPortalAccess(event.target.checked)}
-        />
-        <span>
-          <span className="block text-sm font-semibold">允許進入管理後台</span>
-          <span className="mt-1 block text-xs leading-5 text-content-muted">
-            預設不允許；開啟後可檢視並編輯下方授權的專案，但不會取得帳號管理或專案建立／刪除權限。
+      {unrestricted ? (
+        <p
+          className="border-b border-border bg-surface-sunken px-5 py-4 text-xs leading-5 text-content-muted"
+          role="note"
+        >
+          <span className="block text-sm font-semibold text-content">
+            {role === "root" ? "ROOT" : "管理員"}不受這份清單限制
           </span>
-        </span>
-      </label>
+          這個帳號看得到、用得到全部資源，本來就能進管理後台。下方的勾選只決定登入後的預設值，
+          以及他替別人授權時能分配哪些專案專屬資源；要縮小他能動的範圍，請用「資源上限」。
+        </p>
+      ) : (
+        <label className="flex cursor-pointer items-start gap-3 border-b border-border bg-surface-sunken px-5 py-4">
+          <input
+            className="mt-1 h-4 w-4 accent-primary"
+            type="checkbox"
+            checked={form.access.admin_portal_access}
+            onChange={(event) => form.setAdminPortalAccess(event.target.checked)}
+          />
+          <span>
+            <span className="block text-sm font-semibold">允許進入管理後台</span>
+            <span className="mt-1 block text-xs leading-5 text-content-muted">
+              預設不允許；開啟後可檢視並編輯下方授權的專案，但不會取得帳號管理或專案建立／刪除權限。
+            </span>
+          </span>
+        </label>
+      )}
       <label className="flex cursor-pointer items-start gap-3 border-b border-border bg-surface-sunken px-5 py-4">
         <input
           className="mt-1 h-4 w-4 accent-primary"

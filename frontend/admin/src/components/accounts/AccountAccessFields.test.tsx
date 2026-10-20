@@ -86,3 +86,17 @@ describe("AccountAccessFields 分組", () => {
     expect(within(aws as HTMLElement).getByText("1 / 1")).toBeTruthy();
   });
 });
+
+describe("AccountAccessFields 管理員帳號", () => {
+  it("管理員不顯示後台勾選，改成說明清單對他不生效", () => {
+    render(<AccountAccessFields form={formWith({})} role="admin" />);
+    expect(screen.getByRole("note").textContent).toContain("管理員不受這份清單限制");
+    expect(screen.queryByLabelText(/允許進入管理後台/)).toBeNull();
+  });
+
+  it("一般帳號照舊有後台勾選", () => {
+    render(<AccountAccessFields form={formWith({})} role="user" />);
+    expect(screen.getByLabelText(/允許進入管理後台/)).toBeTruthy();
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+});
