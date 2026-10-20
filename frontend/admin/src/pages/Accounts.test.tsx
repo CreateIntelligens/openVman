@@ -152,6 +152,7 @@ describe("Accounts", () => {
           custom_voices: ["voice-a"],
           avatar_mascots: [],
           avatar_backgrounds: [],
+          asr_engines: [],
         },
         defaults: {
           project_id: "project-a",
@@ -459,6 +460,7 @@ describe("Accounts", () => {
             custom_voices: ["voice-a"],
             avatar_mascots: [],
             avatar_backgrounds: [],
+            asr_engines: [],
           },
           defaults: {
             project_id: "project-a",

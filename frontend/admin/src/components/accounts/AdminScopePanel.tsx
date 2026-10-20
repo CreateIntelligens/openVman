@@ -60,18 +60,25 @@ export default function AdminScopePanel({
   const [scoped, setScoped] = useState(false);
   const [selection, setSelection] = useState<AdminScopeResources>(EMPTY_RESOURCES);
   const [loading, setLoading] = useState(true);
+  // 讀到目前的上限才准儲存：讀失敗時表單裡是預設的「不設限」，ROOT 一按儲存
+  // 就會把管理員的限制整個解掉。
+  const [loaded, setLoaded] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoaded(false);
+    setError(null);
     Promise.all([fetchAccountAccessOptions(), fetchAdminScope(account.id)])
       .then(([fetchedOptions, scope]) => {
         if (cancelled) return;
         setOptions(fetchedOptions);
         setScoped(scope.scoped);
         setSelection({ ...EMPTY_RESOURCES, ...scope.resources });
+        setLoaded(true);
       })
       .catch((reason) => {
         if (!cancelled) setError(messageFrom(reason, "載入資源上限失敗"));
@@ -82,7 +89,7 @@ export default function AdminScopePanel({
     return () => {
       cancelled = true;
     };
-  }, [account.id]);
+  }, [account.id, loadAttempt]);
 
   const toggleAll = useCallback((key: ScopeKey, ids: string[]) => {
     setSelection((current) => {
@@ -154,10 +161,20 @@ export default function AdminScopePanel({
 
       {error && (
         <div
-          className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+          className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
           role="alert"
         >
-          {error}
+          <span>{error}</span>
+          {!loaded && (
+            <button
+              className="btn btn-ghost px-2 py-1 text-xs"
+              type="button"
+              onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+              disabled={loading}
+            >
+              重新讀取
+            </button>
+          )}
         </div>
       )}
 
@@ -256,7 +273,7 @@ export default function AdminScopePanel({
           className="btn btn-primary"
           type="button"
           onClick={() => void save()}
-          disabled={loading || saving}
+          disabled={!loaded || loading || saving}
         >
           {saving ? "儲存中…" : "儲存上限"}
         </button>

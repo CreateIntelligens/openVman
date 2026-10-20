@@ -28,6 +28,7 @@ const EMPTY_ACCESS: AccountAccessInput = {
     custom_voices: [],
     avatar_mascots: [],
     avatar_backgrounds: [],
+    asr_engines: [],
   },
   defaults: {
     project_id: "",
@@ -101,7 +102,7 @@ function initialDefault(current: string | undefined, selected: string[]): string
   return current && selected.includes(current) ? current : selected[0] ?? "";
 }
 
-function accessFromOptions(
+export function accessFromOptions(
   options: AccountAccessOptions,
   current?: AccountAccessInput,
 ): AccountAccessInput {
@@ -132,6 +133,14 @@ function accessFromOptions(
     options.avatar_backgrounds ?? [],
     PREFERRED_BACKGROUND,
   );
+  // 辨識引擎沒有預設值、也不預勾；但一定要帶回去，後端 replace 是整份覆蓋，
+  // 少了這一類就等於把既有的引擎授權清掉。
+  const asrEngines = initialSelection(
+    current?.grants.asr_engines,
+    options.asr_engines ?? [],
+    "",
+    true,
+  );
   const voiceId = initialDefault(current?.defaults.voice_id, voices);
   const voice = options.custom_voices.find((option) => option.id === voiceId);
   return {
@@ -141,6 +150,7 @@ function accessFromOptions(
       custom_voices: voices,
       avatar_mascots: mascots,
       avatar_backgrounds: backgrounds,
+      asr_engines: asrEngines,
     },
     defaults: {
       project_id: initialDefault(current?.defaults.project_id, projects),
@@ -534,7 +544,8 @@ function AccessGroup({
           <p className="py-3 text-sm text-content-muted">目前沒有可授權項目</p>
         )}
       </div>
-      {grantTypes.map((type) => {
+      {grantTypes.filter((type) => type !== "asr_engines").map((type) => {
+        // 辨識引擎沒有帳號層級的預設（沒選過的人用部署設定），不畫下拉免得讓人以為有。
         const typeOptions = selectedOptions.filter((o) => o.grantType === type);
         const suffix = GRANT_SUFFIX[type];
         // 合併顯示時，兩種分類各自保有自己的預設值（後端 defaults 是分開的欄位）。

@@ -110,3 +110,24 @@ describe("AccountAccessFields 人物預覽", () => {
     expect(videos.some((video) => (video.getAttribute("src") ?? "").includes("hayley"))).toBe(false);
   });
 });
+
+describe("accessFromOptions", () => {
+  it("帶回既有的辨識引擎授權，儲存時不會被整份覆蓋掉", async () => {
+    const { accessFromOptions } = await import("./AccountAccessFields");
+    const options = formWith({}).options!;
+    const current = {
+      ...formWith({}).access,
+      grants: { ...formWith({}).access.grants, asr_engines: ["breeze"] },
+    };
+    expect(accessFromOptions(options, current).grants.asr_engines).toEqual(["breeze"]);
+    // 沒授權過的人不預勾，也不會因為清單有引擎就自動塞一個。
+    expect(accessFromOptions(options, undefined).grants.asr_engines).toEqual([]);
+  });
+
+  it("辨識引擎區塊不畫登入後預設值", () => {
+    render(<AccountAccessFields form={formWith({ asr_engines: ["breeze"] })} />);
+    // 只數「預設值」下拉的 label（說明文字也含這幾個字）：專案、2D 人物、VRM、聲音、背景。
+    const selects = screen.getAllByText(/^登入後預設值/).filter((node) => node.tagName === "LABEL");
+    expect(selects).toHaveLength(5);
+  });
+});
