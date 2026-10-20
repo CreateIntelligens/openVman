@@ -561,7 +561,9 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
                     audio_bytes=b"fallback-wav",
                     content_type="audio/wav",
                     provider="edge-tts",
-                )
+                ),
+                fallback=False,
+                fallback_reason="",
             )
 
     fake_service = FakeService()
@@ -1033,6 +1035,8 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
                     content_type="audio/mpeg",
                     provider="cosyvoice",
                 ),
+                fallback=False,
+                fallback_reason="",
             )
 
     monkeypatch.setattr(module.tts_routes, "_get_service", lambda: FakeService())
@@ -1998,6 +2002,8 @@ def test_tts_stream_pcm16k_decodes_edge_and_cosyvoice_mp3(monkeypatch):
         def synthesize(self, request, provider="", edge_fallback_voice="", partners=(), order=()):
             return types.SimpleNamespace(
                 result=types.SimpleNamespace(audio_bytes=mp3, content_type="audio/mpeg", provider="cosyvoice"),
+                fallback=False,
+                fallback_reason="",
             )
 
     _, client = _pcm16k_client(monkeypatch, Service(), tts_indextts_url="")

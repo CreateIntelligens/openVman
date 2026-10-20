@@ -422,9 +422,9 @@ def _buffered_audio(
         )
     # 跟 /api/v1/tts 一樣標出備援：只看 X-TTS-Provider 知道換了引擎，
     # 看不出第一站為什麼失敗。
-    if output.fallback:
+    if getattr(output, "fallback", False):
         response.headers["X-TTS-Fallback"] = "true"
-        response.headers["X-TTS-Fallback-Reason"] = output.fallback_reason
+        response.headers["X-TTS-Fallback-Reason"] = getattr(output, "fallback_reason", "")
     return response
 
 
