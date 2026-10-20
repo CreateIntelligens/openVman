@@ -66,11 +66,13 @@ def _to_simplified_chinese(text: str) -> str:
 
 def _normalize_via_api(
     text: str,
-    url: str = "",
+    url: str | None = None,
     timeout: float = 5.0,
     simplified: bool = True,
 ) -> str | None:
-    target_url = url or _get_normalize_url()
+    # ``""`` 是呼叫端明說「只做本地正規化」，不能再退回設定檔的 API；
+    # chat 的 tts_text 逐句走這裡，退回去會每句同步多打一次遠端。
+    target_url = _get_normalize_url(url)
     if not target_url:
         return None
     try:
@@ -89,11 +91,11 @@ def _normalize_via_api(
 
 async def _normalize_via_api_async(
     text: str,
-    url: str = "",
+    url: str | None = None,
     timeout: float = 5.0,
     simplified: bool = True,
 ) -> str | None:
-    target_url = url or _get_normalize_url()
+    target_url = _get_normalize_url(url)
     if not target_url:
         return None
     try:
@@ -226,7 +228,7 @@ def prepare_tts_text(
 
     result = _normalize_via_api(
         cleaned,
-        url=normalize_url or "",
+        url=normalize_url,
         simplified=simplified,
     )
     if result is not None:
@@ -251,7 +253,7 @@ async def prepare_tts_text_async(
 
     result = await _normalize_via_api_async(
         cleaned,
-        url=normalize_url or "",
+        url=normalize_url,
         simplified=simplified,
     )
     if result is not None:

@@ -79,6 +79,26 @@ async def test_prepare_tts_text_async_with_mock_api(monkeypatch):
     assert res == "三立在二零三零年预计省下一百六十二万元"
 
 
+@pytest.mark.asyncio
+async def test_prepare_tts_text_empty_url_skips_configured_api(monkeypatch):
+    # normalize_url="" 是「只做本地」，不是「用設定檔的那個」：兩個版本都不能打出去。
+    from app.config import get_tts_config
+
+    monkeypatch.setenv("NORMALIZE_API_URL", "http://normalize.invalid/normalize")
+    get_tts_config.cache_clear()
+    try:
+        def _forbidden(self, *args, **kwargs):
+            pytest.fail("normalize_url='' must not reach the configured API")
+
+        monkeypatch.setattr(httpx.Client, "post", _forbidden)
+        monkeypatch.setattr(httpx.AsyncClient, "post", _forbidden)
+        text = "2030年省下 162 萬元"
+        assert "二零三零年" in prepare_tts_text(text, normalize_url="", simplified=False)
+        assert "二零三零年" in await prepare_tts_text_async(text, normalize_url="", simplified=False)
+    finally:
+        get_tts_config.cache_clear()
+
+
 def test_prepare_tts_text_api_error_fallback(monkeypatch):
     def mock_post_err(self, url, **kwargs):
         raise httpx.ConnectError("Connection refused")

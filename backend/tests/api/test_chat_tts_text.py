@@ -7,6 +7,8 @@ import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -22,6 +24,28 @@ def test_spoken_form_verbalizes_chinese_digits_and_keeps_traditional():
     )
     # 英文句不套中文數字讀法。
     assert spoken_form("Call **0800-123-456** now") == "Call 0800-123-456 now"
+
+
+def test_spoken_form_never_calls_normalize_api(monkeypatch):
+    # 正式環境有設 NORMALIZE_API_URL；逐句改寫若退回去打 API，每句同步多等一次遠端
+    # 往返（實測 0.4～0.6 秒）還卡住事件迴圈，所以要在有設定的情況下驗證不會打。
+    from app.config import get_tts_config
+
+    monkeypatch.setenv("NORMALIZE_API_URL", "http://normalize.invalid/normalize")
+    get_tts_config.cache_clear()
+    try:
+        assert get_tts_config().normalize_api_url == "http://normalize.invalid/normalize"
+
+        def _forbidden(self, *args, **kwargs):
+            pytest.fail("spoken_form must not call the normalize API")
+
+        monkeypatch.setattr(httpx.Client, "post", _forbidden)
+        monkeypatch.setattr(httpx.AsyncClient, "post", _forbidden)
+        assert spoken_form("**門診**時間 09:00 至 12:00，電話 0800-123-456") == (
+            "門診時間 09:00 至 12:00，電話 零八零零一二三四五六"
+        )
+    finally:
+        get_tts_config.cache_clear()
 
 
 def _proxy_app() -> FastAPI:
