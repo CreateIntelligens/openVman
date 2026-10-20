@@ -32,6 +32,7 @@
 - [帳號 API key 與 ASR 整合](guides/account-api-keys.md)
 - [2D 人物素材：格式要求、上架與驗收](guides/avatar-character-assets.md)：DHLiveMini2 依賴的影格數、幀同步標記與姿態矩陣，專案專屬人物的上傳方式。
 - [能力探索與語音串接快速開始](guides/integration-quickstart.md)：帳號能力清單、單次 ASR／TTS 選擇、Python 標準庫範例及音訊格式。
+- [串接方交付說明（模板）](guides/integration-handover-template.md)：交付帳號給串接方時複製填寫的一頁說明，登入入口、key、專案、三個端點範例、台語、錯誤碼。
 - [後台 Canonical Routes 現況](guides/admin-canonical-routes.md)
 - [前台費茨法則評估](guides/frontend-fitts-law-audit.md)
 - [紅色供應鏈與替代方案評估](guides/red-supply-chain-assessment.md)
