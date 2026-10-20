@@ -121,12 +121,17 @@ def run_agent_loop(
     reply_mode: str = "",
     force_web_search: bool = False,
     force_memory_search: bool = False,
-    force_knowledge_search: bool = False,
+    force_knowledge_search: bool | None = None,
     on_tool_round: Callable[[list[dict[str, Any]]], None] | None = None,
     text_listener: TextDeltaListener | None = None,
 ) -> AgentLoopResult:
     """Run a bounded think -> tool -> observe loop until the model returns text.
 
+    *force_knowledge_search* is the turn decision's ``needs_knowledge`` (``None``
+    when uncertain or undecided). With ``chat_prefetch_knowledge_always`` (default)
+    an ordinary user turn reads the knowledge base before the model is called
+    whatever the decision said; with it off ``True`` prefetches, ``None`` forces a
+    tool round and ``False`` skips the search.
     *on_tool_round* sees all tool steps after each round, so callers can start work
     that only needs retrieval results (picking the reply picture) while the model
     is still writing the answer. *text_listener* receives the text of every round
@@ -164,7 +169,7 @@ def _resolve_forced_first_tool(
     allow_forced_knowledge_search: bool,
     force_web_search: bool,
     force_memory_search: bool,
-    force_knowledge_search: bool,
+    force_knowledge_search: bool | None,
 ) -> str | None:
     """Decide the tool_choice for the first LLM call.
 
@@ -228,6 +233,14 @@ def _ensure_memory_search(turn: LLMReply, user_message: str) -> LLMReply:
     return _append_synthetic_call(turn, "auto-search-memory", "search_memory", {"queries": [user_message]})
 
 
+def _prefetch_knowledge_always(cfg: Any) -> bool:
+    """Whether every ordinary user turn reads the knowledge base first, whatever the decision said."""
+    return bool(
+        getattr(cfg, "chat_prefetch_knowledge_search", True)
+        and getattr(cfg, "chat_prefetch_knowledge_always", True)
+    )
+
+
 def _should_prefetch_knowledge(
     cfg: Any,
     tools: list[dict[str, Any]],
@@ -241,6 +254,8 @@ def _should_prefetch_knowledge(
 
     只在這一輪要先查的只有知識庫時才先查：還要上網或查記憶時，第一次呼叫本來就得替
     那些工具寫參數，先查省不到那一次。這一句沒有文字時 *reads* 是空的，照原本流程。
+    一律先查（chat_prefetch_knowledge_always）時 *reads* 已經含知識庫、第一次呼叫也已被
+    強制，這裡的條件不用再分。
     """
     if not getattr(cfg, "chat_prefetch_knowledge_search", True):
         return False
@@ -314,7 +329,7 @@ def _run_tool_phase(
     reply_mode: str = "",
     force_web_search: bool = False,
     force_memory_search: bool = False,
-    force_knowledge_search: bool = False,
+    force_knowledge_search: bool | None = None,
     on_tool_round: Callable[[list[dict[str, Any]]], None] | None = None,
     text_listener: TextDeltaListener | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
@@ -334,6 +349,14 @@ def _run_tool_phase(
     )
     hallucination_pattern = _build_hallucination_pattern(tools)
     hallucination_retried = False
+    if allow_forced_knowledge_search and _prefetch_knowledge_always(cfg):
+        # 有知識庫的專案一律先查，決策的 needs_knowledge 不再決定要不要查（Clef 實測多數
+        # 問題落在不確定帶、還有問門診時間判成否的）；只有 web／memory 也要先查時，
+        # 第一次呼叫照舊強制工具，知識庫那一筆由下面補上。
+        force_knowledge_search = True
+    elif force_knowledge_search is False:
+        # 關掉一律先查時照決策：判定為否就不強制、也不補查。
+        allow_forced_knowledge_search = False
     first_forced = _resolve_forced_first_tool(
         cfg, tools, forced_tool_name, allow_forced_knowledge_search,
         force_web_search, force_memory_search, force_knowledge_search,
@@ -350,6 +373,7 @@ def _run_tool_phase(
         else tools
     )
     empty_reply_retried = False
+    answer_only_nudged = False
     # 第一輪之後只准追加有限輪工具，超過就收掉工具逼模型作答。
     answer_only_from = (
         1 + max(0, int(getattr(cfg, "chat_max_followup_tool_rounds", 1)))
@@ -359,10 +383,12 @@ def _run_tool_phase(
 
     texts = user_texts(messages)
     current_text = texts[-1] if texts else ""
+    # 一律先查時上面已把 force_knowledge_search 設成 True；關掉時只有決策高信心為是才先查，
+    # 不確定（None）維持強制工具那一輪。還要上網或查記憶時 _should_prefetch_knowledge 會擋掉。
     reads = planned_reads(
         current_text=current_text,
         previous_text=previous_user_text(messages, current_text),
-        knowledge=force_knowledge_search,
+        knowledge=force_knowledge_search is True,
         web=force_web_search,
         memory=force_memory_search,
     )
@@ -404,6 +430,15 @@ def _run_tool_phase(
                 current_tools = None
             else:
                 current_tools = later_tools or None
+            if current_tools is None and iteration >= 1 and tool_steps and not answer_only_nudged:
+                # 工具收掉的第一輪先講明只能作答：模型看到對話裡的工具呼叫會再叫一次，被
+                # _drop_unoffered_calls 丟掉後還要重送整段提示（正式環境實測每次約 0.75 秒）。
+                # 每回合只加一次；_PREFETCHED_KNOWLEDGE_RETRY_MSG 把 answer_only_from 往後推時，
+                # 這裡要等真的收掉工具那一輪才加。模型不理會時下面的丟棄＋重試仍是保險。
+                answer_only_nudged = True
+                working_messages.append(
+                    {"role": "user", "content": _with_reply_rules(_ANSWER_ONLY_MSG, messages)}
+                )
             # stream_chat_turn 只是把 provider 串流即時消化成完整 LLMReply（沒有 token
             # 外送給用戶端），所以串流純粹是 TTFB 最佳化：強制搜尋那一回合只會吐
             # tool_call，不需要串流；之後每一回合都可能是長文答案，都串流。
@@ -620,6 +655,11 @@ _PREFETCHED_KNOWLEDGE_RETRY_MSG = (
 )
 _UNOFFERED_TOOL_RETRY_MSG = (
     "這一輪不能使用 {tools}。請直接以文字回答上一個問題；"
+    "查不到的部分合併成一句帶過，不要逐項說明，也不要留空。"
+)
+# 工具收掉那一輪先說明，模型就不會先叫一次被丟掉的工具再被 _UNOFFERED_TOOL_RETRY_MSG 催。
+_ANSWER_ONLY_MSG = (
+    "工具已經用完，這一輪請直接以文字回答上一個問題；"
     "查不到的部分合併成一句帶過，不要逐項說明，也不要留空。"
 )
 # prompt_builder 把這一輪的回答語言與長度放在 system prompt 最後，從這行開始。

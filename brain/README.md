@@ -118,10 +118,10 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ### Agent loop
 
-- 第一次 LLM 呼叫必須使用工具（`CHAT_FORCE_KNOWLEDGE_SEARCH`，僅在 `search_knowledge` 有註冊時生效）。模型一次決定要查哪些，沒叫 `search_knowledge` 就自動補一筆；同一輪的工具平行執行。slash command 指定的工具優先。
-- 每輪決策高信心判定需要知識庫（`needs_knowledge=True`）、而且不必同時強制上網或查記憶時，改由伺服器先跑 `search_knowledge`（`CHAT_PREFETCH_KNOWLEDGE_SEARCH`，預設開啟）：查詢是使用者原句，加上「上一句問題＋這一句」一條（追問句「那價格呢？」靠它補回主詞），走跟工具同一個實作。結果以一筆已完成的 `search_knowledge` 呼叫（id `prefetch-search-knowledge`，`tool_steps` 第 0 輪）放進對話，第一次 LLM 呼叫不強制工具、提供查完知識庫後的工具（不含 `search_knowledge`），不需要其他工具時一次就答完，省掉只產生工具呼叫的那一次。這次先查不算模型自選的工具輪：選型題仍在第一次呼叫叫 `filter_products`，之後照下一條的輪數規則，fast 模式仍是最多一輪工具、然後只能作答。模型仍去叫已收回的 `search_knowledge` 時，伺服器提示結果已在上面、要篩選就叫 `filter_products`，這一輪不算（每回合一次），選型題不會因此沒篩選就作答。判定為否或不確定時流程不變。
+- 沒有先查（下一條）時第一次 LLM 呼叫必須使用工具（`CHAT_FORCE_KNOWLEDGE_SEARCH`，僅在 `search_knowledge` 有註冊時生效；還要上網或查記憶、這一句沒有文字、或先查關閉時走這條）。模型一次決定要查哪些，沒叫 `search_knowledge` 就自動補一筆；同一輪的工具平行執行。slash command 指定的工具優先。
+- 有知識庫的專案一律先查：一般使用者回合不必同時強制上網或查記憶時，改由伺服器先跑 `search_knowledge`（`CHAT_PREFETCH_KNOWLEDGE_SEARCH`，預設開啟）：查詢是使用者原句，加上「上一句問題＋這一句」一條（追問句「那價格呢？」靠它補回主詞），走跟工具同一個實作。結果以一筆已完成的 `search_knowledge` 呼叫（id `prefetch-search-knowledge`，`tool_steps` 第 0 輪）放進對話，第一次 LLM 呼叫不強制工具、提供查完知識庫後的工具（不含 `search_knowledge`），不需要其他工具時一次就答完，省掉只產生工具呼叫的那一次。這次先查不算模型自選的工具輪：選型題仍在第一次呼叫叫 `filter_products`，之後照下一條的輪數規則，fast 模式仍是最多一輪工具、然後只能作答。模型仍去叫已收回的 `search_knowledge` 時，伺服器提示結果已在上面、要篩選就叫 `filter_products`，這一輪不算（每回合一次），選型題不會因此沒篩選就作答。要不要先查不再由每輪決策的 `needs_knowledge` 判定（`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`，預設開啟）：Clef 實測多數問題落在不確定帶（原本要多一次只為了產生工具呼叫的 LLM 呼叫），還有把門診時間判成否的；閒聊多一次約 0.3 秒檢索。關閉時照決策：是先查、不確定強制工具那一輪、否不查。
 - 之後的回合拿掉 `search_knowledge`（`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`），其他工具照常；最多再追加 `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS` 輪，之後不給工具、只能作答。總回合數受 `AGENT_LOOP_MAX_ROUNDS` 限制。
-- 模型呼叫本輪沒提供的工具時，該呼叫不執行並記 warning，要求模型直接用文字回答，避免繞過回覆模式的限制。
+- 工具收掉、只能作答的第一輪在呼叫前先告訴模型「工具已經用完，直接以文字回答」（每回合一次），不等它先叫一次被收回的工具再催。模型仍呼叫本輪沒提供的工具時，該呼叫不執行並記 warning，要求模型直接用文字回答，避免繞過回覆模式的限制。
 - provider 忽略強制 tool_choice 直接回文字時，該文字當作答案。空回覆或把工具呼叫寫成文字時各重試一次。
 
 ### 回覆模式
@@ -356,7 +356,7 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 | LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`、`NEN_API_KEY`、`NEN_BASE_URL` |
 | Embedding | `EMBEDDING_THRESHOLDS`、`EMBEDDING_SERVICE_URL`（外部 gateway 才填）、`EMBEDDING_SERVICE_TOKEN`；模型與 identity 的預設值在 `config.py` |
 | 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`EMBEDDING_THRESHOLDS`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
-| Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
+| Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
 | 記憶 | `SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`、`MAX_SESSION_TTL_MINUTES`、`AUTO_RECALL_ENABLED`、`DREAMING_ENABLED`、`DREAMING_CRON`、`DREAMING_TIMEZONE`、`SESSION_BACKUP_ENABLED`、`SESSION_BACKUP_HOUR`、`SESSION_BACKUP_KEEP` |
 | 決策供應鏈 | `CLEF_API_KEY`（選填）、`TYPESAFE_API_KEY`、`JEV_BASE_URL`、`OPENAI_API_KEY`、`JEV_MEMORY_GATE_ENABLED`、`JEV_LANGUAGE_ENABLED`、`JEV_GATE_TIMEOUT_SECONDS`、`AUTO_RECALL_USE_JEV_FILTER`、`ASR_FINAL_JUDGE_ENABLED` |
 | 每輪決策 | `TURN_DECISIONS_ENABLED`、`TURN_DECISIONS_RETRIEVAL_ENABLED`、`TURN_DECISIONS_LANGUAGE_ENABLED`、`TURN_DECISIONS_TONE_ENABLED`、`TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED`、`TURN_DECISIONS_TIMEOUT_SECONDS`、`TURN_DECISIONS_HOP_TIMEOUT_SECONDS`、`TURN_DECISIONS_NOUL_*`、`TURN_DECISIONS_CHOICE_*` |

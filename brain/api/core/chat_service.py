@@ -624,14 +624,11 @@ def execute_generation(
             persona_id=context.persona_id,
             project_id=project_id,
             forced_tool_name=context.forced_tool_name,
-            # 只有一般使用者回合才強制先查知識庫：slash command 已指定工具，
-            # role=tool 的訊息雖然 path 也是 "tool" 但 skip_rag=True，都不該強制。
+            # 只有一般使用者回合才先查知識庫：slash command 已指定工具，
+            # role=tool 的訊息雖然 path 也是 "tool" 但 skip_rag=True，都不該查。
+            # 決策判定為否要不要查由 agent loop 依 CHAT_PREFETCH_KNOWLEDGE_ALWAYS 決定。
             allow_forced_knowledge_search=(
                 not context.route.skip_rag and not context.forced_tool_name
-                and not (
-                    context.turn_decision is not None
-                    and context.turn_decision.policy.force_knowledge_search is False
-                )
             ),
             reply_mode=context.reply_mode,
             force_web_search=bool(
@@ -642,9 +639,12 @@ def execute_generation(
                 context.turn_decision
                 and context.turn_decision.policy.needs_memory is True
             ),
-            force_knowledge_search=bool(
-                context.turn_decision
-                and context.turn_decision.policy.needs_knowledge is True
+            # 決策三態照傳（沒有決策算不確定）；一律先查時 agent loop 不看它，
+            # 關掉時 True 先查、None 強制工具那一輪、False 不查。
+            force_knowledge_search=(
+                context.turn_decision.policy.needs_knowledge
+                if context.turn_decision is not None
+                else None
             ),
             on_tool_round=context.media_choice.on_tool_round,
             **({"text_listener": text_listener} if text_listener is not None else {}),

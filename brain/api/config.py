@@ -180,9 +180,15 @@ class BrainSettings(BaseSettings):
     # 強制查完知識庫後的回合不再提供 search_knowledge（避免重複翻書），
     # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
     chat_answer_pass_excludes_knowledge_search: bool = True
-    # 每輪決策高信心判定需要知識庫時，伺服器先用使用者原句（加上一句問題）查好再叫 LLM，
+    # 伺服器先用使用者原句（加上一句問題）查好知識庫再叫 LLM，
     # 省掉只為了產生 search_knowledge 呼叫的那一次（約 1.2 秒）。
     chat_prefetch_knowledge_search: bool = True
+    # 有知識庫的專案一律先查，不再由每輪決策的 needs_knowledge 決定要不要查：Clef 實測
+    # 12 句醫院問題只有 1 句高信心為是，「骨科早上的門診是幾點」還判成否（答題時沒有知識庫）；
+    # 不確定帶原本要多一次只為了產生 search_knowledge 呼叫的 LLM 呼叫（約 1.2 秒），
+    # 先查只花約 0.3 秒檢索。關掉就回到決策判定：是→先查、不確定→強制工具那一輪、否→不查。
+    # 只在 chat_prefetch_knowledge_search 開啟時有效。
+    chat_prefetch_knowledge_always: bool = True
 
     # Per-turn typed decisions use the shared Brain provider chain. Group switches
     # allow operational rollback without changing provider configuration.

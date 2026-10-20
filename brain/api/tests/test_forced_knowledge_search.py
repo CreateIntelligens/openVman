@@ -63,8 +63,13 @@ def _install_loop_stubs(
     force: bool = True,
     exclude_knowledge: bool = True,
     prefetch: bool = True,
+    prefetch_always: bool = False,
 ) -> list[dict[str, Any]]:
-    """Patch registry / settings and record every LLM call the loop makes."""
+    """Patch registry / settings and record every LLM call the loop makes.
+
+    一律先查（*prefetch_always*）預設關掉：這裡多數測試驗的是依決策走的流程
+    （強制工具那一輪、判定為否不查），開著會全部變成先查。
+    """
     calls: list[dict[str, Any]] = []
 
     fake_registry = MagicMock()
@@ -90,6 +95,7 @@ def _install_loop_stubs(
     fake_cfg.chat_force_knowledge_search = force
     fake_cfg.chat_answer_pass_excludes_knowledge_search = exclude_knowledge
     fake_cfg.chat_prefetch_knowledge_search = prefetch
+    fake_cfg.chat_prefetch_knowledge_always = prefetch_always
     fake_cfg.forced_tool_model_override = ""
     fake_cfg.chat_max_followup_tool_rounds = 1
     fake_cfg.forced_tool_max_tokens = 200
@@ -863,10 +869,12 @@ class TestKnowledgePrefetch:
 
     def _run(
         self, monkeypatch, *, replies, messages=None, tools=None, prefetch=True,
-        **loop_kwargs,
+        prefetch_always=False, **loop_kwargs,
     ):
         agent_loop = _load_agent_loop(monkeypatch)
-        calls = _install_loop_stubs(monkeypatch, agent_loop, tools=tools, prefetch=prefetch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=tools, prefetch=prefetch, prefetch_always=prefetch_always,
+        )
         # filter_products 依專案規格表調整說明，這裡沒有規格表，原樣提供。
         monkeypatch.setattr(agent_loop, "_tools_for_project", lambda tools, project_id: tools)
         executed: list[tuple[str, str]] = []
@@ -923,7 +931,7 @@ class TestKnowledgePrefetch:
 
     @pytest.mark.parametrize("prefetch", [True, False])
     def test_uncertain_or_disabled_keeps_the_forced_tool_round(self, monkeypatch, prefetch):
-        """needs_knowledge 為 None 時 chat_service 傳 force_knowledge_search=False，行為不變。"""
+        """沒開一律先查時，needs_knowledge 為 None（或先查關閉）維持強制工具那一輪。"""
         agent_loop, result, calls, executed, seen = self._run(
             monkeypatch,
             replies=lambda al: [
@@ -931,7 +939,7 @@ class TestKnowledgePrefetch:
                 al.LLMReply(content="答案", tool_calls=[], model="m1"),
             ],
             prefetch=prefetch,
-            force_knowledge_search=not prefetch,
+            force_knowledge_search=None if prefetch else True,
         )
 
         assert result.reply == "答案"
@@ -1026,7 +1034,9 @@ class TestKnowledgePrefetch:
 
         assert result.reply == "答案"
         assert [name for name, _ in executed] == ["search_knowledge"]
-        assert "不能使用 search_knowledge" in seen[2][-1]["content"]
+        # 第二次重叫被丟掉後是一般的「不能使用」催促；這一輪工具收掉，後面再接「工具已經用完」
+        assert "不能使用 search_knowledge" in seen[2][-2]["content"]
+        assert seen[2][-1]["content"] == agent_loop._ANSWER_ONLY_MSG
         assert len(calls) == 3
 
     def test_multimodal_turn_searches_its_own_text_not_the_previous_question(self, monkeypatch):
@@ -1126,3 +1136,262 @@ class TestKnowledgePrefetch:
 
         assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
         assert seen[0][-1]["role"] == "user"
+
+
+class TestPrefetchKnowledgeAlways:
+    """有知識庫的專案一律先查（CHAT_PREFETCH_KNOWLEDGE_ALWAYS）：決策的 needs_knowledge 不再決定要不要查。
+
+    Clef 實測 12 句醫院問題只有 1 句高信心為是、「骨科早上的門診是幾點」判成否；
+    不確定帶原本要多一次只為了產生 search_knowledge 呼叫的 LLM 呼叫。
+    """
+
+    def _run(self, monkeypatch, *, replies, tools=None, prefetch_always=True, **loop_kwargs):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=tools, prefetch_always=prefetch_always,
+        )
+        monkeypatch.setattr(agent_loop, "_tools_for_project", lambda tools, project_id: tools)
+        executed: list[tuple[str, str]] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call",
+            lambda name, args: executed.append((name, args)) or '{"status":"ok","data":{}}',
+        )
+        seen: list[list[dict]] = []
+        seq = list(replies(agent_loop))
+
+        def make(kind):
+            def _fn(msgs, tools=None, **kw):
+                calls.append({"kind": kind, "tools": tools, **kw})
+                seen.append([dict(m) for m in msgs])
+                return seq.pop(0) if len(seq) > 1 else seq[0]
+
+            return _fn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", make("stream"))
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", make("generate"))
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "骨科早上的門診是幾點？"}],
+            allow_forced_knowledge_search=True,
+            **loop_kwargs,
+        )
+        return agent_loop, result, calls, executed, seen
+
+    @pytest.mark.parametrize("decision", [True, None, False])
+    def test_every_decision_prefetches_when_always_is_on(self, monkeypatch, decision):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [al.LLMReply(content="早上八點", tool_calls=[], model="m1")],
+            force_knowledge_search=decision,
+        )
+
+        assert result.reply == "早上八點"
+        assert len(calls) == 1
+        assert "forced_tool_name" not in calls[0]
+        assert [name for name, _ in executed] == ["search_knowledge"]
+        assert "骨科早上的門診是幾點？" in executed[0][1]
+        assert seen[0][-1]["role"] == "tool"
+        assert [(s["tool_call_id"], s["round"]) for s in result.tool_steps] == [
+            ("prefetch-search-knowledge", 0),
+        ]
+
+    def test_uncertain_decision_keeps_the_forced_round_when_always_is_off(self, monkeypatch):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [
+                _tool_turn(al),
+                al.LLMReply(content="早上八點", tool_calls=[], model="m1"),
+            ],
+            prefetch_always=False,
+            force_knowledge_search=None,
+        )
+
+        assert result.reply == "早上八點"
+        assert len(calls) == 2
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
+        assert seen[0][-1]["role"] == "user"
+        assert [s["tool_call_id"] for s in result.tool_steps] == ["c1"]
+
+    def test_negative_decision_skips_the_search_when_always_is_off(self, monkeypatch):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [al.LLMReply(content="早上八點", tool_calls=[], model="m1")],
+            prefetch_always=False,
+            force_knowledge_search=False,
+        )
+
+        assert result.reply == "早上八點"
+        assert executed == []
+        assert len(calls) == 1 and "forced_tool_name" not in calls[0]
+
+    def test_always_needs_the_prefetch_switch_too(self, monkeypatch):
+        """CHAT_PREFETCH_KNOWLEDGE_SEARCH 關掉時一律先查沒有作用，照決策走。"""
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(monkeypatch, agent_loop, prefetch=False, prefetch_always=True)
+        executed: list[str] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call", lambda name, args: executed.append(name) or "{}",
+        )
+        _record_turns(
+            monkeypatch, agent_loop, calls,
+            stream_reply=[agent_loop.LLMReply(content="早上八點", tool_calls=[], model="m1")],
+            generate_reply=[agent_loop.LLMReply(content="早上八點", tool_calls=[], model="m1")],
+        )
+
+        agent_loop.run_agent_loop(
+            [{"role": "user", "content": "骨科早上的門診是幾點？"}],
+            allow_forced_knowledge_search=True,
+            force_knowledge_search=False,
+        )
+
+        assert executed == []
+        assert len(calls) == 1 and "forced_tool_name" not in calls[0]
+
+    @pytest.mark.parametrize("extra", [{"force_web_search": True}, {"force_memory_search": True}])
+    def test_other_forced_reads_keep_the_tool_round_and_backfill_knowledge(self, monkeypatch, extra):
+        """還要上網或查記憶時照原本流程：第一次呼叫強制工具，知識庫那一筆沒叫就補上。"""
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC, _MEMORY_TOOL_SPEC],
+            replies=lambda al: [
+                _tool_turn(al, name="search_web" if "force_web_search" in extra else "search_memory"),
+                al.LLMReply(content="答案", tool_calls=[], model="m1"),
+            ],
+            force_knowledge_search=False,
+            **extra,
+        )
+
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
+        assert seen[0][-1]["role"] == "user"
+        other = "search_web" if "force_web_search" in extra else "search_memory"
+        assert sorted(name for name, _ in executed) == sorted(["search_knowledge", other])
+
+    def test_slash_command_turn_does_not_prefetch(self, monkeypatch):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(monkeypatch, agent_loop, prefetch_always=True)
+        executed: list[str] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call", lambda name, args: executed.append(name) or "{}",
+        )
+        _record_turns(
+            monkeypatch, agent_loop, calls,
+            stream_reply=[agent_loop.LLMReply(content="好", tool_calls=[], model="m1")],
+            generate_reply=[agent_loop.LLMReply(content="好", tool_calls=[], model="m1")],
+        )
+
+        agent_loop.run_agent_loop(
+            [{"role": "user", "content": "/skill:do 參數"}],
+            forced_tool_name="skill__do",
+            allow_forced_knowledge_search=False,
+        )
+
+        assert executed == []
+        assert calls[0]["forced_tool_name"] == "skill__do"
+
+
+class TestAnswerOnlyNudge:
+    """工具收掉那一輪先告訴模型只能作答，不要等它叫了被丟掉的工具再催（正式環境每次約 0.75 秒）。"""
+
+    def _run(self, monkeypatch, *, replies, tools=None, prefetch_always=False, **loop_kwargs):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=tools or [_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC],
+            prefetch_always=prefetch_always,
+        )
+        monkeypatch.setattr(agent_loop, "_tools_for_project", lambda tools, project_id: tools)
+        executed: list[str] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call",
+            lambda name, args: executed.append(name) or '{"status":"ok","data":{}}',
+        )
+        seen: list[list[dict]] = []
+        seq = list(replies(agent_loop))
+
+        def make(kind):
+            def _fn(msgs, tools=None, **kw):
+                calls.append({"kind": kind, "tools": tools, **kw})
+                seen.append([dict(m) for m in msgs])
+                return seq.pop(0) if len(seq) > 1 else seq[0]
+
+            return _fn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", make("stream"))
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", make("generate"))
+        result = agent_loop.run_agent_loop(
+            [
+                {"role": "system", "content": "人設……\n\n這一輪的回答語言：中文。每次回覆不超過 60 字。"},
+                {"role": "user", "content": "什麼是PRP？"},
+            ],
+            allow_forced_knowledge_search=True,
+            reply_mode="fast",
+            **loop_kwargs,
+        )
+        return agent_loop, result, calls, executed, seen
+
+    def test_forced_round_then_answer_only_call_is_told_up_front(self, monkeypatch):
+        """fast 模式強制查完就收工具：第二次呼叫前對話最後一句是「工具已經用完」。"""
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [
+                _tool_turn(al),
+                al.LLMReply(content="PRP 是高濃度血小板血漿", tool_calls=[], model="m1"),
+            ],
+            force_knowledge_search=None,
+        )
+
+        assert result.reply == "PRP 是高濃度血小板血漿"
+        assert len(calls) == 2
+        assert calls[1]["tools"] is None
+        nudge = seen[1][-1]
+        assert nudge["role"] == "user"
+        assert nudge["content"].startswith(agent_loop._ANSWER_ONLY_MSG)
+        assert nudge["content"].endswith("每次回覆不超過 60 字。")
+        assert seen[1][-2]["role"] == "tool"
+        assert not any("不能使用" in m["content"] for m in seen[1] if m["role"] == "user")
+
+    def test_prefetched_turn_with_a_tool_round_gets_the_nudge_once_tools_are_withdrawn(
+        self, monkeypatch,
+    ):
+        # fast 模式沒有上網工具，模型自選的那一輪叫的是 filter_products
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            tools=[_SEARCH_TOOL_SPEC, _FILTER_TOOL_SPEC],
+            prefetch_always=True,
+            replies=lambda al: [
+                _tool_turn(al, name="filter_products"),
+                al.LLMReply(content="答案", tool_calls=[], model="m1"),
+            ],
+            force_knowledge_search=None,
+        )
+
+        assert result.reply == "答案"
+        assert executed == ["search_knowledge", "filter_products"]
+        assert len(calls) == 2
+        # 先查那一輪沒有催促：模型可以直接作答，也可以叫 filter_products
+        assert seen[0][-1]["role"] == "tool"
+        assert calls[0]["tools"] == [_FILTER_TOOL_SPEC]
+        assert calls[1]["tools"] is None
+        assert seen[1][-1]["content"].startswith(agent_loop._ANSWER_ONLY_MSG)
+
+    def test_model_ignoring_the_nudge_still_gets_the_drop_and_retry(self, monkeypatch):
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [
+                _tool_turn(al),
+                _tool_turn(al, name="search_web"),
+                al.LLMReply(content="答案", tool_calls=[], model="m1"),
+            ],
+            force_knowledge_search=None,
+        )
+
+        assert result.reply == "答案"
+        assert executed == ["search_knowledge"]
+        assert len(calls) == 3
+        assert calls[1]["tools"] is None and calls[2]["tools"] is None
+        assert seen[1][-1]["content"].startswith(agent_loop._ANSWER_ONLY_MSG)
+        retry = seen[2][-1]["content"]
+        assert retry.startswith(agent_loop._UNOFFERED_TOOL_RETRY_MSG.format(tools="search_web"))
+        # 催促只加一次
+        assert sum(
+            m["role"] == "user" and m["content"].startswith(agent_loop._ANSWER_ONLY_MSG)
+            for m in seen[2]
+        ) == 1

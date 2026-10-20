@@ -90,6 +90,7 @@
 
 ### Changed
 
+- **[2026-10-20]** **Brain 聊天回合少兩次 LLM 呼叫**：有知識庫的專案一律先查，不再由每輪決策判定要不要查（`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`，預設開啟；Clef 實測多數問題落在不確定帶，原本要多一次只為了產生 `search_knowledge` 呼叫的 LLM 呼叫，還有把門診時間判成否、答題時沒有知識庫的）；閒聊多一次約 0.3 秒檢索，關掉回到是→先查、不確定→強制工具那一輪、否→不查。工具收掉、只能作答的第一輪在呼叫前先告訴模型「工具已經用完，直接以文字回答」，不等它叫一次被收回的工具、被丟掉後再催（原本每次多一輪約 0.75 秒）。估省每輪 0.8～2 秒（推測，依正式環境單筆 trace）。
 - **[2026-10-20]** **台語備援鏈改由順位設定驅動**：台語那一輪的引擎順序照專案 `tts_engine_order`，沒設就用 `.env` 的 `TTS_TAIWANESE_FALLBACK_ORDER`（預設 `cosyvoice,voxcpm,indextts`）；每一站聲音對成同一個人，全部失敗才退 Edge。以後調順序改設定即可，不用動程式。
 - **[2026-10-20]** **台語備援第三順位 IndexTTS**：台語這一輪 CosyVoice、VoxCPM 都失敗時先退 IndexTTS 的 `TTS_INDEXTTS_DEFAULT_CHARACTER`（hayley，與 CosyVoice 預設同一位、念華語），IndexTTS 也失敗才退 Edge；專案設了引擎順位就照順位、沒列的不試。所有引擎回零長度或只有 WAV 檔頭的音訊一律視為失敗往下退（IndexTTS 停機時會回 200 空檔）。
 - **[2026-10-19]** **台語 TTS 引擎互為備援**：`POST /api/v1/tts/stream` 台語這一輪 CosyVoice 失敗先改 VoxCPM、VoxCPM 失敗先改 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設，專案限制聲音時只換到清單裡的聲音），兩家都失敗才退 Edge；`X-TTS-Provider` 照實標最後念的引擎。`TTSRouterService.synthesize` 新增 `partners`。華語指定 CosyVoice 的行為不變。
