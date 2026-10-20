@@ -90,6 +90,7 @@
 
 ### Changed
 
+- **[2026-10-20]** **台語備援第三順位 IndexTTS**：台語這一輪 CosyVoice、VoxCPM 都失敗時先退 IndexTTS 的 `TTS_INDEXTTS_DEFAULT_CHARACTER`（hayley，與 CosyVoice 預設同一位、念華語），IndexTTS 也失敗才退 Edge；專案設了引擎順位就照順位、沒列的不試。所有引擎回零長度或只有 WAV 檔頭的音訊一律視為失敗往下退（IndexTTS 停機時會回 200 空檔）。
 - **[2026-10-19]** **台語 TTS 引擎互為備援**：`POST /api/v1/tts/stream` 台語這一輪 CosyVoice 失敗先改 VoxCPM、VoxCPM 失敗先改 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設，專案限制聲音時只換到清單裡的聲音），兩家都失敗才退 Edge；`X-TTS-Provider` 照實標最後念的引擎。`TTSRouterService.synthesize` 新增 `partners`。華語指定 CosyVoice 的行為不變。
 - **[2026-10-19]** **2D 人物幀同步改用 requestVideoFrameCallback**：新增共用模組 `frontend/shared/avatar/avatarFrameClock.ts`，以瀏覽器回報的 `mediaTime` 直接算出畫面上那一幀（25 fps 下即幀序），runtime 不再每幀讀右上角 2×2 角標做 GPU 回讀；角落修補改在 runtime 複製影片幀後直接進行。沒有 rVFC 的瀏覽器、以及換角色後第一幀還沒畫出來前，照舊走角標路徑。素材包仍打角標，舊版 runtime 與舊素材不受影響。
 - **[2026-10-15]** **主機 nginx 可讓其他專案掛路徑而不改 repo**：`infra/nginx/native/openvman.conf.template`（與參考檔 `146-openvman.conf`）在 HTTPS server 區塊的兜底 location 之前加入 `include /etc/nginx/openvman-extra/*.conf;`。其他專案（例如 `/arwin/`）把自己的 `location` 放在主機的 `/etc/nginx/openvman-extra/`，不進 openVman 版控；資料夾空的或不存在時行為不變。做法見 `infra/nginx/native/README.md`。

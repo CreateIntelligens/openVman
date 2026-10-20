@@ -320,35 +320,57 @@ _VOXCPM_COSY_PREFIX = "voxcpm2-cosy-"
 
 def _taiwanese_partners(
     runtime, policy, provider: str, voice: str, *, is_root: bool,
+    order: tuple[str, ...] = (),
 ) -> tuple[tuple[str, str], ...]:
-    """The other Taiwanese engine, in the same voice, to try before Edge.
+    """Engines to try, in the same voice, before Edge on a Taiwanese turn.
 
     CosyVoice 掛了（例如節點 GPU 記憶體不足）不該直接退到 Edge 的華語音色，
-    先換 VoxCPM 念同一個人；反過來亦然。聲音對不到才用那家的預設；專案限制
-    了聲音就只能換到清單裡那家的聲音。
+    先換 VoxCPM 念同一個人；反過來亦然。兩家都掛再退 IndexTTS 的 hayley——
+    念的是華語，但還是同一位。聲音對不到才用那家的預設；專案限制了聲音就
+    只能換到清單裡那家的聲音；專案設了引擎順位就照順位排、沒列的不試。
     """
     svc = _get_service()
+    cfg = get_tts_config()
+    candidates: list[tuple[str, str, bool]] = []
     if provider == COSYVOICE_PROVIDER_NAME:
-        partner, adapter = VOXCPM_PROVIDER_NAME, svc.voxcpm_adapter
         source = voice or getattr(svc.cosyvoice_adapter, "default_voice", "")
-        mapped = f"{_VOXCPM_COSY_PREFIX}{source}" if source else ""
+        candidates.append((
+            VOXCPM_PROVIDER_NAME,
+            f"{_VOXCPM_COSY_PREFIX}{source}" if source else "",
+            bool(getattr(svc.voxcpm_adapter, "enabled", False)),
+        ))
     elif provider == VOXCPM_PROVIDER_NAME:
-        partner, adapter = COSYVOICE_PROVIDER_NAME, svc.cosyvoice_adapter
         source = voice or getattr(svc.voxcpm_adapter, "default_voice", "")
-        mapped = source.removeprefix(_VOXCPM_COSY_PREFIX) if source.startswith(_VOXCPM_COSY_PREFIX) else ""
+        candidates.append((
+            COSYVOICE_PROVIDER_NAME,
+            source.removeprefix(_VOXCPM_COSY_PREFIX) if source.startswith(_VOXCPM_COSY_PREFIX) else "",
+            bool(getattr(svc.cosyvoice_adapter, "enabled", False)),
+        ))
     else:
         return ()
-    if not adapter.enabled:
-        return ()
-    if policy is not None and policy.restricts_tts:
-        picked = voice_access.project_voice_for_providers(
-            runtime, policy, (partner,), is_root=is_root,
+    candidates.append((
+        INDEXTTS_PROVIDER, cfg.tts_indextts_default_character, bool(cfg.tts_indextts_url),
+    ))
+    if order:
+        ranked = {name: index for index, name in enumerate(order)}
+        candidates = sorted(
+            (c for c in candidates if c[0] in ranked), key=lambda c: ranked[c[0]],
         )
-        if picked is None:
-            return ()
-        if picked[1] and picked[1] != mapped:
-            mapped = picked[1]
-    return ((partner, mapped),)
+
+    partners: list[tuple[str, str]] = []
+    for partner, mapped, running in candidates:
+        if not running:
+            continue
+        if policy is not None and policy.restricts_tts:
+            picked = voice_access.project_voice_for_providers(
+                runtime, policy, (partner,), is_root=is_root,
+            )
+            if picked is None:
+                continue
+            if picked[1] and picked[1] != mapped:
+                mapped = picked[1]
+        partners.append((partner, mapped))
+    return tuple(partners)
 
 
 def _stream_audio(
@@ -491,7 +513,10 @@ async def tts_stream_endpoint(
                 voice = character = picked[1] or cfg.tts_indextts_default_character
     # 台語這一輪才互備：華語指定 CosyVoice 失敗，換成 VoxCPM 照字唸不是使用者要的。
     partners = (
-        _taiwanese_partners(runtime, policy, provider, voice, is_root=is_root)
+        _taiwanese_partners(
+            runtime, policy, provider, voice, is_root=is_root,
+            order=_project_engine_order(policy),
+        )
         if language == language_routes_mod.TAIWANESE else ()
     )
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
@@ -580,6 +605,7 @@ async def tts_stream_endpoint(
                             ),
                             provider=partner,
                             edge_fallback_voice=edge_fallback_voice,
+                            partners=partners[1:],
                         )
                     except RuntimeError as partner_exc:
                         return JSONResponse(status_code=502, content={"error": str(partner_exc)})

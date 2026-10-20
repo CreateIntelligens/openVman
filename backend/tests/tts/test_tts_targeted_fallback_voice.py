@@ -114,3 +114,19 @@ def test_project_order_does_not_override_an_explicit_provider() -> None:
         SynthesizeRequest(text="你好"), provider="cosyvoice", order=("voxcpm",),
     )
     assert output.result.provider == "cosyvoice"
+
+
+def test_empty_audio_counts_as_a_failure_and_falls_through() -> None:
+    svc = TTSRouterService(_taiwanese_config())
+    from dataclasses import replace as dc_replace
+
+    empty = dc_replace(_ok_result("cosyvoice"), audio_bytes=b"RIFF" + bytes(40))
+    svc._cosyvoice.synthesize = MagicMock(return_value=empty)  # type: ignore[method-assign]
+    svc._voxcpm.synthesize = MagicMock(return_value=_ok_result("voxcpm"))  # type: ignore[method-assign]
+    output = svc.synthesize(
+        SynthesizeRequest(text="你好", voice_hint="young-female-02"),
+        provider="cosyvoice", partners=(("voxcpm", "voxcpm2-cosy-young-female-02"),),
+    )
+    assert output.result.provider == "voxcpm"
+    assert output.fallback is True
+    assert "bytes of audio" in output.fallback_reason

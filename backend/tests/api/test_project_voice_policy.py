@@ -534,12 +534,13 @@ class _FakeService:
     def synthesize(self, request, *, provider="", edge_fallback_voice="", partners=(), order=()):
         self.orders.append(order)
         self.calls.append((provider, request.voice_hint, edge_fallback_voice))
-        for partner, partner_voice in partners:
-            if provider in self.failing and partner not in self.failing:
+        if provider in self.failing:
+            for partner, partner_voice in partners:
                 self.calls.append((partner, partner_voice, edge_fallback_voice))
-                return SimpleNamespace(
-                    result=_ok(partner), fallback=True, fallback_reason="down",
-                )
+                if partner not in self.failing:
+                    return SimpleNamespace(
+                        result=_ok(partner), fallback=True, fallback_reason="down",
+                    )
         if provider not in self.failing:
             return SimpleNamespace(
                 result=_ok(provider), fallback=False, fallback_reason="",
@@ -806,3 +807,43 @@ def test_project_tts_order_decides_which_taiwanese_engine_goes_first(
     # 順位把 VoxCPM 排前面：台語這一輪先走 VoxCPM 串流（假服務的串流會失敗，再換 CosyVoice）。
     assert tts_client.service.calls[0][0] == "voxcpm-stream"
     assert tts_client.service.calls[1][0] == "cosyvoice"
+
+
+def test_taiwanese_partners_end_with_indextts_hayley_before_edge(env, tts_client, monkeypatch):
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    monkeypatch.setenv("TTS_INDEXTTS_URL", "http://index")
+    monkeypatch.setenv("TTS_INDEXTTS_DEFAULT_CHARACTER", "hayley")
+    from app.config import get_tts_config
+    get_tts_config.cache_clear()
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    # 假服務：CosyVoice 與 VoxCPM 都失敗，IndexTTS 成功。
+    tts_client.service.failing = {"cosyvoice", "voxcpm"}
+    response = _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    assert response.status_code == 200
+    assert tts_client.service.calls == [
+        ("cosyvoice", "", ""),
+        ("voxcpm", "voxcpm2-cosy-young-female-02", ""),
+        ("indextts", "hayley", ""),
+    ]
+    assert response.headers["X-TTS-Provider"] == "indextts"
+
+
+def test_project_order_filters_the_taiwanese_partners(env, tts_client, monkeypatch):
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    monkeypatch.setenv("TTS_INDEXTTS_URL", "http://index")
+    from app.config import get_tts_config
+    get_tts_config.cache_clear()
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    tts_client.service.failing = {"cosyvoice", "voxcpm"}
+    # 順位只列 CosyVoice 與 IndexTTS：VoxCPM 不在裡面就不試。
+    _policy(env, tts_engine_order=["cosyvoice", "indextts"])
+    _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    assert [call[0] for call in tts_client.service.calls] == ["cosyvoice", "indextts"]

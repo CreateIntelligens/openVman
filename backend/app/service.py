@@ -29,6 +29,19 @@ from app.providers.error_mapping import (
 from app.providers.gcp_adapter import GCPTTSAdapter
 from app.providers.gemini_tts_adapter import GeminiTTSAdapter
 from app.usage_ledger_client import UNIT_CHARS, record_usage_event
+
+#: 一個 WAV 檔頭就是 44 bytes；只有檔頭沒有取樣，或根本零長度，都是空檔。
+WAV_HEADER_BYTES = 44
+
+
+class EmptyAudioError(RuntimeError):
+    """The provider answered 200 with no usable audio."""
+
+
+def is_empty_audio(audio: bytes) -> bool:
+    if not audio:
+        return True
+    return audio.startswith(b"RIFF") and len(audio) <= WAV_HEADER_BYTES
 from app.providers.indextts_adapter import IndexTTSAdapter
 from app.providers.voxcpm_adapter import VoxCPMAdapter
 
@@ -163,6 +176,12 @@ class TTSRouterService:
         t0 = monotonic()
         try:
             result = target.adapter.synthesize(request)
+            # IndexTTS 沒在跑時會回 200 空音檔；任何引擎回太短的音訊都當失敗，
+            # 否則備援會「成功」地吐一段無聲。
+            if is_empty_audio(result.audio_bytes):
+                raise EmptyAudioError(
+                    f"{target.target} returned {len(result.audio_bytes)} bytes of audio"
+                )
             latency_ms = (monotonic() - t0) * 1000
             record_route_attempt(
                 target=target.target, result="success", latency_ms=latency_ms,

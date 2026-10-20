@@ -140,7 +140,7 @@ Brain 對台語提問的回答一律寫成繁體中文文字（台語沒有通�
 
 | 語言 | 引擎 | 條件 |
 |---|---|---|
-| `nan` 台語 | CosyVoice（停用時改 VoxCPM） | 請求帶 `project_id`，且專案分流含台語；指定了別家引擎也會換。CosyVoice 會先把漢字轉成台文再合成，只能整段合成，第一聲比逐句串流慢。台語這一輪 CosyVoice 失敗（例如節點 GPU 記憶體不足）先換 VoxCPM 念同一個人的聲音（`young-female-02` ↔ `voxcpm2-cosy-young-female-02`，對不到才用那家預設），反過來 VoxCPM 失敗先換 CosyVoice，兩家都失敗才退 Edge；`X-TTS-Provider` 標的是最後真正念的引擎 |
+| `nan` 台語 | CosyVoice（停用時改 VoxCPM） | 請求帶 `project_id`，且專案分流含台語；指定了別家引擎也會換。CosyVoice 會先把漢字轉成台文再合成，只能整段合成，第一聲比逐句串流慢。台語這一輪 CosyVoice 失敗（例如節點 GPU 記憶體不足）先換 VoxCPM 念同一個人的聲音（`young-female-02` ↔ `voxcpm2-cosy-young-female-02`，對不到才用那家預設），反過來 VoxCPM 失敗先換 CosyVoice，兩家都失敗再退 IndexTTS 的 hayley（同一位、但念華語），IndexTTS 也失敗才退 Edge；`X-TTS-Provider` 標的是最後真正念的引擎 |
 | `zh` 國語、`en` 英文 | IndexTTS | 沒指定 `provider` 也沒指定 `voice` 時；有指定就照指定的 |
 | 其他或沒給語言 | 指定的聲音，沒指定就用專案預設、帳號預設 | — |
 
