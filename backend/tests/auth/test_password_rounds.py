@@ -35,9 +35,21 @@ def test_default_cost_stays_at_twelve_when_unset(monkeypatch: pytest.MonkeyPatch
     assert seen["rounds"] == 12
 
 
-def test_cost_below_bcrypt_minimum_is_clamped(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cost_outside_bcrypt_range_is_clamped(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUTH_BCRYPT_ROUNDS", "1")
     assert _cost(hash_password("correct horse battery")) == 4
+    monkeypatch.setenv("AUTH_BCRYPT_ROUNDS", "99")
+    seen_max: dict[str, int] = {}
+    real = bcrypt.gensalt
+
+    def fake_max(rounds: int = 12) -> bytes:
+        seen_max["rounds"] = rounds
+        return real(rounds=4)
+
+    monkeypatch.setattr(bcrypt, "gensalt", fake_max)
+    hash_password("correct horse battery")
+    assert seen_max["rounds"] == 31
+    monkeypatch.setattr(bcrypt, "gensalt", real)
     monkeypatch.setenv("AUTH_BCRYPT_ROUNDS", "not-a-number")
     seen: dict[str, int] = {}
     real_gensalt = bcrypt.gensalt

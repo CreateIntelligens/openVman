@@ -30,7 +30,9 @@ def validate_password(password: str) -> bytes:
 
 
 _DEFAULT_ROUNDS = 12
+# bcrypt 只接受 4 到 31；超出就讓 gensalt 拋例外，整個登入與建帳號都會壞。
 _MIN_ROUNDS = 4
+_MAX_ROUNDS = 31
 
 
 def _rounds() -> int:
@@ -44,7 +46,7 @@ def _rounds() -> int:
     if not raw:
         return _DEFAULT_ROUNDS
     try:
-        return max(_MIN_ROUNDS, int(raw))
+        return min(_MAX_ROUNDS, max(_MIN_ROUNDS, int(raw)))
     except ValueError:
         return _DEFAULT_ROUNDS
 
