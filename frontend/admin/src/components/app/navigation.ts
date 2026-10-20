@@ -4,6 +4,8 @@ import {
   type LazyExoticComponent,
 } from "react";
 
+import { readScoped, writeScoped } from "../../utils/scopedStorage";
+
 export const workspaceTabs = [
   { key: "Chat", label: "對話", icon: "chat" },
   { key: "Voice", label: "語音", icon: "graphic_eq" },
@@ -280,4 +282,22 @@ export function consumeChatDeepLink(): ChatDeepLink | null {
   );
 
   return { sessionId, personaId };
+}
+
+const SUB_VIEW_MEMORY_PREFIX = "brain-sub-view:";
+
+/**
+ * 記住每個分頁上次停在哪個子視圖。側欄連結不帶子視圖，沒有這份記憶的話
+ * 每次切回來都掉回預設頁，使用者得再點一次。存的是「明確停過的地方」，
+ * 包括預設頁本身（存空字串），所以選回預設頁也會被記住。
+ */
+export function rememberSubView(tab: Tab, subView: string | undefined): void {
+  writeScoped(`${SUB_VIEW_MEMORY_PREFIX}${tab}`, subView ?? "");
+}
+
+/** 這個分頁上次停的子視圖；沒記過或記的是預設頁都回 undefined。 */
+export function recallSubView(tab: Tab): string | undefined {
+  const saved = readScoped(`${SUB_VIEW_MEMORY_PREFIX}${tab}`);
+  if (!saved || !adminSubViews[tab]?.includes(saved)) return undefined;
+  return saved;
 }

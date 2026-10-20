@@ -25,6 +25,8 @@ import {
   parseAdminRoute,
   normalizeAdminRoute,
   readChatDeepLink,
+  recallSubView,
+  rememberSubView,
   publicAdminPath,
   type AdminRoute,
   type Tab,
@@ -132,6 +134,8 @@ function AppContent() {
     } else {
       removeScoped("brain-active-sub-view");
     }
+    // 每個分頁各記一份：從側欄切回來時還原到上次停的子視圖。
+    rememberSubView(route.tab, route.subView);
     currentUrlRef.current = canonicalPath;
     if (`${window.location.pathname}${window.location.search}` !== canonicalPath) {
       window.history.replaceState(null, "", canonicalPath);
@@ -174,7 +178,8 @@ function AppContent() {
 
   const switchTab = useCallback(
     (tab: Tab, subView?: string) => {
-      const nextRoute = normalizeAdminRoute({ tab, subView });
+      // 側欄只給分頁不給子視圖；有記憶就回到上次停的地方，不要每次都掉回預設頁。
+      const nextRoute = normalizeAdminRoute({ tab, subView: subView ?? recallSubView(tab) });
       if (nextRoute.tab === route.tab && nextRoute.subView === route.subView) {
         return;
       }

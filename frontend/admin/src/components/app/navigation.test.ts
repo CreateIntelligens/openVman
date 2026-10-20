@@ -233,3 +233,24 @@ describe("merged access and system status pages", () => {
     ]);
   });
 });
+
+describe("sub view memory", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("remembers the last sub view per tab and recalls it for sidebar navigation", async () => {
+    const { recallSubView, rememberSubView } = await import("./navigation");
+    expect(recallSubView("Access")).toBeUndefined();
+    rememberSubView("Access", "accounts/manage");
+    rememberSubView("Avatar", "mascots");
+    expect(recallSubView("Access")).toBe("accounts/manage");
+    expect(recallSubView("Avatar")).toBe("mascots");
+    // 選回預設頁也要記住，不能還原成上一次的非預設頁。
+    rememberSubView("Avatar", undefined);
+    expect(recallSubView("Avatar")).toBeUndefined();
+    // 記到不存在的子視圖（舊版路由）就當沒記。
+    window.localStorage.setItem(Object.keys(window.localStorage).find((key) => key.includes("brain-sub-view:Access"))!, "nope");
+    expect(recallSubView("Access")).toBeUndefined();
+  });
+});
