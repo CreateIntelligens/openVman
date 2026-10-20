@@ -37,7 +37,7 @@ from app.providers.voxcpm_adapter import (
     VOXCPM_STREAM_CONTENT_TYPE,
     VoxCPMHTTPError,
 )
-from app.service import TTSRouterService
+from app.service import SynthesisOutput, TTSRouterService
 from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.tts_pcm import (
     PCM16K_CONTENT_TYPE,
@@ -406,18 +406,26 @@ def _stream_audio(
 
 
 def _buffered_audio(
-    result: NormalizedTTSResult, output_format: str, provider: str,
+    output: SynthesisOutput, output_format: str, provider: str,
 ) -> Response:
+    result = output.result
     provider = result.provider or provider
     if output_format == PCM16K_FORMAT:
-        return _stream_audio(
+        response = _stream_audio(
             iter_bytes(result.audio_bytes), result.content_type, output_format, provider,
         )
-    return Response(
-        content=result.audio_bytes,
-        media_type=result.content_type,
-        headers={TTS_PROVIDER_HEADER: provider},
-    )
+    else:
+        response = Response(
+            content=result.audio_bytes,
+            media_type=result.content_type,
+            headers={TTS_PROVIDER_HEADER: provider},
+        )
+    # 跟 /api/v1/tts 一樣標出備援：只看 X-TTS-Provider 知道換了引擎，
+    # 看不出第一站為什麼失敗。
+    if output.fallback:
+        response.headers["X-TTS-Fallback"] = "true"
+        response.headers["X-TTS-Fallback-Reason"] = output.fallback_reason
+    return response
 
 
 async def _proxy_indextts_stream(
@@ -623,7 +631,7 @@ async def tts_stream_endpoint(
                         )
                     except RuntimeError as partner_exc:
                         return JSONResponse(status_code=502, content={"error": str(partner_exc)})
-                    return _buffered_audio(output.result, body.format, partner)
+                    return _buffered_audio(output, body.format, partner)
 
     # 明確指定的非串流 provider（CosyVoice 等）直接走整段合成。不這樣做的話
     # 會掉進下面的 IndexTTS／Edge 串流，回的是別的引擎的聲音——CosyVoice 是
@@ -641,7 +649,7 @@ async def tts_stream_endpoint(
             )
         except RuntimeError as exc:
             return JSONResponse(status_code=502, content={"error": str(exc)})
-        return _buffered_audio(output.result, body.format, provider)
+        return _buffered_audio(output, body.format, provider)
 
     # Primary: proxy stream directly from IndexTTS — 只在沒指定或指定 IndexTTS 時。明確指定
     # Edge（或 VoxCPM 掛掉往下退）卻先送 IndexTTS，IndexTTS 沒在跑時會回 200 空音檔。
@@ -690,4 +698,4 @@ async def tts_stream_endpoint(
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
-    return _buffered_audio(output.result, body.format, provider)
+    return _buffered_audio(output, body.format, provider)

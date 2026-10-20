@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **[2026-10-20]** **`/api/v1/tts/stream` 備援時補上 `X-TTS-Fallback` 與 `X-TTS-Fallback-Reason`**：整段合成的路徑（CosyVoice、VoxCPM 失敗後的備援、其餘引擎）原本只換 `X-TTS-Provider`，呼叫端看得出換了引擎卻看不出第一站為什麼失敗；現在與 `/api/v1/tts` 一樣，發生備援時帶 `X-TTS-Fallback: true` 與第一站的錯誤描述，`pcm16k` 輸出也帶。沒有備援時這兩個標頭不出現。
 - **[2026-10-20]** **chat 的 `tts_text` 不再逐句打 normalize API**：`spoken_form` 本來就以 `normalize_url=""` 要求只做本地正規化，但 `prepare_tts_text` 把空字串當成「沒指定」退回 `NORMALIZE_API_URL`，有設定的部署上 `/chat/stream` 每個 `sentence`／`done` 事件與 `/chat` 的 JSON 都同步多打一次遠端（實測每次 0.4～0.6 秒，且卡住 Backend 的事件迴圈，其他同時進行的請求跟著等）。現在空字串在同步與非同步版本都代表不打 API；`/tts`、`/tts/stream` 沒帶 `normalize_url`，照舊走設定檔的 API。
 - **[2026-10-20]** **退掉 2D 人物的 requestVideoFrameCallback 幀時鐘，恢復角標幀序**：10/19 上線的幀時鐘在正式機實測會卡住好幾幀（`characterVideo` 是 `display:none`，Chrome 對沒畫出來的 video 幾乎不觸發 rVFC），123 個取樣有 110 個幀序對不上，嘴部貼片套到錯的幀，表現為「嘴／下巴有點歪」。runtime 改回每幀讀右上角角標（從實際畫出的像素解碼，必然正確），角落修補照舊由角標讀取觸發；`avatarFrameClock.ts` 移除。
 - **[2026-10-19]** **後台 Avatar 響應式版面**：手機下將上傳欄位、檔案選擇器、素材分頁與卡片操作按鈕直向排列，`md` 起回到橫向；角色、背景、小助理卡片採可縮至零的網格欄位，長名稱與轉換進度可換行。共用頂列的專案選單可縮短名稱，展開清單限制在手機視窗內，保留既有手機導覽抽屜。

@@ -248,7 +248,7 @@ ws.send(JSON.stringify(payload));
 - 批次 ASR（`/api/v1/asr/transcribe`）：明確指定 `provider` 須同時在帳號授權與專案清單內（否則 403，推論前就拒絕）。省略時依序取帳號偏好 → 專案預設 → 部署預設 `ASR_PROVIDER`，每一個都要在「（帳號授權 ∪ 部署預設）∩ 專案清單」內，備援鏈也限於此集合；專案把批次引擎全部排除時回 403。台語分流改用 `taiwanese_asr_engine`（須在允許集合內，否則不換引擎）。
 - 上傳媒體（`POST /api/v1/uploads` 的 `project_id`，Embed key 一律用金鑰的專案）：背景 `process_media` 在專案有 ASR 限制時套用同一個交集；沒有限制時維持原本不設限的內部備援。
 - 串流 ASR（`/api/v1/asr/stream` 的 `project_id`）：query `engine` 不在專案清單內回 `not_allowed`，管理員的「可試任何串流引擎」例外也受專案限制。未指定 `engine` 時先用帳號偏好（被專案擋掉才看專案預設；偏好是批次引擎時不會被換成串流）。
-- TTS（`/v1/audio/speech` 新增選填 `project_id`、`/api/v1/tts/stream`）：`resolve_tts_voice` 帶專案；聲音不在清單回 403（帳號本身看不到仍回 404），管理員一樣受限。省略聲音時依序取專案預設 → 帳號預設 → 清單第一個可用聲音。台語分流換 CosyVoice（停用時 VoxCPM）、國語與英文換 IndexTTS（VH-384，僅在呼叫端沒指定 provider 與 voice 時）時，專案有限制就只換到清單內該 provider 的聲音，找不到就不換；`/api/v1/tts/stream` 的回應一律帶 `X-TTS-Provider`。合成失敗退回 Edge-TTS 只在專案不限制、或清單內有 Edge 聲音（改用該聲音）時發生，否則回 502，不默默換引擎；有聲音限制的專案在 `/v1/audio/speech` 快取 key 加上專案範圍，避免拿到別的專案備援出來的音訊。
+- TTS（`/v1/audio/speech` 新增選填 `project_id`、`/api/v1/tts/stream`）：`resolve_tts_voice` 帶專案；聲音不在清單回 403（帳號本身看不到仍回 404），管理員一樣受限。省略聲音時依序取專案預設 → 帳號預設 → 清單第一個可用聲音。台語分流換 CosyVoice（停用時 VoxCPM）、國語與英文換 IndexTTS（VH-384，僅在呼叫端沒指定 provider 與 voice 時）時，專案有限制就只換到清單內該 provider 的聲音，找不到就不換；`/api/v1/tts/stream` 的回應一律帶 `X-TTS-Provider`，整段合成路徑發生備援時另帶 `X-TTS-Fallback: true` 與 `X-TTS-Fallback-Reason`（第一站的錯誤描述）。合成失敗退回 Edge-TTS 只在專案不限制、或清單內有 Edge 聲音（改用該聲音）時發生，否則回 502，不默默換引擎；有聲音限制的專案在 `/v1/audio/speech` 快取 key 加上專案範圍，避免拿到別的專案備援出來的音訊。
 - Embed key：沒有帳號授權，專案有限制時以專案清單代替帳號授權（批次備援、串流預設引擎、聲音）；仍不可明確指定 ASR provider 或串流 `engine`。金鑰設定的聲音不在清單內時回 403，`/api/v1/tts/providers` 也不列。
 - `/api/v1/tts/providers` 與 `/api/v1/me/capabilities` 接受選填 `project_id`，見下節。
 

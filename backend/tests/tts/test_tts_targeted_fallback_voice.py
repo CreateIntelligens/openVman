@@ -130,3 +130,24 @@ def test_empty_audio_counts_as_a_failure_and_falls_through() -> None:
     assert output.result.provider == "voxcpm"
     assert output.fallback is True
     assert "bytes of audio" in output.fallback_reason
+
+
+def test_stream_route_marks_fallback_on_buffered_audio() -> None:
+    """/tts/stream 的整段合成回應也要像 /tts 一樣標出備援，不只換掉 X-TTS-Provider。"""
+    from app.routes.tts import _buffered_audio
+    from app.service import SynthesisOutput
+
+    output = SynthesisOutput(
+        result=_ok_result("voxcpm"), fallback=True, fallback_reason="cosyvoice: ConnectError",
+    )
+    plain = _buffered_audio(output, "", "cosyvoice")
+    assert plain.headers["X-TTS-Provider"] == "voxcpm"
+    assert plain.headers["X-TTS-Fallback"] == "true"
+    assert plain.headers["X-TTS-Fallback-Reason"] == "cosyvoice: ConnectError"
+
+    pcm = _buffered_audio(output, "pcm16k", "cosyvoice")
+    assert pcm.headers["X-TTS-Provider"] == "voxcpm"
+    assert pcm.headers["X-TTS-Fallback"] == "true"
+
+    direct = _buffered_audio(SynthesisOutput(result=_ok_result("cosyvoice")), "", "cosyvoice")
+    assert "X-TTS-Fallback" not in direct.headers
