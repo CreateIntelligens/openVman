@@ -5,8 +5,12 @@ import {
   type AccountAccessInput,
   type AccountAccessOption,
   type AccountAccessOptions,
-  type AccountResourceGrants,
 } from "../../api/auth";
+import {
+  groupAccessOptions,
+  type AccessSection,
+  type GrantType,
+} from "./accountAccessGroups";
 
 const PREFERRED_PROJECT = "proj-b85afb8bb6";
 const PREFERRED_CHARACTER = "0713";
@@ -14,8 +18,6 @@ const PREFERRED_VOICE = "hayley";
 const PREFERRED_MASCOT = "qqman";
 // 前台預設就是內建的深色舞台（avatarBackground.ts 的 fallback）。
 const PREFERRED_BACKGROUND = "dark";
-
-type GrantType = keyof AccountResourceGrants;
 
 const EMPTY_ACCESS: AccountAccessInput = {
   grants: {
@@ -355,7 +357,7 @@ export function useAccountAccessForm(
   };
 }
 
-type AccountAccessForm = ReturnType<typeof useAccountAccessForm>;
+export type AccountAccessForm = ReturnType<typeof useAccountAccessForm>;
 
 function defaultOptionValue(
   defaults: AccountAccessInput["defaults"],
@@ -424,20 +426,6 @@ export default function AccountAccessFields({
   );
 }
 
-const PROVIDER_LABELS: Record<string, string> = {
-  indextts: "IndexTTS",
-  voxcpm: "VoxCPM",
-  cosyvoice: "CosyVoice",
-  "gemini-tts": "Gemini TTS",
-  "edge-tts": "Edge TTS",
-  gcp: "GCP TTS",
-  aws: "AWS Polly",
-};
-
-function providerLabel(provider: string): string {
-  return PROVIDER_LABELS[provider] ?? provider;
-}
-
 /** 併入同一張清單時，用後綴標示這筆屬於哪個分類（與前台選單一致）。*/
 const GRANT_SUFFIX: Partial<Record<GrantType, string>> = {
   avatar_characters: "openVman 2D",
@@ -472,60 +460,31 @@ function AccessGroup({
     (form.access.grants[option.grantType] ?? []).includes(option.id);
   const selectedOptions = options.filter(isSelected);
 
-  // 聲音有數十個且分屬不同廠牌，先挑廠牌再挑聲音才選得動。
-  const providers = Array.from(
-    new Set(
-      options
-        .map((option) => option.provider)
-        .filter((p): p is string => Boolean(p)),
-    ),
-  ).sort();
-  const useProviderFilter = providers.length > 1;
-  const [activeProvider, setActiveProvider] = useState<string>("");
-  const visibleOptions = useProviderFilter && activeProvider
-    ? options.filter((option) => option.provider === activeProvider)
-    : options;
+  // 人物依擁有的專案、聲音依引擎分區段：幾十個項目攤成一張清單，
+  // 管理者對不出哪個是哪個專案的；一次只看一個區段才核對得了。
+  const sections = groupAccessOptions(grantType, options, form.options?.projects ?? []);
 
-  // 全選只作用在目前看得見的項目：篩了廠牌還整批全選，會選到畫面上沒
-  // 出現的聲音。
-  const allVisibleSelected = visibleOptions.length > 0
-    && visibleOptions.every(isSelected);
-
-  function toggleAllVisible() {
+  /** 把 ids 加進（或移出）各自分類的授權清單；一次只動傳進來的這些。 */
+  function setSelected(targets: MergedOption[], selected: boolean) {
     for (const type of grantTypes) {
-      const current = form.access.grants[type] ?? [];
-      const visibleIds = visibleOptions
+      const ids = targets
         .filter((option) => option.grantType === type)
         .map((option) => option.id);
-      if (visibleIds.length === 0) continue;
-      const next = allVisibleSelected
-        ? current.filter((id) => !visibleIds.includes(id))
-        : Array.from(new Set([...current, ...visibleIds]));
+      if (ids.length === 0) continue;
+      const current = form.access.grants[type] ?? [];
+      const next = selected
+        ? Array.from(new Set([...current, ...ids]))
+        : current.filter((id) => !ids.includes(id));
       form.setSelection(type, next);
     }
   }
+
+  const allSelected = options.length > 0 && options.every(isSelected);
 
   return (
     <fieldset className="min-w-0 border-b border-border px-5 py-5 last:border-b-0 lg:border-b-0">
       <legend className="font-semibold">{title}</legend>
       <p className="mt-1 text-xs text-content-muted">{description}</p>
-      {useProviderFilter && (
-        <label className="mt-3 block text-xs font-medium text-content-muted">
-          語音廠牌
-          <select
-            className="input mt-1"
-            value={activeProvider}
-            onChange={(event) => setActiveProvider(event.target.value)}
-          >
-            <option value="">全部廠牌</option>
-            {providers.map((provider) => (
-              <option key={provider} value={provider}>
-                {providerLabel(provider)}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="text-xs text-content-subtle">
           已選 {selectedOptions.length} / {options.length}
@@ -533,42 +492,26 @@ function AccessGroup({
         <button
           className="btn btn-ghost px-2 py-1 text-xs"
           type="button"
-          onClick={toggleAllVisible}
-          disabled={visibleOptions.length === 0}
+          onClick={() => setSelected(options, !allSelected)}
+          disabled={options.length === 0}
         >
-          {allVisibleSelected ? "全部不選" : "全選"}
-          {useProviderFilter && activeProvider ? "（此廠牌）" : ""}
+          {allSelected ? "全部不選" : "全選"}
         </button>
       </div>
-      <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
-        {visibleOptions.map((option) => (
-          <label
-            key={`${option.grantType}:${option.id}`}
-            className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-2 py-2 last:border-b-0 hover:bg-surface-sunken"
-          >
-            <input
-              className="h-4 w-4 accent-primary"
-              type="checkbox"
-              checked={isSelected(option)}
-              onChange={() => form.toggle(option.grantType, option.id)}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
-                {option.label}
-                {GRANT_SUFFIX[option.grantType]
-                  ? ` · ${GRANT_SUFFIX[option.grantType]}`
-                  : ""}
-              </span>
-              <span className="block truncate text-xs text-content-subtle">
-                {option.id}{option.provider ? ` · ${option.provider}` : ""}
-              </span>
-            </span>
-          </label>
+      <div className="mt-2 max-h-72 overflow-y-auto pr-1">
+        {sections.map((section) => (
+          <AccessSectionList
+            key={section.key}
+            section={section}
+            isSelected={isSelected}
+            onToggle={(option) => form.toggle(option.grantType, option.id)}
+            onSetAll={(selected) => setSelected(section.options, selected)}
+          />
         ))}
         {form.loading && (
           <p className="py-3 text-sm text-content-muted" role="status">載入中…</p>
         )}
-        {!form.loading && visibleOptions.length === 0 && (
+        {!form.loading && options.length === 0 && (
           <p className="py-3 text-sm text-content-muted">目前沒有可授權項目</p>
         )}
       </div>
@@ -599,5 +542,71 @@ function AccessGroup({
         );
       })}
     </fieldset>
+  );
+}
+
+function AccessSectionList({
+  section,
+  isSelected,
+  onToggle,
+  onSetAll,
+}: {
+  section: AccessSection<MergedOption>;
+  isSelected: (option: MergedOption) => boolean;
+  onToggle: (option: MergedOption) => void;
+  onSetAll: (selected: boolean) => void;
+}) {
+  const selectedCount = section.options.filter(isSelected).length;
+  const allSelected = section.options.length > 0 && selectedCount === section.options.length;
+  // 開合只在第一次畫出來時決定（有勾選的區段先展開），之後交給瀏覽器；
+  // 綁著勾選狀態的話，勾一下區段就在游標底下收起來。
+  const [open] = useState(() => selectedCount > 0);
+
+  const rows = section.options.map((option) => (
+    <label
+      key={`${option.grantType}:${option.id}`}
+      className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-2 py-2 last:border-b-0 hover:bg-surface-sunken"
+    >
+      <input
+        className="h-4 w-4 accent-primary"
+        type="checkbox"
+        checked={isSelected(option)}
+        onChange={() => onToggle(option)}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">
+          {option.label}
+          {GRANT_SUFFIX[option.grantType] ? ` · ${GRANT_SUFFIX[option.grantType]}` : ""}
+        </span>
+        <span className="block truncate text-xs text-content-subtle">
+          {option.id}{option.provider ? ` · ${option.provider}` : ""}
+        </span>
+      </span>
+    </label>
+  ));
+
+  if (!section.label) return <div className="space-y-1">{rows}</div>;
+
+  return (
+    <details open={open} className="group border-b border-border last:border-b-0">
+      <summary className="flex min-h-11 cursor-pointer select-none list-none items-center gap-2 px-2 py-2 text-sm hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+        <span aria-hidden="true" className="inline-block text-xs transition-transform group-open:rotate-90">▸</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{section.label}</span>
+        <span className="text-xs text-content-subtle">{selectedCount} / {section.options.length}</span>
+        <button
+          className="btn btn-ghost px-2 py-0.5 text-xs"
+          type="button"
+          aria-label={`${allSelected ? "全部不選" : "全選"}：${section.label}`}
+          onClick={(event) => {
+            // 按鈕在 summary 裡，不擋掉的話同一下點擊也會把區段收起來。
+            event.preventDefault();
+            onSetAll(!allSelected);
+          }}
+        >
+          {allSelected ? "全部不選" : "全選"}
+        </button>
+      </summary>
+      <div className="space-y-1 pb-1 pl-5">{rows}</div>
+    </details>
   );
 }
