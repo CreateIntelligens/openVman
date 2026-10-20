@@ -10,6 +10,8 @@ import {
   type AdminScopeResources,
 } from "../../api/auth";
 import { useAuth } from "../../context/AuthContext";
+import { groupAccessOptions } from "./accountAccessGroups";
+import GroupedChecklist from "./GroupedChecklist";
 
 type ScopeKey = keyof AdminScopeResources;
 
@@ -101,6 +103,18 @@ export default function AdminScopePanel({
         [key]: allSelected
           ? values.filter((value) => !ids.includes(value))
           : Array.from(new Set([...values, ...ids])),
+      };
+    });
+  }, []);
+
+  const setSome = useCallback((key: ScopeKey, ids: string[], selected: boolean) => {
+    setSelection((current) => {
+      const values = current[key] ?? [];
+      return {
+        ...current,
+        [key]: selected
+          ? Array.from(new Set([...values, ...ids]))
+          : values.filter((value) => !ids.includes(value)),
       };
     });
   }, []);
@@ -224,35 +238,15 @@ export default function AdminScopePanel({
                   <p className="mt-1 text-xs text-content-subtle">
                     已選 {selectedHere.length} / {groupIds.length}
                   </p>
-                  <div className="mt-3 max-h-56 space-y-1 overflow-y-auto pr-1">
-                    {groupOptions.map((option) => (
-                      <label
-                        key={option.id}
-                        className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-2 py-2 last:border-b-0 hover:bg-surface-sunken"
-                      >
-                        <input
-                          className="h-4 w-4 accent-primary"
-                          type="checkbox"
-                          checked={(selection[group.key] ?? []).includes(option.id)}
-                          onChange={() => toggle(group.key, option.id)}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">
-                            {option.label}
-                          </span>
-                          <span className="block truncate text-xs text-content-subtle">
-                            {option.id}
-                            {option.provider ? ` · ${option.provider}` : ""}
-                          </span>
-                        </span>
-                      </label>
-                    ))}
-                    {!loading && groupOptions.length === 0 && (
-                      <p className="py-3 text-sm text-content-muted">
-                        目前沒有可指派項目
-                      </p>
-                    )}
-                  </div>
+                  <GroupedChecklist
+                    sections={groupAccessOptions(group.key, groupOptions, options?.projects ?? [])}
+                    isSelected={(option) => (selection[group.key] ?? []).includes(option.id)}
+                    onToggle={(option) => toggle(group.key, option.id)}
+                    onSetAll={(targets, selected) => setSome(group.key, targets.map((option) => option.id), selected)}
+                    loading={loading}
+                    emptyText="目前沒有可指派項目"
+                    searchLabel={`搜尋${group.title}`}
+                  />
                 </div>
               );
             })}

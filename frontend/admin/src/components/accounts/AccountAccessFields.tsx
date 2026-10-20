@@ -8,11 +8,8 @@ import {
   type AccountAccessOptions,
   type AccountRole,
 } from "../../api/auth";
-import {
-  groupAccessOptions,
-  type AccessSection,
-  type GrantType,
-} from "./accountAccessGroups";
+import { groupAccessOptions, type GrantType } from "./accountAccessGroups";
+import GroupedChecklist from "./GroupedChecklist";
 
 const PREFERRED_PROJECT = "proj-b85afb8bb6";
 const PREFERRED_CHARACTER = "0713";
@@ -527,23 +524,29 @@ function AccessGroup({
           {allSelected ? "全部不選" : "全選"}
         </button>
       </div>
-      <div className="mt-2 max-h-72 overflow-y-auto pr-1">
-        {sections.map((section) => (
-          <AccessSectionList
-            key={section.key}
-            section={section}
-            isSelected={isSelected}
-            onToggle={(option) => form.toggle(option.grantType, option.id)}
-            onSetAll={(selected) => setSelected(section.options, selected)}
+      <GroupedChecklist
+        sections={sections}
+        isSelected={isSelected}
+        onToggle={(option) => form.toggle(option.grantType, option.id)}
+        onSetAll={setSelected}
+        loading={form.loading}
+        emptyText="目前沒有可授權項目"
+        keyOf={(option) => `${option.grantType}:${option.id}`}
+        searchLabel={`搜尋${title}`}
+        preview={(option) => option.grantType === "avatar_characters" ? (
+          // 人物只看 id 對不出是誰；跟 Avatar 頁一樣拿影片第一格當預覽，
+          // 只預載 metadata、不播，幾十個人物也不會拖慢對話框。
+          <video
+            src={`/static/characters/${option.id}/01.webm`}
+            preload="metadata"
+            muted
+            playsInline
+            aria-hidden="true"
+            className="h-10 w-auto shrink-0 rounded bg-surface-sunken object-cover"
           />
-        ))}
-        {form.loading && (
-          <p className="py-3 text-sm text-content-muted" role="status">載入中…</p>
-        )}
-        {!form.loading && options.length === 0 && (
-          <p className="py-3 text-sm text-content-muted">目前沒有可授權項目</p>
-        )}
-      </div>
+        ) : null}
+        titleSuffix={(option) => GRANT_SUFFIX[option.grantType] ? ` · ${GRANT_SUFFIX[option.grantType]}` : ""}
+      />
       {grantTypes.filter((type) => type !== "asr_engines").map((type) => {
         // 辨識引擎沒有帳號層級的預設（沒選過的人用部署設定），不畫下拉免得讓人以為有。
         const typeOptions = selectedOptions.filter((o) => o.grantType === type);
@@ -572,83 +575,5 @@ function AccessGroup({
         );
       })}
     </fieldset>
-  );
-}
-
-function AccessSectionList({
-  section,
-  isSelected,
-  onToggle,
-  onSetAll,
-}: {
-  section: AccessSection<MergedOption>;
-  isSelected: (option: MergedOption) => boolean;
-  onToggle: (option: MergedOption) => void;
-  onSetAll: (selected: boolean) => void;
-}) {
-  const selectedCount = section.options.filter(isSelected).length;
-  const allSelected = section.options.length > 0 && selectedCount === section.options.length;
-  // 開合只在第一次畫出來時決定（有勾選的區段先展開），之後交給瀏覽器；
-  // 綁著勾選狀態的話，勾一下區段就在游標底下收起來。
-  const [open] = useState(() => selectedCount > 0);
-
-  const rows = section.options.map((option) => (
-    <label
-      key={`${option.grantType}:${option.id}`}
-      className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-2 py-2 last:border-b-0 hover:bg-surface-sunken"
-    >
-      <input
-        className="h-4 w-4 accent-primary"
-        type="checkbox"
-        checked={isSelected(option)}
-        onChange={() => onToggle(option)}
-      />
-      {option.grantType === "avatar_characters" && (
-        // 人物只看 id 對不出是誰；跟 Avatar 頁一樣拿影片第一格當預覽，
-        // 只預載 metadata、不播，幾十個人物也不會拖慢對話框。
-        <video
-          src={`/static/characters/${option.id}/01.webm`}
-          preload="metadata"
-          muted
-          playsInline
-          aria-hidden="true"
-          className="h-10 w-auto shrink-0 rounded bg-surface-sunken object-cover"
-        />
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">
-          {option.label}
-          {GRANT_SUFFIX[option.grantType] ? ` · ${GRANT_SUFFIX[option.grantType]}` : ""}
-        </span>
-        <span className="block truncate text-xs text-content-subtle">
-          {option.id}{option.provider ? ` · ${option.provider}` : ""}
-        </span>
-      </span>
-    </label>
-  ));
-
-  if (!section.label) return <div className="space-y-1">{rows}</div>;
-
-  return (
-    <details open={open} className="group border-b border-border last:border-b-0">
-      <summary className="flex min-h-11 cursor-pointer select-none list-none items-center gap-2 px-2 py-2 text-sm hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
-        <span aria-hidden="true" className="inline-block text-xs transition-transform group-open:rotate-90">▸</span>
-        <span className="min-w-0 flex-1 truncate font-medium">{section.label}</span>
-        <span className="text-xs text-content-subtle">{selectedCount} / {section.options.length}</span>
-        <button
-          className="btn btn-ghost px-2 py-0.5 text-xs"
-          type="button"
-          aria-label={`${allSelected ? "全部不選" : "全選"}：${section.label}`}
-          onClick={(event) => {
-            // 按鈕在 summary 裡，不擋掉的話同一下點擊也會把區段收起來。
-            event.preventDefault();
-            onSetAll(!allSelected);
-          }}
-        >
-          {allSelected ? "全部不選" : "全選"}
-        </button>
-      </summary>
-      <div className="space-y-1 pb-1 pl-5">{rows}</div>
-    </details>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   isAtLeastAdmin,
@@ -6,6 +6,7 @@ import {
   type Account,
   type AccountAccessInput,
 } from "../../api/auth";
+import { useUnsavedChanges } from "../../context/NavigationGuardContext";
 import AccountAccessFields, {
   useAccountAccessForm,
 } from "./AccountAccessFields";
@@ -38,6 +39,16 @@ export default function FormalAccountAccessPanel({
   const accessForm = useAccountAccessForm(account.id, initialAccess);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 讀到資料後的快照；跟現在的表單不同就是「尚未儲存」，切帳號或離開頁面前會先問。
+  const snapshot = useRef<string | null>(null);
+  const serialized = JSON.stringify(accessForm.access);
+  useEffect(() => {
+    if (!accessForm.loading && accessForm.options && snapshot.current === null) {
+      snapshot.current = serialized;
+    }
+  }, [accessForm.loading, accessForm.options, serialized]);
+  const dirty = snapshot.current !== null && serialized !== snapshot.current;
+  useUnsavedChanges(`account-access:${account.id}`, dirty, `${account.username} 的資源權限`);
 
   async function save() {
     if (!accessForm.complete) {
@@ -48,7 +59,9 @@ export default function FormalAccountAccessPanel({
     setSaving(true);
     setError(null);
     try {
-      onSaved(await updateAccountAccess(account.id, accessForm.access));
+      const saved = await updateAccountAccess(account.id, accessForm.access);
+      snapshot.current = serialized;
+      onSaved(saved);
     } catch (reason) {
       setError(messageFrom(reason, "儲存資源權限失敗"));
     } finally {

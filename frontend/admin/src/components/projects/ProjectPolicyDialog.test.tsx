@@ -304,7 +304,8 @@ describe("ProjectPolicyDialog", () => {
 
     renderDialog();
     expect(await screen.findByText("唯讀（僅 ROOT 可編輯）")).toBeTruthy();
-    expect(screen.getByText("c-assigned-1")).toBeTruthy();
+    // 指派區與允許清單（清單列現在顯示 id）都會出現這個 id。
+    expect(screen.getAllByText("c-assigned-1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("特派角色 1").length).toBeGreaterThan(0);
     expect(screen.getByText("ROOT 指派")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "解除指派" })).toBeNull();

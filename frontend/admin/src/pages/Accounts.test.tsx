@@ -47,6 +47,12 @@ vi.mock("../context/AuthContext", () => ({
   useAuth: () => authState,
 }));
 
+vi.mock("../context/NavigationGuardContext", () => ({
+  // 守衛本身在 NavigationGuardContext.test 驗；這裡直接放行，專心測帳號頁。
+  useNavigationGuard: () => ({ hasUnsavedChanges: false, requestNavigation: (go: () => void) => go() }),
+  useUnsavedChanges: () => {},
+}));
+
 vi.mock("../components/accounts/FormalAccountAccessPanel", () => ({
   default: () => null,
 }));

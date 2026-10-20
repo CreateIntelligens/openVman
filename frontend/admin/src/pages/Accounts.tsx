@@ -24,6 +24,7 @@ import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
+import { useNavigationGuard } from "../context/NavigationGuardContext";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 
 // 「專案與權限 → 帳號」分頁內的第二層：建立（正式／臨時）與編輯／管理。
@@ -62,6 +63,11 @@ function getDeleteDisabledReason(account: Account, resourceCount: number): strin
   return undefined;
 }
 
+function matchesAccountQuery(account: { username: string; role: string }, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  return !needle || account.username.toLowerCase().includes(needle) || account.role.toLowerCase() === needle;
+}
+
 export default function Accounts() {
   const { account: currentAccount } = useAuth();
   const isRoot = currentAccount?.role === "root";
@@ -79,6 +85,13 @@ export default function Accounts() {
   const [hasOpenedBatches, setHasOpenedBatches] = useState(false);
   const [createdNotice, setCreatedNotice] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [accountQuery, setAccountQuery] = useState("");
+  const { requestNavigation } = useNavigationGuard();
+  // 切換正在編輯的帳號會卸載那個面板；有未儲存的修改先問，不要默默丟掉。
+  const switchEditingAccount = (next: string | null) => {
+    if (next === editingAccountId) return;
+    requestNavigation(() => setEditingAccountId(next));
+  };
   const [editingScopeAccountId, setEditingScopeAccountId] = useState<string | null>(null);
   const [roleChangeAccount, setRoleChangeAccount] = useState<Account | null>(
     null,
@@ -367,6 +380,14 @@ export default function Accounts() {
                 <span className="chip">{accounts.length} 個帳號</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <input
+                  className="input w-40 py-1.5 text-xs sm:text-sm"
+                  type="search"
+                  aria-label="搜尋帳號"
+                  placeholder="搜尋帳號"
+                  value={accountQuery}
+                  onChange={(event) => setAccountQuery(event.target.value)}
+                />
                 <label className="flex items-center gap-2 text-xs text-content-muted sm:text-sm">
                   排序
                   <select
@@ -400,7 +421,9 @@ export default function Accounts() {
               <div className="p-8 text-center text-sm text-content-muted" role="status">載入帳號中…</div>
             ) : (
               <div className="divide-y divide-border">
-                {(sortMode === "idle" ? sortByLeastRecentActivity(accounts) : accounts).map((account) => {
+                {(sortMode === "idle" ? sortByLeastRecentActivity(accounts) : accounts)
+                  .filter((account) => matchesAccountQuery(account, accountQuery))
+                  .map((account) => {
                   const isSelf = account.id === currentAccount?.id;
                   const isFormal = (
                     account.kind ?? account.account_type ?? "formal"
@@ -498,7 +521,7 @@ export default function Accounts() {
                               className={editingAccess ? "btn btn-primary" : "btn btn-ghost"}
                               type="button"
                               aria-expanded={editingAccess}
-                              onClick={() => setEditingAccountId(
+                              onClick={() => switchEditingAccount(
                                 editingAccess ? null : account.id,
                               )}
                             >

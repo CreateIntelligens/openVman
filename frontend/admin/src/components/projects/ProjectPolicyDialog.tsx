@@ -15,6 +15,8 @@ import {
   type ProjectResourcesResponse,
 } from "../../api/projects";
 import { errorMessage } from "../../utils/errorMessage";
+import { groupAccessOptions, type GrantType } from "../accounts/accountAccessGroups";
+import GroupedChecklist from "../accounts/GroupedChecklist";
 import { useModalDismiss } from "../useModalDismiss";
 
 // 跟後端 SERVER_ASR_PROVIDERS 一致：台語分流走批次辨識，只能選這些。
@@ -122,13 +124,16 @@ export function mergeProjectResources(
 
 interface ChecklistProps {
   legend: string;
+  grantType: GrantType;
   options: AccountAccessOption[];
   selected: string[];
   disabled: boolean;
   onToggle: (id: string) => void;
+  /** 整段勾選；沒給就只能逐項點。 */
+  onSetMany?: (ids: string[], selected: boolean) => void;
 }
 
-function Checklist({ legend, options, selected, disabled, onToggle }: ChecklistProps) {
+function Checklist({ legend, grantType, options, selected, disabled, onToggle, onSetMany }: ChecklistProps) {
   return (
     <fieldset>
       <legend className="text-sm font-medium">
@@ -142,39 +147,21 @@ function Checklist({ legend, options, selected, disabled, onToggle }: ChecklistP
           不限制：沿用各帳號自己的授權。勾選後只能用勾選的項目。
         </p>
       )}
-      <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-        {options.map((option) => {
-          const isOutOfScope = option.in_project_scope === false;
-          return (
-            <li key={option.id}>
-              <label
-                className={`flex cursor-pointer items-start gap-2 text-sm ${
-                  isOutOfScope ? "text-danger" : ""
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                  checked={selected.includes(option.id)}
-                  disabled={disabled}
-                  onChange={() => onToggle(option.id)}
-                />
-                <span className="min-w-0 break-words">
-                  {option.label}
-                  {option.provider && (
-                    <span className="ml-1 text-xs text-content-subtle">{option.provider}</span>
-                  )}
-                  {isOutOfScope && (
-                    <span className="ml-1 text-xs text-danger font-medium">
-                      （不在專案範圍內，一般使用者無法使用）
-                    </span>
-                  )}
-                </span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
+      <GroupedChecklist
+        sections={groupAccessOptions(grantType, options)}
+        isSelected={(option) => selected.includes(option.id)}
+        onToggle={(option) => onToggle(option.id)}
+        onSetAll={(targets, next) => {
+          if (onSetMany) onSetMany(targets.map((option) => option.id), next);
+          else targets.forEach((option) => { if (selected.includes(option.id) !== next) onToggle(option.id); });
+        }}
+        disabled={disabled}
+        searchLabel={`搜尋${legend}`}
+        rowClassName={(option) => option.in_project_scope === false ? "text-danger" : ""}
+        titleSuffix={(option) => option.in_project_scope === false ? (
+          <span className="ml-1 text-xs font-medium text-danger">（不在專案範圍內，一般使用者無法使用）</span>
+        ) : null}
+      />
     </fieldset>
   );
 }
@@ -570,6 +557,7 @@ export default function ProjectPolicyDialog({
               <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
                   legend="允許的虛擬人物"
+                  grantType="avatar_characters"
                   options={characterOptions}
                   selected={policy.allowed_characters ?? []}
                   disabled={busy}
@@ -591,6 +579,7 @@ export default function ProjectPolicyDialog({
               <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
                   legend="允許的舞台背景"
+                  grantType="avatar_backgrounds"
                   options={backgroundOptions}
                   selected={policy.allowed_backgrounds ?? []}
                   disabled={busy}
@@ -612,6 +601,7 @@ export default function ProjectPolicyDialog({
               <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
                   legend="允許的小助理 (VRM / 影片)"
+                  grantType="avatar_mascots"
                   options={mascotOptions}
                   selected={policy.allowed_mascots ?? []}
                   disabled={busy}
@@ -633,6 +623,7 @@ export default function ProjectPolicyDialog({
               <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
                   legend="允許的語音辨識引擎"
+                  grantType="asr_engines"
                   options={engineOptions}
                   selected={policy.allowed_asr_engines}
                   disabled={busy}
@@ -677,6 +668,7 @@ export default function ProjectPolicyDialog({
               <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
                   legend="允許的聲音"
+                  grantType="custom_voices"
                   options={voiceOptions}
                   selected={policy.allowed_tts_voices}
                   disabled={busy}
