@@ -134,10 +134,32 @@ def test_startup_migration_marks_the_configured_default_without_recreating_defau
     monkeypatch.setattr(get_settings(), "default_project_id", "proj-hospital")
     # 舊資料搬移的各步驟碰的是真實路徑，這裡只驗 marker 落點。
     for step in ("_migrate_workspace", "_migrate_lancedb", "_migrate_sessions_db",
-                 "_migrate_index_state", "_migrate_learnings"):
+                 "_migrate_index_state"):
         monkeypatch.setattr(migration, step, lambda: False)
 
     migration.run_migration()
 
     assert (tmp_path / "projects" / "proj-hospital" / ".migrated").exists()
     assert not (tmp_path / "projects" / "default").exists()
+
+
+def test_startup_migration_leaves_learnings_inside_dot_learnings(tmp_path, monkeypatch):
+    # 2026-10-20：預設專案換成沒有 marker 的專案時，舊遷移重跑，把各專案的
+    # .learnings/*.md 搬到 workspace 根目錄，與現行版面（knowledge.workspace）相反。
+    import scripts.migrate_to_projects as migration
+    from config import get_settings
+
+    monkeypatch.setattr("infra.project_context._DATA_ROOT", tmp_path / "projects")
+    monkeypatch.setattr(migration, "_DATA_ROOT", tmp_path)
+    monkeypatch.setattr(get_settings(), "default_project_id", "proj-hospital")
+    for step in ("_migrate_workspace", "_migrate_lancedb", "_migrate_sessions_db",
+                 "_migrate_index_state"):
+        monkeypatch.setattr(migration, step, lambda: False)
+    learnings = tmp_path / "projects" / "other" / "workspace" / ".learnings"
+    learnings.mkdir(parents=True)
+    (learnings / "ERRORS.md").write_text("# errors", encoding="utf-8")
+
+    migration.run_migration()
+
+    assert (learnings / "ERRORS.md").exists()
+    assert not (learnings.parent / "ERRORS.md").exists()
