@@ -251,6 +251,7 @@ ws.send(JSON.stringify(payload));
 - TTS（`/v1/audio/speech` 新增選填 `project_id`、`/api/v1/tts/stream`）：`resolve_tts_voice` 帶專案；聲音不在清單回 403（帳號本身看不到仍回 404），管理員一樣受限。省略聲音時依序取專案預設 → 帳號預設 → 清單第一個可用聲音。台語分流換 CosyVoice（停用時 VoxCPM）、國語與英文換 IndexTTS（VH-384，僅在呼叫端沒指定 provider 與 voice 時）時，專案有限制就只換到清單內該 provider 的聲音，找不到就不換；`/api/v1/tts/stream` 的回應一律帶 `X-TTS-Provider`，整段合成路徑發生備援時另帶 `X-TTS-Fallback: true` 與 `X-TTS-Fallback-Reason`（第一站的錯誤描述）。合成失敗退回 Edge-TTS 只在專案不限制、或清單內有 Edge 聲音（改用該聲音）時發生，否則回 502，不默默換引擎；有聲音限制的專案在 `/v1/audio/speech` 快取 key 加上專案範圍，避免拿到別的專案備援出來的音訊。
 - Embed key：沒有帳號授權，專案有限制時以專案清單代替帳號授權（批次備援、串流預設引擎、聲音）；仍不可明確指定 ASR provider 或串流 `engine`。金鑰設定的聲音不在清單內時回 403，`/api/v1/tts/providers` 也不列。
 - `/api/v1/tts/providers` 與 `/api/v1/me/capabilities` 接受選填 `project_id`，見下節。
+- `/api/v1/tts/providers` 每個引擎除了純 ID 清單 `voices`，另帶 `voice_items: [{id, label, in_project_scope?}]` 給選單顯示。`label` 取上游的聲音名稱；同一位錄音者在各引擎 ID 不同（例如 CosyVoice `young-female-02`、VoxCPM `voxcpm2-cosy-young-female-02`、IndexTTS `hayley`），名稱一律以錄音者開頭（`Hayley · 青年女聲 02（臺灣台語）`），對照表在 `app/providers/voice_catalog.py` 的 `VOICE_SPEAKERS`。呼叫 TTS 仍送 `id`。
 
 ### 影片轉素材包（`POST/GET /api/v1/avatar/jobs`、`GET/DELETE /api/v1/avatar/jobs/{job_id}`，管理員）
 

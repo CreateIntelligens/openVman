@@ -380,12 +380,21 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
             "name": "IndexTTS",
             "default_voice": "hayley",
             "voices": ["jay", "hayley"],
+            "voice_items": [
+                {"id": "jay", "label": "jay"},
+                {"id": "hayley", "label": "Hayley"},
+            ],
         },
         {
             "id": "edge-tts",
             "name": "Edge TTS",
             "default_voice": "zh-TW-HsiaoChenNeural",
             "voices": ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "zh-CN-XiaoyiNeural"],
+            "voice_items": [
+                {"id": "zh-TW-HsiaoChenNeural", "label": "曉臻 (Edge-TTS)"},
+                {"id": "zh-TW-YunJheNeural", "label": "雲哲 (Edge-TTS)"},
+                {"id": "zh-CN-XiaoyiNeural", "label": "曉伊 (Edge-TTS)"},
+            ],
         },
     ]
 
@@ -954,6 +963,10 @@ def test_tts_providers_includes_voxcpm_when_configured(monkeypatch):
             "name": "VoxCPM",
             "default_voice": "voxcpm2-cosy-young-female-01",
             "voices": ["barbet-hung-yi-lee", "voxcpm2-cosy-young-female-01"],
+            "voice_items": [
+                {"id": "barbet-hung-yi-lee", "label": "李宏毅老師"},
+                {"id": "voxcpm2-cosy-young-female-01", "label": "青年女聲 01"},
+            ],
         },
     ]
 
@@ -1010,6 +1023,12 @@ def test_tts_providers_includes_cosyvoice_when_configured(monkeypatch):
             # 預設聲音是 Hayley（young-female-02）；上游清單沒列時補在最前面。
             "default_voice": "young-female-02",
             "voices": ["young-female-02", "young-male-02", "teen-female-01"],
+            # 不管上游名稱標不標，Hayley 這位一律以名字顯示。
+            "voice_items": [
+                {"id": "young-female-02", "label": "Hayley"},
+                {"id": "young-male-02", "label": "青年男聲 02"},
+                {"id": "teen-female-01", "label": "少女聲 01"},
+            ],
         },
     ]
 

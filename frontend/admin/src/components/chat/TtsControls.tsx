@@ -1,4 +1,5 @@
 import type { TtsProvider } from "../../api";
+import { voiceLabel } from "../../api/tts";
 import Select from "../Select";
 
 interface TtsControlsProps {
@@ -51,7 +52,7 @@ export const TtsControls: React.FC<TtsControlsProps> = ({
               const inScope = voiceItem ? voiceItem.in_project_scope : activeTtsProvider.in_project_scope;
               return {
                 value: v,
-                label: v,
+                label: voiceLabel(activeTtsProvider, v),
                 in_project_scope: inScope,
               };
             })}

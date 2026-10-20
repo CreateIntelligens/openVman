@@ -113,7 +113,7 @@ export function buildAsrProviderOptions(
 export function buildTtsVoiceOptions(
   activeProvider?: {
     voices: string[];
-    voice_items?: Array<{ id: string; in_project_scope?: boolean }>;
+    voice_items?: Array<{ id: string; label?: string; in_project_scope?: boolean }>;
     in_project_scope?: boolean;
   },
 ): SelectOption[] {
@@ -126,9 +126,12 @@ export function buildTtsVoiceOptions(
       }
     }
   }
+  const labels = new Map(
+    (activeProvider.voice_items ?? []).map((item) => [item.id, item.label]),
+  );
   return scopeFirst(activeProvider.voices.map((v) => ({
     value: v,
-    label: v,
+    label: labels.get(v) || v,
     in_project_scope: voiceItemMap.has(v) ? voiceItemMap.get(v) : activeProvider.in_project_scope,
   })));
 }

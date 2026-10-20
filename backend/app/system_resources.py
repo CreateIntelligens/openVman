@@ -22,6 +22,7 @@ from app.providers.voice_catalog import (
     fetch_gemini_voices,
     fetch_indextts_voices,
     fetch_voxcpm_voices,
+    voice_display_label,
 )
 from app.providers.voxcpm_adapter import VOXCPM_PROVIDER_NAME
 
@@ -143,7 +144,7 @@ async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
                 runtime.resources.upsert_system_resource(
                     resource_type=ResourceType.CUSTOM_VOICE,
                     resource_id=voice_id,
-                    metadata={"provider": "indextts", "label": voice_id},
+                    metadata={"provider": "indextts", "label": voice_display_label(voice_id)},
                 )
         except Exception as exc:
             logger.warning("failed to sync indextts voices: %s", exc)
@@ -169,7 +170,10 @@ async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
                 runtime.resources.upsert_system_resource(
                     resource_type=ResourceType.CUSTOM_VOICE,
                     resource_id=voice_id,
-                    metadata={"provider": VOXCPM_PROVIDER_NAME, "label": label},
+                    metadata={
+                        "provider": VOXCPM_PROVIDER_NAME,
+                        "label": voice_display_label(voice_id, label),
+                    },
                 )
         except Exception as exc:
             logger.warning("failed to sync voxcpm voices: %s", exc)
@@ -184,7 +188,10 @@ async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
                 runtime.resources.upsert_system_resource(
                     resource_type=ResourceType.CUSTOM_VOICE,
                     resource_id=voice_id,
-                    metadata={"provider": COSYVOICE_PROVIDER_NAME, "label": label},
+                    metadata={
+                        "provider": COSYVOICE_PROVIDER_NAME,
+                        "label": voice_display_label(voice_id, label),
+                    },
                 )
         except Exception as exc:
             logger.warning("failed to sync cosyvoice voices: %s", exc)

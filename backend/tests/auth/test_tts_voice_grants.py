@@ -260,6 +260,7 @@ def test_scoped_admin_lists_and_resolves_only_voices_in_scope(
     assert json.loads(response.body) == [{
         "id": "cosyvoice", "name": PROVIDER_NAMES["cosyvoice"],
         "default_voice": "cosy-a", "voices": ["cosy-a"],
+        "voice_items": [{"id": "cosy-a", "label": "cosy-a"}],
     }]
     catalog.assert_not_awaited()
     voice = _resolve(current, runtime, voice="cosy-a")

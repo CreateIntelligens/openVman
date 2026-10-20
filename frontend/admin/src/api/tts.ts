@@ -2,7 +2,8 @@ import { apiFetch, fetchJson, parseErrorMessage } from "./common";
 
 export interface TtsVoiceItem {
   id: string;
-  name?: string;
+  /** 選單顯示名稱；同一位錄音者在各引擎 ID 不同，名稱統一冠上錄音者。 */
+  label?: string;
   in_project_scope?: boolean;
 }
 
@@ -13,6 +14,11 @@ export interface TtsProvider {
   voices: string[];
   voice_items?: TtsVoiceItem[];
   in_project_scope?: boolean;
+}
+
+/** 選單上顯示的聲音名稱；後端沒給名稱時顯示 ID。 */
+export function voiceLabel(provider: TtsProvider | undefined, voiceId: string): string {
+  return provider?.voice_items?.find((item) => item.id === voiceId)?.label || voiceId;
 }
 
 export interface SpeechResult {

@@ -281,6 +281,16 @@ test("SettingsModal maps in_project_scope across Voice, ASR, Character, and Back
   assert.equal(voiceOptions.find((v) => v.value === "voice-in")?.in_project_scope, true);
   assert.equal(voiceOptions.find((v) => v.value === "voice-out")?.in_project_scope, false);
 
+  // 後端給了顯示名稱就用名稱，值仍是聲音 ID；沒給名稱的顯示 ID。
+  const labelled = buildTtsVoiceOptions({
+    voices: ["young-female-02", "young-male-01"],
+    voice_items: [{ id: "young-female-02", label: "Hayley · 青年女聲 02（臺灣台語）" }],
+  });
+  assert.deepEqual(
+    labelled.map((v) => [v.value, v.label]),
+    [["young-female-02", "Hayley · 青年女聲 02（臺灣台語）"], ["young-male-01", "young-male-01"]],
+  );
+
   // 2. ASR: 保留各引擎的 in_project_scope
   const asrOptions = buildAsrProviderOptions([
     { id: "gemini-live", label: "Gemini Live", in_project_scope: true },

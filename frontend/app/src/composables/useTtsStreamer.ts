@@ -43,6 +43,8 @@ type TtsBodyBuilder = (text: string, opts: SpeakOptions) => Record<string, strin
 
 export interface TtsVoiceItem {
   id: string;
+  /** 選單顯示名稱；同一位錄音者在各引擎 ID 不同，名稱統一冠上錄音者。 */
+  label?: string;
   in_project_scope?: boolean;
 }
 

@@ -49,6 +49,39 @@ EDGE_TTS_VOICE_LABELS = {
     "zh-CN-XiaoyiNeural": "曉伊 (Edge-TTS)",
 }
 
+# 同一位錄音者在各引擎的聲音 ID 都不一樣（CosyVoice 的 young-female-02、VoxCPM 的
+# voxcpm2-cosy-young-female-02、IndexTTS 的 hayley），上游的名稱也不一定標出是誰，
+# 同事在選單上認不出來。ID 是上游定的不能改，顯示名稱統一冠上錄音者。
+VOXCPM_COSY_PREFIX = "voxcpm2-cosy-"
+VOICE_SPEAKERS = {
+    "young-female-02": "Hayley",
+    "hayley": "Hayley",
+}
+
+
+def voice_display_label(voice_id: str, upstream_label: str = "") -> str:
+    """選單上顯示的聲音名稱：有登記錄音者就以名字開頭，其餘沿用上游名稱。"""
+    label = upstream_label.strip() or voice_id
+    speaker = VOICE_SPEAKERS.get(voice_id.removeprefix(VOXCPM_COSY_PREFIX))
+    if not speaker:
+        return label
+    if label == voice_id or label == speaker:
+        return speaker
+    # 登錄時已經換過的名稱再讀一次也要原樣回來。
+    if label.startswith(f"{speaker} · "):
+        return label
+    rest = label.replace(f"{speaker}・", "").replace(f"・{speaker}", "").replace(speaker, "")
+    rest = rest.replace("（）", "").strip()
+    return f"{speaker} · {rest}" if rest else speaker
+
+
+def voice_items(voices: list[str], labels: dict[str, str]) -> list[dict[str, str]]:
+    """``voices`` 依序配上顯示名稱，給選單用；``voices`` 欄位仍是純 ID 清單。"""
+    return [
+        {"id": voice_id, "label": voice_display_label(voice_id, labels.get(voice_id, ""))}
+        for voice_id in voices
+    ]
+
 
 async def fetch_provider_voices(
     base_url: str,
@@ -213,53 +246,53 @@ async def build_tts_provider_catalog(cfg: Any) -> list[dict]:
             cfg.gateway_internal_token,
         )
         if fetched_voices:
+            indextts_voices = prepend_default_voice(
+                fetched_voices,
+                cfg.tts_indextts_default_character,
+            )
             providers.append({
                 "id": "indextts",
                 "name": "IndexTTS",
                 "default_voice": cfg.tts_indextts_default_character,
-                "voices": prepend_default_voice(
-                    fetched_voices,
-                    cfg.tts_indextts_default_character,
-                ),
+                "voices": indextts_voices,
+                "voice_items": voice_items(indextts_voices, {}),
             })
 
     if cfg.tts_voxcpm_url:
         # 同 IndexTTS：抓不到 voices 就不列，避免選單出現會 502 的 provider。
-        voxcpm_voices = [
-            voice_id
-            for voice_id, _label in await fetch_voxcpm_voices(
-                cfg.tts_voxcpm_url,
-                excluded_voices(cfg, "tts_voxcpm_excluded_voices"),
-            )
-        ]
-        if voxcpm_voices:
+        voxcpm_labels = dict(await fetch_voxcpm_voices(
+            cfg.tts_voxcpm_url,
+            excluded_voices(cfg, "tts_voxcpm_excluded_voices"),
+        ))
+        if voxcpm_labels:
             default_voice = cfg.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
+            voxcpm_voices = prepend_default_voice(list(voxcpm_labels), default_voice)
             providers.append({
                 "id": VOXCPM_PROVIDER_NAME,
                 "name": "VoxCPM",
                 "default_voice": default_voice,
-                "voices": prepend_default_voice(voxcpm_voices, default_voice),
+                "voices": voxcpm_voices,
+                "voice_items": voice_items(voxcpm_voices, voxcpm_labels),
             })
 
     if cfg.tts_cosyvoice_url:
         # 同 IndexTTS：抓不到 voices 就不列，避免選單出現會 502 的 provider。
-        cosyvoice_voices = [
-            voice_id
-            for voice_id, _label in await fetch_cosyvoice_voices(
-                cfg.tts_cosyvoice_url,
-                cfg.tts_cosyvoice_api_key,
-                excluded_voices(cfg, "tts_cosyvoice_excluded_voices"),
-            )
-        ]
-        if cosyvoice_voices:
+        cosyvoice_labels = dict(await fetch_cosyvoice_voices(
+            cfg.tts_cosyvoice_url,
+            cfg.tts_cosyvoice_api_key,
+            excluded_voices(cfg, "tts_cosyvoice_excluded_voices"),
+        ))
+        if cosyvoice_labels:
             default_voice = (
                 cfg.tts_cosyvoice_default_voice or COSYVOICE_DEFAULT_VOICE
             )
+            cosyvoice_voices = prepend_default_voice(list(cosyvoice_labels), default_voice)
             providers.append({
                 "id": COSYVOICE_PROVIDER_NAME,
                 "name": "CosyVoice",
                 "default_voice": default_voice,
-                "voices": prepend_default_voice(cosyvoice_voices, default_voice),
+                "voices": cosyvoice_voices,
+                "voice_items": voice_items(cosyvoice_voices, cosyvoice_labels),
             })
 
     if cfg.tts_gcp_enabled:
@@ -300,6 +333,7 @@ async def build_tts_provider_catalog(cfg: Any) -> list[dict]:
             "name": "Edge TTS",
             "default_voice": cfg.edge_tts_voice,
             "voices": voices,
+            "voice_items": voice_items(voices, EDGE_TTS_VOICE_LABELS),
         })
 
     return providers

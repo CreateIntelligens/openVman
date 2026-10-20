@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import { fetchTtsProviders, synthesizeSpeechPreview, type TtsProvider } from "../api/tts";
+import { fetchTtsProviders, synthesizeSpeechPreview, voiceLabel, type TtsProvider } from "../api/tts";
 import Select from "./Select";
 
 const SAMPLE_TEXT = "你好，歡迎使用 openVman。這是一段語音試聽，請確認聲音與語速是否合適。";
@@ -168,7 +168,7 @@ export default function TtsPreviewPanel() {
                 const inScope = voiceItem ? voiceItem.in_project_scope : activeProvider?.in_project_scope;
                 return {
                   value,
-                  label: value,
+                  label: voiceLabel(activeProvider, value),
                   in_project_scope: inScope,
                 };
               })}

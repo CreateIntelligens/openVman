@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 from app.config import get_tts_config
 from app.providers.cosyvoice_adapter import COSYVOICE_DEFAULT_VOICE, COSYVOICE_PROVIDER_NAME
-from app.providers.voice_catalog import PROVIDER_NAMES
+from app.providers.voice_catalog import PROVIDER_NAMES, voice_display_label
 from app.providers.voxcpm_adapter import VOXCPM_DEFAULT_VOICE, VOXCPM_PROVIDER_NAME
 
 from .dependencies import CurrentAccount
@@ -80,6 +80,13 @@ def _policy_for(
 
 def _registered_provider(record: ResourceRecord) -> str:
     return _metadata_string(_voice_metadata(record), "provider")
+
+
+def _voice_label(record: ResourceRecord) -> str:
+    return voice_display_label(
+        record.resource_id,
+        _metadata_string(_voice_metadata(record), "label"),
+    )
 
 
 def _runtime_key(record: ResourceRecord) -> str:
@@ -352,40 +359,41 @@ def _default_for(provider: str, preferred: str, ids: list[str]) -> str:
 
 
 def _grouped(
-    voices: list[tuple[str, str]],
+    voices: list[tuple[str, str, str]],
     default_voice: str,
 ) -> list[dict[str, object]]:
-    voices_by_provider: dict[str, list[str]] = {}
-    for provider, voice_id in voices:
-        voices_by_provider.setdefault(provider, []).append(voice_id)
-    return [
-        {
-            "id": provider,
-            "name": PROVIDER_NAMES.get(provider, provider),
-            "default_voice": _default_for(provider, default_voice, ids),
-            "voices": ids,
-        }
-        for provider, ids in voices_by_provider.items()
-    ]
-
-
-def _grouped_scoped(
-    voices: list[tuple[str, str, bool]],
-    default_voice: str,
-) -> list[dict[str, object]]:
-    voices_by_provider: dict[str, list[tuple[str, bool]]] = {}
-    for provider, voice_id, in_scope in voices:
-        voices_by_provider.setdefault(provider, []).append((voice_id, in_scope))
+    voices_by_provider: dict[str, list[tuple[str, str]]] = {}
+    for provider, voice_id, label in voices:
+        voices_by_provider.setdefault(provider, []).append((voice_id, label))
     return [
         {
             "id": provider,
             "name": PROVIDER_NAMES.get(provider, provider),
             "default_voice": _default_for(provider, default_voice, [v for v, _ in items]),
             "voices": [v for v, _ in items],
-            "in_project_scope": any(in_scope for _, in_scope in items),
+            "voice_items": [{"id": v, "label": label} for v, label in items],
+        }
+        for provider, items in voices_by_provider.items()
+    ]
+
+
+def _grouped_scoped(
+    voices: list[tuple[str, str, bool, str]],
+    default_voice: str,
+) -> list[dict[str, object]]:
+    voices_by_provider: dict[str, list[tuple[str, bool, str]]] = {}
+    for provider, voice_id, in_scope, label in voices:
+        voices_by_provider.setdefault(provider, []).append((voice_id, in_scope, label))
+    return [
+        {
+            "id": provider,
+            "name": PROVIDER_NAMES.get(provider, provider),
+            "default_voice": _default_for(provider, default_voice, [v for v, _, _ in items]),
+            "voices": [v for v, _, _ in items],
+            "in_project_scope": any(in_scope for _, in_scope, _ in items),
             "voice_items": [
-                {"id": v, "in_project_scope": in_scope}
-                for v, in_scope in items
+                {"id": v, "in_project_scope": in_scope, "label": label}
+                for v, in_scope, label in items
             ],
         }
         for provider, items in voices_by_provider.items()
@@ -432,7 +440,7 @@ def embed_tts_providers(
             runtime, None, p_id, ResourceType.CUSTOM_VOICE
         )
         voices = [
-            (_registered_provider(record), record.resource_id)
+            (_registered_provider(record), record.resource_id, _voice_label(record))
             for entry in entries
             if (record := runtime.resources.get(ResourceType.CUSTOM_VOICE, entry.resource_id))
             and _registered_provider(record) not in ("", "auto")
@@ -450,8 +458,16 @@ def embed_tts_providers(
             ),
             "default_voice": key.default_tts_voice,
             "voices": [key.default_tts_voice] if key.default_tts_voice else [],
+            "voice_items": [
+                {"id": key.default_tts_voice, "label": _embed_voice_label(runtime, key.default_tts_voice)}
+            ] if key.default_tts_voice else [],
         }
     ]
+
+
+def _embed_voice_label(runtime: AuthRuntime | None, voice_id: str) -> str:
+    record = runtime.resources.get(ResourceType.CUSTOM_VOICE, voice_id) if runtime else None
+    return _voice_label(record) if record else voice_display_label(voice_id)
 
 
 def scoped_tts_providers(
@@ -479,7 +495,9 @@ def scoped_tts_providers(
             provider = _registered_provider(record) or fallback_provider
             if not provider or provider == "auto":
                 continue
-            voices.append((provider, record.resource_id, entry.in_project_scope))
+            voices.append((
+                provider, record.resource_id, entry.in_project_scope, _voice_label(record),
+            ))
 
         preferred = (
             effective_project_default(
@@ -493,7 +511,7 @@ def scoped_tts_providers(
         )
         return _grouped_scoped(voices, preferred)
 
-    voices: list[tuple[str, str]] = []
+    voices: list[tuple[str, str, str]] = []
     for record in list_accessible_resources(
         runtime.resources,
         current.user,
@@ -505,7 +523,7 @@ def scoped_tts_providers(
         provider = _registered_provider(record) or fallback_provider
         if not provider or provider == "auto":
             continue
-        voices.append((provider, record.resource_id))
+        voices.append((provider, record.resource_id, _voice_label(record)))
 
     preferred = defaults.voice_id if defaults else ""
     return _grouped(voices, preferred)

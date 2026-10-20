@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchTtsProviders, synthesizeSpeechPreview, type SpeechPreview } from "../api/tts";
 import Tts from "./TtsPreviewPanel";
 
-vi.mock("../api/tts", () => ({ fetchTtsProviders: vi.fn(), synthesizeSpeechPreview: vi.fn() }));
+vi.mock("../api/tts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/tts")>()),
+  fetchTtsProviders: vi.fn(),
+  synthesizeSpeechPreview: vi.fn(),
+}));
 
 const providers = [
   { id: "edge", name: "Edge TTS", default_voice: "voice-a", voices: ["voice-a", "voice-b"] },
@@ -43,6 +47,25 @@ describe("TTS preview", () => {
     view.unmount();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+  });
+
+  it("lists voices by their display name and still sends the voice id", async () => {
+    vi.mocked(fetchTtsProviders).mockResolvedValue([{
+      id: "cosyvoice", name: "CosyVoice", default_voice: "young-male-01",
+      voices: ["young-male-01", "young-female-02"],
+      voice_items: [
+        { id: "young-male-01", label: "青年男聲 01（臺灣台語）" },
+        { id: "young-female-02", label: "Hayley · 青年女聲 02（臺灣台語）" },
+      ],
+    }]);
+    await ready();
+    fireEvent.click(screen.getByRole("combobox", { name: "聲音" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Hayley · 青年女聲 02（臺灣台語）" }));
+    fireEvent.click(screen.getByRole("button", { name: "試聽" }));
+    await screen.findByLabelText("試聽播放器");
+    expect(synthesizeSpeechPreview).toHaveBeenCalledWith(
+      expect.any(String), "cosyvoice", "young-female-02", expect.any(AbortSignal),
+    );
   });
 
   it("resets the voice when switching providers and blocks blank input", async () => {

@@ -428,7 +428,7 @@ def test_project_id_without_policy_reports_unrestricted_lists(env):
                 **provider,
                 "in_project_scope": True,
                 "voice_items": [
-                    {"id": v, "in_project_scope": True} for v in provider["voices"]
+                    {**item, "in_project_scope": True} for item in provider["voice_items"]
                 ],
             }
             for provider in plain["tts"]["providers"]
