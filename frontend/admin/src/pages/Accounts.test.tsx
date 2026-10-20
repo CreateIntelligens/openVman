@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Accounts from "./Accounts";
 import {
   createAccount,
+  updateAdminScope,
   deleteAccount,
   fetchAccountAccessOptions,
   listAccounts,
@@ -32,6 +33,7 @@ const authState = vi.hoisted(() => ({
 }));
 
 vi.mock("../api/auth", () => ({
+  isAtLeastAdmin: (role: string) => role === "admin" || role === "root",
   createAccount: vi.fn(),
   deleteAccount: vi.fn(),
   fetchAccountAccessOptions: vi.fn(),
@@ -41,6 +43,7 @@ vi.mock("../api/auth", () => ({
   setAccountDisabled: vi.fn(),
   updateAccountRole: vi.fn(),
   updateAccountAccess: vi.fn(),
+  updateAdminScope: vi.fn(),
 }));
 
 vi.mock("../context/AuthContext", () => ({
@@ -126,6 +129,33 @@ describe("Accounts", () => {
     expect(window.location.pathname).toBe("/admin/access/accounts");
     fireEvent.click(screen.getByRole("button", { name: "臨時帳號" }));
     expect(window.location.pathname).toBe("/admin/access/accounts/temporary");
+  });
+
+  it("lets ROOT set an admin's scope while creating the account", async () => {
+    authState.account = { id: "root-1", username: "root", role: "root" };
+    vi.mocked(createAccount).mockResolvedValue({ id: "admin-new", username: "jane", role: "admin" } as never);
+    render(<Accounts />);
+    await screen.findByText(/可檢視並編輯下方授權的專案/);
+
+    fireEvent.change(screen.getByLabelText("帳號"), { target: { value: "jane" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "correct horse battery staple" } });
+    fireEvent.change(screen.getByLabelText("角色"), { target: { value: "admin" } });
+    expect(await screen.findByText("資源上限")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/限制可用資源/));
+    // 登入預設值那段也列同一個專案；要勾的是「資源上限」區塊裡的那個。
+    const scopeSection = screen.getByRole("region", { name: "資源上限" });
+    fireEvent.click(within(scopeSection).getByLabelText("專案 A"));
+
+    const submit = screen.getByRole("button", { name: "建立正式帳號" });
+    await waitFor(() => expect(submit.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalled());
+    expect(vi.mocked(createAccount).mock.calls[0][0].role).toBe("admin");
+    await waitFor(() => expect(updateAdminScope).toHaveBeenCalledWith("admin-new", {
+      scoped: true,
+      resources: expect.objectContaining({ projects: ["project-a"] }),
+    }));
   });
 
   it("selects access before creating a formal user", async () => {
@@ -261,11 +291,13 @@ describe("Accounts", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "建立正式帳號" }));
 
-    await waitFor(() => expect(createAccount).toHaveBeenCalledWith({
+    // 管理員也帶登入預設值（access），但不設資源上限。
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith(expect.objectContaining({
       username: "operator",
       password: "operator-password",
       role: "admin",
-    }));
+    })));
+    expect(updateAdminScope).not.toHaveBeenCalled();
   });
 
   it("switches cleanly between create account and account management tabs", async () => {

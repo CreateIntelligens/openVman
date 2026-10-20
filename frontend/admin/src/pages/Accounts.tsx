@@ -6,7 +6,9 @@ import {
   listAccounts,
   revokeAccountSessions,
   setAccountDisabled,
+  updateAdminScope,
   type Account,
+  type AdminScopeResources,
   type AssignableAccountRole,
 } from "../api/auth";
 import AccountAccessFields, {
@@ -20,6 +22,7 @@ import {
   formatRelative,
   sortByLeastRecentActivity,
 } from "../components/accounts/accountActivity";
+import AdminScopeFields, { EMPTY_SCOPE_RESOURCES } from "../components/accounts/AdminScopeFields";
 import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
@@ -105,6 +108,9 @@ export default function Accounts() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const accessForm = useAccountAccessForm("formal-account-create");
+  // 建立管理員時一起設資源上限，不必建完再從更多選單找。
+  const [newAdminScoped, setNewAdminScoped] = useState(false);
+  const [newAdminScope, setNewAdminScope] = useState<AdminScopeResources>(EMPTY_SCOPE_RESOURCES);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -139,15 +145,25 @@ export default function Accounts() {
     setError(null);
     try {
       const createdUsername = username.trim();
-      await createAccount({
+      const created = await createAccount({
         username: createdUsername,
         password,
         role,
-        ...(role === "user" ? { access: accessForm.access } : {}),
+        ...(accessForm.complete ? { access: accessForm.access } : {}),
       });
+      if (role === "admin" && newAdminScoped) {
+        // 帳號已經建好；上限寫失敗要講清楚，不能讓人以為沒建成功。
+        try {
+          await updateAdminScope(created.id, { scoped: true, resources: newAdminScope });
+        } catch (scopeError) {
+          setError(`帳號「${createdUsername}」已建立，但資源上限沒有存成功：${errorMessage(scopeError, "")}。請到「編輯／管理」再設一次。`);
+        }
+      }
       setUsername("");
       setPassword("");
       setRole("user");
+      setNewAdminScoped(false);
+      setNewAdminScope(EMPTY_SCOPE_RESOURCES);
       setCreatedNotice(`正式帳號「${createdUsername}」建立成功！可切換至「編輯／管理」查看。`);
       accessForm.reload();
       await reload();
@@ -344,14 +360,37 @@ export default function Accounts() {
                       <AccountAccessFields form={accessForm} />
                     </section>
                   ) : (
-                    <div className="border-t border-border bg-surface-sunken px-5 py-4 text-sm text-content-muted">
-                      管理員可使用所有已登錄資源，因此不需要另外設定資源權限。
-                    </div>
+                    <>
+                      <section className="border-t border-border" aria-labelledby="new-admin-defaults-title">
+                        <div className="px-5 py-4">
+                          <h3 id="new-admin-defaults-title" className="card-title">登入預設值</h3>
+                          <p className="mt-1 text-xs text-content-muted">
+                            管理員看得到全部資源；這裡只決定他登入後預設的專案、人物與聲音。
+                          </p>
+                        </div>
+                        <AccountAccessFields form={accessForm} role="admin" />
+                      </section>
+                      <section className="border-t border-border px-5 pb-4" aria-labelledby="new-admin-scope-title">
+                        <h3 id="new-admin-scope-title" className="card-title pt-4">資源上限</h3>
+                        <p className="mt-1 text-xs text-content-muted">
+                          要限制這位管理員看得到、分得出去的資源，在這裡勾；不勾就是不設限。
+                        </p>
+                        <AdminScopeFields
+                          options={accessForm.options}
+                          loading={accessForm.loading}
+                          scoped={newAdminScoped}
+                          canUnrestrict={isRoot}
+                          selection={newAdminScope}
+                          onScopedChange={setNewAdminScoped}
+                          onSelectionChange={setNewAdminScope}
+                        />
+                      </section>
+                    </>
                   )}
 
                   <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-content-muted">
-                      建立後可切換至「編輯／管理」分頁隨時調整使用者資源權限。
+                      建立後可切換至「編輯／管理」分頁隨時調整。
                     </p>
                     <button
                       className="btn btn-primary self-start sm:self-auto"
