@@ -25,6 +25,7 @@ Single `.env` at repo root. All Docker services read from it. Copy `.env.example
 cd backend
 pip install -r requirements.txt
 python -m pytest tests/ -v                    # all backend tests
+python -m pytest tests/ -n auto               # same, in parallel (pytest-xdist); the suite is CPU-bound
 python -m pytest tests/tts/ -v                # single directory
 python -m pytest tests/tts/test_foo.py::test_bar -v  # single test
 ```

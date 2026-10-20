@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import bcrypt
 
 _MIN_PASSWORD_BYTES = 8
@@ -27,9 +29,29 @@ def validate_password(password: str) -> bytes:
     return encoded
 
 
+_DEFAULT_ROUNDS = 12
+_MIN_ROUNDS = 4
+
+
+def _rounds() -> int:
+    """bcrypt cost factor; AUTH_BCRYPT_ROUNDS overrides the default 12.
+
+    一次雜湊約 0.3 秒是正式環境要的；測試一跑就建上百個帳號、登入上百次，
+    光這個就吃掉幾分鐘，所以單元測試把它降到 4。驗證照存起來的雜湊自己的
+    cost 走，改這個值不影響既有密碼。
+    """
+    raw = os.getenv("AUTH_BCRYPT_ROUNDS", "").strip()
+    if not raw:
+        return _DEFAULT_ROUNDS
+    try:
+        return max(_MIN_ROUNDS, int(raw))
+    except ValueError:
+        return _DEFAULT_ROUNDS
+
+
 def hash_password(password: str) -> str:
     encoded = validate_password(password)
-    return bcrypt.hashpw(encoded, bcrypt.gensalt()).decode("utf-8")
+    return bcrypt.hashpw(encoded, bcrypt.gensalt(rounds=_rounds())).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:

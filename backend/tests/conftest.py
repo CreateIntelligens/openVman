@@ -54,6 +54,9 @@ def _clear_auth_and_config_caches(tmp_path_factory):
             "SESSION_JWT_SECRET": "test-session-jwt-secret-for-backend-unit-tests-32",
             "AUTH_DATABASE_PATH": test_db,
             "AUTH_COOKIE_SECURE": "false",
+            # bcrypt 12 rounds 一次 0.3 秒；auth 測試建帳號、登入上百次，
+            # 這一項就吃掉幾分鐘。4 是 bcrypt 允許的最小值，雜湊格式不變。
+            "AUTH_BCRYPT_ROUNDS": "4",
             # 預設會連正式 Clef；單元測試一律關掉，要測的自己打開並 mock 傳輸層。
             "VISION_CLEF_URL": "",
         },

@@ -21,6 +21,7 @@ youtube-transcript-api>=1.2.4,<2
 Pillow>=10,<11
 PyJWT==2.13.0
 pytest>=8.0.0
+pytest-xdist>=3.5.0
 pytest-asyncio>=0.23.0
 opencc-python-reimplemented>=0.1,<1
 prometheus_client>=0.20,<1
