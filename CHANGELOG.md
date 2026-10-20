@@ -90,6 +90,7 @@
 
 ### Changed
 
+- **[2026-10-20]** **台語備援鏈改由順位設定驅動**：台語那一輪的引擎順序照專案 `tts_engine_order`，沒設就用 `.env` 的 `TTS_TAIWANESE_FALLBACK_ORDER`（預設 `cosyvoice,voxcpm,indextts`）；每一站聲音對成同一個人，全部失敗才退 Edge。以後調順序改設定即可，不用動程式。
 - **[2026-10-20]** **台語備援第三順位 IndexTTS**：台語這一輪 CosyVoice、VoxCPM 都失敗時先退 IndexTTS 的 `TTS_INDEXTTS_DEFAULT_CHARACTER`（hayley，與 CosyVoice 預設同一位、念華語），IndexTTS 也失敗才退 Edge；專案設了引擎順位就照順位、沒列的不試。所有引擎回零長度或只有 WAV 檔頭的音訊一律視為失敗往下退（IndexTTS 停機時會回 200 空檔）。
 - **[2026-10-19]** **台語 TTS 引擎互為備援**：`POST /api/v1/tts/stream` 台語這一輪 CosyVoice 失敗先改 VoxCPM、VoxCPM 失敗先改 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設，專案限制聲音時只換到清單裡的聲音），兩家都失敗才退 Edge；`X-TTS-Provider` 照實標最後念的引擎。`TTSRouterService.synthesize` 新增 `partners`。華語指定 CosyVoice 的行為不變。
 - **[2026-10-19]** **2D 人物幀同步改用 requestVideoFrameCallback**：新增共用模組 `frontend/shared/avatar/avatarFrameClock.ts`，以瀏覽器回報的 `mediaTime` 直接算出畫面上那一幀（25 fps 下即幀序），runtime 不再每幀讀右上角 2×2 角標做 GPU 回讀；角落修補改在 runtime 複製影片幀後直接進行。沒有 rVFC 的瀏覽器、以及換角色後第一幀還沒畫出來前，照舊走角標路徑。素材包仍打角標，舊版 runtime 與舊素材不受影響。

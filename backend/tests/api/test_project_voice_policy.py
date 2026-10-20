@@ -847,3 +847,19 @@ def test_project_order_filters_the_taiwanese_partners(env, tts_client, monkeypat
     _policy(env, tts_engine_order=["cosyvoice", "indextts"])
     _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
     assert [call[0] for call in tts_client.service.calls] == ["cosyvoice", "indextts"]
+
+
+def test_deployment_taiwanese_order_is_read_from_the_environment(env, tts_client, monkeypatch):
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    monkeypatch.setenv("TTS_TAIWANESE_FALLBACK_ORDER", "voxcpm,cosyvoice")
+    from app.config import get_tts_config
+    get_tts_config.cache_clear()
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    tts_client.service.failing = {"cosyvoice", "voxcpm", "indextts"}
+    _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    # .env 把 VoxCPM 排前面：先走 VoxCPM 串流，失敗換 CosyVoice；IndexTTS 不在順序裡就不試。
+    assert [call[0] for call in tts_client.service.calls] == ["voxcpm-stream", "cosyvoice"]

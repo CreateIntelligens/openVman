@@ -293,9 +293,9 @@ def _taiwanese_providers(
         return ()
     svc = _get_service()
     candidates = list(language_routes_mod.TAIWANESE_TTS_PROVIDERS)
-    if order:
-        ranked = [name for name in order if name in candidates]
-        candidates = ranked + [name for name in candidates if name not in ranked]
+    chain = order or _taiwanese_chain(None)
+    ranked = [name for name in chain if name in candidates]
+    candidates = ranked + [name for name in candidates if name not in ranked]
     return tuple(
         name for name in candidates
         if getattr(svc, f"{name}_adapter").enabled
@@ -318,58 +318,72 @@ def _switch_voice(runtime, policy, providers: tuple[str, ...], *, is_root: bool)
 _VOXCPM_COSY_PREFIX = "voxcpm2-cosy-"
 
 
+def _taiwanese_chain(policy) -> tuple[str, ...]:
+    """Engine order for a Taiwanese turn: the project's, else the deployment's."""
+    order = _project_engine_order(policy)
+    if order:
+        return order
+    cfg = get_tts_config()
+    raw = getattr(cfg, "tts_taiwanese_fallback_order", "cosyvoice,voxcpm,indextts")
+    return tuple(name.strip() for name in raw.split(",") if name.strip())
+
+
+def _same_person_voice(provider: str, voice: str, target: str) -> str:
+    """The voice on ``target`` that is the same person as ``voice`` on ``provider``.
+
+    CosyVoice 與 VoxCPM 的 cosy 系列是同一套參考聲（voxcpm2-cosy-<id> ↔ <id>）；
+    IndexTTS 只有部署預設角色跟它們對得上（hayley ↔ young-female-02）。對不到
+    就回空字串，讓那家用自己的預設。
+    """
+    svc = _get_service()
+    cfg = get_tts_config()
+    if provider == COSYVOICE_PROVIDER_NAME:
+        source = voice or getattr(svc.cosyvoice_adapter, "default_voice", "")
+    elif provider == VOXCPM_PROVIDER_NAME:
+        raw = voice or getattr(svc.voxcpm_adapter, "default_voice", "")
+        source = raw.removeprefix(_VOXCPM_COSY_PREFIX) if raw.startswith(_VOXCPM_COSY_PREFIX) else ""
+    else:
+        source = ""
+    if target == VOXCPM_PROVIDER_NAME:
+        return f"{_VOXCPM_COSY_PREFIX}{source}" if source else ""
+    if target == COSYVOICE_PROVIDER_NAME:
+        return source
+    if target == INDEXTTS_PROVIDER:
+        return cfg.tts_indextts_default_character
+    return ""
+
+
 def _taiwanese_partners(
     runtime, policy, provider: str, voice: str, *, is_root: bool,
     order: tuple[str, ...] = (),
 ) -> tuple[tuple[str, str], ...]:
-    """Engines to try, in the same voice, before Edge on a Taiwanese turn.
+    """Engines to try after ``provider`` fails on a Taiwanese turn, before Edge.
 
-    CosyVoice 掛了（例如節點 GPU 記憶體不足）不該直接退到 Edge 的華語音色，
-    先換 VoxCPM 念同一個人；反過來亦然。兩家都掛再退 IndexTTS 的 hayley——
-    念的是華語，但還是同一位。聲音對不到才用那家的預設；專案限制了聲音就
-    只能換到清單裡那家的聲音；專案設了引擎順位就照順位排、沒列的不試。
+    順序就是專案順位（沒設就是 TTS_TAIWANESE_FALLBACK_ORDER），跳過正在用的
+    那家與 Edge（Edge 永遠是最後一道，由 edge_fallback_voice 決定能不能退）。
+    每一站的聲音都對成同一個人；專案限制了聲音就只能換到清單裡那家的聲音。
     """
+    if provider not in language_routes_mod.TAIWANESE_TTS_PROVIDERS:
+        return ()
     svc = _get_service()
     cfg = get_tts_config()
-    candidates: list[tuple[str, str, bool]] = []
-    if provider == COSYVOICE_PROVIDER_NAME:
-        source = voice or getattr(svc.cosyvoice_adapter, "default_voice", "")
-        candidates.append((
-            VOXCPM_PROVIDER_NAME,
-            f"{_VOXCPM_COSY_PREFIX}{source}" if source else "",
-            bool(getattr(svc.voxcpm_adapter, "enabled", False)),
-        ))
-    elif provider == VOXCPM_PROVIDER_NAME:
-        source = voice or getattr(svc.voxcpm_adapter, "default_voice", "")
-        candidates.append((
-            COSYVOICE_PROVIDER_NAME,
-            source.removeprefix(_VOXCPM_COSY_PREFIX) if source.startswith(_VOXCPM_COSY_PREFIX) else "",
-            bool(getattr(svc.cosyvoice_adapter, "enabled", False)),
-        ))
-    else:
-        return ()
-    candidates.append((
-        INDEXTTS_PROVIDER, cfg.tts_indextts_default_character, bool(cfg.tts_indextts_url),
-    ))
-    if order:
-        ranked = {name: index for index, name in enumerate(order)}
-        candidates = sorted(
-            (c for c in candidates if c[0] in ranked), key=lambda c: ranked[c[0]],
-        )
-
+    chain = order or _taiwanese_chain(policy)
     partners: list[tuple[str, str]] = []
-    for partner, mapped, running in candidates:
-        if not running:
+    for name in chain:
+        if name == provider or name == voice_access.EDGE_TTS_PROVIDER or name in dict(partners):
             continue
+        if not _stream_engine_running(name, cfg):
+            continue
+        mapped = _same_person_voice(provider, voice, name)
         if policy is not None and policy.restricts_tts:
             picked = voice_access.project_voice_for_providers(
-                runtime, policy, (partner,), is_root=is_root,
+                runtime, policy, (name,), is_root=is_root,
             )
             if picked is None:
                 continue
             if picked[1] and picked[1] != mapped:
                 mapped = picked[1]
-        partners.append((partner, mapped))
+        partners.append((name, mapped))
     return tuple(partners)
 
 

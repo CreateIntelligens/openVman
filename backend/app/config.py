@@ -42,6 +42,12 @@ class TTSRouterConfig(BaseSettings):
     # --- IndexTTS (primary, voice-cloning) ---
     tts_indextts_url: str = Field(default="", validation_alias="TTS_INDEXTTS_URL")
     tts_indextts_default_character: str = Field(default="", validation_alias="TTS_INDEXTTS_DEFAULT_CHARACTER")
+    # 台語那一輪的引擎順序（沒設專案順位時用）：第一個在跑的引擎先念，失敗照後面
+    # 的順序換，聲音對應成同一個人；全部失敗才退 Edge。
+    tts_taiwanese_fallback_order: str = Field(
+        default="cosyvoice,voxcpm,indextts",
+        validation_alias="TTS_TAIWANESE_FALLBACK_ORDER",
+    )
 
     # --- AWS Polly ---
     tts_aws_enabled: bool = False
