@@ -592,6 +592,18 @@ function AccessSectionList({
         checked={isSelected(option)}
         onChange={() => onToggle(option)}
       />
+      {option.grantType === "avatar_characters" && (
+        // 人物只看 id 對不出是誰；跟 Avatar 頁一樣拿影片第一格當預覽，
+        // 只預載 metadata、不播，幾十個人物也不會拖慢對話框。
+        <video
+          src={`/static/characters/${option.id}/01.webm`}
+          preload="metadata"
+          muted
+          playsInline
+          aria-hidden="true"
+          className="h-10 w-auto shrink-0 rounded bg-surface-sunken object-cover"
+        />
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">
           {option.label}

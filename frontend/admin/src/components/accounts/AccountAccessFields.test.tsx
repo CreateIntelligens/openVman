@@ -100,3 +100,13 @@ describe("AccountAccessFields 管理員帳號", () => {
     expect(screen.queryByRole("note")).toBeNull();
   });
 });
+
+describe("AccountAccessFields 人物預覽", () => {
+  it("人物列帶影片第一格預覽，聲音列沒有", () => {
+    const { container } = render(<AccountAccessFields form={formWith({ avatar_characters: ["0713"] })} />);
+    const videos = Array.from(container.querySelectorAll("video"));
+    expect(videos.map((video) => video.getAttribute("src"))).toContain("/static/characters/0713/01.webm");
+    expect(videos.every((video) => video.getAttribute("preload") === "metadata")).toBe(true);
+    expect(videos.some((video) => (video.getAttribute("src") ?? "").includes("hayley"))).toBe(false);
+  });
+});
