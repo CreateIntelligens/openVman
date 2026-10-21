@@ -46,19 +46,22 @@ export default function WorkspaceEditor({
 }: WorkspaceEditorProps) {
   return (
     <main className="flex-1 flex flex-col min-w-0 relative bg-surface dark:bg-background-dark">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface dark:bg-surface-sunken/20 md:hidden shrink-0">
-        <div className="flex items-center gap-2 text-sm text-content-muted">
-          <span className="material-symbols-outlined text-[1rem]">folder_open</span>
-          <span className="font-bold">工作區</span>
-          <span className="text-xs text-content-subtle">({documentsCount})</span>
+      {/* 手機看不到側欄：用共用頁首放主標題，側欄抽屜由右側按鈕打開。 */}
+      <header className="page-header page-header-static md:hidden">
+        <div className="page-heading">
+          <h1 className="page-title">工作區</h1>
+          <p className="page-subtitle">{documentsCount} 份文件</p>
         </div>
-        <button
-          onClick={onOpenSidebar}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
-        >
-          <span className="material-symbols-outlined text-[1.25rem]">menu</span>
-        </button>
-      </div>
+        <div className="page-actions">
+          <button
+            onClick={onOpenSidebar}
+            aria-label="開啟文件清單"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
+          >
+            <span className="material-symbols-outlined text-[1.25rem]">menu</span>
+          </button>
+        </div>
+      </header>
 
       {dragOver && (
         <div className="absolute inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
@@ -127,7 +130,7 @@ export default function WorkspaceEditor({
               className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-content placeholder:text-content-subtle focus:outline-none font-mono resize-none overflow-y-auto ${
                 editorMode === "split" ? "border-r border-border " : ""
               }`}
-              placeholder="# Markdown 內容\n\n…"
+              placeholder={"# Markdown 內容\n\n…"}
             />
           ) : null}
 

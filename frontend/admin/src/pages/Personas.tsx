@@ -301,6 +301,32 @@ export default function Personas() {
 
                      {/* Main Editor Content */}
                      <main className="flex-1 flex flex-col min-w-0 bg-surface dark:bg-background-dark relative overflow-hidden">
+                            {/* 手機看不到側欄：主標題與切換角色放在這一列，桌面版由側欄負責。 */}
+                            <header className="page-header page-header-static md:hidden">
+                                   <div className="page-heading">
+                                          <h1 className="page-title">角色管理</h1>
+                                   </div>
+                                   <label className="flex min-w-0 flex-[1_1_12rem] items-center gap-2 text-sm text-content-muted">
+                                          <span className="shrink-0">角色</span>
+                                          <select
+                                                 className="input min-w-0 flex-1 py-1.5"
+                                                 aria-label="切換角色"
+                                                 value={selectedPersona?.persona_id ?? ""}
+                                                 onChange={(event) => {
+                                                        const persona = personas.find((item) => item.persona_id === event.target.value);
+                                                        if (!persona) return;
+                                                        setSelectedPersona(persona);
+                                                        openDocument(persona.path);
+                                                 }}
+                                          >
+                                                 {personas.map((persona) => (
+                                                        <option key={persona.persona_id} value={persona.persona_id}>
+                                                               {persona.label || persona.persona_id}
+                                                        </option>
+                                                 ))}
+                                          </select>
+                                   </label>
+                            </header>
                             {status && (
                                    <div className="p-4 shrink-0 shadow-sm z-20 border-b border-border ">
                                           <StatusAlert type={status.type} message={status.message} />
