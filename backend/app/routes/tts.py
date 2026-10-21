@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Literal
 
 import httpx
@@ -94,6 +95,11 @@ class SpeechRequest(BaseModel):
     speed: float = 1.0
     # 選填：套用這個專案的聲音限制（Embed key 一律用金鑰綁定的專案）。
     project_id: str = ""
+    # 以下是 OpenAI 規格之外的選填欄位，意義與 /api/v1/tts/stream 相同；
+    # OpenAI 用戶端不會送，行為就和以前一樣。
+    speech_language: str = ""
+    language: str = ""
+    language_routes: list[str] | str | None = None
 
 
 def _cache_scope(
@@ -126,13 +132,6 @@ async def create_speech(
     cfg = get_tts_config()
     runtime = get_auth_runtime()
     project_id, policy = voice_policy.request_policy(runtime, current, body.project_id)
-    authorized = voice_access.resolve_tts_voice(
-        current,
-        runtime,
-        requested_provider=body.provider,
-        requested_voice=body.voice,
-        project_id=project_id,
-    )
     is_root = (
         current.embed_key is None
         and getattr(getattr(current, "user", None), "role", None) is AccountRole.ROOT
@@ -140,8 +139,14 @@ async def create_speech(
     edge_fallback_voice = voice_access.tts_fallback_voice(
         runtime, policy, is_root=is_root
     )
-    provider = authorized.provider if authorized else body.provider
-    voice = authorized.runtime_key if authorized else body.voice
+    plan = await plan_tts_voice(
+        current, runtime,
+        project_id=project_id, policy=policy, is_root=is_root,
+        requested_provider=body.provider, requested_voice=body.voice,
+        language=body.speech_language or body.language,
+        language_routes=body.language_routes, supplied_project_id=body.project_id,
+    )
+    provider, voice = plan.provider, plan.voice
     svc = _get_service()
     cleaned_text = (await prepare_tts_text_async(body.input)) or ""
     request = SynthesizeRequest(
@@ -178,7 +183,7 @@ async def create_speech(
     try:
         output = svc.synthesize(
             request, provider=provider, edge_fallback_voice=edge_fallback_voice,
-            order=_project_engine_order(policy),
+            partners=plan.partners, order=_project_engine_order(policy),
         )
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
@@ -387,6 +392,92 @@ def _taiwanese_partners(
     return tuple(partners)
 
 
+@dataclass(frozen=True, slots=True)
+class VoicePlan:
+    """一次 TTS 請求選定的引擎與聲音，兩個合成端點共用同一套規則。"""
+
+    provider: str
+    voice: str
+    # IndexTTS 串流端點要的角色名；其他引擎用 voice。
+    character: str
+    # 台語這一輪主引擎失敗時，依序改試的（引擎, 同一位的聲音）。
+    partners: tuple[tuple[str, str], ...]
+
+
+async def plan_tts_voice(
+    current: CurrentAccount,
+    runtime,
+    *,
+    project_id: str | None,
+    policy,
+    is_root: bool,
+    requested_provider: str,
+    requested_voice: str,
+    requested_character: str = "",
+    language: str = "",
+    language_routes: list[str] | str | None = None,
+    supplied_project_id: str = "",
+) -> VoicePlan:
+    """依語言、授權與專案設定決定引擎與聲音。
+
+    ``/v1/audio/speech`` 與 ``/api/v1/tts/stream`` 都走這裡，兩邊才不會一個會換台語
+    引擎、一個不會。VH-384：台語 → CosyVoice／VoxCPM，國語、英文 → IndexTTS。
+    """
+    cfg = get_tts_config()
+    language = language.strip()
+    switched = None
+    if language == language_routes_mod.TAIWANESE:
+        # 只有台語才需要問專案分流（會打一次 Brain，有 30 秒快取）。
+        routes = await language_routes_mod.effective_routes(
+            current, supplied_project_id, language_routes_mod.parse_requested(language_routes),
+        )
+        if language_routes_mod.TAIWANESE in routes:
+            providers = _taiwanese_providers(requested_provider, _project_engine_order(policy))
+            if providers:
+                switched = _switch_voice(runtime, policy, providers, is_root=is_root)
+    if switched:
+        # 台語換引擎先於帳號的聲音授權判斷，否則只開了別家聲音的帳號會在換家前就被擋下。
+        provider, voice = switched
+        character = voice
+    else:
+        authorized = voice_access.resolve_tts_voice(
+            current,
+            runtime,
+            requested_provider=requested_provider,
+            requested_voice=requested_voice or requested_character,
+            project_id=project_id,
+        )
+        provider = authorized.provider if authorized else requested_provider
+        character = (
+            authorized.runtime_key if authorized
+            else (requested_character or cfg.tts_indextts_default_character)
+        )
+        voice = authorized.runtime_key if authorized else requested_voice
+        explicit = (
+            requested_provider.strip() or requested_voice.strip() or requested_character.strip()
+        )
+        # 帳號／專案預設本來就是 IndexTTS 的聲音就照用，不換成部署預設。
+        if (
+            language in _INDEXTTS_LANGUAGES
+            and not explicit
+            and cfg.tts_indextts_url
+            and provider != INDEXTTS_PROVIDER
+        ):
+            picked = _switch_voice(runtime, policy, (INDEXTTS_PROVIDER,), is_root=is_root)
+            if picked:
+                provider = INDEXTTS_PROVIDER
+                voice = character = picked[1] or cfg.tts_indextts_default_character
+    # 台語這一輪才互備：華語指定 CosyVoice 失敗，換成 VoxCPM 照字唸不是使用者要的。
+    partners = (
+        _taiwanese_partners(
+            runtime, policy, provider, voice, is_root=is_root,
+            order=_project_engine_order(policy),
+        )
+        if language == language_routes_mod.TAIWANESE else ()
+    )
+    return VoicePlan(provider=provider, voice=voice, character=character, partners=partners)
+
+
 def _stream_audio(
     stream: AsyncIterator[bytes],
     media_type: str,
@@ -487,9 +578,6 @@ async def tts_stream_endpoint(
 ) -> Response:
     cfg = get_tts_config()
     runtime = get_auth_runtime()
-    routes = await language_routes_mod.effective_routes(
-        current, body.project_id, language_routes_mod.parse_requested(body.language_routes),
-    )
     project_id, policy = voice_policy.request_policy(runtime, current, body.project_id)
     is_root = (
         current.embed_key is None
@@ -498,48 +586,17 @@ async def tts_stream_endpoint(
     edge_fallback_voice = voice_access.tts_fallback_voice(
         runtime, policy, is_root=is_root
     )
-    # VH-384：依偵測（ASR）或選擇的語言決定引擎，台語 → CosyVoice／VoxCPM，國語、
-    # 英文 → IndexTTS。偵測到的語言優先，打字時才看使用者選的語言。
+    # 偵測到的語言（ASR）優先，打字時才看使用者選的語言。
     language = (body.speech_language or body.language).strip()
-    switched = None
-    if language == language_routes_mod.TAIWANESE and language_routes_mod.TAIWANESE in routes:
-        providers = _taiwanese_providers(body.provider, _project_engine_order(policy))
-        if providers:
-            switched = _switch_voice(runtime, policy, providers, is_root=is_root)
-    if switched:
-        # 台語換引擎先於帳號的聲音授權判斷，否則只開了別家聲音的帳號會在換家前就被擋下。
-        provider, voice = switched
-        character = voice
-    else:
-        authorized = voice_access.resolve_tts_voice(
-            current,
-            runtime,
-            requested_provider=body.provider,
-            requested_voice=body.voice or body.character,
-            project_id=project_id,
-        )
-        provider = authorized.provider if authorized else body.provider
-        character = authorized.runtime_key if authorized else (body.character or cfg.tts_indextts_default_character)
-        voice = authorized.runtime_key if authorized else body.voice
-        explicit = body.provider.strip() or body.voice.strip() or body.character.strip()
-        # 帳號／專案預設本來就是 IndexTTS 的聲音就照用，不換成部署預設。
-        if (
-            language in _INDEXTTS_LANGUAGES
-            and not explicit
-            and cfg.tts_indextts_url
-            and provider != INDEXTTS_PROVIDER
-        ):
-            picked = _switch_voice(runtime, policy, (INDEXTTS_PROVIDER,), is_root=is_root)
-            if picked:
-                provider = INDEXTTS_PROVIDER
-                voice = character = picked[1] or cfg.tts_indextts_default_character
-    # 台語這一輪才互備：華語指定 CosyVoice 失敗，換成 VoxCPM 照字唸不是使用者要的。
-    partners = (
-        _taiwanese_partners(
-            runtime, policy, provider, voice, is_root=is_root,
-            order=_project_engine_order(policy),
-        )
-        if language == language_routes_mod.TAIWANESE else ()
+    plan = await plan_tts_voice(
+        current, runtime,
+        project_id=project_id, policy=policy, is_root=is_root,
+        requested_provider=body.provider, requested_voice=body.voice,
+        requested_character=body.character, language=language,
+        language_routes=body.language_routes, supplied_project_id=body.project_id,
+    )
+    provider, voice, character, partners = (
+        plan.provider, plan.voice, plan.character, plan.partners,
     )
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:

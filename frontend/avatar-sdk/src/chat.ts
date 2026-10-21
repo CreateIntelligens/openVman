@@ -175,6 +175,9 @@ export class AvatarConversation {
         input: text,
         provider: this.options.tts?.provider,
         voice: this.options.tts?.voice,
+        // 同源 session 沒有 embed key 綁定專案，要靠這裡帶專案才套得到專案的聲音與分流。
+        project_id: this.options.projectId,
+        language: this.options.tts?.language,
       }),
       "SPEECH_FAILED",
       signal,

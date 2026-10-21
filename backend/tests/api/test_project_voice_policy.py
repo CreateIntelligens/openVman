@@ -863,3 +863,59 @@ def test_deployment_taiwanese_order_is_read_from_the_environment(env, tts_client
     _stream(tts_client, provider="indextts", voice="index-a", speech_language="nan")
     # .env 把 VoxCPM 排前面：先走 VoxCPM 串流，失敗換 CosyVoice；IndexTTS 不在順序裡就不試。
     assert [call[0] for call in tts_client.service.calls] == ["voxcpm-stream", "cosyvoice"]
+
+
+# --- /v1/audio/speech 與 /api/v1/tts/stream 選引擎一致 ---------------------------
+
+
+def _speech(client, **body):
+    return client.post("/v1/audio/speech", json={"input": "你好", "project_id": "p1", **body})
+
+
+def test_speech_switches_taiwanese_like_the_stream_endpoint(env, tts_client, monkeypatch):
+    # 2026-10-21：兩個端點的選引擎規則原本各寫一份，/v1/audio/speech 不會換台語引擎。
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.failing.discard("cosyvoice")
+    response = _speech(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    assert response.status_code == 200
+    assert tts_client.service.calls[0][:2] == ("cosyvoice", "")
+    assert response.headers["X-TTS-Provider"] == "cosyvoice"
+
+
+def test_speech_without_language_keeps_the_requested_engine(env, tts_client, monkeypatch):
+    # OpenAI 用戶端不送語言欄位：行為和以前一樣，照指定的引擎。
+    async def routes(*args):
+        raise AssertionError("沒有台語就不該去問專案分流")
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    tts_client.service.failing.clear()
+    response = _speech(tts_client, provider="indextts", voice="index-a")
+    assert response.status_code == 200
+    assert tts_client.service.calls[0][:2] == ("indextts", "index-a")
+
+
+def test_speech_uses_the_same_taiwanese_partners_as_stream(env, tts_client, monkeypatch):
+    async def routes(*args):
+        return ["zh", "nan"]
+
+    monkeypatch.setattr(tts.language_routes_mod, "effective_routes", routes)
+    monkeypatch.setenv("TTS_INDEXTTS_URL", "http://index")
+    monkeypatch.setenv("TTS_INDEXTTS_DEFAULT_CHARACTER", "hayley")
+    from app.config import get_tts_config
+    get_tts_config.cache_clear()
+    tts_client.service.cosyvoice_adapter.enabled = True
+    tts_client.service.voxcpm_adapter.enabled = True
+    tts_client.service.failing = {"cosyvoice", "voxcpm"}
+    response = _speech(tts_client, provider="indextts", voice="index-a", speech_language="nan")
+    assert response.status_code == 200
+    # 和串流端點同一條互備：CosyVoice → VoxCPM 同一位 → IndexTTS 的 Hayley。
+    assert tts_client.service.calls == [
+        ("cosyvoice", "", ""),
+        ("voxcpm", "voxcpm2-cosy-young-female-02", ""),
+        ("indextts", "hayley", ""),
+    ]
+    assert response.headers["X-TTS-Provider"] == "indextts"

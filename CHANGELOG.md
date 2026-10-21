@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **[2026-10-21]** **`/v1/audio/speech` 與 `/api/v1/tts/stream` 選引擎一致**：選引擎、選聲音與台語互備抽成共用的 `plan_tts_voice`，兩個端點都走它。`/v1/audio/speech` 另收選填的 `speech_language`、`language`、`language_routes`：台語且專案開了分流時換 CosyVoice／VoxCPM，主引擎失敗先換同一位的另一家，國語、英文在沒指定引擎與聲音時用 IndexTTS。OpenAI 用戶端不送這些欄位，行為不變。兩個端點只差在回傳方式（整段並有快取，或串流）。Avatar SDK 的 `ask()` 合成語音時多帶 `project_id` 與新的 `tts.language` 選項，對話模式也能唸台語。
 - **[2026-10-21]** **VoxCPM 預設聲音改成 Hayley**：沒指定聲音、也沒設 `TTS_VOXCPM_DEFAULT_VOICE` 時，VoxCPM 改用 `voxcpm2-cosy-young-female-02`（原本是 `young-female-01`）。IndexTTS 的 `hayley`、CosyVoice 的 `young-female-02` 本來就是 Hayley，IndexTTS 失敗備援到 VoxCPM 時聲音不再換人。
 - **[2026-10-20]** **預設專案改成可設定，`default` 變成它的別名**：新增 `DEFAULT_PROJECT_ID`（根目錄 `.env`，Brain 與 Backend 同讀，未設定時照舊是 `default`）。沒帶 `project_id` 的請求與 `project_id=default` 都解析成這個專案：Brain 在 `normalize_project_id` 換，Backend 在 Brain 代理的專案授權、語音專案解析、WebSocket 與 A2A 預設值處先換成正式 ID 再查授權與專案限制（`app/project_ids.py`）。`GET /api/v1/projects` 每個專案多帶 `is_default`，後台與前台找不到上次選的專案時改落到預設專案，不再挑清單第一個。預設專案不可刪除（以解析後的 ID 比對，不會經由別名刪到它）；開機的舊目錄遷移改搬進預設專案，不再建回 `default` 目錄；預設專案改成別的 ID 後，殘留的 `default` 目錄不再列出。
 - **[2026-10-20]** **聲音選單顯示名稱，Hayley 在各引擎都認得出來**：`GET /api/v1/tts/providers` 每個引擎多帶 `voice_items[].label`，後台 TTS 試聽、後台聊天與前台設定的聲音選單改顯示名稱，送出的仍是聲音 ID。同一位錄音者在各引擎的 ID 不同，名稱一律以錄音者開頭：CosyVoice `young-female-02`、VoxCPM `voxcpm2-cosy-young-female-02` 都顯示「Hayley · 青年女聲 02（臺灣台語）」，IndexTTS `hayley` 顯示「Hayley」。後端啟動同步聲音資源時用同一套名稱，資源權限清單也跟著改。聲音 ID 不變，既有授權與專案設定不受影響。

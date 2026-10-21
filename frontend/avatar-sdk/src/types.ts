@@ -11,6 +11,8 @@ export type OpenVmanAvatarAudioOutput = "speaker" | "silent";
 export interface OpenVmanAvatarTtsOptions {
   provider?: string;
   voice?: string;
+  // 回答要唸的語言（zh、en、nan…）。nan 且專案開了台語分流時改用台語引擎。
+  language?: string;
 }
 
 export interface OpenVmanAvatarOptions {

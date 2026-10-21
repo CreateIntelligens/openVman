@@ -144,7 +144,7 @@ Brain 對台語提問的回答一律寫成繁體中文文字（台語沒有通�
 | `zh` 國語、`en` 英文 | IndexTTS | 沒指定 `provider` 也沒指定 `voice` 時；有指定就照指定的 |
 | 其他或沒給語言 | 指定的聲音，沒指定就用專案預設、帳號預設 | — |
 
-專案限制了聲音時，只會換到清單內該引擎的聲音，清單裡沒有就不換。回應標頭 `X-TTS-Provider` 標出實際用的引擎。`/v1/audio/speech` 沒有語言參數，只能直接指定 `provider` 與 `voice`。
+專案限制了聲音時，只會換到清單內該引擎的聲音，清單裡沒有就不換。回應標頭 `X-TTS-Provider` 標出實際用的引擎。`/v1/audio/speech`（OpenAI 相容格式，整段回傳）選引擎與聲音的規則和這裡相同：除了 OpenAI 的 `input`、`voice`，另收選填的 `provider`、`project_id`、`speech_language`、`language`、`language_routes`，沒送語言欄位時照指定的引擎與聲音。
 
 ### 機台與伺服器代理
 

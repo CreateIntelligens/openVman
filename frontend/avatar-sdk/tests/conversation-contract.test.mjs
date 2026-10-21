@@ -379,7 +379,7 @@ test("a keyed host sends X-Embed-Key without credentials and speaks the reply", 
     embedKey: "ovk_demo",
     personaId: "guide",
     projectId: "alpha",
-    tts: { provider: "voxcpm", voice: "zh-female" },
+    tts: { provider: "voxcpm", voice: "zh-female", language: "nan" },
   });
   const replies = [];
   avatar.on("reply", (event) => replies.push(event.text));
@@ -406,6 +406,8 @@ test("a keyed host sends X-Embed-Key without credentials and speaks the reply", 
     input: "你好，我是 openVman。",
     provider: "voxcpm",
     voice: "zh-female",
+    project_id: "alpha",
+    language: "nan",
   });
 
   assert.ok(runtimeCalls.pushedAudio > 0);
@@ -427,6 +429,8 @@ test("a same-origin session host sends credentials and no embed key", async () =
   assert.equal("persona_id" in chatPayload, false);
   assert.deepEqual(JSON.parse(speechRequests(requests)[0].options.body), {
     input: "你好，我是 openVman。",
+    // 沒有 embed key 綁專案，語音請求要自己帶專案。
+    project_id: "alpha",
   });
 });
 
