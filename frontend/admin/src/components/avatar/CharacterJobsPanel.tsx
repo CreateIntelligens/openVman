@@ -191,16 +191,16 @@ export default function CharacterJobsPanel({
       </div>
       <div className={fileRowClassName}>
         <div className={fileFieldClassName}>
-          <span className="text-xs font-medium text-content-muted">Source video:</span>
+          <span className="text-xs font-medium text-content-muted">來源影片：</span>
           <label className={filePickerClassName(videoName)}>
             <span className="material-symbols-outlined text-sm">videocam</span>
-            <span className="min-w-0 truncate">{videoName || "Select video"}</span>
+            <span className="min-w-0 truncate">{videoName || "選擇影片"}</span>
             <input
               ref={videoRef}
               type="file"
               accept=".mp4,.mov,.m4v,.webm,video/*"
               className="hidden"
-              aria-label="Source video"
+              aria-label="來源影片"
               onChange={(e) => setVideoName(e.target.files?.[0]?.name || "")}
             />
           </label>
@@ -223,7 +223,7 @@ export default function CharacterJobsPanel({
       )}
 
       {jobs.length > 0 && (
-        <ul className="flex flex-col gap-2" aria-label="Conversion jobs">
+        <ul className="flex flex-col gap-2" aria-label="轉檔工作">
           {jobs.map((job) => (
             <li
               key={job.job_id}
@@ -246,17 +246,17 @@ export default function CharacterJobsPanel({
                 )}
                 {job.state === "done" && job.frame_count !== undefined && (
                   <span className="block text-content-subtle">
-                    {job.frame_count} frames · {job.width}×{job.height}
+                    {job.frame_count} 幀 · {job.width}×{job.height}
                   </span>
                 )}
               </span>
               {!isActive(job) && (
                 <button
                   onClick={() => handleDismiss(job.job_id)}
-                  aria-label={`Dismiss job ${job.char_id}`}
+                  aria-label={`移除工作 ${job.char_id}`}
                   className={`${dangerActionClassName} w-full px-2 md:w-auto md:flex-none`}
                 >
-                  Dismiss
+                  移除
                 </button>
               )}
             </li>

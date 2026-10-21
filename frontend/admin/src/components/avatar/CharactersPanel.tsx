@@ -106,7 +106,7 @@ export default function CharactersPanel({
         <div className={fileRowClassName}>
           <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
-              Video (.webm):
+              影片（.webm）：
             </span>
             <label className={filePickerClassName(selectedVideoName)}>
               <span className="material-symbols-outlined text-sm">movie</span>
@@ -118,7 +118,7 @@ export default function CharactersPanel({
                 type="file"
                 accept=".webm"
                 className="hidden"
-                aria-label="Video"
+                aria-label="影片"
                 onChange={(e) => onVideoChange(e.target.files?.[0]?.name || "")}
               />
             </label>
@@ -126,7 +126,7 @@ export default function CharactersPanel({
 
           <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
-              Data (.gz):
+              資料檔（.gz）：
             </span>
             <label className={filePickerClassName(selectedDataName)}>
               <span
@@ -143,7 +143,7 @@ export default function CharactersPanel({
                 type="file"
                 accept=".gz"
                 className="hidden"
-                aria-label="Data"
+                aria-label="資料檔"
                 onChange={(e) => onDataChange(e.target.files?.[0]?.name || "")}
               />
             </label>
@@ -159,12 +159,12 @@ export default function CharactersPanel({
         </div>
       </div>
 
-      {loading && <p className="text-sm text-content-muted">Loading…</p>}
+      {loading && <p className="text-sm text-content-muted">載入中…</p>}
 
       {!loading && characters.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-12 text-content-subtle ">
           <span className="material-symbols-outlined text-4xl">face</span>
-          <p className="text-sm">No characters yet</p>
+          <p className="text-sm">還沒有人物</p>
         </div>
       )}
 
@@ -200,16 +200,16 @@ export default function CharactersPanel({
               <div className={cardActionsClassName}>
                 <button
                   onClick={() => onTry(character.char_id)}
-                  aria-label={`Try ${character.char_id}`}
+                  aria-label={`試用 ${character.char_id}`}
                   className={primaryActionClassName}
                 >
-                  Try
+                  試用
                 </button>
                 <button
                   onClick={() => onRename(character)}
                   className={secondaryActionClassName}
                 >
-                  Rename
+                  改名
                 </button>
                 <button
                   onClick={() => onDelete(character.char_id)}

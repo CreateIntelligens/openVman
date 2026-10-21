@@ -6,7 +6,8 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
-export function useMobileTreeDrawer() {
+/** 手機側欄抽屜：打開時聚焦關閉鈕（以 `closeLabel` 找），Esc 關閉並把焦點還給開啟鈕。 */
+export function useMobileTreeDrawer(closeLabel = "關閉檔案樹") {
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const mobileTreeOpenerRef = useRef<HTMLButtonElement | null>(null);
   const mobileTreePanelRef = useRef<HTMLElement | null>(null);
@@ -28,7 +29,7 @@ export function useMobileTreeDrawer() {
     if (!mobileTreeOpen) return;
 
     mobileTreePanelRef.current
-      ?.querySelector<HTMLButtonElement>('button[aria-label="關閉檔案樹"]')
+      ?.querySelector<HTMLButtonElement>(`button[aria-label="${closeLabel}"]`)
       ?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -39,7 +40,7 @@ export function useMobileTreeDrawer() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeMobileTree, mobileTreeOpen]);
+  }, [closeLabel, closeMobileTree, mobileTreeOpen]);
 
   return {
     mobileTreeOpen,

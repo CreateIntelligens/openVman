@@ -1,6 +1,6 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 
-import AccountRowMenu from "../accounts/AccountRowMenu";
+import ActionMenu from "../ActionMenu";
 import { PageHeader, PageTabs } from "../app/PageHeader";
 import LanguageRoutesButton from "./LanguageRoutesButton";
 
@@ -51,6 +51,29 @@ export default function KnowledgeHeader({
     </button>
   );
 
+  const indexActions = [
+    {
+      id: "commit",
+      label: "採納上傳",
+      busyLabel: "採納中…",
+      busy: committing,
+      onSelect: onCommit,
+      icon: "library_add",
+      title: "採納 raw 區的上傳檔案進知識庫，並重建索引與圖譜",
+      className: "border border-primary text-primary hover:bg-primary/10",
+    },
+    {
+      id: "reindex",
+      label: "重新索引",
+      busyLabel: "索引中…",
+      busy: reindexing,
+      onSelect: onReindex,
+      icon: "sync",
+      title: undefined,
+      className: "bg-primary text-white hover:bg-primary/90",
+    },
+  ];
+
   return (
     <PageHeader
       title="知識庫"
@@ -69,48 +92,33 @@ export default function KnowledgeHeader({
           </button>
           {/* 低頻的採納與重建索引：寬畫面直接列出，手機收進「更多」，頁首維持一列。 */}
           <div className="hidden items-center gap-2 sm:flex">
-            <button
-              onClick={onCommit}
-              disabled={committing}
-              title="採納 raw 區的上傳檔案進知識庫，並重建索引與圖譜"
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-            >
-              <span className={`material-symbols-outlined text-[1rem] ${committing ? "animate-spin" : ""}`}>
-                library_add
-              </span>
-              {committing ? "採納中..." : "採納上傳"}
-            </button>
-            <button
-              onClick={onReindex}
-              disabled={reindexing}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <span className={`material-symbols-outlined text-[1rem] ${reindexing ? "animate-spin" : ""}`}>
-                sync
-              </span>
-              {reindexing ? "索引中..." : "重新索引"}
-            </button>
+            {indexActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={action.onSelect}
+                disabled={action.busy}
+                title={action.title}
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${action.className}`}
+              >
+                <span className={`material-symbols-outlined text-[1rem] ${action.busy ? "animate-spin" : ""}`}>
+                  {action.icon}
+                </span>
+                {action.busy ? action.busyLabel : action.label}
+              </button>
+            ))}
           </div>
           <div className="sm:hidden">
-            <AccountRowMenu
-              accountName="知識庫"
+            <ActionMenu
+              label="知識庫"
               groups={[{
                 id: "index",
                 label: "索引",
-                items: [
-                  {
-                    id: "commit",
-                    label: "採納上傳",
-                    onSelect: onCommit,
-                    disabledReason: committing ? "採納中…" : undefined,
-                  },
-                  {
-                    id: "reindex",
-                    label: "重新索引",
-                    onSelect: onReindex,
-                    disabledReason: reindexing ? "索引中…" : undefined,
-                  },
-                ],
+                items: indexActions.map((action) => ({
+                  id: action.id,
+                  label: action.label,
+                  onSelect: action.onSelect,
+                  disabledReason: action.busy ? action.busyLabel : undefined,
+                })),
               }]}
             />
           </div>

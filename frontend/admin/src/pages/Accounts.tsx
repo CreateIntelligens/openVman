@@ -16,7 +16,7 @@ import AccountAccessFields, {
 } from "../components/accounts/AccountAccessFields";
 import AccountPasswordResetDialog from "../components/accounts/AccountPasswordResetDialog";
 import AccountRoleDialog from "../components/accounts/AccountRoleDialog";
-import AccountRowMenu from "../components/accounts/AccountRowMenu";
+import ActionMenu from "../components/ActionMenu";
 import {
   formatFullTime,
   formatRelative,
@@ -564,8 +564,8 @@ export default function Accounts() {
                             >
                               資源權限
                             </button>
-                            <AccountRowMenu
-                              accountName={account.username}
+                            <ActionMenu
+                              label={account.username}
                               groups={[
                                 {
                                   id: "settings",

@@ -28,7 +28,7 @@ describe("CharacterJobsPanel", () => {
     fireEvent.change(screen.getByPlaceholderText("人物 ID（char_id）"), { target: { value: "hero" } });
     fireEvent.change(screen.getByPlaceholderText("顯示名稱"), { target: { value: "主角" } });
     const file = new File([new Uint8Array([0, 0, 0, 24])], "clip.mp4", { type: "video/mp4" });
-    fireEvent.change(screen.getByLabelText("Source video"), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText("來源影片"), { target: { files: [file] } });
     fireEvent.click(screen.getByRole("button", { name: "產生人物" }));
 
     await waitFor(() => expect(submit).toHaveBeenCalledWith({
@@ -63,7 +63,7 @@ describe("CharacterJobsPanel", () => {
     // Nothing left running: the poll stops.
     await vi.advanceTimersByTimeAsync(4000);
     expect(fetchJobs).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("150 frames · 1080×1920")).toBeTruthy();
+    expect(screen.getByText("150 幀 · 1080×1920")).toBeTruthy();
   });
 
   it("dismisses finished jobs", async () => {
@@ -73,7 +73,7 @@ describe("CharacterJobsPanel", () => {
     const remove = vi.spyOn(api, "deleteAvatarCharacterJob").mockResolvedValue({ status: "ok" });
     render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
     expect(await screen.findByText("第一幀偵測不到人臉")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss job hero" }));
+    fireEvent.click(screen.getByRole("button", { name: "移除工作 hero" }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith("j1"));
     await waitFor(() => expect(screen.queryByText("第一幀偵測不到人臉")).toBeNull());
   });
@@ -83,6 +83,6 @@ describe("CharacterJobsPanel", () => {
     render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
     await waitFor(() => expect(api.fetchAvatarCharacterJobs).toHaveBeenCalled());
     expect(screen.queryByRole("status")).toBeNull();
-    expect(screen.queryByRole("list", { name: "Conversion jobs" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "轉檔工作" })).toBeNull();
   });
 });

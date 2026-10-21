@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
-export interface AccountMenuItem {
+export interface ActionMenuItem {
   id: string;
   label: string;
   onSelect: () => void;
@@ -9,25 +9,29 @@ export interface AccountMenuItem {
   disabledReason?: string;
 }
 
-export interface AccountMenuGroup {
+export interface ActionMenuGroup {
   id: string;
   label: string;
-  items: AccountMenuItem[];
+  items: ActionMenuItem[];
 }
 
-interface AccountRowMenuProps {
-  accountName: string;
-  groups: AccountMenuGroup[];
+interface ActionMenuProps {
+  /** 選單對象的名稱，用在按鈕與選單的無障礙名稱。 */
+  label: string;
+  groups: ActionMenuGroup[];
 }
 
 // 估計值：最多六項＋兩個分組標題。只用來決定往上或往下展開。
 const ESTIMATED_MENU_HEIGHT_REM = 20;
+const MENU_WIDTH_REM = 16;
 
-export default function AccountRowMenu({ accountName, groups }: AccountRowMenuProps) {
+export default function ActionMenu({ label, groups }: ActionMenuProps) {
   const visibleGroups = groups.filter((group) => group.items.length > 0);
   const items = visibleGroups.flatMap((group) => group.items);
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
+  const [alignEnd, setAlignEnd] = useState(false);
+  const [maxWidthRem, setMaxWidthRem] = useState<number | null>(null);
   const [pendingFocus, setPendingFocus] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -65,6 +69,13 @@ export default function AccountRowMenu({ accountName, groups }: AccountRowMenuPr
         spaceBelow < ESTIMATED_MENU_HEIGHT_REM * rootFontSize
           && rect.top > spaceBelow,
       );
+      // 按鈕在列尾（帳號列、頁首右側）就對齊右緣往左開；按鈕左邊放不下才往右開。
+      const menuWidth = Math.min(MENU_WIDTH_REM * rootFontSize, window.innerWidth * 0.85);
+      const spaceRight = window.innerWidth - rect.left;
+      const end = rect.right >= menuWidth || rect.right > spaceRight;
+      setAlignEnd(end);
+      // 兩邊都放不下整個寬度時縮到可用空間，留半個字的邊，選單不超出畫面。
+      setMaxWidthRem((end ? rect.right : spaceRight) / rootFontSize - 0.5);
     }
     setOpen(true);
     setPendingFocus(focusIndex);
@@ -125,7 +136,7 @@ export default function AccountRowMenu({ accountName, groups }: AccountRowMenuPr
     }
   }
 
-  function activate(item: AccountMenuItem) {
+  function activate(item: ActionMenuItem) {
     if (item.disabledReason) return;
     closeMenu({ restoreFocus: true });
     item.onSelect();
@@ -138,7 +149,7 @@ export default function AccountRowMenu({ accountName, groups }: AccountRowMenuPr
         ref={triggerRef}
         className={`btn btn-ghost px-2.5 ${open ? "bg-surface-sunken" : ""}`}
         type="button"
-        aria-label={`更多動作：${accountName}`}
+        aria-label={`更多動作：${label}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -154,10 +165,11 @@ export default function AccountRowMenu({ accountName, groups }: AccountRowMenuPr
         <div
           id={menuId}
           role="menu"
-          aria-label={`${accountName} 的更多動作`}
-          className={`absolute left-0 z-40 w-[16rem] max-w-[85vw] rounded-lg border border-border bg-surface-raised py-1 shadow-lg sm:left-auto sm:right-0 ${
-            dropUp ? "bottom-full mb-1" : "top-full mt-1"
-          }`}
+          aria-label={`${label} 的更多動作`}
+          className={`absolute z-40 w-[16rem] max-w-[85vw] rounded-lg border border-border bg-surface-raised py-1 shadow-lg ${
+            alignEnd ? "right-0" : "left-0"
+          } ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
+          style={maxWidthRem === null ? undefined : { maxWidth: `min(85vw, ${maxWidthRem}rem)` }}
           onKeyDown={handleMenuKeyDown}
         >
           {visibleGroups.map((group, groupIndex) => {

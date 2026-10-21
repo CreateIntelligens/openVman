@@ -114,7 +114,7 @@ export default function MascotsPanel({
         <div className={formRowClassName}>
           <input
             type="text"
-            placeholder="Mascot ID"
+            placeholder="小助理 ID（mascot_id）"
             value={uploadId}
             onChange={(e) => onUploadIdChange(e.target.value)}
             className={inputClassName}
@@ -144,7 +144,7 @@ export default function MascotsPanel({
         <div className={fileRowClassName}>
           <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
-              Model (.vrm):
+              模型（.vrm）：
             </span>
             <label className={filePickerClassName(selectedModelName)}>
               <span className="material-symbols-outlined text-sm">
@@ -158,7 +158,7 @@ export default function MascotsPanel({
                 type="file"
                 accept=".vrm"
                 className="hidden"
-                aria-label="VRM"
+                aria-label="VRM 模型"
                 onChange={(e) => onModelChange(e.target.files?.[0]?.name || "")}
               />
             </label>
@@ -166,7 +166,7 @@ export default function MascotsPanel({
 
           <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
-              Thumbnail (Image):
+              縮圖（圖片）：
             </span>
             <label className={filePickerClassName(selectedThumbnailName)}>
               <span className="material-symbols-outlined text-sm">image</span>
@@ -178,7 +178,7 @@ export default function MascotsPanel({
                 type="file"
                 accept=".png,.jpg,.jpeg,.webp"
                 className="hidden"
-                aria-label="Thumbnail"
+                aria-label="縮圖"
                 onChange={(e) =>
                   onThumbnailChange(e.target.files?.[0]?.name || "")}
               />
@@ -195,12 +195,12 @@ export default function MascotsPanel({
         </div>
       </div>
 
-      {loading && <p className="text-sm text-content-muted">Loading…</p>}
+      {loading && <p className="text-sm text-content-muted">載入中…</p>}
 
       {!loading && mascots.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-12 text-content-subtle ">
           <span className="material-symbols-outlined text-4xl">view_in_ar</span>
-          <p className="text-sm">No mascots yet</p>
+          <p className="text-sm">還沒有小助理</p>
         </div>
       )}
 
@@ -248,7 +248,7 @@ export default function MascotsPanel({
                   <button
                     type="button"
                     onClick={() => onUse(mascot)}
-                    aria-label={`Use ${mascot.label}`}
+                    aria-label={`使用 ${mascot.label}`}
                     className={
                       selected ? secondaryActionClassName : primaryActionClassName
                     }
@@ -260,10 +260,10 @@ export default function MascotsPanel({
                       <button
                         type="button"
                         onClick={() => onRename(mascot)}
-                        aria-label={`Rename ${mascot.mascot_id}`}
+                        aria-label={`改名 ${mascot.mascot_id}`}
                         className={secondaryActionClassName}
                       >
-                        Rename
+                        改名
                       </button>
                       <button
                         type="button"

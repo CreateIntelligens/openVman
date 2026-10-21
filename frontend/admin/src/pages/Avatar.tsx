@@ -277,7 +277,7 @@ export default function Avatar() {
     try {
       await deleteAvatarCharacter(charId);
       setCharacters((prev) => prev.filter((c) => c.char_id !== charId));
-      setStatus({ type: "success", message: `Deleted ${charId}` });
+      setStatus({ type: "success", message: `已刪除 ${charId}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
@@ -321,7 +321,7 @@ export default function Avatar() {
     if (!mascotId || !label || !model) {
       setStatus({
         type: "error",
-        message: "Please fill in all fields and select a VRM model",
+        message: "請填寫所有欄位，並選好 VRM 模型",
       });
       return;
     }
@@ -350,7 +350,7 @@ export default function Avatar() {
     try {
       await deleteAvatarBackground(backgroundId);
       setBackgrounds((prev) => prev.filter((bg) => bg.background_id !== backgroundId));
-      setStatus({ type: "success", message: `Deleted ${backgroundId}` });
+      setStatus({ type: "success", message: `已刪除 ${backgroundId}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
@@ -365,7 +365,7 @@ export default function Avatar() {
       if (selectedMascotId === mascotId) {
         setSelectedMascotId(DEFAULT_MASCOT_ID);
       }
-      setStatus({ type: "success", message: `Deleted ${mascotId}` });
+      setStatus({ type: "success", message: `已刪除 ${mascotId}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
@@ -388,7 +388,7 @@ export default function Avatar() {
               character.char_id === target.character.char_id ? res.character : character,
             ),
           );
-          setStatus({ type: "success", message: `Renamed to ${newLabel}` });
+          setStatus({ type: "success", message: `已改名為 ${newLabel}` });
         } catch (err) {
           setStatus({ type: "error", message: errorMessage(err) });
         }
@@ -409,7 +409,7 @@ export default function Avatar() {
                 : background,
             ),
           );
-          setStatus({ type: "success", message: `Renamed to ${newLabel}` });
+          setStatus({ type: "success", message: `已改名為 ${newLabel}` });
         } catch (err) {
           setStatus({ type: "error", message: errorMessage(err) });
         }
@@ -425,7 +425,7 @@ export default function Avatar() {
               mascot.mascot_id === target.mascot.mascot_id ? res.mascot : mascot,
             ),
           );
-          setStatus({ type: "success", message: `Renamed to ${newLabel}` });
+          setStatus({ type: "success", message: `已改名為 ${newLabel}` });
         } catch (err) {
           setStatus({ type: "error", message: errorMessage(err) });
         }

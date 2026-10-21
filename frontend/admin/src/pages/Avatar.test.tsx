@@ -37,22 +37,22 @@ describe("Avatar page", () => {
     window.localStorage.setItem("admin.avatar.assets_tab", "backgrounds");
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
     render(<Avatar />);
-    expect(await screen.findByText(/no characters yet/i)).toBeTruthy();
+    expect(await screen.findByText(/還沒有人物/)).toBeTruthy();
   });
 
   it("updates the visible asset panel when history restores a route", async () => {
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
     vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({ backgrounds: [] });
     render(<Avatar />);
-    await screen.findByText(/no characters yet/i);
+    await screen.findByText(/還沒有人物/);
     fireEvent.click(screen.getByRole("tab", { name: "背景" }));
     expect(window.location.pathname).toBe("/admin/avatar/backgrounds");
     window.history.replaceState(null, "", "/admin/avatar");
     fireEvent(window, new PopStateEvent("popstate"));
-    expect(await screen.findByText(/no characters yet/i)).toBeTruthy();
+    expect(await screen.findByText(/還沒有人物/)).toBeTruthy();
     window.history.replaceState(null, "", "/admin/avatar/backgrounds");
     fireEvent(window, new PopStateEvent("popstate"));
-    expect(screen.queryByText(/no characters yet/i)).toBeNull();
+    expect(screen.queryByText(/還沒有人物/)).toBeNull();
   });
 
   it("renders character list", async () => {
@@ -69,7 +69,7 @@ describe("Avatar page", () => {
   it("shows empty state when no characters", async () => {
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
     render(<Avatar />);
-    expect(await screen.findByText(/no characters yet/i)).toBeTruthy();
+    expect(await screen.findByText(/還沒有人物/)).toBeTruthy();
   });
 
   it("shows error when load fails", async () => {
@@ -110,7 +110,7 @@ describe("Avatar page", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Try 010" }));
+    fireEvent.click(await screen.findByRole("button", { name: "試用 010" }));
 
     expect(window.localStorage.getItem("avatar.character_id")).toBe("010");
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
@@ -121,7 +121,7 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
 
-    await screen.findByText(/no characters yet/i);
+    await screen.findByText(/還沒有人物/);
 
     expect(screen.queryByText("settings_zip")).toBeNull();
     const icon = screen.getByText("folder_zip");
@@ -141,7 +141,7 @@ describe("Avatar page", () => {
       character: { char_id: "010", label: "新的名字", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z" },
     });
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: /rename/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "改名" }));
 
     const input = await screen.findByLabelText(/顯示名稱/);
     fireEvent.change(input, { target: { value: "新的名字" } });
@@ -215,13 +215,13 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
-    fireEvent.change(await screen.findByPlaceholderText("Background ID"), {
+    fireEvent.change(await screen.findByPlaceholderText("背景 ID（background_id）"), {
       target: { value: "clinic" },
     });
     fireEvent.change(screen.getByPlaceholderText("顯示名稱"), {
       target: { value: "診間背景" },
     });
-    fireEvent.change(screen.getByLabelText(/Image/), {
+    fireEvent.change(screen.getByLabelText(/圖片/), {
       target: { files: [new File(["image"], "clinic.png", { type: "image/png" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "上傳背景" }));
@@ -253,7 +253,7 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Use clinic" }));
+    fireEvent.click(await screen.findByRole("button", { name: "使用 clinic" }));
 
     expect(window.localStorage.getItem("avatar.background_id")).toBe("uploaded:clinic");
     expect(window.localStorage.getItem("avatar.background_url")).toBe("/static/backgrounds/clinic/image.png");
@@ -281,7 +281,7 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Use Frieren" }));
+    fireEvent.click(await screen.findByRole("button", { name: "使用 Frieren" }));
 
     expect(window.localStorage.getItem("avatar.mascot_id")).toBe("qqman");
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
@@ -335,7 +335,7 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
-    fireEvent.change(await screen.findByPlaceholderText("Mascot ID"), {
+    fireEvent.change(await screen.findByPlaceholderText("小助理 ID（mascot_id）"), {
       target: { value: "custom" },
     });
     fireEvent.change(screen.getByPlaceholderText("小助理顯示名稱"), {
@@ -389,7 +389,7 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Rename custom" }));
+    fireEvent.click(await screen.findByRole("button", { name: "改名 custom" }));
 
     const input = await screen.findByLabelText(/顯示名稱/);
     fireEvent.change(input, { target: { value: "新小助理" } });

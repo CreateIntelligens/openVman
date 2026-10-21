@@ -71,6 +71,8 @@ interface PageHeaderProps {
   /** 第一層分頁，放在標題列下方。 */
   tabs?: ReactNode;
   sticky?: boolean;
+  /** 額外的 class，例如只在手機顯示的頁首加 `md:hidden`。 */
+  className?: string;
 }
 
 /** 後台每一頁共用的頁首：同一個內距、同一條對齊線，切頁時標題位置不跳。 */
@@ -80,9 +82,12 @@ export function PageHeader({
   actions,
   tabs,
   sticky = true,
+  className,
 }: PageHeaderProps) {
   return (
-    <header className={`page-header${sticky ? "" : " page-header-static"}`}>
+    <header
+      className={`page-header${sticky ? "" : " page-header-static"}${className ? ` ${className}` : ""}`}
+    >
       {/* 標題前不放圖示或按鈕：每頁標題都從同一條左緣開始，切頁時才不跳。 */}
       <div className="page-heading">
         <h1 className="page-title">{title}</h1>

@@ -70,7 +70,7 @@ export default function BackgroundsPanel({
         <div className={formRowClassName}>
           <input
             type="text"
-            placeholder="Background ID"
+            placeholder="背景 ID（background_id）"
             value={uploadId}
             onChange={(e) => onUploadIdChange(e.target.value)}
             className={inputClassName}
@@ -100,7 +100,7 @@ export default function BackgroundsPanel({
         <div className={fileRowClassName}>
           <div className={fileFieldClassName}>
             <span className="text-xs font-medium text-content-muted">
-              Image (.png, .jpg, .webp):
+              圖片（.png、.jpg、.webp）：
             </span>
             <label className={filePickerClassName(selectedImageName)}>
               <span className="material-symbols-outlined text-sm">image</span>
@@ -112,7 +112,7 @@ export default function BackgroundsPanel({
                 type="file"
                 accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                 className="hidden"
-                aria-label="Image"
+                aria-label="圖片"
                 onChange={(e) => onImageChange(e.target.files?.[0]?.name || "")}
               />
             </label>
@@ -128,12 +128,12 @@ export default function BackgroundsPanel({
         </div>
       </div>
 
-      {loading && <p className="text-sm text-content-muted">Loading…</p>}
+      {loading && <p className="text-sm text-content-muted">載入中…</p>}
 
       {!loading && backgrounds.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-12 text-content-subtle ">
           <span className="material-symbols-outlined text-4xl">image</span>
-          <p className="text-sm">No backgrounds yet</p>
+          <p className="text-sm">還沒有背景</p>
         </div>
       )}
 
@@ -166,16 +166,16 @@ export default function BackgroundsPanel({
               <div className={cardActionsClassName}>
                 <button
                   onClick={() => onUse(background)}
-                  aria-label={`Use ${background.background_id}`}
+                  aria-label={`使用 ${background.background_id}`}
                   className={primaryActionClassName}
                 >
-                  Use
+                  使用
                 </button>
                 <button
                   onClick={() => onRename(background)}
                   className={secondaryActionClassName}
                 >
-                  Rename
+                  改名
                 </button>
                 <button
                   onClick={() => onDelete(background.background_id)}

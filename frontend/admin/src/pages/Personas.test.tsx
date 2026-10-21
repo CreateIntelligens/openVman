@@ -96,4 +96,24 @@ describe("Personas page", () => {
       expect(setPersonaAvatar).toHaveBeenCalledWith("default", "0616");
     });
   });
+
+  it("opens the persona list as a drawer on phones so create and delete stay reachable", async () => {
+    render(<Personas />);
+
+    const opener = await screen.findByRole("button", { name: "管理角色" });
+    expect(screen.queryByRole("dialog", { name: "角色清單" })).toBeNull();
+
+    fireEvent.click(opener);
+    const drawer = screen.getByRole("dialog", { name: "角色清單" });
+    expect(opener.getAttribute("aria-expanded")).toBe("true");
+    expect(drawer.querySelector('[data-testid="persona-list"]')).not.toBeNull();
+    expect(drawer.querySelector('[data-testid="persona-create-form"]')).not.toBeNull();
+    await waitFor(() => {
+      expect(document.activeElement?.getAttribute("aria-label")).toBe("關閉角色清單");
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "角色清單" })).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
 });

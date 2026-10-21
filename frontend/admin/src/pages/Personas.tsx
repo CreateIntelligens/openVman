@@ -14,6 +14,7 @@ import {
        setPersonaAvatar,
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
+import { PageHeader } from "../components/app/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import Select from "../components/Select";
 import PersonaCreateForm from "../components/personas/PersonaCreateForm";
@@ -23,6 +24,7 @@ import PersonaList from "../components/personas/PersonaList";
 import { useUnsavedChanges } from "../context/NavigationGuardContext";
 import { useProject } from "../context/ProjectContext";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
 
 type EditorMode = "edit" | "preview" | "split";
 const EDITOR_MODES: readonly EditorMode[] = ["edit", "split", "preview"];
@@ -119,6 +121,13 @@ export default function Personas() {
               } finally {
                      setLoadingDocument(false);
               }
+       };
+
+       const personaDrawer = useMobileTreeDrawer("關閉角色清單");
+
+       const selectPersona = (persona: PersonaSummary) => {
+              setSelectedPersona(persona);
+              openDocument(persona.path);
        };
 
        const saveDocument = async () => {
@@ -249,25 +258,55 @@ export default function Personas() {
        return (
               <div className="flex h-full w-full overflow-hidden bg-surface dark:bg-background-dark">
                      {/* Contextual Sidebar */}
-                     <aside className="w-[18.75rem] lg:w-[20rem] flex-shrink-0 border-r border-border bg-surface-raised dark:bg-surface/30 flex flex-col hidden md:flex z-10">
+                     {/* 手機上側欄是抽屜：新增、複製、刪除角色都在裡面，由頁首的「管理角色」打開。 */}
+                     {personaDrawer.mobileTreeOpen && (
+                            <button
+                                   type="button"
+                                   className="fixed inset-0 z-40 bg-black/40 md:hidden"
+                                   onClick={personaDrawer.closeMobileTree}
+                                   aria-label="關閉角色清單"
+                            />
+                     )}
+                     <aside
+                            ref={personaDrawer.mobileTreePanelRef}
+                            id="persona-list-panel"
+                            aria-label="角色清單"
+                            aria-modal={personaDrawer.mobileTreeOpen ? "true" : undefined}
+                            role={personaDrawer.mobileTreeOpen ? "dialog" : undefined}
+                            className={`fixed inset-y-0 left-0 z-50 w-[min(18.75rem,85vw)] flex-shrink-0 flex-col border-r border-border bg-surface-raised md:relative md:z-10 md:flex md:w-[18.75rem] md:dark:bg-surface/30 lg:w-[20rem] ${
+                                   personaDrawer.mobileTreeOpen ? "flex" : "hidden"
+                            }`}
+                     >
                             {/* Sidebar Header */}
                             <div className="px-5 py-5 border-b border-border flex items-center justify-between shrink-0 bg-surface dark:bg-surface-sunken/20">
-                                   <div className="flex items-center gap-2.5">
+                                   <h2 className="section-title md:hidden">管理角色</h2>
+                                   <div className="hidden items-center gap-2.5 md:flex">
                                           <div className="w-8 h-8 rounded flex items-center justify-center bg-surface-sunken text-content-muted">
                                                  <span className="material-symbols-outlined text-[1.25rem]">groups_2</span>
                                           </div>
                                           <h1 className="page-title">角色管理</h1>
                                    </div>
-                                   <button
-                                          onClick={() => loadPersonas(selectedPersona?.persona_id)}
-                                          disabled={loadingList}
-                                          className="flex h-7 w-7 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-50"
-                                          title="重新整理"
-                                   >
-                                          <span className={`material-symbols-outlined text-[1rem] ${loadingList ? "animate-spin text-content" : ""}`}>
-                                                 refresh
-                                          </span>
-                                   </button>
+                                   <div className="flex items-center gap-1">
+                                          <button
+                                                 onClick={() => loadPersonas(selectedPersona?.persona_id)}
+                                                 disabled={loadingList}
+                                                 className="flex h-7 w-7 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-50"
+                                                 title="重新整理"
+                                                 aria-label="重新整理角色清單"
+                                          >
+                                                 <span className={`material-symbols-outlined text-[1rem] ${loadingList ? "animate-spin text-content" : ""}`}>
+                                                        refresh
+                                                 </span>
+                                          </button>
+                                          <button
+                                                 type="button"
+                                                 onClick={personaDrawer.closeMobileTree}
+                                                 aria-label="關閉角色清單"
+                                                 className="flex h-7 w-7 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors md:hidden"
+                                          >
+                                                 <span className="material-symbols-outlined text-[1.125rem]">close</span>
+                                          </button>
+                                   </div>
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 space-y-6 select-none no-scrollbar">
@@ -276,8 +315,8 @@ export default function Personas() {
                                           selectedPersonaId={selectedPersona?.persona_id}
                                           deletingPersonaId={deletingPersonaId}
                                           onSelect={(persona) => {
-                                                 setSelectedPersona(persona);
-                                                 openDocument(persona.path);
+                                                 selectPersona(persona);
+                                                 personaDrawer.setMobileTreeOpen(false);
                                           }}
                                           onDelete={setDeletePersonaTarget}
                                    />
@@ -302,31 +341,43 @@ export default function Personas() {
                      {/* Main Editor Content */}
                      <main className="flex-1 flex flex-col min-w-0 bg-surface dark:bg-background-dark relative overflow-hidden">
                             {/* 手機看不到側欄：主標題與切換角色放在這一列，桌面版由側欄負責。 */}
-                            <header className="page-header page-header-static md:hidden">
-                                   <div className="page-heading">
-                                          <h1 className="page-title">角色管理</h1>
-                                   </div>
-                                   <label className="flex min-w-0 flex-[1_1_12rem] items-center gap-2 text-sm text-content-muted">
-                                          <span className="shrink-0">角色</span>
-                                          <select
-                                                 className="input min-w-0 flex-1 py-1.5"
-                                                 aria-label="切換角色"
-                                                 value={selectedPersona?.persona_id ?? ""}
-                                                 onChange={(event) => {
-                                                        const persona = personas.find((item) => item.persona_id === event.target.value);
-                                                        if (!persona) return;
-                                                        setSelectedPersona(persona);
-                                                        openDocument(persona.path);
-                                                 }}
-                                          >
-                                                 {personas.map((persona) => (
-                                                        <option key={persona.persona_id} value={persona.persona_id}>
-                                                               {persona.label || persona.persona_id}
-                                                        </option>
-                                                 ))}
-                                          </select>
-                                   </label>
-                            </header>
+                            <PageHeader
+                                   title="角色管理"
+                                   sticky={false}
+                                   className="md:hidden"
+                                   actions={(
+                                          <>
+                                                 <label className="flex min-w-0 items-center gap-2 text-sm text-content-muted">
+                                                        <span className="shrink-0">角色</span>
+                                                        <select
+                                                               className="input min-w-0 flex-1 py-1.5"
+                                                               aria-label="切換角色"
+                                                               value={selectedPersona?.persona_id ?? ""}
+                                                               onChange={(event) => {
+                                                                      const persona = personas.find((item) => item.persona_id === event.target.value);
+                                                                      if (persona) selectPersona(persona);
+                                                               }}
+                                                        >
+                                                               {personas.map((persona) => (
+                                                                      <option key={persona.persona_id} value={persona.persona_id}>
+                                                                             {persona.label || persona.persona_id}
+                                                                      </option>
+                                                               ))}
+                                                        </select>
+                                                 </label>
+                                                 <button
+                                                        type="button"
+                                                        onClick={personaDrawer.openMobileTree}
+                                                        aria-label="管理角色"
+                                                        aria-controls="persona-list-panel"
+                                                        aria-expanded={personaDrawer.mobileTreeOpen}
+                                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-subtle hover:bg-surface-sunken hover:text-primary"
+                                                 >
+                                                        <span className="material-symbols-outlined text-[1.125rem]">manage_accounts</span>
+                                                 </button>
+                                          </>
+                                   )}
+                            />
                             {status && (
                                    <div className="p-4 shrink-0 shadow-sm z-20 border-b border-border ">
                                           <StatusAlert type={status.type} message={status.message} />

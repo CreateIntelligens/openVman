@@ -1,4 +1,5 @@
 import MarkdownPreview from "../MarkdownPreview";
+import { PageHeader } from "../app/PageHeader";
 import StatusAlert from "../StatusAlert";
 import { EditorModeSwitch, EditorSaveBar, type EditorMode } from "../editor/EditorControls";
 type Status = { type: "success" | "error"; message: string } | null;
@@ -47,12 +48,12 @@ export default function WorkspaceEditor({
   return (
     <main className="flex-1 flex flex-col min-w-0 relative bg-surface dark:bg-background-dark">
       {/* 手機看不到側欄：用共用頁首放主標題，側欄抽屜由右側按鈕打開。 */}
-      <header className="page-header page-header-static md:hidden">
-        <div className="page-heading">
-          <h1 className="page-title">工作區</h1>
-          <p className="page-subtitle">{documentsCount} 份文件</p>
-        </div>
-        <div className="page-actions">
+      <PageHeader
+        title="工作區"
+        subtitle={`${documentsCount} 份文件`}
+        sticky={false}
+        className="md:hidden"
+        actions={(
           <button
             onClick={onOpenSidebar}
             aria-label="開啟文件清單"
@@ -60,8 +61,8 @@ export default function WorkspaceEditor({
           >
             <span className="material-symbols-outlined text-[1.25rem]">menu</span>
           </button>
-        </div>
-      </header>
+        )}
+      />
 
       {dragOver && (
         <div className="absolute inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">

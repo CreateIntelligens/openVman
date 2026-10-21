@@ -13,6 +13,9 @@ vi.mock("../../api", async () => {
   return { ...actual, ...api };
 });
 
+// 依按鈕的可存取名稱找，手機只留圖示也找得到，不綁顯示文字的 DOM 結構。
+const routesButton = (summary: string) => new RegExp(`^語言分流：${summary}，`);
+
 describe("LanguageRoutesButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -22,7 +25,7 @@ describe("LanguageRoutesButton", () => {
 
   it("keeps at least one route but Chinese is not required", async () => {
     render(<LanguageRoutesButton projectId="proj-hospital" />);
-    fireEvent.click(await screen.findByText(/^分流：中文$/));
+    fireEvent.click(await screen.findByRole("button", { name: routesButton("中文") }));
 
     // 只剩一條時不能取消。
     expect((screen.getByLabelText(/^中文/) as HTMLInputElement).disabled).toBe(true);
@@ -37,20 +40,20 @@ describe("LanguageRoutesButton", () => {
     await waitFor(() =>
       expect(api.saveKnowledgeSettings).toHaveBeenLastCalledWith({ language_routes: ["en"] }),
     );
-    expect(await screen.findByText(/^分流：English$/)).toBeTruthy();
+    expect(await screen.findByRole("button", { name: routesButton("English") })).toBeTruthy();
   });
 
   it("reorders routes so the first one is the primary language", async () => {
     api.fetchKnowledgeSettings.mockResolvedValue({ language_routes: ["zh", "en"] });
     render(<LanguageRoutesButton projectId="proj-hekee" />);
-    fireEvent.click(await screen.findByText(/^分流：中文、English$/));
+    fireEvent.click(await screen.findByRole("button", { name: routesButton("中文、English") }));
 
     expect(screen.getByText("主要")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("English 往前移"));
     await waitFor(() =>
       expect(api.saveKnowledgeSettings).toHaveBeenLastCalledWith({ language_routes: ["en", "zh"] }),
     );
-    expect(await screen.findByText(/^分流：English、中文$/)).toBeTruthy();
+    expect(await screen.findByRole("button", { name: routesButton("English、中文") })).toBeTruthy();
   });
 
   it("saves the reply length in seconds and shows what it means per language", async () => {
@@ -60,7 +63,7 @@ describe("LanguageRoutesButton", () => {
       speech_rates: { chars_per_second: 4, words_per_second: 1.5 },
     });
     render(<LanguageRoutesButton projectId="proj-hospital" />);
-    fireEvent.click(await screen.findByText(/^分流：中文、English$/));
+    fireEvent.click(await screen.findByRole("button", { name: routesButton("中文、English") }));
 
     const input = screen.getByLabelText("回答長度上限（秒）") as HTMLInputElement;
     expect(input.value).toBe("20");
@@ -72,14 +75,14 @@ describe("LanguageRoutesButton", () => {
     await waitFor(() =>
       expect(api.saveKnowledgeSettings).toHaveBeenLastCalledWith({ language_routes: ["zh", "en"], reply_seconds: 10 }),
     );
-    expect(await screen.findByText("· 回答 10 秒")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "語言分流：中文、English，回答 10 秒" })).toBeTruthy();
   });
 
   it("zero means unlimited and toggling routes does not resend the seconds", async () => {
     api.fetchKnowledgeSettings.mockResolvedValue({ language_routes: ["zh"], reply_seconds: 0 });
     render(<LanguageRoutesButton projectId="esg" />);
-    expect(await screen.findByText("· 回答 不限")).toBeTruthy();
-    fireEvent.click(screen.getByText(/^分流：中文$/));
+    expect(await screen.findByRole("button", { name: "語言分流：中文，回答 不限" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: routesButton("中文") }));
     expect(screen.getByText("不限制長度")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText(/^English/));
@@ -90,7 +93,7 @@ describe("LanguageRoutesButton", () => {
 
   it("rejects seconds out of range without saving", async () => {
     render(<LanguageRoutesButton projectId="proj-hekee" />);
-    fireEvent.click(await screen.findByText(/^分流：中文$/));
+    fireEvent.click(await screen.findByRole("button", { name: routesButton("中文") }));
     const input = screen.getByLabelText("回答長度上限（秒）");
     fireEvent.change(input, { target: { value: "500" } });
     fireEvent.blur(input);

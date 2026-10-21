@@ -121,6 +121,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
   ];
 
   const summary = routes.map(labelOf).join("、");
+  const limit = seconds > 0 ? `${seconds} 秒` : "不限";
   const preview = Math.round(Number(secondsDraft));
   const showTable = Number.isFinite(preview) && preview > 0 && preview <= MAX_SECONDS;
 
@@ -132,12 +133,12 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
         aria-expanded={open}
         className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-content-muted hover:bg-surface-sunken transition-colors"
         title="使用者用哪種語言問，就查那個語言的文件"
-        aria-label={`語言分流：${summary}，回答 ${seconds > 0 ? `${seconds} 秒` : "不限"}`}
+        aria-label={`語言分流：${summary}，回答 ${limit}`}
       >
         <span className="material-symbols-outlined text-[1rem]" aria-hidden="true">translate</span>
         {/* 手機只留圖示，頁首才不會被長標籤撐成好幾列。 */}
         <span className="hidden sm:inline">分流：{summary}</span>
-        <span className="hidden text-content-subtle sm:inline">· 回答 {seconds > 0 ? `${seconds} 秒` : "不限"}</span>
+        <span className="hidden text-content-subtle sm:inline">· 回答 {limit}</span>
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">
