@@ -56,7 +56,7 @@ describe("Memory subpage routes", () => {
     render(<RouteHarness><Memory /></RouteHarness>);
     await act(async () => {});
     expect(screen.queryByLabelText("記憶內容")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "新增" }));
+    fireEvent.click(screen.getByRole("tab", { name: "新增" }));
     expect(location.pathname).toBe("/admin/memory/add");
     expect(screen.getByLabelText("記憶內容")).toBeTruthy();
     history.replaceState(null, "", "/admin/memory");

@@ -1,7 +1,7 @@
 import AsrProviderPanel from "../components/AsrProviderPanel";
 import TtsPreviewPanel from "../components/TtsPreviewPanel";
+import PageTabsShell from "../components/app/PageTabsShell";
 import { useAdminSubView } from "../hooks/useAdminSubView";
-import { handleTablistKeyDown } from "../utils/tablistKeys";
 
 type Tab = "tts" | "asr";
 
@@ -16,40 +16,10 @@ export default function Voice() {
   const [tab, setTab] = useAdminSubView<Tab>("Voice", "tts", TAB_IDS);
 
   return (
-    <div className="page-scroll p-6 lg:p-8">
-      <header className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border">
-        <h1 className="page-title whitespace-nowrap">語音</h1>
-        <nav
-          className="flex"
-          aria-label="語音功能"
-          role="tablist"
-          onKeyDown={(event) => handleTablistKeyDown(event, TAB_IDS, tab)}
-        >
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-left ${
-                tab === item.id
-                  ? "border-primary text-content"
-                  : "border-transparent text-content-muted hover:text-content"
-              }`}
-              type="button"
-              role="tab"
-              id={`voice-${item.id}-tab`}
-              aria-controls="voice-panel"
-              aria-selected={tab === item.id}
-              tabIndex={tab === item.id ? 0 : -1}
-              onClick={() => setTab(item.id)}
-            >
-              <span className="block text-sm font-semibold">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <div id="voice-panel" role="tabpanel" aria-labelledby={`voice-${tab}-tab`}>
+    <PageTabsShell idPrefix="voice" title="語音" tabs={TABS} active={tab} onSelect={setTab}>
+      <div className="page-scroll p-4 sm:p-6 lg:p-8">
         {tab === "tts" ? <TtsPreviewPanel /> : <AsrProviderPanel />}
       </div>
-    </div>
+    </PageTabsShell>
   );
 }

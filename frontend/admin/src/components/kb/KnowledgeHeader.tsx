@@ -1,6 +1,12 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 
+import { PageHeader, PageTabs } from "../app/PageHeader";
 import LanguageRoutesButton from "./LanguageRoutesButton";
+
+const KNOWLEDGE_TABS = [
+  { id: "documents", label: "文件" },
+  { id: "graph", label: "圖譜" },
+] as const;
 
 interface KnowledgeHeaderProps {
   activeTab: "documents" | "graph";
@@ -31,52 +37,27 @@ export default function KnowledgeHeader({
   reindexing,
   projectId,
 }: KnowledgeHeaderProps) {
+  const tree = (
+    <button
+      type="button"
+      onClick={onOpenMobileTree}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-subtle hover:bg-surface-sunken hover:text-primary md:hidden"
+      aria-label="開啟檔案樹"
+      aria-controls="knowledge-tree-panel"
+      aria-expanded={mobileTreeOpen}
+    >
+      <span className="material-symbols-outlined text-[1.125rem]">account_tree</span>
+    </button>
+  );
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
-      {/* 標題與頁籤先占一個基本寬度；放不下時操作列整組換到下一行，平板寬度標題才不會被擠成直排。 */}
-      <div className="flex min-w-0 flex-[1_1_18rem] items-center gap-2 sm:gap-3">
-        <button
-          type="button"
-          onClick={onOpenMobileTree}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-subtle hover:bg-surface-sunken hover:text-primary md:hidden"
-          aria-label="開啟檔案樹"
-          aria-controls="knowledge-tree-panel"
-          aria-expanded={mobileTreeOpen}
-        >
-          <span className="material-symbols-outlined text-[1.125rem]">
-            account_tree
-          </span>
-        </button>
-        <span className="material-symbols-outlined text-primary text-[1.5rem]">school</span>
-        <h1 className="page-title whitespace-nowrap">知識庫</h1>
-        <span className="hidden whitespace-nowrap text-xs text-content-subtle xl:inline">
-          {documentCount} 文件 · {indexedCount} 已索引
-        </span>
-        <div className="ml-auto flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface-sunken p-0.5 dark:bg-surface-sunken/40 sm:ml-3">
-          <button
-            onClick={() => setActiveTab("documents")}
-            className={`whitespace-nowrap px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-              activeTab === "documents"
-                ? "bg-surface-raised text-primary shadow-sm"
-                : "text-content-subtle hover:text-content"
-            }`}
-          >
-            文件
-          </button>
-          <button
-            onClick={() => setActiveTab("graph")}
-            className={`whitespace-nowrap px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-              activeTab === "graph"
-                ? "bg-surface-raised text-primary shadow-sm"
-                : "text-content-subtle hover:text-content"
-            }`}
-          >
-            圖譜
-          </button>
-        </div>
-      </div>
-      {activeTab === "documents" && (
-        <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+    <PageHeader
+      title="知識庫"
+      subtitle={`${documentCount} 文件 · ${indexedCount} 已索引`}
+      sticky={false}
+      actions={activeTab === "documents" ? (
+        <>
+          {tree}
           <LanguageRoutesButton projectId={projectId} />
           <button
             onClick={onToggleSourcePanel}
@@ -106,8 +87,17 @@ export default function KnowledgeHeader({
             </span>
             {reindexing ? "索引中..." : "重新索引"}
           </button>
-        </div>
+        </>
+      ) : undefined}
+      tabs={(
+        <PageTabs
+          idPrefix="knowledge"
+          label="知識庫分頁"
+          tabs={KNOWLEDGE_TABS}
+          active={activeTab}
+          onSelect={setActiveTab}
+        />
       )}
-    </div>
+    />
   );
 }

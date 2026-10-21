@@ -370,7 +370,7 @@ describe("KnowledgeBase merged tree", () => {
 describe("KnowledgeBase route views", () => {
   it("navigates the graph tab through the shared router", () => {
     render(<KnowledgeBase />);
-    fireEvent.click(screen.getByRole("button", { name: "圖譜" }));
+    fireEvent.click(screen.getByRole("tab", { name: "圖譜" }));
     expect(navigationMocks.navigateTo).toHaveBeenCalledWith("KnowledgeBase", "graph");
   });
 });

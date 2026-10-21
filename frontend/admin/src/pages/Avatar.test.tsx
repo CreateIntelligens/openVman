@@ -95,7 +95,10 @@ describe("Avatar page", () => {
     const page = await screen.findByTestId("avatar-page");
     expect(page.className).toContain("h-full");
     expect(page.className).toContain("min-h-0");
-    expect(page.className).toContain("overflow-y-auto");
+    // 頁首固定在上方，和其他頁對齊；捲動的是頁首下面的內容區。
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.className).toContain("min-h-0");
+    expect(panel.className).toContain("overflow-y-auto");
   });
 
   it("can open the avatar app with the selected character", async () => {

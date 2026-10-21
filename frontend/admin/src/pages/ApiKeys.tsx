@@ -147,7 +147,7 @@ export default function ApiKeys() {
   return (
     <div className="page-scroll p-6 lg:p-8">
       <header className="mb-6 border-b border-border pb-4">
-        <h2 className="page-title">帳號 API 金鑰</h2>
+        <h2 className="page-section-title">帳號 API 金鑰</h2>
         <p className="page-subtitle">供服務串接使用，權限隨所屬帳號的角色與資源授權變動。</p>
       </header>
       <div className="space-y-6">

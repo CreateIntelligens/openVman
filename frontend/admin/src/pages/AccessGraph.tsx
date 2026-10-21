@@ -477,7 +477,7 @@ export default function AccessGraph() {
     <div className="flex h-full flex-col overflow-y-auto lg:overflow-hidden">
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 px-4 pb-4 pt-6 sm:px-6 lg:px-8">
         <div className="min-w-0">
-          <h2 className="page-title">權限圖譜</h2>
+          <h2 className="page-section-title">權限圖譜</h2>
           <p className="page-subtitle">
             誰能存取哪些專案與資源。唯讀檢視，要調整授權請到帳號管理。
           </p>

@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **[2026-10-21]** **後台頁首與分頁統一規格**：新增共用的 `PageHeader`、`PageTabs`（`components/app/PageHeader.tsx`）與 `SegmentedControl`。每頁主標題由同一個頁首管理，內距與左緣一致，標題前不再放圖示；第一層分頁一律是標題下方的底線分頁，只排一列、放不下就橫捲並把選中分頁捲進畫面。專案與權限、系統狀態、語音、Avatar、模型供應商、記憶管理、知識庫都改用它，原本的灰色膠囊、橘色分段、小型分段與 Avatar 手機直列分頁都拿掉。帳號的建立／管理與編輯器的編輯／並排／預覽改用共用的分段切換。分頁殼裡的內頁（專案管理、系統健康、API 金鑰、Embed 金鑰、權限圖譜）標題改用 `page-section-title`，不再和外層主標題同級。320、375、768、1440 寬度實測十個頁面的標題上緣一致、分頁列單行。
 - **[2026-10-21]** **後台分頁鍵盤操作一致、Avatar 與專案頁改用繁中文案**：方向鍵與 Home／End 切換分頁抽成共用函式，語音、模型供應商、Avatar 素材與共用分頁殼都用它；模型供應商與 Avatar 素材分頁補上 tab／tabpanel 關聯。Avatar 的人物、背景、小助理分頁與上傳表單、專案頁的新增與刪除、工作區編輯器的英文文案改成繁中。
 - **[2026-10-21]** **`/v1/audio/speech` 與 `/api/v1/tts/stream` 選引擎一致**：選引擎、選聲音與台語互備抽成共用的 `plan_tts_voice`，兩個端點都走它。`/v1/audio/speech` 另收選填的 `speech_language`、`language`、`language_routes`：台語且專案開了分流時換 CosyVoice／VoxCPM，主引擎失敗先換同一位的另一家，國語、英文在沒指定引擎與聲音時用 IndexTTS。OpenAI 用戶端不送這些欄位，行為不變。兩個端點只差在回傳方式（整段並有快取，或串流）。Avatar SDK 的 `ask()` 合成語音時多帶 `project_id` 與新的 `tts.language` 選項，對話模式也能唸台語。
 - **[2026-10-21]** **VoxCPM 預設聲音改成 Hayley**：沒指定聲音、也沒設 `TTS_VOXCPM_DEFAULT_VOICE` 時，VoxCPM 改用 `voxcpm2-cosy-young-female-02`（原本是 `young-female-01`）。IndexTTS 的 `hayley`、CosyVoice 的 `young-female-02` 本來就是 Hayley，IndexTTS 失敗備援到 VoxCPM 時聲音不再換人。

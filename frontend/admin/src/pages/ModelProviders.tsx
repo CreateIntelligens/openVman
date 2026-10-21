@@ -4,7 +4,7 @@ import StatusAlert from "../components/StatusAlert";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 import { useBottomBarClearance } from "../hooks/useBottomBarClearance";
 import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
-import { handleTablistKeyDown } from "../utils/tablistKeys";
+import { PageHeader, PageTabs } from "../components/app/PageHeader";
 import {
   fetchModelProviderSettings,
   resetModelProviderHealth,
@@ -61,15 +61,6 @@ const PAGE_TABS = ["chat", "decision", "keys"] as const;
 type PageTab = (typeof PAGE_TABS)[number];
 const TAB_CATEGORY: Record<PageTab, string | null> = { chat: "chat_llm", decision: "decision", keys: null };
 const TAB_LABELS: Record<PageTab, string> = { chat: "主對話模型", decision: "決策模型", keys: "API 金鑰" };
-
-function tabClassName(active: boolean): string {
-  return [
-    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-    active
-      ? "border border-border/60 bg-surface-raised text-content shadow-sm"
-      : "text-content-muted hover:bg-surface-sunken hover:text-content",
-  ].join(" ");
-}
 
 type PageNotice = { type: "success" | "error"; message: string } | null;
 
@@ -294,49 +285,42 @@ export default function ModelProviders() {
 
   return (
     <div className="page-scroll">
-      <header className="page-header">
-        <div className="page-heading">
-          <h1 className="page-title">模型供應商</h1>
-          <p className="page-subtitle">全站各類模型使用哪幾家、優先順序與 API 金鑰。只有 ROOT 能修改。</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => requestNavigation(() => void load())}
-          disabled={busy}
-          className="btn btn-ghost shrink-0"
-        >
-          {loading ? "載入中…" : "重新載入"}
-        </button>
-      </header>
+      <PageHeader
+        title="模型供應商"
+        subtitle="全站各類模型使用哪幾家、優先順序與 API 金鑰。只有 ROOT 能修改。"
+        actions={(
+          <button
+            type="button"
+            onClick={() => requestNavigation(() => void load())}
+            disabled={busy}
+            className="btn btn-ghost"
+          >
+            {loading ? "載入中…" : "重新載入"}
+          </button>
+        )}
+        tabs={(
+          <PageTabs
+            idPrefix="model-providers"
+            label="模型供應商分類"
+            tabs={PAGE_TABS.map((tab) => ({
+              id: tab,
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  {TAB_LABELS[tab]}
+                  {tabHasPendingChanges(tab) && (
+                    <span className="size-1.5 rounded-full bg-primary" aria-label="有未儲存的修改" />
+                  )}
+                </span>
+              ),
+            }))}
+            active={activeTab}
+            onSelect={setActiveTab}
+          />
+        )}
+      />
 
       <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
         {notice && <StatusAlert type={notice.type} message={notice.message} />}
-
-        <div
-          role="tablist"
-          aria-label="模型供應商分類"
-          className="flex w-fit max-w-full flex-wrap rounded-lg border border-border/50 bg-surface-sunken p-1"
-          onKeyDown={(event) => handleTablistKeyDown(event, PAGE_TABS, activeTab)}
-        >
-          {PAGE_TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              id={`model-providers-${tab}-tab`}
-              aria-controls="model-providers-panel"
-              aria-selected={activeTab === tab}
-              tabIndex={activeTab === tab ? 0 : -1}
-              onClick={() => setActiveTab(tab)}
-              className={tabClassName(activeTab === tab)}
-            >
-              {TAB_LABELS[tab]}
-              {tabHasPendingChanges(tab) && (
-                <span className="size-1.5 rounded-full bg-primary" aria-label="有未儲存的修改" />
-              )}
-            </button>
-          ))}
-        </div>
 
         <div id="model-providers-panel" role="tabpanel" aria-labelledby={`model-providers-${activeTab}-tab`} className="space-y-6">
         {loading && !settings ? (

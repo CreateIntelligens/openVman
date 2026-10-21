@@ -2,7 +2,7 @@ export default function Monitoring() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Grafana kiosk 模式全螢幕顯示，頁名僅供 a11y 使用 */}
-      <h2 className="page-title sr-only">系統監控</h2>
+      <h2 className="sr-only">系統監控</h2>
       <iframe
         src="/grafana/d/vman-overview/vman-overview?kiosk=tv&refresh=10s"
         title="Grafana Monitoring"

@@ -227,6 +227,102 @@ body {
     font-size: 0.875rem;
     color: rgb(var(--color-content-muted));
   }
+  /* 不釘頂的頁首（整頁本身不捲動、由內層捲動的版面，例如知識庫）。 */
+  .page-header-static {
+    position: static;
+  }
+  /* 第一層分頁：頁首最後一列，底線壓在頁首下框線上；只排一列，放不下就橫捲。 */
+  .page-tabs {
+    display: flex;
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    max-width: 100%;
+    margin-bottom: -1rem;
+    overflow-x: auto;
+  }
+  .page-tab {
+    flex-shrink: 0;
+    margin-bottom: calc(-1 * var(--hairline));
+    padding: 0.625rem 0.75rem;
+    border-bottom: 0.125rem solid transparent;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+    color: rgb(var(--color-content-muted));
+    transition: color 120ms ease, border-color 120ms ease;
+  }
+  .page-tab:hover {
+    color: rgb(var(--color-content));
+  }
+  .page-tab[aria-selected="true"] {
+    color: rgb(var(--color-content));
+    border-bottom-color: rgb(var(--color-accent));
+  }
+  .page-tab:focus-visible {
+    outline: 0.125rem solid rgb(var(--color-accent));
+    outline-offset: -0.125rem;
+    border-radius: var(--radius-md);
+  }
+  /* 分頁殼裡的內頁標頭：不釘頂、沒有底色，和外層頁首同一條左右對齊線。 */
+  .section-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    column-gap: 1rem;
+    row-gap: 0.75rem;
+    padding: 1rem 1rem 0;
+  }
+  @media (min-width: 40rem) {
+    .section-header {
+      padding-inline: 2rem;
+    }
+  }
+  /* 分頁殼或頁首底下的第二層標題，比主標題低一階，避免兩個同等的視覺重心。 */
+  .page-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: rgb(var(--color-content));
+    overflow-wrap: anywhere;
+  }
+  /* 頁內模式切換（帳號建立／管理、編輯器模式）：中性底色，比第一層分頁低一階。 */
+  .segmented {
+    display: inline-flex;
+    flex-shrink: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0.25rem;
+    gap: 0.125rem;
+    border: var(--hairline) solid rgb(var(--color-border));
+    border-radius: var(--radius-md);
+    background: rgb(var(--color-surface-sunken));
+  }
+  .segmented-option {
+    padding: 0.375rem 0.875rem;
+    border-radius: calc(var(--radius-md) - 0.125rem);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+    color: rgb(var(--color-content-muted));
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .segmented-option:hover {
+    color: rgb(var(--color-content));
+  }
+  .segmented-option[aria-selected="true"],
+  .segmented-option[aria-pressed="true"] {
+    background: rgb(var(--color-surface-raised));
+    color: rgb(var(--color-content));
+    box-shadow: 0 0.0625rem 0.125rem rgb(0 0 0 / 0.08);
+  }
+  .segmented-option:focus-visible {
+    outline: 0.125rem solid rgb(var(--color-accent));
+    outline-offset: -0.125rem;
+  }
   .section-title {
     font-size: 0.875rem;
     font-weight: 700;

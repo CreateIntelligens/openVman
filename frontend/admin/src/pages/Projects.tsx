@@ -35,9 +35,9 @@ export default function Projects() {
 
   return (
     <div className="page-scroll">
-      <header className="page-header">
+      <header className="section-header">
         <div className="page-heading">
-          <h2 className="page-title">專案管理</h2>
+          <h2 className="page-section-title">專案管理</h2>
           <p className="page-subtitle">
             管理多專案隔離，每個專案有獨立的 knowledge、persona、memory 空間。
           </p>

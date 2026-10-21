@@ -1,11 +1,8 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import { handleTablistKeyDown } from "../../utils/tablistKeys";
+import { PageHeader, PageTabs, type PageTab } from "./PageHeader";
 
-export interface PageTab<T extends string> {
-  id: T;
-  label: string;
-}
+export type { PageTab };
 
 interface PageTabsShellProps<T extends string> {
   idPrefix: string;
@@ -17,9 +14,8 @@ interface PageTabsShellProps<T extends string> {
 }
 
 /**
- * Page header with first-level underline tabs for pages that merge several
- * former sidebar entries. The panel fills the remaining height and leaves
- * scrolling to the embedded page, so full-height views (graphs, iframes) fit.
+ * 有第一層分頁的頁面外框：共用頁首（標題列下方接分頁），內容區填滿剩下的高度，
+ * 捲動交給內頁自己處理，全高的檢視（圖譜、iframe）才放得下。
  */
 export default function PageTabsShell<T extends string>({
   idPrefix,
@@ -29,40 +25,21 @@ export default function PageTabsShell<T extends string>({
   onSelect,
   children,
 }: PageTabsShellProps<T>) {
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) =>
-    handleTablistKeyDown(event, tabs.map((item) => item.id), active);
-
   return (
     <div className="flex h-full flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-1 border-b border-border px-6 pt-3 lg:px-8">
-        <h1 className="page-title whitespace-nowrap">{title}</h1>
-        <nav
-          className="no-scrollbar -mb-px flex max-w-full overflow-x-auto"
-          aria-label={`${title}分頁`}
-          role="tablist"
-          onKeyDown={handleKeyDown}
-        >
-          {tabs.map((item) => (
-            <button
-              key={item.id}
-              className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition-colors ${
-                active === item.id
-                  ? "border-primary text-content"
-                  : "border-transparent text-content-muted hover:text-content"
-              }`}
-              type="button"
-              role="tab"
-              id={`${idPrefix}-${item.id}-tab`}
-              aria-controls={`${idPrefix}-panel`}
-              aria-selected={active === item.id}
-              tabIndex={active === item.id ? 0 : -1}
-              onClick={() => onSelect(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </header>
+      <PageHeader
+        title={title}
+        sticky={false}
+        tabs={(
+          <PageTabs
+            idPrefix={idPrefix}
+            label={`${title}分頁`}
+            tabs={tabs}
+            active={active}
+            onSelect={onSelect}
+          />
+        )}
+      />
       <div
         id={`${idPrefix}-panel`}
         role="tabpanel"

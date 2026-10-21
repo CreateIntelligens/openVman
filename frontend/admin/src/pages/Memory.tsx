@@ -17,9 +17,14 @@ import MemoryPagination from "../components/memory/MemoryPagination";
 import MemoryRecordCard from "../components/memory/MemoryRecordCard";
 import { useProject } from "../context/ProjectContext";
 import { useAdminSubView } from "../hooks/useAdminSubView";
+import { PageHeader, PageTabs } from "../components/app/PageHeader";
 import { errorMessage } from "../utils/errorMessage";
 
 const MEMORY_TABS = ["browse", "add"] as const;
+const MEMORY_TAB_ITEMS = [
+  { id: "browse", label: "瀏覽" },
+  { id: "add", label: "新增" },
+] as const;
 type Tab = (typeof MEMORY_TABS)[number];
 type Status = { type: "success" | "error"; message: string } | null;
 
@@ -128,30 +133,26 @@ export default function Memory() {
 
   return (
     <div className="page-scroll">
-      <header className="page-header">
-        <div className="page-heading">
-          <h1 className="page-title">記憶管理</h1>
-          <p className="page-subtitle">
-            瀏覽、新增並管理精選記憶紀錄。
-          </p>
-        </div>
-        <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
-          {(["browse", "add"] as Tab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab
-                  ? "bg-primary text-white"
-                  : "text-content-muted hover:text-content "
-                }`}
-            >
-              {tab === "browse" ? "瀏覽" : "新增"}
-            </button>
-          ))}
-        </div>
-      </header>
+      <PageHeader
+        title="記憶管理"
+        subtitle="瀏覽、新增並管理精選記憶紀錄。"
+        tabs={(
+          <PageTabs
+            idPrefix="memory"
+            label="記憶管理分頁"
+            tabs={MEMORY_TAB_ITEMS}
+            active={activeTab}
+            onSelect={setActiveTab}
+          />
+        )}
+      />
 
-      <div className="p-8 max-w-6xl">
+      <div
+        id="memory-panel"
+        role="tabpanel"
+        aria-labelledby={`memory-${activeTab}-tab`}
+        className="max-w-6xl p-4 sm:p-8"
+      >
         {status && (
           <div className="mb-6">
             <StatusAlert type={status.type} message={status.message} />

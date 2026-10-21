@@ -1,13 +1,14 @@
 import { useRef } from "react";
 
 import { useBottomBarClearance } from "../../hooks/useBottomBarClearance";
+import SegmentedControl from "../SegmentedControl";
 
 export type EditorMode = "edit" | "preview" | "split";
 
-const EDITOR_MODES: Array<{ mode: EditorMode; label: string }> = [
-  { mode: "edit", label: "編輯" },
-  { mode: "split", label: "並排" },
-  { mode: "preview", label: "預覽" },
+const EDITOR_MODES: Array<{ id: EditorMode; label: string }> = [
+  { id: "edit", label: "編輯" },
+  { id: "split", label: "並排" },
+  { id: "preview", label: "預覽" },
 ];
 
 interface EditorModeSwitchProps {
@@ -17,23 +18,7 @@ interface EditorModeSwitchProps {
 
 export function EditorModeSwitch({ mode, onChange }: EditorModeSwitchProps) {
   return (
-    <div className="flex shrink-0 overflow-hidden rounded-md border border-border bg-surface-raised" role="group" aria-label="編輯模式">
-      {EDITOR_MODES.map((item) => (
-        <button
-          key={item.mode}
-          type="button"
-          onClick={() => onChange(item.mode)}
-          aria-pressed={mode === item.mode}
-          className={`whitespace-nowrap px-3 py-1.5 text-xs font-semibold transition-colors ${
-            mode === item.mode
-              ? "bg-border text-content"
-              : "text-content-muted hover:bg-surface-sunken hover:text-content"
-          }`}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl label="編輯模式" options={EDITOR_MODES} value={mode} onChange={onChange} />
   );
 }
 

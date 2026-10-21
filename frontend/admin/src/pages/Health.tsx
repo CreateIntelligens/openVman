@@ -17,9 +17,9 @@ export default function Health() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="page-header">
+      <header className="section-header">
         <div className="page-heading">
-          <h2 className="page-title">系統健康</h2>
+          <h2 className="page-section-title">系統健康</h2>
           <p className="page-subtitle">Real-time status of your brain infrastructure</p>
         </div>
         <div className="page-actions">

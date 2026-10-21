@@ -54,7 +54,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 ### 管理後台
 
-後台每頁都有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/access/accounts/temporary`），以 `?project=<id>` 指定專案，公開子路徑部署時加 `/openvman` 前綴。完整路由表見 [Canonical Routes](docs/guides/admin-canonical-routes.md)。開站時若後端暫時連不上（連線失敗或 5xx），畫面提供重試而保留登入狀態，只有 401 才回登入頁。
+後台每頁都有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/access/accounts/temporary`），以 `?project=<id>` 指定專案，公開子路徑部署時加 `/openvman` 前綴。完整路由表見 [Canonical Routes](docs/guides/admin-canonical-routes.md)。開站時若後端暫時連不上（連線失敗或 5xx），畫面提供重試而保留登入狀態，只有 401 才回登入頁。各頁共用同一個頁首：主標題位置固定，第一層分頁一律是標題下方的底線分頁（窄畫面單行橫捲），頁內模式用分段切換，分頁殼裡的內頁標題降一級。
 
 | 群組 | 頁面 | 用途 |
 |---|---|---|

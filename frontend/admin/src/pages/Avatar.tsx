@@ -27,7 +27,7 @@ import {
   toMascotOption,
 } from "../data/mascotCatalog";
 import { useAdminSubView } from "../hooks/useAdminSubView";
-import { handleTablistKeyDown } from "../utils/tablistKeys";
+import { PageHeader, PageTabs } from "../components/app/PageHeader";
 import BackgroundsPanel from "../components/avatar/BackgroundsPanel";
 import CharacterJobsPanel from "../components/avatar/CharacterJobsPanel";
 import CharactersPanel from "../components/avatar/CharactersPanel";
@@ -62,15 +62,6 @@ const hiddenSnapshotFrameStyle: CSSProperties = {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {
-  return [
-    "whitespace-nowrap px-3 py-1.5 text-sm font-medium transition-all duration-200 rounded-md",
-    tab === activeTab
-      ? "bg-surface-raised text-content shadow-sm border border-border/60 "
-      : "text-content-muted hover:text-content hover:bg-surface-sunken dark:hover:bg-surface-sunken/50",
-  ].join(" ");
 }
 
 function snapshotWidgetSrc(mascots: AvatarMascot[], mascotId: string | null): string | null {
@@ -466,36 +457,28 @@ export default function Avatar() {
   return (
     <div
       data-testid="avatar-page"
-      className="flex h-full min-h-0 min-w-0 flex-col gap-6 overflow-y-auto [overflow-wrap:anywhere] bg-surface p-4 md:p-6 dark:bg-background-dark"
+      className="flex h-full min-h-0 min-w-0 flex-col bg-surface dark:bg-background-dark"
     >
-      <div className="flex items-center gap-2">
-        <span className="material-symbols-outlined text-content-muted">face</span>
-        <h1 className="page-title">Avatar</h1>
-      </div>
-
-      {status && <StatusAlert type={status.type} message={status.message} />}
-
+      <PageHeader
+        title="Avatar"
+        sticky={false}
+        tabs={(
+          <PageTabs
+            idPrefix="avatar"
+            label="素材類別"
+            tabs={ASSET_TABS.map((tab) => ({ id: tab, label: ASSET_TAB_LABELS[tab] }))}
+            active={activeTab}
+            onSelect={handleTabChange}
+          />
+        )}
+      />
       <div
-        role="tablist"
-        aria-label="素材類別"
-        className="flex w-full shrink-0 flex-col rounded-lg md:w-fit md:flex-row bg-surface-sunken p-1 dark:bg-surface/40 border border-border/50 "
-        onKeyDown={(event) => handleTablistKeyDown(event, ASSET_TABS, activeTab)}
+        id="avatar-panel"
+        role="tabpanel"
+        aria-labelledby={`avatar-${activeTab}-tab`}
+        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto [overflow-wrap:anywhere] p-4 md:p-6"
       >
-        {ASSET_TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            id={`avatar-${tab}-tab`}
-            aria-selected={activeTab === tab}
-            tabIndex={activeTab === tab ? 0 : -1}
-            onClick={() => handleTabChange(tab)}
-            className={tabButtonClassName(tab, activeTab)}
-          >
-            {ASSET_TAB_LABELS[tab]}
-          </button>
-        ))}
-      </div>
+      {status && <StatusAlert type={status.type} message={status.message} />}
 
       {activeTab === "characters" && (
         <CharacterJobsPanel projects={projects} onCharacterCreated={load} />
@@ -597,6 +580,7 @@ export default function Avatar() {
           style={hiddenSnapshotFrameStyle}
         />
       )}
+      </div>
     </div>
   );
 }

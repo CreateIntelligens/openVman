@@ -286,139 +286,146 @@ export default function KnowledgeBase() {
         </div>
       )}
 
-      {activeTab === "graph" ? (
-        <GraphView />
-      ) : (
-        <>
-          {showSourcePanel && (
-            <SourcePanel
-              activeMode={activeSourceMode}
-              setActiveMode={setActiveSourceMode}
-              uploading={uploading}
-              uploadInputRef={uploadInputRef}
-              currentDir={currentDir}
-              crawlUrlValue={crawlUrlValue}
-              setCrawlUrlValue={setCrawlUrlValue}
-              crawling={crawling}
-              onCrawl={handleCrawl}
-              onShowNote={() => {
-                setSelectedQaNodeId(null);
-                setShowNoteComposer(true);
-              }}
-            />
-          )}
+      <div
+        id="knowledge-panel"
+        role="tabpanel"
+        aria-labelledby={`knowledge-${activeTab}-tab`}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {activeTab === "graph" ? (
+          <GraphView />
+        ) : (
+          <>
+            {showSourcePanel && (
+              <SourcePanel
+                activeMode={activeSourceMode}
+                setActiveMode={setActiveSourceMode}
+                uploading={uploading}
+                uploadInputRef={uploadInputRef}
+                currentDir={currentDir}
+                crawlUrlValue={crawlUrlValue}
+                setCrawlUrlValue={setCrawlUrlValue}
+                crawling={crawling}
+                onCrawl={handleCrawl}
+                onShowNote={() => {
+                  setSelectedQaNodeId(null);
+                  setShowNoteComposer(true);
+                }}
+              />
+            )}
 
-          <input
-            type="file"
-            ref={uploadInputRef}
-            onChange={handleFileUpload}
-            className="hidden"
-            accept=".md,.txt,.csv,.xlsx,.docx,.pdf"
-            multiple
-          />
-
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            <KnowledgeTreeSidebar
-              mobileTreeOpen={mobileTree.mobileTreeOpen}
-              onCloseMobileTree={mobileTree.closeMobileTree}
-              mobileTreePanelRef={mobileTree.mobileTreePanelRef}
-              qaTreeLoading={qaTreeLoading}
-              qaTreeError={qaTreeError}
-              showNewFolder={showNewFolder}
-              newFolderName={newFolderName}
-              onStartNewFolder={() => {
-                setShowNewFolder(true);
-                setNewFolderName("");
-              }}
-              onNewFolderNameChange={setNewFolderName}
-              onCreateFolderSubmit={handleCreateFolderSubmit}
-              onCancelCreateFolder={cancelCreateFolder}
-              search={search}
-              onSearchChange={setSearch}
-              hasActiveSearch={hasActiveSearch}
-              matchingDocumentCount={matchingDocumentCount}
-              loading={loading}
-              documentCount={documents.length}
-              showSearchEmptyState={showSearchEmptyState}
-              displayTree={displayTree}
-              selectedTreePath={selectedTreePath ?? ""}
-              displayExpandedDirs={displayExpandedDirs}
-              onSelectTreeFile={handleSelectTreeFile}
-              onToggleExpand={toggleExpand}
-              draggingPath={treeDrag.draggingPath}
-              sourceDragDir={treeDrag.sourceDragDir}
-              dropTargetPath={treeDrag.dropTargetPath}
-              onTreeDragStart={treeDrag.handleTreeDragStart}
-              onTreeDragEnd={treeDrag.handleTreeDragEnd}
-              onDropTargetPathChange={treeDrag.setDropTargetPath}
-              onTreeDrop={treeDrag.handleTreeDrop}
-              onDeleteFolder={(path) => setDeleteTarget({ type: "dir", value: path })}
-              onSelectQaNode={handleSelectQaNode}
-              onCreateQaNode={qaModals.openCreateQaNodeDialog}
-              onRenameQaNode={qaModals.openRenameQaNodeDialog}
-              onToggleQaNodeHidden={qaModals.handleToggleQaNodeHidden}
-              onDeleteQaNode={qaModals.openDeleteQaNodeDialog}
-              onOrderQaNode={qaModals.handleOpenOrderModal}
-              canDropQaNode={treeDrag.canDropQaNode}
-              canDropQaEntry={treeDrag.canDropQaEntry}
-              multiSelect={batch.multiSelect}
-              onToggleMultiSelect={batch.handleToggleMultiSelect}
-              multiSelectDisabled={batch.batchRunning}
-              checkedPaths={batch.checkedPathSet}
-              onToggleChecked={batch.handleToggleChecked}
-              batchBar={
-                <BatchActionBar
-                  selectedPaths={batch.batchSelectedPaths}
-                  documents={documents}
-                  serverDirs={serverDirs}
-                  onClearSelection={() => batch.setCheckedFilePaths([])}
-                  onSelectionChange={batch.setCheckedFilePaths}
-                  onFinished={batch.handleBatchFinished}
-                  onStatus={setStatus}
-                  onRunningChange={batch.setBatchRunning}
-                />
-              }
+            <input
+              type="file"
+              ref={uploadInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".md,.txt,.csv,.xlsx,.docx,.pdf"
+              multiple
             />
 
-            <KnowledgeContentPane
-              showNoteComposer={showNoteComposer}
-              creatingNote={creatingNote}
-              onCloseNoteComposer={closeNoteComposer}
-              onCreateNote={handleComposerCreate}
-              selectedQaNodeId={selectedQaNodeId}
-              selectedQaNodeLabel={selectedQaNode?.label}
-              mergedRefreshKey={mergedRefreshKey}
-              onQaMutationSuccess={handleQaMutationSuccess}
-              nodesTree={nodesTree}
-              onSelectQaNode={handleSelectQaNode}
-              rightPane={rightPane}
-              openDocument={openDocument}
-              editContent={editContent}
-              onEditContentChange={updateEditContent}
-              editLoading={editLoading}
-              saving={saving}
-              editorDirty={editorDirty}
-              onSave={handleSave}
-              onCloseFileView={closeFileView}
-              onDeleteFile={(path) => setDeleteTarget({ type: "file", value: path })}
-              onMoveFile={(path) => setMovingPath(path)}
-              onToggleEnabled={handleToggleEnabled}
-              onChangeLanguage={handleChangeLanguage}
-              onRenormalize={handleRenormalize}
-              renormalizing={renormalizing || previewingNormalization}
-              onOpenMobileTree={openMobileTree}
-            />
-          </div>
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+              <KnowledgeTreeSidebar
+                mobileTreeOpen={mobileTree.mobileTreeOpen}
+                onCloseMobileTree={mobileTree.closeMobileTree}
+                mobileTreePanelRef={mobileTree.mobileTreePanelRef}
+                qaTreeLoading={qaTreeLoading}
+                qaTreeError={qaTreeError}
+                showNewFolder={showNewFolder}
+                newFolderName={newFolderName}
+                onStartNewFolder={() => {
+                  setShowNewFolder(true);
+                  setNewFolderName("");
+                }}
+                onNewFolderNameChange={setNewFolderName}
+                onCreateFolderSubmit={handleCreateFolderSubmit}
+                onCancelCreateFolder={cancelCreateFolder}
+                search={search}
+                onSearchChange={setSearch}
+                hasActiveSearch={hasActiveSearch}
+                matchingDocumentCount={matchingDocumentCount}
+                loading={loading}
+                documentCount={documents.length}
+                showSearchEmptyState={showSearchEmptyState}
+                displayTree={displayTree}
+                selectedTreePath={selectedTreePath ?? ""}
+                displayExpandedDirs={displayExpandedDirs}
+                onSelectTreeFile={handleSelectTreeFile}
+                onToggleExpand={toggleExpand}
+                draggingPath={treeDrag.draggingPath}
+                sourceDragDir={treeDrag.sourceDragDir}
+                dropTargetPath={treeDrag.dropTargetPath}
+                onTreeDragStart={treeDrag.handleTreeDragStart}
+                onTreeDragEnd={treeDrag.handleTreeDragEnd}
+                onDropTargetPathChange={treeDrag.setDropTargetPath}
+                onTreeDrop={treeDrag.handleTreeDrop}
+                onDeleteFolder={(path) => setDeleteTarget({ type: "dir", value: path })}
+                onSelectQaNode={handleSelectQaNode}
+                onCreateQaNode={qaModals.openCreateQaNodeDialog}
+                onRenameQaNode={qaModals.openRenameQaNodeDialog}
+                onToggleQaNodeHidden={qaModals.handleToggleQaNodeHidden}
+                onDeleteQaNode={qaModals.openDeleteQaNodeDialog}
+                onOrderQaNode={qaModals.handleOpenOrderModal}
+                canDropQaNode={treeDrag.canDropQaNode}
+                canDropQaEntry={treeDrag.canDropQaEntry}
+                multiSelect={batch.multiSelect}
+                onToggleMultiSelect={batch.handleToggleMultiSelect}
+                multiSelectDisabled={batch.batchRunning}
+                checkedPaths={batch.checkedPathSet}
+                onToggleChecked={batch.handleToggleChecked}
+                batchBar={
+                  <BatchActionBar
+                    selectedPaths={batch.batchSelectedPaths}
+                    documents={documents}
+                    serverDirs={serverDirs}
+                    onClearSelection={() => batch.setCheckedFilePaths([])}
+                    onSelectionChange={batch.setCheckedFilePaths}
+                    onFinished={batch.handleBatchFinished}
+                    onStatus={setStatus}
+                    onRunningChange={batch.setBatchRunning}
+                  />
+                }
+              />
 
-          <QaNodeModals
-            dialog={qaModals.qaNodeDialog}
-            onClose={qaModals.closeQaNodeDialog}
-            onCreateSubmit={qaModals.handleCreateQaNodeSubmit}
-            onRenameSubmit={qaModals.handleRenameQaNodeSubmit}
-            onDeleteConfirm={qaModals.handleDeleteQaNodeConfirm}
-          />
-        </>
-      )}
+              <KnowledgeContentPane
+                showNoteComposer={showNoteComposer}
+                creatingNote={creatingNote}
+                onCloseNoteComposer={closeNoteComposer}
+                onCreateNote={handleComposerCreate}
+                selectedQaNodeId={selectedQaNodeId}
+                selectedQaNodeLabel={selectedQaNode?.label}
+                mergedRefreshKey={mergedRefreshKey}
+                onQaMutationSuccess={handleQaMutationSuccess}
+                nodesTree={nodesTree}
+                onSelectQaNode={handleSelectQaNode}
+                rightPane={rightPane}
+                openDocument={openDocument}
+                editContent={editContent}
+                onEditContentChange={updateEditContent}
+                editLoading={editLoading}
+                saving={saving}
+                editorDirty={editorDirty}
+                onSave={handleSave}
+                onCloseFileView={closeFileView}
+                onDeleteFile={(path) => setDeleteTarget({ type: "file", value: path })}
+                onMoveFile={(path) => setMovingPath(path)}
+                onToggleEnabled={handleToggleEnabled}
+                onChangeLanguage={handleChangeLanguage}
+                onRenormalize={handleRenormalize}
+                renormalizing={renormalizing || previewingNormalization}
+                onOpenMobileTree={openMobileTree}
+              />
+            </div>
+
+            <QaNodeModals
+              dialog={qaModals.qaNodeDialog}
+              onClose={qaModals.closeQaNodeDialog}
+              onCreateSubmit={qaModals.handleCreateQaNodeSubmit}
+              onRenameSubmit={qaModals.handleRenameQaNodeSubmit}
+              onDeleteConfirm={qaModals.handleDeleteQaNodeConfirm}
+            />
+          </>
+        )}
+      </div>
 
       <KnowledgeModals
         documents={documents}

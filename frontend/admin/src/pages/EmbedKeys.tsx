@@ -198,9 +198,9 @@ export default function EmbedKeys() {
 
   return (
     <div className="page-scroll">
-      <header className="page-header">
+      <header className="section-header">
         <div className="page-heading">
-          <h2 className="page-title">Embed 金鑰</h2>
+          <h2 className="page-section-title">Embed 金鑰</h2>
           <p className="page-subtitle">
             管理外部網站嵌入用的金鑰：綁定專案、限制來源網域與每日用量。
           </p>

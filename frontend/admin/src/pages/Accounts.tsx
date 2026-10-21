@@ -26,6 +26,7 @@ import AdminScopeFields, { EMPTY_SCOPE_RESOURCES } from "../components/accounts/
 import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
+import SegmentedControl from "../components/SegmentedControl";
 import { useAuth } from "../context/AuthContext";
 import { useNavigationGuard } from "../context/NavigationGuardContext";
 import { useAdminSubView } from "../hooks/useAdminSubView";
@@ -70,6 +71,11 @@ function matchesAccountQuery(account: { username: string; role: string }, query:
   const needle = query.trim().toLowerCase();
   return !needle || account.username.toLowerCase().includes(needle) || account.role.toLowerCase() === needle;
 }
+
+const ACCOUNT_MODES = [
+  { id: "create", label: "建立帳號" },
+  { id: "manage", label: "編輯／管理" },
+] as const;
 
 export default function Accounts() {
   const { account: currentAccount } = useAuth();
@@ -207,45 +213,18 @@ export default function Accounts() {
 
   return (
     <div className="page-scroll p-6 lg:p-8">
-      {/* 第一層分頁在外層頁首；這一層用分段控制，視覺上明顯低一階，不再疊一條底線分頁。 */}
-      <div
-        className="mb-5 inline-flex rounded-lg border border-border bg-surface-sunken p-1"
-        aria-label="帳號功能"
-        role="tablist"
-        onKeyDown={(event) => {
-          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-          event.preventDefault();
-          const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-          const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : mainTab === "create" ? 1 : 0;
-          tabs[next]?.focus();
-          tabs[next]?.click();
-        }}
-      >
-        {([
-          ["create", "建立帳號"],
-          ["manage", "編輯／管理"],
-        ] as const).map(([id, label]) => (
-          <button
-            key={id}
-            className={`whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
-              mainTab === id
-                ? "bg-surface-raised text-content shadow-sm"
-                : "text-content-muted hover:text-content"
-            }`}
-            type="button"
-            role="tab"
-            id={`accounts-${id}-tab`}
-            aria-controls="accounts-main-panel"
-            aria-selected={mainTab === id}
-            tabIndex={mainTab === id ? 0 : -1}
-            onClick={() => {
-              setMainTab(id);
-              setError(null);
-            }}
-          >
-            {label}
-          </button>
-        ))}
+      {/* 第一層分頁在外層頁首；這一層是頁內模式，用共用的分段控制，視覺上低一階。 */}
+      <div className="mb-5">
+        <SegmentedControl
+          idPrefix="accounts-main"
+          label="帳號功能"
+          options={ACCOUNT_MODES}
+          value={mainTab}
+          onChange={(id) => {
+            setMainTab(id);
+            setError(null);
+          }}
+        />
       </div>
 
       {error && (
@@ -273,7 +252,7 @@ export default function Accounts() {
       <div
         id="accounts-main-panel"
         role="tabpanel"
-        aria-labelledby={`accounts-${mainTab}-tab`}
+        aria-labelledby={`accounts-main-${mainTab}-tab`}
       >
         {mainTab === "create" && (
           <div>
