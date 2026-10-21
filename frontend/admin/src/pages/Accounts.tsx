@@ -123,6 +123,7 @@ export default function Accounts() {
       custom_voices: visible.custom_voices.map((option) => option.id),
       avatar_mascots: (visible.avatar_mascots ?? []).map((option) => option.id),
       avatar_backgrounds: (visible.avatar_backgrounds ?? []).map((option) => option.id),
+      asr_engines: (visible.asr_engines ?? []).map((option) => option.id),
     });
   }, [role, isRoot, accessForm.options]);
 

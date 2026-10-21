@@ -164,6 +164,7 @@ export interface AdminScopeResources {
   custom_voices: string[];
   avatar_mascots: string[];
   avatar_backgrounds: string[];
+  asr_engines: string[];
 }
 
 export interface AdminScope {

@@ -3,6 +3,7 @@ import { useState, type ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NavigationProvider } from "../context/NavigationContext";
+import { NavigationGuardProvider } from "../context/NavigationGuardContext";
 import ModelProviders from "./ModelProviders";
 import {
   fetchModelProviderSettings,
@@ -56,9 +57,11 @@ function render(element: ReactElement) {
   function RouteHarness() {
     const [view, setView] = useState<string | undefined>();
     return (
-      <NavigationProvider currentTab="ModelProviders" currentSubView={view} onSelectTab={(_tab, next) => setView(next)}>
-        {element}
-      </NavigationProvider>
+      <NavigationGuardProvider>
+        <NavigationProvider currentTab="ModelProviders" currentSubView={view} onSelectTab={(_tab, next) => setView(next)}>
+          {element}
+        </NavigationProvider>
+      </NavigationGuardProvider>
     );
   }
   return renderComponent(<RouteHarness />);
@@ -94,6 +97,30 @@ describe("ModelProviders", () => {
     await openTab("API 金鑰");
     expect(screen.getByText(/用於決策模型、主對話模型/)).toBeTruthy();
     expect(screen.getByText(/環境變數已設定/)).toBeTruthy();
+  });
+
+  it("asks before a reload throws away unsaved edits", async () => {
+    render(<ModelProviders />);
+    const openAiRow = await screen.findByTestId("provider-chat_llm-openai");
+    fireEvent.click(within(openAiRow).getByLabelText("啟用 主對話模型 OpenAI"));
+    expect(fetchModelProviderSettings).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "重新載入" }));
+
+    // 草稿還在、也沒重抓；確認捨棄後才重新載入。
+    expect(await screen.findByText("尚有未儲存的變更")).toBeTruthy();
+    expect(fetchModelProviderSettings).toHaveBeenCalledTimes(1);
+    expect((within(openAiRow).getByLabelText("啟用 主對話模型 OpenAI") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "捨棄並離開" }));
+    await waitFor(() => expect(fetchModelProviderSettings).toHaveBeenCalledTimes(2));
+  });
+
+  it("switches tabs with the arrow keys like the other tabbed pages", async () => {
+    render(<ModelProviders />);
+    const first = await screen.findByRole("tab", { name: /主對話模型/ });
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: /決策模型/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe("model-providers-decision-tab");
   });
 
   it("keeps edits made on one tab while another tab is open and saves them together", async () => {

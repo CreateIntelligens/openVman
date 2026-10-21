@@ -16,6 +16,7 @@ import {
   type SessionExportScope,
 } from "../components/chat/sessionExport";
 import { useRefetchOnRecovery } from "../context/BackendHealthContext";
+import { errorMessage } from "../utils/errorMessage";
 import { readScoped } from "../utils/scopedStorage";
 
 export type SessionSortKey = "updated_at" | "created_at" | "message_count";
@@ -62,6 +63,8 @@ export function useSessionBrowser() {
   );
   const [deleteTarget, setDeleteTarget] = useState<SessionSummary | null>(null);
   const [error, setError] = useState("");
+  // 列表讀取失敗另外記：和刪除、匯出的錯誤分開，畫面才能把「讀不到」和「真的沒有」分清楚。
+  const [loadError, setLoadError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -86,6 +89,7 @@ export function useSessionBrowser() {
 
   const loadSessions = useCallback(() => {
     setLoadingSessions(true);
+    setLoadError("");
     fetchSessions(personaFilter, {
       dateFrom,
       dateTo,
@@ -93,7 +97,7 @@ export function useSessionBrowser() {
       language: language || undefined,
     })
       .then((response) => setSessions(response.sessions ?? []))
-      .catch((reason) => setError(String(reason)))
+      .catch((reason) => setLoadError(errorMessage(reason, "無法載入對話紀錄")))
       .finally(() => setLoadingSessions(false));
   }, [dateFrom, dateTo, debouncedSearchQuery, language, personaFilter]);
 
@@ -263,6 +267,7 @@ export function useSessionBrowser() {
     deleteTarget,
     setDeleteTarget,
     error,
+    loadError,
     searchQuery,
     setSearchQuery,
     dateFrom,

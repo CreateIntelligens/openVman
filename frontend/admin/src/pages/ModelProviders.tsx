@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import StatusAlert from "../components/StatusAlert";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 import { useBottomBarClearance } from "../hooks/useBottomBarClearance";
+import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
+import { handleTablistKeyDown } from "../utils/tablistKeys";
 import {
   fetchModelProviderSettings,
   resetModelProviderHealth,
@@ -285,6 +287,11 @@ export default function ModelProviders() {
     return resetCategories.has(categoryId) || Boolean(category && draft && draftChanged(draft, category));
   }
 
+  // 任一分頁有未儲存的修改，離開頁面與重新載入都要先確認，不能默默把草稿蓋掉。
+  const hasPendingChanges = PAGE_TABS.some((tab) => tabHasPendingChanges(tab));
+  useUnsavedChanges("model-providers", hasPendingChanges, "模型供應商設定");
+  const { requestNavigation } = useNavigationGuard();
+
   return (
     <div className="page-scroll">
       <header className="page-header">
@@ -294,7 +301,7 @@ export default function ModelProviders() {
         </div>
         <button
           type="button"
-          onClick={() => void load()}
+          onClick={() => requestNavigation(() => void load())}
           disabled={busy}
           className="btn btn-ghost shrink-0"
         >
@@ -305,13 +312,21 @@ export default function ModelProviders() {
       <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
         {notice && <StatusAlert type={notice.type} message={notice.message} />}
 
-        <div role="tablist" aria-label="模型供應商分類" className="flex w-fit flex-wrap rounded-lg border border-border/50 bg-surface-sunken p-1">
+        <div
+          role="tablist"
+          aria-label="模型供應商分類"
+          className="flex w-fit max-w-full flex-wrap rounded-lg border border-border/50 bg-surface-sunken p-1"
+          onKeyDown={(event) => handleTablistKeyDown(event, PAGE_TABS, activeTab)}
+        >
           {PAGE_TABS.map((tab) => (
             <button
               key={tab}
               type="button"
               role="tab"
+              id={`model-providers-${tab}-tab`}
+              aria-controls="model-providers-panel"
               aria-selected={activeTab === tab}
+              tabIndex={activeTab === tab ? 0 : -1}
               onClick={() => setActiveTab(tab)}
               className={tabClassName(activeTab === tab)}
             >
@@ -323,6 +338,7 @@ export default function ModelProviders() {
           ))}
         </div>
 
+        <div id="model-providers-panel" role="tabpanel" aria-labelledby={`model-providers-${activeTab}-tab`} className="space-y-6">
         {loading && !settings ? (
           <div className="space-y-3" aria-label="正在載入供應商設定">
             {[0, 1, 2, 3].map((row) => (
@@ -567,6 +583,7 @@ export default function ModelProviders() {
             </section>}
           </>
         )}
+        </div>
 
         {/* 金鑰分頁有六組，存檔鈕放最底會被推出視窗；固定在捲動區底部。 */}
         <div ref={saveBarRef} className="sticky bottom-0 z-10 -mx-6 flex justify-end border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-md md:-mx-8 md:px-8">

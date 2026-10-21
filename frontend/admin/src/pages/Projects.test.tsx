@@ -63,7 +63,7 @@ describe("Projects", () => {
     expect(screen.getByText("專案 A")).toBeTruthy();
     expect(screen.getByText(/可以編輯下方已授權專案的內容/)).toBeTruthy();
     expect(screen.queryByText("建立新專案")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Delete Project" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "刪除專案" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Gemini 金鑰" })).toBeNull();
   });
 
@@ -73,7 +73,7 @@ describe("Projects", () => {
     render(<Projects />);
 
     expect(screen.getByText("建立新專案")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Delete Project" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "刪除專案" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Gemini 金鑰" })).toBeNull();
   });
 

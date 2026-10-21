@@ -45,7 +45,7 @@ describe("Avatar page", () => {
     vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({ backgrounds: [] });
     render(<Avatar />);
     await screen.findByText(/no characters yet/i);
-    fireEvent.click(screen.getByRole("button", { name: "Backgrounds" }));
+    fireEvent.click(screen.getByRole("tab", { name: "背景" }));
     expect(window.location.pathname).toBe("/admin/avatar/backgrounds");
     window.history.replaceState(null, "", "/admin/avatar");
     fireEvent(window, new PopStateEvent("popstate"));
@@ -165,7 +165,7 @@ describe("Avatar page", () => {
     });
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Backgrounds" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
 
     expect(await screen.findByText("診間背景")).toBeTruthy();
     expect(api.fetchAvatarBackgrounds).toHaveBeenCalledOnce();
@@ -211,17 +211,17 @@ describe("Avatar page", () => {
     });
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Backgrounds" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
     fireEvent.change(await screen.findByPlaceholderText("Background ID"), {
       target: { value: "clinic" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Display name"), {
+    fireEvent.change(screen.getByPlaceholderText("顯示名稱"), {
       target: { value: "診間背景" },
     });
     fireEvent.change(screen.getByLabelText(/Image/), {
       target: { files: [new File(["image"], "clinic.png", { type: "image/png" })] },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Upload background" }));
+    fireEvent.click(screen.getByRole("button", { name: "上傳背景" }));
 
     await waitFor(() => {
       expect(api.uploadAvatarBackground).toHaveBeenCalledWith({
@@ -249,7 +249,7 @@ describe("Avatar page", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Backgrounds" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
     fireEvent.click(await screen.findByRole("button", { name: "Use clinic" }));
 
     expect(window.localStorage.getItem("avatar.background_id")).toBe("uploaded:clinic");
@@ -277,7 +277,7 @@ describe("Avatar page", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
     fireEvent.click(await screen.findByRole("button", { name: "Use Frieren" }));
 
     expect(window.localStorage.getItem("avatar.mascot_id")).toBe("qqman");
@@ -303,9 +303,9 @@ describe("Avatar page", () => {
     });
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
 
-    const frame = await screen.findByTitle("Mascot snapshot capture");
+    const frame = await screen.findByTitle("小助理縮圖擷取");
     const src = decodeURIComponent(frame.getAttribute("src") ?? "");
 
     expect(src).toContain("/static/mascots/custom/model.vrm");
@@ -331,17 +331,17 @@ describe("Avatar page", () => {
     });
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
     fireEvent.change(await screen.findByPlaceholderText("Mascot ID"), {
       target: { value: "custom" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Mascot display name"), {
+    fireEvent.change(screen.getByPlaceholderText("小助理顯示名稱"), {
       target: { value: "自訂小助理" },
     });
     fireEvent.change(screen.getByLabelText(/VRM/), {
       target: { files: [new File(["glTF"], "custom.vrm", { type: "model/gltf-binary" })] },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Upload mascot" }));
+    fireEvent.click(screen.getByRole("button", { name: "上傳小助理" }));
 
     await waitFor(() => {
       expect(api.uploadAvatarMascot).toHaveBeenCalledWith({
@@ -385,7 +385,7 @@ describe("Avatar page", () => {
     });
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
     fireEvent.click(await screen.findByRole("button", { name: "Rename custom" }));
 
     const input = await screen.findByLabelText(/顯示名稱/);
@@ -431,10 +431,10 @@ describe("Avatar page", () => {
     });
 
     render(<Avatar />);
-    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
 
-    expect(screen.queryByRole("button", { name: "Delete Frieren" })).toBeNull();
-    fireEvent.click(await screen.findByRole("button", { name: "Delete custom" }));
+    expect(screen.queryByRole("button", { name: "刪除 Frieren" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "刪除 custom" }));
 
     expect(api.deleteAvatarMascot).toHaveBeenCalledWith("custom");
     await waitFor(() => expect(screen.queryByText("custom")).toBeNull());

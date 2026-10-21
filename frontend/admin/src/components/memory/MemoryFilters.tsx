@@ -1,6 +1,7 @@
 interface MemoryFiltersProps {
   searchTerm: string;
-  total: number;
+  /** null 代表讀取失敗、筆數未知。 */
+  total: number | null;
   page: number;
   totalPages: number;
   loading: boolean;
@@ -29,7 +30,7 @@ export default function MemoryFilters({
         />
       </div>
       <div className="whitespace-nowrap text-xs text-content-subtle">
-        共 {total} 筆 · 第 {page}/{totalPages} 頁
+        {total === null ? "筆數未知" : `共 ${total} 筆 · 第 ${page}/${totalPages} 頁`}
       </div>
       <button
         onClick={onRefresh}

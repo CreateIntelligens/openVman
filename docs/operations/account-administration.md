@@ -70,7 +70,7 @@
 
 ### 管理員資源範圍
 
-帳號頁的「資源上限」是指定給 admin 的資源白名單，不是數量配額。`scoped=false` 表示不限制；`scoped=true` 且清單為空表示沒有可用範圍。ROOT 本身不受此範圍限制。
+帳號頁的「資源上限」是指定給 admin 的資源白名單，不是數量配額，涵蓋知識庫專案、虛擬人物、VRM、自訂聲音、舞台背景與語音辨識引擎（`PUT /api/v1/users/{id}/scope` 的 `resources.asr_engines`）。`scoped=false` 表示不限制；`scoped=true` 且清單為空表示沒有可用範圍。ROOT 本身不受此範圍限制。
 
 ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立的 admin，且只能給出自己範圍的子集，也不得給出「不設限」——否則他可以開一個無限制的下屬再取回全部資源。
 

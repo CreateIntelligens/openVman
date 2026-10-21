@@ -109,7 +109,7 @@ export default function MascotsPanel({
       <div className={formPanelClassName}>
         <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
           <span className="material-symbols-outlined text-base">view_in_ar</span>
-          Upload mascot
+          上傳小助理
         </p>
         <div className={formRowClassName}>
           <input
@@ -121,7 +121,7 @@ export default function MascotsPanel({
           />
           <input
             type="text"
-            placeholder="Mascot display name"
+            placeholder="小助理顯示名稱"
             value={uploadLabel}
             onChange={(e) => onUploadLabelChange(e.target.value)}
             className={inputClassName}
@@ -151,7 +151,7 @@ export default function MascotsPanel({
                 deployed_code
               </span>
               <span className="min-w-0 truncate">
-                {selectedModelName || "Select VRM"}
+                {selectedModelName || "選擇 VRM 模型"}
               </span>
               <input
                 ref={modelRef}
@@ -171,7 +171,7 @@ export default function MascotsPanel({
             <label className={filePickerClassName(selectedThumbnailName)}>
               <span className="material-symbols-outlined text-sm">image</span>
               <span className="min-w-0 truncate">
-                {selectedThumbnailName || "Select Image"}
+                {selectedThumbnailName || "選擇縮圖"}
               </span>
               <input
                 ref={thumbnailRef}
@@ -190,7 +190,7 @@ export default function MascotsPanel({
             disabled={uploading}
             className={uploadButtonClassName}
           >
-            {uploading ? "Uploading…" : "Upload mascot"}
+            {uploading ? "上傳中…" : "上傳小助理"}
           </button>
         </div>
       </div>
@@ -253,7 +253,7 @@ export default function MascotsPanel({
                       selected ? secondaryActionClassName : primaryActionClassName
                     }
                   >
-                    {selected ? "Using" : "Use"}
+                    {selected ? "使用中" : "使用"}
                   </button>
                   {!mascot.builtin && (
                     <>
@@ -268,10 +268,10 @@ export default function MascotsPanel({
                       <button
                         type="button"
                         onClick={() => onDelete(mascot.mascot_id)}
-                        aria-label={`Delete ${mascot.mascot_id}`}
+                        aria-label={`刪除 ${mascot.mascot_id}`}
                         className={dangerActionClassName}
                       >
-                        Delete
+                        刪除
                       </button>
                     </>
                   )}

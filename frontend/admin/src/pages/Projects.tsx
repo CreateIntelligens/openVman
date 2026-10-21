@@ -53,7 +53,7 @@ export default function Projects() {
         {canManageProjects ? (
           <section className="rounded-3xl border border-border bg-surface p-6 shadow-sm transition-all dark:bg-surface-sunken/40 dark:shadow-none">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-content-subtle">
-              New Project
+              新增專案
             </p>
             <h3 className="card-title mt-2">建立新專案</h3>
             <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -77,7 +77,7 @@ export default function Projects() {
                 disabled={!canCreateProject}
                 className="rounded-xl bg-primary px-6 py-3 font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {creating ? "Creating..." : "Create"}
+                {creating ? "建立中…" : "建立專案"}
               </button>
             </div>
             {lastCreatedId && (
@@ -97,7 +97,7 @@ export default function Projects() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-content-subtle">
-                All Projects
+                全部專案
               </p>
               <h3 className="card-title mt-2">專案列表</h3>
             </div>
@@ -127,7 +127,7 @@ export default function Projects() {
                   </div>
                   {project.project_id === "default" && (
                     <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-primary">
-                      Default
+                      預設
                     </span>
                   )}
                 </div>
@@ -167,7 +167,7 @@ export default function Projects() {
                         disabled={!!deletingId}
                         className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-colors disabled:opacity-50"
                       >
-                        {deletingId === project.project_id ? "Deleting..." : "Delete Project"}
+                        {deletingId === project.project_id ? "刪除中…" : "刪除專案"}
                       </button>
                     )}
                   </div>
@@ -208,9 +208,9 @@ export default function Projects() {
 
       <ConfirmModal
         open={canManageProjects && deleteTargetId !== ""}
-        title="Delete Project"
+        title="刪除專案"
         message={`確定要刪除專案「${deleteTargetId}」嗎？\n\n此操作會刪除該專案的所有 knowledge、persona 和 memory 資料，且無法復原。`}
-        confirmLabel="Delete"
+        confirmLabel="刪除"
         danger
         onConfirm={() => handleDelete(deleteTargetId)}
         onCancel={() => setDeleteTargetId("")}

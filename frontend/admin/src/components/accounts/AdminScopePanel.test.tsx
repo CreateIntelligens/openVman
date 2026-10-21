@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as renderComponent, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -7,7 +8,17 @@ import {
   updateAdminScope,
   type Account,
 } from "../../api/auth";
+import { NavigationGuardProvider, useNavigationGuard } from "../../context/NavigationGuardContext";
 import AdminScopePanel from "./AdminScopePanel";
+
+function GuardProbe() {
+  const { hasUnsavedChanges } = useNavigationGuard();
+  return <span>{hasUnsavedChanges ? "guard:dirty" : "guard:clean"}</span>;
+}
+
+function render(element: ReactElement) {
+  return renderComponent(<NavigationGuardProvider>{element}<GuardProbe /></NavigationGuardProvider>);
+}
 
 vi.mock("../../api/auth", () => ({
   fetchAccountAccessOptions: vi.fn(),
@@ -54,6 +65,7 @@ describe("AdminScopePanel 載入失敗", () => {
           custom_voices: [],
           avatar_mascots: [],
           avatar_backgrounds: [],
+          asr_engines: [],
         },
       });
 
@@ -69,5 +81,30 @@ describe("AdminScopePanel 載入失敗", () => {
     await waitFor(() => expect(save.disabled).toBe(false));
     expect(screen.queryByRole("alert")).toBeNull();
     expect((screen.getByLabelText(/限制可用資源/) as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+
+describe("AdminScopePanel 未儲存的修改", () => {
+  it("改了限制模式就向離開防護登記，收合前會被攔下", async () => {
+    // 2026-10-21 複查：只切本機的限制模式再按收合，面板直接消失沒有提醒。
+    vi.mocked(fetchAccountAccessOptions).mockResolvedValue(options);
+    vi.mocked(fetchAdminScope).mockResolvedValue({
+      user_id: "usr-admin",
+      scoped: false,
+      resources: {
+        projects: [], avatar_characters: [], custom_voices: [],
+        avatar_mascots: [], avatar_backgrounds: [], asr_engines: [],
+      },
+    });
+
+    render(<AdminScopePanel account={account} onCancel={() => {}} onSaved={() => {}} />);
+
+    const toggle = await screen.findByLabelText(/限制可用資源/);
+    expect(screen.getByText("guard:clean")).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(await screen.findByText("guard:dirty")).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(await screen.findByText("guard:clean")).toBeTruthy();
   });
 });

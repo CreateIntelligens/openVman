@@ -157,6 +157,7 @@ describe("buildAccessGraph", () => {
             custom_voices: [],
             avatar_mascots: [],
             avatar_backgrounds: [],
+            asr_engines: [],
           },
         },
         open: {
@@ -168,6 +169,7 @@ describe("buildAccessGraph", () => {
             custom_voices: [],
             avatar_mascots: [],
             avatar_backgrounds: [],
+            asr_engines: [],
           },
         },
         unknown: "error",
@@ -181,6 +183,28 @@ describe("buildAccessGraph", () => {
       "account:scoped->project:p-hk:scope*",
       "account:scoped->project:p-demo:scope",
     ]);
+  });
+
+  it("draws a scoped administrator's ASR ceiling like the other resource types", () => {
+    // 2026-10-21：ASR 的上限原本沒有對應欄位，受限管理員的 ASR 連線畫不出來。
+    const scoped = account({ id: "scoped", role: "admin" });
+    const graph = buildAccessGraph({
+      accounts: [scoped],
+      options,
+      scopes: {
+        scoped: {
+          user_id: "scoped",
+          scoped: true,
+          resources: {
+            projects: [], avatar_characters: [], custom_voices: [],
+            avatar_mascots: [], avatar_backgrounds: [], asr_engines: ["asr-1"],
+          },
+        },
+      },
+      layers: ["asr"],
+    });
+
+    expect(edgeIds(graph)).toContain("account:scoped->asr:asr-1:scope");
   });
 
   it("shows granted resources the viewer cannot list as missing nodes", () => {

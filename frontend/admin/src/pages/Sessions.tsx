@@ -77,6 +77,7 @@ export default function Sessions() {
     deleteTarget,
     setDeleteTarget,
     error,
+    loadError,
     searchQuery,
     setSearchQuery,
     dateFrom,
@@ -267,6 +268,12 @@ export default function Sessions() {
           </div>
         )}
 
+        {loadError && sessions.length > 0 && (
+          <div className="rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
+            {loadError}；下方是上次載入的資料。
+          </div>
+        )}
+
         <section className="card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
             <div className="flex items-center gap-3">
@@ -298,7 +305,9 @@ export default function Sessions() {
               )}
             </div>
             <span className="text-sm text-content-subtle">
-              共 {sessions.length} 筆對話 · {totalMessages} 則訊息
+              {loadError && sessions.length === 0
+                ? "筆數未知"
+                : `共 ${sessions.length} 筆對話 · ${totalMessages} 則訊息`}
             </span>
           </div>
 
@@ -308,7 +317,16 @@ export default function Sessions() {
             </p>
           )}
 
-          {!loadingSessions && sessions.length === 0 && (
+          {!loadingSessions && loadError && sessions.length === 0 && (
+            <div className="flex flex-col items-center gap-3 px-5 py-14 text-center" role="alert">
+              <p className="text-sm text-danger">{loadError}</p>
+              <button onClick={loadSessions} className="btn btn-ghost">
+                重新載入
+              </button>
+            </div>
+          )}
+
+          {!loadingSessions && !loadError && sessions.length === 0 && (
             <div className="flex flex-col items-center gap-2 px-5 py-14 text-center">
               <span className="material-symbols-outlined text-[2rem] text-content-subtle">
                 forum

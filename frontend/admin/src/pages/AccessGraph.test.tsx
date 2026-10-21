@@ -144,6 +144,7 @@ describe("AccessGraph page", () => {
         custom_voices: [],
         avatar_mascots: [],
         avatar_backgrounds: [],
+        asr_engines: [],
       },
     });
     vi.mocked(listTemporaryBatches).mockResolvedValue(batches);

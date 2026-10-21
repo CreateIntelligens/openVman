@@ -1,5 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
 
+import { handleTablistKeyDown } from "../../utils/tablistKeys";
+
 export interface PageTab<T extends string> {
   id: T;
   label: string;
@@ -27,19 +29,8 @@ export default function PageTabsShell<T extends string>({
   onSelect,
   children,
 }: PageTabsShellProps<T>) {
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-    const current = tabs.findIndex((item) => item.id === active);
-    const next = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? tabs.length - 1
-        : (current + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
-    buttons[next]?.focus();
-    buttons[next]?.click();
-  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) =>
+    handleTablistKeyDown(event, tabs.map((item) => item.id), active);
 
   return (
     <div className="flex h-full flex-col">

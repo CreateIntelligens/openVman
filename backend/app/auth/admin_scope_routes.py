@@ -53,6 +53,9 @@ class AdminScopeResources(_StrictModel):
             (ResourceType.CUSTOM_VOICE, self.custom_voices),
             (ResourceType.AVATAR_MASCOT, self.avatar_mascots),
             (ResourceType.AVATAR_BACKGROUND, self.avatar_backgrounds),
+            # 讀取時就有 asr_engines，寫入卻漏了這一行：上限存不進 ASR，受限管理員
+            # 因此一個引擎都指派不出去（2026-10-21 補上）。
+            (ResourceType.ASR_ENGINE, self.asr_engines),
         )
         return [
             (resource_type, resource_id)

@@ -1,7 +1,6 @@
 import MarkdownPreview from "../MarkdownPreview";
 import StatusAlert from "../StatusAlert";
-
-type EditorMode = "edit" | "preview" | "split";
+import { EditorModeSwitch, EditorSaveBar, type EditorMode } from "../editor/EditorControls";
 type Status = { type: "success" | "error"; message: string } | null;
 
 interface WorkspaceEditorProps {
@@ -50,7 +49,7 @@ export default function WorkspaceEditor({
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface dark:bg-surface-sunken/20 md:hidden shrink-0">
         <div className="flex items-center gap-2 text-sm text-content-muted">
           <span className="material-symbols-outlined text-[1rem]">folder_open</span>
-          <span className="font-bold">Workspace</span>
+          <span className="font-bold">工作區</span>
           <span className="text-xs text-content-subtle">({documentsCount})</span>
         </div>
         <button
@@ -65,7 +64,7 @@ export default function WorkspaceEditor({
         <div className="absolute inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-surface-raised px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">upload_file</span>
-            <span className="text-xl font-bold text-content ">Drop files to upload</span>
+            <span className="text-xl font-bold text-content ">拖曳檔案到這裡上傳</span>
           </div>
         </div>
       )}
@@ -77,49 +76,37 @@ export default function WorkspaceEditor({
       )}
 
       <div className="flex-1 flex flex-col min-h-0 p-4 lg:p-6 lg:pl-8">
-        <div className="flex items-center justify-between gap-4 mb-4 shrink-0 bg-surface dark:bg-surface-sunken/30 rounded-xl p-3 border border-border ">
-          <div className="flex-1 min-w-0 flex items-center gap-3">
+        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3 dark:bg-surface-sunken/30">
+          <div className="flex min-w-0 flex-[1_1_14rem] items-center gap-3">
             <span className="material-symbols-outlined text-content-subtle">description</span>
             <input
               id="knowledge-path"
               value={draftPath}
               onChange={(event) => onDraftPathChange(event.target.value)}
-              placeholder="e.g. docs/guide.md"
-              className="flex-1 bg-transparent text-sm text-content placeholder:text-content-subtle focus:outline-none font-mono truncate"
+              placeholder="例：docs/guide.md"
+              aria-label="文件路徑"
+              className="min-w-0 flex-1 bg-transparent font-mono text-sm text-content placeholder:text-content-subtle focus:outline-none truncate"
             />
             {!selectedPath && draftPath && (
               <span className="shrink-0 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-primary">
-                New
+                新檔
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             {selectedPath && (
               <button
+                type="button"
                 onClick={onDelete}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/10 transition-colors"
-                title="Delete Document"
+                className="btn btn-danger px-3 py-1.5 text-xs"
+                title="刪除文件"
               >
-                <span className="material-symbols-outlined text-[1rem]">delete</span>
-                Delete
+                <span className="material-symbols-outlined text-[1rem]" aria-hidden="true">delete</span>
+                刪除
               </button>
             )}
-            <div className="flex rounded-md border border-border overflow-hidden bg-surface-raised">
-              {(["edit", "split", "preview"] as EditorMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => onEditorModeChange(mode)}
-                  className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    editorMode === mode
-                      ? "bg-border text-content "
-                      : "text-content-muted hover:text-content hover:bg-surface-sunken"
-                  }`}
-                >
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </button>
-              ))}
-            </div>
+            <EditorModeSwitch mode={editorMode} onChange={onEditorModeChange} />
           </div>
         </div>
 
@@ -127,7 +114,7 @@ export default function WorkspaceEditor({
           {loadingDocument && (
             <div className="absolute inset-0 bg-surface-raised/60 dark:bg-surface/60 backdrop-blur-sm z-10 flex items-center justify-center">
               <div className="flex items-center gap-2 text-primary font-bold">
-                <span className="material-symbols-outlined animate-spin">refresh</span> Loading...
+                <span className="material-symbols-outlined animate-spin">refresh</span> 載入中…
               </div>
             </div>
           )}
@@ -140,7 +127,7 @@ export default function WorkspaceEditor({
               className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-content placeholder:text-content-subtle focus:outline-none font-mono resize-none overflow-y-auto ${
                 editorMode === "split" ? "border-r border-border " : ""
               }`}
-              placeholder="# Markdown Content\n\n..."
+              placeholder="# Markdown 內容\n\n…"
             />
           ) : null}
 
@@ -151,32 +138,14 @@ export default function WorkspaceEditor({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between shrink-0 pt-2 px-1">
-          <div className="flex items-center gap-2 text-xs text-content-subtle">
-            <span className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
-            {hasUnsavedChanges ? "Unsaved changes" : "Saved"}
-            <span className="mx-2 opacity-30">•</span>
-            {draftContent.length.toLocaleString()} chars
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onDiscard}
-              disabled={!hasUnsavedChanges}
-              className="rounded-lg px-4 py-2 text-sm text-content-muted hover:text-content hover:bg-surface-sunken transition-colors disabled:opacity-30"
-            >
-              Discard
-            </button>
-            <button
-              onClick={onSave}
-              disabled={saving || !canSave}
-              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/10"
-            >
-              <span className="material-symbols-outlined text-[1.125rem]">save</span>
-              {saving ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </div>
+        <EditorSaveBar
+          hasUnsavedChanges={hasUnsavedChanges}
+          charCount={draftContent.length}
+          saving={saving}
+          canSave={canSave}
+          onDiscard={onDiscard}
+          onSave={onSave}
+        />
       </div>
     </main>
   );

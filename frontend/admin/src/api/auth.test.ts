@@ -365,6 +365,7 @@ describe("cookie auth API", () => {
         custom_voices: ["voice-a", "voice-b"],
         avatar_mascots: [],
         avatar_backgrounds: [],
+        asr_engines: ["breeze"],
       },
     };
     // 每次呼叫都要有自己的 Response：body 只能讀一次。

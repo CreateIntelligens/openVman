@@ -14,6 +14,7 @@ export const EMPTY_SCOPE_RESOURCES: AdminScopeResources = {
   custom_voices: [],
   avatar_mascots: [],
   avatar_backgrounds: [],
+  asr_engines: [],
 };
 
 export const SCOPE_GROUPS: Array<{ key: ScopeKey; title: string }> = [
@@ -22,6 +23,7 @@ export const SCOPE_GROUPS: Array<{ key: ScopeKey; title: string }> = [
   { key: "avatar_mascots", title: "VRM" },
   { key: "custom_voices", title: "自訂聲音" },
   { key: "avatar_backgrounds", title: "舞台背景" },
+  { key: "asr_engines", title: "語音辨識引擎" },
 ];
 
 function optionsFor(options: AccountAccessOptions | null, key: ScopeKey): AccountAccessOption[] {

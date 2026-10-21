@@ -25,11 +25,11 @@ describe("CharacterJobsPanel", () => {
     });
     render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Character ID (char_id)"), { target: { value: "hero" } });
-    fireEvent.change(screen.getByPlaceholderText("Display name (label)"), { target: { value: "主角" } });
+    fireEvent.change(screen.getByPlaceholderText("人物 ID（char_id）"), { target: { value: "hero" } });
+    fireEvent.change(screen.getByPlaceholderText("顯示名稱"), { target: { value: "主角" } });
     const file = new File([new Uint8Array([0, 0, 0, 24])], "clip.mp4", { type: "video/mp4" });
     fireEvent.change(screen.getByLabelText("Source video"), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole("button", { name: "產生人物" }));
 
     await waitFor(() => expect(submit).toHaveBeenCalledWith({
       charId: "hero", label: "主角", video: file, projectId: undefined,
@@ -42,7 +42,7 @@ describe("CharacterJobsPanel", () => {
     vi.spyOn(api, "fetchAvatarCharacterJobs").mockResolvedValue({ jobs: [] });
     const submit = vi.spyOn(api, "submitAvatarCharacterJob");
     render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole("button", { name: "產生人物" }));
     expect(await screen.findByRole("status")).toBeTruthy();
     expect(submit).not.toHaveBeenCalled();
   });

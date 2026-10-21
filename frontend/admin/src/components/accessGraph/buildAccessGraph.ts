@@ -101,7 +101,7 @@ const RESOURCE_SOURCES = {
     scope: "avatar_characters",
   },
   voice: { option: "custom_voices", grant: "custom_voices", scope: "custom_voices" },
-  asr: { option: "asr_engines", grant: "asr_engines", scope: null },
+  asr: { option: "asr_engines", grant: "asr_engines", scope: "asr_engines" },
 } as const;
 
 type ResourceKind = keyof typeof RESOURCE_SOURCES;

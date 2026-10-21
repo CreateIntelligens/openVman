@@ -162,14 +162,14 @@ export default function CharacterJobsPanel({
       <div className={formRowClassName}>
         <input
           type="text"
-          placeholder="Character ID (char_id)"
+          placeholder="人物 ID（char_id）"
           value={charId}
           onChange={(e) => setCharId(e.target.value)}
           className={inputClassName}
         />
         <input
           type="text"
-          placeholder="Display name (label)"
+          placeholder="顯示名稱"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           className={inputClassName}
@@ -206,7 +206,7 @@ export default function CharacterJobsPanel({
           </label>
         </div>
         <button onClick={handleSubmit} disabled={submitting} className={uploadButtonClassName}>
-          {submitting ? "Submitting…" : "Generate"}
+          {submitting ? "送出中…" : "產生人物"}
         </button>
       </div>
       {status && (

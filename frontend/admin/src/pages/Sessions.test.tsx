@@ -14,6 +14,8 @@ const browserState = vi.hoisted(() => ({
   confirmBulkDelete: vi.fn(),
   setSimpleExport: vi.fn(),
   bulkDeleteOpen: false,
+  loadError: "",
+  loadSessions: vi.fn(),
   page: 1,
   pageCount: 1,
   selectedSessionIds: new Set<string>(),
@@ -82,6 +84,7 @@ vi.mock("../hooks/useSessionBrowser", async () => {
       deleteTarget: null,
       setDeleteTarget: browserState.setDeleteTarget,
       error: "",
+      loadError: browserState.loadError,
       searchQuery: "",
       setSearchQuery: vi.fn(),
       dateFrom: "",
@@ -93,7 +96,7 @@ vi.mock("../hooks/useSessionBrowser", async () => {
       language: "" as const,
       setLanguage: vi.fn(),
       hasActiveFilters: browserState.hasActiveFilters,
-      loadSessions: vi.fn(),
+      loadSessions: browserState.loadSessions,
       resetFilters: browserState.resetFilters,
       toggleSessionSelection: browserState.toggleSessionSelection,
       toggleAllSessions: browserState.toggleAllSessions,
@@ -112,6 +115,24 @@ describe("Sessions", () => {
     browserState.bulkDeleteOpen = false;
     browserState.page = 1;
     browserState.pageCount = 1;
+    browserState.loadError = "";
+  });
+
+  it("shows a load failure with retry instead of the empty state", () => {
+    // 2026-10-21 複查：讀取失敗時同時出現錯誤與「還沒有任何對話紀錄」，看起來像資料不見。
+    const saved = browserState.sessions;
+    browserState.sessions = [];
+    browserState.loadError = "無法載入對話紀錄";
+    try {
+      render(<Sessions />);
+      expect(screen.getByRole("alert").textContent).toContain("無法載入對話紀錄");
+      expect(screen.queryByText("還沒有任何對話紀錄")).toBeNull();
+      expect(screen.getByText("筆數未知")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "重新載入" }));
+      expect(browserState.loadSessions).toHaveBeenCalled();
+    } finally {
+      browserState.sessions = saved;
+    }
   });
 
   it("offers bulk delete only once sessions are selected", () => {

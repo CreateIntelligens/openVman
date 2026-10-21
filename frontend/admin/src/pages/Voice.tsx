@@ -1,6 +1,7 @@
 import AsrProviderPanel from "../components/AsrProviderPanel";
 import TtsPreviewPanel from "../components/TtsPreviewPanel";
 import { useAdminSubView } from "../hooks/useAdminSubView";
+import { handleTablistKeyDown } from "../utils/tablistKeys";
 
 type Tab = "tts" | "asr";
 
@@ -22,19 +23,7 @@ export default function Voice() {
           className="flex"
           aria-label="語音功能"
           role="tablist"
-          onKeyDown={(event) => {
-            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-            event.preventDefault();
-            const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-            const current = TABS.findIndex((item) => item.id === tab);
-            const next = event.key === "Home"
-              ? 0
-              : event.key === "End"
-                ? TABS.length - 1
-                : (current + (event.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length;
-            tabs[next]?.focus();
-            tabs[next]?.click();
-          }}
+          onKeyDown={(event) => handleTablistKeyDown(event, TAB_IDS, tab)}
         >
           {TABS.map((item) => (
             <button

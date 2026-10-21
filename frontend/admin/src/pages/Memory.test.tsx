@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fetchMemories } from "../api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Memory from "./Memory";
 import { NavigationProvider } from "../context/NavigationContext";
@@ -26,6 +27,18 @@ function RouteHarness({ children }: { children: ReactNode }) {
 }
 
 beforeEach(() => { localStorage.clear(); history.replaceState(null, "", "/admin/memory"); });
+describe("Memory load failure", () => {
+  it("shows the error with retry, not an empty list or a count of zero", async () => {
+    vi.mocked(fetchMemories).mockRejectedValueOnce(new Error("連不上伺服器"));
+    render(<RouteHarness><Memory /></RouteHarness>);
+    expect((await screen.findByRole("alert")).textContent).toContain("連不上伺服器");
+    expect(screen.queryByText(/尚無記憶/)).toBeNull();
+    expect(screen.getByText("筆數未知")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "重新載入" }));
+    expect(await screen.findByText(/尚無記憶/)).toBeTruthy();
+  });
+});
+
 describe("Memory subpage routes", () => {
   it("opens add directly and preserves it across a remount", async () => {
     history.replaceState(null, "", "/admin/memory/add");

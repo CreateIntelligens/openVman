@@ -33,7 +33,8 @@ export default function KnowledgeHeader({
 }: KnowledgeHeaderProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
-      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      {/* 標題與頁籤先占一個基本寬度；放不下時操作列整組換到下一行，平板寬度標題才不會被擠成直排。 */}
+      <div className="flex min-w-0 flex-[1_1_18rem] items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={onOpenMobileTree}
@@ -47,11 +48,11 @@ export default function KnowledgeHeader({
           </span>
         </button>
         <span className="material-symbols-outlined text-primary text-[1.5rem]">school</span>
-        <h1 className="page-title">知識庫</h1>
-        <span className="hidden text-xs text-content-subtle lg:inline">
+        <h1 className="page-title whitespace-nowrap">知識庫</h1>
+        <span className="hidden whitespace-nowrap text-xs text-content-subtle xl:inline">
           {documentCount} 文件 · {indexedCount} 已索引
         </span>
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface-sunken p-0.5 dark:bg-surface-sunken/40 sm:ml-3">
+        <div className="ml-auto flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface-sunken p-0.5 dark:bg-surface-sunken/40 sm:ml-3">
           <button
             onClick={() => setActiveTab("documents")}
             className={`whitespace-nowrap px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
@@ -75,7 +76,7 @@ export default function KnowledgeHeader({
         </div>
       </div>
       {activeTab === "documents" && (
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
           <LanguageRoutesButton projectId={projectId} />
           <button
             onClick={onToggleSourcePanel}

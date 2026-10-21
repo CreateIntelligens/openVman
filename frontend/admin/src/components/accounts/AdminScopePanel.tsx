@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   fetchAccountAccessOptions,
@@ -9,6 +9,7 @@ import {
   type AdminScopeResources,
 } from "../../api/auth";
 import { useAuth } from "../../context/AuthContext";
+import { useUnsavedChanges } from "../../context/NavigationGuardContext";
 import AdminScopeFields, { EMPTY_SCOPE_RESOURCES } from "./AdminScopeFields";
 
 
@@ -44,6 +45,7 @@ export default function AdminScopePanel({
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const snapshot = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,8 +56,10 @@ export default function AdminScopePanel({
       .then(([fetchedOptions, scope]) => {
         if (cancelled) return;
         setOptions(fetchedOptions);
+        const loadedSelection = { ...EMPTY_SCOPE_RESOURCES, ...scope.resources };
+        snapshot.current = JSON.stringify({ scoped: scope.scoped, resources: loadedSelection });
         setScoped(scope.scoped);
-        setSelection({ ...EMPTY_SCOPE_RESOURCES, ...scope.resources });
+        setSelection(loadedSelection);
         setLoaded(true);
       })
       .catch((reason) => {
@@ -69,10 +73,9 @@ export default function AdminScopePanel({
     };
   }, [account.id, loadAttempt]);
 
-
-
-
-
+  // 跟讀到的上限不同就是「尚未儲存」：收合面板、切帳號或離開頁面前會先問。
+  const dirty = loaded && snapshot.current !== JSON.stringify({ scoped, resources: selection });
+  useUnsavedChanges(`admin-scope:${account.id}`, dirty, `${account.username} 的資源上限`);
 
   async function save() {
     setSaving(true);

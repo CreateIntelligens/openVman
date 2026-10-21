@@ -17,6 +17,7 @@ import MemoryPagination from "../components/memory/MemoryPagination";
 import MemoryRecordCard from "../components/memory/MemoryRecordCard";
 import { useProject } from "../context/ProjectContext";
 import { useAdminSubView } from "../hooks/useAdminSubView";
+import { errorMessage } from "../utils/errorMessage";
 
 const MEMORY_TABS = ["browse", "add"] as const;
 type Tab = (typeof MEMORY_TABS)[number];
@@ -33,6 +34,8 @@ export default function Memory() {
   // Browse state
   const [memories, setMemories] = useState<Awaited<ReturnType<typeof fetchMemories>>["memories"]>([]);
   const [total, setTotal] = useState(0);
+  // 讀不到和真的沒有要分開：讀取失敗時不顯示「尚無記憶」，也不把筆數當成 0。
+  const [loadError, setLoadError] = useState("");
   const [page, setPage] = useState(1);
   const [loadingMemories, setLoadingMemories] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,13 +63,14 @@ export default function Memory() {
 
   const loadMemories = (targetPage = page) => {
     setLoadingMemories(true);
+    setLoadError("");
     fetchMemories(targetPage, pageSize)
       .then((res) => {
         setMemories(res.memories);
         setTotal(res.total);
         setPage(res.page);
       })
-      .catch((e) => setStatus({ type: "error", message: String(e) }))
+      .catch((e) => setLoadError(errorMessage(e, "無法載入記憶")))
       .finally(() => setLoadingMemories(false));
   };
 
@@ -158,7 +162,7 @@ export default function Memory() {
           <div className="space-y-6">
             <MemoryFilters
               searchTerm={searchTerm}
-              total={total}
+              total={loadError && !memories.length ? null : total}
               page={page}
               totalPages={totalPages}
               loading={loadingMemories}
@@ -172,7 +176,15 @@ export default function Memory() {
                   載入記憶中...
                 </div>
               )}
-              {!loadingMemories && !filteredMemories.length && (
+              {loadError && (
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-danger/30 bg-danger/10 p-8 text-center text-sm text-danger" role="alert">
+                  <p>{loadError}{memories.length ? "；下方是上次載入的資料。" : ""}</p>
+                  <button type="button" className="btn btn-ghost" onClick={() => loadMemories(page)}>
+                    重新載入
+                  </button>
+                </div>
+              )}
+              {!loadingMemories && !loadError && !filteredMemories.length && (
                 <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-content-subtle">
                   {searchTerm ? "沒有符合搜尋條件的記憶。" : "尚無記憶。請切換至「新增」標籤頁建立。"}
                 </div>

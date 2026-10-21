@@ -71,19 +71,19 @@ export default function CharactersPanel({
       <div className={formPanelClassName}>
         <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
           <span className="material-symbols-outlined text-base">upload</span>
-          Upload new character
+          上傳新人物
         </p>
         <div className={formRowClassName}>
           <input
             type="text"
-            placeholder="Character ID (char_id)"
+            placeholder="人物 ID（char_id）"
             value={uploadId}
             onChange={(e) => onUploadIdChange(e.target.value)}
             className={inputClassName}
           />
           <input
             type="text"
-            placeholder="Display name (label)"
+            placeholder="顯示名稱"
             value={uploadLabel}
             onChange={(e) => onUploadLabelChange(e.target.value)}
             className={inputClassName}
@@ -111,7 +111,7 @@ export default function CharactersPanel({
             <label className={filePickerClassName(selectedVideoName)}>
               <span className="material-symbols-outlined text-sm">movie</span>
               <span className="min-w-0 truncate">
-                {selectedVideoName || "Select WebM"}
+                {selectedVideoName || "選擇 WebM 影片"}
               </span>
               <input
                 ref={videoRef}
@@ -136,7 +136,7 @@ export default function CharactersPanel({
                 folder_zip
               </span>
               <span className="min-w-0 truncate">
-                {selectedDataName || "Select GZ data"}
+                {selectedDataName || "選擇 GZ 資料檔"}
               </span>
               <input
                 ref={dataRef}
@@ -154,7 +154,7 @@ export default function CharactersPanel({
             disabled={uploading}
             className={uploadButtonClassName}
           >
-            {uploading ? "Uploading…" : "Upload"}
+            {uploading ? "上傳中…" : "上傳"}
           </button>
         </div>
       </div>
@@ -215,7 +215,7 @@ export default function CharactersPanel({
                   onClick={() => onDelete(character.char_id)}
                   className={dangerActionClassName}
                 >
-                  Delete
+                  刪除
                 </button>
               </div>
             </div>

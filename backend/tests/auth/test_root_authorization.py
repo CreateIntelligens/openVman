@@ -638,3 +638,31 @@ def test_scoped_admin_creating_an_account_is_rejected_outside_its_scope(
     )
     assert response.status_code == 422
     assert "voice-forbidden" in response.json()["detail"]
+
+
+def test_admin_scope_keeps_asr_engines(client, runtime):
+    # 2026-10-21：讀取有 asr_engines，寫入的 mapping 卻漏了它，上限永遠存不進 ASR，
+    # 受限管理員因此一個 ASR 引擎都指派不出去。
+    root = _root(runtime)
+    admin = _create_admin(runtime, root.id)
+    for engine in ("breeze", "sensevoice"):
+        runtime.resources.upsert_system_resource(
+            resource_type=ResourceType.ASR_ENGINE,
+            resource_id=engine,
+            metadata={"label": engine},
+        )
+    headers = _headers(client, "ai360", _ROOT_PASSWORD)
+
+    response = client.put(
+        f"/api/v1/users/{admin.id}/scope",
+        json={"scoped": True, "resources": {"asr_engines": ["breeze"]}},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["resources"]["asr_engines"] == ["breeze"]
+    read_back = client.get(f"/api/v1/users/{admin.id}/scope", headers=headers)
+    assert read_back.json()["resources"]["asr_engines"] == ["breeze"]
+    scope = runtime.admin_scopes.get(admin.id)
+    assert scope.allows(ResourceType.ASR_ENGINE, "breeze")
+    assert not scope.allows(ResourceType.ASR_ENGINE, "sensevoice")

@@ -27,6 +27,7 @@ import {
   toMascotOption,
 } from "../data/mascotCatalog";
 import { useAdminSubView } from "../hooks/useAdminSubView";
+import { handleTablistKeyDown } from "../utils/tablistKeys";
 import BackgroundsPanel from "../components/avatar/BackgroundsPanel";
 import CharacterJobsPanel from "../components/avatar/CharacterJobsPanel";
 import CharactersPanel from "../components/avatar/CharactersPanel";
@@ -40,6 +41,11 @@ type RenameTarget =
   | { kind: "background"; background: AvatarBackground }
   | { kind: "mascot"; mascot: AvatarMascot };
 const ASSET_TABS = ["characters", "backgrounds", "mascots"] as const;
+const ASSET_TAB_LABELS: Record<(typeof ASSET_TABS)[number], string> = {
+  characters: "人物",
+  backgrounds: "背景",
+  mascots: "小助理",
+};
 type AssetTab = (typeof ASSET_TABS)[number];
 const AVATAR_CHARACTER_STORAGE_KEY = "avatar.character_id";
 const AVATAR_BACKGROUND_ID_STORAGE_KEY = "avatar.background_id";
@@ -251,7 +257,7 @@ export default function Avatar() {
     if (!charId || !label || !videoFile || !dataFile) {
       setStatus({
         type: "error",
-        message: "Please fill in all fields and select both files",
+        message: "請填寫所有欄位，並選好兩個檔案",
       });
       return;
     }
@@ -266,7 +272,7 @@ export default function Avatar() {
         projectId: uploadCharProjectId || undefined,
       });
       resetUploadForm();
-      setStatus({ type: "success", message: "Upload successful" });
+      setStatus({ type: "success", message: "上傳完成" });
       await load();
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
@@ -293,7 +299,7 @@ export default function Avatar() {
     if (!backgroundId || !label || !image) {
       setStatus({
         type: "error",
-        message: "Please fill in all fields and select an image",
+        message: "請填寫所有欄位，並選好圖片",
       });
       return;
     }
@@ -307,7 +313,7 @@ export default function Avatar() {
         projectId: uploadBgProjectId || undefined,
       });
       resetBackgroundUploadForm();
-      setStatus({ type: "success", message: "Background upload successful" });
+      setStatus({ type: "success", message: "背景上傳完成" });
       await loadBackgrounds();
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
@@ -339,7 +345,7 @@ export default function Avatar() {
         projectId: uploadMascotProjectId || undefined,
       });
       resetMascotUploadForm();
-      setStatus({ type: "success", message: "Mascot upload successful" });
+      setStatus({ type: "success", message: "小助理上傳完成" });
       await loadMascots();
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
@@ -469,28 +475,26 @@ export default function Avatar() {
 
       {status && <StatusAlert type={status.type} message={status.message} />}
 
-      <div className="flex w-full shrink-0 flex-col rounded-lg md:w-fit md:flex-row bg-surface-sunken p-1 dark:bg-surface/40 border border-border/50 ">
-        <button
-          type="button"
-          onClick={() => handleTabChange("characters")}
-          className={tabButtonClassName("characters", activeTab)}
-        >
-          Characters
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange("backgrounds")}
-          className={tabButtonClassName("backgrounds", activeTab)}
-        >
-          Backgrounds
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange("mascots")}
-          className={tabButtonClassName("mascots", activeTab)}
-        >
-          Mascots
-        </button>
+      <div
+        role="tablist"
+        aria-label="素材類別"
+        className="flex w-full shrink-0 flex-col rounded-lg md:w-fit md:flex-row bg-surface-sunken p-1 dark:bg-surface/40 border border-border/50 "
+        onKeyDown={(event) => handleTablistKeyDown(event, ASSET_TABS, activeTab)}
+      >
+        {ASSET_TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            id={`avatar-${tab}-tab`}
+            aria-selected={activeTab === tab}
+            tabIndex={activeTab === tab ? 0 : -1}
+            onClick={() => handleTabChange(tab)}
+            className={tabButtonClassName(tab, activeTab)}
+          >
+            {ASSET_TAB_LABELS[tab]}
+          </button>
+        ))}
       </div>
 
       {activeTab === "characters" && (
@@ -589,7 +593,7 @@ export default function Avatar() {
         <iframe
           key={currentSnapshotId}
           src={currentSnapshotSrc}
-          title="Mascot snapshot capture"
+          title="小助理縮圖擷取"
           style={hiddenSnapshotFrameStyle}
         />
       )}

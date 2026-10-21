@@ -65,7 +65,7 @@ export default function BackgroundsPanel({
       <div className={formPanelClassName}>
         <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
           <span className="material-symbols-outlined text-base">image</span>
-          Upload background
+          上傳背景
         </p>
         <div className={formRowClassName}>
           <input
@@ -77,7 +77,7 @@ export default function BackgroundsPanel({
           />
           <input
             type="text"
-            placeholder="Display name"
+            placeholder="顯示名稱"
             value={uploadLabel}
             onChange={(e) => onUploadLabelChange(e.target.value)}
             className={inputClassName}
@@ -105,7 +105,7 @@ export default function BackgroundsPanel({
             <label className={filePickerClassName(selectedImageName)}>
               <span className="material-symbols-outlined text-sm">image</span>
               <span className="min-w-0 truncate">
-                {selectedImageName || "Select background image"}
+                {selectedImageName || "選擇背景圖片"}
               </span>
               <input
                 ref={imageRef}
@@ -123,7 +123,7 @@ export default function BackgroundsPanel({
             disabled={uploading}
             className={uploadButtonClassName}
           >
-            {uploading ? "Uploading…" : "Upload background"}
+            {uploading ? "上傳中…" : "上傳背景"}
           </button>
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function BackgroundsPanel({
                   onClick={() => onDelete(background.background_id)}
                   className={dangerActionClassName}
                 >
-                  Delete
+                  刪除
                 </button>
               </div>
             </div>

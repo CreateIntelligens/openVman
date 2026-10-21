@@ -1,6 +1,5 @@
 import MarkdownPreview from "../MarkdownPreview";
-
-type EditorMode = "edit" | "preview" | "split";
+import { EditorModeSwitch, EditorSaveBar, type EditorMode } from "../editor/EditorControls";
 
 interface PersonaCoreDoc {
   path: string;
@@ -42,37 +41,21 @@ export default function PersonaEditor({
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 lg:p-8 z-10">
       <div className="flex flex-col gap-6 mb-6 shrink-0">
-        <div className="flex items-end justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-4">
             <div className="w-10 h-10 rounded border border-border bg-surface-raised dark:bg-surface-sunken/50 flex items-center justify-center text-content-muted">
               <span className="material-symbols-outlined text-[1.25rem]">psychology</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="card-title leading-tight tracking-tight mb-0.5">
                 {title}
               </h3>
               <div className="flex items-center gap-2">
-                <span className="text-[0.6875rem] font-mono text-content-subtle">{selectedPath}</span>
+                <span className="break-all text-[0.6875rem] font-mono text-content-subtle">{selectedPath}</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 shrink-0">
-            <div className="flex rounded-md border border-border overflow-hidden bg-surface-raised">
-              {(["edit", "split", "preview"] as EditorMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => onEditorModeChange(mode)}
-                  className={`px-3 py-1 text-[0.6875rem] font-medium transition-colors ${
-                    editorMode === mode
-                      ? "bg-border text-content "
-                      : "text-content-muted hover:text-content hover:bg-surface-sunken"
-                  }`}
-                >
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
+          <EditorModeSwitch mode={editorMode} onChange={onEditorModeChange} />
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar border-b border-border pb-3">
@@ -120,31 +103,15 @@ export default function PersonaEditor({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between shrink-0 pt-2 px-1">
-        <div className="flex items-center gap-2 text-[0.6875rem] text-content-subtle font-medium">
-          <span className={`w-2 h-2 rounded-full transition-colors duration-300 ${hasUnsavedChanges ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
-          {hasUnsavedChanges ? "Unsaved changes" : "Saved"}
-          <span className="mx-1.5 opacity-30 text-content-muted">•</span>
-          <span className="font-mono">{draftContent.length.toLocaleString()} chars</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onDiscard}
-            disabled={!hasUnsavedChanges}
-            className="rounded-lg px-4 py-2 text-[0.75rem] font-medium text-content-muted hover:text-content hover:bg-surface-sunken transition-colors disabled:opacity-30"
-          >
-            捨棄
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving || !hasUnsavedChanges}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[0.75rem] font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/10"
-          >
-            <span className="material-symbols-outlined text-[1rem]">save</span>
-            {saving ? "儲存中..." : "儲存設定"}
-          </button>
-        </div>
-      </div>
+      <EditorSaveBar
+        hasUnsavedChanges={hasUnsavedChanges}
+        charCount={draftContent.length}
+        saving={saving}
+        canSave={hasUnsavedChanges}
+        saveLabel="儲存設定"
+        onDiscard={onDiscard}
+        onSave={onSave}
+      />
     </div>
   );
 }
