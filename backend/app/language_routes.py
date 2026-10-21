@@ -56,7 +56,7 @@ def resolve_project(current: CurrentAccount, supplied_project_id: str) -> str | 
     查不到或沒權限就回 None（當作沒有分流），不讓語音請求失敗。
     """
     if current.embed_key is not None:
-        return current.embed_key.project_id
+        return canonical_project_id(current.embed_key.project_id) or None
     project_id = canonical_project_id(supplied_project_id)
     if not project_id:
         return None

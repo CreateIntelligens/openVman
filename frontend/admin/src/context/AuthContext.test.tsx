@@ -126,6 +126,19 @@ describe("AuthProvider", () => {
     expect(getCurrentAccount).toHaveBeenCalledTimes(2);
   });
 
+  it("drops the stale outage message once the account authenticates", async () => {
+    vi.mocked(getCurrentAccount).mockRejectedValueOnce(
+      new AdminSessionUnavailableError("連不上伺服器，請稍後再試。"),
+    );
+    render(<AuthProvider><Probe /></AuthProvider>);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "login" }));
+
+    expect(await screen.findByText("alice")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("keeps the normal frontend session when Admin portal bootstrap is denied", async () => {
     vi.mocked(getCurrentAccount).mockRejectedValue(
       new AdminPortalAccessError("Admin portal access required"),

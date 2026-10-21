@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const expireSession = useCallback(() => {
     setAccount(null);
     setForbidden(false);
+    setUnavailable(null);
     setLoading(false);
     if (window.location.pathname !== publicAdminPath("/admin/login")) {
       replacePath(publicAdminPath("/admin/login"));
@@ -106,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleAuthenticated = useCallback((profile: AccountProfile) => {
     setAccount(profile);
     setForbidden(false);
+    setUnavailable(null);
     replacePath(publicAdminPath("/admin/chat"));
   }, []);
 

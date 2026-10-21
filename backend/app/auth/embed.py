@@ -16,6 +16,8 @@ from threading import Lock
 
 from fastapi import HTTPException, status
 
+from app.project_ids import canonical_project_id
+
 from .embed_keys_repository import utc_day
 from .models import AccountRole, AccountType, EmbedKeyRecord, UserRecord
 
@@ -197,8 +199,9 @@ def _seconds_until_next_utc_day() -> int:
 
 def enforce_project_binding(key: EmbedKeyRecord, supplied_project_id: str) -> None:
     """A client-supplied project that is not the key's own project is a 403."""
-    candidate = supplied_project_id.strip()
-    if candidate and candidate != key.project_id:
+    candidate = canonical_project_id(supplied_project_id)
+    # 兩邊都換算別名：金鑰綁 "default"、呼叫端帶預設專案的正式 ID 是同一個專案。
+    if candidate and candidate != canonical_project_id(key.project_id):
         raise _forbidden("Project is not allowed for this embed key")
 
 

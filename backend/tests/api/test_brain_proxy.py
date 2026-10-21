@@ -494,3 +494,29 @@ def test_voice_requests_resolve_the_default_alias_before_checking_access(monkeyp
 
     assert language_routes.resolve_project(current, "default") == "hospital"
     assert seen == ["hospital"]
+
+
+def test_invalid_default_project_setting_falls_back_like_brain(monkeypatch) -> None:
+    # Brain 對不合法的 DEFAULT_PROJECT_ID 退回 "default"；Backend 要一樣，兩邊才查同一個專案。
+    from app import project_ids
+
+    for value, expected in (("bad/id", "default"), ("", "default"), ("hospital", "hospital")):
+        monkeypatch.setattr(
+            project_ids, "get_tts_config", lambda value=value: MagicMock(default_project_id=value),
+        )
+        assert project_ids.default_project_id() == expected
+
+
+def test_embed_key_bound_to_default_alias_uses_the_default_project(monkeypatch) -> None:
+    from app import language_routes
+    from app.auth.embed import enforce_project_binding
+
+    monkeypatch.setattr("app.project_ids.default_project_id", lambda: "hospital")
+    key = MagicMock(project_id="default")
+
+    assert language_routes.resolve_project(MagicMock(embed_key=key), "") == "hospital"
+    # 金鑰綁 "default"，呼叫端帶正式 ID 或別名都是同一個專案，不該 403。
+    enforce_project_binding(key, "hospital")
+    enforce_project_binding(key, "default")
+    with pytest.raises(Exception):
+        enforce_project_binding(key, "other")

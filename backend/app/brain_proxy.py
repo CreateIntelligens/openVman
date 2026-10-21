@@ -356,8 +356,10 @@ async def _authorize_project_context(
             current.embed_key,
             await _request_project_id(request) or "",
         )
-        request.state.resolved_project_id = current.embed_key.project_id
-        return current.embed_key.project_id
+        # 金鑰可能在 default 拔掉前就綁了 "default"，一樣換成預設專案的正式 ID。
+        embed_project_id = canonical_project_id(current.embed_key.project_id)
+        request.state.resolved_project_id = embed_project_id
+        return embed_project_id
 
     supplied_project_id = await _request_project_id(request)
     if explicit_project_id is not None:
