@@ -316,7 +316,7 @@ export default function Personas() {
                                           deletingPersonaId={deletingPersonaId}
                                           onSelect={(persona) => {
                                                  selectPersona(persona);
-                                                 personaDrawer.setMobileTreeOpen(false);
+                                                 personaDrawer.closeMobileTree();
                                           }}
                                           onDelete={setDeletePersonaTarget}
                                    />

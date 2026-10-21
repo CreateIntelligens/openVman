@@ -176,7 +176,7 @@ export default function KnowledgeBase() {
   });
 
   const mobileTree = useMobileTreeDrawer();
-  const { setMobileTreeOpen, openMobileTree } = mobileTree;
+  const { closeMobileTree, openMobileTree } = mobileTree;
 
   const displayTree = useMemo(
     () => mergeQaNodesIntoTree(filteredTree, nodesTree, search),
@@ -200,9 +200,9 @@ export default function KnowledgeBase() {
       writeScoped(`kb-selected-qa-node-id:${projectId}`, nodeId);
       removeScoped(`kb-selected-file-path:${projectId}`);
       closeFileView();
-      setMobileTreeOpen(false);
+      closeMobileTree();
     },
-    [closeFileView, projectId],
+    [closeFileView, closeMobileTree, projectId],
   );
 
   const handleSelectTreeFile = useCallback(
@@ -210,9 +210,9 @@ export default function KnowledgeBase() {
       setSelectedQaNodeId(null);
       removeScoped(`kb-selected-qa-node-id:${projectId}`);
       handleTreeSelect(node);
-      setMobileTreeOpen(false);
+      closeMobileTree();
     },
-    [handleTreeSelect, projectId],
+    [closeMobileTree, handleTreeSelect, projectId],
   );
 
   const handleQaMutationSuccess = useCallback(() => {

@@ -27,7 +27,10 @@ function openWithTriggerAt(left: number, width = 40) {
 }
 
 describe("ActionMenu", () => {
+  const originalInnerWidth = window.innerWidth;
+
   afterEach(() => {
+    window.innerWidth = originalInnerWidth;
     vi.restoreAllMocks();
   });
 

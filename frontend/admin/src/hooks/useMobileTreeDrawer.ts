@@ -20,9 +20,12 @@ export function useMobileTreeDrawer(closeLabel = "關閉檔案樹") {
     [],
   );
 
+  // 選了項目也走這裡：抽屜開著才有開啟鈕可還焦點；桌面版沒開過抽屜就只是關。
   const closeMobileTree = useCallback(() => {
+    const opener = mobileTreeOpenerRef.current;
+    mobileTreeOpenerRef.current = null;
     setMobileTreeOpen(false);
-    mobileTreeOpenerRef.current?.focus();
+    opener?.focus();
   }, []);
 
   useEffect(() => {
@@ -44,7 +47,6 @@ export function useMobileTreeDrawer(closeLabel = "關閉檔案樹") {
 
   return {
     mobileTreeOpen,
-    setMobileTreeOpen,
     mobileTreePanelRef,
     openMobileTree,
     closeMobileTree,
