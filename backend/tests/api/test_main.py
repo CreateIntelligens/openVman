@@ -961,9 +961,13 @@ def test_tts_providers_includes_voxcpm_when_configured(monkeypatch):
         {
             "id": "voxcpm",
             "name": "VoxCPM",
-            "default_voice": "voxcpm2-cosy-young-female-01",
-            "voices": ["barbet-hung-yi-lee", "voxcpm2-cosy-young-female-01"],
+            # 預設聲音是 Hayley（voxcpm2-cosy-young-female-02）；上游清單沒列時補在最前面。
+            "default_voice": "voxcpm2-cosy-young-female-02",
+            "voices": [
+                "voxcpm2-cosy-young-female-02", "barbet-hung-yi-lee", "voxcpm2-cosy-young-female-01",
+            ],
             "voice_items": [
+                {"id": "voxcpm2-cosy-young-female-02", "label": "Hayley"},
                 {"id": "barbet-hung-yi-lee", "label": "李宏毅老師"},
                 {"id": "voxcpm2-cosy-young-female-01", "label": "青年女聲 01"},
             ],
@@ -1355,7 +1359,8 @@ def test_voxcpm_voice_list_drops_excluded_ids(monkeypatch):
         tts_aws_enabled=False,
         tts_gemini_url="",
         tts_voxcpm_url="http://voxcpm.invalid",
-        tts_voxcpm_default_voice="",
+        # 預設聲音指定成清單裡有的那一個，這裡只驗黑名單，不讓預設聲音被補進清單。
+        tts_voxcpm_default_voice="voxcpm2-cosy-young-female-01",
         tts_voxcpm_excluded_voices=" barbet-hung-yi-lee, ",
         tts_cosyvoice_url="",
         edge_tts_enabled=False,

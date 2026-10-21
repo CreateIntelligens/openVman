@@ -22,9 +22,10 @@ logger = logging.getLogger("provider.voxcpm")
 VOXCPM_PROVIDER_NAME = "voxcpm"
 # /api/v1/catalog 公布的引擎 id；這個部署只有 voxcpm2。
 VOXCPM_ENGINE_ID = "voxcpm2"
-# 無 TTS_VOXCPM_DEFAULT_VOICE 時的保底語音。VoxCPM2 依文字內容推斷語言，
+# 無 TTS_VOXCPM_DEFAULT_VOICE 時的保底語音：Hayley，與 IndexTTS 的 hayley、CosyVoice 的
+# young-female-02 同一位，備援換引擎時聲音不變。VoxCPM2 依文字內容推斷語言，
 # 參考音只決定音色，所以台語參考音唸華語文字仍是華語。
-VOXCPM_DEFAULT_VOICE = "voxcpm2-cosy-young-female-01"
+VOXCPM_DEFAULT_VOICE = "voxcpm2-cosy-young-female-02"
 # VoxCPM2 輸出 48kHz WAV，gateway 再以 ffmpeg 轉 mp3（取樣率不變）。
 # mp3 由瀏覽器自行解碼，此值只作為 cache metadata。
 VOXCPM_SAMPLE_RATE = 48000

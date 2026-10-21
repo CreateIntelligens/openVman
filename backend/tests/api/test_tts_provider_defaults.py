@@ -21,7 +21,7 @@ def test_engines_without_a_preference_show_the_deployment_default(monkeypatch):
     grouped = voice_access._grouped(
         [
             ("cosyvoice", "child-female-01", "child-female-01"), ("cosyvoice", "young-female-02", "young-female-02"),
-            ("voxcpm", "voxcpm2-cosy-child-female-01", "voxcpm2-cosy-child-female-01"), ("voxcpm", "voxcpm2-cosy-young-female-01", "voxcpm2-cosy-young-female-01"),
+            ("voxcpm", "voxcpm2-cosy-child-female-01", "voxcpm2-cosy-child-female-01"), ("voxcpm", "voxcpm2-cosy-young-female-02", "voxcpm2-cosy-young-female-02"),
             ("indextts", "hayley", "hayley"), ("indextts", "jinping", "jinping"),
         ],
         "hayley",
@@ -29,7 +29,7 @@ def test_engines_without_a_preference_show_the_deployment_default(monkeypatch):
     defaults = {entry["id"]: entry["default_voice"] for entry in grouped}
     assert defaults == {
         "cosyvoice": "young-female-02",
-        "voxcpm": "voxcpm2-cosy-young-female-01",
+        "voxcpm": "voxcpm2-cosy-young-female-02",
         "indextts": "hayley",
     }
 
