@@ -132,8 +132,12 @@ export default function Personas() {
        };
 
        // 使用者主動換角色或換文件：有未存的修改先問，不直接蓋掉。
-       const selectPersona = (persona: PersonaSummary) => {
-              requestNavigation(() => void openPersona(persona));
+       // onConfirmed 只在真的要換時才跑，例如關手機抽屜；按取消就留在原地。
+       const selectPersona = (persona: PersonaSummary, onConfirmed?: () => void) => {
+              requestNavigation(() => {
+                     onConfirmed?.();
+                     void openPersona(persona);
+              });
        };
 
        const selectDocument = (path: string) => {
@@ -335,11 +339,7 @@ export default function Personas() {
                                           personas={personas}
                                           selectedPersonaId={selectedPersona?.persona_id}
                                           deletingPersonaId={deletingPersonaId}
-                                          onSelect={(persona) => {
-                                                 // 先關抽屜讓焦點回到「管理角色」，跳出的未存提醒關掉後才有地方還焦點。
-                                                 personaDrawer.closeMobileTree();
-                                                 selectPersona(persona);
-                                          }}
+                                          onSelect={(persona) => selectPersona(persona, personaDrawer.closeMobileTree)}
                                           onDelete={setDeletePersonaTarget}
                                    />
 

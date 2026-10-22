@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
@@ -76,6 +76,26 @@ describe("Workspace unsaved changes", () => {
     fireEvent.click(screen.getByRole("button", { name: /文件乙/ }));
     fireEvent.click(await screen.findByRole("button", { name: "捨棄並離開" }));
     await waitFor(() => expect(opened()).toContain("b.md"));
+  });
+
+  it("keeps the phone file list open when the user stays", async () => {
+    render(
+      <NavigationGuardProvider>
+        <Workspace />
+      </NavigationGuardProvider>,
+    );
+    await editorWithDraft();
+
+    fireEvent.click(screen.getByRole("button", { name: "開啟文件清單" }));
+    const mobileList = () => screen.getByRole("button", { name: "關閉文件清單" }).closest("aside") as HTMLElement;
+    fireEvent.click(within(mobileList()).getByRole("button", { name: /文件乙/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "取消" }));
+    expect(screen.getByRole("button", { name: "關閉文件清單" })).toBeTruthy();
+
+    fireEvent.click(within(mobileList()).getByRole("button", { name: /文件乙/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "捨棄並離開" }));
+    await waitFor(() => expect(opened()).toContain("b.md"));
+    expect(screen.queryByRole("button", { name: "關閉文件清單" })).toBeNull();
   });
 
   it("asks before starting a new document or reloading the list over unsaved edits", async () => {

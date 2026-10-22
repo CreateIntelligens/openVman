@@ -46,9 +46,16 @@ export default function Workspace() {
   const { requestNavigation } = useNavigationGuard();
 
   // 換文件、開新文件、重新整理都會蓋掉編輯區，有未存的修改先問。
-  const selectDocument = (path: string) => {
-    if (path === selectedPath) return;
-    requestNavigation(() => void openDocument(path));
+  // onConfirmed 只在真的換文件時才跑（例如關手機側欄）；按取消側欄留著。
+  const selectDocument = (path: string, onConfirmed?: () => void) => {
+    if (path === selectedPath) {
+      onConfirmed?.();
+      return;
+    }
+    requestNavigation(() => {
+      onConfirmed?.();
+      void openDocument(path);
+    });
   };
   const startNewDocument = () => requestNavigation(createDocument);
 
@@ -68,10 +75,7 @@ export default function Workspace() {
         onClose={() => setMobileSidebarOpen(false)}
         onCreate={startNewDocument}
         onSearchChange={setDocSearch}
-        onSelect={(path) => {
-          setMobileSidebarOpen(false);
-          selectDocument(path);
-        }}
+        onSelect={(path) => selectDocument(path, () => setMobileSidebarOpen(false))}
       />
 
       <WorkspaceDesktopSidebar
@@ -86,7 +90,7 @@ export default function Workspace() {
         onSync={() => void syncDocuments()}
         onCreate={startNewDocument}
         onSearchChange={setDocSearch}
-        onSelect={selectDocument}
+        onSelect={(path) => selectDocument(path)}
         onFileUpload={handleFileUpload}
       />
 

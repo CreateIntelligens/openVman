@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Personas from "./Personas";
@@ -67,6 +67,26 @@ describe("Personas unsaved changes", () => {
     fireEvent.click(await screen.findByRole("button", { name: "捨棄並離開" }));
     await waitFor(() => expect(opened()).toContain("personas/nurse/SOUL.md"));
     expect((await editor("護理師")).value).toBe("內容：personas/nurse/SOUL.md");
+  });
+
+  it("keeps the phone drawer open when the user stays, closes it after switching", async () => {
+    renderPage();
+    const draft = await editor("預設");
+    await waitFor(() => expect(draft.value).toBe("內容：SOUL.md"));
+    fireEvent.change(draft, { target: { value: "還沒存的修改" } });
+
+    const opener = screen.getByRole("button", { name: "管理角色" });
+    fireEvent.click(opener);
+    fireEvent.click(within(screen.getByRole("dialog", { name: "角色清單" })).getByText("護理師"));
+    fireEvent.click(await screen.findByRole("button", { name: "取消" }));
+    // 選了留下：抽屜還開著，可以改點別的角色。
+    expect(screen.getByRole("dialog", { name: "角色清單" })).toBeTruthy();
+
+    fireEvent.click(within(screen.getByRole("dialog", { name: "角色清單" })).getByText("護理師"));
+    fireEvent.click(await screen.findByRole("button", { name: "捨棄並離開" }));
+    await waitFor(() => expect(opened()).toContain("personas/nurse/SOUL.md"));
+    expect(screen.queryByRole("dialog", { name: "角色清單" })).toBeNull();
+    expect(document.activeElement).toBe(opener);
   });
 
   it("asks before switching document tabs with unsaved edits", async () => {

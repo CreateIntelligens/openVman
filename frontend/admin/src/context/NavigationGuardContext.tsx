@@ -98,7 +98,9 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
     const action = pendingActionRef.current;
     pendingActionRef.current = null;
     setConfirmOpen(false);
-    action?.();
+    // 等確認視窗關掉、焦點還回去之後才執行：視窗開著時頁面其他地方是 inert，
+    // 動作裡要移動焦點（例如關手機抽屜、回到開啟鈕）會落空，接著又被視窗還焦點蓋掉。
+    if (action) window.setTimeout(action, 0);
   }, []);
 
   const stayOnPage = useCallback(() => {

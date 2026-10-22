@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -22,8 +22,12 @@ function GuardHarness({ onNavigate }: { onNavigate: () => void }) {
 }
 
 describe("NavigationGuardProvider", () => {
-  it("requires confirmation before discarding dirty content", () => {
-    const onNavigate = vi.fn();
+  it("requires confirmation before discarding dirty content", async () => {
+    // 動作要等確認視窗關掉才跑，裡面移動焦點才不會被 inert 的頁面吃掉。
+    let dialogOpenDuringNavigate: boolean | null = null;
+    const onNavigate = vi.fn(() => {
+      dialogOpenDuringNavigate = document.querySelector("dialog[open]") !== null;
+    });
     render(
       <NavigationGuardProvider>
         <GuardHarness onNavigate={onNavigate} />
@@ -35,7 +39,8 @@ describe("NavigationGuardProvider", () => {
     expect(screen.getByText("尚有未儲存的變更")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "捨棄並離開" }));
-    expect(onNavigate).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledOnce());
+    expect(dialogOpenDuringNavigate).toBe(false);
   });
 
   it("navigates immediately after the dirty source is cleared", () => {
