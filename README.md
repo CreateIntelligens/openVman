@@ -171,6 +171,8 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD backend \
 
 開發請使用 worktree 並疊加 `docker-compose.dev.yml`（掛載原始碼、前端 HMR、停用 watchtower）。首次部署、疑難排解、CI 細節與 worktree 流程見 [部署手冊](docs/operations/11_DEPLOYMENT.md)。
 
+前端 Docker 建置與開發階段使用 Node.js 24.22.1 LTS；正式前端 image 以 nginx 提供靜態檔。
+
 ### 選用元件
 
 以下元件保留在 compose 或程式中，但目前部署未啟用：

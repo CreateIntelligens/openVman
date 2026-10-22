@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Updated frontend Docker build stages to Node.js 24.22.1 LTS for the latest Node.js security fixes.
 - **[2026-10-21]** **「更多動作」選單改成共用元件，手機頁首改用 `PageHeader`**：原本在帳號頁的 `AccountRowMenu` 搬到 `components/ActionMenu.tsx`（屬性 `accountName` 改名 `label`），帳號列表與知識庫頁首都用它；知識庫的採納與重新索引改由同一份定義產生寬畫面按鈕與手機選單項目。`PageHeader` 加 `className`，工作區與角色管理的手機頁首改用它，不再手寫頁首結構。操作不變。
 - **[2026-10-21]** **後台頁首與分頁統一規格**：新增共用的 `PageHeader`、`PageTabs`（`components/app/PageHeader.tsx`）與 `SegmentedControl`。每頁主標題由同一個頁首管理，內距與左緣一致，標題前不再放圖示；第一層分頁一律是標題下方的底線分頁，只排一列、放不下就橫捲並把選中分頁捲進畫面。專案與權限、系統狀態、語音、Avatar、模型供應商、記憶管理、知識庫都改用它，原本的灰色膠囊、橘色分段、小型分段與 Avatar 手機直列分頁都拿掉。帳號的建立／管理與編輯器的編輯／並排／預覽改用共用的分段切換。分頁殼裡的內頁（專案管理、系統健康、API 金鑰、Embed 金鑰、權限圖譜）標題改用 `page-section-title`，不再和外層主標題同級。320、375、768、1440 寬度實測十個頁面的標題上緣一致、分頁列單行。
 - **[2026-10-21]** **後台分頁鍵盤操作一致、Avatar 與專案頁改用繁中文案**：方向鍵與 Home／End 切換分頁抽成共用函式，語音、模型供應商、Avatar 素材與共用分頁殼都用它；模型供應商與 Avatar 素材分頁補上 tab／tabpanel 關聯。Avatar 的人物、背景、小助理分頁與上傳表單、專案頁的新增與刪除、工作區編輯器的英文文案改成繁中。

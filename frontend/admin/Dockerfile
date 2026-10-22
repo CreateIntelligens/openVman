@@ -2,14 +2,14 @@
 # Admin frontend image. Build context is the repo root because Vite resolves
 # "@contracts" to ../../contracts.
 
-FROM node:20-alpine AS deps
+FROM node:24.22.1-alpine AS deps
 
 WORKDIR /app
 
 COPY frontend/admin/package.json frontend/admin/pnpm-lock.yaml ./
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile
 
-FROM node:20-alpine AS avatar-sdk-builder
+FROM node:24.22.1-alpine AS avatar-sdk-builder
 
 WORKDIR /sdk
 
