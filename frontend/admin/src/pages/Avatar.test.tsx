@@ -8,6 +8,9 @@ import { MascotProvider } from "../context/MascotContext";
 import * as api from "../api";
 
 const authState = vi.hoisted(() => ({ role: "admin" as "root" | "admin" | "user" }));
+vi.mock("../context/ProjectContext", () => ({
+  useProject: () => ({ projectId: "proj-a" }),
+}));
 vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({ account: { id: "a", username: "a", role: authState.role } }),
 }));
@@ -89,6 +92,15 @@ describe("Avatar page", () => {
     expect(screen.queryByText("上傳新人物")).toBeNull();
     expect(screen.queryByRole("button", { name: "改名" })).toBeNull();
     expect(screen.queryByRole("button", { name: "刪除" })).toBeNull();
+  });
+
+  it("lists regular accounts' assets for the current project", async () => {
+    // 不帶專案時後端只回帳號自己被授權的素材，專案專屬的人物一個都看不到。
+    authState.role = "user";
+    const spy = vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    render(<Avatar />);
+
+    await waitFor(() => expect(spy).toHaveBeenCalledWith("proj-a"));
   });
 
   it("shows admins the upload, conversion and rename controls", async () => {

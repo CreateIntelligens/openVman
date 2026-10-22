@@ -24,6 +24,7 @@ import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
 import { useAuth } from "../context/AuthContext";
 import { useMascot } from "../context/MascotContext";
+import { useProject } from "../context/ProjectContext";
 import {
   DEFAULT_MASCOT_ID,
   buildMascotWidgetSrc,
@@ -89,6 +90,9 @@ export default function Avatar() {
   const { account } = useAuth();
   // 上傳、轉檔、改名、刪除的 API 都限管理員；一般帳號只看清單、試用。
   const canManage = account ? isAtLeastAdmin(account.role) : false;
+  const { projectId } = useProject();
+  // 一般帳號只看得到所屬專案的素材，不帶專案時後端回空清單；管理員要管所有專案，不帶。
+  const listProjectId = canManage ? undefined : projectId;
   const { selectedMascotId, setMascotOptions, setSelectedMascotId } = useMascot();
   const [activeTab, setActiveTab] = useAdminSubView<AssetTab>(
     "Avatar",
@@ -185,7 +189,7 @@ export default function Avatar() {
     setLoading(true);
     setStatus(null);
     try {
-      const res = await fetchAvatarCharacters();
+      const res = await fetchAvatarCharacters(listProjectId);
       setCharacters(res.characters);
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
@@ -200,7 +204,7 @@ export default function Avatar() {
     setBackgroundsLoading(true);
     setStatus(null);
     try {
-      const res = await fetchAvatarBackgrounds();
+      const res = await fetchAvatarBackgrounds(listProjectId);
       setBackgrounds(res.backgrounds);
       backgroundsLoaded.current = true;
     } catch (err) {
@@ -217,7 +221,7 @@ export default function Avatar() {
     setMascotsLoading(true);
     setStatus(null);
     try {
-      const res = await fetchAvatarMascots();
+      const res = await fetchAvatarMascots(listProjectId);
       syncMascots(res.mascots);
       mascotsLoaded.current = true;
     } catch (err) {
@@ -229,8 +233,12 @@ export default function Avatar() {
   }
 
   useEffect(() => {
+    // 一般帳號換專案時清單跟著換；背景與小助理切到該分頁時重新載入。
+    backgroundsLoaded.current = false;
+    mascotsLoaded.current = false;
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listProjectId]);
 
   useEffect(() => {
     if (activeTab === "backgrounds" && !backgroundsLoaded.current) {
@@ -239,7 +247,8 @@ export default function Avatar() {
     if (activeTab === "mascots" && !mascotsLoaded.current) {
       void loadMascots();
     }
-  }, [activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, listProjectId]);
 
   function handleTabChange(tab: AssetTab): void {
     setActiveTab(tab);
