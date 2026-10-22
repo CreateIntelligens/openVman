@@ -8,15 +8,16 @@ import { MascotProvider } from "../context/MascotContext";
 import * as api from "../api";
 
 const authState = vi.hoisted(() => ({ role: "admin" as "root" | "admin" | "user" }));
+const projectState = vi.hoisted(() => ({ projectId: "proj-a" }));
 vi.mock("../context/ProjectContext", () => ({
-  useProject: () => ({ projectId: "proj-a" }),
+  useProject: () => ({ projectId: projectState.projectId }),
 }));
 vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({ account: { id: "a", username: "a", role: authState.role } }),
 }));
 
 function render(element: ReactElement) {
-  function RouteHarness() {
+  function RouteHarness({ element }: { element: ReactElement }) {
     const [view, setView] = useState(() => parseAdminRoute(window.location.pathname, window.location.search)?.subView);
     useEffect(() => {
       const update = () => setView(parseAdminRoute(window.location.pathname, window.location.search)?.subView);
@@ -28,11 +29,13 @@ function render(element: ReactElement) {
       setView(next);
     }}>{element}</NavigationProvider>;
   }
-  return renderComponent(<RouteHarness />);
+  const result = renderComponent(<RouteHarness element={element} />);
+  return { ...result, rerender: (next: ReactElement) => result.rerender(<RouteHarness element={next} />) };
 }
 
 beforeEach(() => {
   authState.role = "admin";
+  projectState.projectId = "proj-a";
   window.history.replaceState(null, "", "/admin/avatar");
   window.localStorage.clear();
 });
@@ -101,6 +104,35 @@ describe("Avatar page", () => {
     render(<Avatar />);
 
     await waitFor(() => expect(spy).toHaveBeenCalledWith("proj-a"));
+  });
+
+  it("keeps the new project's backgrounds when the old project's list answers late", async () => {
+    // 背景還在載入就切專案：新專案要照樣載入，舊專案晚回來的清單不能蓋掉它。
+    authState.role = "user";
+    window.history.replaceState(null, "", "/admin/avatar/backgrounds");
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    const background = (id: string) => ({
+      background_id: id, label: `背景 ${id}`, url: `/bg/${id}.png`, mime_type: "image/png",
+      size_bytes: 1, updated_at: "2026-10-22T00:00:00Z",
+    });
+    let answerOld: (value: { backgrounds: ReturnType<typeof background>[] }) => void = () => {};
+    const spy = vi.spyOn(api, "fetchAvatarBackgrounds").mockImplementation((project) =>
+      project === "proj-a"
+        ? new Promise((resolve) => { answerOld = resolve; })
+        : Promise.resolve({ backgrounds: [background("bg-new")] }),
+    );
+    const view = render(<Avatar />);
+    await waitFor(() => expect(spy).toHaveBeenCalledWith("proj-a"));
+
+    projectState.projectId = "proj-b";
+    view.rerender(<Avatar />);
+    expect(await screen.findByText("背景 bg-new")).toBeTruthy();
+    expect(spy).toHaveBeenCalledWith("proj-b");
+
+    answerOld({ backgrounds: [background("bg-old")] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByText("背景 bg-old")).toBeNull();
+    expect(screen.getByText("背景 bg-new")).toBeTruthy();
   });
 
   it("shows admins the upload, conversion and rename controls", async () => {

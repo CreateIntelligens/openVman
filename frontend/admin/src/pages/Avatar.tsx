@@ -108,10 +108,14 @@ export default function Avatar() {
   const [backgroundsLoading, setBackgroundsLoading] = useState(false);
   const [mascotsLoading, setMascotsLoading] = useState(false);
   const [status, setStatus] = useState<Status>(null);
+  // 一般帳號切換專案時，前一個專案的清單可能比新專案晚回來；回應只在
+  // 仍是目前專案時套用，「載入中」也記是哪個專案，才不會擋掉新專案的載入。
+  const currentListProject = useRef(listProjectId);
+  currentListProject.current = listProjectId;
   const backgroundsLoaded = useRef(false);
-  const backgroundsLoadingRef = useRef(false);
+  const backgroundsLoadingFor = useRef<string | undefined | null>(null);
   const mascotsLoaded = useRef(false);
-  const mascotsLoadingRef = useRef(false);
+  const mascotsLoadingFor = useRef<string | undefined | null>(null);
 
   const [uploadCharId, setUploadCharId] = useState("");
   const [uploadLabel, setUploadLabel] = useState("");
@@ -186,49 +190,62 @@ export default function Avatar() {
   }
 
   async function load(): Promise<void> {
+    const project = listProjectId;
     setLoading(true);
     setStatus(null);
     try {
-      const res = await fetchAvatarCharacters(listProjectId);
+      const res = await fetchAvatarCharacters(project);
+      if (currentListProject.current !== project) return;
       setCharacters(res.characters);
     } catch (err) {
+      if (currentListProject.current !== project) return;
       setStatus({ type: "error", message: errorMessage(err) });
     } finally {
-      setLoading(false);
+      if (currentListProject.current === project) setLoading(false);
     }
   }
 
   async function loadBackgrounds(): Promise<void> {
-    if (backgroundsLoadingRef.current) return;
-    backgroundsLoadingRef.current = true;
+    const project = listProjectId;
+    if (backgroundsLoadingFor.current === project) return;
+    backgroundsLoadingFor.current = project;
     setBackgroundsLoading(true);
     setStatus(null);
     try {
-      const res = await fetchAvatarBackgrounds(listProjectId);
+      const res = await fetchAvatarBackgrounds(project);
+      if (currentListProject.current !== project) return;
       setBackgrounds(res.backgrounds);
       backgroundsLoaded.current = true;
     } catch (err) {
+      if (currentListProject.current !== project) return;
       setStatus({ type: "error", message: errorMessage(err) });
     } finally {
-      backgroundsLoadingRef.current = false;
-      setBackgroundsLoading(false);
+      if (backgroundsLoadingFor.current === project) {
+        backgroundsLoadingFor.current = null;
+        setBackgroundsLoading(false);
+      }
     }
   }
 
   async function loadMascots(): Promise<void> {
-    if (mascotsLoadingRef.current) return;
-    mascotsLoadingRef.current = true;
+    const project = listProjectId;
+    if (mascotsLoadingFor.current === project) return;
+    mascotsLoadingFor.current = project;
     setMascotsLoading(true);
     setStatus(null);
     try {
-      const res = await fetchAvatarMascots(listProjectId);
+      const res = await fetchAvatarMascots(project);
+      if (currentListProject.current !== project) return;
       syncMascots(res.mascots);
       mascotsLoaded.current = true;
     } catch (err) {
+      if (currentListProject.current !== project) return;
       setStatus({ type: "error", message: errorMessage(err) });
     } finally {
-      mascotsLoadingRef.current = false;
-      setMascotsLoading(false);
+      if (mascotsLoadingFor.current === project) {
+        mascotsLoadingFor.current = null;
+        setMascotsLoading(false);
+      }
     }
   }
 
