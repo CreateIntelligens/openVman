@@ -186,6 +186,9 @@ def test_project_content_writes_require_edit_access() -> None:
     from app.brain_proxy import _project_access
 
     assert _project_access("knowledge/document", "PUT") is ResourceAccess.EDIT
+    assert _project_access("sessions", "GET") is ResourceAccess.EDIT
+    assert _project_access("sessions/export", "GET") is ResourceAccess.EDIT
+    assert _project_access("chat/history", "GET") is ResourceAccess.READ
     assert _project_access("personas", "POST") is ResourceAccess.EDIT
     assert _project_access("skills/example", "DELETE") is ResourceAccess.EDIT
     assert _project_access("tools/example", "PATCH") is ResourceAccess.EDIT

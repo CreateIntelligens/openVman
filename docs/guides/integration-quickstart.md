@@ -160,7 +160,7 @@ Brain 對台語提問的回答一律寫成繁體中文文字（台語沒有通�
 
 ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流 ASR 的 `engine` 是 WebSocket query；這些選擇只影響本次請求或連線，不需要先 `PUT /settings/my-asr-provider` 或 `PUT /settings/my-preferences`。`PUT /settings/my-asr-provider` 改的是帳號偏好，共用同一把 key 的所有機台會一起變，機台各自要不同引擎時請每次帶 `provider`／`engine`。
 
-重開一段對話不需要刪除：換一個新的 `session_id` 即可。刪除對話（`DELETE /api/v1/sessions/{id}`、`POST /api/v1/sessions/batch-delete`）需要專案編輯權，只有讀取授權的帳號會收到 403。
+重開一段對話不需要刪除：換一個新的 `session_id` 即可。列出、匯出、刪除對話（`GET /api/v1/sessions`、`GET /api/v1/sessions/export`、`DELETE /api/v1/sessions/{id}`、`POST /api/v1/sessions/batch-delete`）都需要專案編輯權，只有讀取授權的帳號會收到 403；接續自己的對話用 `GET /api/v1/chat/history?session_id=...`，要知道 `session_id` 才讀得到。
 
 ### 邊生成邊念：逐句串流（SSE）
 

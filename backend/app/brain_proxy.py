@@ -326,7 +326,9 @@ def _requires_project_context(path: str) -> bool:
 
 def _project_access(path: str, method: str) -> ResourceAccess:
     normalized = path.strip("/")
-    if normalized == "sessions/export":
+    # 對話清單會攤開整個專案所有人的對話 ID 與內容摘要；前台介面用不到，
+    # 只給能進後台的帳號（編輯權）。單一對話的歷史仍要知道 session_id 才讀得到。
+    if normalized in {"sessions", "sessions/export"}:
         return ResourceAccess.EDIT
     if method.upper() in _SAFE_METHODS:
         return ResourceAccess.READ
