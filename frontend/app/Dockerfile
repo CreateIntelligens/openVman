@@ -19,7 +19,7 @@ RUN corepack pnpm build
 # 正式環境只送靜態檔。之前這一層跑的是 pnpm dev——每個使用者打開頁面都在讓
 # Vite 現場轉譯 TypeScript，還掛著 HMR client 與 esbuild 常駐程序。開發時的
 # 熱重載由 docker-compose.dev.yml 覆寫 command 提供，不在正式 image 裡。
-FROM nginx:1.27-alpine AS runner
+FROM nginx:1.31.8-alpine AS runner
 
 ENV TZ=Asia/Taipei
 RUN apk add --no-cache tzdata

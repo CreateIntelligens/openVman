@@ -54,7 +54,7 @@ COPY frontend/shared /shared
 COPY frontend/admin/ ./
 RUN pnpm build
 
-FROM nginx:1.27-alpine AS runner
+FROM nginx:1.31.8-alpine AS runner
 
 ENV TZ=Asia/Taipei
 RUN apk add --no-cache openssl tzdata
