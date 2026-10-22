@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **[2026-10-22]** **avatar-sdk 建置工具升級**：`frontend/avatar-sdk` 的 `vite` 升到 6.4.5，`postcss` 升到 8.5.31，`source-map-js` 升到 1.2.2，`nanoid` 升到 3.3.20，處理 Dependabot 安全警示。這些都只在 admin 映像建置 SDK 時用到，正式站執行時不會載入。合併取代 Dependabot #46～#48。
 - **[2026-10-22]** **拿掉內建的 Frieren 與 VRM 3D 小助理**：內建小助理只留 Haru（Live2D），3D 模型改成只用上傳的 VRM。auth 資料庫 schema 26 刪掉 `qqman`、`vrm-sample` 兩筆資源（授權、範圍、指派跟著清除），帳號與專案預設指到它們的改成不指定；前台 3D 模式不再預設 `qqman`。正式環境原本放 `qqman` 模型的 `/data/mascots/qqman` 已搬到 `/data/backups/mascots-qqman-20261022`；其他環境若還留著這個資料夾，它會被當成上傳的小助理列出，可在後台刪除。
 - Updated frontend Docker build stages to Node.js 24.22.1 LTS for the latest Node.js security fixes.
 - **[2026-10-21]** **「更多動作」選單改成共用元件，手機頁首改用 `PageHeader`**：原本在帳號頁的 `AccountRowMenu` 搬到 `components/ActionMenu.tsx`（屬性 `accountName` 改名 `label`），帳號列表與知識庫頁首都用它；知識庫的採納與重新索引改由同一份定義產生寬畫面按鈕與手機選單項目。`PageHeader` 加 `className`，工作區與角色管理的手機頁首改用它，不再手寫頁首結構。操作不變。
