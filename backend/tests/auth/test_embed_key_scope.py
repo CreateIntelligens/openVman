@@ -142,3 +142,20 @@ def test_root_manages_keys_in_any_project(setup):
     headers = _headers(runtime, users["root"])
 
     assert client.delete(f"/api/v1/embed-keys/{keys['outside']}", headers=headers).status_code == 200
+
+
+def test_scoped_admin_can_manage_a_key_created_with_padded_project_id(setup):
+    # 範圍比對用的是存下來的 project_id；儲存時去空白（repository 負責），
+    # 受限管理員才看得到自己用帶空白的 ID 建的金鑰。
+    runtime, client, users, _keys = setup
+    headers = _headers(runtime, users["scoped"])
+
+    created = client.post(
+        "/api/v1/embed-keys",
+        headers=headers,
+        json={"project_id": "  inside  ", "allowed_origins": [ORIGIN]},
+    )
+
+    assert created.status_code == 201
+    assert created.json()["project_id"] == "inside"
+    assert _listed_projects(client, headers) == ["inside", "inside"]
