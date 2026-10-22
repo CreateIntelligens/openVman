@@ -112,6 +112,22 @@ def test_summary_groups_and_filters(ledger):
         ledger.summarize_usage(group_by="nope")
 
 
+def test_project_ids_limits_to_the_listed_projects(ledger):
+    for project_id, total in (("p1", 2), ("p2", 10), ("p3", 100)):
+        with usage_scope(user_id="u", project_id=project_id):
+            ledger.record_usage_event(provider="g", model="m", usage=LLMUsage(1, total - 1, total))
+
+    two = ledger.summarize_usage(group_by="project", project_ids=["p1", "p2"])
+    assert two["totals"]["total_tokens"] == 12
+    assert {g["project_id"] for g in two["groups"]} == {"p1", "p2"}
+
+    # 受限管理員範圍裡一個專案都沒有：一筆都不能回，不能當成沒篩選。
+    none = ledger.summarize_usage(group_by="project", project_ids=[])
+    assert none["totals"]["total_tokens"] in (0, None)
+    assert none["groups"] == []
+    assert ledger.list_usage_events(project_ids=[""]) == []
+
+
 def _record_at(ledger, monkeypatch, when: str, **kwargs):
     """Write one event stamped at *when* so bucket boundaries are testable."""
     monkeypatch.setattr(ledger, "_now_iso", lambda: when)

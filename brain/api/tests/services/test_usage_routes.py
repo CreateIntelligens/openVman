@@ -52,6 +52,23 @@ def test_usage_summary_and_events(client: TestClient):
     assert bad.status_code == 400
 
 
+def test_repeated_project_ids_reach_every_query(client: TestClient):
+    headers = {"X-Internal-Token": "test-internal-token"}
+    for project_id in ("p1", "p2", "p3"):
+        with usage_scope(user_id="u", project_id=project_id):
+            usage_ledger.record_usage_event(provider="g", model="m", usage=LLMUsage(1, 1, 2))
+    params = [("project_ids", "p1"), ("project_ids", "p2")]
+
+    summary = client.get("/brain/usage/summary", params=params, headers=headers)
+    events = client.get("/brain/usage/events", params=params, headers=headers)
+    series = client.get("/brain/usage/timeseries", params=params, headers=headers)
+
+    assert summary.json()["totals"]["total_tokens"] == 4
+    assert events.json()["count"] == 2
+    assert series.status_code == 200
+    assert sum(point["total_tokens"] for point in series.json()["points"]) == 4
+
+
 def test_api_key_usage_is_separate_per_key_and_rolls_up_to_owner(client):
     headers = {"X-Internal-Token": "test-internal-token"}
     for key_id, seconds in [("key-a", 1.5), ("key-b", 2.5)]:

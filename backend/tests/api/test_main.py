@@ -1180,6 +1180,86 @@ def test_usage_events_non_admin_is_scoped_to_self(monkeypatch):
     assert captured["params"] == {"user_id": current.user.id, "limit": "5"}
 
 
+def _scope_usage_admin(current, project_ids):
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    root = runtime.users.get_by_username("ai360") or runtime.users.create_root(
+        username="ai360", password_hash="unused"
+    )
+    for project_id in ("p1", "p2", "p3"):
+        runtime.resources.upsert_system_resource(
+            resource_type=ResourceType.PROJECT, resource_id=project_id
+        )
+    runtime.admin_scopes.replace(
+        admin_user_id=current.user.id,
+        updated_by=root.id,
+        scoped=True,
+        resources=[(ResourceType.PROJECT, project_id) for project_id in project_ids],
+    )
+
+
+def test_usage_scoped_admin_only_sees_projects_in_scope(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+    _install_fake_brain_usage(module, captured, monkeypatch)
+    current = _usage_account(module, admin=True)
+    _scope_usage_admin(current, ["p2", "p1"])
+
+    response = asyncio.run(
+        module.admin_routes.get_usage_summary(
+            _usage_request("group_by=user&user_id=someone"), current=current
+        )
+    )
+
+    # 沒選專案＝只看範圍內的專案，不是全系統。
+    assert response.status_code == 200
+    assert captured["params"] == {
+        "group_by": "user",
+        "user_id": "someone",
+        "project_ids": ["p1", "p2"],
+    }
+
+
+def test_usage_scoped_admin_gets_404_for_a_project_outside_scope(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+    _install_fake_brain_usage(module, captured, monkeypatch)
+    current = _usage_account(module, admin=True)
+    _scope_usage_admin(current, ["p1"])
+
+    outside = asyncio.run(
+        module.admin_routes.get_usage_events(
+            _usage_request("project_id=p3"), current=current
+        )
+    )
+    assert outside.status_code == 404
+    assert captured == {}
+
+    inside = asyncio.run(
+        module.admin_routes.get_usage_events(
+            _usage_request("project_id=p1"), current=current
+        )
+    )
+    assert inside.status_code == 200
+    assert captured["params"] == {"project_id": "p1"}
+
+
+def test_usage_admin_scoped_to_no_projects_sees_nothing(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+    _install_fake_brain_usage(module, captured, monkeypatch)
+    current = _usage_account(module, admin=True)
+    _scope_usage_admin(current, [])
+
+    asyncio.run(
+        module.admin_routes.get_usage_summary(_usage_request("group_by=model"), current=current)
+    )
+
+    assert captured["params"] == {"group_by": "model", "project_ids": [""]}
+
+
 def test_usage_routes_only_forward_endpoint_parameters(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     captured: dict[str, object] = {}

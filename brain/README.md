@@ -314,6 +314,8 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 | `GET /brain/usage/summary` | 依 `model`、`user`、`project`、`kind` 或 `session` 彙總 |
 | `GET /brain/usage/timeseries` | `bucket=hour\|day\|month`、選填 `group_by`、`limit=1..50`（預設 8）、`report_timezone=UTC\|Asia/Taipei`；有分組時回 `series`，否則回 `points`，低用量分組併成 `__other__` |
 | `GET /brain/usage/events` | 依帳號、專案、session、trace、類型與時間區間查事件 |
+
+三支查詢都另收可重複的 `project_ids`，只算列出的專案；Backend 用它把受限管理員限制在範圍內。帶了但全是空值時一筆都不回，不會變成不篩選。
 | `POST /brain/usage/events` | 其他服務寫入非 LLM 用量；必填 `provider`、`unit_type`、`units`，歸屬欄位由呼叫端帶入；成功回 201 |
 
 帳本以 UTC 儲存，查詢區間為 `since <= created_at < until`。瀏覽器與外部客戶端改用 Backend 的 `/api/v1/usage/*`。

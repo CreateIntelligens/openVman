@@ -2,6 +2,8 @@
 
 A key id is a public identifier, not a secret, so it is returned in full on
 every read; the protection is the origin allowlist plus the per-key limits.
+A scoped administrator only lists and manages keys of projects inside its
+scope; anything else is reported as not found.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from .embed_keys_repository import (
     EmbedKeyNotFoundError,
 )
 from .models import EmbedKeyRecord, ResourceType
+from .resources import ResourceNotFoundError, resolve_admin_scope, resolve_resource
 from .runtime import AuthRuntime, get_auth_runtime
 
 router = APIRouter(prefix="/api/v1/embed-keys", tags=["Embed Keys"])
@@ -60,9 +63,35 @@ def _normalize_origins(raw_origins: list[str]) -> list[str]:
     return list(dict.fromkeys(origins))
 
 
-def _require_project(runtime: AuthRuntime, project_id: str) -> None:
-    if runtime.resources.get(ResourceType.PROJECT, project_id.strip()) is None:
-        raise HTTPException(status_code=404, detail=_PROJECT_NOT_FOUND)
+def _require_project(
+    runtime: AuthRuntime, current: CurrentAccount, project_id: str
+) -> None:
+    """The project must exist and sit inside the caller's admin scope.
+
+    範圍外的專案跟不存在一樣回 404：受限管理員不該替別人的專案開金鑰，
+    也不該從錯誤訊息得知那個專案存在。
+    """
+    try:
+        resolve_resource(
+            runtime.resources,
+            current.user,
+            ResourceType.PROJECT,
+            project_id.strip(),
+            admin_scopes=runtime.admin_scopes,
+        )
+    except ResourceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=_PROJECT_NOT_FOUND) from exc
+
+
+def _manageable_key(
+    runtime: AuthRuntime, current: CurrentAccount, key_id: str
+) -> EmbedKeyRecord:
+    """A key whose project is outside the caller's scope is reported as missing."""
+    record = runtime.embed_keys.get(key_id)
+    scope = resolve_admin_scope(current.user, runtime.admin_scopes)
+    if record is None or not scope.allows(ResourceType.PROJECT, record.project_id):
+        raise HTTPException(status_code=404, detail=_KEY_NOT_FOUND)
+    return record
 
 
 class EmbedKeyCreateRequest(_StrictModel):
@@ -118,10 +147,15 @@ def _serialize(record: EmbedKeyRecord, requests_today: int) -> dict[str, object]
 
 @router.get("", summary="列出 Embed 金鑰")
 async def list_embed_keys(
-    _current: CurrentAccount = Depends(require_admin),
+    current: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, object]:
-    records = runtime.embed_keys.list_all()
+    scope = resolve_admin_scope(current.user, runtime.admin_scopes)
+    records = [
+        record
+        for record in runtime.embed_keys.list_all()
+        if scope.allows(ResourceType.PROJECT, record.project_id)
+    ]
     return {
         "embed_keys": [
             _serialize(record, runtime.embed_keys.requests_today(record.key_id))
@@ -137,7 +171,7 @@ async def create_embed_key(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, object]:
     origins = _normalize_origins(payload.allowed_origins)
-    _require_project(runtime, payload.project_id)
+    _require_project(runtime, current, payload.project_id)
     try:
         record = runtime.embed_keys.create(
             label=payload.label,
@@ -161,9 +195,10 @@ async def create_embed_key(
 async def update_embed_key(
     key_id: str,
     payload: EmbedKeyUpdateRequest,
-    _current: CurrentAccount = Depends(require_admin),
+    current: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, object]:
+    _manageable_key(runtime, current, key_id)
     changes = payload.model_dump(exclude_none=True)
     if "allowed_origins" in changes:
         changes["allowed_origins"] = _normalize_origins(changes["allowed_origins"])
@@ -179,9 +214,10 @@ async def update_embed_key(
 @router.delete("/{key_id}", summary="刪除 Embed 金鑰")
 async def delete_embed_key(
     key_id: str,
-    _current: CurrentAccount = Depends(require_admin),
+    current: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, str]:
+    _manageable_key(runtime, current, key_id)
     try:
         runtime.embed_keys.delete(key_id)
     except EmbedKeyNotFoundError as exc:

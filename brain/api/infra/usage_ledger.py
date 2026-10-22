@@ -228,9 +228,20 @@ def _build_filters(
     kind: str = "",
     since: str = "",
     until: str = "",
+    project_ids: list[str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     clauses: list[str] = []
     params: dict[str, Any] = {}
+    if project_ids is not None:
+        # Backend 替受限管理員帶他範圍內的專案；清單是空的就是一個都不能看，
+        # 不能當成沒篩選而回全部。
+        allowed = [value for value in project_ids if value]
+        if not allowed:
+            clauses.append("1 = 0")
+        else:
+            names = [f"project_ids_{index}" for index in range(len(allowed))]
+            clauses.append(f"project_id IN ({', '.join(':' + name for name in names)})")
+            params.update(zip(names, allowed))
     for column, value in (
         ("user_id", user_id),
         ("principal_type", principal_type),
@@ -253,7 +264,7 @@ def _build_filters(
     return where, params
 
 
-def summarize_usage(*, group_by: str = "model", **filters: str) -> dict[str, Any]:
+def summarize_usage(*, group_by: str = "model", **filters: Any) -> dict[str, Any]:
     """Aggregate tokens over the filtered events, grouped by one dimension."""
     columns = _GROUP_COLUMNS.get(group_by)
     if columns is None:
@@ -297,7 +308,7 @@ def timeseries_usage(
     bucket: str = "day",
     limit: int = 8,
     report_timezone: str = "UTC",
-    **filters: str,
+    **filters: Any,
 ) -> dict[str, Any]:
     """Aggregate tokens per time bucket, optionally split by one dimension.
 
@@ -411,7 +422,7 @@ def timeseries_usage(
     }
 
 
-def list_usage_events(*, limit: int = 100, **filters: str) -> list[dict[str, Any]]:
+def list_usage_events(*, limit: int = 100, **filters: Any) -> list[dict[str, Any]]:
     where, params = _build_filters(**filters)
     params["limit"] = max(1, min(int(limit), 1000))
     with _LOCK, _connect() as conn:

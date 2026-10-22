@@ -477,8 +477,10 @@ process.on('SIGTERM', async () => {
 Backend 以 `GET /api/v1/usage/summary`、`GET /api/v1/usage/timeseries` 與 `GET /api/v1/usage/events` 提供已驗證帳號的
 LLM token 用量查詢，並以 `X-Internal-Token` 轉送至 Brain 的
 `/brain/usage/*`。正式管理員可指定 `user_id`；一般或臨時帳號傳入的
-`user_id` 必須覆寫成自身帳號 ID。Brain catch-all proxy 必須阻擋 `usage`
-路徑，避免繞過此帳號範圍限制。
+`user_id` 必須覆寫成自身帳號 ID。設了資源上限的管理員只看得到範圍內的專案：
+指定範圍外的 `project_id` 回 404；沒指定時改帶 `project_ids`（範圍內的全部
+專案，可重複；範圍是空的就帶一個空值，Brain 一筆都不回）。Brain catch-all
+proxy 必須阻擋 `usage` 路徑，避免繞過此帳號範圍限制。
 
 `summary` 只轉送 `group_by`、帳號／專案／session／類型與時間篩選；`events`
 只轉送 `limit`、帳號／專案／session／trace／類型與時間篩選。未知或屬於
@@ -566,6 +568,8 @@ Brain Live 的內部 WebSocket 也沿用這些身分標頭及 `X-OpenVMan-User-I
 `PATCH/DELETE /api/v1/embed-keys/{key_id}` 僅限管理員。建立時至少要有一個
 來源，格式必須是精確的 `scheme://host[:port]`（不接受 `*`、缺 scheme、或帶路徑），
 專案必須存在（否則 404），上限值最小為 1，省略時採 60 次/分與 1000 次/日。
+設了資源上限的管理員只列得出、只建得了、只改得了範圍內專案的金鑰；範圍外的
+專案與金鑰一律回 404，跟不存在一樣。ROOT 與未設限的管理員管全部。
 金鑰資料存在 auth 資料庫的 `embed_keys` 與 `embed_key_daily_usage` 兩張表，
 由既有的 migration 機制（v8）建立。所有設定都掛在金鑰上，不引入新的環境變數。
 

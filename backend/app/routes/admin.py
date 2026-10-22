@@ -27,6 +27,7 @@ from app.gateway.temp_storage import get_temp_storage
 from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
+from app.project_ids import canonical_project_id
 from app.providers.voice_catalog import build_tts_provider_catalog
 
 logger = logging.getLogger("backend")
@@ -118,8 +119,10 @@ async def _forward_usage_query(
 
     Brain 的 ledger 沒有帳號概念，只認 header 帶進去的 user_id，所以權限
     收在這裡：管理員可帶任意 filter，其餘帳號的 user_id 一律覆寫成自己。
+    受限管理員只看得到範圍內的專案：指定範圍外的專案回 404，沒指定就只查
+    範圍內的專案。
     """
-    params = {
+    params: dict[str, str | list[str]] = {
         key: value
         for key, value in request.query_params.items()
         if key in _USAGE_QUERY_KEYS[endpoint] and value
@@ -130,6 +133,19 @@ async def _forward_usage_query(
     )
     if not is_admin:
         params["user_id"] = current.user.id
+    else:
+        scope = resolve_admin_scope(current.user, get_auth_runtime().admin_scopes)
+        if scope.scoped:
+            allowed = scope.resource_ids(ResourceType.PROJECT)
+            requested = canonical_project_id(cast(str, params.get("project_id", "")))
+            if requested and requested not in allowed:
+                # 範圍外的專案跟不存在一樣，不洩漏它有沒有用量。
+                return JSONResponse(status_code=404, content={"detail": "Resource not found"})
+            if requested:
+                params["project_id"] = requested
+            else:
+                # 空清單也要帶：Brain 收到空的 project_ids 一筆都不回，不會變成不篩選。
+                params["project_ids"] = sorted(allowed) or [""]
 
     cfg = get_tts_config()
     url = f"{cfg.brain_url.rstrip('/')}/brain/usage/{endpoint}"

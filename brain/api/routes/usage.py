@@ -1,4 +1,7 @@
-"""Token usage ledger queries (internal; Backend applies account scoping)."""
+"""Token usage ledger queries (internal; Backend applies account scoping).
+
+`project_ids` 可重複帶，Backend 用它把受限管理員限制在範圍內的專案。
+"""
 
 from __future__ import annotations
 
@@ -31,6 +34,7 @@ async def usage_summary(
     principal_type: str = "",
     principal_id: str = "",
     project_id: str = "",
+    project_ids: list[str] | None = Query(None),
     session_id: str = "",
     kind: str = "",
     since: str = "",
@@ -43,6 +47,7 @@ async def usage_summary(
             principal_type=principal_type,
             principal_id=principal_id,
             project_id=project_id,
+            project_ids=project_ids,
             session_id=session_id,
             kind=kind,
             since=since,
@@ -62,6 +67,7 @@ async def usage_timeseries(
     principal_type: str = "",
     principal_id: str = "",
     project_id: str = "",
+    project_ids: list[str] | None = Query(None),
     session_id: str = "",
     kind: str = "",
     since: str = "",
@@ -77,6 +83,7 @@ async def usage_timeseries(
             principal_type=principal_type,
             principal_id=principal_id,
             project_id=project_id,
+            project_ids=project_ids,
             session_id=session_id,
             kind=kind,
             since=since,
@@ -93,6 +100,7 @@ async def usage_events(
     principal_type: str = "",
     principal_id: str = "",
     project_id: str = "",
+    project_ids: list[str] | None = Query(None),
     session_id: str = "",
     trace_id: str = "",
     kind: str = "",
@@ -105,6 +113,7 @@ async def usage_events(
         principal_type=principal_type,
         principal_id=principal_id,
         project_id=project_id,
+        project_ids=project_ids,
         session_id=session_id,
         trace_id=trace_id,
         kind=kind,
