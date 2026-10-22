@@ -42,6 +42,8 @@ type CharactersPanelProps = {
   onTry: (charId: string) => void;
   onRename: (character: AvatarCharacter) => void;
   onDelete: (charId: string) => void;
+  /** 能上傳、改名、刪除；一般帳號只有清單。 */
+  canManage: boolean;
 };
 
 export default function CharactersPanel({
@@ -65,99 +67,103 @@ export default function CharactersPanel({
   onTry,
   onRename,
   onDelete,
+  canManage,
 }: CharactersPanelProps) {
   return (
     <>
-      <div className={formPanelClassName}>
-        <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
-          <span className="material-symbols-outlined text-base">upload</span>
-          上傳新人物
-        </p>
-        <div className={formRowClassName}>
-          <input
-            type="text"
-            placeholder="人物 ID（char_id）"
-            value={uploadId}
-            onChange={(e) => onUploadIdChange(e.target.value)}
-            className={inputClassName}
-          />
-          <input
-            type="text"
-            placeholder="顯示名稱"
-            value={uploadLabel}
-            onChange={(e) => onUploadLabelChange(e.target.value)}
-            className={inputClassName}
-          />
-          {projects && projects.length > 0 && onProjectIdChange && (
-            <select
-              value={selectedProjectId || ""}
-              onChange={(e) => onProjectIdChange(e.target.value)}
+      {/* 上傳、改名、刪除都只開放管理員；一般帳號只看清單。 */}
+      {canManage && (
+        <div className={formPanelClassName}>
+          <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
+            <span className="material-symbols-outlined text-base">upload</span>
+            上傳新人物
+          </p>
+          <div className={formRowClassName}>
+            <input
+              type="text"
+              placeholder="人物 ID（char_id）"
+              value={uploadId}
+              onChange={(e) => onUploadIdChange(e.target.value)}
               className={inputClassName}
-            >
-              <option value="">全域資源（所有專案可用）</option>
-              {projects.map((p) => (
-                <option key={p.project_id} value={p.project_id}>
-                  專案專屬：{p.label || p.project_id}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div className={fileRowClassName}>
-          <div className={fileFieldClassName}>
-            <span className="text-xs font-medium text-content-muted">
-              影片（.webm）：
-            </span>
-            <label className={filePickerClassName(selectedVideoName)}>
-              <span className="material-symbols-outlined text-sm">movie</span>
-              <span className="min-w-0 truncate">
-                {selectedVideoName || "選擇 WebM 影片"}
-              </span>
-              <input
-                ref={videoRef}
-                type="file"
-                accept=".webm"
-                className="hidden"
-                aria-label="影片"
-                onChange={(e) => onVideoChange(e.target.files?.[0]?.name || "")}
-              />
-            </label>
-          </div>
-
-          <div className={fileFieldClassName}>
-            <span className="text-xs font-medium text-content-muted">
-              資料檔（.gz）：
-            </span>
-            <label className={filePickerClassName(selectedDataName)}>
-              <span
-                aria-hidden="true"
-                className="material-symbols-outlined inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden text-[1rem] leading-none"
+            />
+            <input
+              type="text"
+              placeholder="顯示名稱"
+              value={uploadLabel}
+              onChange={(e) => onUploadLabelChange(e.target.value)}
+              className={inputClassName}
+            />
+            {projects && projects.length > 0 && onProjectIdChange && (
+              <select
+                value={selectedProjectId || ""}
+                onChange={(e) => onProjectIdChange(e.target.value)}
+                className={inputClassName}
               >
-                folder_zip
-              </span>
-              <span className="min-w-0 truncate">
-                {selectedDataName || "選擇 GZ 資料檔"}
-              </span>
-              <input
-                ref={dataRef}
-                type="file"
-                accept=".gz"
-                className="hidden"
-                aria-label="資料檔"
-                onChange={(e) => onDataChange(e.target.files?.[0]?.name || "")}
-              />
-            </label>
+                <option value="">全域資源（所有專案可用）</option>
+                {projects.map((p) => (
+                  <option key={p.project_id} value={p.project_id}>
+                    專案專屬：{p.label || p.project_id}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
+          <div className={fileRowClassName}>
+            <div className={fileFieldClassName}>
+              <span className="text-xs font-medium text-content-muted">
+                影片（.webm）：
+              </span>
+              <label className={filePickerClassName(selectedVideoName)}>
+                <span className="material-symbols-outlined text-sm">movie</span>
+                <span className="min-w-0 truncate">
+                  {selectedVideoName || "選擇 WebM 影片"}
+                </span>
+                <input
+                  ref={videoRef}
+                  type="file"
+                  accept=".webm"
+                  className="hidden"
+                  aria-label="影片"
+                  onChange={(e) => onVideoChange(e.target.files?.[0]?.name || "")}
+                />
+              </label>
+            </div>
 
-          <button
-            onClick={onUpload}
-            disabled={uploading}
-            className={uploadButtonClassName}
-          >
-            {uploading ? "上傳中…" : "上傳"}
-          </button>
+            <div className={fileFieldClassName}>
+              <span className="text-xs font-medium text-content-muted">
+                資料檔（.gz）：
+              </span>
+              <label className={filePickerClassName(selectedDataName)}>
+                <span
+                  aria-hidden="true"
+                  className="material-symbols-outlined inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden text-[1rem] leading-none"
+                >
+                  folder_zip
+                </span>
+                <span className="min-w-0 truncate">
+                  {selectedDataName || "選擇 GZ 資料檔"}
+                </span>
+                <input
+                  ref={dataRef}
+                  type="file"
+                  accept=".gz"
+                  className="hidden"
+                  aria-label="資料檔"
+                  onChange={(e) => onDataChange(e.target.files?.[0]?.name || "")}
+                />
+              </label>
+            </div>
+
+            <button
+              onClick={onUpload}
+              disabled={uploading}
+              className={uploadButtonClassName}
+            >
+              {uploading ? "上傳中…" : "上傳"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {loading && <p className="text-sm text-content-muted">載入中…</p>}
 
@@ -205,18 +211,22 @@ export default function CharactersPanel({
                 >
                   試用
                 </button>
-                <button
-                  onClick={() => onRename(character)}
-                  className={secondaryActionClassName}
-                >
-                  改名
-                </button>
-                <button
-                  onClick={() => onDelete(character.char_id)}
-                  className={dangerActionClassName}
-                >
-                  刪除
-                </button>
+                {canManage && (
+                  <>
+                    <button
+                      onClick={() => onRename(character)}
+                      className={secondaryActionClassName}
+                    >
+                      改名
+                    </button>
+                    <button
+                      onClick={() => onDelete(character.char_id)}
+                      className={dangerActionClassName}
+                    >
+                      刪除
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}

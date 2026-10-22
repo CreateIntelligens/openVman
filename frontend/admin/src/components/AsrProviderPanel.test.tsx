@@ -10,6 +10,7 @@ import { streamTestUrl } from "./asr/StreamTester";
 import { streamClip } from "./asr/streamClip";
 
 const activeProjectState = vi.hoisted(() => ({ projectId: "proj-1" }));
+const authState = vi.hoisted(() => ({ role: "admin" as "root" | "admin" | "user" }));
 
 vi.mock("../api/settings", () => ({ previewAsr: vi.fn(), fetchAsrEngines: vi.fn() }));
 vi.mock("../api/knowledge", () => ({
@@ -18,6 +19,9 @@ vi.mock("../api/knowledge", () => ({
   saveKnowledgeDocument: vi.fn(),
 }));
 vi.mock("../api", () => ({ getActiveProjectId: () => activeProjectState.projectId }));
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: { id: "a", username: "a", role: authState.role } }),
+}));
 vi.mock("./asr/streamClip", () => ({ streamClip: vi.fn() }));
 vi.mock("../hooks/useVad", () => ({
   useVad: () => ({ speaking: false, starting: false, supported: true }),
@@ -25,6 +29,7 @@ vi.mock("../hooks/useVad", () => ({
 
 beforeEach(() => {
   activeProjectState.projectId = "proj-1";
+  authState.role = "admin";
   vi.mocked(previewAsr).mockReset();
   vi.mocked(fetchAsrEngines).mockReset().mockResolvedValue({
     engines: ["breeze", "r2t2", "r2t2-dev", "sensevoice"], stream: ["gemini-live"],
@@ -53,6 +58,16 @@ function engineButton(label: RegExp) {
 }
 
 describe("AsrProviderPanel", () => {
+  it("一般帳號不顯示批次試辨識，也不打只限管理員的引擎清單", async () => {
+    authState.role = "user";
+    render(<AsrProviderPanel />);
+
+    // 詞表與串流試聽照常出現；引擎清單一回 403 就會讓整個後台變成「權限不足」。
+    await waitFor(() => expect(fetchKnowledgeDocument).toHaveBeenCalled());
+    expect(screen.queryByRole("heading", { name: "試辨識" })).toBeNull();
+    expect(fetchAsrEngines).not.toHaveBeenCalled();
+  });
+
   it("依當前專案查詢引擎，切換到有專屬金鑰的專案時列出 Gemini", async () => {
     vi.mocked(fetchAsrEngines).mockImplementation(async (projectId) => ({
       engines: ["breeze"], stream: projectId === "proj-gemini" ? ["gemini-live"] : [],

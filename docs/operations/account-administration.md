@@ -63,7 +63,7 @@
 - 唯一 ROOT 是正規化 username 符合程式常數 `ROOT_USERNAME` 的正式帳號；空白部署可透過 `AUTH_ROOT_USERNAME` 設定，資料庫已有 ROOT 後不可藉此改名。ROOT 繼承所有 admin 能力，並可建立及管理 admin／user／temporary。
 - admin 可管理 user／temporary 與專案生命週期，也可以建立 admin 並管理**自己直接建立**的帳號（含 admin），但不能對 ROOT 執行任何帳號管理操作，也不能管理自己的帳號。變更角色與重設密碼仍限定 ROOT。
 - user 與 temporary 沒有帳號管理或專案建立／刪除權限，資源存取仍依 ownership、grants 與 defaults 決定。
-- ROOT／admin 固定可進管理後台；user 與 temporary 只有在管理員明確開啟「允許進入管理後台」後才可進入，預設為不允許。這項權限不會提升帳號角色或擴大原有 grants，但會讓帳號可編輯已授權專案內的知識、Quick QA、Persona Prompt、記憶、Skills 與 Tools。
+- ROOT／admin 固定可進管理後台；user 與 temporary 只有在管理員明確開啟「允許進入管理後台」後才可進入，預設為不允許。這項權限不會提升帳號角色或擴大原有 grants，但會讓帳號可編輯已授權專案內的知識、Quick QA、Persona Prompt、記憶、Skills 與 Tools。Avatar 的人物、背景、小助理對這類帳號是唯讀（可試用、看清單；上傳、從影片產生、改名、刪除都限 admin），「語音 → ASR」不顯示只給 admin 用的批次試辨識。
 - 管理 API 不允許建立第二個 ROOT，也不允許 rename、disable、delete 或 demote 既有 ROOT。
 
 管理後台登入同時支援正式帳號與臨時密碼，但使用 Admin 專用登入端點先檢查後台權限。未授權的臨時密碼會直接取得 403，不會啟動首次使用後的 72 小時計時。管理員可在正式帳號權限編輯器、臨時批次建立表單與既有臨時批次紀錄調整這項權限。

@@ -17,9 +17,11 @@ import {
   uploadAvatarCharacter,
   uploadAvatarMascot,
 } from "../api";
+import { isAtLeastAdmin } from "../api/auth";
 import { fetchProjects, type ProjectSummary } from "../api/projects";
 import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
+import { useAuth } from "../context/AuthContext";
 import { useMascot } from "../context/MascotContext";
 import {
   DEFAULT_MASCOT_ID,
@@ -48,6 +50,8 @@ const ASSET_TAB_LABELS: Record<(typeof ASSET_TABS)[number], string> = {
 };
 type AssetTab = (typeof ASSET_TABS)[number];
 const AVATAR_CHARACTER_STORAGE_KEY = "avatar.character_id";
+// 一般帳號不截縮圖：上傳縮圖要管理員權限，送出去只會換來 403。
+const NO_SNAPSHOT_MASCOTS: AvatarMascot[] = [];
 const AVATAR_BACKGROUND_ID_STORAGE_KEY = "avatar.background_id";
 const AVATAR_BACKGROUND_URL_STORAGE_KEY = "avatar.background_url";
 const hiddenSnapshotFrameStyle: CSSProperties = {
@@ -84,6 +88,9 @@ function renameTargetLabel(target: RenameTarget | null): string {
 }
 
 export default function Avatar() {
+  const { account } = useAuth();
+  // 上傳、轉檔、改名、刪除的 API 都限管理員；一般帳號只看清單、試用。
+  const canManage = account ? isAtLeastAdmin(account.role) : false;
   const { selectedMascotId, setMascotOptions, setSelectedMascotId } = useMascot();
   const [activeTab, setActiveTab] = useAdminSubView<AssetTab>(
     "Avatar",
@@ -126,7 +133,7 @@ export default function Avatar() {
     void loadMascots();
   }, []);
   const currentSnapshotId = useMascotSnapshotQueue({
-    mascots,
+    mascots: canManage ? mascots : NO_SNAPSHOT_MASCOTS,
     loading: mascotsLoading,
     onUploaded: handleSnapshotUploaded,
   });
@@ -480,12 +487,13 @@ export default function Avatar() {
       >
       {status && <StatusAlert type={status.type} message={status.message} />}
 
-      {activeTab === "characters" && (
+      {activeTab === "characters" && canManage && (
         <CharacterJobsPanel projects={projects} onCharacterCreated={load} />
       )}
 
       {activeTab === "characters" && (
         <CharactersPanel
+          canManage={canManage}
           characters={characters}
           loading={loading}
           uploading={uploading}
@@ -511,6 +519,7 @@ export default function Avatar() {
 
       {activeTab === "backgrounds" && (
         <BackgroundsPanel
+          canManage={canManage}
           backgrounds={backgrounds}
           loading={backgroundsLoading}
           uploading={backgroundUploading}
@@ -533,6 +542,7 @@ export default function Avatar() {
 
       {activeTab === "mascots" && (
         <MascotsPanel
+          canManage={canManage}
           mascots={mascots}
           selectedMascotId={selectedMascotId}
           loading={mascotsLoading}

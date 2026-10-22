@@ -21,7 +21,7 @@ import PersonaCreateForm from "../components/personas/PersonaCreateForm";
 import PersonaEditor from "../components/personas/PersonaEditor";
 import PersonaEmptyState from "../components/personas/PersonaEmptyState";
 import PersonaList from "../components/personas/PersonaList";
-import { useUnsavedChanges } from "../context/NavigationGuardContext";
+import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
 import { useProject } from "../context/ProjectContext";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
@@ -79,30 +79,25 @@ export default function Personas() {
 
        const hasUnsavedChanges = draftContent !== loadedContent;
        useUnsavedChanges("persona-editor", hasUnsavedChanges, "Persona 文件");
+       const { requestNavigation } = useNavigationGuard();
 
-       const loadPersonas = async (preferredId?: string) => {
+       // 重抓清單。keepId 的角色還在就只換成新資料、不重開文件：存檔、綁虛擬人、
+       // 重新整理、刪別的角色之後，草稿和正在看的分頁都要留著。不在了才改開第一個。
+       const loadPersonas = async (keepId?: string): Promise<PersonaSummary[]> => {
               setLoadingList(true);
               try {
                      const response = await fetchPersonas();
                      setPersonas(response.personas);
-
-                     let nextPersona = response.personas.find((p) => p.persona_id === preferredId);
-                     if (!nextPersona && response.personas.length > 0) {
-                            nextPersona = response.personas[0];
-                     }
-
-                     if (nextPersona) {
-                            setSelectedPersona(nextPersona);
-                            if (nextPersona.path) {
-                                   await openDocument(nextPersona.path);
-                            }
+                     const kept = response.personas.find((p) => p.persona_id === keepId);
+                     if (kept) {
+                            setSelectedPersona(kept);
                      } else {
-                            setSelectedPersona(null);
-                            setDraftContent("");
-                            setLoadedContent("");
+                            await openPersona(response.personas[0] ?? null);
                      }
+                     return response.personas;
               } catch (error) {
                      setStatus({ type: "error", message: String(error) });
+                     return [];
               } finally {
                      setLoadingList(false);
               }
@@ -125,9 +120,25 @@ export default function Personas() {
 
        const personaDrawer = useMobileTreeDrawer("關閉角色清單");
 
-       const selectPersona = (persona: PersonaSummary) => {
+       const openPersona = async (persona: PersonaSummary | null) => {
               setSelectedPersona(persona);
-              openDocument(persona.path);
+              if (persona?.path) {
+                     await openDocument(persona.path);
+                     return;
+              }
+              setSelectedPath("");
+              setDraftContent("");
+              setLoadedContent("");
+       };
+
+       // 使用者主動換角色或換文件：有未存的修改先問，不直接蓋掉。
+       const selectPersona = (persona: PersonaSummary) => {
+              requestNavigation(() => void openPersona(persona));
+       };
+
+       const selectDocument = (path: string) => {
+              if (path === selectedPath) return;
+              requestNavigation(() => void openDocument(path));
        };
 
        const saveDocument = async () => {
@@ -146,6 +157,12 @@ export default function Personas() {
               } finally {
                      setSaving(false);
               }
+       };
+
+       const openCreatedPersona = async (personaId: string) => {
+              const list = await loadPersonas(selectedPersona?.persona_id);
+              const created = list.find((p) => p.persona_id === personaId);
+              if (created) selectPersona(created);
        };
 
        const handleCreateOrClone = async () => {
@@ -168,7 +185,7 @@ export default function Personas() {
                             setNewPersonaId("");
                             setNewPersonaLabel("");
                             setTemplateSourceId("");
-                            await loadPersonas(response.persona.persona_id);
+                            await openCreatedPersona(response.persona.persona_id);
                      } catch (error) {
                             setStatus({ type: "error", message: String(error) });
                      } finally {
@@ -185,7 +202,7 @@ export default function Personas() {
                             });
                             setNewPersonaId("");
                             setNewPersonaLabel("");
-                            await loadPersonas(response.persona.persona_id);
+                            await openCreatedPersona(response.persona.persona_id);
                      } catch (error) {
                             setStatus({ type: "error", message: String(error) });
                      } finally {
@@ -207,7 +224,11 @@ export default function Personas() {
                             type: "success",
                             message: `已刪除 persona ${persona.persona_id}。`,
                      });
-                     await loadPersonas();
+                     await loadPersonas(
+                            selectedPersona?.persona_id === persona.persona_id
+                                   ? undefined
+                                   : selectedPersona?.persona_id,
+                     );
               } catch (error) {
                      setStatus({ type: "error", message: String(error) });
               } finally {
@@ -288,7 +309,7 @@ export default function Personas() {
                                    </div>
                                    <div className="flex items-center gap-1">
                                           <button
-                                                 onClick={() => loadPersonas(selectedPersona?.persona_id)}
+                                                 onClick={() => void loadPersonas(selectedPersona?.persona_id)}
                                                  disabled={loadingList}
                                                  className="flex h-7 w-7 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-50"
                                                  title="重新整理"
@@ -315,8 +336,9 @@ export default function Personas() {
                                           selectedPersonaId={selectedPersona?.persona_id}
                                           deletingPersonaId={deletingPersonaId}
                                           onSelect={(persona) => {
-                                                 selectPersona(persona);
+                                                 // 先關抽屜讓焦點回到「管理角色」，跳出的未存提醒關掉後才有地方還焦點。
                                                  personaDrawer.closeMobileTree();
+                                                 selectPersona(persona);
                                           }}
                                           onDelete={setDeletePersonaTarget}
                                    />
@@ -401,7 +423,7 @@ export default function Personas() {
                                                  saving={saving}
                                                  hasUnsavedChanges={hasUnsavedChanges}
                                                  onEditorModeChange={setEditorMode}
-                                                 onOpenDocument={openDocument}
+                                                 onOpenDocument={selectDocument}
                                                  onDraftContentChange={setDraftContent}
                                                  onDiscard={() => setDraftContent(loadedContent)}
                                                  onSave={saveDocument}

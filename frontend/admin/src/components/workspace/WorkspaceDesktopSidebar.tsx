@@ -42,7 +42,8 @@ export default function WorkspaceDesktopSidebar({
             onClick={onRefresh}
             disabled={loadingList}
             className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-50"
-            title="Refresh"
+            title="重新整理"
+            aria-label="重新整理文件清單"
           >
             <span className="material-symbols-outlined text-[1rem]">refresh</span>
           </button>
@@ -50,7 +51,8 @@ export default function WorkspaceDesktopSidebar({
             onClick={onSync}
             disabled={syncing}
             className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-            title="Reindex Knowledge Base"
+            title="重建知識庫索引"
+            aria-label="重建知識庫索引"
           >
             <span className={`material-symbols-outlined text-[1rem] ${syncing ? "animate-spin" : ""}`}>sync</span>
           </button>
@@ -60,7 +62,7 @@ export default function WorkspaceDesktopSidebar({
       <div className="px-4 mt-5 mb-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 text-xs font-bold text-content-subtle">
           <span className="material-symbols-outlined text-[0.875rem]">folder_open</span>
-          <span className="uppercase tracking-widest">{documents.length} FILES</span>
+          <span>{documents.length} 份文件</span>
         </div>
         <div className="flex items-center gap-1">
           <input
@@ -74,14 +76,16 @@ export default function WorkspaceDesktopSidebar({
             onClick={() => uploadInputRef.current?.click()}
             disabled={uploading}
             className="flex h-6 w-6 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-50"
-            title="Upload Files"
+            title="上傳檔案"
+            aria-label="上傳檔案"
           >
             <span className="material-symbols-outlined text-[1rem]">upload_file</span>
           </button>
           <button
             onClick={onCreate}
             className="flex h-6 w-6 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
-            title="New Document"
+            title="新文件"
+            aria-label="新文件"
           >
             <span className="material-symbols-outlined text-[1rem]">add</span>
           </button>

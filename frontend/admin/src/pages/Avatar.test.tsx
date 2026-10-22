@@ -6,6 +6,11 @@ import { fireEvent, render as renderComponent, screen, waitFor } from "@testing-
 import Avatar from "./Avatar";
 import * as api from "../api";
 
+const authState = vi.hoisted(() => ({ role: "admin" as "root" | "admin" | "user" }));
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: { id: "a", username: "a", role: authState.role } }),
+}));
+
 function render(element: ReactElement) {
   function RouteHarness() {
     const [view, setView] = useState(() => parseAdminRoute(window.location.pathname, window.location.search)?.subView);
@@ -23,6 +28,7 @@ function render(element: ReactElement) {
 }
 
 beforeEach(() => {
+  authState.role = "admin";
   window.history.replaceState(null, "", "/admin/avatar");
   window.localStorage.clear();
 });
@@ -64,6 +70,38 @@ describe("Avatar page", () => {
     render(<Avatar />);
     expect(await screen.findByText("008")).toBeTruthy();
     expect(screen.getByText("角色八")).toBeTruthy();
+  });
+
+  it("gives regular accounts a read-only list without admin-only controls", async () => {
+    // 上傳、轉檔、改名、刪除的 API 都限管理員；畫面若照樣顯示，一按就回 403，
+    // 整個後台會翻成「權限不足」。
+    authState.role = "user";
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({
+      characters: [
+        { char_id: "008", label: "角色八", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z" },
+      ],
+    });
+    render(<Avatar />);
+
+    expect(await screen.findByRole("button", { name: "試用 008" })).toBeTruthy();
+    expect(screen.queryByText("從影片產生角色")).toBeNull();
+    expect(screen.queryByText("上傳新人物")).toBeNull();
+    expect(screen.queryByRole("button", { name: "改名" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "刪除" })).toBeNull();
+  });
+
+  it("shows admins the upload, conversion and rename controls", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({
+      characters: [
+        { char_id: "008", label: "角色八", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z" },
+      ],
+    });
+    render(<Avatar />);
+
+    expect(await screen.findByRole("button", { name: "試用 008" })).toBeTruthy();
+    expect(screen.getByText("從影片產生角色")).toBeTruthy();
+    expect(screen.getByText("上傳新人物")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "改名" })).toBeTruthy();
   });
 
   it("shows empty state when no characters", async () => {

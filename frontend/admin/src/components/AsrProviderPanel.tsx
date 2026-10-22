@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { getActiveProjectId } from "../api";
+import { isAtLeastAdmin } from "../api/auth";
 import { fetchKnowledgeSettings } from "../api/knowledge";
+import { useAuth } from "../context/AuthContext";
 import BatchTester from "./asr/BatchTester";
 import GlossaryEditor from "./asr/GlossaryEditor";
 import RoutePicker from "./asr/RoutePicker";
@@ -16,6 +18,9 @@ import StreamTester from "./asr/StreamTester";
  */
 export default function AsrProviderPanel() {
   const projectId = getActiveProjectId();
+  const { account } = useAuth();
+  // 批次試辨識是管理員的測試台（/asr/engines、/asr/preview 都限管理員），一般帳號不顯示。
+  const canUseBatchTester = account ? isAtLeastAdmin(account.role) : false;
   const [available, setAvailable] = useState<string[]>([]);
   const [routes, setRoutes] = useState<string[]>([]);
   const [routesError, setRoutesError] = useState("");
@@ -51,9 +56,11 @@ export default function AsrProviderPanel() {
         {routesError && <p className="text-xs text-content-muted">{routesError}</p>}
       </div>
 
-      <div className="border-t border-border pt-6">
-        <BatchTester projectId={projectId} routes={routes} />
-      </div>
+      {canUseBatchTester && (
+        <div className="border-t border-border pt-6">
+          <BatchTester projectId={projectId} routes={routes} />
+        </div>
+      )}
 
       <div className="border-t border-border pt-6">
         <StreamTester projectId={projectId} routes={routes} />

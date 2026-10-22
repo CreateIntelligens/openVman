@@ -10,6 +10,7 @@ vi.mock("../context/ProjectContext", () => ({
 
 vi.mock("../context/NavigationGuardContext", () => ({
   useUnsavedChanges: vi.fn(),
+  useNavigationGuard: () => ({ requestNavigation: (action: () => void) => { action(); return true; } }),
 }));
 
 vi.mock("../components/personas/PersonaCreateForm", () => ({

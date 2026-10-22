@@ -2,7 +2,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import WorkspaceDesktopSidebar from "../components/workspace/WorkspaceDesktopSidebar";
 import WorkspaceEditor from "../components/workspace/WorkspaceEditor";
 import WorkspaceMobileSidebar from "../components/workspace/WorkspaceMobileSidebar";
-import { useUnsavedChanges } from "../context/NavigationGuardContext";
+import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
 import { useWorkspaceManager } from "../hooks/useWorkspaceManager";
 
 export default function Workspace() {
@@ -43,6 +43,14 @@ export default function Workspace() {
     uploadInputRef,
   } = useWorkspaceManager();
   useUnsavedChanges("workspace-editor", hasUnsavedChanges, "Workspace 文件");
+  const { requestNavigation } = useNavigationGuard();
+
+  // 換文件、開新文件、重新整理都會蓋掉編輯區，有未存的修改先問。
+  const selectDocument = (path: string) => {
+    if (path === selectedPath) return;
+    requestNavigation(() => void openDocument(path));
+  };
+  const startNewDocument = () => requestNavigation(createDocument);
 
   return (
     <div
@@ -58,11 +66,11 @@ export default function Workspace() {
         loadingList={loadingList}
         docSearch={docSearch}
         onClose={() => setMobileSidebarOpen(false)}
-        onCreate={createDocument}
+        onCreate={startNewDocument}
         onSearchChange={setDocSearch}
         onSelect={(path) => {
-          void openDocument(path);
           setMobileSidebarOpen(false);
+          selectDocument(path);
         }}
       />
 
@@ -74,11 +82,11 @@ export default function Workspace() {
         uploading={uploading}
         docSearch={docSearch}
         uploadInputRef={uploadInputRef}
-        onRefresh={() => void loadDocuments()}
+        onRefresh={() => requestNavigation(() => void loadDocuments())}
         onSync={() => void syncDocuments()}
-        onCreate={createDocument}
+        onCreate={startNewDocument}
         onSearchChange={setDocSearch}
-        onSelect={(path) => void openDocument(path)}
+        onSelect={selectDocument}
         onFileUpload={handleFileUpload}
       />
 

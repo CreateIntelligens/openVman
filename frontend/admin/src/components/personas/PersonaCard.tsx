@@ -46,9 +46,10 @@ export default function PersonaCard({
               onDelete(persona);
             }}
             disabled={deleting}
-            className="flex items-center justify-center rounded bg-red-500/10 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-red-400 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
+            aria-label={`刪除角色 ${persona.persona_id}`}
+            className="flex items-center justify-center rounded bg-red-500/10 px-2 py-0.5 text-[0.625rem] font-bold text-red-400 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
           >
-            {deleting ? "..." : "DEL"}
+            {deleting ? "刪除中…" : "刪除"}
           </button>
         )}
       </div>

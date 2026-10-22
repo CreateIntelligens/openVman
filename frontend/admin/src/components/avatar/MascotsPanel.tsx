@@ -79,6 +79,8 @@ type MascotsPanelProps = {
   onUse: (mascot: AvatarMascot) => void;
   onRename: (mascot: AvatarMascot) => void;
   onDelete: (mascotId: string) => void;
+  /** 能上傳、改名、刪除；一般帳號只有清單。 */
+  canManage: boolean;
 };
 
 export default function MascotsPanel({
@@ -103,97 +105,101 @@ export default function MascotsPanel({
   onUse,
   onRename,
   onDelete,
+  canManage,
 }: MascotsPanelProps) {
   return (
     <>
-      <div className={formPanelClassName}>
-        <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
-          <span className="material-symbols-outlined text-base">view_in_ar</span>
-          上傳小助理
-        </p>
-        <div className={formRowClassName}>
-          <input
-            type="text"
-            placeholder="小助理 ID（mascot_id）"
-            value={uploadId}
-            onChange={(e) => onUploadIdChange(e.target.value)}
-            className={inputClassName}
-          />
-          <input
-            type="text"
-            placeholder="小助理顯示名稱"
-            value={uploadLabel}
-            onChange={(e) => onUploadLabelChange(e.target.value)}
-            className={inputClassName}
-          />
-          {projects && projects.length > 0 && onProjectIdChange && (
-            <select
-              value={selectedProjectId || ""}
-              onChange={(e) => onProjectIdChange(e.target.value)}
+      {/* 上傳、改名、刪除都只開放管理員；一般帳號只看清單。 */}
+      {canManage && (
+        <div className={formPanelClassName}>
+          <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
+            <span className="material-symbols-outlined text-base">view_in_ar</span>
+            上傳小助理
+          </p>
+          <div className={formRowClassName}>
+            <input
+              type="text"
+              placeholder="小助理 ID（mascot_id）"
+              value={uploadId}
+              onChange={(e) => onUploadIdChange(e.target.value)}
               className={inputClassName}
+            />
+            <input
+              type="text"
+              placeholder="小助理顯示名稱"
+              value={uploadLabel}
+              onChange={(e) => onUploadLabelChange(e.target.value)}
+              className={inputClassName}
+            />
+            {projects && projects.length > 0 && onProjectIdChange && (
+              <select
+                value={selectedProjectId || ""}
+                onChange={(e) => onProjectIdChange(e.target.value)}
+                className={inputClassName}
+              >
+                <option value="">全域資源（所有專案可用）</option>
+                {projects.map((p) => (
+                  <option key={p.project_id} value={p.project_id}>
+                    專案專屬：{p.label || p.project_id}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className={fileRowClassName}>
+            <div className={fileFieldClassName}>
+              <span className="text-xs font-medium text-content-muted">
+                模型（.vrm）：
+              </span>
+              <label className={filePickerClassName(selectedModelName)}>
+                <span className="material-symbols-outlined text-sm">
+                  deployed_code
+                </span>
+                <span className="min-w-0 truncate">
+                  {selectedModelName || "選擇 VRM 模型"}
+                </span>
+                <input
+                  ref={modelRef}
+                  type="file"
+                  accept=".vrm"
+                  className="hidden"
+                  aria-label="VRM 模型"
+                  onChange={(e) => onModelChange(e.target.files?.[0]?.name || "")}
+                />
+              </label>
+            </div>
+
+            <div className={fileFieldClassName}>
+              <span className="text-xs font-medium text-content-muted">
+                縮圖（圖片）：
+              </span>
+              <label className={filePickerClassName(selectedThumbnailName)}>
+                <span className="material-symbols-outlined text-sm">image</span>
+                <span className="min-w-0 truncate">
+                  {selectedThumbnailName || "選擇縮圖"}
+                </span>
+                <input
+                  ref={thumbnailRef}
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp"
+                  className="hidden"
+                  aria-label="縮圖"
+                  onChange={(e) =>
+                    onThumbnailChange(e.target.files?.[0]?.name || "")}
+                />
+              </label>
+            </div>
+
+            <button
+              onClick={onUpload}
+              disabled={uploading}
+              className={uploadButtonClassName}
             >
-              <option value="">全域資源（所有專案可用）</option>
-              {projects.map((p) => (
-                <option key={p.project_id} value={p.project_id}>
-                  專案專屬：{p.label || p.project_id}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div className={fileRowClassName}>
-          <div className={fileFieldClassName}>
-            <span className="text-xs font-medium text-content-muted">
-              模型（.vrm）：
-            </span>
-            <label className={filePickerClassName(selectedModelName)}>
-              <span className="material-symbols-outlined text-sm">
-                deployed_code
-              </span>
-              <span className="min-w-0 truncate">
-                {selectedModelName || "選擇 VRM 模型"}
-              </span>
-              <input
-                ref={modelRef}
-                type="file"
-                accept=".vrm"
-                className="hidden"
-                aria-label="VRM 模型"
-                onChange={(e) => onModelChange(e.target.files?.[0]?.name || "")}
-              />
-            </label>
+              {uploading ? "上傳中…" : "上傳小助理"}
+            </button>
           </div>
-
-          <div className={fileFieldClassName}>
-            <span className="text-xs font-medium text-content-muted">
-              縮圖（圖片）：
-            </span>
-            <label className={filePickerClassName(selectedThumbnailName)}>
-              <span className="material-symbols-outlined text-sm">image</span>
-              <span className="min-w-0 truncate">
-                {selectedThumbnailName || "選擇縮圖"}
-              </span>
-              <input
-                ref={thumbnailRef}
-                type="file"
-                accept=".png,.jpg,.jpeg,.webp"
-                className="hidden"
-                aria-label="縮圖"
-                onChange={(e) =>
-                  onThumbnailChange(e.target.files?.[0]?.name || "")}
-              />
-            </label>
-          </div>
-
-          <button
-            onClick={onUpload}
-            disabled={uploading}
-            className={uploadButtonClassName}
-          >
-            {uploading ? "上傳中…" : "上傳小助理"}
-          </button>
         </div>
-      </div>
+      )}
 
       {loading && <p className="text-sm text-content-muted">載入中…</p>}
 
@@ -255,7 +261,7 @@ export default function MascotsPanel({
                   >
                     {selected ? "使用中" : "使用"}
                   </button>
-                  {!mascot.builtin && (
+                  {canManage && !mascot.builtin && (
                     <>
                       <button
                         type="button"

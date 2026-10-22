@@ -89,6 +89,7 @@ export default function PersonaEditor({
         )}
         {editorMode === "edit" || editorMode === "split" ? (
           <textarea
+            aria-label={`${title} 文件內容`}
             value={draftContent}
             onChange={(event) => onDraftContentChange(event.target.value)}
             className={`h-full w-full bg-transparent p-6 text-[0.8125rem] leading-relaxed text-content placeholder:text-content-subtle focus:outline-none font-mono resize-none ${

@@ -39,6 +39,7 @@ export default function WorkspaceMobileSidebar({
           <h2 className="section-title">工作區</h2>
           <button
             onClick={onClose}
+            aria-label="關閉文件清單"
             className="flex h-7 w-7 items-center justify-center rounded text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
           >
             <span className="material-symbols-outlined text-[1.125rem]">close</span>
@@ -47,13 +48,14 @@ export default function WorkspaceMobileSidebar({
         <div className="px-4 mt-5 mb-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-xs font-bold text-content-subtle">
             <span className="material-symbols-outlined text-[0.875rem]">folder_open</span>
-            <span className="uppercase tracking-widest">{documents.length} FILES</span>
+            <span>{documents.length} 份文件</span>
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={onCreate}
               className="flex h-6 w-6 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
-              title="New Document"
+              title="新文件"
+              aria-label="新文件"
             >
               <span className="material-symbols-outlined text-[1rem]">add</span>
             </button>
