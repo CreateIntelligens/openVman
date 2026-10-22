@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **[2026-10-22]** **backend 的 PyJWT 升到 2.15.1**：處理 2.13.0 的 Dependabot 安全警示。登入 token 固定用 HS256、密鑰在伺服器端，這批警示多半是公鑰被當成 HMAC 密鑰的情況，原本就碰不到，但它是 runtime 套件，所以照樣升級。
 - **[2026-10-22]** **avatar-sdk 建置工具升級**：`frontend/avatar-sdk` 的 `vite` 升到 6.4.5，`postcss` 升到 8.5.31，`source-map-js` 升到 1.2.2，`nanoid` 升到 3.3.20，處理 Dependabot 安全警示。這些都只在 admin 映像建置 SDK 時用到，正式站執行時不會載入。合併取代 Dependabot #46～#48。
 - **[2026-10-22]** **拿掉內建的 Frieren 與 VRM 3D 小助理**：內建小助理只留 Haru（Live2D），3D 模型改成只用上傳的 VRM。auth 資料庫 schema 26 刪掉 `qqman`、`vrm-sample` 兩筆資源（授權、範圍、指派跟著清除），帳號與專案預設指到它們的改成不指定；前台 3D 模式不再預設 `qqman`。正式環境原本放 `qqman` 模型的 `/data/mascots/qqman` 已搬到 `/data/backups/mascots-qqman-20261022`；其他環境若還留著這個資料夾，它會被當成上傳的小助理列出，可在後台刪除。
 - Updated frontend Docker build stages to Node.js 24.22.1 LTS for the latest Node.js security fixes.
