@@ -140,7 +140,33 @@ describe("Avatar page", () => {
     expect(panel.className).toContain("overflow-y-auto");
   });
 
-  it("can open the avatar app with the selected character", async () => {
+  it("hands the tried character and its owner project to the avatar app", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({
+      characters: [
+        { char_id: "010", label: "角色十", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z", owner_project_id: "proj-owner" },
+        { char_id: "011", label: "角色十一", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z", owner_project_id: null },
+      ],
+    });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "試用 010" }));
+
+    // 前台登入後會用伺服器偏好蓋掉直接寫的鍵，所以改留一次性的交接指令。
+    expect(window.localStorage.getItem("avatar.character_id")).toBeNull();
+    const payload = JSON.parse(window.localStorage.getItem("avatar.admin_handoff") ?? "null");
+    expect(payload).toMatchObject({ v: 1, accountId: "a", characterId: "010", projectId: "proj-owner" });
+    expect(typeof payload.createdAt).toBe("number");
+    expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
+
+    fireEvent.click(screen.getByRole("button", { name: "試用 011" }));
+    const global = JSON.parse(window.localStorage.getItem("avatar.admin_handoff") ?? "null");
+    expect(global).toMatchObject({ v: 1, accountId: "a", characterId: "011" });
+    expect("projectId" in global).toBe(false);
+  });
+
+  it("opens the avatar app under the public prefix when the admin is served there", async () => {
+    window.history.replaceState(null, "", "/openvman/admin/avatar");
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({
       characters: [
         { char_id: "010", label: "角色十", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z" },
@@ -151,8 +177,7 @@ describe("Avatar page", () => {
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("button", { name: "試用 010" }));
 
-    expect(window.localStorage.getItem("avatar.character_id")).toBe("010");
-    expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
+    expect(openSpy).toHaveBeenCalledWith("/openvman/", "_blank", "noopener,noreferrer");
   });
 
   it("uses a bounded zip icon for the GZ data picker", async () => {
@@ -274,7 +299,7 @@ describe("Avatar page", () => {
     });
   });
 
-  it("can open the avatar app with the selected background", async () => {
+  it("hands the chosen background to the avatar app", async () => {
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
     vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({
       backgrounds: [
@@ -285,6 +310,7 @@ describe("Avatar page", () => {
           mime_type: "image/png",
           size_bytes: 2048,
           updated_at: "2026-06-08T00:00:00Z",
+          owner_project_id: "proj-owner",
         },
       ],
     });
@@ -294,12 +320,19 @@ describe("Avatar page", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
     fireEvent.click(await screen.findByRole("button", { name: "使用 clinic" }));
 
-    expect(window.localStorage.getItem("avatar.background_id")).toBe("uploaded:clinic");
-    expect(window.localStorage.getItem("avatar.background_url")).toBe("/static/backgrounds/clinic/image.png");
+    expect(window.localStorage.getItem("avatar.background_id")).toBeNull();
+    expect(window.localStorage.getItem("avatar.background_url")).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem("avatar.admin_handoff") ?? "null")).toMatchObject({
+      v: 1,
+      accountId: "a",
+      projectId: "proj-owner",
+      backgroundId: "uploaded:clinic",
+      backgroundUrl: "/static/backgrounds/clinic/image.png",
+    });
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
   });
 
-  it("can replace the right-corner mascot used by the admin and avatar app", async () => {
+  it("replaces the admin's own corner mascot without opening the avatar app", async () => {
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
     vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({
       mascots: [
@@ -324,7 +357,9 @@ describe("Avatar page", () => {
     fireEvent.click(await screen.findByRole("button", { name: "使用 自訂 VRM" }));
 
     expect(window.localStorage.getItem("avatar.mascot_id")).toBe("custom-vrm");
-    expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
+    // 前台不讀這個設定，開前台只是多一個看不出差別的分頁。
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("avatar.admin_handoff")).toBeNull();
   });
 
   it("captures uploaded mascot snapshots with that mascot's widget source", async () => {

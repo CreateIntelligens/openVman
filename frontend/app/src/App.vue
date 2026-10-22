@@ -209,6 +209,7 @@ import StartOverlay from "./components/StartOverlay.vue";
 import UnlockDialog from "./components/controls/UnlockDialog.vue";
 import { useAuth } from "./composables/useAuth";
 import QuickQaPanel from "./components/controls/QuickQaPanel.vue";
+import { useAdminHandoff } from "./composables/useAdminHandoff";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { useAsrPreferences } from "./composables/useAsrPreferences";
 import { useAvatarStage } from "./composables/useAvatarStage";
@@ -334,6 +335,7 @@ function handleEnterKiosk(): void {
 const { handleTtsChange, handleTtsVoiceChange,
   handleProjectChange, handlePersonaChange, handleVoiceModeChange,
   handleReplyModeChange } = useAvatarSettings(settings, bootstrap, showSettings, stage.syncCharacter);
+const { applyAdminHandoff } = useAdminHandoff({ settings, bootstrap, stage, visitor, handleProjectChange });
 
 onMounted(async () => {
   await settingsReady();
@@ -343,7 +345,7 @@ onMounted(async () => {
     vrmReady, bootstrap.fetchTtsProviders(), bootstrap.fetchBackgrounds(),
     projectReady, camera.fetchVisionHealth(),
     stage.bootstrapRenderer(vrmReady, projectReady),
-  ]);
+  ]).then(applyAdminHandoff);
 });
 </script>
 

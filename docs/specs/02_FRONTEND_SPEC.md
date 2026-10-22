@@ -133,6 +133,12 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 不分模式：標題顯示角色名稱（預設角色時用專案名稱）與狀態 pill（在線／聆聽中／思考中／說話中／連線中／暫停服務）；收音時 `useMicLevel` 另開一條麥克風串流量音量，`MicLevel` 疊在輸入框右側；還沒開口前 `useSuggestedQuestions` 從 `GET /api/v1/knowledge/qa/nodes` 依主題輪流挑最多 4 題（第一層是語言分類時取中文）顯示在輸入框上方，手機寬度只顯示 2 題，點了照快速問答的格式送出（主題＋題目、帶 `source_path`）。手機寬度下輸入框聚焦時 `ChatPanel` 送出 `composing`，`app-shell` 加 `composing` class 把舞台縮到 `clamp(6rem, 20svh, 9rem)`；viewport 設 `interactive-widget=resizes-content`。
 
+### 5.3 後台試用交接（2026-10-22）
+
+後台 Avatar 頁人物的「試用」與背景的「使用」不直接寫前台的偏好鍵（登入後會被伺服器存的偏好與專案別偏好蓋掉），改用 `@shared/avatar/adminHandoff` 在同源 localStorage 留一筆一次性指令 `avatar.admin_handoff`：`{ v: 1, accountId, projectId?, characterId?, backgroundId?, backgroundUrl?, createdAt }`，`projectId` 是資源的 `owner_project_id`（全域資源不帶），再以新分頁開前台（公開前綴下開 `/openvman/`）。不用網址參數：nginx 轉址會丟掉 query，網址也能被第三方偽造。小助理的「使用」只換後台自己右下角的小助理，不開前台。
+
+前台 `useAdminHandoff` 在 `App.vue` 開場的 `Promise.allSettled`（專案、專案資源、人物與背景清單、舞台）結束後執行一次：`takeAdminHandoff` 讀取後一律刪除，只接受帳號相符、`createdAt` 在 0～120 秒內的指令；舞台還停在 loading（開場失敗要整頁重新載入）時先不取。訪客模式未解鎖時直接忽略。之後走設定視窗「套用」的同一批處理：專案不同且在帳號清單內就 `handleProjectChange` 並等新專案清單載完，不在清單內只留提示；人物要在目前專案的清單內才 `handleCharChange`，舞台是 3D 時再 `handleRenderModeChange('2d')`；背景要在伺服器回傳的清單內，網址取清單的、不取指令的。結果照一般「套用」存成帳號偏好；提示是固定字句，不放指令內容。
+
 ### 6. ASR 與語音輸入 (Speech Recognition)
 
 **授權邊界與部署（2026-09-30）**：前端的引擎選擇只是偏好，不是授權；Backend 必須依帳號允許的引擎重新驗證，串流端點也不可略過。不得信任前端傳入的 provider 或語言分流來取得未授權引擎。

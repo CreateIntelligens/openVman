@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { writeAdminHandoff } from "@shared/avatar/adminHandoff";
 import {
   AvatarBackground,
   AvatarCharacter,
@@ -35,7 +36,7 @@ import CharacterJobsPanel from "../components/avatar/CharacterJobsPanel";
 import CharactersPanel from "../components/avatar/CharactersPanel";
 import MascotsPanel from "../components/avatar/MascotsPanel";
 import { useMascotSnapshotQueue } from "../hooks/useMascotSnapshotQueue";
-import { writeScoped } from "../utils/scopedStorage";
+import { publicAdminPath } from "../components/app/navigation";
 
 type Status = { type: "success" | "error"; message: string } | null;
 type RenameTarget =
@@ -49,11 +50,8 @@ const ASSET_TAB_LABELS: Record<(typeof ASSET_TABS)[number], string> = {
   mascots: "小助理",
 };
 type AssetTab = (typeof ASSET_TABS)[number];
-const AVATAR_CHARACTER_STORAGE_KEY = "avatar.character_id";
 // 一般帳號不截縮圖：上傳縮圖要管理員權限，送出去只會換來 403。
 const NO_SNAPSHOT_MASCOTS: AvatarMascot[] = [];
-const AVATAR_BACKGROUND_ID_STORAGE_KEY = "avatar.background_id";
-const AVATAR_BACKGROUND_URL_STORAGE_KEY = "avatar.background_url";
 const hiddenSnapshotFrameStyle: CSSProperties = {
   position: "absolute",
   left: "-62.5rem",
@@ -440,23 +438,40 @@ export default function Avatar() {
     }
   }
 
-  function handleTry(charId: string): void {
-    writeScoped(AVATAR_CHARACTER_STORAGE_KEY, charId);
-    window.open("/", "_blank", "noopener,noreferrer");
+  // 前台登入後會用伺服器上的偏好與專案別的偏好蓋掉直接寫進去的鍵，所以改留
+  // 一筆一次性指令，讓前台載完清單後自己走「選好按套用」的路徑。
+  function openAppWith(
+    selection: { characterId?: string; backgroundId?: string; backgroundUrl?: string },
+    ownerProjectId?: string | null,
+  ): void {
+    if (!account) return;
+    writeAdminHandoff({
+      v: 1,
+      accountId: account.id,
+      ...(ownerProjectId ? { projectId: ownerProjectId } : {}),
+      ...selection,
+      createdAt: Date.now(),
+    });
+    window.open(publicAdminPath("/"), "_blank", "noopener,noreferrer");
+  }
+
+  function handleTry(character: AvatarCharacter): void {
+    openAppWith({ characterId: character.char_id }, character.owner_project_id);
   }
 
   function handleUseBackground(background: AvatarBackground): void {
-    writeScoped(
-      AVATAR_BACKGROUND_ID_STORAGE_KEY,
-      `uploaded:${background.background_id}`,
+    openAppWith(
+      {
+        backgroundId: `uploaded:${background.background_id}`,
+        backgroundUrl: background.url,
+      },
+      background.owner_project_id,
     );
-    writeScoped(AVATAR_BACKGROUND_URL_STORAGE_KEY, background.url);
-    window.open("/", "_blank", "noopener,noreferrer");
   }
 
+  // 只換後台自己右下角的小助理；前台不讀這個設定，開前台沒有意義。
   function handleUseMascot(mascot: AvatarMascot): void {
     setSelectedMascotId(mascot.mascot_id);
-    window.open("/", "_blank", "noopener,noreferrer");
   }
 
   const currentSnapshotSrc = snapshotWidgetSrc(mascots, currentSnapshotId);

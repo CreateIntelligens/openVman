@@ -16,12 +16,14 @@ export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>,
     saveSettings({ ttsProvider: settings.ttsProvider, ttsVoice: voice });
   }
 
-  function handleProjectChange(projectId: string): void {
+  // 回傳 Promise：後台交接要等新專案的人物、背景清單載完才能接著選人物。
+  async function handleProjectChange(projectId: string): Promise<void> {
     if (!projectId) return;
     saveSettings({ projectId });
     if (bootstrap.switchProject) {
       // 換專案會依新專案重挑人物，只改設定值的話舞台還是上一個專案的人物。
-      void bootstrap.switchProject(projectId).then(() => syncStageCharacter?.());
+      await bootstrap.switchProject(projectId);
+      syncStageCharacter?.();
     }
   }
 

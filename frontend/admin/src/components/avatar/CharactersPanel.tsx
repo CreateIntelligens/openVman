@@ -39,7 +39,7 @@ type CharactersPanelProps = {
   onVideoChange: (fileName: string) => void;
   onDataChange: (fileName: string) => void;
   onUpload: () => void;
-  onTry: (charId: string) => void;
+  onTry: (character: AvatarCharacter) => void;
   onRename: (character: AvatarCharacter) => void;
   onDelete: (charId: string) => void;
   /** 能上傳、改名、刪除；一般帳號只有清單。 */
@@ -205,7 +205,7 @@ export default function CharactersPanel({
               </div>
               <div className={cardActionsClassName}>
                 <button
-                  onClick={() => onTry(character.char_id)}
+                  onClick={() => onTry(character)}
                   aria-label={`試用 ${character.char_id}`}
                   className={primaryActionClassName}
                 >
