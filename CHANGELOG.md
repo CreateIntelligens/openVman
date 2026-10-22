@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **[2026-10-22]** **拿掉內建的 Frieren 與 VRM 3D 小助理**：內建小助理只留 Haru（Live2D），3D 模型改成只用上傳的 VRM。auth 資料庫 schema 26 刪掉 `qqman`、`vrm-sample` 兩筆資源（授權、範圍、指派跟著清除），帳號與專案預設指到它們的改成不指定；前台 3D 模式不再預設 `qqman`。正式環境原本放 `qqman` 模型的 `/data/mascots/qqman` 已搬到 `/data/backups/mascots-qqman-20261022`；其他環境若還留著這個資料夾，它會被當成上傳的小助理列出，可在後台刪除。
 - Updated frontend Docker build stages to Node.js 24.22.1 LTS for the latest Node.js security fixes.
 - **[2026-10-21]** **「更多動作」選單改成共用元件，手機頁首改用 `PageHeader`**：原本在帳號頁的 `AccountRowMenu` 搬到 `components/ActionMenu.tsx`（屬性 `accountName` 改名 `label`），帳號列表與知識庫頁首都用它；知識庫的採納與重新索引改由同一份定義產生寬畫面按鈕與手機選單項目。`PageHeader` 加 `className`，工作區與角色管理的手機頁首改用它，不再手寫頁首結構。操作不變。
 - **[2026-10-21]** **後台頁首與分頁統一規格**：新增共用的 `PageHeader`、`PageTabs`（`components/app/PageHeader.tsx`）與 `SegmentedControl`。每頁主標題由同一個頁首管理，內距與左緣一致，標題前不再放圖示；第一層分頁一律是標題下方的底線分頁，只排一列、放不下就橫捲並把選中分頁捲進畫面。專案與權限、系統狀態、語音、Avatar、模型供應商、記憶管理、知識庫都改用它，原本的灰色膠囊、橘色分段、小型分段與 Avatar 手機直列分頁都拿掉。帳號的建立／管理與編輯器的編輯／並排／預覽改用共用的分段切換。分頁殼裡的內頁（專案管理、系統健康、API 金鑰、Embed 金鑰、權限圖譜）標題改用 `page-section-title`，不再和外層主標題同級。320、375、768、1440 寬度實測十個頁面的標題上緣一致、分頁列單行。

@@ -48,7 +48,8 @@ test("avatar settings persist the selected render mode", () => {
 
 test("avatar settings persist the selected VRM avatar id", () => {
   assert.match(storageSource, /VRM_AVATAR_ID:\s*"avatar\.vrm_avatar_id"/);
-  assert.match(storeSource, /vrmAvatarId:\s*readPref\(STORAGE_KEYS\.VRM_AVATAR_ID,\s*"qqman"\)/);
+  // 內建 VRM 已拿掉，沒存過就不指定，等清單載入後再挑。
+  assert.match(storeSource, /vrmAvatarId:\s*readPref\(STORAGE_KEYS\.VRM_AVATAR_ID,\s*""\)/);
   assert.match(storeSource, /vrmAvatarId: STORAGE_KEYS\.\w+/);
 });
 

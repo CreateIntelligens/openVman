@@ -34,18 +34,6 @@ export const FALLBACK_MASCOT_CATALOG: MascotOption[] = [
     modelUrl: "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json",
     fit: "half",
   },
-  {
-    id: "qqman",
-    label: "Frieren",
-    engine: "3d",
-    vrmUrl: "/static/mascots/qqman/model.vrm",
-  },
-  {
-    id: "vrm-sample",
-    label: "VRM 範例",
-    engine: "3d",
-    vrmUrl: "https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm",
-  },
 ]
 
 export const MASCOT_CATALOG = FALLBACK_MASCOT_CATALOG

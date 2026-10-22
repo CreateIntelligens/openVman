@@ -110,7 +110,7 @@ export function MascotProvider({
   );
 
   // 右下角小助理在每個頁面都會出現，清單不能只靠 Avatar 頁載入；
-  // 這裡一掛載就向後端拿（含自動衍生的影片角色與上傳的 VRM），失敗就維持內建三個。
+  // 這裡一掛載就向後端拿（含自動衍生的影片角色與上傳的 VRM），失敗就維持內建的 Haru。
   const hasInitialOptions = Boolean(initialOptions?.length);
   useEffect(() => {
     if (hasInitialOptions) return;

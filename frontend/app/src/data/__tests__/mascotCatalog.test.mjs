@@ -29,24 +29,18 @@ test("mascot catalog exposes a default option", async () => {
     await loadModule();
 
   assert.ok(DEFAULT_MASCOT_ID);
-  assert.ok(MASCOT_CATALOG.length >= 2);
+  assert.ok(MASCOT_CATALOG.length >= 1);
   assert.equal(resolveMascotOption("").id, DEFAULT_MASCOT_ID);
   assert.equal(resolveMascotOption("missing").id, DEFAULT_MASCOT_ID);
 });
 
-test("qqman mascot uses the Frieren display name", async () => {
+test("retired built-in VRMs are no longer in the fallback catalog", async () => {
+  // 內建的 Frieren（qqman）與 VRM 3D（vrm-sample）已拿掉，3D 模型只剩上傳的。
   const { MASCOT_CATALOG } = await loadModule();
-  const qqmanMascot = MASCOT_CATALOG.find((mascot) => mascot.id === "qqman");
+  const ids = MASCOT_CATALOG.map((mascot) => mascot.id);
 
-  assert.equal(qqmanMascot?.label, "Frieren");
-});
-
-test("qqman mascot points at the built-in VRM asset route", async () => {
-  const { MASCOT_CATALOG } = await loadModule();
-  const qqmanMascot = MASCOT_CATALOG.find((mascot) => mascot.id === "qqman");
-
-  assert.equal(qqmanMascot?.vrmUrl, "/static/mascots/qqman/model.vrm");
-  assert.notEqual(qqmanMascot?.vrmUrl, "/QQman_fll.vrm");
+  assert.equal(ids.includes("qqman"), false);
+  assert.equal(ids.includes("vrm-sample"), false);
 });
 
 test("mascot widget src encodes a 2D model option", async () => {
@@ -101,17 +95,4 @@ test("mascot api records convert to switcher options", async () => {
   assert.equal(option.label, "自訂小助理");
   assert.equal(option.vrmUrl, "/static/mascots/custom/model.vrm");
   assert.equal(resolveMascotOption("custom", [option]).id, "custom");
-});
-
-test("built-in VRM mascots rely on widget auto-fit instead of per-model framing", async () => {
-  const { MASCOT_CATALOG } = await loadModule();
-  const vrmMascots = MASCOT_CATALOG.filter((mascot) => mascot.engine === "3d");
-
-  assert.ok(vrmMascots.length >= 1);
-  for (const mascot of vrmMascots) {
-    assert.equal(mascot.vrmScale, undefined);
-    assert.equal(mascot.vrmCameraY, undefined);
-    assert.equal(mascot.vrmLookAtY, undefined);
-    assert.equal(mascot.vrmCameraZ, undefined);
-  }
 });

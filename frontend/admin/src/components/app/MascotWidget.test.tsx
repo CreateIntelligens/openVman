@@ -22,8 +22,21 @@ describe("MascotWidget", () => {
     vi.unstubAllGlobals();
   });
 
-  it("loads the selected mascot iframe source from localStorage", () => {
-    window.localStorage.setItem("avatar.mascot_id", "qqman");
+  it("loads the selected mascot iframe source from localStorage", async () => {
+    fetchAvatarMascotsMock.mockResolvedValue({
+      mascots: [{
+        mascot_id: "custom-vrm",
+        label: "自訂 VRM",
+        engine: "3d",
+        model_url: "",
+        vrm_url: "/static/mascots/custom-vrm/model.vrm",
+        fit: "",
+        builtin: false,
+        size_bytes: 1024,
+        updated_at: "",
+      }],
+    });
+    window.localStorage.setItem("avatar.mascot_id", "custom-vrm");
     // VRM 最大可到 20MB，widget 預設收合；展開過才會掛 iframe。
     window.localStorage.setItem("admin-mascot-open", "1");
 
@@ -33,11 +46,11 @@ describe("MascotWidget", () => {
       </MascotProvider>,
     );
 
-    const frame = screen.getByTitle("AI 虛擬人小助理");
-    const src = frame.getAttribute("src") ?? "";
-
-    expect(src).toContain("engine=3d");
-    expect(decodeURIComponent(src)).toContain("/static/mascots/qqman/model.vrm");
+    await waitFor(() => {
+      const src = screen.getByTitle("AI 虛擬人小助理").getAttribute("src") ?? "";
+      expect(src).toContain("engine=3d");
+      expect(decodeURIComponent(src)).toContain("/static/mascots/custom-vrm/model.vrm");
+    });
   });
 
   it("starts collapsed by default so the VRM is not downloaded eagerly", () => {

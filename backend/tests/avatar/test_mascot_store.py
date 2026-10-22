@@ -24,11 +24,11 @@ def _make_mascot(store, mascot_id="custom", label="自訂小助理"):
 def test_list_includes_builtin_mascots(store):
     mascots = store.list_mascots()
 
-    assert [mascot["mascot_id"] for mascot in mascots[:3]] == [
+    assert [mascot["mascot_id"] for mascot in mascots[: len(BUILTIN_MASCOTS)]] == [
         mascot["mascot_id"] for mascot in BUILTIN_MASCOTS
     ]
-    assert mascots[1]["label"] == "Frieren"
-    assert mascots[1]["builtin"] is True
+    assert mascots[0]["label"] == "Haru"
+    assert mascots[0]["builtin"] is True
 
 
 def test_create_uploaded_mascot(store):
@@ -50,7 +50,7 @@ def test_create_duplicate_uploaded_raises(store):
 
 def test_create_duplicate_builtin_raises(store):
     with pytest.raises(MascotExists):
-        _make_mascot(store, mascot_id="qqman")
+        _make_mascot(store, mascot_id="haru-live2d")
 
 
 def test_update_uploaded_label(store):
@@ -63,7 +63,7 @@ def test_update_uploaded_label(store):
 
 def test_update_builtin_label_raises(store):
     with pytest.raises(MascotNotFound):
-        store.update_label("qqman", "新名稱")
+        store.update_label("haru-live2d", "新名稱")
 
 
 def test_delete_uploaded_mascot(store):
@@ -77,7 +77,7 @@ def test_delete_uploaded_mascot(store):
 
 def test_delete_builtin_raises(store):
     with pytest.raises(MascotNotFound):
-        store.delete_mascot("qqman")
+        store.delete_mascot("haru-live2d")
 
 
 def test_create_video_mascot_from_character(store):

@@ -21,7 +21,7 @@ def client(tmp_path, monkeypatch):
     get_tts_config.cache_clear()
     mascot_routes.reset_store()
     runtime = get_auth_runtime()
-    for mid, label in [("haru-live2d", "Haru"), ("qqman", "Frieren"), ("vrm-sample", "VRM Sample")]:
+    for mid, label in [("haru-live2d", "Haru")]:
         runtime.resources.upsert_system_resource(
             resource_type=ResourceType.AVATAR_MASCOT,
             resource_id=mid,
@@ -67,8 +67,9 @@ def test_list_builtin_mascots(client):
     assert response.status_code == 200
     mascots = response.json()["mascots"]
     assert mascots[0]["mascot_id"] == "haru-live2d"
-    assert mascots[1]["label"] == "Frieren"
-    assert mascots[1]["builtin"] is True
+    assert mascots[0]["builtin"] is True
+    # 內建的 Frieren（qqman）與 VRM 3D（vrm-sample）已經拿掉。
+    assert not {"qqman", "vrm-sample"} & {mascot["mascot_id"] for mascot in mascots}
 
 
 def test_upload_then_list(client):
@@ -110,7 +111,7 @@ def test_upload_duplicate_conflict(client):
 
 
 def test_upload_duplicate_builtin_conflict(client):
-    response = _upload(client, mascot_id="qqman")
+    response = _upload(client, mascot_id="haru-live2d")
 
     assert response.status_code == 409
 
@@ -128,15 +129,11 @@ def test_delete(client):
 
     assert client.delete("/api/v1/avatar/mascots/custom").status_code == 200
     mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    assert [mascot["mascot_id"] for mascot in mascots] == [
-        "haru-live2d",
-        "qqman",
-        "vrm-sample",
-    ]
+    assert [mascot["mascot_id"] for mascot in mascots] == ["haru-live2d"]
 
 
 def test_delete_builtin_404(client):
-    response = client.delete("/api/v1/avatar/mascots/qqman")
+    response = client.delete("/api/v1/avatar/mascots/haru-live2d")
 
     assert response.status_code == 404
 

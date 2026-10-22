@@ -39,7 +39,7 @@ function loadState() {
     backgroundFit: normalizeAvatarBackgroundFit(readPref(STORAGE_KEYS.BACKGROUND_FIT, "cover")),
     cameraPreviewScale: normalizeCameraPreviewScale(readPref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, "1")),
     renderMode: normalizeAvatarRenderMode(readPref(STORAGE_KEYS.RENDER_MODE, "2d")),
-    vrmAvatarId: readPref(STORAGE_KEYS.VRM_AVATAR_ID, "qqman"),
+    vrmAvatarId: readPref(STORAGE_KEYS.VRM_AVATAR_ID, ""),
     replyMode: normalizeReplyMode(readPref(STORAGE_KEYS.REPLY_MODE, "fast")),
   }
 }

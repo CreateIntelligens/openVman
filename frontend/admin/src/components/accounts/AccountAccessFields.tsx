@@ -14,7 +14,6 @@ import GroupedChecklist from "./GroupedChecklist";
 const PREFERRED_PROJECT = "proj-b85afb8bb6";
 const PREFERRED_CHARACTER = "0713";
 const PREFERRED_VOICE = "hayley";
-const PREFERRED_MASCOT = "qqman";
 // 前台預設就是內建的深色舞台（avatarBackground.ts 的 fallback）。
 const PREFERRED_BACKGROUND = "dark";
 
@@ -121,7 +120,7 @@ export function accessFromOptions(
   const mascots = initialSelection(
     current?.grants.avatar_mascots,
     options.avatar_mascots ?? [],
-    PREFERRED_MASCOT,
+    "",
     true,
   );
   // 背景預設給深色（前台的 fallback 也是它），VRM 才是完全選填。

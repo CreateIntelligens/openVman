@@ -39,32 +39,6 @@ BUILTIN_MASCOTS: tuple[dict[str, Any], ...] = (
         "size_bytes": 0,
         "updated_at": "",
     },
-    {
-        "mascot_id": "qqman",
-        "label": "Frieren",
-        "engine": "3d",
-        "model_url": "",
-        "vrm_url": "/static/mascots/qqman/model.vrm",
-        "character_id": "",
-        "thumbnail_url": "",
-        "fit": "",
-        "builtin": True,
-        "size_bytes": 0,
-        "updated_at": "",
-    },
-    {
-        "mascot_id": "vrm-sample",
-        "label": "VRM 3D",
-        "engine": "3d",
-        "model_url": "",
-        "vrm_url": "https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm",
-        "character_id": "",
-        "thumbnail_url": "",
-        "fit": "",
-        "builtin": True,
-        "size_bytes": 0,
-        "updated_at": "",
-    },
 )
 
 _BUILTIN_IDS = frozenset(mascot["mascot_id"] for mascot in BUILTIN_MASCOTS)

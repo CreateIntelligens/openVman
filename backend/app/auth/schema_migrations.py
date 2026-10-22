@@ -564,4 +564,26 @@ _MIGRATIONS = (
             """,
         ),
     ),
+    (
+        26,
+        "retire_builtin_vrm_mascots",
+        (
+            # 內建的 Frieren（qqman）與 VRM 3D（vrm-sample）拿掉了。資源列刪掉後
+            # 授權、管理範圍、專案指派會跟著 CASCADE 清掉；指到它們的預設改成不指定，
+            # 不然編輯那些帳號時預設值會指向不存在的資源。
+            """
+            DELETE FROM resources
+            WHERE resource_type = 'avatar_mascot'
+              AND resource_id IN ('qqman', 'vrm-sample')
+            """,
+            """
+            UPDATE account_defaults SET mascot_id = ''
+            WHERE mascot_id IN ('qqman', 'vrm-sample')
+            """,
+            """
+            UPDATE project_policies SET default_mascot_id = NULL
+            WHERE default_mascot_id IN ('qqman', 'vrm-sample')
+            """,
+        ),
+    ),
 )

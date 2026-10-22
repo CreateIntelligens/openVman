@@ -47,20 +47,6 @@ export const FALLBACK_MASCOT_CATALOG: MascotOption[] = [
     fit: "half",
     builtin: true,
   },
-  {
-    id: "qqman",
-    label: "Frieren",
-    engine: "3d",
-    vrmUrl: "/static/mascots/qqman/model.vrm",
-    builtin: true,
-  },
-  {
-    id: "vrm-sample",
-    label: "VRM 3D",
-    engine: "3d",
-    vrmUrl: "https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm",
-    builtin: true,
-  },
 ];
 
 export const MASCOT_CATALOG = FALLBACK_MASCOT_CATALOG;

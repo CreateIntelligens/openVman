@@ -4,6 +4,7 @@ import { buildAdminPath, parseAdminRoute } from "../components/app/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render as renderComponent, screen, waitFor } from "@testing-library/react";
 import Avatar from "./Avatar";
+import { MascotProvider } from "../context/MascotContext";
 import * as api from "../api";
 
 const authState = vi.hoisted(() => ({ role: "admin" as "root" | "admin" | "user" }));
@@ -303,25 +304,26 @@ describe("Avatar page", () => {
     vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({
       mascots: [
         {
-          mascot_id: "qqman",
-          label: "Frieren",
+          mascot_id: "custom-vrm",
+          label: "自訂 VRM",
           engine: "3d",
           model_url: "",
-          vrm_url: "/static/mascots/qqman/model.vrm",
+          vrm_url: "/static/mascots/custom-vrm/model.vrm",
           fit: "",
-          builtin: true,
-          size_bytes: 0,
+          builtin: false,
+          size_bytes: 1024,
           updated_at: "",
         },
       ],
     });
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
-    render(<Avatar />);
+    // 選項要從清單來：包上 MascotProvider，Avatar 頁載入的小助理才會成為可選項目。
+    render(<MascotProvider><Avatar /></MascotProvider>);
     fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
-    fireEvent.click(await screen.findByRole("button", { name: "使用 Frieren" }));
+    fireEvent.click(await screen.findByRole("button", { name: "使用 自訂 VRM" }));
 
-    expect(window.localStorage.getItem("avatar.mascot_id")).toBe("qqman");
+    expect(window.localStorage.getItem("avatar.mascot_id")).toBe("custom-vrm");
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
   });
 
