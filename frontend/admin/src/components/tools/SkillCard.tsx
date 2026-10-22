@@ -73,34 +73,38 @@ export default function SkillCard({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[0.6875rem] text-content-subtle">
-          <span className="material-symbols-outlined text-[0.875rem]">handyman</span>
-          {skill.tools.length}個工具
-          <span className="text-border-strong mx-1">|</span>
-          <span className="truncate font-mono max-w-[7.5rem]" title={skill.tools.join(", ")}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-[0.6875rem] text-content-subtle">
+          <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[0.875rem]">handyman</span>
+          <span className="shrink-0 whitespace-nowrap">{skill.tools.length}個工具</span>
+          <span aria-hidden="true" className="text-border-strong mx-1">|</span>
+          <span className="min-w-0 truncate font-mono" title={skill.tools.join(", ")}>
             {skill.tools.join(", ")}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
+            type="button"
             onClick={() => onEdit(skill.id)}
-            className={`flex items-center gap-1 px-2 py-1 text-[0.6875rem] border rounded-lg transition-colors ${
+            aria-pressed={isEditing}
+            className={`flex items-center gap-1 whitespace-nowrap px-2 py-1 text-[0.6875rem] border rounded-lg transition-colors ${
               isEditing
                 ? "text-primary border-primary/30 bg-primary/10"
                 : "text-content-muted hover:text-primary border-border hover:border-primary/30"
             }`}
           >
-            <span className="material-symbols-outlined text-[0.875rem]">edit</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">edit</span>
             編輯
           </button>
           <button
+            type="button"
             onClick={() => onDelete(skill)}
-            className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-content-muted hover:text-red-400 border border-border hover:border-red-500/30 rounded-lg transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-content-muted hover:text-danger border border-border hover:border-danger/30 rounded-lg transition-colors"
             title="刪除"
+            aria-label={`刪除 ${skill.name}`}
           >
-            <span className="material-symbols-outlined text-[0.875rem]">delete</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">delete</span>
           </button>
         </div>
       </div>

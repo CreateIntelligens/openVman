@@ -17,7 +17,7 @@ export default function Voice() {
 
   return (
     <PageTabsShell idPrefix="voice" title="語音" tabs={TABS} active={tab} onSelect={setTab}>
-      <div className="page-scroll p-4 sm:p-6 lg:p-8">
+      <div className="page-scroll page-body">
         {tab === "tts" ? <TtsPreviewPanel /> : <AsrProviderPanel />}
       </div>
     </PageTabsShell>

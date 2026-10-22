@@ -280,6 +280,15 @@ body {
       padding-inline: 2rem;
     }
   }
+  /* 頁首底下的內容區：內距跟著 .page-header 走，標題和內容才在同一條左緣。 */
+  .page-body {
+    padding: 1rem;
+  }
+  @media (min-width: 40rem) {
+    .page-body {
+      padding: 2rem;
+    }
+  }
   /* 分頁殼或頁首底下的第二層標題，比主標題低一階，避免兩個同等的視覺重心。 */
   .page-section-title {
     font-size: 1.125rem;

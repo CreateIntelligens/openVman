@@ -1,5 +1,6 @@
 import { SESSION_LANGUAGE_LABELS, type SessionLanguage } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
+import { PageHeader } from "../components/app/PageHeader";
 import SessionBackupPanel from "../components/sessions/SessionBackupPanel";
 import { useAuth } from "../context/AuthContext";
 import { useProject } from "../context/ProjectContext";
@@ -108,62 +109,64 @@ export default function Sessions() {
 
   return (
     <div className="page-scroll">
-      <header className="page-header">
-        <div className="page-heading">
-          <h1 className="page-title">對話紀錄</h1>
-          <p className="page-subtitle">
-            瀏覽、篩選並匯出歷史對話。時間區間可精確到秒。
-          </p>
-        </div>
-        <div className="page-actions">
-          <label
-            className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-content-muted"
-            title="每則訊息只留角色、內容與時間"
-          >
-            <input
-              type="checkbox"
-              checked={simpleExport}
-              onChange={(event) => setSimpleExport(event.target.checked)}
-              className="h-4 w-4 accent-primary"
-            />
-            簡化格式
-          </label>
-          <button
-            onClick={loadSessions}
-            disabled={loadingSessions}
-            className="btn btn-ghost"
-          >
-            <span className="material-symbols-outlined text-[1.125rem]">
-              refresh
-            </span>
-            {loadingSessions ? "載入中…" : "重新整理"}
-          </button>
-          <button
-            onClick={() => {
-              const ids = [...selectedSessionIds];
-              void exportSessionHistory(ids.length ? ids : undefined);
-            }}
-            disabled={exportingSessions || sessions.length === 0}
-            className="btn btn-primary"
-          >
-            <span className="material-symbols-outlined text-[1.125rem]">
-              download
-            </span>
-            {getExportButtonLabel(exportingSessions, selectedCount)}
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title="對話紀錄"
+        subtitle="瀏覽、篩選並匯出歷史對話。時間區間可精確到秒。"
+        actions={(
+          <>
+            <label
+              className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-content-muted"
+              title="每則訊息只留角色、內容與時間"
+            >
+              <input
+                type="checkbox"
+                checked={simpleExport}
+                onChange={(event) => setSimpleExport(event.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+              簡化格式
+            </label>
+            <button
+              type="button"
+              onClick={loadSessions}
+              disabled={loadingSessions}
+              className="btn btn-ghost"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">
+                refresh
+              </span>
+              {loadingSessions ? "載入中…" : "重新整理"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const ids = [...selectedSessionIds];
+                void exportSessionHistory(ids.length ? ids : undefined);
+              }}
+              disabled={exportingSessions || sessions.length === 0}
+              className="btn btn-primary"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">
+                download
+              </span>
+              {getExportButtonLabel(exportingSessions, selectedCount)}
+            </button>
+          </>
+        )}
+      />
 
-      <div className="space-y-6 p-8">
+      <div className="page-body space-y-6">
         {account?.role === "root" && <SessionBackupPanel />}
         <section className="card p-5">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            <label className="flex flex-col gap-1.5">
+          {/* 一個格線排兩列：寬畫面四欄、搜尋占兩欄，起訖時間落在搜尋底下，
+              語言對齊角色、清除篩選對齊排序，上下兩列的欄線才會一致。 */}
+          <div className="grid gap-4 sm:grid-cols-2 sm:items-end xl:grid-cols-4">
+            <label className="flex flex-col gap-1.5 sm:col-span-2">
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
                 搜尋內容
               </span>
               <div className="relative flex items-center">
-                <span className="material-symbols-outlined absolute left-3 text-[1.125rem] text-content-subtle">
+                <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute left-3 text-[1.125rem] text-content-subtle">
                   search
                 </span>
                 <input
@@ -210,9 +213,7 @@ export default function Sessions() {
                 className="w-full"
               />
             </label>
-          </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
                 起始時間
@@ -252,8 +253,8 @@ export default function Sessions() {
               />
             </label>
             {hasActiveFilters && (
-              <button onClick={resetFilters} className="btn btn-ghost">
-                <span className="material-symbols-outlined text-[1.125rem]">
+              <button type="button" onClick={resetFilters} className="btn btn-ghost justify-self-start">
+                <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">
                   filter_alt_off
                 </span>
                 清除篩選

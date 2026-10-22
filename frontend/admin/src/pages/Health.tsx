@@ -25,17 +25,18 @@ export default function Health() {
         <div className="page-actions">
           <span className="whitespace-nowrap text-xs text-content-subtle">auto-refresh in {countdown}s</span>
           <button
+            type="button"
             onClick={load}
             disabled={loading}
-            className="btn btn-primary"
+            className="btn btn-ghost"
           >
-            <span className="material-symbols-outlined text-[1.125rem]">refresh</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">refresh</span>
             <span>{loading ? "載入中…" : "重新整理"}</span>
           </button>
         </div>
       </header>
 
-      <div className="p-8 space-y-6">
+      <div className="page-body space-y-6">
         {healthError && <StatusAlert type="error" message={`Health: ${healthError}`} />}
         {metricsError && <StatusAlert type="error" message={`Metrics: ${metricsError}`} />}
 

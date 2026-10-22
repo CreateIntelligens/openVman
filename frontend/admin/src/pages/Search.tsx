@@ -1,3 +1,4 @@
+import { PageHeader } from "../components/app/PageHeader";
 import Select from "../components/Select";
 import StatusAlert from "../components/StatusAlert";
 import { type SearchResult, useSemanticSearch } from "../hooks/useSemanticSearch";
@@ -86,80 +87,72 @@ export default function Search() {
 
   return (
     <div className="page-scroll">
-      {/* Header */}
-      <header className="page-header">
-        <div className="page-heading">
-          <h1 className="page-title">知識庫搜尋</h1>
-          <p className="page-subtitle">
-            顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="知識庫搜尋"
+        subtitle="顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。"
+      />
 
-      <div className="p-8 max-w-5xl space-y-8">
-        {/* Search Bar */}
-        <div className="bg-surface-raised dark:bg-surface-overlay/40 border border-border p-1.5 rounded-2xl flex flex-col md:flex-row items-stretch gap-2 shadow-xl shadow-border/50 dark:shadow-primary/5">
-          <div className="flex-1 relative flex items-center">
-            <span className="material-symbols-outlined absolute left-4 text-content-subtle">search</span>
+      <div className="page-body max-w-5xl space-y-6">
+        <form
+          className="card flex flex-wrap items-center gap-2 p-2"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          <div className="relative flex min-w-0 basis-full items-center md:basis-0 md:flex-1">
+            <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute left-3 text-[1.125rem] text-content-subtle">
+              search
+            </span>
             <input
-              className="w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-content placeholder:text-content-subtle text-lg"
+              type="text"
+              aria-label="搜尋內容"
+              className="input pl-10"
               placeholder="描述你要搜尋的內容..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  void submit();
-                }
-              }}
             />
           </div>
-          <div className="h-auto w-px bg-border hidden md:block mx-2 my-2" />
-          <div className="flex items-center px-4">
-            <Select
-              value={table}
-              onChange={setTable}
-              options={[
-                { value: "memories", label: "個人記憶" },
-                { value: "knowledge", label: "知識庫" },
-              ]}
-              className="text-sm min-w-[6.25rem]"
-            />
-          </div>
-          <div className="h-auto w-px bg-border hidden md:block mx-2 my-2" />
-          <div className="flex items-center gap-2 px-4">
-            <label className="text-xs text-content-subtle font-bold whitespace-nowrap">Top K</label>
-            <Select
-              value={String(topK)}
-              onChange={(v) => setTopK(Number(v))}
-              options={TOP_K_OPTIONS.map((k) => ({ value: String(k), label: String(k) }))}
-              className="text-sm min-w-[3.75rem]"
-            />
-          </div>
+          <Select
+            ariaLabel="搜尋範圍"
+            value={table}
+            onChange={setTable}
+            options={[
+              { value: "memories", label: "個人記憶" },
+              { value: "knowledge", label: "知識庫" },
+            ]}
+            className="text-sm"
+          />
+          <Select
+            ariaLabel="Top K"
+            label="Top K"
+            value={String(topK)}
+            onChange={(v) => setTopK(Number(v))}
+            options={TOP_K_OPTIONS.map((k) => ({ value: String(k), label: String(k) }))}
+            className="text-sm"
+          />
           <button
-            onClick={() => void submit()}
+            type="submit"
             disabled={!canSubmit}
-            className="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-8 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
+            className="btn btn-primary ml-auto"
           >
-            <span>{loading ? "搜尋中..." : "執行查詢"}</span>
+            {loading ? "搜尋中…" : "執行查詢"}
           </button>
-        </div>
+        </form>
 
         {error && <StatusAlert type="error" message={error} />}
 
-        {/* Results */}
         {response && !response.error && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <h3 className="card-title flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">analytics</span>
-                搜尋結果
-              </h3>
+          <section className="space-y-4" aria-label="搜尋結果">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-3">
+              <h2 className="card-title">搜尋結果</h2>
               <span className="text-sm text-content-subtle">
                 找到 {response.results.length} 筆結果
               </span>
             </div>
 
-            <div className="grid gap-4">
+            <ul className="grid gap-4">
               {response.results.map((item, i) => {
                 const metadata = parseMetadata(item.metadata);
                 const similarity = getResultPercentage(item);
@@ -169,48 +162,38 @@ export default function Search() {
                 const headings = metadata.heading_path ?? [];
                 const exactMatch = hasExactMatch(query, item, metadata);
                 return (
-                  <div
-                    key={i}
-                    className="bg-surface-raised dark:bg-surface-overlay/30 border border-border p-6 rounded-2xl hover:border-primary/50 transition-all group shadow-sm"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-1 rounded bg-primary/10 text-primary text-[0.625rem] font-bold uppercase tracking-wider">
-                          RAG chunk
-                        </span>
-                        <span className="px-2 py-1 rounded bg-surface-sunken dark:bg-surface-overlay text-content-muted text-[0.625rem] font-bold uppercase tracking-wider">
-                          {response.table}
-                        </span>
+                  <li key={i} className="card min-w-0 p-5">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="chip">{response.table === "memories" ? "個人記憶" : "知識庫"}</span>
                         {exactMatch && (
-                          <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 text-[0.625rem] font-bold">
-                            完全命中
-                          </span>
+                          <span className="chip border-success/30 bg-success/10 text-success">完全命中</span>
                         )}
                         {response.table === "memories" && <PersonaBadge metadata={metadata} />}
                         <span className="text-xs text-content-subtle">來源：{item.source}</span>
                       </div>
-                      <div className="text-right min-w-[7.5rem]">
-                        <p className="text-[0.625rem] text-content-subtle uppercase font-bold tracking-tighter mb-1">相關度</p>
+                      <div className="flex w-36 shrink-0 items-center gap-2" title="相關度">
+                        <span className="sr-only">相關度</span>
                         {similarity != null ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 rounded-full bg-border overflow-hidden">
+                          <>
+                            <div aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
                               <div
-                                className="h-full rounded-full bg-primary transition-all"
+                                className="h-full rounded-full bg-primary"
                                 style={{ width: `${similarity}%` }}
                               />
                             </div>
-                            <span className="text-xs font-mono font-bold text-primary shrink-0">
+                            <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-primary">
                               {similarity.toFixed(1)}%
                             </span>
-                          </div>
+                          </>
                         ) : (
-                          <span className="text-sm font-mono text-content-subtle">—</span>
+                          <span className="ml-auto font-mono text-sm text-content-subtle">—</span>
                         )}
                       </div>
                     </div>
-                    <p className="text-content-muted leading-relaxed mb-4">{item.text}</p>
+                    <p className="mb-3 leading-relaxed text-content-muted [overflow-wrap:anywhere]">{item.text}</p>
                     {(resultTitle || resultPath || headings.length > 0 || chunkId) && (
-                      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-content-muted">
+                      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-content-muted [overflow-wrap:anywhere]">
                         {resultTitle && (
                           <span className="font-semibold text-content">{resultTitle}</span>
                         )}
@@ -219,19 +202,19 @@ export default function Search() {
                         {chunkId && <span className="font-mono text-content-subtle">{chunkId}</span>}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 text-content-subtle text-xs pt-4 border-t border-border ">
-                      <span className="material-symbols-outlined text-sm">calendar_today</span>
+                    <div className="flex items-center gap-2 border-t border-border pt-3 text-xs text-content-subtle">
+                      <span aria-hidden="true" className="material-symbols-outlined text-sm">calendar_today</span>
                       <span>{item.date}</span>
                     </div>
-                  </div>
+                  </li>
                 );
               })}
+            </ul>
 
-              {response.results.length === 0 && (
-                <p className="text-content-subtle text-center py-8">沒有找到結果。</p>
-              )}
-            </div>
-          </div>
+            {response.results.length === 0 && (
+              <p className="py-8 text-center text-content-subtle">沒有找到結果。</p>
+            )}
+          </section>
         )}
       </div>
     </div>
@@ -246,8 +229,8 @@ function PersonaBadge({ metadata }: { metadata: SearchMetadata }) {
   }
 
   return (
-    <span className="flex items-center gap-1 font-semibold text-primary/80 uppercase text-[0.625rem] bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-      <span className="material-symbols-outlined text-[0.75rem]">masks</span>
+    <span className="chip border-primary/20 bg-primary/10 text-primary">
+      <span aria-hidden="true" className="material-symbols-outlined text-[0.75rem]">masks</span>
       {personaId}
     </span>
   );

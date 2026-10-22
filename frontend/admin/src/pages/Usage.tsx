@@ -18,6 +18,7 @@ import {
   type UsageSummaryResponse,
   type UsageTimeseriesResponse,
 } from "../api/usage";
+import { PageHeader } from "../components/app/PageHeader";
 import Select from "../components/Select";
 import StatusAlert from "../components/StatusAlert";
 import UsageTrendChart from "../components/usage/UsageTrendChart";
@@ -505,14 +506,10 @@ export default function Usage() {
 
   return (
     <div className="page-scroll">
-      <header className="page-header">
-        <div className="page-heading">
-          <h1 className="page-title">用量</h1>
-          <p className="page-subtitle">
-            查看 LLM 與語音的呼叫次數、Token 消耗與延遲，並追溯每個對話回合的成本。
-          </p>
-        </div>
-        <div className="page-actions">
+      <PageHeader
+        title="用量"
+        subtitle="查看 LLM 與語音的呼叫次數、Token 消耗與延遲，並追溯每個對話回合的成本。"
+        actions={(
           <button
             type="button"
             onClick={() => void reload()}
@@ -524,10 +521,10 @@ export default function Usage() {
             </span>
             {loading ? "載入中…" : "重新整理"}
           </button>
-        </div>
-      </header>
+        )}
+      />
 
-      <div className="space-y-6 p-8">
+      <div className="page-body space-y-6">
         {error && (
           <StatusAlert
             type="error"

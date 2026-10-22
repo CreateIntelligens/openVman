@@ -151,7 +151,7 @@ export default function Memory() {
         id="memory-panel"
         role="tabpanel"
         aria-labelledby={`memory-${activeTab}-tab`}
-        className="max-w-6xl p-4 sm:p-8"
+        className="page-body max-w-6xl"
       >
         {status && (
           <div className="mb-6">

@@ -8,6 +8,7 @@ import {
   type SkillInfo,
   type ToolInfo,
 } from "../api";
+import { PageHeader } from "../components/app/PageHeader";
 import StatusAlert from "../components/StatusAlert";
 import ConfirmModal from "../components/ConfirmModal";
 import CreateSkillForm from "../components/tools/CreateSkillForm";
@@ -46,13 +47,13 @@ function SkillSection({
 }: SkillSectionProps) {
   return (
     <section>
-      <h3 className="section-title px-1 mb-4 flex items-center gap-2">
-        <span className="material-symbols-outlined text-base">{icon}</span>
+      <h2 className="section-title mb-4 flex items-center gap-2">
+        <span aria-hidden="true" className="material-symbols-outlined text-base">{icon}</span>
         {title}
         <span className="text-xs font-mono text-content-subtle">({skills.length})</span>
-      </h3>
+      </h2>
       {skills.length === 0 && !loading && !hasError && (
-        <p className="text-sm text-content-subtle px-1 mb-4">{emptyMessage}</p>
+        <p className="text-sm text-content-subtle mb-4">{emptyMessage}</p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         {skills.map((skill) => {
@@ -175,27 +176,24 @@ export default function Tools() {
 
   return (
     <div className="page-scroll">
-      <header className="page-header">
-        <div className="page-heading">
-          <h1 className="page-title">工具與技能</h1>
-          <p className="page-subtitle">
-            管理技能插件及查看已註冊工具
-          </p>
-        </div>
-        <div className="page-actions">
+      <PageHeader
+        title="工具與技能"
+        subtitle="管理技能插件及查看已註冊工具"
+        actions={(
           <button
+            type="button"
             onClick={handleReloadAll}
             disabled={busy}
             title="重新掃描技能檔案並刷新清單"
-            className="btn btn-primary"
+            className="btn btn-ghost"
           >
-            <span className="material-symbols-outlined text-[1.125rem]">sync</span>
-            <span>{reloading ? "重新載入中..." : loading ? "載入中..." : "重新載入"}</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">sync</span>
+            <span>{reloading ? "重新載入中…" : loading ? "載入中…" : "重新載入"}</span>
           </button>
-        </div>
-      </header>
+        )}
+      />
 
-      <div className="p-8 space-y-8">
+      <div className="page-body space-y-8">
         {error && <StatusAlert type="error" message={error} />}
 
         <SkillSection
@@ -242,22 +240,22 @@ export default function Tools() {
         )}
 
         <section>
-          <h3 className="section-title px-1 mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-base">settings</span>
+          <h2 className="section-title mb-4 flex items-center gap-2">
+            <span aria-hidden="true" className="material-symbols-outlined text-base">settings</span>
             內建工具
             <span className="text-xs font-mono text-content-subtle">({tools.length})</span>
-          </h3>
+          </h2>
 
           {tools.length > 0 && <ToolTable tools={tools} />}
         </section>
 
         {skillTools.length > 0 && (
           <section>
-            <h3 className="section-title px-1 mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">extension</span>
+            <h2 className="section-title mb-4 flex items-center gap-2">
+              <span aria-hidden="true" className="material-symbols-outlined text-base">extension</span>
               技能工具
               <span className="text-xs font-mono text-content-subtle">({skillTools.length})</span>
-            </h3>
+            </h2>
 
             <ToolTable tools={skillTools} resolveSkillName={(skillId) => skillNameById[skillId]} />
           </section>

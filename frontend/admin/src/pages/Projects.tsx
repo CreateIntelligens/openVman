@@ -47,7 +47,7 @@ export default function Projects() {
         </div>
       </header>
 
-      <div className="p-8 space-y-8">
+      <div className="page-body space-y-8">
         {status && <StatusAlert type={status.type} message={status.message} />}
 
         {canManageProjects ? (

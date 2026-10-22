@@ -214,7 +214,7 @@ export default function EmbedKeys() {
         </button>
       </header>
 
-      <div className="p-8 space-y-6">
+      <div className="page-body space-y-6">
         {status && (
           <StatusAlert
             type={status.type}

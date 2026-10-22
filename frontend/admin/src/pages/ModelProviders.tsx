@@ -319,7 +319,7 @@ export default function ModelProviders() {
         )}
       />
 
-      <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
+      <div className="page-body max-w-5xl space-y-6">
         {notice && <StatusAlert type={notice.type} message={notice.message} />}
 
         <div id="model-providers-panel" role="tabpanel" aria-labelledby={`model-providers-${activeTab}-tab`} className="space-y-6">
@@ -570,7 +570,7 @@ export default function ModelProviders() {
         </div>
 
         {/* 金鑰分頁有六組，存檔鈕放最底會被推出視窗；固定在捲動區底部。 */}
-        <div ref={saveBarRef} className="sticky bottom-0 z-10 -mx-6 flex justify-end border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-md md:-mx-8 md:px-8">
+        <div ref={saveBarRef} className="sticky bottom-0 z-10 -mx-4 flex justify-end border-t border-border bg-surface/95 px-4 py-4 backdrop-blur-md sm:-mx-8 sm:px-8">
           <button
             type="button"
             onClick={() => void save()}

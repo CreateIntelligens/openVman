@@ -212,7 +212,7 @@ export default function Accounts() {
   }
 
   return (
-    <div className="page-scroll p-6 lg:p-8">
+    <div className="page-scroll page-body">
       {/* 第一層分頁在外層頁首；這一層是頁內模式，用共用的分段控制，視覺上低一階。 */}
       <div className="mb-5">
         <SegmentedControl
