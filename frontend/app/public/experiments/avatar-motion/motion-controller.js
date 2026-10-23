@@ -22,7 +22,10 @@ export class MotionSegmentPlayer {
     this.tick = () => {
       if (this.disposed) return;
       const segment = this.segments[this.state];
-      if (!this.transitioning && !this.video.paused && this.video.currentTime >= segment.end - 0.04) {
+      // 結束在檔尾的片段若在最後一幀之間沒輪到 rAF，影片會自行 ended 並轉成 paused；
+      // ended 也算播到結尾，否則會永遠停在這一段。
+      const playing = !this.video.paused || this.video.ended;
+      if (!this.transitioning && playing && this.video.currentTime >= segment.end - 0.04) {
         const once = segment.loop === false;
         void this.setState(once ? segment.next ?? "idle" : this.state, once ? "complete" : "loop")
           .catch((error) => this.hooks.onError?.(error));

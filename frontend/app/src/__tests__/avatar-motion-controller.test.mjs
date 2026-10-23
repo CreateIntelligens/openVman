@@ -122,6 +122,39 @@ test("a one-shot action reaches its end and returns to idle without looping", as
   } finally { player.dispose(); }
 });
 
+test("a one-shot action at the end of the file still returns to idle after the video has ended", async () => {
+  // 最後一段結束在檔尾：最後 0.04 秒若沒有剛好一次 rAF，影片已自行 ended／paused。
+  const video = new Video(), changes = [];
+  const player = new MotionSegmentPlayer(video, {
+    ...segments, bye: { start: 6.4, end: 8.16, loop: false, next: "idle" },
+  }, { onChange: (state) => changes.push(state) });
+  try {
+    await player.setState("bye");
+    video.time = 8.16;
+    video.paused = true;
+    video.ended = true;
+    player.tick();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    assert.equal(player.state, "idle");
+    assert.deepEqual(changes, ["bye", "idle"]);
+    assert.equal(player.transitions.at(-1).reason, "complete");
+  } finally { player.dispose(); }
+});
+
+test("a manually paused segment does not count as finished", async () => {
+  const video = new Video();
+  const player = new MotionSegmentPlayer(video, segments);
+  try {
+    await player.setState("thinking");
+    video.time = segments.thinking.end;
+    video.paused = true;
+    player.tick();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    assert.equal(player.state, "thinking");
+    assert.equal(player.loops, 0);
+  } finally { player.dispose(); }
+});
+
 test("dispose cancels a pending seek without playing a stale request", async () => {
   const video = new Video();
   video.emitSeeked = false;
