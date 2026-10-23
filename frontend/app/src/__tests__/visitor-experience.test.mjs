@@ -124,14 +124,14 @@ test("the idle reset clears the conversation and returns to the start screen", (
   assert.match(app, /resetForNextVisitor\(\);\s*started\.value = false;/);
 });
 
-test("typing on a phone shrinks the stage so the keyboard does not push the composer away", () => {
+test("typing on a phone shrinks the regular stage while immersive retains its viewport", () => {
   const panel = read("../components/chat/ChatPanel.vue");
   assert.match(panel, /@focus="handleComposerFocus"/);
   assert.match(panel, /@blur="emit\('composing', false\)"/);
   assert.match(app, /@composing="composing = \$event"/);
   const shell = read("../styles/app-shell.css");
   const mobile = shell.slice(shell.indexOf("@media (max-width: 48rem) {"));
-  assert.match(mobile, /\.app-shell\.composing \.stage-card \{\s*height: clamp\(6rem, 20svh, 9rem\);/);
+  assert.match(mobile, /\.app-shell\.composing:not\(\.immersive\) \.stage-card \{\s*height: clamp\(6rem, 20svh, 9rem\);/);
   assert.match(read("../../index.html"), /interactive-widget=resizes-content/);
 });
 

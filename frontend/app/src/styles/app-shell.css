@@ -116,13 +116,20 @@
 
 /* Immersive mode: avatar fills the entire viewport, other panels float on top */
 .app-shell.immersive {
+  /* 手機的一般頁面可隨內容增高；全螢幕的絕對定位舞台仍需要確定的參照高度。 */
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   padding: 0;
 }
 
 .app-shell.immersive .kiosk-layout {
   position: relative;
   display: block;
+  flex: 1;
+  min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .app-shell.immersive .stage-panel {
@@ -157,10 +164,10 @@
 .app-shell.immersive .chat-area {
   position: absolute;
   left: 50%;
-  bottom: 1.5rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
   z-index: 2;
   width: min(32rem, calc(100% - 2rem));
-  max-height: 30%;
+  max-height: min(40dvh, calc(100dvh - 8rem));
   transform: translateX(-50%);
 }
 
@@ -168,6 +175,13 @@
   left: clamp(1rem, 6vw, 6rem);
   width: min(34rem, 56vw, calc(100% - 2rem));
   transform: none;
+}
+
+@media (max-width: 42rem) {
+  /* 登入工具列在窄畫面固定於底部，懸浮輸入區需留出它的觸控範圍。 */
+  .app-shell.immersive:has(~ .session-toolbar) .chat-area {
+    bottom: calc(var(--ov-touch-target) + 2.25rem + env(safe-area-inset-bottom));
+  }
 }
 
 .app-shell.immersive.camera-active .stage-frame :deep(.camera-preview) {
@@ -194,15 +208,13 @@
 }
 
 .app-shell.immersive .chat-area :deep(.chat-input-bar input) {
-  background: rgba(28, 26, 23, 0.55);
-  backdrop-filter: blur(0.5rem);
-  -webkit-backdrop-filter: blur(0.5rem);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--line);
 }
 
 .app-shell.immersive .chat-area :deep(.chat-input-bar input::placeholder) {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-soft);
 }
 
 @media (max-width: 68.75rem) {
@@ -280,7 +292,7 @@
   }
 
   /* 打字時舞台縮成一小條，讓出位置給鍵盤與對話；收起鍵盤就恢復。 */
-  .app-shell.composing .stage-card {
+  .app-shell.composing:not(.immersive) .stage-card {
     height: clamp(6rem, 20svh, 9rem);
   }
 

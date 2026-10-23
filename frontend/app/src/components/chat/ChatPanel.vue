@@ -650,6 +650,8 @@ useStickToBottom(messagesRef, contentRef)
 .chat-input-bar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
   border-top: var(--hairline) solid var(--line);
@@ -664,7 +666,8 @@ useStickToBottom(messagesRef, contentRef)
 }
 
 .composer-shell {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -710,6 +713,7 @@ useStickToBottom(messagesRef, contentRef)
 .chat-input-bar input {
   height: 2.75rem;
   width: 100%;
+  min-width: 0;
   border: var(--hairline) solid var(--line);
   border-radius: 0.5rem;
   background: var(--bg-soft);
@@ -731,12 +735,14 @@ useStickToBottom(messagesRef, contentRef)
 }
 
 .chat-send-btn {
+  flex: none;
+  white-space: nowrap;
   min-height: 2.75rem;
   padding: 0 1.25rem;
-  border: none;
+  border: var(--hairline) solid var(--primary);
   border-radius: 0.5rem;
   background: var(--primary);
-  color: white;
+  color: rgb(var(--ov-color-content-inverse));
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -752,14 +758,14 @@ useStickToBottom(messagesRef, contentRef)
 }
 
 .chat-stop-btn {
-  background: var(--ov-color-surface-raised);
-  color: var(--ov-color-danger);
-  box-shadow: inset 0 0 0 1px var(--ov-color-danger);
+  background: var(--bg-soft);
+  color: rgb(var(--ov-color-danger));
+  border-color: rgb(var(--ov-color-danger));
 }
 
 @media (hover: hover) {
-  .chat-stop-btn:hover {
-    background: color-mix(in srgb, var(--ov-color-danger) 10%, var(--ov-color-surface-raised));
+  .chat-stop-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, rgb(var(--ov-color-danger)) 10%, var(--bg-soft));
   }
 }
 
@@ -779,13 +785,15 @@ useStickToBottom(messagesRef, contentRef)
 
 .chat-panel--compact {
   height: auto;
-  max-height: 16rem;
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
 .chat-panel--compact .chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   padding: 0 0 0.5rem;
 }
 
@@ -798,9 +806,16 @@ useStickToBottom(messagesRef, contentRef)
 }
 
 .chat-panel--compact .chat-input-bar {
-  border-top: none;
-  padding: 0;
-  background: transparent;
+  /* 懸浮在影片上仍保留一整塊操作底色，避免把 disabled 或停止誤看成透明。 */
+  gap: 0.5rem;
+  border: var(--hairline) solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  background: var(--bg-soft);
+}
+
+.chat-panel--compact .chat-send-btn {
+  padding-inline: 0.875rem;
 }
 
 @media (max-width: 48rem) {
