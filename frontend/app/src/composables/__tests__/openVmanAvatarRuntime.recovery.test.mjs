@@ -20,6 +20,7 @@ async function loadRuntimeModule({ captureLifecycle = false } = {}) {
         builder.onLoad({ filter: /.*/, namespace: "lifecycle" }, () => ({
           contents: `export const ref = value => ({ value });
             export const readonly = value => value;
+            export const computed = getter => ({ get value() { return getter(); } });
             export const onUnmounted = callback => globalThis.__runtimeUnmounts.push(callback);`,
           loader: "js",
         }));

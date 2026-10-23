@@ -1,5 +1,12 @@
 <template>
-  <div class="avatar-canvas">
+  <div class="avatar-canvas"
+    :data-char-id="characterId"
+    :data-motion-enabled="motionEnabled"
+    :data-motion-profile="motionProfile"
+    :data-motion-state="motionState"
+    :data-motion-transitioning="motionTransitioning"
+    :data-motion-pending="motionPending"
+  >
     <div
       class="avatar-background"
       :class="backgroundClass"
@@ -7,6 +14,7 @@
     />
     <!-- Main rendering canvas required by the DHLiveMini2 runtime -->
     <canvas id="canvas_video" class="avatar-display" :width="width" :height="height" />
+    <canvas id="avatar-motion-held" class="avatar-motion-held" aria-hidden="true" />
     <!-- WebGL canvas required by WASM engine -->
     <canvas id="canvas_gl" class="avatar-gl-hidden" width="180" height="180" />
     <!-- Screen div required by WASM engine -->
@@ -36,6 +44,12 @@ const props = withDefaults(defineProps<{
   backgroundId?: AvatarBackgroundId
   backgroundFit?: AvatarBackgroundFit
   customBackgroundUrl?: string
+  characterId?: string
+  motionEnabled?: boolean
+  motionProfile?: string | null
+  motionState?: string | null
+  motionTransitioning?: boolean
+  motionPending?: number
 }>(), {
   width: 800,
   height: 800,
@@ -44,6 +58,12 @@ const props = withDefaults(defineProps<{
   backgroundId: "dark",
   backgroundFit: "cover",
   customBackgroundUrl: "",
+  characterId: "",
+  motionEnabled: false,
+  motionProfile: null,
+  motionState: null,
+  motionTransitioning: false,
+  motionPending: 0,
 })
 
 const backgroundClass = computed(() =>
@@ -153,6 +173,17 @@ defineEmits<{}>()
   opacity: 0.001;
   z-index: 1;
   pointer-events: none;
+}
+
+.avatar-motion-held {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0;
 }
 
 .avatar-screen-hidden {

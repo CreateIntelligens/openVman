@@ -46,6 +46,17 @@
               :background-id="settings.backgroundId"
               :custom-background-url="settings.backgroundUrl"
               :background-fit="settings.backgroundFit"
+              :character-id="wasm.currentCharId.value ?? ''"
+              :motion-enabled="wasm.motionEnabled.value"
+              :motion-profile="wasm.motionSnapshot.value.profile"
+              :motion-state="wasm.motionState.value"
+              :motion-transitioning="wasm.motionSnapshot.value.transitioning"
+              :motion-pending="wasm.motionSnapshot.value.cache?.pending ?? 0"
+            />
+            <AvatarMotionControls
+              v-if="settings.renderMode === '2d' && wasm.motionEnabled.value"
+              :disabled="rendererDisabled || avatarResponding"
+              @gesture="handleMotionGesture"
             />
             <iframe
               v-if="settings.renderMode === '3d' && stageAvatarWidgetSrc"
@@ -198,6 +209,7 @@
 import { computed, onMounted, ref } from "vue";
 import { BROWSER_ASR } from "@shared/speech";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
+import AvatarMotionControls from "./components/avatar/AvatarMotionControls.vue";
 import DecisionDebugPanel from "./components/debug/DecisionDebugPanel.vue";
 import CameraPreview from "./components/avatar/CameraPreview.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
@@ -275,6 +287,12 @@ const conversation = useAvatarConversation({ settings, stage, languageRoutes,
 const { chat, canSend, isTyping, avatarResponding, handleStart, resetForNextVisitor, handleSend,
   handleComposerSend, handleStopResponse, handleSettingsApply,
   handleFatalRetry } = conversation;
+function handleMotionGesture(state: "greeting" | "bye"): void {
+  if (avatarResponding.value || rendererDisabled.value) return;
+  void wasm.playMotionGesture(state).catch(() => {
+    showMessage("動作暫時無法播放，已回到待機。");
+  });
+}
 const voice = useAvatarVoiceInput({ conversation, preferences, stage,
   languageRoutes, turnTiming, statusToastRef });
 const { activeAsr, serverAsr, vadAsr, streamAsr, asrSpeaking,

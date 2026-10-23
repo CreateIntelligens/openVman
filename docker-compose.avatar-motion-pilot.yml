@@ -1,0 +1,6 @@
+# Local pilot only: keep watchtower from replacing the unpushed frontend image.
+services:
+  avatar:
+    image: openvman-avatar:motion-pilot
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"

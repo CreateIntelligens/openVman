@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>角色動作切換測試 · openVman</title>
+  <link rel="stylesheet" href="./demo.css?v=hciot-1">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">openVman · 技術預覽</p>
+      <h1>角色動作切換測試</h1>
+      <p class="intro">使用 HCIOT 的等待指令、思考、比心與道別四段素材，測試動作切換與對嘴。比心和道別會完整播放一次，再回待機。</p>
+    </header>
+    <div class="layout">
+      <section class="preview" aria-label="角色預覽">
+        <div class="stage" id="stage">
+          <div id="avatar"></div>
+          <canvas id="held-frame" aria-hidden="true"></canvas>
+          <p class="stage-label" id="stage-state">準備載入</p>
+        </div>
+        <p id="status" role="status">正在確認登入與角色存取權限…</p>
+        <p class="caption">四段動作 · 專屬逐幀對嘴資料 · 切換時保留上一張畫面</p>
+      </section>
+      <section class="controls" aria-label="測試控制">
+        <section id="access" class="access" aria-label="登入與角色存取" hidden>
+          <p id="access-message"></p>
+          <div class="actions">
+            <a id="login" class="button-link" href="/admin/login" target="_blank" rel="noopener">登入 Vman</a>
+            <button id="check-access" type="button">登入後重新檢查</button>
+          </div>
+        </section>
+        <button id="load" class="primary" type="button" disabled>載入測試角色</button>
+        <div class="state-buttons" role="group" aria-label="切換測試區段">
+          <button type="button" data-state="idle" disabled>待機</button>
+          <button type="button" data-state="thinking" disabled>思考</button>
+          <button type="button" data-state="speaking" disabled>說話</button>
+          <button type="button" data-state="greeting" disabled>比心</button>
+          <button type="button" data-state="bye" disabled>道別</button>
+        </div>
+        <p id="segment-description" class="caption">待機與說話使用 waiting-command；idle 素材顯示為比心。</p>
+        <div class="actions">
+          <button id="cycle" class="primary" type="button" disabled>自動示範</button>
+          <button id="stop" type="button" disabled>停止</button>
+          <button id="record" type="button" disabled>開始錄影</button>
+          <a id="download" hidden download="openvman-motion-demo.webm">下載錄影</a>
+        </div>
+        <label class="upload">換用自己的音訊（留在瀏覽器內）
+          <input id="audio" type="file" accept="audio/*" disabled>
+        </label>
+        <p class="caption">「說話」與自動示範會播放預先準備的測試語音，不會呼叫聊天或即時語音合成服務。</p>
+        <details>
+          <summary>查看測試數據</summary>
+          <dl><div><dt>狀態</dt><dd id="metric-state">尚未載入</dd></div><div><dt>區段循環</dt><dd id="metric-loops">0</dd></div><div><dt>畫面更新</dt><dd id="metric-frames">0</dd></div><div><dt>完整交接</dt><dd id="metric-latency">—</dd></div><div><dt>快取命中</dt><dd id="metric-cache">—</dd></div></dl>
+          <ol id="events"></ol>
+        </details>
+        <p id="error" role="alert" hidden></p>
+        <button id="retry" type="button" hidden>重新載入測試頁</button>
+      </section>
+    </div>
+  </main>
+  <script src="/static/sdk/openvman-avatar-sdk.js"></script>
+  <script type="module" src="./motion-demo.js?v=hciot-1"></script>
+</body>
+</html>

@@ -58,6 +58,7 @@ function createFakeWasm({ initFailures = 0 } = {}) {
     isLoading: ref(false),
     error: ref(null),
     currentCharId: ref(null),
+    currentProjectId: ref(""),
     loads: [],
     initCalls: 0,
     async initWasm() {
@@ -68,12 +69,14 @@ function createFakeWasm({ initFailures = 0 } = {}) {
       }
       wasm.isReady.value = true;
     },
-    async loadCharacter(charId) {
+    async loadCharacter(charId, _assetsBase, projectId = "") {
       wasm.loads.push(charId);
       wasm.currentCharId.value = charId;
+      wasm.currentProjectId.value = projectId;
     },
     clearAudio() {},
     resetSpeaking() {},
+    disposeMotion() {},
   };
   return wasm;
 }
@@ -197,4 +200,16 @@ test("switching project loads the character the new project picked", async () =>
   settings.characterId = "1014";
   stage.syncCharacter();
   assert.deepEqual(wasm.loads, ["0713", "1014"]);
+});
+
+test("the same character is reloaded when its project motion scope changes", async () => {
+  const wasm = createFakeWasm();
+  const { stage, settings } = createStage(wasm);
+  settings.projectId = "hospital-a";
+  await stage.bootstrapRenderer(Promise.resolve(), Promise.resolve());
+  const character = wasm.currentCharId.value;
+  settings.projectId = "hospital-b";
+  stage.syncCharacter();
+  assert.deepEqual(wasm.loads, [character, character]);
+  assert.equal(wasm.currentProjectId.value, "hospital-b");
 });

@@ -1,4 +1,5 @@
-import { computed, ref, onUnmounted, type Ref } from "vue";
+import { computed, ref, onUnmounted, watch, type Ref } from "vue";
+import { createAvatarMotionAudioGate, resolveAvatarMotionIntent } from "./avatarMotionAudio";
 import { useAudioPlayer } from "./useAudioPlayer";
 import {
   DEFAULT_TEXT_CHAT_STREAM_ENDPOINT,
@@ -73,6 +74,15 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     },
     onQueueEmpty: onAudioQueueEmpty,
   });
+  const motionAudioPreparing = ref(false);
+  const motionAudio = createAvatarMotionAudioGate<ArrayBuffer | string>({
+    enabled: () => settings.renderMode === "2d" && wasm.motionEnabled.value,
+    playing: () => audio.isPlaying.value,
+    prepare: () => wasm.setMotionState("speaking"),
+    play: audio.playChunk,
+    onPreparing: (pending) => { motionAudioPreparing.value = pending; },
+    onError: (error) => console.warn("[motion] Speaking handoff failed; continuing audio:", error),
+  });
 
   const typewriter = useTypewriter({
     onBegin: () => {
@@ -113,7 +123,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       // 聲音又來了：句與句之間的短暫斷音不算卡住，取消欠載看門狗。
       clearUnderrunTimer();
       const copy = new Int16Array(pcm);
-      void audio.playChunk(copy.buffer);
+      void motionAudio.play(copy.buffer);
     },
     // TTS 下載完不代表播完：這時把字幕倒完，長回覆會在講到一半時整段跳出來。
     // 打字機（約 22 字／秒）本來就比語音快，讓它自己跑完；出錯、停止播放才一次顯示。
@@ -202,10 +212,11 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     onAudioChunk: (data) => {
       // Live 模式由 Gemini 直接出聲音，沒有另外的 TTS。
       turnTiming.mark("first_audio");
-      return audio.playChunk(data);
+      return motionAudio.play(data);
     },
     onDisconnect: () => {
       isStarted.value = false;
+      motionAudio.cancel();
       audio.flush();
     },
     onReconnectExhausted: () => {
@@ -216,6 +227,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     },
     onStopAudio: () => {
       turnTiming.interrupted();
+      motionAudio.cancel();
       ttsPending.value = false;
       speechQueue.cancel();
       ttsStreamer.cancel();
@@ -289,8 +301,20 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   const avatarResponding = computed(() =>
     chat.state.value === "THINKING" || avatarSpeaking.value,
   );
+  watch([
+    () => chat.state.value, () => audio.isPlaying.value, ttsPending,
+    motionAudioPreparing, () => wasm.motionEnabled.value, () => settings.renderMode,
+  ], () => {
+    if (settings.renderMode !== "2d" || !wasm.motionEnabled.value) return;
+    const intent = resolveAvatarMotionIntent({
+      playing: audio.isPlaying.value, preparing: motionAudioPreparing.value,
+      thinking: chat.state.value === "THINKING", ttsPending: ttsPending.value,
+    });
+    void wasm.setMotionState(intent).catch((error) => console.warn("[motion] State change failed:", error));
+  }, { immediate: true });
 
   function handleStopResponse(): void {
+    motionAudio.cancel();
     chat.interrupt();
   }
 
@@ -325,6 +349,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
 
   /** 展示機台換下一位來賓：停掉回答、斷線、清空畫面上的對話，下一句會開新的對話。 */
   function resetForNextVisitor(): void {
+    motionAudio.cancel();
     chat.interrupt();
     chat.disconnect();
     audio.stopAll();
@@ -428,7 +453,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     }
   }
 
-  onUnmounted(clearUnderrunTimer);
+  onUnmounted(() => { motionAudio.cancel(); clearUnderrunTimer(); });
 
   return { chat, audio, isStarted, isTyping, avatarSpeaking, avatarResponding, spokenReply, canSend, handleStart, resetForNextVisitor, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
 }

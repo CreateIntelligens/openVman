@@ -85,7 +85,7 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     wasm.resetSpeaking();
     saveSettings({ characterId: charId });
     if (wasm.isReady.value) {
-      await wasm.loadCharacter(charId);
+      await wasm.loadCharacter(charId, undefined, settings.projectId);
     }
   }
   function handleRenderModeChange(mode: '2d' | '3d'): void {
@@ -94,12 +94,13 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     if (mode === "3d") {
       wasm.clearAudio();
       wasm.resetSpeaking();
+      wasm.disposeMotion();
       return;
     }
     stopStageAvatarMouth();
     const charId = settings.characterId || pickInitialCharacter();
-    if (wasm.isReady.value && wasm.currentCharId.value !== charId) {
-      void wasm.loadCharacter(charId);
+    if (wasm.isReady.value) {
+      void wasm.loadCharacter(charId, undefined, settings.projectId);
     }
   }
 
@@ -176,7 +177,7 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
       }
       throw new NoCharacterError("帳號沒有可使用的虛擬人物");
     }
-    await wasm.loadCharacter(characterId);
+    await wasm.loadCharacter(characterId, undefined, settings.projectId);
   }
 
   function reloadOnceForRuntime(): boolean {
@@ -234,11 +235,11 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
       || rendererBootstrapState.value !== "ready"
       || !wasm.isReady.value
       || !charId
-      || wasm.currentCharId.value === charId
+      || (wasm.currentCharId.value === charId && wasm.currentProjectId.value === settings.projectId)
     ) return;
     wasm.clearAudio();
     wasm.resetSpeaking();
-    void wasm.loadCharacter(charId).catch(() => {
+    void wasm.loadCharacter(charId, undefined, settings.projectId).catch(() => {
       // 錯誤已記在 wasm.error，舞台會顯示；這裡不重複處理。
     });
   }

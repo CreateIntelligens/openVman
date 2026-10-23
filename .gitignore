@@ -21,6 +21,7 @@ supervisord.pid
 
 # Avatar uploads and runtime media
 data/avatar/
+/data/avatar-jobs/
 data/backgrounds/
 data/mascots/
 data/auth/

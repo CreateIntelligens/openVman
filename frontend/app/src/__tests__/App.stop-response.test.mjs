@@ -14,7 +14,7 @@ test("the composer turns into a stop button while the avatar is answering", () =
   assert.match(panel, /v-if="responding && !inputText\.trim\(\)"[\s\S]*?@click="emit\('stop'\)"/);
   assert.match(app, /:responding="avatarResponding"/);
   assert.match(app, /@stop="handleStopResponse"/);
-  assert.match(app, /function handleStopResponse\(\): void \{\s*chat\.interrupt\(\);/);
+  assert.match(app, /function handleStopResponse\(\): void \{[^}]*chat\.interrupt\(\);/);
 });
 
 test("standard mode still counts as answering while audio plays", () => {

@@ -10,6 +10,8 @@
 > - 第 12 節的管理介面目前已補齊 Canonical Routes：`navigation.ts` 統一路徑，`App.tsx` 用 History API 同步頁面、專案與子視圖；支援 `/admin/knowledge` 與公開 `/openvman` 前綴。詳見[後台路由現況](../guides/admin-canonical-routes.md)（2026-09-30 核對）。
 > - 第 6、7、9、10、11、12.5 節與現況大致相符，僅部分細節有出入，各節內文已個別註記。
 
+> **2026-10-22 動作試用補充**：正式 Vue 前台可針對 `hciot-motion` 及兩個醫院專案使用同一 WASM 的動作區段播放器。角色的中立底片仍放於一般 `01.webm`／`combined_data.json.gz`；可選的 32 秒動作包放於 `motions/hciot-v1/`，以 manifest 核對幀序。對話思考與實際音訊排程分開驅動動作，首段音訊等說話畫面交接後才開始，停止須取消尚在等待的 PCM。一般人物、Avatar SDK 與嵌入 widget 的既有契約維持不變。詳細安裝與範圍見 [動作試用](../guides/avatar-motion-lab.md#接入正式-vman)。
+
 ### 1. 技術棧與核心目標 (Tech Stack & Goals)
 * **核心技術**：HTML5 `<video>`、`<canvas>`、WebGL (Three.js/PixiJS)、Web Audio API、WebSockets。
 * **渲染架構**：從單一的覆蓋，升級為支援三大渲染引擎的插拔式架構 (Pluggable Rendering Engines)。
