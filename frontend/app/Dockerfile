@@ -5,7 +5,8 @@ FROM node:26.12.1-alpine AS builder
 WORKDIR /app
 COPY frontend/app/package.json frontend/app/pnpm-lock.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    corepack enable \
+    npm install -g corepack@latest \
+    && corepack enable \
     && corepack prepare pnpm@9.15.4 --activate \
     && pnpm install --frozen-lockfile
 

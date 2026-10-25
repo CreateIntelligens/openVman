@@ -7,14 +7,15 @@ FROM node:26.12.1-alpine AS deps
 WORKDIR /app
 
 COPY frontend/admin/package.json frontend/admin/pnpm-lock.yaml ./
-RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile
 
 FROM node:26.12.1-alpine AS avatar-sdk-builder
 
 WORKDIR /sdk
 
 COPY frontend/avatar-sdk/package.json frontend/avatar-sdk/pnpm-lock.yaml ./
-RUN corepack enable \
+RUN npm install -g corepack@latest \
+    && corepack enable \
     && corepack prepare pnpm@10.33.0 --activate \
     && pnpm install --frozen-lockfile
 
