@@ -19,20 +19,50 @@ export class MotionSegmentPlayer {
         throw new Error(`無效的 ${name} 播放區間`);
       }
     }
+    this.endTimer = undefined;
     this.tick = () => {
       if (this.disposed) return;
-      const segment = this.segments[this.state];
-      // 結束在檔尾的片段若在最後一幀之間沒輪到 rAF，影片會自行 ended 並轉成 paused；
-      // ended 也算播到結尾，否則會永遠停在這一段。
-      const playing = !this.video.paused || this.video.ended;
-      if (!this.transitioning && playing && this.video.currentTime >= segment.end - 0.04) {
-        const once = segment.loop === false;
-        void this.setState(once ? segment.next ?? "idle" : this.state, once ? "complete" : "loop")
-          .catch((error) => this.hooks.onError?.(error));
-      }
+      this.checkSegmentEnd();
       this.animation = requestAnimationFrame(this.tick);
     };
     this.animation = requestAnimationFrame(this.tick);
+  }
+
+  checkSegmentEnd() {
+    if (this.disposed || this.transitioning) return;
+    const segment = this.segments[this.state];
+    const video = this.video;
+    // 結束在檔尾的片段若在最後一幀之間沒輪到檢查，影片會自行 ended 並轉成 paused；
+    // ended 也算播到結尾，否則會永遠停在這一段。
+    const playing = !video.paused || video.ended;
+    if (!playing) return;
+    const remaining = segment.end - video.currentTime;
+    if (remaining > 0.04) {
+      // 畫面更新變慢（重負載、低階機台）時 rAF 會晚很多才輪到，
+      // 另依影片時間排計時器，準時在片段結尾前檢查。
+      clearTimeout(this.endTimer);
+      this.endTimer = setTimeout(() => this.checkSegmentEnd(),
+        ((remaining - 0.04) / (video.playbackRate || 1)) * 1000);
+      return;
+    }
+    clearTimeout(this.endTimer);
+    // 停在片段最後一幀再交接：交接本身要時間，不停的話舊影片會播進下一段的影格。
+    const held = !video.ended;
+    if (held) video.pause();
+    const once = segment.loop === false;
+    void this.setState(once ? segment.next ?? "idle" : this.state, once ? "complete" : "loop")
+      .then((changed) => { if (!changed && held) this.resumeHeld(video); })
+      .catch((error) => {
+        if (held) this.resumeHeld(video);
+        this.hooks.onError?.(error);
+      });
+  }
+
+  resumeHeld(video) {
+    // 交接失敗或被取代時，若這支影片仍是目前的來源就恢復播放，不要卡在暫停。
+    if (!this.disposed && !this.transitioning && this.video === video && video.paused) {
+      void video.play()?.catch?.(() => {});
+    }
   }
 
   async setState(next, reason = "manual") {
@@ -96,6 +126,7 @@ export class MotionSegmentPlayer {
     this.disposed = true;
     this.revision += 1;
     this.abort?.abort();
+    clearTimeout(this.endTimer);
     cancelAnimationFrame(this.animation);
     this.video.pause();
   }

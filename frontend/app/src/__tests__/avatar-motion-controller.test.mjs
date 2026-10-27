@@ -141,6 +141,66 @@ test("a one-shot action at the end of the file still returns to idle after the v
   } finally { player.dispose(); }
 });
 
+test("a timer catches the segment end when animation frames stall", async () => {
+  // 測試裡的 rAF 不會自己執行，只有計時器能觸發，模擬重負載時畫面更新停擺。
+  const video = new Video(), changes = [];
+  const player = new MotionSegmentPlayer(video, {
+    ...segments, bye: { start: 6.4, end: 8.16, loop: false, next: "idle" },
+  }, { onChange: (state) => changes.push(state) });
+  try {
+    await player.setState("bye");
+    video.time = 8.16 - 0.06;
+    player.tick();
+    video.time = 8.16 - 0.03;
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal(player.state, "idle");
+    assert.deepEqual(changes, ["bye", "idle"]);
+  } finally { player.dispose(); }
+});
+
+test("the outgoing clip holds its last segment frame while the handoff is prepared", async () => {
+  const video = new Video(), next = new Video();
+  let release;
+  const acquired = new Promise((resolve) => { release = resolve; });
+  const player = new MotionSegmentPlayer(video, {
+    ...segments, bye: { start: 6.4, end: 8.16, loop: false, next: "idle" },
+  }, {
+    acquireVideo: async (state) => state === "idle" ? acquired : { video, cacheHit: true },
+    activateVideo() {},
+  });
+  try {
+    video.time = 6.4;
+    await player.setState("bye");
+    video.paused = false;
+    video.time = 8.14;
+    player.tick();
+    assert.equal(video.paused, true, "the old clip must not play into the next segment's frames");
+    next.time = segments.idle.start;
+    release({ video: next, cacheHit: true });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    assert.equal(player.state, "idle");
+  } finally { player.dispose(); }
+});
+
+test("a failed end-of-segment handoff resumes the held clip", async () => {
+  const video = new Video(), errors = [];
+  const player = new MotionSegmentPlayer(video, segments, {
+    acquireVideo: async () => { throw new Error("decoder lost"); },
+    activateVideo() {},
+    onError: (error) => errors.push(error.message),
+  });
+  try {
+    player.state = "thinking";
+    video.paused = false;
+    video.time = segments.thinking.end - 0.01;
+    player.tick();
+    assert.equal(video.paused, true);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    assert.deepEqual(errors, ["decoder lost"]);
+    assert.equal(video.paused, false, "a failed loop must not leave the avatar frozen");
+  } finally { player.dispose(); }
+});
+
 test("a manually paused segment does not count as finished", async () => {
   const video = new Video();
   const player = new MotionSegmentPlayer(video, segments);
