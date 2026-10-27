@@ -185,6 +185,62 @@ test('a cache miss keeps the outgoing canvas live and delays decoder refill unti
   assert.equal(updates.at(-1).cache.pending, 0, 'the UI must be notified after deferred refill completes')
 })
 
+async function thinkingWithUndecodedIdleStandby(t) {
+  const context = fixture(t)
+  await context.session.start()
+  await context.session.setState('thinking')
+  const outgoing = window.characterVideo
+  const standby = context.standbys.find((video) => video !== outgoing && video.currentTime === 0)
+    ?? [context.active, ...context.standbys].find((video) => video !== outgoing && video.currentTime === 0)
+  assert.ok(standby, 'an idle-entry standby is prepared')
+  standby.readyState = 1
+  return { ...context, outgoing, standby }
+}
+
+test('thinking keeps playing unfrozen until the speaking standby has decoded a frame', async (t) => {
+  const { session, outgoing, standby, held } = await thinkingWithUndecodedIdleStandby(t)
+  outgoing.time = 10
+  const speaking = session.setState('speaking')
+  await until(() => standby.plays > 0)
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(window.characterVideo, outgoing, 'WASM keeps drawing the outgoing motion')
+  assert.equal(outgoing.paused, false)
+  assert.equal(held.style.opacity, '0', 'nothing is frozen while the standby decodes')
+  standby.readyState = 4
+  await until(() => window.characterVideo === standby)
+  assert.ok(Number(held.style.opacity) > .95, 'the freeze only covers the source swap')
+  assert.equal(outgoing.paused, true)
+  assert.equal(await speaking, true)
+  assert.equal(session.snapshot().state, 'speaking')
+})
+
+test('a superseded handoff rewinds the standby it had already started', async (t) => {
+  const { session, outgoing, standby } = await thinkingWithUndecodedIdleStandby(t)
+  outgoing.time = 10
+  const speaking = session.setState('speaking')
+  await until(() => standby.plays > 0)
+  standby.time = 0.3
+  const seeks = standby.seeks.length
+  const greeting = session.setState('greeting')
+  assert.equal(await speaking, false)
+  await until(() => standby.seeks.length > seeks)
+  assert.equal(standby.paused, true)
+  assert.equal(standby.seeks.at(-1), 0, 'the slot is ready at its entry again')
+  standby.readyState = 4
+  assert.equal(await greeting, true)
+  assert.notEqual(window.characterVideo, outgoing)
+})
+
+test('the outgoing motion reaching its segment end swaps without waiting for the decode', async (t) => {
+  const { session, outgoing, standby } = await thinkingWithUndecodedIdleStandby(t)
+  outgoing.time = 15.95
+  const speaking = session.setState('speaking')
+  await until(() => window.characterVideo === standby)
+  assert.equal(session.snapshot().state, 'thinking', 'the reveal still waits for a decoded frame')
+  standby.readyState = 4
+  assert.equal(await speaking, true)
+})
+
 test('rapid requests commit only the last state and keep speaking on the neutral timeline', async (t) => {
   const { session, changes } = fixture(t)
   await session.start()

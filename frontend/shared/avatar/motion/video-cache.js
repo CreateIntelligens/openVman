@@ -84,6 +84,12 @@ export class MotionVideoCache {
     if (!deferRefill) this.refill();
   }
 
+  /** Return a standby that started playing but was never activated to its segment entry. */
+  release(video) {
+    const slot = this.slots.find((entry) => entry.video === video);
+    if (!this.disposed && slot?.state) return this.prepare(slot, slot.state);
+  }
+
   refill() {
     const pending = this.deferredRefill;
     this.deferredRefill = null;

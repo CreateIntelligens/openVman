@@ -16,6 +16,7 @@ export class MotionVideoCache {
   warm(): Promise<void>;
   acquire(state: string, signal: AbortSignal): Promise<{ video: HTMLVideoElement; cacheHit: boolean }>;
   activate(video: HTMLVideoElement, state: string, options?: { deferRefill?: boolean }): void;
+  release(video: HTMLVideoElement): Promise<void> | undefined;
   refill(): Promise<void> | undefined;
   snapshot(): MotionCacheSnapshot;
   dispose(options?: { keepActive?: boolean }): void;

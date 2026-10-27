@@ -32,6 +32,8 @@ export class AvatarMotionSession {
   private frozen = false
   private held: HTMLCanvasElement | null = null
   private canvas: HTMLCanvasElement | null = null
+  private incoming: { video: HTMLVideoElement, state: string, decoded?: boolean } | null = null
+  private activeVideo: HTMLVideoElement
   private readonly errors: string[] = []
   private readonly externalAbort = () => this.dispose()
 
@@ -39,6 +41,7 @@ export class AvatarMotionSession {
     const video = window.characterVideo
     if (!video) throw new Error('角色播放器尚未初始化')
     this.initialVideo = video
+    this.activeVideo = video
     options.signal.addEventListener('abort', this.externalAbort, { once: true })
   }
 
@@ -113,17 +116,38 @@ export class AvatarMotionSession {
         },
         ...(this.cache ? {
           acquireVideo: (state: string, requestSignal: AbortSignal) => this.cache!.acquire(cacheState(state), requestSignal),
+          // Only remember the standby here; it starts playing next while WASM keeps
+          // drawing the outgoing motion, and is swapped in once it has a frame.
           activateVideo: (selected: HTMLVideoElement, state: string) => {
             this.assertActive()
-            this.freezeFrame()
-            this.cache!.activate(selected, cacheState(state), { deferRefill: true })
-            window.characterVideo = selected
+            this.incoming = { video: selected, state: cacheState(state) }
           },
         } : {}),
         afterSeek: async (state, requestSignal, selected) => {
-          // play()/seeked and a draw of the right element do not prove that
-          // its decoded surface has advanced to the requested segment yet.
-          await waitForDecodedFrame(selected, requestSignal, HCIOT_MOTION_SEGMENTS[state as AvatarMotionState])
+          const segment = HCIOT_MOTION_SEGMENTS[state as AvatarMotionState]
+          const incoming = this.incoming?.video === selected ? this.incoming : null
+          if (incoming) {
+            // 新播放器在背景解出畫面前，舊動作照常播放、不凍結；
+            // 凍結只留給「切換來源到 WASM 畫出新畫面」這一小段。
+            try { incoming.decoded = await this.waitForIncomingFrame(selected, requestSignal, segment) }
+            catch (error) {
+              if (this.incoming === incoming) this.incoming = null
+              void this.cache?.release(selected)?.catch(() => {})
+              throw error
+            }
+            this.assertActive()
+            this.incoming = null
+            this.freezeFrame()
+            this.cache!.activate(selected, incoming.state, { deferRefill: true })
+            window.characterVideo = selected
+            this.activeVideo = selected
+            // 舊動作已播到片段結尾才切的，還沒確認新畫面已解碼，這裡補等。
+            if (!incoming.decoded) await waitForDecodedFrame(selected, requestSignal, segment)
+          } else {
+            // play()/seeked and a draw of the right element do not prove that
+            // its decoded surface has advanced to the requested segment yet.
+            await waitForDecodedFrame(selected, requestSignal, segment)
+          }
           await this.waitForRenderedFrame(selected, requestSignal)
           await this.revealFrame(requestSignal)
           void this.cache?.refill()?.then(
@@ -235,6 +259,31 @@ export class AvatarMotionSession {
     this.held.style.opacity = '1'
   }
 
+  /**
+   * Resolves true once the standby shows a frame of its segment, or false as soon as
+   * the outgoing motion reaches its own segment end (a loop or one-shot completion
+   * starts there), so the old clip never plays into the next segment's frames.
+   */
+  private async waitForIncomingFrame(
+    video: HTMLVideoElement, signal: AbortSignal, segment: { start: number, end: number },
+  ): Promise<boolean> {
+    const outgoing = window.characterVideo
+    const ending = this.player ? HCIOT_MOTION_SEGMENTS[this.player.state as AvatarMotionState] : null
+    const local = new AbortController()
+    const stop = () => local.abort()
+    signal.addEventListener('abort', stop, { once: true })
+    try {
+      return await Promise.race([
+        waitForDecodedFrame(video, local.signal, segment).then(() => true),
+        this.animate(local.signal, () => !ending || !outgoing || outgoing.paused
+          || outgoing.currentTime >= ending.end - 0.12).then(() => false),
+      ])
+    } finally {
+      signal.removeEventListener('abort', stop)
+      local.abort()
+    }
+  }
+
   private waitForRenderedFrame(video: HTMLVideoElement, signal: AbortSignal): Promise<void> {
     const first = this.frames, started = performance.now()
     return this.animate(signal, () => {
@@ -314,9 +363,9 @@ export class AvatarMotionSession {
     this.restoreDraw?.()
     this.restoreDraw = null
     if (this.held) this.held.style.opacity = '0'
-    const active = this.player?.video ?? this.initialVideo
-    active.pause()
-    active.loop = false
+    // The standby may already be playing mid-handoff; WASM still draws activeVideo.
+    for (const video of new Set([this.activeVideo, this.player?.video ?? this.activeVideo])) video.pause()
+    this.activeVideo.loop = false
     if (this.blobUrl) URL.revokeObjectURL(this.blobUrl)
     this.blobUrl = null
   }
