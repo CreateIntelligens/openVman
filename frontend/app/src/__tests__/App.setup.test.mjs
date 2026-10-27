@@ -10,7 +10,7 @@ import { createSSRApp, h } from "vue";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(resolve(appRoot, "package.json"));
-const { renderToString } = require("@vue/server-renderer");
+const { renderToString } = require("vue/server-renderer");
 const source = readFileSync(resolve(appRoot, "src/App.vue"), "utf8");
 const { descriptor } = parse(source);
 const compiled = compileScript(descriptor, { id: "thin-entry-regression" });

@@ -21,6 +21,8 @@ async function flushAsyncEffects(): Promise<void> {
 
 describe("GraphView", () => {
   beforeEach(() => {
+    // vitest 4 的 restoreAllMocks 不再清 vi.mock 的呼叫次數，要自己清。
+    vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-29T00:00:00Z"));
     mockedFetchGraphStatus.mockResolvedValue({
