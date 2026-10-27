@@ -9,7 +9,7 @@
 ```env
 EMBEDDING_SERVICE_URL=http://embedding:8009
 VISION_LLM_BASE_URL=http://vlm:8000/v1
-TTS_INDEXTTS_URL=http://index-tts-vllm:8011
+TTS_INDEXTTS_URL=http://shared-gpu-node:8011
 ```
 
 Embedding 使用 `EMBEDDING_SERVICE_TOKEN`，未設定時沿用 `GATEWAY_INTERNAL_TOKEN`；外部 VLM 使用 `VISION_LLM_API_KEY`。完整設定見 [環境變數範本](../../.env.example)，服務啟動方式見 [部署手冊](11_DEPLOYMENT.md)。

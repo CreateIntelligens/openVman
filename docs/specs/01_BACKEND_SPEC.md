@@ -313,7 +313,7 @@ LLM_MODEL=gpt-4o             # 預設模型名稱
 LLM_STREAM=true              # 必須為 true
 
 # === TTS 設定 ===
-TTS_INDEXTTS_URL=http://index-tts-vllm:8011
+TTS_INDEXTTS_URL=http://shared-gpu-node:8011
 TTS_INDEXTTS_DEFAULT_CHARACTER=hayley
 TTS_VOXCPM_URL=http://voxcpm-gateway:8800
 TTS_VOXCPM_API_KEY=***

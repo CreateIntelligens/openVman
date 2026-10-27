@@ -179,7 +179,6 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD backend \
 
 以下元件保留在 compose 或程式中，但目前部署未啟用：
 
-- IndexTTS 本地語音合成（`indextts` profile）
 - VLM 本地視覺模型（`vlm` profile；鏡頭判讀用 Clef，VLM 只當備援）
 - A2A Agent-to-Agent 網絡（`A2A_ENABLED`，預設關閉）
 

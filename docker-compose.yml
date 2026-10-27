@@ -15,8 +15,6 @@ x-backend-runtime: &backend-runtime
     - ./backend/logs:/app/logs
     - ./data:/data
     - ./brain/data:/brain-data:ro
-    - ./backend/index-tts-vllm/assets:/indextts-assets:ro
-    - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
   env_file:
     - ./.env
   environment: &backend-environment
@@ -102,45 +100,6 @@ services:
       timeout: 10s
       retries: 30
       start_period: 60s
-    deploy:
-      resources:
-        reservations:
-          devices:
-            # CDI 模式：根治 systemd daemon-reload 洗掉 GPU cgroup 權限
-            # （NVML Unknown Error、需 force-recreate 急救）的問題。
-            # spec 在 /var/run/cdi/nvidia.yaml，nvidia-cdi-refresh 自動維護。
-            - driver: cdi
-              capabilities: [gpu]
-              device_ids:
-                - nvidia.com/gpu=all
-
-  index-tts-vllm:
-    <<: *shared
-    profiles: ["indextts"]
-    build:
-      context: ./backend/index-tts-vllm
-      dockerfile: Dockerfile
-    environment:
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-      - CUDA_LAUNCH_BLOCKING=1
-      - TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST:-8.9}
-      - MODEL=${INDEXTTS_MODEL:-IndexTeam/IndexTTS-1.5}
-      - VLLM_USE_MODELSCOPE=${INDEXTTS_USE_MODELSCOPE:-1}
-      - DOWNLOAD_MODEL=${INDEXTTS_DOWNLOAD_MODEL:-1}
-      - CONVERT_MODEL=${INDEXTTS_CONVERT_MODEL:-1}
-      - MODEL_DIR=assets/checkpoints
-      - PORT=8011
-      - GPU_MEMORY_UTILIZATION=${INDEXTTS_GPU_MEM:-0.1}
-      - INTERNAL_API_TOKEN=${GATEWAY_INTERNAL_TOKEN:-}
-    volumes:
-      - ./backend/index-tts-vllm:/app
-      - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('INTERNAL_API_TOKEN',''); req=urllib.request.Request('http://localhost:8011/health/ready', headers={'X-Internal-Token': token} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
-      interval: 30s
-      timeout: 10s
-      retries: 30
-      start_period: 120s
     deploy:
       resources:
         reservations:

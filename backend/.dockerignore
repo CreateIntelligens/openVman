@@ -15,4 +15,3 @@
 data
 logs
 # TTS 模型權重，數 GB 且不需要進 image
-index-tts-vllm/assets

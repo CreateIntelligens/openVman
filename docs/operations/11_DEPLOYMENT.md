@@ -32,8 +32,8 @@ cp .env.example .env
 
 填入外部服務網址、`PUBLIC_DOMAIN` 與 `LETSENCRYPT_EMAIL`。所有服務共用**根目錄
 唯一一份 `.env`**：compose 對 `api`、`backend` 用 `env_file: ./.env` 注入，compose
-本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、
-`INDEXTTS_*` 等）也讀這一份。
+本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD` 等）
+也讀這一份。
 
 `GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`MODEL_PROVIDER_ENCRYPTION_SECRET`、
 `GRAFANA_PASSWORD` 留空即可，啟動時會自動產生高熵值。`MODEL_PROVIDER_ENCRYPTION_SECRET`

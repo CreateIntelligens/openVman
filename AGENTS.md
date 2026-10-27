@@ -12,7 +12,7 @@ Three-tier decoupled system: Frontend (senses) → Backend (nervous) → Brain (
 | Admin UI | `frontend/admin/` | React + Vite + Tailwind | 8786 |
 | Avatar pipeline | `avatar-pipeline/` | arq worker (Python, MediaPipe, ffmpeg) | - |
 
-Infrastructure: Redis, Prometheus, Grafana, IndexTTS (GPU), optional VLM (GPU profile).
+Infrastructure: Redis, Prometheus, Grafana, optional VLM (GPU profile). IndexTTS runs on an external node reached through `TTS_INDEXTTS_URL`; the repo no longer ships its server.
 
 ## Environment
 
@@ -84,7 +84,7 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 ## Key Gotchas
 
 - **Two Python runtimes**: `backend/` and `brain/api/` have separate `requirements.txt`, configs, and venvs. Never assume shared dependencies.
-- **GPU services**: `index-tts-vllm` and `vlm` require NVIDIA GPU. `vlm` is opt-in via `docker compose --profile vlm up`.
+- **GPU services**: `vlm` and `embedding` require NVIDIA GPU. `vlm` is opt-in via `docker compose --profile vlm up`.
 - **Brain skills**: Modular tools in `brain/skills/`. Each skill has its own directory. Skills are loaded dynamically at runtime.
 - **LanceDB data**: Runtime vector DB data in `brain/data/` and `.openclaw/` — both gitignored.
 - **Avatar assets**: User uploads in `data/avatar/` and `data/backgrounds/` — gitignored.

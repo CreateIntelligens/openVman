@@ -27,7 +27,7 @@ PUBLIC_HOSTS = {
 }
 SERVICE_HOSTS = {
     "localhost", "backend", "api", "brain", "admin", "avatar", "nginx",
-    "redis", "embedding", "vlm", "index-tts-vllm", "voxcpm-gateway",
+    "redis", "embedding", "vlm", "index-tts-vllm", "voxcpm-gateway", "shared-gpu-node",
     "grafana", "prometheus", "server1", "server2",
 }
 PUBLIC_EMAILS = {"sales@evak-pumps.com", "privacy@typesafe.ai"}

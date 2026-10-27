@@ -73,9 +73,6 @@ services:
       - ./backend/scripts:/app/scripts
       - ./data:/data
       - ./brain/data:/brain-data:ro
-      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
-      - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
-      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
 
   avatar-pipeline:
     labels:
@@ -103,9 +100,6 @@ services:
       - ./backend/scripts:/app/scripts
       - ./data:/data
       - ./brain/data:/brain-data:ro
-      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
-      - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
-      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
 
   watchtower:
     profiles: ["production"]

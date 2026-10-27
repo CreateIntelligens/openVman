@@ -18,22 +18,22 @@ The system SHALL use an explicitly configured embedding, VLM, or IndexTTS servic
 
 #### Scenario: External IndexTTS URL is configured
 - **WHEN** `TTS_INDEXTTS_URL` contains an external reachable URL
-- **THEN** Backend uses that URL and the worktree does not require the local `indextts` profile
+- **THEN** Backend uses that URL; IndexTTS is always an external node because the repo does not ship a local IndexTTS service
 
 ### Requirement: Local services use explicit Compose profiles
-The Compose configuration SHALL provide `embedding`, `vlm`, and `indextts` profiles and SHALL use internal service URLs only for required or explicitly selected local services.
+The Compose configuration SHALL provide `embedding` and `vlm` profiles and SHALL use internal service URLs only for required or explicitly selected local services.
 
 #### Scenario: Fully local GPU mode
-- **WHEN** `COMPOSE_PROFILES` includes `embedding,vlm,indextts` and no external service URL is set
-- **THEN** Compose starts all three local services and consumers resolve them through Docker service DNS
+- **WHEN** `COMPOSE_PROFILES` includes `embedding,vlm` and no external service URL is set
+- **THEN** Compose starts both local services and consumers resolve them through Docker service DNS
 
 #### Scenario: Mixed local and external mode
 - **WHEN** an external embedding URL is set, `COMPOSE_PROFILES` includes `vlm`, and IndexTTS is not configured
 - **THEN** Brain uses external embedding, Backend uses local VLM, and IndexTTS remains disabled
 
 #### Scenario: IndexTTS is omitted by default
-- **WHEN** `TTS_INDEXTTS_URL` is empty and `COMPOSE_PROFILES` does not include `indextts`
-- **THEN** the IndexTTS container does not start and Backend does not attempt the internal IndexTTS URL
+- **WHEN** `TTS_INDEXTTS_URL` is empty
+- **THEN** Backend does not attempt any IndexTTS route
 
 ### Requirement: Direct Compose startup uses explicit routing configuration
 The project SHALL use standard `docker compose` startup without a custom launcher. `.env` SHALL explicitly select required local profiles or configure external service URLs, and Compose interpolation SHALL provide matching consumer routes and credentials.
@@ -66,7 +66,7 @@ Brain and Backend health payloads SHALL identify whether embedding, VLM, and Ind
 - **THEN** health reports the route as local and unreachable with an actionable profile hint
 
 #### Scenario: Optional IndexTTS is disabled
-- **WHEN** no IndexTTS URL or profile is configured
+- **WHEN** no IndexTTS URL is configured
 - **THEN** health reports IndexTTS as disabled rather than unreachable
 
 ### Requirement: IndexTTS readiness proves model availability
@@ -99,5 +99,5 @@ An unavailable optional VLM or IndexTTS route SHALL not prevent unrelated applic
 - **THEN** non-vision application features start normally and health reports VLM disabled
 
 #### Scenario: Configured IndexTTS becomes unavailable
-- **WHEN** an enabled local or external IndexTTS route fails during synthesis
+- **WHEN** the configured external IndexTTS route fails during synthesis
 - **THEN** Backend records the provider failure and attempts the next configured TTS provider
