@@ -46,7 +46,7 @@ def test_order_enabled_and_models_round_trip_per_category(provider_settings):
                 ("openai", "jev", "clef-backup", "clef-primary"), ("openai", "jev"),
             ),
             "chat_llm": CategoryUpdate(
-                ("groq", "gemini", "openai", "nen"), ("groq", "gemini"),
+                ("groq", "gemini", "openai"), ("groq", "gemini"),
                 {"groq": "openai/gpt-oss-20b"},
             ),
         },
@@ -80,7 +80,7 @@ def test_decision_rejects_bad_hops_and_model_changes(provider_settings, change):
 @pytest.mark.parametrize("model", ["", "has space", "x" * 200, "../etc"])
 def test_chat_model_names_are_validated(provider_settings, model):
     _, root, repository = provider_settings
-    change = CategoryUpdate(("gemini", "openai", "groq", "nen"), ("gemini",), {"gemini": model})
+    change = CategoryUpdate(("gemini", "openai", "groq"), ("gemini",), {"gemini": model})
 
     with pytest.raises(InvalidModelProviderSettings):
         repository.update({"chat_llm": change}, credentials={}, actor_id=root.id)

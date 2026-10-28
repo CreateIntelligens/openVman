@@ -83,8 +83,8 @@ const SUMMARY = {
       reasoning_tokens: 0, chars: 0, seconds: 0,
     },
     {
-      provider: "nen",
-      model: "nen-chat",
+      provider: "groq",
+      model: "openai/gpt-oss-120b",
       calls: 1,
       input_tokens: 100,
       output_tokens: 50,
@@ -123,7 +123,7 @@ const TIMESERIES = {
 const EVENTS: UsageEvent[] = [
   event({ id: 1, trace_id: "trace-1" }),
   event({ id: 2, trace_id: "trace-1", provider: "openai", model: "gpt-4o" }),
-  event({ id: 3, trace_id: "trace-1", provider: "nen", model: "nen-chat" }),
+  event({ id: 3, trace_id: "trace-1", provider: "groq", model: "openai/gpt-oss-120b" }),
   event({
     id: 4,
     trace_id: "trace-2",
@@ -240,7 +240,7 @@ describe("Usage page", () => {
       await screen.findByRole("table", { name: "依 Provider" }),
     );
     expect(providerTable.getByText("openai")).toBeTruthy();
-    expect(providerTable.getByText("nen")).toBeTruthy();
+    expect(providerTable.getByText("groq")).toBeTruthy();
     // openai 450 / 600 總量
     expect(providerTable.getByText("75.0%")).toBeTruthy();
     expect(providerTable.getByText("25.0%")).toBeTruthy();
@@ -249,7 +249,7 @@ describe("Usage page", () => {
       screen.getByRole("table", { name: "依模型" }),
     );
     expect(modelTable.getByText("gpt-4o")).toBeTruthy();
-    expect(modelTable.getByText("nen-chat")).toBeTruthy();
+    expect(modelTable.getByText("openai/gpt-oss-120b")).toBeTruthy();
   });
 
   it("groups recent events by trace so one turn's calls sit together", async () => {

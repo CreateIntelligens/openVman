@@ -80,7 +80,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 - RAG：知識文件轉為 Markdown 後以 EmbeddingGemma 2 向量化，存於 LanceDB；問答節點與 CSV 轉換的 QA 同樣索引。
 - 記憶：workspace 核心文件（`SOUL.md`、`MEMORY.md` 等）直接進 prompt，對話歸檔與夜間記憶整理（dreaming）。
 - 工具：知識檢索、圖譜、記憶、網路搜尋與網頁轉 Markdown（2md）、Wiki 發布，以及依專案 `knowledge/products/_catalog.yaml` 啟用的產品規格篩選 `filter_products`。
-- 模型路由：主對話依序嘗試 Gemini、OpenAI、Groq、NEN 中啟用的供應商；後台沒存過設定時照 `LLM_PROVIDER`／`LLM_FALLBACK_CHAIN`。
+- 模型路由：主對話依序嘗試 Gemini、OpenAI、Groq 中啟用的供應商；後台沒存過設定時照 `LLM_PROVIDER`／`LLM_FALLBACK_CHAIN`。
 - 決策輔助：本地 Guard Agent 規則先判；規則無法判斷時依後台順序呼叫 Clef 主／備援、Jev、OpenAI Decisions。
 - 模型供應商：ROOT 在後台「System → 模型供應商」調整主對話與決策的順序、啟用狀態、主對話模型名稱，以及各家 API key（加密存放，每家一把、各類共用），約 10 秒內生效。
 - 專案專屬 Gemini 金鑰：ROOT 可在專案設定替正式專案綁定自己的 Gemini 金鑰（加密存放，後台只顯示名稱與遮罩），該專案的 Gemini 對話、TTS 與 Live 都改用它；金鑰失效時不會改借共用金鑰，用量依專案分開記。沒綁定的專案照共用設定。

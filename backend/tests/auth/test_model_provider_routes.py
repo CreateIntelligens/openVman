@@ -43,7 +43,6 @@ def _runtime(tmp_path, **overrides) -> AuthRuntime:
         openai_api_key="env-openai-key",
         gemini_api_key="env-gemini-key",
         llm_fallback_chain="gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini",
-        nen_base_url="https://nen.example/v1",
         **overrides,
     ))
 
@@ -81,7 +80,7 @@ def _category(payload: dict, category_id: str) -> dict:
 
 def _save_body(**chat_overrides) -> dict:
     chat = {
-        "order": ["gemini", "openai", "groq", "nen"],
+        "order": ["gemini", "openai", "groq"],
         "enabled": ["gemini", "openai"],
         "models": {},
     }
@@ -108,9 +107,8 @@ def test_root_reads_deployment_defaults_and_only_credential_metadata(tmp_path):
     assert decision["enabled"] == ["clef-primary", "jev", "openai"]
     assert decision["configured"] is False
     # 主對話預設順序與模型來自 LLM_FALLBACK_CHAIN，沒列在鏈上的供應商預設停用。
-    assert chat["order"] == ["gemini", "openai", "groq", "nen"]
+    assert chat["order"] == ["gemini", "openai", "groq"]
     assert chat["enabled"] == ["gemini", "openai"]
-    assert chat["providers"][3]["endpoint"] == "https://nen.example/v1"
     openai = next(item for item in payload["credentials"] if item["id"] == "openai")
     assert openai["used_by"] == ["決策模型", "主對話模型"]
     assert openai["source"] == "environment"
@@ -124,7 +122,7 @@ def test_root_saves_order_models_and_shared_key_without_echoing_it(tmp_path):
     headers = _login(client, runtime, AccountRole.ROOT)
     key = "new-openai-provider-key"
     body = _save_body(
-        order=["openai", "gemini", "groq", "nen"],
+        order=["openai", "gemini", "groq"],
         models={"openai": "gpt-4.1", "gemini": "  "},
     )
     body["credentials"] = {"openai": key}
@@ -214,7 +212,7 @@ def test_bad_categories_and_conflicting_actions_are_rejected(tmp_path):
     assert client.put(PATH, headers=headers, json=save_and_reset).status_code == 422
     assert client.put(PATH, headers=headers, json={"reset_categories": ["vision"]}).status_code == 422
     assert client.put(
-        PATH, headers=headers, json=_save_body(order=["gemini", "gemini", "groq", "nen"]),
+        PATH, headers=headers, json=_save_body(order=["gemini", "gemini", "groq"]),
     ).status_code == 422
 
 

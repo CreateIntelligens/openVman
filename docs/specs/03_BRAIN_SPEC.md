@@ -19,7 +19,7 @@
 | API 服務 | FastAPI（`brain/api/`） | compose 服務 `api`，容器內 `:8100`，只在內部網路 |
 | 向量資料庫 | **LanceDB**（嵌入式） | 每個專案一個資料目錄，含向量表與 FTS 索引 |
 | Embedding 模型 | **google/embeddinggemma-2** | 768 維 Dense，由獨立的 embedding gateway 推論；全文檢索由 LanceDB FTS 負責 |
-| LLM | Gemini / OpenAI / Groq / NEN 等 | 一律以 OpenAI 相容 API 呼叫，依 `LLM_FALLBACK_CHAIN` 路由（第 8 節） |
+| LLM | Gemini / OpenAI / Groq | 一律以 OpenAI 相容 API 呼叫，依 `LLM_FALLBACK_CHAIN` 路由（第 8 節） |
 | 短期記憶 | SQLite（專案的 `sessions.db`） | Session、訊息與待確認回合 |
 | 知識庫格式 | Markdown + Raw | 原始檔留在 `raw/`，Markdown 是可編輯的 canonical form |
 | 文件解析 | Gateway（pdf-inspector + Docling + AnyDoc）與 Brain 內建轉換 | 見第 4.1 節 |
@@ -262,13 +262,13 @@ LLM 呼叫一律經 `core/llm_client.py`，不假設單一金鑰、單一模型�
 * **Fallback chain**（`core/fallback_chain.py`）：`LLM_FALLBACK_CHAIN` 為 `provider:model,provider:model,...`，有值時其順序就是實際呼叫順序，不會把 `LLM_PROVIDER` 額外插入鏈首；未設定時為 `LLM_PROVIDER` 搭配 `LLM_MODEL` 與 `LLM_FALLBACK_MODEL`。
 * **Gemini 模型展開**：鏈中的 `gemini` 項目會依 model discovery 展開成可用的 Gemini 模型清單（主模型在前）；`LLM_DISABLE_MODEL_DISCOVERY=true` 時照設定原樣使用。
 * **有界跳轉**：單次請求最多 `LLM_MAX_FALLBACK_HOPS`（預設 4）跳；沒有金鑰的 provider 直接略過。
-* **Provider 端點與金鑰**：`gemini`、`groq` 有內建的 OpenAI 相容 base URL；`nen` 是獨立 provider，使用 `NEN_API_KEY`、`NEN_BASE_URL`，不可用 `LLM_PROVIDER=openai` 或 `OPENAI_API_KEY` 代替，否則 metrics 與用量帳本會記成 OpenAI；其他 provider 以 `LLM_BASE_URL` 指定端點。各 provider 金鑰為 `GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`、`NEN_API_KEY`，主 provider 另可用 `LLM_API_KEYS`（逗號分隔）／`LLM_API_KEY`。
+* **Provider 端點與金鑰**：`gemini`、`groq` 有內建的 OpenAI 相容 base URL；其他 provider 以 `LLM_BASE_URL` 指定端點。各 provider 金鑰為 `GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`，主 provider 另可用 `LLM_API_KEYS`（逗號分隔）／`LLM_API_KEY`。
 * **Key pool**（`core/key_pool.py`）：失敗依類型分類並處置——401／403 停用該金鑰；429 或 quota／insufficient／exhausted 長冷卻（`LLM_KEY_LONG_COOLDOWN_SECONDS`，300 秒）；其他限流、5xx、連線與逾時短冷卻（`LLM_KEY_COOLDOWN_SECONDS`，60 秒）。fallback chain 解析不出任何 hop 時，才改用主 provider 的 key pool，依上述冷卻與停用狀態逐一輪替金鑰與模型；chain 的每個 provider 只用其第一把金鑰。
 * **觀測**：每一跳的成功或失敗、切換原因與整條鏈耗盡都記入 metrics 與 structured logs（`trace_id` 綁定同一條鏈），route 失敗另寫入 `.learnings/ERRORS.md`。所有 hop 皆失敗時回 502（`LLM_OVERLOAD`）。
 * **逾時**：單次呼叫 `LLM_REQUEST_TIMEOUT_SECONDS`（預設 20 秒）。
 
 ```env
-LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b,nen:gemini-3.5-flash-lite
+LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b
 ```
 
 ### 9. 工具調用 (Tool Calling)
@@ -495,7 +495,7 @@ GATEWAY_INTERNAL_TOKEN=***
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash-lite
 LLM_FALLBACK_MODEL=
-LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b,nen:gemini-3.5-flash-lite
+LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b
 LLM_MAX_FALLBACK_HOPS=4
 LLM_API_KEYS=                    # 主 provider 的金鑰池（逗號分隔）
 LLM_REQUEST_TIMEOUT_SECONDS=20
@@ -504,8 +504,6 @@ LLM_STREAM_INCLUDE_USAGE=true
 GEMINI_API_KEY=***
 OPENAI_API_KEY=
 GROQ_API_KEY=***
-NEN_API_KEY=***
-NEN_BASE_URL=https://nen.com.tw/v1
 
 # === Embedding ===
 EMBEDDING_SERVICE_URL=           # 外部 gateway 才填；空白為 http://embedding:8009

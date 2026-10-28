@@ -55,8 +55,6 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - OPF_MOE_TRITON=false
       - EMBEDDING_SERVICE_TOKEN=${EMBEDDING_SERVICE_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}
-      - NEN_API_KEY=${NEN_API_KEY:-}
-      - NEN_BASE_URL=${NEN_BASE_URL:-https://nen.com.tw/v1}
     healthcheck:
       test:
         - CMD

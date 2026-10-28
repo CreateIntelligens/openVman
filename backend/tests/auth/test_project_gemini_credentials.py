@@ -270,7 +270,7 @@ def test_internal_project_runtime_uses_bound_key_only_with_internal_auth(context
     }
     runtime.model_providers.update(
         {"chat_llm": CategoryUpdate(
-            ("gemini", "openai", "groq", "nen"), ("gemini", "openai"),
+            ("gemini", "openai", "groq"), ("gemini", "openai"),
         )},
         credentials={"openai": "shared-openai-key"}, actor_id=root.id,
     )

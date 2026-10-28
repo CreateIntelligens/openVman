@@ -54,7 +54,7 @@ describe("MessageMeta", () => {
           latency_ms: 3000,
           by_model: {
             "gemini/gemini-3.5-flash-lite": { calls: 1 },
-            "nen/gemini-3.5-flash-lite": { calls: 1 },
+            "groq/gemini-3.5-flash-lite": { calls: 1 },
           },
         }}
       />,

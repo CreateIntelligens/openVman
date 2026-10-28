@@ -11,7 +11,7 @@ Backend (/api/v1/*)
   -> Brain API  (compose 服務 api，容器內 :8100，只在內部網路)
        -> 專案資料    brain/data/projects/<project_id>/（workspace、LanceDB、sessions.db）
        -> Embedding gateway（compose 服務 embedding，:8009，或外部 EMBEDDING_SERVICE_URL）
-       -> LLM providers（Gemini、OpenAI、Groq、NEN 等，依 fallback chain）
+       -> LLM providers（Gemini、OpenAI、Groq，依 fallback chain）
        -> 決策供應鏈：Clef 主／備援、Jev、OpenAI Decisions
        -> 外部工具：2md（搜尋／讀網頁）、David888 Wiki
        -> Redis（2md circuit 協調，選用）
@@ -355,7 +355,7 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 | 類別 | 主要變數 |
 |---|---|
 | 環境 | `ENV`（`prod`／`dev`）、`GATEWAY_INTERNAL_TOKEN` |
-| LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`、`NEN_API_KEY`、`NEN_BASE_URL` |
+| LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY` |
 | Embedding | `EMBEDDING_THRESHOLDS`、`EMBEDDING_SERVICE_URL`（外部 gateway 才填）、`EMBEDDING_SERVICE_TOKEN`；模型與 identity 的預設值在 `config.py` |
 | 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`EMBEDDING_THRESHOLDS`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
 | Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
@@ -370,9 +370,9 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 
 注意事項：
 
-- 主對話鏈的來源：ROOT 在後台「模型供應商」改過主對話那一區並儲存後，`core/fallback_chain.py` 改用 Backend `GET /api/v1/internal/model-providers` 的 `chat_llm` 段（Gemini／OpenAI／Groq／NEN 的順序、啟用、模型、端點與 key；Backend 沒有某家 key 而來源不是後台時，補用 Brain 自己的環境變數），10 秒快取；Backend 暫時失敗沿用上一次設定，從未取得或後台沒存過則照環境變數。Gemini 模型探索、`LLM_MAX_FALLBACK_HOPS` 與缺 key 略過在兩種來源下相同。
+- 主對話鏈的來源：ROOT 在後台「模型供應商」改過主對話那一區並儲存後，`core/fallback_chain.py` 改用 Backend `GET /api/v1/internal/model-providers` 的 `chat_llm` 段（Gemini／OpenAI／Groq 的順序、啟用、模型、端點與 key；Backend 沒有某家 key 而來源不是後台時，補用 Brain 自己的環境變數），10 秒快取；Backend 暫時失敗沿用上一次設定，從未取得或後台沒存過則照環境變數。Gemini 模型探索、`LLM_MAX_FALLBACK_HOPS` 與缺 key 略過在兩種來源下相同。
 - 主對話那一區沒存過（或按了「改回部署設定」）時，`LLM_FALLBACK_CHAIN` 有值就是實際呼叫順序；後台存過的 key（`chat_llm.credential_overrides`，含刻意清除）仍會取代同一家的環境變數 key。
-- 失敗的站會往後排（`core/provider_health.py`，主對話與決策共用）：401／403 視為 key 無效，換 key 或重開前都排到最後；配額用完（429）冷卻 5 分鐘；逾時、5xx、連線或回應錯誤連續 2 次冷卻 60 秒，時間到再試一次，成功即恢復。站不會被拿掉：健康的站都失敗後仍會試冷卻中與 key 無效的站。決策的逾時若是因為前面的站把時間用掉（剩不到一半），不算這一站失敗。狀態以 key 的 sha256 前 12 碼區分，後台換新 key 立即重試；決策鏈再依用途（每輪決策、附圖選擇、插話判斷…）分開記，小請求成功不會把大請求的失敗次數歸零；`GET /brain/internal/provider-health` 列出正在失敗的站，後台「模型供應商」頁據此顯示每站狀態；頁面的「重置」按鈕經 Backend 呼叫 `POST /brain/internal/provider-health/reset`（可只清某一類或某一站）。後台存檔後 Backend 呼叫 `POST /brain/internal/model-providers/refresh` 立即清掉設定快取，Brain 連不上時照常 10 秒內生效。決策鏈每站時限之外，跨公網的 OpenAI Decisions 每站至少 1.5 秒（仍受整次請求期限限制）。NEN 是獨立的 `nen` provider（沿用 OpenAI 相容傳輸），不可用 `LLM_PROVIDER=openai` 或 `OPENAI_API_KEY` 代替，否則 metrics 與用量帳本會把它記成 OpenAI。
+- 失敗的站會往後排（`core/provider_health.py`，主對話與決策共用）：401／403 視為 key 無效，換 key 或重開前都排到最後；配額用完（429）冷卻 5 分鐘；逾時、5xx、連線或回應錯誤連續 2 次冷卻 60 秒，時間到再試一次，成功即恢復。站不會被拿掉：健康的站都失敗後仍會試冷卻中與 key 無效的站。決策的逾時若是因為前面的站把時間用掉（剩不到一半），不算這一站失敗。狀態以 key 的 sha256 前 12 碼區分，後台換新 key 立即重試；決策鏈再依用途（每輪決策、附圖選擇、插話判斷…）分開記，小請求成功不會把大請求的失敗次數歸零；`GET /brain/internal/provider-health` 列出正在失敗的站，後台「模型供應商」頁據此顯示每站狀態；頁面的「重置」按鈕經 Backend 呼叫 `POST /brain/internal/provider-health/reset`（可只清某一類或某一站）。後台存檔後 Backend 呼叫 `POST /brain/internal/model-providers/refresh` 立即清掉設定快取，Brain 連不上時照常 10 秒內生效。決策鏈每站時限之外，跨公網的 OpenAI Decisions 每站至少 1.5 秒（仍受整次請求期限限制）。
 - 未設定外部 `EMBEDDING_SERVICE_URL` 時，`COMPOSE_PROFILES` 必須包含 `embedding`。Gateway 的模型、revision、批次大小等預設值都寫在 `brain/embedding/app.py`，compose 只傳 token 與雲端 API key；要覆寫再在 compose 的 embedding 服務加環境變數。
 - Embedding gateway 沒有 Bearer token 時 fail closed；預設不允許瀏覽器跨來源呼叫（目前所有呼叫端都是後端）。
 

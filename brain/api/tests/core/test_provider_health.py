@@ -48,9 +48,9 @@ def test_quota_cools_for_five_minutes_and_success_clears_it():
     health.record_failure(_hop("groq"), "quota", "quota_exhausted")
 
     clock.now += 299
-    assert _order(health, "groq", "nen") == ["nen", "groq"]
+    assert _order(health, "groq", "openai") == ["openai", "groq"]
     health.record_success(_hop("groq"))
-    assert _order(health, "groq", "nen") == ["groq", "nen"]
+    assert _order(health, "groq", "openai") == ["groq", "openai"]
 
 
 def test_nothing_is_dropped_and_cooling_hops_run_before_blocked_ones():

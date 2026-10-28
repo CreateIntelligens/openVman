@@ -45,16 +45,14 @@ Backend 啟動時記一筆 ERROR，`/healthz` 的 `dependencies.model_provider_k
 主對話若套用後台設定後沒有任何一家有可用 key，Brain 也會改照 `LLM_FALLBACK_CHAIN` 跑，不會整個停掉。Grafana 預設不開放匿名瀏覽，每個部署都必須有唯一密碼。
 
 模型供應商由 ROOT 在 Admin「System → 模型供應商」管理。key 每家一把：Clef 讀 `CLEF_API_KEY`（可選）、
-Jev 讀 `TYPESAFE_API_KEY`、OpenAI 讀 `OPENAI_API_KEY`（決策與主對話共用）、Gemini／Groq／NEN 讀
-`GEMINI_API_KEY`／`GROQ_API_KEY`／`NEN_API_KEY`。Admin 設定覆寫環境預設，清除 Admin key 會停用該 key，
+Jev 讀 `TYPESAFE_API_KEY`、OpenAI 讀 `OPENAI_API_KEY`（決策與主對話共用）、Gemini／Groq 讀
+`GEMINI_API_KEY`／`GROQ_API_KEY`。Admin 設定覆寫環境預設，清除 Admin key 會停用該 key，
 「移除後台金鑰，改用 .env」會移除覆寫。每個類別只在 ROOT 實際改了那一區並儲存後才改照後台設定（只改決策時主對話不受影響）；
 還沒存過的主對話照 `LLM_FALLBACK_CHAIN` 運作，但後台存過的 key 仍會蓋過 `.env` 同一家的 key。
 各區的「改回部署設定」會刪掉那一類的後台設定。
 內部 API（`/api/v1/internal/*`，含模型金鑰明文）只給容器之間呼叫，對外的 admin nginx 一律回 404，跟 `/brain/` 一樣。Brain 每 10 秒向 Backend 取一次設定，Backend 暫時連不上時沿用上一次取得的設定，從未取得過就照環境變數。
 
-LLM 的 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<model>` 加入
-鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，
-但不得占用 `OPENAI_API_KEY` 或共用的 `LLM_BASE_URL`。
+LLM 的 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。
 
 若啟用 A2A，必須從 secret store 注入 `A2A_HUB_KEY` 與
 `A2A_CREDENTIALS_ENCRYPTION_KEY`（或確認 `SESSION_JWT_SECRET` 已設定），並提供

@@ -380,8 +380,6 @@ class TTSRouterConfig(BaseSettings):
     # --- 主對話 LLM（Brain 實際呼叫；這裡只是後台「模型供應商」頁的部署預設值）---
     gemini_api_key: str = Field(default="", repr=False, validation_alias="GEMINI_API_KEY")
     groq_api_key: str = Field(default="", repr=False, validation_alias="GROQ_API_KEY")
-    nen_api_key: str = Field(default="", repr=False, validation_alias="NEN_API_KEY")
-    nen_base_url: str = Field(default="", validation_alias="NEN_BASE_URL")
     llm_provider: str = Field(default="gemini", validation_alias="LLM_PROVIDER")
     llm_model: str = Field(default="gemini-3.5-flash-lite", validation_alias="LLM_MODEL")
     llm_fallback_chain: str = Field(default="", validation_alias="LLM_FALLBACK_CHAIN")

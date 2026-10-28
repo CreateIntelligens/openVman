@@ -58,7 +58,6 @@ CREDENTIALS: Final[tuple[Credential, ...]] = (
     Credential("openai", "OpenAI", "OPENAI_API_KEY"),
     Credential("gemini", "Gemini", "GEMINI_API_KEY"),
     Credential("groq", "Groq", "GROQ_API_KEY"),
-    Credential("nen", "NEN", "NEN_API_KEY"),
 )
 CREDENTIAL_IDS: Final[frozenset[str]] = frozenset(item.id for item in CREDENTIALS)
 
@@ -107,11 +106,6 @@ CHAT_LLM: Final = ModelCategory(
             "groq", "groq", "Groq",
             "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", True,
         ),
-        # NEN 的網址由部署設定（NEN_BASE_URL），這裡只是沒設定時顯示用的預設。
-        ProviderHop(
-            "nen", "nen", "NEN",
-            "https://nen.com.tw/v1", "gemini-3.5-flash-lite", True,
-        ),
     ),
 )
 
@@ -134,7 +128,6 @@ def environment_credential(config: TTSRouterConfig, credential_id: str) -> str:
         "openai": config.openai_api_key,
         "gemini": config.gemini_api_key,
         "groq": config.groq_api_key,
-        "nen": config.nen_api_key,
     }
     return values[credential_id]
 
@@ -143,8 +136,6 @@ def hop_endpoint(config: TTSRouterConfig, category: ModelCategory, hop: Provider
     if category is DECISION and hop.id == "jev":
         base = config.jev_base_url.strip().rstrip("/") or "https://api.typesafe.ai"
         return base if base.endswith("/v1/systemone") else f"{base}/v1/systemone"
-    if category is CHAT_LLM and hop.id == "nen":
-        return config.nen_base_url.strip() or hop.endpoint
     return hop.endpoint
 
 

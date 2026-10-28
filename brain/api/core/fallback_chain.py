@@ -19,7 +19,7 @@ from safety.observability import log_event
 
 logger = logging.getLogger("core.fallback_chain")
 
-_ADMIN_PROVIDERS: Final = frozenset({"gemini", "openai", "groq", "nen"})
+_ADMIN_PROVIDERS: Final = frozenset({"gemini", "openai", "groq"})
 # 本機 Backend 正常是毫秒級回應；設上限是怕 Backend 卡住時拖慢每 10 秒那一輪對話。
 _ADMIN_CONFIG_TIMEOUT_SECONDS: Final = 1.0
 
