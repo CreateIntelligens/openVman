@@ -9,7 +9,7 @@ const source = readFileSync(
 );
 // 腳本頂層：建立 video、查 canvas；之後才是 emscripten 的 Module 定義。
 const head = source.slice(
-  source.indexOf("// 初始化视频播放器"),
+  source.indexOf("// 初始化影片播放器"),
   source.indexOf("var Module;"),
 );
 const callbacks = source.slice(

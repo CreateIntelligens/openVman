@@ -1,6 +1,6 @@
 # 2D 人物素材：格式要求、上架與驗收
 
-前台與 Avatar SDK 用 DHLiveMini2（`frontend/app/public/js/OpenVmanAvatarRuntime.js`、`public/wasm/DHLiveMini2.wasm`）播放 2D 人物。每個人物是一個資料夾，放在 backend 的 `avatar_assets_dir`（正式機為 `data/avatar/<char_id>/`），經 `GET /static/characters/<char_id>/<檔名>` 提供，讀取權限依人物資源判斷（全域、專案專屬、ROOT 指派，見 `docs/specs/01_BACKEND_SPEC.md`「專案資源範圍」）。
+前台與 Avatar SDK 用 DHLiveMini2 引擎（`frontend/app/public/js/OpenVmanAvatarRuntime.js`、`public/wasm/OpenVmanAvatarRuntime.wasm`）播放 2D 人物。每個人物是一個資料夾，放在 backend 的 `avatar_assets_dir`（正式機為 `data/avatar/<char_id>/`），經 `GET /static/characters/<char_id>/<檔名>` 提供，讀取權限依人物資源判斷（全域、專案專屬、ROOT 指派，見 `docs/specs/01_BACKEND_SPEC.md`「專案資源範圍」）。
 
 素材的製作管線不在本 repo；本文只記 openVman 這端要求的格式、上架方式與如何驗收。
 
@@ -23,7 +23,7 @@
 
 顯示修復集中在共用 TypeScript 模組 `frontend/shared/avatar/avatarFrameSyncRepair.ts`，由前台與 SDK 的 runtime adapter 安裝及卸載，不手動拆改 WASM 工具產生的引擎內容。讀取 2×2 標記時，先保留原始 RGBA 供引擎判斷幀號，再依左側與下側乾淨邊界重建右上角 16×16 背景，外緣 4 像素逐步融合原始畫面，避免複製另一塊背景造成方形亮度接縫。標記本體建議不超過 8×8，壓縮污染須留在修復區域內，修復邊界須保留背景；不要放人物或文字。修復使用 `putImageData`，不受影片繪製的 `globalCompositeOperation = "copy"` 影響。前台、Avatar SDK 與 SDK 嵌入 widget 共用此修正；3D VRM 不使用這項標記。
 
-引擎入口統一命名為 `OpenVmanAvatarRuntime.js`，其來源仍為 DHLiveMini2／Emscripten；WASM 檔名維持 `DHLiveMini2.wasm`。SDK 公開路徑 `/static/sdk/runtime/OpenVmanAvatarRuntime.js` 不變；前台 Nginx 將舊 `/js/DHLiveMini2.js` 轉送至新檔，讓仍留有舊 app bundle 的瀏覽器能載入。
+引擎入口與 WASM 統一命名為 `OpenVmanAvatarRuntime.js`、`OpenVmanAvatarRuntime.wasm`，引擎本身為 DHLiveMini2（Emscripten 編譯），一律從同源載入。SDK 公開路徑 `/static/sdk/runtime/OpenVmanAvatarRuntime.js`、`.wasm` 不變；舊的 `/js/DHLiveMini2.js`、`/wasm/DHLiveMini2.wasm` 不再提供。
 
 ## 上架
 

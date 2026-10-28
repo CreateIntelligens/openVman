@@ -214,7 +214,7 @@ export function useOpenVmanAvatarRuntime() {
 
       runtimeInitPromise = window.createQtAppInstance({
         locateFile(path: string) {
-          return path.endsWith('.wasm') ? '/wasm/DHLiveMini2.wasm' : path
+          return path.endsWith('.wasm') ? '/wasm/OpenVmanAvatarRuntime.wasm' : path
         },
         onRuntimeInitialized() {
           console.log('[OpenVmanAvatarRuntime] WASM runtime initialised')

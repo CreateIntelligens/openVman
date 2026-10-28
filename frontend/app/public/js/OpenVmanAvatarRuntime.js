@@ -1,6 +1,6 @@
 const isApple = /(iPhone|iPod|iPad|Macintosh|Mac OS X)/i.test(navigator.userAgent);
 
-// confirm："IOS系统版本需要高于17.4"
+// confirm："iOS 系統版本需要 17.4 以上"
 if (isApple) {
     const iosVersionMatch = navigator.userAgent.match(/OS (\d+)_(\d+)_?(\d+)?/);
     if (iosVersionMatch) {
@@ -8,10 +8,10 @@ if (isApple) {
         const minorVersion = parseInt(iosVersionMatch[2]);
         const patchVersion = iosVersionMatch[3] ? parseInt(iosVersionMatch[3]) : 0;
 
-        // 检查是否低于17.4版本
+        // 檢查是否低於 17.4 版
         if (majorVersion < 17 || (majorVersion === 17 && minorVersion < 4)) {
-            const shouldUpdate = confirm("IOS系统版本需要高于17.4");
-            // 可以根据用户选择执行后续操作
+            const shouldUpdate = confirm("iOS 系統版本需要 17.4 以上");
+            // 可依使用者選擇執行後續操作
             if (shouldUpdate) {
                 history.back();
             }
@@ -19,15 +19,15 @@ if (isApple) {
     }
 }
 
-// 初始化视频播放器
+// 初始化影片播放器
 characterVideo = document.createElement('video');
 characterVideo.setAttribute('playsinline', '');
 characterVideo.crossOrigin = "";
 characterVideo.style.display = 'none';
 document.body.appendChild(characterVideo);
 
-// 画布可能在脚本载入时还不在页面上（例如 401 把 App 切到登录页），
-// 所以延后到每次绘制前再查，缺画布时跳过那一帧而不是整个脚本崩掉。
+// 畫布可能在腳本載入時還不在頁面上（例如 401 把 App 切到登入頁），
+// 所以延後到每次繪製前再查，缺畫布時跳過那一幀，而不是整支腳本壞掉。
 let canvas_video = null;
 let ctx_video = null;
 function resolveVideoCanvas() {
@@ -223,7 +223,7 @@ var createQtAppInstance = ( () => {
             }
         }
         var UTF8Decoder = typeof TextDecoder != "undefined" ? new TextDecoder("utf8") : undefined;
-        // 将 stringToUTF8 挂载到 Module 上
+        // 把 stringToUTF8 掛到 Module 上
         Module["stringToUTF8"] = function(str, outPtr, maxBytesToWrite) {
             return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
         };
@@ -437,12 +437,7 @@ var createQtAppInstance = ( () => {
         function isFileURI(filename) {
             return filename.startsWith("file://")
         }
-        var wasmBinaryFile;
-        if (window.location.hostname.endsWith('matesx.com')) {
-            wasmBinaryFile = "https://matesx.oss-cn-beijing.aliyuncs.com/public/DHLiveMini2.wasm.gz";
-        } else {
-            wasmBinaryFile = "/web/wasm/DHLiveMini2.wasm";
-        }
+        var wasmBinaryFile = "/web/wasm/OpenVmanAvatarRuntime.wasm";
         if (!isDataURI(wasmBinaryFile)) {
             wasmBinaryFile = locateFile(wasmBinaryFile)
         }

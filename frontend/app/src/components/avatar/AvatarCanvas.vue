@@ -12,7 +12,7 @@
       :class="backgroundClass"
       :style="backgroundStyle"
     />
-    <!-- Main rendering canvas required by the DHLiveMini2 runtime -->
+    <!-- Main rendering canvas required by the avatar runtime -->
     <canvas id="canvas_video" class="avatar-display" :width="width" :height="height" />
     <canvas id="avatar-motion-held" class="avatar-motion-held" aria-hidden="true" />
     <!-- WebGL canvas required by WASM engine -->
