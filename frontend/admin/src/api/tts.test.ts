@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { synthesizeSpeechPreview } from "./tts";
+import { openSpeechStream, synthesizeSpeech, synthesizeSpeechPreview } from "./tts";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -19,6 +19,31 @@ describe("speech preview API", () => {
       credentials: "include", signal,
       body: JSON.stringify({ input: "你好", provider: "edge", voice: "voice-a" }),
     }));
+  });
+
+  it("adds the language only when one is chosen", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response("audio", {
+      headers: { "Content-Type": "audio/wav", "X-TTS-Provider": "voxcpm" },
+    }));
+    vi.stubGlobal("fetch", fetch);
+    await synthesizeSpeechPreview("你好", "voxcpm", "voice-a", new AbortController().signal, "nan");
+    expect(fetch).toHaveBeenCalledWith("/v1/audio/speech", expect.objectContaining({
+      body: JSON.stringify({ input: "你好", provider: "voxcpm", voice: "voice-a", language: "nan" }),
+    }));
+  });
+
+  it("forwards the turn's speech language on chat playback paths", async () => {
+    const fetch = vi.fn().mockImplementation(async () => new Response("audio", {
+      headers: { "Content-Type": "audio/mpeg" },
+    }));
+    vi.stubGlobal("fetch", fetch);
+    await openSpeechStream("你好", { provider: "voxcpm", speechLanguage: "nan" });
+    await synthesizeSpeech("你好", { provider: "edge", speechLanguage: "nan" });
+    await synthesizeSpeech("你好", { provider: "edge" });
+    const bodies = fetch.mock.calls.map(([, init]) => JSON.parse(init.body));
+    expect(bodies[0]).toEqual({ text: "你好", provider: "voxcpm", speech_language: "nan" });
+    expect(bodies[1]).toEqual({ input: "你好", provider: "edge", speech_language: "nan" });
+    expect(bodies[2]).toEqual({ input: "你好", provider: "edge" });
   });
 
   it("identifies fallback on cached results without a fallback header", async () => {

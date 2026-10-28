@@ -55,6 +55,8 @@ export function useTts() {
        const streamStopRef = useRef<(() => void) | null>(null);
        const ttsCacheRef = useRef<TtsLruCache<CachedSpeech>>(new TtsLruCache<CachedSpeech>());
        const ttsPrefetchAbortRef = useRef<AbortController | null>(null);
+       // 回覆文字 → 那一輪使用者語音被判成的語言；之後按播放才念得跟預先合成的一樣。
+       const speechLanguageByTextRef = useRef(new Map<string, string>());
        const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
        const mascotAudioCtxRef = useRef<AudioContext | null>(null);
        const mascotAudioGraphRef = useRef<MascotAudioGraph | null>(null);
@@ -288,10 +290,12 @@ export function useTts() {
                      .catch(cleanup);
        }, [decodeMascotPcm, driveMascotFromAudio, pushPcm, stopMascotAnalyser]);
 
-       const prefetchTts = useCallback(async (text: string) => {
+       const prefetchTts = useCallback(async (text: string, speechLanguage = "") => {
               ttsPrefetchAbortRef.current?.abort();
+              if (speechLanguage) speechLanguageByTextRef.current.set(text, speechLanguage);
+              else speechLanguageByTextRef.current.delete(text);
               const selection = resolveTtsSelection(ttsProviderRef.current, ttsVoiceRef.current);
-              const key = await ttsCacheKey(text, selection.provider, selection.voice);
+              const key = await ttsCacheKey(text, selection.provider, selection.voice, speechLanguage);
               if (ttsCacheRef.current.has(key)) {
                      return;
               }
@@ -302,6 +306,7 @@ export function useTts() {
               try {
                      const { audio, fallback } = await synthesizeSpeech(text, {
                             ...selection,
+                            speechLanguage,
                             signal: controller.signal,
                      });
                      ttsCacheRef.current.set(key, { audio, fallback });
@@ -325,7 +330,8 @@ export function useTts() {
               setPlayingIndex(index);
 
               const selection = resolveTtsSelection(ttsProviderRef.current, ttsVoiceRef.current);
-              const key = await ttsCacheKey(text, selection.provider, selection.voice);
+              const speechLanguage = speechLanguageByTextRef.current.get(text) ?? "";
+              const key = await ttsCacheKey(text, selection.provider, selection.voice, speechLanguage);
               const cached = ttsCacheRef.current.get(key);
               if (cached) {
                      await playAudioBuffer(cached.audio, cached.fallback);
@@ -338,7 +344,9 @@ export function useTts() {
                      // 先試串流端點：auto 或支援串流的 provider 會邊生成邊回 PCM；
                      // 回的不是 PCM（例如 mp3）就退回整段路徑。
                      if (!selection.provider || selection.provider === "voxcpm" || selection.provider === "gemini-tts" || selection.provider === "indextts") {
-                            const response = await openSpeechStream(text, { ...selection, signal: controller.signal });
+                            const response = await openSpeechStream(text, {
+                                   ...selection, speechLanguage, signal: controller.signal,
+                            });
                             const streamed = await playStreamedSpeech(
                                    response,
                                    key,
@@ -348,6 +356,7 @@ export function useTts() {
                      }
                      const { audio, fallback } = await synthesizeSpeech(text, {
                             ...selection,
+                            speechLanguage,
                             signal: controller.signal,
                      });
                      ttsCacheRef.current.set(key, { audio, fallback });

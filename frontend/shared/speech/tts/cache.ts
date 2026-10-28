@@ -11,8 +11,10 @@ export async function ttsCacheKey(
   text: string,
   provider: string,
   voice: string,
+  language = '',
 ): Promise<string> {
-  const raw = `${text}|${provider}|${voice}`
+  // 同一句台語與華語念法不同（台語會先查詞表），語言要分開快取；沒帶語言時鍵值照舊。
+  const raw = language ? `${text}|${provider}|${voice}|${language}` : `${text}|${provider}|${voice}`
   const cryptoObj = globalThis.crypto
   if (!cryptoObj?.subtle) {
     return raw

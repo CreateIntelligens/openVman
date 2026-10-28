@@ -23,6 +23,7 @@ import {
   type MyAsrProvider,
   type SpeechController,
   type SpeechControllerState,
+  type TranscriptionMeta,
 } from "@shared/speech";
 import { readReplyMode, writeReplyMode, type ReplyMode } from "../components/chat/replyMode";
 import { useTts } from "./useTts";
@@ -271,11 +272,14 @@ export function useChatSession() {
   const inputRef = useRef(input);
   inputRef.current = input;
   const submitRef = useRef<(value?: string) => Promise<void>>();
+  // 語音送出的這一輪被 ASR 判成的語言（例如台語 nan），回覆念出來才會跟前台一樣；打字送出就是空的。
+  const pendingSpeechLanguageRef = useRef("");
 
-  const handleFinalTranscript = useCallback((transcript: string) => {
+  const handleFinalTranscript = useCallback((transcript: string, meta?: TranscriptionMeta) => {
     const text = transcript.trim();
     setAsrInterim("");
     if (!text) return;
+    pendingSpeechLanguageRef.current = meta?.language ?? "";
 
     controllerRef.current?.markActivity();
     const currentInput = inputRef.current.trim();
@@ -362,7 +366,7 @@ export function useChatSession() {
     clearStopReplyTimer();
   }, [clearStopReplyTimer]);
 
-  const applyChatResult = useCallback((payload: ChatResultPayload) => {
+  const applyChatResult = useCallback((payload: ChatResultPayload, speechLanguage = "") => {
     const sources = {
       knowledge: payload.knowledge_results ?? [],
       memory: payload.memory_results ?? [],
@@ -372,7 +376,7 @@ export function useChatSession() {
     persistSessionId(payload.session_id);
 
     if (payload.reply) {
-      void prefetchTts(payload.reply);
+      void prefetchTts(payload.reply, speechLanguage);
     }
   }, [persistSessionId, prefetchTts, setMessages]);
 
@@ -387,6 +391,8 @@ export function useChatSession() {
     setError("");
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    const speechLanguage = pendingSpeechLanguageRef.current;
+    pendingSpeechLanguageRef.current = "";
 
     const userTimestamp = new Date().toISOString();
     const submitTime = performance.now();
@@ -416,7 +422,7 @@ export function useChatSession() {
         }
       }
 
-      applyChatResult({ ...payload, response_time_s });
+      applyChatResult({ ...payload, response_time_s }, speechLanguage);
 
       if (payload.pii_pending && payload.session_id) {
         void pollForReplyPiiWarning(

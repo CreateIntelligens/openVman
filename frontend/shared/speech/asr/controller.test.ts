@@ -257,6 +257,21 @@ describe('SpeechController (shared state machine)', () => {
     expect(controller.uiLabel).toBe('辨識中…')
   })
 
+  it('辨識結果連同 ASR 判出的語言一起交給呼叫端，TTS 才能照同一種語言念', () => {
+    const onResult = vi.fn()
+    const controller = new SpeechController({
+      http,
+      browserRecognizer: browser,
+      vadRecognizer: vad,
+      serverRecorder: recorder,
+      onResult,
+    })
+
+    controller.handleResult('食飽未', { language: 'nan' })
+
+    expect(onResult).toHaveBeenCalledWith('食飽未', { language: 'nan' })
+  })
+
   it('伺服器引擎清單跟後端 SERVER_ASR_PROVIDERS 同一組（取代 D7 的「預設」選項）', () => {
     expect([...SERVER_ASR_ENGINES].sort()).toEqual(['breeze', 'openai', 'r2t2', 'r2t2-dev', 'sensevoice'])
   })

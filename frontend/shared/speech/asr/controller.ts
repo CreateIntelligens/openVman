@@ -20,6 +20,7 @@
  */
 
 import type { HttpAdapter } from '../http'
+import type { TranscriptionMeta } from './client'
 import { BrowserRecognizer } from './browser-recognizer'
 import {
   fetchMyAsrProvider,
@@ -72,7 +73,7 @@ export interface SpeechControllerOptions {
   vadRecognizer: SpeechRecognizerUnit
   serverRecorder: SpeechRecognizerUnit
   initialProvider?: MyAsrProvider
-  onResult?: (transcript: string) => void
+  onResult?: (transcript: string, meta?: TranscriptionMeta) => void
   onInterim?: (transcript: string) => void
   onError?: (error: AsrErrorCode | string) => void
   onProviderChange?: (provider: MyAsrProvider) => void
@@ -97,7 +98,7 @@ export class SpeechController {
   private vadRecognizer: SpeechRecognizerUnit
   private serverRecorder: SpeechRecognizerUnit
 
-  private onResult?: (transcript: string) => void
+  private onResult?: (transcript: string, meta?: TranscriptionMeta) => void
   private onInterim?: (transcript: string) => void
   private onError?: (error: AsrErrorCode | string) => void
   private onProviderChange?: (provider: MyAsrProvider) => void
@@ -325,7 +326,7 @@ export class SpeechController {
   }
 
   public updateCallbacks(callbacks: {
-    onResult?: (transcript: string) => void
+    onResult?: (transcript: string, meta?: TranscriptionMeta) => void
     onInterim?: (transcript: string) => void
     onError?: (error: AsrErrorCode | string) => void
     onProviderChange?: (provider: MyAsrProvider) => void
@@ -412,9 +413,9 @@ export class SpeechController {
   /**
    * 處理單元傳來的最終結果
    */
-  public handleResult(text: string): void {
+  public handleResult(text: string, meta?: TranscriptionMeta): void {
     this.markActivity()
-    this.onResult?.(text)
+    this.onResult?.(text, meta)
   }
 
   public dispose(): void {
@@ -435,7 +436,7 @@ export interface CreateSpeechControllerOptions {
   lang?: string
   silenceTimeoutMs?: number
   initialProvider?: MyAsrProvider
-  onResult?: (transcript: string) => void
+  onResult?: (transcript: string, meta?: TranscriptionMeta) => void
   onInterim?: (transcript: string) => void
   onError?: (error: AsrErrorCode | string) => void
   onProviderChange?: (provider: MyAsrProvider) => void
@@ -465,7 +466,7 @@ export function createSpeechController(
   const vadRecognizer = new VadRecognizer({
     http: options.http,
     silenceTimeoutMs: options.silenceTimeoutMs,
-    onResult: (text) => controller.handleResult(text),
+    onResult: (text, meta) => controller.handleResult(text, meta),
     onError: (err) => controller.handleRecognizerError(err),
     onSpeechStart: () => controller.markActivity(),
     onStartingChange: () => controller.notifyState(),
@@ -479,7 +480,7 @@ export function createSpeechController(
 
   const serverRecorder = new ServerRecorder({
     http: options.http,
-    onResult: (text) => controller.handleResult(text),
+    onResult: (text, meta) => controller.handleResult(text, meta),
     onError: (err) => controller.handleRecognizerError(err),
     onRecordingChange: () => controller.notifyState(),
     onTranscribingChange: () => controller.notifyState(),

@@ -44,11 +44,15 @@ export async function synthesizeSpeechPreview(
   provider: string,
   voice: string,
   signal: AbortSignal,
+  language = "",
 ): Promise<SpeechPreview> {
+  // 台語（nan）要帶語言，後端才會先查台語詞表再交給引擎，跟正式對話念的一樣。
+  const body: Record<string, string> = { input: text, provider, voice };
+  if (language) body.language = language;
   const response = await apiFetch("/v1/audio/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input: text, provider, voice }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!response.ok) {
@@ -71,11 +75,12 @@ export async function synthesizeSpeechPreview(
 /** 打串流端點，回傳原始 Response 讓呼叫端邊收邊播；provider 空字串表示交給後端決定。 */
 export async function openSpeechStream(
   text: string,
-  opts?: { provider?: string; voice?: string; signal?: AbortSignal },
+  opts?: { provider?: string; voice?: string; speechLanguage?: string; signal?: AbortSignal },
 ): Promise<Response> {
   const body: Record<string, string> = { text };
   if (opts?.provider) body.provider = opts.provider;
   if (opts?.voice) body.voice = opts.voice;
+  if (opts?.speechLanguage) body.speech_language = opts.speechLanguage;
   return apiFetch("/api/v1/tts/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -86,13 +91,14 @@ export async function openSpeechStream(
 
 export async function synthesizeSpeech(
   text: string,
-  opts?: { provider?: string; voice?: string; signal?: AbortSignal },
+  opts?: { provider?: string; voice?: string; speechLanguage?: string; signal?: AbortSignal },
 ): Promise<SpeechResult> {
   const provider = opts?.provider;
   if (provider === "voxcpm") {
     try {
       const streamBody: Record<string, string> = { text, provider };
       if (opts?.voice) streamBody.voice = opts.voice;
+      if (opts?.speechLanguage) streamBody.speech_language = opts.speechLanguage;
 
       const res = await apiFetch("/api/v1/tts/stream", {
         method: "POST",
@@ -113,6 +119,7 @@ export async function synthesizeSpeech(
   const body: Record<string, string> = { input: text };
   if (opts?.provider) body.provider = opts.provider;
   if (opts?.voice) body.voice = opts.voice;
+  if (opts?.speechLanguage) body.speech_language = opts.speechLanguage;
 
   const res = await apiFetch("/v1/audio/speech", {
     method: "POST",

@@ -13,6 +13,12 @@ describe('cache', () => {
     expect(key1).not.toBe(key3)
   })
 
+  it('ttsCacheKey 依語言分開，沒帶語言時與舊鍵值相同', async () => {
+    const plain = await ttsCacheKey('你好', 'voxcpm', 'v')
+    expect(await ttsCacheKey('你好', 'voxcpm', 'v', '')).toBe(plain)
+    expect(await ttsCacheKey('你好', 'voxcpm', 'v', 'nan')).not.toBe(plain)
+  })
+
   it('TtsLruCache 遵循容量限制並淘汰最舊未使用的項目', () => {
     const cache = new TtsLruCache<string>(3)
     cache.set('a', '1')

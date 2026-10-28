@@ -199,7 +199,7 @@ test("non-streaming providers continue to use the full speech endpoint", async (
   }
 });
 
-test("full-file speech carries only the project, so the project voice policy applies", async () => {
+test("full-file speech carries the project and this turn's language like streaming does", async () => {
   const fetchMock = installFetch(() => fullSpeechResponse());
   try {
     const streamer = useTtsStreamer({
@@ -209,7 +209,7 @@ test("full-file speech carries only the project, so the project voice policy app
     await streamer.speak("測試", {
       provider: "edge-tts",
       voice: "zh-TW-HsiaoChenNeural",
-      extraBody: { project_id: "proj-1", language_routes: "zh,nan", speech_language: "" },
+      extraBody: { project_id: "proj-1", language_routes: "zh,nan", speech_language: "nan" },
     });
 
     assert.equal(fetchMock.calls[0].url, "/v1/audio/speech");
@@ -218,6 +218,8 @@ test("full-file speech carries only the project, so the project voice policy app
       provider: "edge-tts",
       voice: "zh-TW-HsiaoChenNeural",
       project_id: "proj-1",
+      language_routes: "zh,nan",
+      speech_language: "nan",
     });
   } finally {
     fetchMock.restore();

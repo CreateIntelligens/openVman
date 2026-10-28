@@ -191,13 +191,12 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
           method: "POST",
           headers: requestHeaders(),
           body: JSON.stringify(
-            useStream
-              ? { ...buildStreamBody(trimmed, opts), ...(opts.extraBody ?? {}) }
-              // 整檔合成也要帶專案，後端才能套用專案的聲音限制。
-              : {
-                ...buildSpeechBody(trimmed, opts, provider),
-                ...(opts.extraBody?.project_id ? { project_id: opts.extraBody.project_id } : {}),
-              },
+            // 整檔合成也要帶專案與這一輪的語言：前台講台語時會換成只走整檔的 CosyVoice，
+            // 少了 speech_language，後端不會查台語詞表，也不會在 CosyVoice 失敗時改由 VoxCPM 備援。
+            {
+              ...(useStream ? buildStreamBody(trimmed, opts) : buildSpeechBody(trimmed, opts, provider)),
+              ...(opts.extraBody ?? {}),
+            },
           ),
           signal: abort.signal,
         },

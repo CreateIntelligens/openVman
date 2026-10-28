@@ -42,7 +42,7 @@ describe("TTS preview", () => {
     fireEvent.change(screen.getByLabelText("試聽文字"), { target: { value: " 測試聲音 " } });
     fireEvent.click(screen.getByRole("button", { name: "試聽" }));
     await screen.findByLabelText("試聽播放器");
-    expect(synthesizeSpeechPreview).toHaveBeenCalledWith("測試聲音", "edge", "voice-b", expect.any(AbortSignal));
+    expect(synthesizeSpeechPreview).toHaveBeenCalledWith("測試聲音", "edge", "voice-b", expect.any(AbortSignal), "zh");
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
     view.unmount();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
@@ -64,7 +64,18 @@ describe("TTS preview", () => {
     fireEvent.click(screen.getByRole("button", { name: "試聽" }));
     await screen.findByLabelText("試聽播放器");
     expect(synthesizeSpeechPreview).toHaveBeenCalledWith(
-      expect.any(String), "cosyvoice", "young-female-02", expect.any(AbortSignal),
+      expect.any(String), "cosyvoice", "young-female-02", expect.any(AbortSignal), "zh",
+    );
+  });
+
+  it("sends Taiwanese so the preview goes through the same word table as chat", async () => {
+    await ready();
+    fireEvent.click(screen.getByRole("combobox", { name: "語言" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "台語" }));
+    fireEvent.click(screen.getByRole("button", { name: "試聽" }));
+    await screen.findByLabelText("試聽播放器");
+    expect(synthesizeSpeechPreview).toHaveBeenCalledWith(
+      expect.any(String), "edge", "voice-a", expect.any(AbortSignal), "nan",
     );
   });
 

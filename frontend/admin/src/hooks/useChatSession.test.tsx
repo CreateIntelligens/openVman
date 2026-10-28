@@ -194,7 +194,7 @@ describe("useChatSession TTS prefetch", () => {
       await result.current.submit("使用者問題");
     });
 
-    await waitFor(() => expect(prefetchTtsMock).toHaveBeenCalledWith("助手最終回覆"));
+    await waitFor(() => expect(prefetchTtsMock).toHaveBeenCalledWith("助手最終回覆", ""));
     expect(playTtsMock).not.toHaveBeenCalled();
   });
 
