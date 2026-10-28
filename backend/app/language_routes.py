@@ -31,7 +31,7 @@ CHINESE = "zh"
 TAIWANESE = "nan"
 KNOWN_ROUTES = ("zh", "en", "es", "nan", "ja", "ko")
 TAIWANESE_ASR_ENGINE = "breeze"
-# 依序嘗試：CosyVoice 會把漢字轉成台文再唸，VoxCPM 照字唸（Brain 的台語回答是華語文字）。
+# 台語每次依實際引擎查詞表，版本由該引擎的環境設定決定。
 TAIWANESE_TTS_PROVIDERS = ("cosyvoice", "voxcpm")
 
 # 指定正確語言時 .37、.35 五種語言全對（串流、批次都一樣）；.37 不會自己判斷（zhen 也當

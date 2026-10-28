@@ -148,9 +148,15 @@ async def create_speech(
     )
     provider, voice = plan.provider, plan.voice
     svc = _get_service()
-    cleaned_text = (await prepare_tts_text_async(body.input)) or ""
+    language = (body.speech_language or body.language).strip()
+    locale = "nan" if provider == COSYVOICE_PROVIDER_NAME else language or "zh-TW"
+    taiwanese = locale.lower().split("-")[0] == "nan"
+    cleaned_text = (await prepare_tts_text_async(
+        body.input, simplified=not taiwanese,
+    )) or ""
     request = SynthesizeRequest(
         text=cleaned_text,
+        locale=locale,
         voice_hint=voice,
         usage_scope=usage_scope_for(
             current, project_id=project_id or "", channel="http",
@@ -160,6 +166,18 @@ async def create_speech(
 
     if cfg.tts_cache_enabled:
         cache_scope = _cache_scope(project_id, policy, is_root=is_root)
+        # 國語與台語即使原文、音色相同也不能共用音檔；啟用詞表後舊快取失效。
+        hanji_url = getattr(
+            cfg, "effective_tts_hanji_convert_url",
+            getattr(cfg, "tts_hanji_convert_url", ""),
+        )
+        if language or hanji_url:
+            cache_scope += (
+                f"|language:{locale}|hanji:"
+                f"{hanji_url}:"
+                f"{getattr(cfg, 'tts_voxcpm_hanji_version', 'v6')}:"
+                f"{getattr(cfg, 'tts_cosyvoice_hanji_version', 'v1')}"
+            )
         if project_id and provider in ("", "auto", "gemini-tts"):
             credential = resolve_gemini_credential(project_id, runtime)
             if credential.source == "project" or provider == "gemini-tts":
@@ -370,7 +388,6 @@ def _taiwanese_partners(
     """
     if provider not in language_routes_mod.TAIWANESE_TTS_PROVIDERS:
         return ()
-    svc = _get_service()
     cfg = get_tts_config()
     chain = order or _taiwanese_chain(policy)
     partners: list[tuple[str, str]] = []
@@ -598,7 +615,11 @@ async def tts_stream_endpoint(
     provider, voice, character, partners = (
         plan.provider, plan.voice, plan.character, plan.partners,
     )
-    cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
+    locale = "nan" if provider == COSYVOICE_PROVIDER_NAME else language or "zh-TW"
+    taiwanese = locale.lower().split("-")[0] == "nan"
+    cleaned = (await prepare_tts_text_async(
+        body.text.strip(), simplified=not taiwanese,
+    )) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
     scope = usage_scope_for(
@@ -627,7 +648,8 @@ async def tts_stream_endpoint(
         svc = _get_service()
         gemini = svc.gemini_adapter
         gemini_request = SynthesizeRequest(
-            text=cleaned, voice_hint=voice, usage_scope=scope,
+            text=cleaned, locale=locale,
+            voice_hint=voice, usage_scope=scope,
         )
         if gemini.enabled_for(gemini_request):
             try:
@@ -660,7 +682,10 @@ async def tts_stream_endpoint(
         if voxcpm.enabled:
             try:
                 stream = await voxcpm.open_stream(
-                    SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope),
+                    SynthesizeRequest(
+                        text=cleaned, locale=locale,
+                        voice_hint=voice, usage_scope=scope,
+                    ),
                     # 要 16 kHz 就請 VoxCPM 直接出，轉換器只需剝檔頭。
                     sample_rate=16000 if body.format == "pcm16k" else None,
                 )
@@ -680,7 +705,8 @@ async def tts_stream_endpoint(
                     try:
                         output = _get_service().synthesize(
                             SynthesizeRequest(
-                                text=cleaned, voice_hint=partner_voice, usage_scope=scope,
+                                text=cleaned, locale=locale,
+                                voice_hint=partner_voice, usage_scope=scope,
                             ),
                             provider=partner,
                             edge_fallback_voice=edge_fallback_voice,
@@ -698,7 +724,8 @@ async def tts_stream_endpoint(
         try:
             output = svc.synthesize(
                 SynthesizeRequest(
-                    text=cleaned, voice_hint=voice or character, usage_scope=scope,
+                    text=cleaned, locale=locale,
+                    voice_hint=voice or character, usage_scope=scope,
                 ),
                 provider=provider,
                 edge_fallback_voice=edge_fallback_voice,
@@ -737,7 +764,10 @@ async def tts_stream_endpoint(
     if edge.enabled and (is_edge or edge_fallback_voice is not None):
         edge_voice = voice if is_edge or not edge_fallback_voice else edge_fallback_voice
         stream = edge.synthesize_stream(
-            SynthesizeRequest(text=cleaned, voice_hint=edge_voice, usage_scope=scope)
+            SynthesizeRequest(
+                text=cleaned, locale=locale,
+                voice_hint=edge_voice, usage_scope=scope,
+            )
         )
         _meter_stream(voice_access.EDGE_TTS_PROVIDER)
         return _stream_audio(stream, "audio/mpeg", body.format, voice_access.EDGE_TTS_PROVIDER)
@@ -746,7 +776,8 @@ async def tts_stream_endpoint(
     try:
         output = svc.synthesize(
             SynthesizeRequest(
-                text=cleaned, voice_hint=voice or character, usage_scope=scope,
+                text=cleaned, locale=locale,
+                voice_hint=voice or character, usage_scope=scope,
             ),
             provider=provider,
             edge_fallback_voice=edge_fallback_voice,

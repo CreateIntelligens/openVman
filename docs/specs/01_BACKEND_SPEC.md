@@ -18,6 +18,17 @@
 
 **chat 回應的 `tts_text`（2026-10-19）**：`proxy_to_brain` 轉發 `chat`、`chat/accept` 的 200 JSON 與 `chat/stream` 的 SSE 時，由 `app/chat_tts_text.py` 替 `reply`（`sentence` 事件為 `text`）加上 `tts_text`：`prepare_tts_text` 的本地路徑（不打 normalize API），去 markdown／emoji、電話與長數字轉逐字讀法、保留繁體；有漢字才套中文規則。SSE 逐事件改寫，收齊一個事件（空行）就轉出，不等整段。Brain 本身不產生這個欄位，OpenAPI 以 Backend 文件為準。
 
+### 台語 TTS 詞表（2026-10-28）
+
+`TTS_HANJI_CONVERT_URL` 可覆寫文字轉換服務網址；留空時從 `TTS_COSYVOICE_URL` 移除尾端 `/v1` 並接上 `/api/convert`，保留反向代理路徑前綴。`TTS_HANJI_CONVERT_ENABLED` 預設 true，設 false 可獨立停用詞表（即使填了覆寫網址也停用）。Backend 以免權杖的 `GET` 送 `text`、`version`、`log_unknown=false`，只接受同版且 `converted` 為非空字串的回應；其餘欄位為 `text`、`changed`、`unknown`。此 API 只查表，不合成、不使用 GPU、不呼叫 LLM，不把未知詞寫進上游補表清單。每次轉換逾時為 3 秒。
+
+- VoxCPM 的台語請求（內部 `SynthesizeRequest.locale` 為 `nan` 或 `nan-*`）依 `TTS_VOXCPM_HANJI_VERSION` 選版，整段與串流一致；國語等語言不查表。
+- CosyVoice 為台語引擎，依 `TTS_COSYVOICE_HANJI_VERSION` 選版，再向 `/v1/synthesize` 帶 `annotate=none`，避免上游預設詞表二次改寫。
+- `/v1/audio/speech` 與 `/api/v1/tts/stream` 都傳遞語言，台語前處理保留字形。備援各自從正規化原文轉換；上一家轉過的文字不會變成另一家或 Edge 的輸入。轉換逾時、HTTP 失敗、錯版或無效回應使該 hop 失敗，照既有專案／部署順位備援，不默默套錯版。
+- 整段音檔快取加入語言、轉換 URL 與各引擎版本設定，啟用後不命中舊策略音檔。詞表內容若在同版更新，既有音檔仍依 `TTS_CACHE_TTL_SECONDS` 到期；需立即生效時由維運清除相關 TTS 快取。
+
+前台與後台透過既有 TTS 入口生效，不新增 UI；Brain 與 chat JSON／SSE 的 `tts_text` 仍提供引擎中立的華語念法（當時尚未確定實際合成／備援引擎），整合方應將它送 Backend TTS 並附 `speech_language=nan`。本地部署需一併更新 backend 與共用映像的 gateway-worker。
+
 ### 帳號 API key（2026-10-12）
 
 Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 Cookie 共存，HTTP 與 WebSocket 使用同一帳號驗證。key 對應正式帳號並繼承當下資源授權；保存發行角色與 token version，角色或版本改變、帳號停用時拒絕。資料庫只存 SHA-256，明文只在建立時回傳；期限與撤銷在每次新驗證檢查。
@@ -271,7 +282,7 @@ multipart：`file`、`provider`（`SERVER_ASR_PROVIDERS` 之一，空白用部�
 
 端點預設依帳號保存的串流偏好選擇引擎，也接受 query `engine`，一般帳號可指定目前已授權的 `STREAM_ASR_ENGINES`，管理員保留後台試聽能力；不改帳號偏好。嵌入金鑰不可使用。批次 `r2t2` 與串流 `r2t2-live` 分開授權，串流引擎均不進 `transcribe()` 備援鏈。沒選串流、指定非串流引擎或授權被撤銷回 `not_allowed`。
 
-R2T2 使用 `ASR_R2T2_STREAM_URL`（設定示例 `ws://192.0.2.35:8040/asr_stream_api_v1`，2026-10-05 起 節點 A 為主機）與 `ASR_R2T2_SECRET_KEY`；另有獨立引擎 `r2t2-dev-live`／批次 `r2t2-dev` 接 節點 B（`ASR_R2T2_DEV_STREAM_URL`＋`ASR_R2T2_DEV_SECRET_KEY`、`ASR_R2T2_DEV_URL`），同一套握手；帳號自己選了才用，失敗不換台，也不排進其他引擎的備援順序。批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒）。設定不齊回 `not_configured`。握手送 `requestId`、`language`、`use_vad=true`、金鑰與 `project_asr_prompt(account, project_id)` 詞表作為 `system_prompt`；收到 `status=connected` 後才回前台 `ready`，握手或連線失敗回 `upstream_failed`。`language` 跟著這條連線生效的分流（不含台語）：只有一種語言時帶對應值（zh→`Chinese`、en→`English`、es→`Spanish`、ja→`Japanese`、ko→`Korean`），多種語言時送 `zhen` 交給 R2T2 自己判斷，沒有分流或只有台語時送 `Chinese`。批次 `/transcribe` 用同一套規則（`language_routes.r2t2_language`）。節點 B 不會判斷（`zhen` 也當中文，西日韓被當中文解碼會整句壞掉）；節點 A 的 `zhen` 能分中英西、日文不行。只有 `Chinese`／`zhen` 的輸出做簡轉繁，日韓英西原樣送出（轉換會把「学校」改成「學校」）。金鑰只由環境提供，不在錯誤或日誌輸出握手內容。
+R2T2 的串流網址預設由 `ASR_R2T2_URL` 推導：HTTP／HTTPS 換成 WS／WSS，保留路徑前綴並接 `/asr_stream_api_v1`；串流分開部署時可用 `ASR_R2T2_STREAM_URL` 覆寫，另需 `ASR_R2T2_SECRET_KEY`；另有獨立引擎 `r2t2-dev-live`／批次 `r2t2-dev` 接 節點 B（`ASR_R2T2_DEV_URL`＋`ASR_R2T2_DEV_SECRET_KEY`；串流同樣自動推導，`ASR_R2T2_DEV_STREAM_URL` 可覆寫），同一套握手；帳號自己選了才用，失敗不換台，也不排進其他引擎的備援順序。批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒）。設定不齊回 `not_configured`。握手送 `requestId`、`language`、`use_vad=true`、金鑰與 `project_asr_prompt(account, project_id)` 詞表作為 `system_prompt`；收到 `status=connected` 後才回前台 `ready`，握手或連線失敗回 `upstream_failed`。`language` 跟著這條連線生效的分流（不含台語）：只有一種語言時帶對應值（zh→`Chinese`、en→`English`、es→`Spanish`、ja→`Japanese`、ko→`Korean`），多種語言時送 `zhen` 交給 R2T2 自己判斷，沒有分流或只有台語時送 `Chinese`。批次 `/transcribe` 用同一套規則（`language_routes.r2t2_language`）。節點 B 不會判斷（`zhen` 也當中文，西日韓被當中文解碼會整句壞掉）；節點 A 的 `zhen` 能分中英西、日文不行。只有 `Chinese`／`zhen` 的輸出做簡轉繁，日韓英西原樣送出（轉換會把「学校」改成「學校」）。金鑰只由環境提供，不在錯誤或日誌輸出握手內容。
 
 前台送 16 kHz、PCM16 單聲道 binary（通常每 100 ms、3200 bytes），Backend 累積重切為每段 5120 bytes。收到 `{"type":"end"}` 時剩餘片段補靜音至 5120 bytes，再送文字 `YOUDAO_ONETIME_ASR_STREAM_EOS`，繼續等待最後定稿；上游正常 EOS 關閉不算故障，意外關閉會回錯誤。`msg.text` 是增量：累加後轉繁體送整句 `interim`；`reset=true` 以 `final_text` 定稿，缺少或空字串則用累加文字，轉繁體後送非空 `final` 並清空累加。靜音不產生空字幕；R2T2 定稿不問 Jev。用量記 `kind=asr`、provider `r2t2-live`、model `Confucius4-R2T2`，秒數僅算原始前台音訊，不含補齊靜音。台語分流維持 Breeze 批次。
 

@@ -1052,6 +1052,8 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
 
         def synthesize(self, request, provider="", edge_fallback_voice="", partners=(), order=()):
             captured["provider"] = provider
+            captured["text"] = request.text
+            captured["locale"] = request.locale
             return types.SimpleNamespace(
                 result=types.SimpleNamespace(
                     audio_bytes=b"taigi-mp3",
@@ -1079,6 +1081,222 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
     assert response.content == b"taigi-mp3"
     assert response.headers["content-type"] == "audio/mpeg"
     assert captured["provider"] == "cosyvoice"
+    assert captured["text"] == "今天天氣真好"
+    assert captured["locale"] == "nan"
+
+
+@pytest.mark.parametrize(
+    "path,text_field,language,provider,expected_locale",
+    [
+        ("/api/v1/tts/stream", "text", "nan-TW", "voxcpm", "nan-TW"),
+        ("/v1/audio/speech", "input", "nan", "voxcpm", "nan"),
+        ("/v1/audio/speech", "input", "", "cosyvoice", "nan"),
+    ],
+)
+def test_taiwanese_tts_entries_preserve_text_and_locale(
+    monkeypatch, path, text_field, language, provider, expected_locale,
+):
+    module, _ = _load_main(monkeypatch)
+    captured = []
+    text = "明天請聯絡櫃檯。"
+    plan = module.tts_routes.VoicePlan(
+        provider=provider, voice="", character="", partners=(),
+    )
+    monkeypatch.setattr(
+        module.tts_routes, "plan_tts_voice", AsyncMock(return_value=plan),
+    )
+
+    def synthesize(request, **kwargs):
+        captured.append(request)
+        return types.SimpleNamespace(
+            result=types.SimpleNamespace(
+                audio_bytes=b"audio", content_type="audio/mpeg",
+                provider=provider, latency_ms=1,
+            ),
+            fallback=False,
+            fallback_reason="",
+        )
+
+    async def open_stream(request, **kwargs):
+        captured.append(request)
+
+        async def chunks():
+            yield b"audio"
+
+        return chunks()
+
+    monkeypatch.setattr(
+        module.tts_routes, "_get_service", lambda: types.SimpleNamespace(
+            synthesize=synthesize,
+            voxcpm_adapter=types.SimpleNamespace(
+                enabled=True, open_stream=open_stream,
+            ),
+        ),
+    )
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        path, json={text_field: text, "provider": provider, "language": language},
+    )
+
+    assert response.status_code == 200
+    assert len(captured) == 1
+    assert captured[0].text == text
+    assert captured[0].locale == expected_locale
+
+
+def test_cosy_entry_keeps_taiwanese_locale_when_partner_takes_over(monkeypatch):
+    from app.config import TTSRouterConfig
+    from app.providers.base import NormalizedTTSResult
+    from app.service import TTSRouterService
+
+    module, _ = _load_main(monkeypatch)
+    service = TTSRouterService(TTSRouterConfig(
+        _env_file=None, tts_cosyvoice_url="http://cosy",
+        tts_voxcpm_url="http://vox", tts_indextts_url="",
+    ))
+    captured = []
+
+    def cosy_down(request):
+        raise RuntimeError("cosy unavailable")
+
+    def vox_synthesize(request):
+        captured.append(request)
+        return NormalizedTTSResult(
+            audio_bytes=b"partner-audio", content_type="audio/mpeg",
+            sample_rate=24000, provider="voxcpm", route_kind="provider",
+            route_target="voxcpm", latency_ms=1,
+        )
+
+    monkeypatch.setattr(service.cosyvoice_adapter, "synthesize", cosy_down)
+    monkeypatch.setattr(service.voxcpm_adapter, "synthesize", vox_synthesize)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: service)
+    monkeypatch.setattr(
+        module.tts_routes, "plan_tts_voice", AsyncMock(return_value=(
+            module.tts_routes.VoicePlan(
+                provider="cosyvoice", voice="", character="",
+                partners=(("voxcpm", "voxcpm2-cosy-young-female-02"),),
+            )
+        )),
+    )
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={"text": "明天請聯絡櫃檯。", "provider": "cosyvoice"},
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"partner-audio"
+    assert response.headers["X-TTS-Provider"] == "voxcpm"
+    assert captured[0].locale == "nan"
+    assert captured[0].text == "明天請聯絡櫃檯。"
+
+
+def test_speech_cache_separates_language_and_dictionary_url(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    from app.tts_cache import make_cache_key
+
+    cfg = _make_test_config(
+        tts_cache_enabled=True,
+        tts_hanji_convert_url="http://dictionary-a/api/convert",
+        tts_voxcpm_hanji_version="v6",
+        tts_cosyvoice_hanji_version="v1",
+    )
+    monkeypatch.setattr(module.tts_routes, "get_tts_config", lambda: cfg)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: None)
+    monkeypatch.setattr(
+        module.tts_routes, "plan_tts_voice", AsyncMock(return_value=(
+            module.tts_routes.VoicePlan(
+                provider="voxcpm", voice="", character="", partners=(),
+            )
+        )),
+    )
+    scopes = []
+    keys = []
+
+    def cache_key(text, voice, provider, *, scope):
+        scopes.append(scope)
+        key = make_cache_key(text, voice, provider, scope=scope)
+        keys.append(key)
+        return key
+
+    async def cache_get(key):
+        return types.SimpleNamespace(
+            audio_bytes=b"cached", content_type="audio/mpeg", provider="voxcpm",
+        )
+
+    monkeypatch.setattr(module.tts_routes, "make_cache_key", cache_key)
+    monkeypatch.setattr(module.tts_routes, "cache_get", cache_get)
+    client, _ = _authenticated_client(module)
+    for language, url, vox_version, cosy_version in (
+        ("zh", "http://dictionary-a/api/convert", "v6", "v1"),
+        ("nan", "http://dictionary-a/api/convert", "v6", "v1"),
+        ("nan", "http://dictionary-b/api/convert", "v6", "v1"),
+        ("nan", "http://dictionary-b/api/convert", "v1", "v1"),
+        ("nan", "http://dictionary-b/api/convert", "v1", "v6"),
+    ):
+        cfg.tts_hanji_convert_url = url
+        cfg.tts_voxcpm_hanji_version = vox_version
+        cfg.tts_cosyvoice_hanji_version = cosy_version
+        response = client.post(
+            "/v1/audio/speech",
+            json={"input": "你好", "provider": "voxcpm", "language": language},
+        )
+        assert response.status_code == 200
+        assert response.headers["X-TTS-Cache-Hit"] == "true"
+
+    assert len(set(keys)) == 5
+    assert "language:zh" in scopes[0]
+    assert "language:nan" in scopes[1]
+    assert "http://dictionary-a/api/convert" in scopes[1]
+    assert "http://dictionary-b/api/convert" in scopes[2]
+
+
+def test_vox_dictionary_timeout_uses_streaming_fallback(monkeypatch):
+    import httpx
+
+    from app.config import TTSRouterConfig
+    from app.service import TTSRouterService
+
+    module, _ = _load_main(monkeypatch)
+    service = TTSRouterService(TTSRouterConfig(
+        _env_file=None, tts_voxcpm_url="http://vox", tts_indextts_url="",
+        TTS_HANJI_CONVERT_URL="http://dictionary/api/convert",
+    ))
+    monkeypatch.setattr(
+        service.voxcpm_adapter, "_ensure_healthy_async", AsyncMock(),
+    )
+    monkeypatch.setattr(
+        service.voxcpm_adapter._hanji, "convert_async",
+        AsyncMock(side_effect=httpx.ReadTimeout("dictionary timeout")),
+    )
+    send = AsyncMock()
+    monkeypatch.setattr(service.voxcpm_adapter, "_send_stream", send)
+    captured = []
+
+    async def edge_stream(request):
+        captured.append(request)
+        yield b"fallback-audio"
+
+    monkeypatch.setattr(service.edge_adapter, "synthesize_stream", edge_stream)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: service)
+    monkeypatch.setattr(
+        module.tts_routes, "plan_tts_voice", AsyncMock(return_value=(
+            module.tts_routes.VoicePlan(
+                provider="voxcpm", voice="", character="", partners=(),
+            )
+        )),
+    )
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={"text": "明天請聯絡櫃檯。", "provider": "voxcpm", "language": "nan"},
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"fallback-audio"
+    assert response.headers["X-TTS-Provider"] == "edge-tts"
+    send.assert_not_called()
+    assert captured[0].text == "明天請聯絡櫃檯。"
 
 
 def _usage_account(module, *, admin: bool):
@@ -1830,6 +2048,7 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
 
         async def open_stream(self, request, **_kwargs):
             opened["voice"] = request.voice_hint
+            opened["locale"] = request.locale
 
             async def _gen():
                 yield b"RIFF"
@@ -1840,7 +2059,8 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
     monkeypatch.setattr(module.tts_routes, "_get_service", lambda: types.SimpleNamespace(
         voxcpm_adapter=FakeVox(), cosyvoice_adapter=types.SimpleNamespace(enabled=False),
     ))
-    async def _clean(text):
+    async def _clean(text, *, simplified=True):
+        opened["simplified"] = simplified
         return text
     monkeypatch.setattr(module.tts_routes, "prepare_tts_text_async", _clean)
     monkeypatch.setattr(module.tts_routes, "record_usage_event", lambda **kw: None)
@@ -1855,6 +2075,8 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
 
     assert response.status_code == 200
     assert opened["voice"] == ""
+    assert opened["locale"] == "nan"
+    assert opened["simplified"] is False
 
     # 打字、快速問答、講華語沒有 speech_language：照使用者選的 TTS，走一般授權。
     authorized: list[str] = []

@@ -96,10 +96,14 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | 類型 | 引擎（設定 id） | 設定 |
 |---|---|---|
 | 批次 ASR | Breeze-ASR（`breeze`）、Confucius4-R2T2（`r2t2`）、SenseVoice（`sensevoice`）、OpenAI Whisper（`openai`） | `ASR_BREEZE_URL`、`ASR_R2T2_URL`、`ASR_SENSEVOICE_URL`、`WHISPER_API_KEY` |
-| 串流 ASR | Confucius4-R2T2 串流（`r2t2-live`）、Gemini Live（`gemini-live`） | `ASR_R2T2_STREAM_URL`、`ASR_R2T2_SECRET_KEY`、`GEMINI_API_KEY` |
-| 開發節點 | `r2t2-dev`、`r2t2-dev-live`（帳號選了才用，不進備援） | `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_STREAM_URL`、`ASR_R2T2_DEV_SECRET_KEY` |
+| 串流 ASR | Confucius4-R2T2 串流（`r2t2-live`）、Gemini Live（`gemini-live`） | `ASR_R2T2_URL`、`ASR_R2T2_SECRET_KEY`、`GEMINI_API_KEY`；串流網址預設自動推導 |
+| 開發節點 | `r2t2-dev`、`r2t2-dev-live`（帳號選了才用，不進備援） | `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_SECRET_KEY`；串流網址預設自動推導 |
 | 瀏覽器 | 瀏覽器內建辨識（`browser`） | 無 |
 | TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語改用 CosyVoice，停用時 VoxCPM；國語、英文在沒指定聲音時用 IndexTTS） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
+
+同服務只需設定一個主要網址：R2T2 的 `ASR_R2T2_URL` 自動推導串流端點（HTTPS 對應 WSS），開發節點同理；Cosy 的 `TTS_COSYVOICE_URL` 自動推導詞表端點。不同服務位置才另填 `ASR_R2T2_STREAM_URL`、`ASR_R2T2_DEV_STREAM_URL`、`TTS_HANJI_CONVERT_URL` 覆寫。
+
+台語詞表預設啟用，可用 `TTS_HANJI_CONVERT_ENABLED=false` 停用。以 `TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION` 分別指定詞表版本（VoxCPM 國語不套用）；備援換引擎會從原文重選詞表，CosyVoice 關閉上游二次轉換。此設定由 Backend 執行，前台與後台沿用原本 TTS API。契約與故障處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md#台語-tts-詞表2026-10-28)。
 
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
 - 部署以 `DEFAULT_PROJECT_ID` 指定預設專案，沒帶專案的請求與 `project_id=default` 都落在這個專案，前後台找不到上次選的專案時也退回它；預設專案不可刪除。

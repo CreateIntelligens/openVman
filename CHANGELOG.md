@@ -4,6 +4,10 @@
 
 ### Added
 
+- **[2026-10-28]** 同服務的衍生網址改為自動推導：R2T2 正式／開發串流從各自的批次基底網址產生，HTTP／HTTPS 對應 WS／WSS；Cosy 詞表從合成網址產生。保留各端點完整網址覆寫，詞表可用 `TTS_HANJI_CONVERT_ENABLED=false` 獨立停用；引擎可用清單、實際連線與 TTS 快取都使用生效網址。
+
+- **[2026-10-28]** 台語 TTS 串接 `.35` 的文字詞表 API：VoxCPM（整段與串流）與 CosyVoice 各自使用環境設定指定的詞表，CosyVoice 以 `annotate=none` 避免上游二次轉換。新增 `TTS_HANJI_CONVERT_URL`、`TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION`；每家引擎從原文獨立轉換，轉換失敗走既有備援，國語 Vox 不查台語詞表，台語文字保留字形，音檔快取依語言與詞表設定隔離。
+
 - **[2026-10-28]** 新增 `scripts/experiments/llm-wiki/` 實驗：比較把同主題 QA 編譯成 wiki 頁（Karpathy llm-wiki 做法）與現行檢索的回答品質，以及用 LLM lint 找知識庫矛盾。全部唯讀，產出放 repo 外。結果見該目錄 `REPORT.md`：QA 與 wiki 小節一起檢索在 24 題可答題答對 21～22 題（正式預查 15～16 題），延遲不變；編譯忠實度 97.5%；3.8-flash 分組加整包 lint 抓回 5/5 個埋入矛盾。另發現正式預查只取 3 筆、0.68 門檻擋掉「停車」這類有答案的問題，兩者都未修改。
 
 - **[2026-10-23]** 正式動作 E2E 可指定 viewport／DPR，並透過實際設定介面進入展示機台模式；補 2160×3840 直向全螢幕真實對話、語音及停止檢查，保存逐幀分析、時間軸與慢放錄影。未重現現場整頁黑閃，保留擷取間隔及高解析度錄影負載的限制。

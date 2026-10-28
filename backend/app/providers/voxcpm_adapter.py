@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from time import monotonic
 
 import httpx
 
 from app.config import TTSRouterConfig
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.tts_hanji import HanjiConverter
 
 logger = logging.getLogger("provider.voxcpm")
 
@@ -62,6 +64,8 @@ class VoxCPMAdapter:
         self._default_voice = config.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
         self._inference_timesteps = str(config.tts_voxcpm_inference_timesteps)
         self._headers = _auth_headers(config.tts_voxcpm_api_key)
+        self._hanji = HanjiConverter(config)
+        self._hanji_version = getattr(config, "tts_voxcpm_hanji_version", "v6")
         self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_SECONDS)
 
     @property
@@ -157,6 +161,14 @@ class VoxCPMAdapter:
             raise RuntimeError("VoxCPM URL is not configured")
         self._ensure_healthy()
 
+        if request.locale.lower().split("-")[0] == "nan":
+            try:
+                request = replace(
+                    request,
+                    text=self._hanji.convert(request.text, self._hanji_version),
+                )
+            except (httpx.HTTPError, RuntimeError) as exc:
+                raise VoxCPMHTTPError(503, "Taiwanese word table unavailable") from exc
         payload = self._build_payload(request)
 
         t0 = monotonic()
@@ -206,6 +218,16 @@ class VoxCPMAdapter:
             raise RuntimeError("VoxCPM URL is not configured")
         await self._ensure_healthy_async()
 
+        if request.locale.lower().split("-")[0] == "nan":
+            try:
+                request = replace(
+                    request,
+                    text=await self._hanji.convert_async(
+                        request.text, self._hanji_version,
+                    ),
+                )
+            except (httpx.HTTPError, RuntimeError) as exc:
+                raise VoxCPMHTTPError(503, "Taiwanese word table unavailable") from exc
         form_data = self._build_stream_form(request)
         if sample_rate is not None:
             # 2026-10-14 起 GB10 節點可直接輸出 16 kHz WAV，省掉我們這端 48k→16k 的重採樣。

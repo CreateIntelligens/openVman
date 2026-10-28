@@ -557,7 +557,7 @@ def tts_client(env, monkeypatch):
     service = _FakeService()
     monkeypatch.setattr(tts, "_get_service", lambda: service)
 
-    async def plain(text):
+    async def plain(text, **_kwargs):
         return text
 
     monkeypatch.setattr(tts, "prepare_tts_text_async", plain)

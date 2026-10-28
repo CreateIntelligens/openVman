@@ -18,6 +18,7 @@ import httpx
 
 from app.config import TTSRouterConfig
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.tts_hanji import HanjiConverter
 
 logger = logging.getLogger("provider.cosyvoice")
 
@@ -47,6 +48,8 @@ class CosyVoiceAdapter:
             config.tts_cosyvoice_default_voice or COSYVOICE_DEFAULT_VOICE
         )
         self._headers = _auth_headers(config.tts_cosyvoice_api_key)
+        self._hanji = HanjiConverter(config)
+        self._hanji_version = getattr(config, "tts_cosyvoice_hanji_version", "v1")
         self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_SECONDS)
 
     @property
@@ -63,11 +66,21 @@ class CosyVoiceAdapter:
         return bool(self._url)
 
     def _build_payload(self, request: SynthesizeRequest) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "text": request.text,
             "voice_id": request.voice_hint or self._default_voice,
             "format": "mp3",
         }
+        if self._hanji.url:
+            try:
+                payload["text"] = self._hanji.convert(
+                    request.text, self._hanji_version,
+                )
+            except (httpx.HTTPError, RuntimeError) as exc:
+                raise CosyVoiceHTTPError(503, "Taiwanese word table unavailable") from exc
+            # 已依引擎設定選表，上游不能再套自己的預設表。
+            payload["annotate"] = "none"
+        return payload
 
     def synthesize(self, request: SynthesizeRequest) -> NormalizedTTSResult:
         """POST to /v1/synthesize on the CosyVoice3 service."""

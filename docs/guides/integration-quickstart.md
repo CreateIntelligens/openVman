@@ -146,6 +146,8 @@ Brain 對台語提問的回答一律寫成繁體中文文字（台語沒有通�
 
 專案限制了聲音時，只會換到清單內該引擎的聲音，清單裡沒有就不換。回應標頭 `X-TTS-Provider` 標出實際用的引擎。`/v1/audio/speech`（OpenAI 相容格式，整段回傳）選引擎與聲音的規則和這裡相同：除了 OpenAI 的 `input`、`voice`，另收選填的 `provider`、`project_id`、`speech_language`、`language`、`language_routes`，沒送語言欄位時照指定的引擎與聲音。
 
+部署的詞表轉換啟用時（預設從 Cosy 服務網址推導端點，`TTS_HANJI_CONVERT_URL` 可覆寫、`TTS_HANJI_CONVERT_ENABLED=false` 可停用），Backend 在台語合成前依 `TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION` 選詞表，Cosy 另關閉上游二次轉換；串流與整段入口一致，備援依實際引擎重新轉換。呼叫端送華語 `tts_text` 並帶 `speech_language=nan` 即可，不需自行查詞表。chat 回傳的 `tts_text` 保持引擎中立，不會預先套其中一版。
+
 ### 機台與伺服器代理
 
 - 憑證：伺服器端代理（例如機台後端、Edge Function）用帳號 API key，最好為這個用途開專屬帳號，只授權需要的專案與聲音。Embed key 是給公開網頁用的，每個請求都要帶白名單內的 `Origin`，而且不能呼叫 `/api/v1/asr/transcribe`。

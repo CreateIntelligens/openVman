@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,6 +23,28 @@ _DEFAULT_SUPPORTED_TYPES = (
 
 def _split_csv_values(raw: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
+def _service_endpoint(
+    base_url: str,
+    path: str,
+    *,
+    websocket: bool = False,
+    trim_suffix: str = "",
+) -> str:
+    try:
+        base = urlsplit(base_url.strip())
+    except ValueError:
+        return ""
+    if base.scheme not in ("http", "https") or not base.netloc:
+        return ""
+    prefix = base.path.rstrip("/")
+    if trim_suffix and prefix.endswith(trim_suffix):
+        prefix = prefix[:-len(trim_suffix)]
+    scheme = base.scheme
+    if websocket:
+        scheme = {"http": "ws", "https": "wss"}[scheme]
+    return urlunsplit((scheme, base.netloc, prefix + path, "", ""))
 
 
 class TTSRouterConfig(BaseSettings):
@@ -117,6 +140,20 @@ class TTSRouterConfig(BaseSettings):
 
     # --- TTS Text Normalization / 轉譯 API ---
     normalize_api_url: str = Field(default="", validation_alias="NORMALIZE_API_URL")
+    tts_hanji_convert_url: str = Field(
+        default="", validation_alias="TTS_HANJI_CONVERT_URL",
+    )
+    tts_hanji_convert_enabled: bool = Field(
+        default=True, validation_alias="TTS_HANJI_CONVERT_ENABLED",
+    )
+    tts_voxcpm_hanji_version: str = Field(
+        default="v6", min_length=1,
+        validation_alias="TTS_VOXCPM_HANJI_VERSION",
+    )
+    tts_cosyvoice_hanji_version: str = Field(
+        default="v1", min_length=1,
+        validation_alias="TTS_COSYVOICE_HANJI_VERSION",
+    )
 
     # --- Edge-TTS (in-process) ---
     edge_tts_enabled: bool = Field(default=True, validation_alias="TTS_EDGE_ENABLED")
@@ -445,6 +482,26 @@ class TTSRouterConfig(BaseSettings):
         default=False,
         validation_alias="A2A_ALLOW_GROUP_BROADCAST",
     )
+
+    @property
+    def effective_asr_r2t2_stream_url(self) -> str:
+        return self.asr_r2t2_stream_url.strip() or _service_endpoint(
+            self.asr_r2t2_url, "/asr_stream_api_v1", websocket=True,
+        )
+
+    @property
+    def effective_asr_r2t2_dev_stream_url(self) -> str:
+        return self.asr_r2t2_dev_stream_url.strip() or _service_endpoint(
+            self.asr_r2t2_dev_url, "/asr_stream_api_v1", websocket=True,
+        )
+
+    @property
+    def effective_tts_hanji_convert_url(self) -> str:
+        if not self.tts_hanji_convert_enabled:
+            return ""
+        return self.tts_hanji_convert_url.strip() or _service_endpoint(
+            self.tts_cosyvoice_url, "/api/convert", trim_suffix="/v1",
+        )
 
     @property
     def supported_mime_types(self) -> frozenset[str]:

@@ -52,8 +52,8 @@ from app.auth.models import (
     ResourceType,
     is_at_least_admin,
 )
-from app.auth.project_resources import effective_project_resources
 from app.auth.project_gemini_credentials import resolve_gemini_credential
+from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import get_auth_runtime
 from app.config import TTSRouterConfig, get_tts_config
 from app.http_client import SharedAsyncClient
@@ -298,9 +298,15 @@ def configured_stream_engines(project_id: str | None = None) -> list[str]:
 def _r2t2_stream_endpoint(cfg: TTSRouterConfig, engine: str) -> tuple[str, str] | None:
     """URL and key for this R2T2 streaming engine, or None when it is not configured."""
     url, key = (
-        (cfg.asr_r2t2_dev_stream_url, cfg.asr_r2t2_dev_secret_key)
+        (
+            getattr(cfg, "effective_asr_r2t2_dev_stream_url", cfg.asr_r2t2_dev_stream_url),
+            cfg.asr_r2t2_dev_secret_key,
+        )
         if engine == R2T2_DEV_STREAM_ASR_ENGINE
-        else (cfg.asr_r2t2_stream_url, cfg.asr_r2t2_secret_key)
+        else (
+            getattr(cfg, "effective_asr_r2t2_stream_url", cfg.asr_r2t2_stream_url),
+            cfg.asr_r2t2_secret_key,
+        )
     )
     return (url, key) if url and key else None
 
