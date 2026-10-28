@@ -3,7 +3,7 @@
 # --- Stage 1: Builder ---
 FROM python:3.12-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:0.11.21 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -15,8 +15,10 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt ./
+# venv 會帶入基底映像的 pip，runner 整包複製過去，所以在這裡升到修好漏洞的版本。
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install -r requirements.txt
+    uv pip install --upgrade "pip>=26.2" \
+    && uv pip install -r requirements.txt
 
 # --- Stage 2: Runner ---
 FROM python:3.12-slim AS runner

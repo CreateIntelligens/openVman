@@ -9,6 +9,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 FROM python:3.12-slim AS runner
 
+# runner 用的是基底映像自帶的 pip，builder 升級的那份不會複製過來。
+RUN pip install --no-cache-dir --upgrade "pip>=26.2"
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
