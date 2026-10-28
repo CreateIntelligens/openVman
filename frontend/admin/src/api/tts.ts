@@ -44,15 +44,11 @@ export async function synthesizeSpeechPreview(
   provider: string,
   voice: string,
   signal: AbortSignal,
-  language = "",
 ): Promise<SpeechPreview> {
-  // 台語（nan）要帶語言，後端才會先查台語詞表再交給引擎，跟正式對話念的一樣。
-  const body: Record<string, string> = { input: text, provider, voice };
-  if (language) body.language = language;
   const response = await apiFetch("/v1/audio/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ input: text, provider, voice }),
     signal,
   });
   if (!response.ok) {

@@ -196,7 +196,7 @@ def test_vox_buffered_sends_v6_text_only_for_taiwanese(monkeypatch, locale):
     assert post.call_args.kwargs["json"]["text"] == _CONVERTED["v6"]
 
 
-def test_vox_mandarin_does_not_apply_taiwanese_dictionary(monkeypatch):
+def test_vox_applies_taiwanese_dictionary_whatever_the_turn_language(monkeypatch):
     calls = _dictionary(monkeypatch)
     adapter = VoxCPMAdapter(_config())
     post = MagicMock(return_value=httpx.Response(200, content=b"audio"))
@@ -204,8 +204,8 @@ def test_vox_mandarin_does_not_apply_taiwanese_dictionary(monkeypatch):
 
     adapter.synthesize(SynthesizeRequest(text=_SOURCE, locale="zh-TW"))
 
-    assert calls == []
-    assert post.call_args.kwargs["json"]["text"] == _SOURCE
+    assert calls[0][1]["version"] == "v6"
+    assert post.call_args.kwargs["json"]["text"] == _CONVERTED["v6"]
 
 
 @pytest.mark.asyncio

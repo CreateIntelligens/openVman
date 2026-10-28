@@ -1091,6 +1091,9 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
         ("/api/v1/tts/stream", "text", "nan-TW", "voxcpm", "nan-TW"),
         ("/v1/audio/speech", "input", "nan", "voxcpm", "nan"),
         ("/v1/audio/speech", "input", "", "cosyvoice", "nan"),
+        # VoxCPM 只講台語：沒帶語言或標成華語也當台語。
+        ("/v1/audio/speech", "input", "", "voxcpm", "nan"),
+        ("/api/v1/tts/stream", "text", "zh", "voxcpm", "nan"),
     ],
 )
 def test_taiwanese_tts_entries_preserve_text_and_locale(
@@ -1244,8 +1247,10 @@ def test_speech_cache_separates_language_and_dictionary_url(monkeypatch):
         assert response.status_code == 200
         assert response.headers["X-TTS-Cache-Hit"] == "true"
 
-    assert len(set(keys)) == 5
-    assert "language:zh" in scopes[0]
+    # VoxCPM 只講台語，標成華語的請求也當台語，跟標台語的共用同一份音檔。
+    assert keys[0] == keys[1]
+    assert len(set(keys)) == 4
+    assert "language:nan" in scopes[0]
     assert "language:nan" in scopes[1]
     assert "http://dictionary-a/api/convert" in scopes[1]
     assert "http://dictionary-b/api/convert" in scopes[2]

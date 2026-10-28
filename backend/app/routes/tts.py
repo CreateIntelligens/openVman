@@ -87,6 +87,18 @@ def _to_cached_tts_entry(result: NormalizedTTSResult) -> CachedTTSEntry:
     )
 
 
+# 只會講台語的引擎：文字一律走台語前處理（保留字形、查詞表），不看請求帶的語言。
+_TAIWANESE_ONLY_PROVIDERS = frozenset({COSYVOICE_PROVIDER_NAME, VOXCPM_PROVIDER_NAME})
+
+
+def _tts_locale(provider: str, language: str) -> str:
+    """台語引擎一律當台語；呼叫端已標成 nan-TW 這類台語變體時照原樣保留。"""
+    locale = language or "zh-TW"
+    if provider in _TAIWANESE_ONLY_PROVIDERS and locale.lower().split("-")[0] != "nan":
+        return "nan"
+    return locale
+
+
 class SpeechRequest(BaseModel):
     input: str
     voice: str = ""
@@ -149,7 +161,7 @@ async def create_speech(
     provider, voice = plan.provider, plan.voice
     svc = _get_service()
     language = (body.speech_language or body.language).strip()
-    locale = "nan" if provider == COSYVOICE_PROVIDER_NAME else language or "zh-TW"
+    locale = _tts_locale(provider, language)
     taiwanese = locale.lower().split("-")[0] == "nan"
     cleaned_text = (await prepare_tts_text_async(
         body.input, simplified=not taiwanese,
@@ -615,7 +627,7 @@ async def tts_stream_endpoint(
     provider, voice, character, partners = (
         plan.provider, plan.voice, plan.character, plan.partners,
     )
-    locale = "nan" if provider == COSYVOICE_PROVIDER_NAME else language or "zh-TW"
+    locale = _tts_locale(provider, language)
     taiwanese = locale.lower().split("-")[0] == "nan"
     cleaned = (await prepare_tts_text_async(
         body.text.strip(), simplified=not taiwanese,

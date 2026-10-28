@@ -21,17 +21,6 @@ describe("speech preview API", () => {
     }));
   });
 
-  it("adds the language only when one is chosen", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response("audio", {
-      headers: { "Content-Type": "audio/wav", "X-TTS-Provider": "voxcpm" },
-    }));
-    vi.stubGlobal("fetch", fetch);
-    await synthesizeSpeechPreview("你好", "voxcpm", "voice-a", new AbortController().signal, "nan");
-    expect(fetch).toHaveBeenCalledWith("/v1/audio/speech", expect.objectContaining({
-      body: JSON.stringify({ input: "你好", provider: "voxcpm", voice: "voice-a", language: "nan" }),
-    }));
-  });
-
   it("forwards the turn's speech language on chat playback paths", async () => {
     const fetch = vi.fn().mockImplementation(async () => new Response("audio", {
       headers: { "Content-Type": "audio/mpeg" },

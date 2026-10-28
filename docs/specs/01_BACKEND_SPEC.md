@@ -22,7 +22,7 @@
 
 `TTS_HANJI_CONVERT_URL` 可覆寫文字轉換服務網址；留空時從 `TTS_COSYVOICE_URL` 移除尾端 `/v1` 並接上 `/api/convert`，保留反向代理路徑前綴。`TTS_HANJI_CONVERT_ENABLED` 預設 true，設 false 可獨立停用詞表（即使填了覆寫網址也停用）。Backend 以免權杖的 `GET` 送 `text`、`version`、`log_unknown=false`，只接受同版且 `converted` 為非空字串的回應；其餘欄位為 `text`、`changed`、`unknown`。此 API 只查表，不合成、不使用 GPU、不呼叫 LLM，不把未知詞寫進上游補表清單。每次轉換逾時為 3 秒。
 
-- VoxCPM 的台語請求（內部 `SynthesizeRequest.locale` 為 `nan` 或 `nan-*`）依 `TTS_VOXCPM_HANJI_VERSION` 選版，整段與串流一致；國語等語言不查表。
+- VoxCPM 與 CosyVoice 都只講台語（VoxCPM 的聲音全標 `nan-TW`），送給它們的文字一律查表，不看請求帶的語言；VoxCPM 依 `TTS_VOXCPM_HANJI_VERSION` 選版，整段與串流一致。指定這兩家時，`/v1/audio/speech` 與 `/api/v1/tts/stream` 的文字前處理與快取一律當台語。
 - CosyVoice 為台語引擎，依 `TTS_COSYVOICE_HANJI_VERSION` 選版，再向 `/v1/synthesize` 帶 `annotate=none`，避免上游預設詞表二次改寫。
 - `/v1/audio/speech` 與 `/api/v1/tts/stream` 都傳遞語言，台語前處理保留字形。備援各自從正規化原文轉換；上一家轉過的文字不會變成另一家或 Edge 的輸入。轉換逾時、HTTP 失敗、錯版或無效回應使該 hop 失敗，照既有專案／部署順位備援，不默默套錯版。
 - 整段音檔快取加入語言、轉換 URL 與各引擎版本設定，啟用後不命中舊策略音檔。詞表內容若在同版更新，既有音檔仍依 `TTS_CACHE_TTL_SECONDS` 到期；需立即生效時由維運清除相關 TTS 快取。

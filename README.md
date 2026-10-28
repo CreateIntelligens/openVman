@@ -103,7 +103,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 同服務只需設定一個主要網址：R2T2 的 `ASR_R2T2_URL` 自動推導串流端點（HTTPS 對應 WSS），開發節點同理；Cosy 的 `TTS_COSYVOICE_URL` 自動推導詞表端點。不同服務位置才另填 `ASR_R2T2_STREAM_URL`、`ASR_R2T2_DEV_STREAM_URL`、`TTS_HANJI_CONVERT_URL` 覆寫。
 
-台語詞表預設啟用，可用 `TTS_HANJI_CONVERT_ENABLED=false` 停用。以 `TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION` 分別指定詞表版本（VoxCPM 國語不套用）；備援換引擎會從原文重選詞表，CosyVoice 關閉上游二次轉換。此設定由 Backend 執行，前台與後台沿用原本 TTS API。契約與故障處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md#台語-tts-詞表2026-10-28)。
+台語詞表預設啟用，可用 `TTS_HANJI_CONVERT_ENABLED=false` 停用。以 `TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION` 分別指定詞表版本（兩家都只講台語，一律套用）；備援換引擎會從原文重選詞表，CosyVoice 關閉上游二次轉換。此設定由 Backend 執行，前台與後台沿用原本 TTS API。契約與故障處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md#台語-tts-詞表2026-10-28)。
 
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
 - 部署以 `DEFAULT_PROJECT_ID` 指定預設專案，沒帶專案的請求與 `project_id=default` 都落在這個專案，前後台找不到上次選的專案時也退回它；預設專案不可刪除。

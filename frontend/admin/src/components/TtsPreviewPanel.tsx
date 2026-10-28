@@ -4,10 +4,6 @@ import { fetchTtsProviders, synthesizeSpeechPreview, voiceLabel, type TtsProvide
 import Select from "./Select";
 
 const SAMPLE_TEXT = "你好，歡迎使用 openVman。這是一段語音試聽，請確認聲音與語速是否合適。";
-const LANGUAGE_OPTIONS = [
-  { value: "zh", label: "華語" },
-  { value: "nan", label: "台語" },
-];
 
 function defaultVoice(provider?: TtsProvider): string {
   if (provider?.voices.includes(provider.default_voice)) return provider.default_voice;
@@ -18,7 +14,6 @@ export default function TtsPreviewPanel() {
   const [providers, setProviders] = useState<TtsProvider[]>([]);
   const [provider, setProvider] = useState("");
   const [voice, setVoice] = useState("");
-  const [language, setLanguage] = useState("zh");
   const [text, setText] = useState(SAMPLE_TEXT);
   const [loading, setLoading] = useState(true);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -101,9 +96,7 @@ export default function TtsPreviewPanel() {
     const controller = new AbortController();
     requestRef.current = controller;
     try {
-      const result = await synthesizeSpeechPreview(
-        text.trim(), provider, voice, controller.signal, language,
-      );
+      const result = await synthesizeSpeechPreview(text.trim(), provider, voice, controller.signal);
       if (controller.signal.aborted) return;
       const url = URL.createObjectURL(result.audio);
       urlRef.current = url;
@@ -143,7 +136,7 @@ export default function TtsPreviewPanel() {
             重新載入聲音
           </button>
         )}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="min-w-0 space-y-2">
             <span className="text-sm font-medium">供應商</span>
             <Select
@@ -182,19 +175,6 @@ export default function TtsPreviewPanel() {
               onChange={(value) => {
                 resetPlaybackState();
                 setVoice(value);
-              }}
-            />
-          </div>
-          <div className="min-w-0 space-y-2">
-            <span className="text-sm font-medium">語言</span>
-            <Select
-              ariaLabel="語言"
-              value={language}
-              disabled={loading || busy}
-              options={LANGUAGE_OPTIONS}
-              onChange={(value) => {
-                resetPlaybackState();
-                setLanguage(value);
               }}
             />
           </div>
