@@ -33,13 +33,14 @@ class LexicalIndex:
     def __init__(self, records):
         self.records = records
         self.counts = [Counter(terms(r["text"])) for r in records]
+        self.lengths = [sum(c.values()) for c in self.counts]
         self.df = Counter(t for c in self.counts for t in c)
-        self.average = sum(sum(c.values()) for c in self.counts) / max(len(records), 1)
+        self.average = sum(self.lengths) / max(len(records), 1)
 
     def hits(self, query, valid_ids, limit=8):
         matches = []
         query_terms = set(terms(query))
-        for record, counts in zip(self.records, self.counts):
+        for record, counts, length in zip(self.records, self.counts, self.lengths):
             if record["id"] not in valid_ids:
                 continue
             score = 0.0
@@ -47,7 +48,7 @@ class LexicalIndex:
                 tf = counts.get(token, 0)
                 if tf:
                     idf = math.log(1 + (len(self.records)-self.df[token]+.5)/(self.df[token]+.5))
-                    score += idf * tf * 2.2 / (tf + 1.2 * (.25 + .75 * sum(counts.values()) / max(self.average, 1)))
+                    score += idf * tf * 2.2 / (tf + 1.2 * (.25 + .75 * length / max(self.average, 1)))
             if score:
                 matches.append({**copy.deepcopy(record), "_lexical_score":score, "_score":score,
                                 "retrieval_bank":"unit_lexical"})
@@ -270,6 +271,31 @@ class SearchRuntime:
             current_source_personas=personas,
         )
 
+    def _reuse_query_vector(self, query, version, vector):
+        """Admit a formal query vector only into its immutable matching bank."""
+        if query in self.query_cache:
+            return
+        dimensions = {
+            bank.shape[1] for bank in self.vectors.values()
+            if bank.ndim == 2 and len(bank)
+        }
+        if len(dimensions) != 1:
+            return
+        try:
+            if self.cfg.resolve_embedding_identity(version) != self.identity:
+                return
+            value = self.np.array(vector, dtype=self.np.float32, copy=True)
+            if value.shape != (next(iter(dimensions)),):
+                return
+            if not self.np.isclose(self.np.linalg.norm(value), 1, atol=.005):
+                return
+        except (KeyError, TypeError, ValueError, OverflowError):
+            # A rejected reuse candidate must still take the original encoder's
+            # validation/error path rather than changing formal retrieval output.
+            return
+        value.setflags(write=False)
+        self.query_cache[query] = value
+
     def _vector(self, query):
         from memory.embedder import encode_query_with_fallback
 
@@ -334,6 +360,8 @@ class SearchRuntime:
             def capture(*args, **kwargs):
                 records, version, vector = original(*args, **kwargs)
                 captured.append(("production:" + args[1], self._mark(records)))
+                if args[0] == "knowledge" and args[1] in queries:
+                    self._reuse_query_vector(args[1], version, vector)
                 return records, version, vector
 
             with patch.object(knowledge_tools, "_search_one", capture):

@@ -10,6 +10,30 @@ from pathlib import Path
 from live_agent_stress import output_path
 
 
+def collect_tool_evidence(tool_steps):
+    """Keep knowledge text intact and label product data as structured evidence."""
+    context, tool_errors = [], []
+    for step in tool_steps:
+        evidence = json.loads(step["result"])
+        if evidence.get("status") != "ok":
+            tool_errors.append(evidence.get("error"))
+        data = evidence.get("data", {})
+        if step.get("name") == "search_knowledge":
+            context.extend(
+                r["text"]
+                for r in data.get("results", []) + data.get("related", [])
+            )
+        elif step.get("name") == "filter_products":
+            # The structured result is evidence the answering agent actually saw;
+            # converting it into prose could drop unknowns or numeric conditions.
+            context.append(
+                '<structured_tool_evidence tool="filter_products">\n'
+                + json.dumps(data, ensure_ascii=False)
+                + "\n</structured_tool_evidence>"
+            )
+    return context, tool_errors
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", type=Path, required=True)
@@ -32,13 +56,7 @@ def main():
 
     def run(row):
         case = cases[row["id"]]
-        context, tool_errors = [], []
-        for step in row["tool_steps"]:
-            evidence = json.loads(step["result"])
-            if evidence.get("status") != "ok":
-                tool_errors.append(evidence.get("error"))
-            data = evidence.get("data", {})
-            context.extend(r["text"] for r in data.get("results", []) + data.get("related", []))
+        context, tool_errors = collect_tool_evidence(row["tool_steps"])
         result = {"id":row["id"],"rep":row["rep"],"variant":row["variant"],
                   "bucket":case["bucket"],"risk":case["risk"],"expected":case["expected"],
                   "answer":row["answer"],"answer_ms":row["time_ms"],

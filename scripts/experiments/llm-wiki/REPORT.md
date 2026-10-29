@@ -10,7 +10,7 @@
 | 正式服務改了嗎 | 沒有。本輪沒有修改或部署正式 Brain／Backend、知識庫、索引、憑證與設定；候選修好不代表使用中的系統已修好。 |
 | 現行系統還有什麼問題 | 正式碼路徑曾重現報到欄位混用、工作天錯答、50／60Hz 偷換、無來源工作點、歧義猜測、長前文失主詞及空回覆。下節集中列題號、版本與證據。 |
 | 醫院原始資料可靠嗎 | 有文字不一致、適用條件未明及內容缺漏；需要院方核定。原始資料、人工埋點與偵測誤報分開列於矛盾清單。 |
-| 效能可直接接受嗎 | 額外核對／修稿中位約 10 秒，最慢約 45 秒；這不是完整 HTTP／語音延遲，尚未完成使用情境的延遲驗收。 |
+| 效能可直接接受嗎 | 不加核對器的最新 main／Wiki 配對，Wiki 首字中位仍較慢：醫院 2.57 對 1.33 秒、鶴記 2.74 對 1.68 秒；同題快取也未消除差距。舊強核對另需中位約 10 秒。這些均不是完整 HTTP／語音延遲。 |
 | 上線還缺什麼 | 凍結候選後另建未見題，依專案與風險分層盲測及獨立複核；釐清來源權威；完成正式流程整合與授權、限流、斷線、串流、PII、媒體、TTS 及前台的實際驗收。 |
 
 **分數的適用範圍：**最新 100 道開發題各跑 2 輪，共 200 份回答；原始機器判分 170→180／200，本次 Codex 工作線按原文複核後為 189→200／200、重大錯誤 10→0。這不是 200 道獨立未見題，也沒有真人專家或第三方盲審；修稿另用較強模型，不能把增益全部歸因於 Wiki。47 項複核標籤調整及一筆時間點修均保留，詳見[第七輪最後結果](#第七輪最後結果與導入判定)。
@@ -724,6 +724,48 @@ python3 "$D/judge_live.py" --cases <相同凍結題檔> \
 四組核對均通過專案檔案前後一致檢查，正式程式與設定未改；核對程式、裁判及原始輸入 hash 前後一致，所有成功回傳的實際模型名稱符合指定值。證據全留 repo 外 `$OUT/round7/`：`checker_model_v13_protocol.json`、`checker_model_v13_comparison_final.json`、`checker_model_v13_analyze.py`、`{hospital,heji}_checked_v13_{lite,flash_control}.json`、各自 checkpoint 與 `*_judged.json`／summary。不覆寫舊批次，不新增 repo 內報告或私有附件。
 
 Wiki 後續優化須同時保留已驗證的條件／主詞防護並縮短即時路徑；本對照只回答「換核對模型」是否可行，沒有驗證新的 Wiki 延遲方案，也沒有改選 RAG 或變更正式流程。導入判定仍為 **NO_GO**。本次提交前隱私掃描、105 項隱私測試、256 項實驗單測與 `git diff --check` 通過；提交範圍只有本報告與 CHANGELOG。
+
+### 與 main 原有知識問答路徑比較（2026-10-29）
+
+**這次以 main 作基準，不再比較核對模型。Wiki 的醫院通過數有改善，但首字較慢，重大錯誤未歸零；尚未達到虛擬人即時使用的目標。** 不因 main 也有錯誤就宣稱 Wiki 可直接上線，Wiki 研究方向維持。
+
+`main_wiki_benchmark.py` 以 main `ec762af92e00a598a99490715d5f946d949b422b` 為基準，發請求前核對容器內 16 份正式模組 hash；涵蓋 config、prompt、agent、provider、檢索、工具及來源 metadata。前台預設 `fast` 模式，兩組共用正式 prompt builder／前文／人設／provider 設定及 `search_knowledge`、`filter_products` schema；沒有套用 `evidence_v1`、前文改寫策略、回答核對或修稿。main 組轉送正式工具的原始 arguments，不硬改 top-k／門檻；Wiki 組使用同一份已驗證快照的 `focused_v2` 動態召回，僅替換知識檢索 handler。兩組都保留產品篩選能力，由模型按實際上下文決定是否呼叫。
+
+兩域仍是原有各 32 題×2 次，每題各跑 main／Wiki，合計 256 份；先後順序逐題交替，第二次反轉。移除研究網格工具的額外 embedding 快取，避免 Wiki 固定吃到 main 剛算好的向量。相同正式 provider chain 主要作答模型為 flash-lite；鶴記 main 的 `heji_stress_E07` R2 有一次既有備援使用 `gpt-4.1-mini`，保留原答案、耗時與分母，不能稱為每筆都是單一模型的嚴格控制。
+
+判分仍是 grading-v2／3.8-flash，僅作離線裁判，不在回答路徑。`judge_live.py` 另修正只看知識文字而漏掉產品工具 JSON 的缺口：將實際 `filter_products.data` 原樣標記為結構證據；不改 JUDGE、`grade()`、gold 或分數。兩組用相同修正版整理證據，全部採原始機器判分，未人工調整。
+
+| 專案 | 路徑 | 通過／64 | 重大標記 | 首字中位／p90（秒） | 完成中位／p90（秒） | 知識檢索中位（秒） |
+|---|---|---:|---:|---|---|---:|
+| 醫院 | main | 32/64 | 5 | 1.33／2.70 | 1.50／2.84 | 0.17 |
+| 醫院 | Wiki | 49/64 | 2 | 2.57／3.35 | 2.69／3.52 | 1.64 |
+| 鶴記 | main | 45/64 | 7 | 1.68／4.29 | 1.85／4.54 | 0.18 |
+| 鶴記 | Wiki | 49/64 | 5 | 2.74／3.39 | 3.01／3.56 | 1.24 |
+
+所有 256 份都有與最終回答完整吻合的串流首字，case 錯誤、裁判錯誤及來源違規皆 0。首字從組 prompt／檢索之前開始計時，只採最後有效 provider attempt 的非空白文字，排除先前失敗／工具回合的串流；p90 採 nearest rank。它是隔離 agent 的首字與完成時間，**不是正式 HTTP／前台收到首字、第一句 TTS 或虛擬人開始說話的 E2E**；session、turn decision、web／memory、PII、媒體、TTS 未包含，兩組排除範圍相同。
+
+不能讓重複題快取掩蓋新問句等待：第一次各 32 題的首字中位，醫院 main／Wiki 為 **1.37／3.08 秒**，鶴記為 **1.65／3.11 秒**；第二次為醫院 1.32／1.92 秒、鶴記 1.87／2.12 秒。Wiki 首次每題有查詢改寫的額外模型呼叫，第二次改寫快取命中，但多查詢、來源驗證與完整段落召回仍需時間。配對的 Wiki 減 main 首字差值中位為醫院 +0.97 秒、鶴記 +0.68 秒，與「兩組中位數相減」是不同統計量。排除觸發備援的整個配對、僅看鶴記其餘 63 對，main／Wiki 首字中位仍為 1.68／2.77 秒；不回填或更動主表分數。鶴記 main 的 p90 較慢，不能把中位差距說成 Wiki 每題都比較慢。
+
+本次已做的純運算優化：Wiki 重用同次正式檢索已取得的向量，先驗實際 query、identity、維度與 norm，不合格即保留原 encoder 路徑；lexical 文長也改為建立索引時計算。單測以相同輸入比對 hits／trace／score／排序完全相同，合成雙查詢 encoder 呼叫由 4 降到 2。沒有改 rewrite prompt、來源 gate、排名、門檻或字元預算；這只證明運算去重，不宣稱已量得最佳化前後的完整首字改善。本表使用優化後候選，仍未追上 main 中位延遲。Wiki 建立記憶體索引的單次啟動另為醫院 12.90 秒、鶴記 5.34 秒，沒有混進每題耗時，也不冒稱已做成正式持久索引。
+
+原始重大標記不是專家複核：例如 Wiki 醫院 `hospital_stress_X03`／`X06` R2 仍猜費用或報告服務；鶴記 `heji_stress_N03` R1 回答未列的 0 度用電差，`X05` 兩次猜電流，`X06` 兩次擅定最大機型。main 也有頻率偷換、工作點與規格混用。裁判另有理由不符實際輸入的案例（如 main 的醫院 M08 R1），本次仍保留原標記，未藉複核改分。這批是開發壓力題，不是未見題，亦不與前節受核對的 200 份分數混算。
+
+重跑介面與證據（所有輸出放 repo 外）：
+
+```bash
+python3 "$D/main_wiki_benchmark.py" --project <專案ID> \
+  --cases "$OUT/stress/<domain>_cases.json" --snapshot "$OUT/repaired/<domain>" \
+  --main-ref <待核對的main提交> --mode fast --wiki-profile focused_v2 --reps 2 \
+  --output "$OUT/round7/<domain>_main_wiki_fast_repro_live.json"
+python3 "$D/judge_live.py" --cases "$OUT/stress/<domain>_cases.json" \
+  --live "$OUT/round7/<domain>_main_wiki_fast_repro_live.json" \
+  --judge-model gemini-3.8-flash \
+  --output "$OUT/round7/<domain>_main_wiki_fast_repro_judged.json"
+```
+
+量測器拒絕覆寫、repo 內輸出、覆蓋來源快照及缺漏／重複配對，並保留失敗 checkpoint。初始化冒煙測試曾失敗、留下空 checkpoint；補正動態模組 `__file__` 後保留原檔，四份實際冒煙請求成功，未混入主表。正式主表完整性、main 模組、題組與執行程式 hash 已核對；專案檔案與 settings 前後不變。
+
+證據在 `$OUT/round7/`：`main_wiki_fast_protocol.json`、`main_wiki_fast_summary.json`、`main_wiki_fast_analyze.py`、`{hospital,heji}_main_wiki_fast_{live,judged}.json`、checkpoint 與判分 summary。本次 281 項實驗單測、105 項隱私測試、實際隱私掃描及 `git diff --check` 通過。沒有新建報告、沒有提交私有原文／題組／模型回答，也沒有修改或部署正式 Brain／Backend、資料、索引或設定。後續應針對 Wiki 即時路徑的改寫及多查詢成本繼續驗證，不能把本次移除核對器視為延遲已解決；導入判定維持 **NO_GO**。
 
 ## 報告與腳本交付補修（2026-10-29；提交前驗證記錄）
 

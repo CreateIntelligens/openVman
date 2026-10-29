@@ -1,6 +1,7 @@
 """Check source-unit admission and whole-record budget behavior."""
 
 import copy
+import math
 from pathlib import Path
 import tempfile
 import types
@@ -14,6 +15,7 @@ from focused_recall import (
     bounded_related,
     complete_records,
     exact_documents,
+    terms,
     unit_records,
 )
 
@@ -139,6 +141,211 @@ class FocusedRecallTests(unittest.TestCase):
         result = complete_records([primary, units], limit=10)
         self.assertEqual(result[:5], primary)
         self.assertEqual(len(result), 6)
+
+
+class QueryVectorReuseTests(unittest.TestCase):
+    def setUp(self):
+        import numpy as np
+
+        self.np = np
+        self.encodings = []
+        self.query_vectors = {"actual query": [0.6, 0.8], "other query": [1.0, 0.0]}
+        self.embedder = types.ModuleType("memory.embedder")
+
+        def encode(query, **kwargs):
+            self.encodings.append((query, kwargs))
+            return types.SimpleNamespace(
+                version="fixture-version", vector=list(self.query_vectors[query]),
+            )
+
+        self.embedder.encode_query_with_fallback = encode
+        self.knowledge = types.ModuleType("tools.builtin.knowledge_tools")
+
+        def search_one(table, query, *args, **kwargs):
+            route = encode(query, project_id="fixture", table_names=(table,))
+            return [], route.version, route.vector
+
+        self.knowledge._search_one = search_one
+        helpers = types.ModuleType("tools.search_helpers")
+        helpers.merge_search_results = lambda grouped, **kw: [
+            r for _, rows in grouped for r in rows
+        ]
+        helpers.normalize_query_list = lambda data: data["queries"]
+        builtin = types.ModuleType("tools.builtin")
+        builtin.knowledge_tools = self.knowledge
+        self.modules = {
+            "memory": types.ModuleType("memory"),
+            "memory.embedder": self.embedder,
+            "tools": types.ModuleType("tools"),
+            "tools.builtin": builtin,
+            "tools.builtin.knowledge_tools": self.knowledge,
+            "tools.search_helpers": helpers,
+        }
+
+    def runtime(self):
+        runtime = SearchRuntime.__new__(SearchRuntime)
+        runtime.np = self.np
+        runtime.pid, runtime.persona = "fixture", "default"
+        runtime.identity = "fixture-identity"
+
+        def resolve(version):
+            if version == "invalid-version":
+                raise ValueError("Unknown fixture identity")
+            if version == "missing-version":
+                raise KeyError(version)
+            return ("fixture-identity" if version == "fixture-version"
+                    else "different-identity")
+
+        runtime.cfg = types.SimpleNamespace(resolve_embedding_identity=resolve)
+        runtime.lock, runtime.trace = RLock(), []
+        runtime.query_cache = {}
+        runtime.sections = [
+            {"id": "s1", "slug": "one", "text": "first source", "source_refs": ["r1"]},
+            {"id": "s2", "slug": "two", "text": "second source", "source_refs": ["r2"]},
+        ]
+        runtime.units = [
+            {"id": "u1", "text": "first unit", "parent_ids": ["s1"]},
+            {"id": "u2", "text": "second unit", "parent_ids": ["s2"]},
+        ]
+        runtime.vectors = {
+            bank: self.np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=self.np.float32)
+            for bank in ("wiki", "unit_full", "unit_question")
+        }
+        runtime._valid = lambda: (runtime.sections, [])
+        runtime.gate = types.SimpleNamespace(
+            merge_ranklists=lambda grouped, merge, limit: [
+                row for _, rows in grouped for row in rows
+            ][:limit],
+        )
+
+        def formal(*args, **kwargs):
+            for query in kwargs["queries"]:
+                self.knowledge._search_one("knowledge", query, 5, "default", "fixture")
+            return {"results": [], "related": []}
+
+        runtime.formal = formal
+        return runtime
+
+    def test_formal_reuse_preserves_hits_and_halves_query_encoder_calls(self):
+        queries = ["actual query", "other query"]
+        original, reused = self.runtime(), self.runtime()
+        original._reuse_query_vector = lambda *args: None
+        with patch.dict("sys.modules", self.modules):
+            expected = original.search(queries, profile="safe_mixed")
+            self.assertEqual(len(self.encodings), 4)
+            self.encodings.clear()
+            actual = reused.search(queries, profile="safe_mixed")
+            self.assertEqual(len(self.encodings), 2)
+            self.assertEqual(actual, expected)
+            self.assertEqual(reused.trace, original.trace)
+            for query in queries:
+                for bank in reused.vectors:
+                    valid = {"s1", "s2"} if bank == "wiki" else {"u1", "u2"}
+                    self.assertEqual(
+                        reused._hits(query, bank, valid, threshold=.60, limit=8),
+                        original._hits(query, bank, valid, threshold=.60, limit=8),
+                    )
+            self.assertEqual(len(self.encodings), 2)
+
+    def test_incompatible_candidates_do_not_pollute_cache_or_skip_encoding(self):
+        for version, vector in (
+            ("other-version", [1.0, 0.0]),
+            ("invalid-version", [1.0, 0.0]),
+            ("missing-version", [1.0, 0.0]),
+            ("fixture-version", [1.0, 0.0, 0.0]),
+            ("fixture-version", [[1.0, 0.0]]),
+            ("fixture-version", [0.0, 0.0]),
+            ("fixture-version", [float("nan"), 0.0]),
+            ("fixture-version", [float("inf"), 0.0]),
+            ("fixture-version", ["invalid", 0.0]),
+        ):
+            with self.subTest(version=version, vector=vector):
+                runtime = self.runtime()
+                runtime._reuse_query_vector("actual query", version, vector)
+                self.assertEqual(runtime.query_cache, {})
+                self.encodings.clear()
+                with patch.dict("sys.modules", self.modules):
+                    value = runtime._vector("actual query")
+                self.assertEqual(len(self.encodings), 1)
+                self.np.testing.assert_array_equal(
+                    value, self.np.asarray([0.6, 0.8], dtype=self.np.float32),
+                )
+
+    def test_invalid_reuse_keeps_original_encoder_validation_failures(self):
+        for version, vector, message in (
+            ("other-version", [1.0, 0.0], "Query identity differs"),
+            ("fixture-version", [0.0, 0.0], "Query is not normalized"),
+        ):
+            with self.subTest(version=version, vector=vector):
+                runtime = self.runtime()
+                runtime._reuse_query_vector("actual query", version, vector)
+                self.embedder.encode_query_with_fallback = lambda *a, **kw: (
+                    types.SimpleNamespace(version=version, vector=vector)
+                )
+                with patch.dict("sys.modules", self.modules):
+                    with self.assertRaisesRegex(ValueError, message):
+                        runtime._vector("actual query")
+                self.assertEqual(runtime.query_cache, {})
+
+    def test_formal_vector_is_bound_to_its_actual_query(self):
+        runtime = self.runtime()
+
+        def formal(*args, **kwargs):
+            self.knowledge._search_one("knowledge", "other query", 5, "default", "fixture")
+            return {"results": [], "related": []}
+
+        runtime.formal = formal
+        with patch.dict("sys.modules", self.modules):
+            runtime.search(["actual query"], profile="safe_mixed")
+        self.assertEqual([query for query, _ in self.encodings], ["other query", "actual query"])
+        self.assertNotIn("other query", runtime.query_cache)
+        self.np.testing.assert_array_equal(
+            runtime.query_cache["actual query"],
+            self.np.asarray([0.6, 0.8], dtype=self.np.float32),
+        )
+
+    def test_reuse_copies_vector_and_does_not_overwrite_an_existing_cache(self):
+        runtime = self.runtime()
+        vector = self.np.asarray([0.6, 0.8], dtype=self.np.float32)
+        runtime._reuse_query_vector("actual query", "fixture-version", vector)
+        vector[:] = [1.0, 0.0]
+        runtime._reuse_query_vector("actual query", "other-version", [0.0, 1.0])
+        runtime._reuse_query_vector("actual query", "fixture-version", [0.0, 1.0])
+        self.np.testing.assert_array_equal(
+            runtime.query_cache["actual query"],
+            self.np.asarray([0.6, 0.8], dtype=self.np.float32),
+        )
+        self.assertFalse(runtime.query_cache["actual query"].flags.writeable)
+
+
+class LexicalLengthTests(unittest.TestCase):
+    def test_precomputed_lengths_preserve_original_scores_and_ranking_exactly(self):
+        records = [
+            {"id": "a", "text": "條件 甲流程 alpha alpha beta"},
+            {"id": "b", "text": "條件 乙流程 beta gamma gamma gamma"},
+            {"id": "c", "text": ""},
+            {"id": "d", "text": "不可見條件 alpha"},
+        ]
+        index = LexicalIndex(records)
+        valid = {"a", "b", "c"}
+        for query in ("alpha beta gamma 條件流程", "beta beta", "不存在", ""):
+            expected = []
+            for record, counts in zip(index.records, index.counts):
+                if record["id"] not in valid:
+                    continue
+                score = 0.0
+                for token in set(terms(query)):
+                    tf = counts.get(token, 0)
+                    if tf:
+                        idf = math.log(1 + (len(records)-index.df[token]+.5)/(index.df[token]+.5))
+                        score += idf * tf * 2.2 / (tf + 1.2 * (.25 + .75 * sum(counts.values()) / max(index.average, 1)))
+                if score:
+                    expected.append({**record, "_lexical_score": score, "_score": score,
+                                     "retrieval_bank": "unit_lexical"})
+            expected.sort(key=lambda row: -row["_lexical_score"])
+            with self.subTest(query=query):
+                self.assertEqual(index.hits(query, valid), expected[:8])
+                self.assertEqual(index.hits(query, valid, limit=1), expected[:1])
 
 
 if __name__ == "__main__":
