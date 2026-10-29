@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check owned documentation for deployment identifiers without echoing values."""
+"""Check docs and LLM Wiki Python sources without echoing private values."""
 
 import argparse
 import ipaddress
@@ -22,7 +22,8 @@ PUBLIC_HOSTS = {
     "www.w3.org", "learn.microsoft.com", "developer.nvidia.com",
     "www.metahuman.com", "static.www.tencent.com", "openbmb.github.io",
     "pypi.org", "cdn.jsdelivr.net", "registry.npmjs.org", "developers.google.com",
-    "ai.google.dev", "ghcr.io", "hub.docker.com", "registry-1.docker.io",
+    "ai.google.dev", "generativelanguage.googleapis.com", "ghcr.io",
+    "hub.docker.com", "registry-1.docker.io",
     "www.motc.gov.tw", "www.ntu.edu.tw", "www.cwa.gov.tw",
 }
 SERVICE_HOSTS = {
@@ -80,6 +81,10 @@ def is_document(path):
     ):
         return False
     if p.suffix.lower() in {".md", ".rst", ".adoc", ".txt"}:
+        return True
+    if p.suffix.lower() == ".py" and path.startswith(
+        "scripts/experiments/llm-wiki/"
+    ):
         return True
     if p.suffix.lower() == ".html" and p.parts[0] == "examples":
         return True

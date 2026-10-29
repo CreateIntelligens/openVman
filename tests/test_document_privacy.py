@@ -1,4 +1,4 @@
-"""Documentation privacy regressions use fabricated identifiers only."""
+"""Documentation and experiment privacy regressions use fabricated identifiers."""
 
 import importlib.util
 from pathlib import Path
@@ -59,6 +59,7 @@ def test_sensitive_formats_are_rejected(value, category):
     "https://ghcr.io/CreateIntelligens/openvman", "https://huggingface.co/model",
     "https://api.typesafe.ai/v1/systemone", "https://nen.com.tw/v1",
     "https://ai.google.dev/gemini-api", "https://developers.openai.com/api",
+    "https://generativelanguage.googleapis.com/v1beta/models/example:generateContent",
     "https://www.evak-pumps.com/catalog.pdf", "sales@evak-pumps.com",
     "https://www.motc.gov.tw", "https://www.ntu.edu.tw", "https://www.cwa.gov.tw",
     "privacy@typesafe.ai", "operator@example.com", "person@internal.test",
@@ -91,6 +92,9 @@ def test_reserved_public_and_service_examples_are_allowed(value):
     ("scripts/experiments/cases/answers.csv", True),
     ("scripts/experiments/catalog/_catalog.yaml", True),
     ("scripts/experiments/catalog/config.yml", True),
+    ("scripts/experiments/llm-wiki/compile_docs.py", True),
+    ("scripts/experiments/llm-wiki/test_snapshot_store.py", True),
+    ("scripts/experiments/other/run.py", False),
     ("docker-compose.yml", False),
     ("scripts/voice_e2e/cases/test.json", True), ("backend/config.json", False),
 ])
@@ -129,6 +133,32 @@ def test_scan_error_does_not_echo_git_errors_or_environment(tmp_path):
     assert result.returncode == 2
     assert result.stdout == ".:1: scan-error\n"
     assert result.stderr == ""
+
+
+def test_cli_scans_tracked_and_new_llm_wiki_python_sources(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    directory = tmp_path / "scripts/experiments/llm-wiki"
+    directory.mkdir(parents=True)
+    tracked = directory / "tracked.py"
+    tracked.write_text('PROJECT = "example-hospital-project"\n')
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "add", str(tracked)], check=True,
+    )
+    project = "proj-" + "a" * 10
+    home = "/home/" + "private-operator/repo"
+    tracked.write_text(f'PROJECT = "{project}"\n')
+    (directory / "new.py").write_text(f'OUTPUT = "{home}"\n')
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--root", str(tmp_path)],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 1
+    assert result.stdout.splitlines() == [
+        "scripts/experiments/llm-wiki/new.py:1: personal-home",
+        "scripts/experiments/llm-wiki/tracked.py:1: project-id",
+    ]
+    assert project not in result.stdout + result.stderr
+    assert home not in result.stdout + result.stderr
 
 
 def test_repository_documentation_has_no_identifying_patterns():

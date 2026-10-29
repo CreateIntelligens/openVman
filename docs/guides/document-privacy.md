@@ -1,6 +1,6 @@
 # 文件去識別化與保留原則
 
-本原則適用於版本庫文件、範例，以及實驗報告附帶的 JSON、JSONL、CSV 與 YAML。正式服務設定、資料庫及私有原始資料另行管理，不以編輯文件取代服務設定或憑證輪替。
+本原則適用於版本庫文件、範例，以及實驗報告附帶的 JSON、JSONL、CSV 與 YAML；自動檢查另涵蓋 `scripts/experiments/llm-wiki/` 的 Python 腳本與測試。正式服務設定、資料庫及私有原始資料另行管理，不以編輯文件取代服務設定或憑證輪替。
 
 ## 文件使用示例值
 
@@ -38,6 +38,8 @@ python3 scripts/check_document_privacy.py
 python3 -m pytest tests/test_document_privacy.py -q
 ```
 
-檢查器使用標準庫，從 Git 清單掃描追蹤及未忽略的新文件、範例 HTML 與指定實驗附件。偵測內網／實機 IP、MAC、常見帳號／專案／請求 ID、憑證格式、literal 登入名稱、個人 home path、未審查 email 與網址主機。輸出只有檔案、行號及分類，不回顯可能的祕密值；exit 0 為通過、1 為命中、2 為掃描失敗。Contracts CI 執行相同檢查。
+檢查器使用標準庫，從 Git 清單掃描追蹤及未忽略的新文件、範例 HTML、指定實驗附件，以及 `scripts/experiments/llm-wiki/**/*.py`。LLM Wiki 的正式專案與容器內來源必須由命令參數／環境變數指定，個人輸出路徑改用設定值或 `Path.home()`；不能把目前操作者的專案 ID 或 home 路徑寫進腳本。這個 Python 範圍是明確新增的覆蓋，不代表其他所有程式碼也已掃描。
+
+偵測內網／實機 IP、MAC、常見帳號／專案／請求 ID、憑證格式、literal 登入名稱、個人 home path、未審查 email 與網址主機。輸出只有檔案、行號及分類，不回顯可能的祕密值；exit 0 為通過、1 為命中、2 為掃描失敗。Contracts CI 執行相同檢查；測試會在臨時 Git 儲存庫注入虛構識別碼與路徑，確認已追蹤與新建的 Python 腳本都會讓檢查失敗。
 
 新公開來源網址必須人工核對後才加入精確 host allowlist。檢查器不會自動辨識所有自然語言姓名、客戶關係、截圖、PDF、音訊或任意格式個資；提交前仍需人工看差異。被忽略的 runtime、私有資料、第三方授權檔及 Git 歷史不在檢查範圍，通過不代表整個儲存庫或歷史已完全匿名。

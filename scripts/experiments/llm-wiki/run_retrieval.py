@@ -7,9 +7,15 @@ import os
 import pathlib
 import subprocess
 
+from experiment_io import validate_output
+
 here = pathlib.Path(__file__).resolve().parent
+output = validate_output("retrieval_all.json", inputs=[
+    "wiki_sections.json", "wiki/pages.json", here / "questions.json",
+])
 payload = {
     "project_id": os.environ["LLM_WIKI_PROJECT"],
+    "runtime": (here / "readonly_runtime.py").read_text(),
     "sections": json.load(open("wiki_sections.json")),
     "pages": json.load(open("wiki/pages.json")),
     "questions": json.load(open(here / "questions.json")),
@@ -21,5 +27,5 @@ r = subprocess.run(
 if r.returncode:
     raise SystemExit(r.stderr[-2000:])
 out = json.loads([l for l in r.stdout.splitlines() if l.startswith("{")][-1])
-json.dump(out, open("retrieval_all.json", "w"), ensure_ascii=False)
+output.write_text(json.dumps(out, ensure_ascii=False))
 print(len(out), "questions")

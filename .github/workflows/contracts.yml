@@ -47,10 +47,10 @@ jobs:
       - name: Install backend test dependencies
         run: python3 -m pip install pytest "pydantic>=2.0.0,<3" "pydantic-settings>=2.0.0"
 
-      - name: Check owned documentation privacy
+      - name: Check documentation and LLM Wiki source privacy
         run: python3 scripts/check_document_privacy.py
 
-      - name: Test documentation privacy checks
+      - name: Test documentation and experiment privacy checks
         run: python3 -m pytest tests/test_document_privacy.py -q
 
       - name: Run backend protocol tests
