@@ -2355,3 +2355,87 @@ def test_tts_stream_rejects_unknown_format(monkeypatch):
         "/api/v1/tts/stream", json={"text": "你好", "format": "pcm24k"},
     )
     assert response.status_code == 422
+
+
+def _capture_speech_requests(monkeypatch, module):
+    captured = []
+    plan = module.tts_routes.VoicePlan(
+        provider="voxcpm", voice="", character="", partners=(),
+    )
+    monkeypatch.setattr(module.tts_routes, "plan_tts_voice", AsyncMock(return_value=plan))
+
+    def synthesize(request, **kwargs):
+        captured.append(request)
+        return types.SimpleNamespace(
+            result=types.SimpleNamespace(
+                audio_bytes=b"audio", content_type="audio/mpeg",
+                provider="voxcpm", latency_ms=1,
+            ),
+            fallback=False,
+            fallback_reason="",
+        )
+
+    monkeypatch.setattr(
+        module.tts_routes, "_get_service", lambda: types.SimpleNamespace(synthesize=synthesize),
+    )
+    return captured
+
+
+def test_admin_preview_passes_the_chosen_voxcpm_model(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    captured = _capture_speech_requests(monkeypatch, module)
+    client, _ = _authenticated_client(module)
+
+    response = client.post("/v1/audio/speech", json={
+        "input": "你好", "provider": "voxcpm", "model_id": "lora::vh387-hayley-mix",
+    })
+
+    assert response.status_code == 200
+    assert captured[0].model_id == "lora::vh387-hayley-mix"
+
+
+@pytest.mark.parametrize("body,status", [
+    ({"provider": "voxcpm", "model_id": "lora::a b"}, 422),
+    ({"provider": "voxcpm", "model_id": "../etc"}, 422),
+    ({"provider": "cosyvoice", "model_id": "lora::vh387-hayley-mix"}, 422),
+])
+def test_speech_rejects_invalid_model_ids(monkeypatch, body, status):
+    module, _ = _load_main(monkeypatch)
+    captured = _capture_speech_requests(monkeypatch, module)
+    client, _ = _authenticated_client(module)
+
+    response = client.post("/v1/audio/speech", json={"input": "你好", **body})
+
+    assert response.status_code == status
+    assert captured == []
+
+
+def test_only_administrators_can_switch_the_voxcpm_model(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    captured = _capture_speech_requests(monkeypatch, module)
+    client, _ = _authenticated_client(module, admin=False)
+
+    response = client.post("/v1/audio/speech", json={
+        "input": "你好", "provider": "voxcpm", "model_id": "lora::vh387-hayley-mix",
+    })
+
+    assert response.status_code == 403
+    assert captured == []
+
+
+def test_voxcpm_model_list_is_for_administrators_only(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    models = [{"id": "lora::vh387-hayley-mix", "label": "mix", "kind": "lora", "loaded": False}]
+    monkeypatch.setattr(module.admin_routes, "fetch_voxcpm_models", AsyncMock(return_value=models))
+    monkeypatch.setattr(
+        module.admin_routes, "get_tts_config",
+        lambda: types.SimpleNamespace(tts_voxcpm_url="http://vox", tts_voxcpm_api_key="k"),
+    )
+
+    user_client, _ = _authenticated_client(module, admin=False)
+    assert user_client.get("/api/v1/tts/voxcpm/models").status_code == 403
+
+    admin_client, _ = _authenticated_client(module)
+    response = admin_client.get("/api/v1/tts/voxcpm/models")
+    assert response.status_code == 200
+    assert response.json() == {"models": models}

@@ -465,3 +465,15 @@ async def test_other_validation_errors_are_not_retried(monkeypatch):
         await adapter.open_stream(SynthesizeRequest(text="你好"), sample_rate=16000)
     assert exc_info.value.status_code == 422
     assert len(sent) == 1
+
+
+def test_voxcpm_adapter_sends_model_id_only_when_chosen(monkeypatch):
+    adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+    mock_post = MagicMock(return_value=httpx.Response(status_code=200, content=b"x"))
+    monkeypatch.setattr(adapter._client, "post", mock_post)
+
+    adapter.synthesize(SynthesizeRequest(text="你好"))
+    assert "model_id" not in mock_post.call_args.kwargs["json"]
+
+    adapter.synthesize(SynthesizeRequest(text="你好", model_id="lora::vh387-hayley-mix"))
+    assert mock_post.call_args.kwargs["json"]["model_id"] == "lora::vh387-hayley-mix"

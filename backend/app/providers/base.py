@@ -17,6 +17,8 @@ class SynthesizeRequest:
     #: 帳本歸屬欄位（user_id、principal_type、project_id…）。由呼叫端填入，
     #: adapter 不讀它；留空表示這次合成不記名（例如系統自己觸發的預熱）。
     usage_scope: dict[str, Any] = field(default_factory=dict)
+    #: 只有 VoxCPM 看：指定 catalog 裡的模型（``full::…``、``lora::…``），空字串沿用目前載入的。
+    model_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)

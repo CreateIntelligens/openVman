@@ -59,7 +59,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | 群組 | 頁面 | 用途 |
 |---|---|---|
 | Workspace | 對話 | 文字／語音對話測試；AI 回答可一鍵「修正成 QA」寫回知識庫 |
-| | 語音 | TTS 試聽（`/admin/voice`）；ASR 測試台（`/admin/voice/asr`）：專案詞表、語言分流、多引擎同句比較與錯字率 |
+| | 語音 | TTS 試聽（`/admin/voice`，管理員選 VoxCPM 時可指定模型或 LoRA）；ASR 測試台（`/admin/voice/asr`）：專案詞表、語言分流、多引擎同句比較與錯字率 |
 | | 對話紀錄、知識庫搜尋 | 檢視 session、測試檢索 |
 | Knowledge | 知識庫 | 文件上傳與轉換、問答節點與快速問答、語言分流、知識圖譜、多選批次移動／設定語言／刪除 |
 | | 記憶管理、工作區 | 長期記憶、編輯 workspace 文件 |

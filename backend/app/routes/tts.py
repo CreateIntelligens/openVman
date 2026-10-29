@@ -21,6 +21,7 @@ from app.auth.dependencies import CurrentAccount, get_current_account
 from app.auth.models import (
     AccountRole,
     ProjectPolicyRecord,
+    is_at_least_admin,
 )
 from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.runtime import get_auth_runtime
@@ -34,6 +35,7 @@ from app.providers.gemini_tts_adapter import (
     GeminiTTSHTTPError,
 )
 from app.providers.voxcpm_adapter import (
+    VOXCPM_MODEL_ID,
     VOXCPM_PROVIDER_NAME,
     VOXCPM_STREAM_CONTENT_TYPE,
     VoxCPMHTTPError,
@@ -112,6 +114,8 @@ class SpeechRequest(BaseModel):
     speech_language: str = ""
     language: str = ""
     language_routes: list[str] | str | None = None
+    # 後台試聽用：指定 VoxCPM catalog 的模型（full::…／lora::…），正式對話不帶。
+    model_id: str = ""
 
 
 def _cache_scope(
@@ -143,6 +147,18 @@ async def create_speech(
 ) -> Response:
     cfg = get_tts_config()
     runtime = get_auth_runtime()
+    model_id = body.model_id.strip()
+    if model_id:
+        # 換成別的底模（full::）會讓 VoxCPM 整個引擎重載數十秒、期間所有 Vox 請求都卡住，只開放給管理員試聽。
+        if current.embed_key is not None or not is_at_least_admin(current.user.role):
+            return JSONResponse(
+                status_code=403, content={"error": "model_id requires an administrator"},
+            )
+        if body.provider != VOXCPM_PROVIDER_NAME or not VOXCPM_MODEL_ID.fullmatch(model_id):
+            return JSONResponse(
+                status_code=422,
+                content={"error": "model_id must be a VoxCPM full:: or lora:: model"},
+            )
     project_id, policy = voice_policy.request_policy(runtime, current, body.project_id)
     is_root = (
         current.embed_key is None
@@ -173,6 +189,7 @@ async def create_speech(
         usage_scope=usage_scope_for(
             current, project_id=project_id or "", channel="http",
         ),
+        model_id=model_id,
     )
     cache_key: str | None = None
 
@@ -190,6 +207,8 @@ async def create_speech(
                 f"{getattr(cfg, 'tts_voxcpm_hanji_version', 'v6')}:"
                 f"{getattr(cfg, 'tts_cosyvoice_hanji_version', 'v1')}"
             )
+        if model_id:
+            cache_scope += f"|model:{model_id}"
         if project_id and provider in ("", "auto", "gemini-tts"):
             credential = resolve_gemini_credential(project_id, runtime)
             if credential.source == "project" or provider == "gemini-tts":

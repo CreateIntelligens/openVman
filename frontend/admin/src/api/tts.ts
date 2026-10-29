@@ -33,6 +33,19 @@ export async function fetchTtsProviders(projectId?: string): Promise<TtsProvider
   return fetchJson<TtsProvider[]>(url);
 }
 
+export interface VoxcpmModel {
+  id: string;
+  label: string;
+  kind: string;
+  loaded: boolean;
+}
+
+/** VoxCPM catalog 裡可選的模型（完整 checkpoint 與 LoRA），只有管理員拿得到。 */
+export async function fetchVoxcpmModels(): Promise<VoxcpmModel[]> {
+  const payload = await fetchJson<{ models: VoxcpmModel[] }>("/api/v1/tts/voxcpm/models");
+  return payload.models;
+}
+
 export interface SpeechPreview {
   audio: Blob;
   provider: string;
@@ -44,11 +57,14 @@ export async function synthesizeSpeechPreview(
   provider: string,
   voice: string,
   signal: AbortSignal,
+  modelId = "",
 ): Promise<SpeechPreview> {
+  const body: Record<string, string> = { input: text, provider, voice };
+  if (modelId) body.model_id = modelId;
   const response = await apiFetch("/v1/audio/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input: text, provider, voice }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!response.ok) {

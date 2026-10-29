@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import { fetchTtsProviders, synthesizeSpeechPreview, voiceLabel, type TtsProvider } from "../api/tts";
+import {
+  fetchTtsProviders,
+  fetchVoxcpmModels,
+  synthesizeSpeechPreview,
+  voiceLabel,
+  type TtsProvider,
+  type VoxcpmModel,
+} from "../api/tts";
 import Select from "./Select";
 
 const SAMPLE_TEXT = "你好，歡迎使用 openVman。這是一段語音試聽，請確認聲音與語速是否合適。";
+const VOXCPM = "voxcpm";
+const DEFAULT_MODEL_LABEL = "預設（沿用目前載入的模型）";
+
+function modelLabel(model: VoxcpmModel): string {
+  return model.loaded ? `${model.label}（目前載入）` : model.label;
+}
 
 function defaultVoice(provider?: TtsProvider): string {
   if (provider?.voices.includes(provider.default_voice)) return provider.default_voice;
@@ -14,6 +27,8 @@ export default function TtsPreviewPanel() {
   const [providers, setProviders] = useState<TtsProvider[]>([]);
   const [provider, setProvider] = useState("");
   const [voice, setVoice] = useState("");
+  const [models, setModels] = useState<VoxcpmModel[] | null>(null);
+  const [modelId, setModelId] = useState("");
   const [text, setText] = useState(SAMPLE_TEXT);
   const [loading, setLoading] = useState(true);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -26,6 +41,10 @@ export default function TtsPreviewPanel() {
   const requestRef = useRef<AbortController | null>(null);
   const urlRef = useRef("");
   const activeProvider = providers.find((item) => item.id === provider);
+  const isVoxcpm = provider === VOXCPM;
+  const activeModel = models?.find((item) => item.id === modelId);
+  // 一般帳號拿不到清單（後端只給管理員），只剩預設選項時不顯示選單。
+  const showModels = isVoxcpm && Boolean(models?.length);
   const canSubmit = !loading && !loadError && Boolean(activeProvider && text.trim());
 
   useEffect(() => {
@@ -46,6 +65,18 @@ export default function TtsPreviewPanel() {
     });
     return () => { disposed = true; };
   }, [loadAttempt]);
+
+  useEffect(() => {
+    if (!isVoxcpm || models !== null) return;
+    let disposed = false;
+    // 清單拿不到就只留預設選項，試聽照常可用。
+    fetchVoxcpmModels().then((items) => {
+      if (!disposed) setModels(items);
+    }).catch(() => {
+      if (!disposed) setModels([]);
+    });
+    return () => { disposed = true; };
+  }, [isVoxcpm, models]);
 
   useEffect(() => {
     return () => {
@@ -96,7 +127,9 @@ export default function TtsPreviewPanel() {
     const controller = new AbortController();
     requestRef.current = controller;
     try {
-      const result = await synthesizeSpeechPreview(text.trim(), provider, voice, controller.signal);
+      const result = await synthesizeSpeechPreview(
+        text.trim(), provider, voice, controller.signal, isVoxcpm ? modelId : "",
+      );
       if (controller.signal.aborted) return;
       const url = URL.createObjectURL(result.audio);
       urlRef.current = url;
@@ -136,7 +169,7 @@ export default function TtsPreviewPanel() {
             重新載入聲音
           </button>
         )}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className={`grid grid-cols-1 gap-4 ${showModels ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div className="min-w-0 space-y-2">
             <span className="text-sm font-medium">供應商</span>
             <Select
@@ -153,6 +186,7 @@ export default function TtsPreviewPanel() {
                 resetPlaybackState();
                 setProvider(id);
                 setVoice(defaultVoice(providers.find((item) => item.id === id)));
+                setModelId("");
               }}
             />
           </div>
@@ -178,7 +212,31 @@ export default function TtsPreviewPanel() {
               }}
             />
           </div>
+          {showModels && (
+            <div className="min-w-0 space-y-2">
+              <span className="text-sm font-medium">模型</span>
+              <Select
+                ariaLabel="模型"
+                value={modelId}
+                disabled={loading || busy}
+                options={[
+                  { value: "", label: DEFAULT_MODEL_LABEL },
+                  ...(models ?? []).map((item) => ({ value: item.id, label: modelLabel(item) })),
+                ]}
+                onChange={(value) => {
+                  resetPlaybackState();
+                  setModelId(value);
+                }}
+              />
+            </div>
+          )}
         </div>
+        {/* LoRA 疊在目前載入的底模上直接套用；只有換成別的完整 checkpoint 才要重載。 */}
+        {showModels && activeModel?.kind === "full" && !activeModel.loaded && (
+          <p className="text-sm text-content-muted">
+            換成這個底模時 VoxCPM 會重新載入，約需 30～40 秒，期間其他人的 VoxCPM 語音也會等待。
+          </p>
+        )}
         <div className="space-y-2">
           <label htmlFor="tts-preview-text" className="text-sm font-medium">試聽文字</label>
           <textarea

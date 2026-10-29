@@ -35,6 +35,18 @@ describe("speech preview API", () => {
     expect(bodies[2]).toEqual({ input: "你好", provider: "edge" });
   });
 
+  it("adds the VoxCPM model only when one is chosen", async () => {
+    const fetch = vi.fn().mockImplementation(async () => new Response("audio", {
+      headers: { "Content-Type": "audio/wav", "X-TTS-Provider": "voxcpm" },
+    }));
+    vi.stubGlobal("fetch", fetch);
+    await synthesizeSpeechPreview("你好", "voxcpm", "v", new AbortController().signal, "lora::mix");
+    await synthesizeSpeechPreview("你好", "voxcpm", "v", new AbortController().signal);
+    const bodies = fetch.mock.calls.map(([, init]) => JSON.parse(init.body));
+    expect(bodies[0]).toEqual({ input: "你好", provider: "voxcpm", voice: "v", model_id: "lora::mix" });
+    expect(bodies[1]).toEqual({ input: "你好", provider: "voxcpm", voice: "v" });
+  });
+
   it("identifies fallback on cached results without a fallback header", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("audio", {
       headers: { "Content-Type": "audio/mpeg", "X-TTS-Provider": "edge" },

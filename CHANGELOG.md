@@ -4,6 +4,7 @@
 
 ### Added
 
+- **[2026-10-28]** **後台試聽可指定 VoxCPM 模型（VH-387 LoRA 驗收用）**：語音試聽選 VoxCPM 時，管理員多一個「模型」選單，選項取自 VoxCPM `/api/v1/catalog`（`full::` 完整 checkpoint、`lora::` LoRA），預設沿用目前載入的模型，不列出載入「最後一個 epoch」的訓練目錄項目（label 結尾為 `/ latest`），避免看不出版本而選錯；LoRA 疊在目前載入的底模上套用；只有選了未載入的 `full::` 底模才提示 VoxCPM 需重新載入約 30～40 秒、期間其他 Vox 語音也會等待。新增 `GET /api/v1/tts/voxcpm/models`（管理員），`/v1/audio/speech` 新增選填 `model_id`，只有管理員指定 `provider: voxcpm` 時接受並轉給 CastVoice，格式不符回 422、非管理員回 403，快取依模型分開。正式對話與串流端點不帶模型，行為不變。
 - **[2026-10-28]** 同服務的衍生網址改為自動推導：R2T2 正式／開發串流從各自的批次基底網址產生，HTTP／HTTPS 對應 WS／WSS；Cosy 詞表從合成網址產生。保留各端點完整網址覆寫，詞表可用 `TTS_HANJI_CONVERT_ENABLED=false` 獨立停用；引擎可用清單、實際連線與 TTS 快取都使用生效網址。
 
 - **[2026-10-28]** 台語 TTS 串接 `.35` 的文字詞表 API：VoxCPM（整段與串流）與 CosyVoice 各自使用環境設定指定的詞表，CosyVoice 以 `annotate=none` 避免上游二次轉換。新增 `TTS_HANJI_CONVERT_URL`、`TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION`；每家引擎從原文獨立轉換，轉換失敗走既有備援，國語 Vox 不查台語詞表，台語文字保留字形，音檔快取依語言與詞表設定隔離。

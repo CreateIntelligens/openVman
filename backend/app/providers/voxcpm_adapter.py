@@ -9,6 +9,7 @@ engines and reference presets a given deployment exposes.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from time import monotonic
@@ -28,6 +29,8 @@ VOXCPM_ENGINE_ID = "voxcpm2"
 # young-female-02 同一位，備援換引擎時聲音不變。VoxCPM2 依文字內容推斷語言，
 # 參考音只決定音色，所以台語參考音唸華語文字仍是華語。
 VOXCPM_DEFAULT_VOICE = "voxcpm2-cosy-young-female-02"
+# catalog 的模型 id：完整 checkpoint（full::）或 LoRA（lora::）。
+VOXCPM_MODEL_ID = re.compile(r"(?:full|lora)::[A-Za-z0-9._-]{1,128}")
 # VoxCPM2 輸出 48kHz WAV，gateway 再以 ffmpeg 轉 mp3（取樣率不變）。
 # mp3 由瀏覽器自行解碼，此值只作為 cache metadata。
 VOXCPM_SAMPLE_RATE = 48000
@@ -131,10 +134,13 @@ class VoxCPMAdapter:
         voice_id 保留 ``voxcpm2-`` 前綴——CastVoice 與 studio 的 reference
         preset 是兩套命名空間，拿 ``cosy-young-female-01`` 去打會 voice_not_found。
         """
-        return {
+        payload = {
             "text": request.text,
             "voice_id": request.voice_hint or self._default_voice,
         }
+        if request.model_id:
+            payload["model_id"] = request.model_id
+        return payload
 
     def _build_stream_form(self, request: SynthesizeRequest) -> dict[str, str]:
         """Multipart form for the studio streaming endpoint.

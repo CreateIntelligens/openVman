@@ -17,7 +17,11 @@ from app.providers.cosyvoice_adapter import (
     COSYVOICE_PROVIDER_NAME,
 )
 from app.providers.gemini_tts_adapter import GEMINI_DEFAULT_VOICE, GEMINI_PROVIDER_NAME
-from app.providers.voxcpm_adapter import VOXCPM_DEFAULT_VOICE, VOXCPM_PROVIDER_NAME
+from app.providers.voxcpm_adapter import (
+    VOXCPM_DEFAULT_VOICE,
+    VOXCPM_MODEL_ID,
+    VOXCPM_PROVIDER_NAME,
+)
 
 logger = logging.getLogger("backend")
 
@@ -189,6 +193,46 @@ async def fetch_voxcpm_voices(
         "voxcpm",
         excluded,
     )
+
+
+async def fetch_voxcpm_models(base_url: str, api_key: str) -> list[dict[str, Any]]:
+    """VoxCPM ``/api/v1/catalog`` 裡 voxcpm2 引擎可選的模型（完整 checkpoint 與 LoRA）。"""
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    try:
+        response = await _http.get().get(
+            f"{base_url.rstrip('/')}/api/v1/catalog",
+            timeout=TTS_PROVIDER_TIMEOUT_SECONDS,
+            follow_redirects=True,
+            headers=headers,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as exc:
+        logger.warning("failed to fetch voxcpm models from %s: %s", base_url, exc)
+        return []
+    engines = payload.get("engines") if isinstance(payload, dict) else None
+    models: list[dict[str, Any]] = []
+    for engine in engines if isinstance(engines, list) else []:
+        if not isinstance(engine, dict) or engine.get("id") != "voxcpm2":
+            continue
+        for entry in engine.get("models") or []:
+            if not isinstance(entry, dict):
+                continue
+            model_id = entry.get("id")
+            if not isinstance(model_id, str) or not VOXCPM_MODEL_ID.fullmatch(model_id):
+                continue
+            label = entry.get("label")
+            # 「<目錄> / latest」是訓練目錄，載入的是最後一個 epoch，名字看不出版本，容易選錯；
+            # 比較 epoch 請用各自展開的扁平項目（例如 lora::vh387-orig-ep15）。
+            if isinstance(label, str) and label.rstrip().endswith("/ latest"):
+                continue
+            models.append({
+                "id": model_id,
+                "label": label if isinstance(label, str) and label else model_id,
+                "kind": entry.get("kind") if isinstance(entry.get("kind"), str) else "",
+                "loaded": entry.get("loaded") is True,
+            })
+    return models
 
 
 async def fetch_cosyvoice_voices(

@@ -10,6 +10,7 @@ from app import voice_policy
 from app.auth.dependencies import (
     CurrentAccount,
     get_current_account,
+    require_admin,
     require_root,
 )
 from app.auth.models import (
@@ -28,7 +29,7 @@ from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
 from app.project_ids import canonical_project_id
-from app.providers.voice_catalog import build_tts_provider_catalog
+from app.providers.voice_catalog import build_tts_provider_catalog, fetch_voxcpm_models
 
 logger = logging.getLogger("backend")
 router = APIRouter()
@@ -327,6 +328,24 @@ async def get_tts_providers(
 
     providers = await build_tts_provider_catalog(get_tts_config())
     return JSONResponse(content=providers)
+
+
+@router.get(
+    "/api/v1/tts/voxcpm/models",
+    tags=["TTS"],
+    summary="VoxCPM 可選的模型（後台試聽用）",
+)
+async def get_voxcpm_models(
+    current: CurrentAccount = Depends(require_admin),
+) -> JSONResponse:
+    """列出 VoxCPM catalog 裡的完整 checkpoint 與 LoRA；正式對話不指定模型。"""
+    if current.embed_key is not None:
+        return JSONResponse(status_code=403, content={"error": "Administrator access required"})
+    cfg = get_tts_config()
+    if not cfg.tts_voxcpm_url:
+        return JSONResponse(content={"models": []})
+    models = await fetch_voxcpm_models(cfg.tts_voxcpm_url, cfg.tts_voxcpm_api_key)
+    return JSONResponse(content={"models": models})
 
 
 

@@ -1,12 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchTtsProviders, synthesizeSpeechPreview, type SpeechPreview } from "../api/tts";
+import { fetchTtsProviders, fetchVoxcpmModels, synthesizeSpeechPreview, type SpeechPreview } from "../api/tts";
 import Tts from "./TtsPreviewPanel";
 
 vi.mock("../api/tts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/tts")>()),
   fetchTtsProviders: vi.fn(),
+  fetchVoxcpmModels: vi.fn(),
   synthesizeSpeechPreview: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ const result: SpeechPreview = { audio: new Blob(["audio"], { type: "audio/wav" }
 beforeEach(() => {
   vi.mocked(fetchTtsProviders).mockReset().mockResolvedValue(providers);
   vi.mocked(synthesizeSpeechPreview).mockReset().mockResolvedValue(result);
+  vi.mocked(fetchVoxcpmModels).mockReset().mockResolvedValue([]);
   vi.stubGlobal("URL", Object.assign(URL, {
     createObjectURL: vi.fn().mockReturnValue("blob:preview"), revokeObjectURL: vi.fn(),
   }));
@@ -42,7 +44,7 @@ describe("TTS preview", () => {
     fireEvent.change(screen.getByLabelText("試聽文字"), { target: { value: " 測試聲音 " } });
     fireEvent.click(screen.getByRole("button", { name: "試聽" }));
     await screen.findByLabelText("試聽播放器");
-    expect(synthesizeSpeechPreview).toHaveBeenCalledWith("測試聲音", "edge", "voice-b", expect.any(AbortSignal));
+    expect(synthesizeSpeechPreview).toHaveBeenCalledWith("測試聲音", "edge", "voice-b", expect.any(AbortSignal), "");
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
     view.unmount();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
@@ -64,7 +66,43 @@ describe("TTS preview", () => {
     fireEvent.click(screen.getByRole("button", { name: "試聽" }));
     await screen.findByLabelText("試聽播放器");
     expect(synthesizeSpeechPreview).toHaveBeenCalledWith(
-      expect.any(String), "cosyvoice", "young-female-02", expect.any(AbortSignal),
+      expect.any(String), "cosyvoice", "young-female-02", expect.any(AbortSignal), "",
+    );
+  });
+
+  it("lets administrators pick a VoxCPM model and sends its id", async () => {
+    vi.mocked(fetchTtsProviders).mockResolvedValue([
+      { id: "voxcpm", name: "VoxCPM", default_voice: "v", voices: ["v"] },
+    ]);
+    vi.mocked(fetchVoxcpmModels).mockResolvedValue([
+      { id: "full::ft-0820", label: "ft-0820", kind: "full", loaded: true },
+      { id: "full::ft-0901", label: "ft-0901", kind: "full", loaded: false },
+      { id: "lora::vh387-hayley-mix", label: "vh387-hayley-mix", kind: "lora", loaded: false },
+    ]);
+    await ready();
+    fireEvent.click(await screen.findByRole("combobox", { name: "模型" }));
+    expect(screen.getByRole("option", { name: "ft-0820（目前載入）" })).toBeTruthy();
+    fireEvent.mouseDown(screen.getByRole("option", { name: "ft-0901" }));
+    // 換別的底模才會重載；LoRA 疊在目前的底模上，不提示。
+    expect(screen.getByText(/VoxCPM 會重新載入/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("combobox", { name: "模型" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "vh387-hayley-mix" }));
+    expect(screen.queryByText(/VoxCPM 會重新載入/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "試聽" }));
+    await screen.findByLabelText("試聽播放器");
+    expect(synthesizeSpeechPreview).toHaveBeenCalledWith(
+      expect.any(String), "voxcpm", "v", expect.any(AbortSignal), "lora::vh387-hayley-mix",
+    );
+  });
+
+  it("hides the model picker for other providers and when no models are offered", async () => {
+    await ready();
+    expect(screen.queryByRole("combobox", { name: "模型" })).toBeNull();
+    expect(fetchVoxcpmModels).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "試聽" }));
+    await screen.findByLabelText("試聽播放器");
+    expect(synthesizeSpeechPreview).toHaveBeenCalledWith(
+      expect.any(String), "edge", "voice-a", expect.any(AbortSignal), "",
     );
   });
 
