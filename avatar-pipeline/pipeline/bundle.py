@@ -3,8 +3,11 @@
 A bundle is the pair the avatar runtime loads from ``data/avatar/<id>/``:
 
 * ``01.webm`` — VP9, 25 fps, no audio, with a frame-sync marker in the
-  top-right corner (``(frame % 7) * 40`` grey, 4×4 px) so the runtime can
-  recover the exact frame index from the decoded picture.
+  top-right corner (``(frame % 7) * 40`` grey, 4×4 px, always opaque) so the
+  runtime can recover the exact frame index from the decoded picture. A
+  transparent source keeps its alpha (``yuva420p``) so the stage background
+  shows through; a clip whose last frame does not match its first is
+  extended with itself played backwards so the loop has no jump.
 * ``combined_data.json.gz`` — ``json_data`` holds one row per frame: a
   flattened 4×4 pose matrix followed by the 209 warp landmarks (x, y) in
   the 180-square; ``combined_data`` is the AES-128-CBC encrypted inner JSON
@@ -25,7 +28,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-import cv2
 import numpy as np
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -38,7 +40,17 @@ from .geometry import (
     smooth_array,
     standardize_points,
 )
-from .landmarks import DEFAULT_MAX_SIDE, FPS, extract_landmarks, prepare_video
+from .frames import (
+    DEFAULT_MAX_SIDE,
+    FPS,
+    LOOP_SEAM_THRESHOLD,
+    count_frames,
+    loop_seam_difference,
+    prepare_video,
+    read_frames,
+    write_ping_pong,
+)
+from .landmarks import extract_landmarks
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 FACE_TEMPLATE_PATH = ASSETS_DIR / "face_template.json"
@@ -52,6 +64,8 @@ LANDMARK_SMOOTHING = [0.02, 0.09, 0.78, 0.09, 0.02]
 CROP_CENTRE_SMOOTHING = [0.10, 0.20, 0.40, 0.20, 0.10]
 POSE_SMOOTHING = [0.03, 0.1, 0.74, 0.1, 0.03]
 
+LOOP_MODES = ("auto", "always", "off")
+
 #: ``(stage, done, total)``; ``total`` is 0 for stages without a frame count.
 StageCallback = Callable[[str, int, int], None]
 
@@ -63,6 +77,10 @@ class BundleResult:
     frame_count: int
     width: int
     height: int
+    has_alpha: bool = False
+    #: Mean grey difference between the source's first and last frame.
+    seam_difference: float = 0.0
+    ping_pong: bool = False
 
 
 class BundleKeyError(ValueError):
@@ -111,26 +129,30 @@ def marker_value(frame_index: int) -> int:
 
 
 def stamp_marker(frame: np.ndarray, frame_index: int) -> None:
-    """Paint the frame-sync marker in place on a BGR frame."""
+    """Paint the frame-sync marker in place on a BGR or BGRA frame.
+
+    The marker stays opaque on transparent clips: the runtime reads its grey
+    level from the composited canvas.
+    """
     width = frame.shape[1]
-    frame[0:MARKER_SIZE, width - MARKER_SIZE:width] = marker_value(frame_index)
+    region = frame[0:MARKER_SIZE, width - MARKER_SIZE:width]
+    region[..., :3] = marker_value(frame_index)
+    if frame.shape[2] == 4:
+        region[..., 3] = 255
 
 
 def transcode_with_marker(
-    source_path: Path, output_path: Path, *, progress: StageCallback | None = None,
-) -> tuple[int, int, int]:
+    source_path: Path, output_path: Path, width: int, height: int, frame_count: int,
+    *, alpha: bool = False, progress: StageCallback | None = None,
+) -> int:
     """Pipe every frame through ffmpeg into VP9 with the marker stamped on."""
-    cap = cv2.VideoCapture(str(source_path))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-f", "rawvideo", "-vcodec", "rawvideo",
-        "-s", f"{width}x{height}", "-pix_fmt", "bgr24", "-r", str(FPS),
+        "-s", f"{width}x{height}", "-pix_fmt", "bgra", "-r", str(FPS),
         "-i", "-",
         "-c:v", "libvpx-vp9", "-b:v", "500k", "-crf", "24",
-        "-pix_fmt", "yuv420p", "-r", str(FPS), "-an",
+        "-pix_fmt", "yuva420p" if alpha else "yuv420p", "-r", str(FPS), "-an",
         # Alt-ref frames are invisible frames; they would shift the frame
         # index the marker encodes.
         "-auto-alt-ref", "0",
@@ -140,23 +162,20 @@ def transcode_with_marker(
     assert proc.stdin is not None
     frame_index = 0
     try:
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
+        for source in read_frames(source_path, width, height):
+            frame = source.copy()
             stamp_marker(frame, frame_index)
             proc.stdin.write(frame.tobytes())
             frame_index += 1
             if progress:
-                progress("transcode", frame_index, total)
+                progress("transcode", frame_index, frame_count)
     finally:
-        cap.release()
         proc.stdin.close()
     stderr = proc.stderr.read().decode("utf-8", errors="ignore") if proc.stderr else ""
     proc.wait()
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg VP9 轉檔失敗：{stderr.strip()[-500:]}")
-    return frame_index, width, height
+    return frame_index
 
 
 def mouth_crops(pts_smooth: np.ndarray, width: int, height: int) -> np.ndarray:
@@ -210,12 +229,16 @@ def build_bundle(
     key: bytes,
     max_side: int = DEFAULT_MAX_SIDE,
     template_path: Path = FACE_TEMPLATE_PATH,
+    loop_mode: str = "auto",
+    seam_threshold: float = LOOP_SEAM_THRESHOLD,
     progress: StageCallback | None = None,
 ) -> BundleResult:
     input_video = Path(input_video)
     output_dir = Path(output_dir)
     if not input_video.is_file():
         raise FileNotFoundError(f"找不到輸入影片：{input_video}")
+    if loop_mode not in LOOP_MODES:
+        raise ValueError(f"loop_mode 必須是 {', '.join(LOOP_MODES)} 之一")
     output_dir.mkdir(parents=True, exist_ok=True)
     template = load_face_template(template_path)
 
@@ -224,18 +247,38 @@ def build_bundle(
             progress(stage, done, total)
 
     with tempfile.TemporaryDirectory(prefix="avatar-bundle-") as tmp:
-        prepared = Path(tmp) / "prepared.mp4"
+        prepared = Path(tmp) / "prepared.mkv"
         report("prepare")
-        prepare_video(input_video, prepared, max_side=max_side)
+        info = prepare_video(input_video, prepared, max_side=max_side)
+        width, height = info.width, info.height
+        source_frames = count_frames(prepared, width, height)
+        if source_frames == 0:
+            raise RuntimeError("影片沒有任何畫面")
+
+        report("loop")
+        seam = loop_seam_difference(prepared, width, height, source_frames)
+        ping_pong = source_frames > 2 and (
+            loop_mode == "always" or (loop_mode == "auto" and seam > seam_threshold)
+        )
+        frames_path = prepared
+        frame_total = source_frames
+        if ping_pong:
+            frames_path = Path(tmp) / "ping_pong.mkv"
+            frame_total = write_ping_pong(
+                prepared, frames_path, width, height, source_frames,
+                progress=lambda done, total: report("loop", done, total),
+            )
 
         report("landmarks")
         pts_3d = extract_landmarks(
-            prepared, progress=lambda done, total: report("landmarks", done, total),
+            frames_path, width, height, frame_total,
+            progress=lambda done, total: report("landmarks", done, total),
         )
 
         video_path = output_dir / "01.webm"
-        frame_count, width, height = transcode_with_marker(
-            prepared, video_path, progress=progress,
+        frame_count = transcode_with_marker(
+            frames_path, video_path, width, height, frame_total,
+            alpha=info.has_alpha, progress=progress,
         )
         if frame_count != len(pts_3d):
             raise RuntimeError(
@@ -271,4 +314,7 @@ def build_bundle(
         frame_count=frame_count,
         width=width,
         height=height,
+        has_alpha=info.has_alpha,
+        seam_difference=round(seam, 2),
+        ping_pong=ping_pong,
     )

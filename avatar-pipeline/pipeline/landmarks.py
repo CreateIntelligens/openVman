@@ -1,4 +1,4 @@
-"""Silent-video preparation: 25 fps transcode and MediaPipe landmark extraction.
+"""MediaPipe landmark extraction over the prepared intermediate.
 
 Ported from DH_live's ``data_preparation_mini`` (MIT licence). The detector
 and mesh models are built once per video instead of once per frame.
@@ -7,68 +7,36 @@ and mesh models are built once per video instead of once per frame.
 from __future__ import annotations
 
 import math
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
 import cv2
 import numpy as np
 
+from .frames import (
+    DEFAULT_MAX_SIDE,
+    FPS,
+    VideoProcessingError,
+    flatten_for_detection,
+    read_frames,
+)
 from .geometry import LANDMARK_COUNT
 
-FPS = 25
-#: Longest side the source is scaled down to; the renderer never needs more
-#: and a phone's 4K upload would otherwise become a 4K VP9 bundle.
-DEFAULT_MAX_SIDE = 1920
+__all__ = [
+    "DEFAULT_MAX_SIDE",
+    "FPS",
+    "FaceDetectionError",
+    "VideoProcessingError",
+    "extract_landmarks",
+]
+
 MIN_FACE_PIXELS = 80
 
 ProgressCallback = Callable[[int, int], None]
 
 
-class VideoProcessingError(RuntimeError):
-    """The source video cannot be turned into a bundle."""
-
-
 class FaceDetectionError(VideoProcessingError):
     """No usable single frontal face in the first frame."""
-
-
-def probe_size(video_path: Path) -> tuple[int, int]:
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        raise VideoProcessingError("無法開啟影片檔")
-    try:
-        return (
-            int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        )
-    finally:
-        cap.release()
-
-
-def prepare_video(
-    input_path: Path, output_path: Path, *, max_side: int = DEFAULT_MAX_SIDE,
-) -> None:
-    """Transcode to a silent 25 fps H.264 intermediate, scaled to ``max_side``.
-
-    Both dimensions are forced even: libx264 refuses odd sizes and MediaPipe
-    crops would otherwise drift by a pixel.
-    """
-    width, height = probe_size(input_path)
-    scale = min(1.0, max_side / max(width, height))
-    new_w = int(width * scale) // 2 * 2
-    new_h = int(height * scale) // 2 * 2
-    cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-i", str(input_path),
-        "-vf", f"scale={new_w}:{new_h}",
-        "-r", str(FPS), "-an",
-        "-pix_fmt", "yuv420p",
-        str(output_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise VideoProcessingError(f"ffmpeg 轉檔失敗：{result.stderr.strip()[-500:]}")
 
 
 def _detect_face(face_detection, frame: np.ndarray, min_confidence: float) -> list[float]:
@@ -146,44 +114,37 @@ def _mesh_points(face_mesh, frame: np.ndarray) -> np.ndarray:
 
 
 def extract_landmarks(
-    video_path: Path, *, progress: ProgressCallback | None = None,
+    video_path: Path, width: int, height: int, frame_count: int,
+    *, progress: ProgressCallback | None = None,
 ) -> np.ndarray:
-    """478 × 3 pixel-space landmarks for every frame of a prepared video."""
+    """478 × 3 pixel-space landmarks for every frame of the intermediate."""
     import mediapipe as mp
 
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        raise VideoProcessingError("無法開啟轉檔後的影片")
-    try:
-        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        vid_w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-        vid_h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        pts_3d = np.zeros((total, LANDMARK_COUNT, 3))
-        face_rect: tuple[int, int, int, int] | None = None
-        with mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.25,
-        ) as face_detection, mp.solutions.face_mesh.FaceMesh(
-            static_image_mode=True,
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
-        ) as face_mesh:
-            for frame_index in range(total):
-                ok, frame = cap.read()
-                if not ok:
-                    pts_3d = pts_3d[:frame_index]
-                    break
-                if face_rect is None:
-                    face_rect = _first_frame_face_rect(face_detection, frame, vid_w, vid_h)
-                x0, y0, x1, y1 = face_rect
-                try:
-                    pts_3d[frame_index] = _mesh_points(face_mesh, frame[y0:y1, x0:x1]) + [x0, y0, 0]
-                except VideoProcessingError as exc:
-                    raise VideoProcessingError(f"第 {frame_index} 幀{exc}") from exc
-                if progress:
-                    progress(frame_index + 1, total)
-    finally:
-        cap.release()
-    if len(pts_3d) == 0:
+    pts_3d = np.zeros((frame_count, LANDMARK_COUNT, 3))
+    face_rect: tuple[int, int, int, int] | None = None
+    read = 0
+    with mp.solutions.face_detection.FaceDetection(
+        model_selection=1, min_detection_confidence=0.25,
+    ) as face_detection, mp.solutions.face_mesh.FaceMesh(
+        static_image_mode=True,
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5,
+    ) as face_mesh:
+        for frame_index, raw in enumerate(read_frames(video_path, width, height)):
+            if frame_index >= frame_count:
+                break
+            frame = flatten_for_detection(raw)
+            if face_rect is None:
+                face_rect = _first_frame_face_rect(face_detection, frame, width, height)
+            x0, y0, x1, y1 = face_rect
+            try:
+                pts_3d[frame_index] = _mesh_points(face_mesh, frame[y0:y1, x0:x1]) + [x0, y0, 0]
+            except VideoProcessingError as exc:
+                raise VideoProcessingError(f"第 {frame_index} 幀{exc}") from exc
+            read = frame_index + 1
+            if progress:
+                progress(read, frame_count)
+    if read == 0:
         raise VideoProcessingError("影片沒有任何畫面")
-    return pts_3d
+    return pts_3d[:read]

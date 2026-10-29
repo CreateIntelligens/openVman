@@ -4,7 +4,10 @@
 
 ### Added
 
+- **[2026-10-29]** **avatar-pipeline 支援透明人物、圖片輸入與首尾銜接**：中繼檔改為每幀關鍵幀的 FFV1 BGRA，經 ffmpeg 管線讀幀（OpenCV 讀不到透明通道）；來源帶透明（PNG／WebP、`alpha_mode=1` 的 VP8／VP9 WebM，後者強制用 libvpx 解碼）時輸出 `yuva420p` 的 VP9，幀同步標記維持不透明，臉部偵測前把透明像素鋪成中性灰。可直接輸入 PNG／JPG／WebP，解碼一次後以 `loop` 濾鏡做成 10 秒靜止片段；不用 `-loop 1`，因為帶 C2PA 簽章或 IEND 後有多餘位元組的 PNG 在那種讀法下會永遠卡住。新階段 `loop` 比較首尾幀，差超過門檻（預設 6.0）就接上倒放片段，CLI 新增 `--loop auto|always|off` 與 `--seam-threshold`，完成 JSON 多回 `alpha`、`seam_difference`、`ping_pong`。單一 ffmpeg 步驟超過 900 秒即中止。
+
 - **[2026-10-28]** **後台試聽可指定 VoxCPM 模型（VH-387 LoRA 驗收用）**：語音試聽選 VoxCPM 時，管理員多一個「模型」選單，選項取自 VoxCPM `/api/v1/catalog`（`full::` 完整 checkpoint、`lora::` LoRA），預設沿用目前載入的模型，不列出載入「最後一個 epoch」的訓練目錄項目（label 結尾為 `/ latest`），避免看不出版本而選錯；LoRA 疊在目前載入的底模上套用；只有選了未載入的 `full::` 底模才提示 VoxCPM 需重新載入約 30～40 秒、期間其他 Vox 語音也會等待。新增 `GET /api/v1/tts/voxcpm/models`（管理員），`/v1/audio/speech` 新增選填 `model_id`，只有管理員指定 `provider: voxcpm` 時接受並轉給 CastVoice，格式不符回 422、非管理員回 403，快取依模型分開。正式對話與串流端點不帶模型，行為不變。
+
 - **[2026-10-28]** 同服務的衍生網址改為自動推導：R2T2 正式／開發串流從各自的批次基底網址產生，HTTP／HTTPS 對應 WS／WSS；Cosy 詞表從合成網址產生。保留各端點完整網址覆寫，詞表可用 `TTS_HANJI_CONVERT_ENABLED=false` 獨立停用；引擎可用清單、實際連線與 TTS 快取都使用生效網址。
 
 - **[2026-10-28]** 台語 TTS 串接 `.35` 的文字詞表 API：VoxCPM（整段與串流）與 CosyVoice 各自使用環境設定指定的詞表，CosyVoice 以 `annotate=none` 避免上游二次轉換。新增 `TTS_HANJI_CONVERT_URL`、`TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION`；每家引擎從原文獨立轉換，轉換失敗走既有備援，國語 Vox 不查台語詞表，台語文字保留字形，音檔快取依語言與詞表設定隔離。
@@ -274,7 +277,6 @@
 - **[2026-10-06]** **後台聊天「修正成 QA」**：AI 回答的操作列可以把這一輪的問答改好後直接存進問答節點，沿用知識庫手動輸入問答的 API 與檔案格式，存完自動重建索引；同題只改答案，預設不出現在前台快速問題按鈕。
 - **[2026-10-05]** **後台語音辨識分頁改成完整的測試台**：可以編輯專案詞表（`ASR_PROMPT.md`，顯示幾個詞、幾條誤聽對照）；勾語言分流；批次試辨識一次勾多個引擎、同一段音檔同時送出比較，輸入有 VAD 收音（講完一句自動送出，可連續講）與上傳，顯示實際引擎、耗時、套用的分流與詞表、台語判斷，填參考文字就算錯字率（跟 voice_e2e 同算法），最近 5 段可回放；新增串流試聽，邊講邊出字。後端：`/api/v1/asr/preview` 多收 `project_id`、`language_routes`，跟正式對話一樣套詞表與台語判斷（引擎照選的跑），回傳 `glossary`、`language_check`、`language_routes`；`/api/v1/asr/stream` 多一個只有管理員能用的 `engine` 參數。原本錄音鈕用到不存在的 `btn-secondary` 樣式，一起改掉。
 - **[2026-10-02]** 講話中插話的分類端點（預設不用）：新增登入保護的 `POST /api/v1/voice/interrupt`（`{transcript, reply_text}` → `{action: "STOP" | "IGNORE"}`），先丟掉完整出現在回答裡的文字（當成喇叭回音），再交給既有 GuardAgent／Jev 判斷。前台串流辨識接好了，但開關 `INTERRUPT_WHILE_SPEAKING`（`useAvatarVoiceInput.ts`）預設關：回音過濾只擋完全相同的文字，辨識錯一個字就擋不住，現場喇叭與麥克風的回音消除還沒實測，開了可能讓虛擬人自己打斷自己。虛擬人出聲時所有引擎照舊停止收音。
-
 
 - **[2026-10-08]** **整理 Gemini Live 決策 helper**：將 finalized text envelope 與預取查詢比對移至 `gemini_payloads.py`、`gemini_tool_execution.py`，讓 Live 會話模組通過 1,000 行 CI 邊界檢查。
 
@@ -588,7 +590,6 @@
 - **[2026-09-21]** 追加 SemIf 固定輸入與全排列穩定性診斷：32 題 × 24 種選項順序 × 3 次，保存凍結排程、逐筆分數與輸入 hash，分開統計重跑差異及順序敏感性；同輸入三次完全一致，但 21/32 題隨排列改答案，維持不接管正式路由。
 - **[2026-09-20]** 新增隔離的 SemIf 語意分流／語音打斷離線實驗，提供繁體中文合成案例、固定上游與模型版本、選項順序穩定性及延遲量測；不變更正式服務路由。
 
-
 ### Changed
 - **[2026-09-22]** **用量頁篩選器**: 日期改為快捷區間（最近 7／14／30／90 天、自訂），選快捷時直接
   算好起訖日，不用開兩個日期欄位。Embed key 從手打 ID 改為下拉選單，清單只有
@@ -606,7 +607,6 @@
   - **ASR 與辨識核心**：統一 `browser-recognizer.ts`、`server-recorder.ts`、`vad-recognizer.ts` 與決策狀態機 `controller.ts`；錯誤訊息集中管理（D6），支援預設伺服器引擎（D1）、瀏覽器故障自動記憶體降級（D2）、閒置自動停止（D3）、VAD 模式（D4/D5）、預設系統設定選項（D7）與樂觀更新還原（D8）。
   - **TTS 串流與排程**：抽取 `pcm-stream.ts`、`scheduler.ts`、`selection.ts`（D9 成對驗證）、`fallback.ts`（D10 讀取並展示 `X-TTS-Fallback-Reason` 後端原因提示）與 `cache.ts`（LRU 快取）。
   - **儲存與相容性**：提供 `storage.ts` 統一使用 `speech.*` 鍵名並具備舊鍵向後相容無縫遷移（D11，舊鍵讀取後遷移且保留不刪）。兩端前端改為純薄層轉接，並更新 Docker 與建置管線以保證兩端各自獨立 build、test 全綠。
-
 
 - **[2026-09-21]** **後台聊天室接上 ASR 引擎選擇**: 後台聊天室原本寫死瀏覽器內建辨識，跟帳號授權
   與「語音」頁的設定完全無關——per-account 授權上線時漏了這個介面。現在依帳號

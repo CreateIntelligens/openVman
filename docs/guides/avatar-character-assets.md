@@ -2,13 +2,13 @@
 
 前台與 Avatar SDK 用 DHLiveMini2 引擎（`frontend/app/public/js/OpenVmanAvatarRuntime.js`、`public/wasm/OpenVmanAvatarRuntime.wasm`）播放 2D 人物。每個人物是一個資料夾，放在 backend 的 `avatar_assets_dir`（正式機為 `data/avatar/<char_id>/`），經 `GET /static/characters/<char_id>/<檔名>` 提供，讀取權限依人物資源判斷（全域、專案專屬、ROOT 指派，見 `docs/specs/01_BACKEND_SPEC.md`「專案資源範圍」）。
 
-素材的製作管線不在本 repo；本文只記 openVman 這端要求的格式、上架方式與如何驗收。
+素材可以由本 repo 的 `avatar-pipeline` 從影片或圖片產生（流程與參數見 [avatar-pipeline/README.md](../../avatar-pipeline/README.md)），也可以由外部工具製作後直接上傳。本文只記 openVman 這端要求的格式、上架方式與如何驗收。
 
 ## 檔案
 
 | 檔案 | 要求 |
 |---|---|
-| `01.webm` | VP9、無音軌、25 fps。寬高與 `combined_data` 對應的原始影片一致（例：1014、local_01 為 720×1280，其他多為 1080×1920）。影格數必須等於 `json_data` 的筆數 |
+| `01.webm` | VP9、無音軌、25 fps。寬高與 `combined_data` 對應的原始影片一致（例：1014、local_01 為 720×1280，其他多為 1080×1920）。影格數必須等於 `json_data` 的筆數。可帶透明通道（`yuva420p`、WebM `alpha_mode=1`），舞台背景會從人物後方透出；Safari 不支援 VP9 透明，會顯示成黑底，展示機台要用 Chrome 或 Edge |
 | `combined_data.json.gz` | 由素材製作管線產出的資料檔，內含 `json_data`（每格一筆）。`json_data` 筆數＝影片影格數 |
 | `meta.json` | 由 backend 上傳時寫入（`label`、`created_at`、`updated_at`），不要手寫 |
 
