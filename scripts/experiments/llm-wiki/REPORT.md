@@ -693,9 +693,39 @@ python3 "$D/judge_live.py" --cases <相同凍結題檔> \
 
 目前249項離線單測通過，`compileall`及`git diff --check`通過。新增案例涵蓋中文中段主題、競爭主詞與條件、完整句／引用行號、錯幣別草稿必須再驗、修稿最多一份、不接受未驗新數字、混寫時鐘、並行ContextVars、pre-prompt失敗仍保留分母及來源違規不得由複核豁免。報告只更新本檔，沒有OUT複本。
 
-第一輪腳本已在main；第二至第七輪仍在本worktree，未stage／commit／push，未rebase，分支HEAD維持73466ce2。未修改或部署正式Brain／Backend、知識庫、索引、憑證及設定；後續合併由使用者處理，CHANGELOG的相鄰條目不自行丟棄。
+第一輪腳本已在 main；以上第二至第七輪的提交前記錄以 `73466ce2` 為基底，之後已在 `experiment/llm-wiki` 以 `33dc9207` 提交留存，未 push、未合併 main、未 rebase。未修改或部署正式 Brain／Backend、知識庫、索引、憑證及設定；後續合併由使用者處理，CHANGELOG 的相鄰條目不自行丟棄。
 
-## 報告與腳本交付補修（2026-10-29）
+### 固定 v13 規則的核對模型對照（2026-10-29）
+
+**結論：flash-lite 不能直接取代 3.8-flash；差距包含放過錯誤，並非只有誤擋。** Wiki 仍是本實驗主線，但同步核對的延遲尚不適合直接接入虛擬人即時回覆，不能只憑內容分數宣稱可導入。
+
+固定目前 `answer_check.py`（SHA-256 `6a4ccde58f5c730e57d9443828af886a3a0dc56bc5474da62c5963e49e697aa7`）的 v13 prompt／validator／程式邏輯，兩域各用原來 32 題×2 輪、`focused_v2` 草稿與實際 prompt／tool 結果；沒有重做 agent 作答或檢索，不啟用 `--repair`。`recheck_answers.py` 兩組都用 `--workers 2`，只換 `--check-model`。`judge_live.py` 固定 grading-v2／`gemini-3.8-flash`（grade hash `54ea9511c821fd9bce1d05bebec8de6710737494ab5e046592cf4c5443853202`），**全用原始機器判分，沒有人工複核或分數調整**。
+
+原有 `hospital_checked_v13.json`／`heji_checked_v13.json` 雖以 v13 命名，記錄的 checker hash 為 `9504da9446279b000d4ac974286c1a45a43596dbe170d6c91a379b6343efe304`，保存的請求也與目前規則不同。因此本次另跑 `_flash_control`，與 `_lite` 共用當前程式，才可隔離模型；舊檔及其 50／54 分數完整保留，不混入下表。128 份輸入均與原批 `*_live_v3.json` 的草稿、歷史、prompt 及工具資料逐筆吻合，並驗證原檔 hash 未變。本次是不改題、不改規則的單一模型對照，沒有新增實驗輪次。
+
+| 專案 | 核對模型 | 通過／64 | 重大錯誤 | check 中位秒 | p90 秒 | action：accept／clarify／refuse | Schema／引用驗證：重試／失敗嘗試／耗盡失敗 |
+|---|---|---:|---:|---:|---:|---|---|
+| 醫院 | gemini-3.8-flash | 52/64 | 0 | 9.45 | 15.45 | 58／4／2 | 0／0／0 |
+| 醫院 | gemini-3.5-flash-lite | 48/64 | 1 | 2.67 | 3.51 | 58／2／4 | 4／4／0 |
+| 鶴記 | gemini-3.8-flash | 55/64 | 0 | 9.71 | 14.71 | 57／5／2 | 0／0／0 |
+| 鶴記 | gemini-3.5-flash-lite | 46/64 | 2 | 2.54 | 4.23 | 54／0／6，另 4 error | 8／12／4 |
+
+`refuse` 對應程式 action `unsupported`，可能保留有支持的句子，並不保證整份是制式拒答；鶴記 lite 的 4 份失敗沒有有效 action，另列 error、不排出分母。Schema／引用驗證含 JSON 解析、schema 與逐字引用 validator；3.8 兩域另外各有 1 次呼叫 `RuntimeError`，既有重試成功，非 schema 失敗，全部嘗試仍保留。四組裁判錯誤均為 0。p90 採 nearest rank，第 58／64 個耗時；時間只計核對，不是 HTTP 首字或 TTS 延遲。來源草稿原程序中位為醫院 2.20 秒、鶴記 2.39 秒，並非獨立 RAG 基準；連 lite 的額外核對都與原草稿程序相當，不能當作可忽略延遲。
+
+**逐題差異：3.8 通過、lite 未通過共 14 份。** 以下 R1／R2 對應原始 `rep=0/1`，只整理機器結果，不改標籤：
+
+- **誤擋／不當拒答或反問（6 份）**：`hospital_stress_E03` R1、R2，將已有依據的 10 日內退押金方式改成資料不足；`heji_stress_N07` R2，交期未載的拒答退成要求再確認已知型號；`heji_stress_X05` R2，應澄清完整型號／相數卻給泛稱拒答；`heji_stress_X06` R1、R2，應問最大指標，卻只泛稱需求或轉介。後三種包含澄清不足，不全是「正確事實遭刪掉」。
+- **放過錯誤（3 份）**：`hospital_stress_X03` R1，應先確認服務卻放行多項費用列舉；`hospital_stress_X06` R1，指涉不明卻猜健檢報告天數，原始裁判標重大；`heji_stress_M08` R1，原始裁判要求確認型號／上限指標，lite 卻放行兩款規格列舉。這些是原始 grading-v2 的判定，不因先前複核對多候選有不同看法而改分。
+- **另 4 份是核對未完成**：`heji_stress_N06` R1、R2，及 `heji_stress_X03` R1、R2，兩次引用驗證都失敗（`nonliteral_evidence`），依既有流程關閉輸出並計失敗；不能偽裝成一般拒答成功，也不能歸為放過錯誤。
+- **另 1 份是同文異判**：`heji_stress_X02` R1，兩模型最終回答逐字相同，機器卻判 3.8 pass、lite fail。反方向只有 `heji_stress_M05` R1（lite pass、3.8 fail），同樣逐字相同。兩筆均保留原分，不能歸因為核對模型的語意差異。
+
+重大標記也保留原樣：醫院 lite 的 1 份為上述 X06 R1；鶴記 lite 的 `heji_stress_X05` R1 放行自行猜 30HP／三相 400V 的 44.6A，3.8 則澄清，但因問得不夠具體仍被判 fail，故不在「3.8 pass」差異清單。鶴記另一份重大標記為 `heji_stress_X02` R2，裁判理由是未明說拒絕跨專案數字挪用；兩模型實際文字只差句尾標點，3.8 同樣 fail 但未標重大。這顯示裁判標記有波動；本次不消除該標記，也不把它說成真的輸出了跨專案金額。
+
+四組核對均通過專案檔案前後一致檢查，正式程式與設定未改；核對程式、裁判及原始輸入 hash 前後一致，所有成功回傳的實際模型名稱符合指定值。證據全留 repo 外 `$OUT/round7/`：`checker_model_v13_protocol.json`、`checker_model_v13_comparison_final.json`、`checker_model_v13_analyze.py`、`{hospital,heji}_checked_v13_{lite,flash_control}.json`、各自 checkpoint 與 `*_judged.json`／summary。不覆寫舊批次，不新增 repo 內報告或私有附件。
+
+Wiki 後續優化須同時保留已驗證的條件／主詞防護並縮短即時路徑；本對照只回答「換核對模型」是否可行，沒有驗證新的 Wiki 延遲方案，也沒有改選 RAG 或變更正式流程。導入判定仍為 **NO_GO**。本次提交前隱私掃描、105 項隱私測試、256 項實驗單測與 `git diff --check` 通過；提交範圍只有本報告與 CHANGELOG。
+
+## 報告與腳本交付補修（2026-10-29；提交前驗證記錄）
 
 這次補修沒有新增模型答題或改動前述分數。開頭改為先說 NO_GO、開發題與驗收缺口；獨立列出 7 項現行基準問題及實際題號、7 項醫院原文差異／待釐清事項、4 項內容／治理問題，並排除人工埋點與未成立的床數判定。前文的 `Draft` 狀態維持原樣。
 
