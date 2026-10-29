@@ -38,6 +38,15 @@ import CharactersPanel from "../components/avatar/CharactersPanel";
 import MascotsPanel from "../components/avatar/MascotsPanel";
 import { useMascotSnapshotQueue } from "../hooks/useMascotSnapshotQueue";
 import { publicAdminPath } from "../components/app/navigation";
+import {
+  BACKGROUND_IMAGE,
+  BUNDLE_DATA,
+  BUNDLE_VIDEO,
+  MASCOT_MODEL,
+  MASCOT_THUMBNAIL,
+  checkBundleTotal,
+  checkFile,
+} from "../components/avatar/uploadRules";
 
 type Status = { type: "success" | "error"; message: string } | null;
 type RenameTarget =
@@ -62,6 +71,10 @@ const hiddenSnapshotFrameStyle: CSSProperties = {
   pointerEvents: "none",
 };
 
+
+function firstProblem(...problems: Array<string | null>): string | null {
+  return problems.find((problem) => problem !== null) ?? null;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -121,19 +134,19 @@ export default function Avatar() {
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCharProjectId, setUploadCharProjectId] = useState("");
   const [uploading, setUploading] = useState(false);
-  const videoRef = useRef<HTMLInputElement>(null);
-  const dataRef = useRef<HTMLInputElement>(null);
+  const [uploadVideoFile, setUploadVideoFile] = useState<File | null>(null);
+  const [uploadDataFile, setUploadDataFile] = useState<File | null>(null);
   const [uploadBackgroundId, setUploadBackgroundId] = useState("");
   const [uploadBackgroundLabel, setUploadBackgroundLabel] = useState("");
   const [uploadBgProjectId, setUploadBgProjectId] = useState("");
   const [backgroundUploading, setBackgroundUploading] = useState(false);
-  const imageRef = useRef<HTMLInputElement>(null);
+  const [uploadImageFile, setUploadImageFile] = useState<File | null>(null);
   const [uploadMascotId, setUploadMascotId] = useState("");
   const [uploadMascotLabel, setUploadMascotLabel] = useState("");
   const [uploadMascotProjectId, setUploadMascotProjectId] = useState("");
   const [mascotUploading, setMascotUploading] = useState(false);
-  const mascotModelRef = useRef<HTMLInputElement>(null);
-  const mascotThumbnailRef = useRef<HTMLInputElement>(null);
+  const [uploadModelFile, setUploadModelFile] = useState<File | null>(null);
+  const [uploadThumbnailFile, setUploadThumbnailFile] = useState<File | null>(null);
 
   const handleSnapshotUploaded = useCallback(() => {
     void loadMascots();
@@ -143,12 +156,6 @@ export default function Avatar() {
     loading: mascotsLoading,
     onUploaded: handleSnapshotUploaded,
   });
-
-  const [selectedVideoName, setSelectedVideoName] = useState<string>("");
-  const [selectedDataName, setSelectedDataName] = useState<string>("");
-  const [selectedImageName, setSelectedImageName] = useState<string>("");
-  const [selectedMascotModelName, setSelectedMascotModelName] = useState<string>("");
-  const [selectedMascotThumbnailName, setSelectedMascotThumbnailName] = useState<string>("");
 
   useEffect(() => {
     void fetchProjects()
@@ -165,28 +172,23 @@ export default function Avatar() {
     setUploadCharId("");
     setUploadLabel("");
     setUploadCharProjectId("");
-    setSelectedVideoName("");
-    setSelectedDataName("");
-    if (videoRef.current) videoRef.current.value = "";
-    if (dataRef.current) dataRef.current.value = "";
+    setUploadVideoFile(null);
+    setUploadDataFile(null);
   }
 
   function resetBackgroundUploadForm(): void {
     setUploadBackgroundId("");
     setUploadBackgroundLabel("");
     setUploadBgProjectId("");
-    setSelectedImageName("");
-    if (imageRef.current) imageRef.current.value = "";
+    setUploadImageFile(null);
   }
 
   function resetMascotUploadForm(): void {
     setUploadMascotId("");
     setUploadMascotLabel("");
     setUploadMascotProjectId("");
-    setSelectedMascotModelName("");
-    setSelectedMascotThumbnailName("");
-    if (mascotModelRef.current) mascotModelRef.current.value = "";
-    if (mascotThumbnailRef.current) mascotThumbnailRef.current.value = "";
+    setUploadModelFile(null);
+    setUploadThumbnailFile(null);
   }
 
   async function load(): Promise<void> {
@@ -274,13 +276,22 @@ export default function Avatar() {
   async function handleUpload(): Promise<void> {
     const charId = uploadCharId.trim();
     const label = uploadLabel.trim();
-    const videoFile = videoRef.current?.files?.[0];
-    const dataFile = dataRef.current?.files?.[0];
+    const videoFile = uploadVideoFile;
+    const dataFile = uploadDataFile;
     if (!charId || !label || !videoFile || !dataFile) {
       setStatus({
         type: "error",
         message: "請填寫所有欄位，並選好兩個檔案",
       });
+      return;
+    }
+    const problem = firstProblem(
+      checkFile(videoFile, [BUNDLE_VIDEO]),
+      checkFile(dataFile, [BUNDLE_DATA]),
+      checkBundleTotal(videoFile, dataFile),
+    );
+    if (problem) {
+      setStatus({ type: "error", message: problem });
       return;
     }
     setUploading(true);
@@ -317,12 +328,17 @@ export default function Avatar() {
   async function handleBackgroundUpload(): Promise<void> {
     const backgroundId = uploadBackgroundId.trim();
     const label = uploadBackgroundLabel.trim();
-    const image = imageRef.current?.files?.[0];
+    const image = uploadImageFile;
     if (!backgroundId || !label || !image) {
       setStatus({
         type: "error",
         message: "請填寫所有欄位，並選好圖片",
       });
+      return;
+    }
+    const imageProblem = checkFile(image, [BACKGROUND_IMAGE]);
+    if (imageProblem) {
+      setStatus({ type: "error", message: imageProblem });
       return;
     }
     setBackgroundUploading(true);
@@ -347,13 +363,21 @@ export default function Avatar() {
   async function handleMascotUpload(): Promise<void> {
     const mascotId = uploadMascotId.trim();
     const label = uploadMascotLabel.trim();
-    const model = mascotModelRef.current?.files?.[0];
-    const thumbnail = mascotThumbnailRef.current?.files?.[0] || undefined;
+    const model = uploadModelFile;
+    const thumbnail = uploadThumbnailFile ?? undefined;
     if (!mascotId || !label || !model) {
       setStatus({
         type: "error",
         message: "請填寫所有欄位，並選好 VRM 模型",
       });
+      return;
+    }
+    const mascotProblem = firstProblem(
+      checkFile(model, [MASCOT_MODEL]),
+      thumbnail ? checkFile(thumbnail, [MASCOT_THUMBNAIL]) : null,
+    );
+    if (mascotProblem) {
+      setStatus({ type: "error", message: mascotProblem });
       return;
     }
     setMascotUploading(true);
@@ -540,17 +564,15 @@ export default function Avatar() {
           uploading={uploading}
           uploadId={uploadCharId}
           uploadLabel={uploadLabel}
-          selectedVideoName={selectedVideoName}
-          selectedDataName={selectedDataName}
-          videoRef={videoRef}
-          dataRef={dataRef}
+          videoFile={uploadVideoFile}
+          dataFile={uploadDataFile}
           projects={projects}
           selectedProjectId={uploadCharProjectId}
           onProjectIdChange={setUploadCharProjectId}
           onUploadIdChange={setUploadCharId}
           onUploadLabelChange={setUploadLabel}
-          onVideoChange={setSelectedVideoName}
-          onDataChange={setSelectedDataName}
+          onVideoChange={setUploadVideoFile}
+          onDataChange={setUploadDataFile}
           onUpload={handleUpload}
           onTry={handleTry}
           onRename={(character) => setRenameTarget({ kind: "character", character })}
@@ -566,14 +588,13 @@ export default function Avatar() {
           uploading={backgroundUploading}
           uploadId={uploadBackgroundId}
           uploadLabel={uploadBackgroundLabel}
-          selectedImageName={selectedImageName}
-          imageRef={imageRef}
+          imageFile={uploadImageFile}
           projects={projects}
           selectedProjectId={uploadBgProjectId}
           onProjectIdChange={setUploadBgProjectId}
           onUploadIdChange={setUploadBackgroundId}
           onUploadLabelChange={setUploadBackgroundLabel}
-          onImageChange={setSelectedImageName}
+          onImageChange={setUploadImageFile}
           onUpload={handleBackgroundUpload}
           onUse={handleUseBackground}
           onRename={(background) => setRenameTarget({ kind: "background", background })}
@@ -590,17 +611,15 @@ export default function Avatar() {
           uploading={mascotUploading}
           uploadId={uploadMascotId}
           uploadLabel={uploadMascotLabel}
-          selectedModelName={selectedMascotModelName}
-          selectedThumbnailName={selectedMascotThumbnailName}
-          modelRef={mascotModelRef}
-          thumbnailRef={mascotThumbnailRef}
+          modelFile={uploadModelFile}
+          thumbnailFile={uploadThumbnailFile}
           projects={projects}
           selectedProjectId={uploadMascotProjectId}
           onProjectIdChange={setUploadMascotProjectId}
           onUploadIdChange={setUploadMascotId}
           onUploadLabelChange={setUploadMascotLabel}
-          onModelChange={setSelectedMascotModelName}
-          onThumbnailChange={setSelectedMascotThumbnailName}
+          onModelChange={setUploadModelFile}
+          onThumbnailChange={setUploadThumbnailFile}
           onUpload={handleMascotUpload}
           onUse={handleUseMascot}
           onRename={(mascot) => setRenameTarget({ kind: "mascot", mascot })}

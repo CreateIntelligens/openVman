@@ -26,6 +26,7 @@ from app.auth.resources import (
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
+from app.avatar.mascot_store import DERIVED_VIDEO_PREFIX, THUMBNAIL_FILENAME
 from app.config import get_tts_config
 
 logger = logging.getLogger("backend.static_assets")
@@ -147,9 +148,40 @@ async def get_mascot_asset(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> FileResponse:
-    _check_resource_access(current, runtime, ResourceType.AVATAR_MASCOT, mascot_id)
+    if _is_derived_video_mascot(runtime, mascot_id):
+        _check_derived_video_mascot_access(current, runtime, mascot_id, file_path)
+    else:
+        _check_resource_access(current, runtime, ResourceType.AVATAR_MASCOT, mascot_id)
     cfg = get_tts_config()
     return FileResponse(_resolve_asset_file(cfg.avatar_mascots_dir, mascot_id, file_path))
+
+
+def _is_derived_video_mascot(runtime: AuthRuntime, mascot_id: str) -> bool:
+    # 由人物自動衍生的 video-<char_id> 不登錄成小助理資源；有登錄的照小助理資源判斷。
+    return (
+        mascot_id.startswith(DERIVED_VIDEO_PREFIX)
+        and len(mascot_id) > len(DERIVED_VIDEO_PREFIX)
+        and runtime.resources.get(ResourceType.AVATAR_MASCOT, mascot_id) is None
+    )
+
+
+def _check_derived_video_mascot_access(
+    current: CurrentAccount,
+    runtime: AuthRuntime,
+    mascot_id: str,
+    file_path: str,
+) -> None:
+    # 衍生目錄只放縮圖；看得到底下的人物才看得到它的縮圖。沒權限一律 404，
+    # 不透過小助理路徑透露人物存在。
+    if file_path != THUMBNAIL_FILENAME:
+        raise HTTPException(status_code=404, detail="File not found")
+    char_id = mascot_id[len(DERIVED_VIDEO_PREFIX):]
+    try:
+        _check_resource_access(current, runtime, ResourceType.AVATAR_CHARACTER, char_id)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            raise HTTPException(status_code=404, detail="File not found") from exc
+        raise
 
 
 @router.get("/static/backgrounds/{background_id}/{file_path:path}", summary="讀取背景檔案")

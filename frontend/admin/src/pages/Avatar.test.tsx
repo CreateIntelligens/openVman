@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { NavigationProvider } from "../context/NavigationContext";
 import { buildAdminPath, parseAdminRoute } from "../components/app/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render as renderComponent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as renderComponent, screen, waitFor, within } from "@testing-library/react";
 import Avatar from "./Avatar";
 import { MascotProvider } from "../context/MascotContext";
 import * as api from "../api";
@@ -91,8 +91,8 @@ describe("Avatar page", () => {
     render(<Avatar />);
 
     expect(await screen.findByRole("button", { name: "試用 008" })).toBeTruthy();
-    expect(screen.queryByText("從影片產生角色")).toBeNull();
-    expect(screen.queryByText("上傳新人物")).toBeNull();
+    expect(screen.queryByText("從影片或圖片產生人物")).toBeNull();
+    expect(screen.queryByText("上傳現成素材包")).toBeNull();
     expect(screen.queryByRole("button", { name: "改名" })).toBeNull();
     expect(screen.queryByRole("button", { name: "刪除" })).toBeNull();
   });
@@ -144,8 +144,8 @@ describe("Avatar page", () => {
     render(<Avatar />);
 
     expect(await screen.findByRole("button", { name: "試用 008" })).toBeTruthy();
-    expect(screen.getByText("從影片產生角色")).toBeTruthy();
-    expect(screen.getByText("上傳新人物")).toBeTruthy();
+    expect(screen.getByText("從影片或圖片產生人物")).toBeTruthy();
+    expect(screen.getByText("上傳現成素材包")).toBeTruthy();
     expect(screen.getByRole("button", { name: "改名" })).toBeTruthy();
   });
 
@@ -233,7 +233,7 @@ describe("Avatar page", () => {
 
     expect(screen.queryByText("settings_zip")).toBeNull();
     const icon = screen.getByText("folder_zip");
-    expect(icon.className).toContain("w-4");
+    expect(icon.className).toContain("w-5");
     expect(icon.className).toContain("overflow-hidden");
     expect(icon.getAttribute("aria-hidden")).toBe("true");
   });
@@ -251,7 +251,7 @@ describe("Avatar page", () => {
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("button", { name: "改名" }));
 
-    const input = await screen.findByLabelText(/顯示名稱/);
+    const input = await screen.findByDisplayValue("角色十");
     fireEvent.change(input, { target: { value: "新的名字" } });
     fireEvent.click(screen.getByRole("button", { name: "儲存" }));
 
@@ -323,13 +323,13 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
-    fireEvent.change(await screen.findByPlaceholderText("背景 ID（background_id）"), {
+    fireEvent.change(await screen.findByLabelText("背景 ID"), {
       target: { value: "clinic" },
     });
-    fireEvent.change(screen.getByPlaceholderText("顯示名稱"), {
+    fireEvent.change(screen.getByLabelText("顯示名稱"), {
       target: { value: "診間背景" },
     });
-    fireEvent.change(screen.getByLabelText(/圖片/), {
+    fireEvent.change(screen.getByLabelText("背景圖片"), {
       target: { files: [new File(["image"], "clinic.png", { type: "image/png" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "上傳背景" }));
@@ -454,13 +454,13 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
-    fireEvent.change(await screen.findByPlaceholderText("小助理 ID（mascot_id）"), {
+    fireEvent.change(await screen.findByLabelText("小助理 ID"), {
       target: { value: "custom" },
     });
-    fireEvent.change(screen.getByPlaceholderText("小助理顯示名稱"), {
+    fireEvent.change(screen.getByLabelText("顯示名稱"), {
       target: { value: "自訂小助理" },
     });
-    fireEvent.change(screen.getByLabelText(/VRM/), {
+    fireEvent.change(screen.getByLabelText("VRM 模型"), {
       target: { files: [new File(["glTF"], "custom.vrm", { type: "model/gltf-binary" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "上傳小助理" }));
@@ -510,7 +510,7 @@ describe("Avatar page", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
     fireEvent.click(await screen.findByRole("button", { name: "改名 custom" }));
 
-    const input = await screen.findByLabelText(/顯示名稱/);
+    const input = await screen.findByDisplayValue("自訂小助理");
     fireEvent.change(input, { target: { value: "新小助理" } });
     fireEvent.click(screen.getByRole("button", { name: "儲存" }));
 
@@ -561,5 +561,120 @@ describe("Avatar page", () => {
     expect(api.deleteAvatarMascot).toHaveBeenCalledWith("custom");
     await waitFor(() => expect(screen.queryByText("custom")).toBeNull());
     expect(screen.getByText("Frieren")).toBeTruthy();
+  });
+
+  it("checks background images before uploading and shows server limits verbatim", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({ backgrounds: [] });
+    const upload = vi.spyOn(api, "uploadAvatarBackground")
+      .mockRejectedValue(new Error("圖片超過大小上限（25 MB）"));
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
+    expect(await screen.findByText("PNG／JPG／WebP，25 MB 內。")).toBeTruthy();
+    const picker = screen.getByLabelText("背景圖片");
+    fireEvent.change(picker, {
+      target: { files: [new File(["gif"], "bg.gif", { type: "image/gif" })] },
+    });
+    expect(screen.getByRole("alert").textContent).toContain("「bg.gif」不是支援的格式");
+
+    fireEvent.change(screen.getByLabelText("背景 ID"), { target: { value: "clinic" } });
+    fireEvent.change(screen.getByLabelText("顯示名稱"), { target: { value: "診間背景" } });
+    fireEvent.change(picker, {
+      target: { files: [new File(["png"], "bg.png", { type: "image/png" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "上傳背景" }));
+
+    await waitFor(() => expect(upload).toHaveBeenCalled());
+    expect(await screen.findByText("圖片超過大小上限（25 MB）")).toBeTruthy();
+  });
+
+  it("refuses a bundle over the combined size before uploading", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    const upload = vi.spyOn(api, "uploadAvatarCharacter");
+    render(<Avatar />);
+    await screen.findByText(/還沒有人物/);
+
+    const bundle = screen.getByText("上傳現成素材包").closest("details")!;
+    const video = new File(["v"], "01.webm", { type: "video/webm" });
+    Object.defineProperty(video, "size", { value: 80 * 1024 * 1024 });
+    const data = new File(["d"], "combined_data.json.gz", { type: "application/gzip" });
+    Object.defineProperty(data, "size", { value: 30 * 1024 * 1024 });
+    fireEvent.change(within(bundle).getByLabelText("人物 ID"), { target: { value: "big" } });
+    fireEvent.change(within(bundle).getByLabelText("顯示名稱"), { target: { value: "大檔" } });
+    fireEvent.change(within(bundle).getByLabelText("影片"), { target: { files: [video] } });
+    fireEvent.change(within(bundle).getByLabelText("資料檔"), { target: { files: [data] } });
+    fireEvent.click(within(bundle).getByRole("button", { name: "上傳素材包" }));
+
+    expect(await screen.findByText("影片和資料檔合計 110.0 MB，上限是 100 MB。")).toBeTruthy();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("groups mascots by type and explains where character-derived ones are managed", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({
+      mascots: [
+        {
+          mascot_id: "haru-live2d", label: "Haru", engine: "2d", model_url: "", vrm_url: "",
+          thumbnail_url: "/static/mascots/haru-live2d/thumbnail.png",
+          fit: "half", builtin: true, size_bytes: 0, updated_at: "",
+        },
+        {
+          mascot_id: "video-0616", label: "ESG-AIKKA半身", engine: "video", model_url: "", vrm_url: "",
+          character_id: "0616", thumbnail_url: "/static/mascots/video-0616/thumbnail.png",
+          fit: "", builtin: true, size_bytes: 0, updated_at: "",
+        },
+        {
+          mascot_id: "custom", label: "自訂小助理", engine: "3d", model_url: "",
+          vrm_url: "/static/mascots/custom/model.vrm", fit: "", builtin: false,
+          size_bytes: 4096, updated_at: "",
+        },
+      ],
+    });
+
+    render(<MascotProvider><Avatar /></MascotProvider>);
+    fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
+
+    await screen.findByText("Haru");
+    const groups = screen.getAllByRole("region").filter((region) => region.hasAttribute("aria-label"));
+    expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
+      "VRM 小助理", "Live2D 小助理", "人物影片 小助理",
+    ]);
+    const videoGroup = screen.getByRole("region", { name: "人物影片 小助理" });
+    expect(within(videoGroup).getByText(/要改名或刪除請到人物分頁/)).toBeTruthy();
+    expect(within(videoGroup).getByText("自動帶入")).toBeTruthy();
+    // 主標題是顯示名稱，ID 只當次要資訊。
+    expect(within(videoGroup).getByText("ESG-AIKKA半身").className).toContain("font-semibold");
+    expect(within(videoGroup).queryByRole("button", { name: /刪除/ })).toBeNull();
+
+    // 縮圖載入失敗時換成首字加類型的佔位，不留破圖。
+    const thumb = videoGroup.querySelector("img")!;
+    fireEvent.error(thumb);
+    expect(videoGroup.querySelector("img")).toBeNull();
+    const placeholder = within(videoGroup).getByTestId("mascot-placeholder");
+    expect(placeholder.textContent).toBe("E人物影片");
+
+    // 沒有縮圖的 VRM 一開始就是佔位。
+    const vrmGroup = screen.getByRole("region", { name: "VRM 小助理" });
+    expect(within(vrmGroup).getByTestId("mascot-placeholder").textContent).toBe("自VRM");
+
+    expect(screen.getByText("「使用」只換這個後台右下角的小助理，不會改變前台。")).toBeTruthy();
+    const use = screen.getByRole("button", { name: "使用 自訂小助理" });
+    expect(use.getAttribute("aria-pressed")).toBe("false");
+    expect(use.className).not.toContain("bg-primary ");
+    fireEvent.click(use);
+    expect(screen.getByRole("button", { name: "使用 自訂小助理" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("states the VRM-only upload limits on the mascot tab", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({ mascots: [] });
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("tab", { name: "小助理" }));
+
+    expect(await screen.findByText(".vrm，100 MB 內。")).toBeTruthy();
+    expect(screen.getByText(/PNG／JPG／WebP，10 MB 內/)).toBeTruthy();
+    expect((screen.getByLabelText("VRM 模型") as HTMLInputElement).accept).toBe(".vrm");
+    expect((screen.getByLabelText("縮圖") as HTMLInputElement).accept).toBe(".png,.jpg,.jpeg,.webp");
   });
 });

@@ -255,7 +255,7 @@ ws.send(JSON.stringify(payload));
 - `POST /api/v1/projects/{project_id}/assignments`：**僅限 ROOT**（非 ROOT 回 403）。指派特定資源給專案（body: `{"resource_type": "...", "resource_id": "..."}`）；資源不存在回 422；已存在回 200 冪等處理。
 - `DELETE /api/v1/projects/{project_id}/assignments/{resource_type}/{resource_id}`：**僅限 ROOT**（非 ROOT 回 403）。解除指派特定資源，不存在回 404。
 - 專案刪除保護：專案被刪除時，其專案專屬資源不會連帶刪除檔案或資料庫記錄，而是將 `owner_project_id` 置 NULL，成為只有 ROOT 可見的「孤兒資源」；指派關聯表記錄自動 CASCADE 刪除。
-- 靜態檔案授權（`/static/characters/`、`/static/backgrounds/`、`/static/mascots/`）：驗證呼叫者具備該資源所屬專案或任一指派專案的 `ResourceAccess.READ` 權限；Embed key 僅限綁定專案。
+- 靜態檔案授權（`/static/characters/`、`/static/backgrounds/`、`/static/mascots/`）：驗證呼叫者具備該資源所屬專案或任一指派專案的 `ResourceAccess.READ` 權限；Embed key 僅限綁定專案。由人物自動衍生、沒有登錄成小助理資源的 `video-<char_id>` 小助理，`/static/mascots/video-<char_id>/` 只提供 `thumbnail.png`，改依底下人物（`avatar_character`／`<char_id>`）的權限判斷，沒有權限回 404。
 
 
 套用位置（沒有專案、專案讀不到、或限制為空時，行為與改版前完全相同）：

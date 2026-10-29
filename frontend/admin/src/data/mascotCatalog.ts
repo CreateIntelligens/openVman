@@ -6,7 +6,7 @@ export type MascotFit = "half" | "full";
 export const MASCOT_ENGINE_LABELS: Record<MascotEngine, string> = {
   "2d": "Live2D",
   "3d": "VRM",
-  video: "Matex",
+  video: "人物影片",
 };
 
 export interface MascotOption {

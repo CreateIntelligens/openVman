@@ -1,25 +1,25 @@
-import type { RefObject } from "react";
-
 import type { AvatarCharacter } from "../../api";
 import { ResourceSourceBadge } from "./ResourceSourceBadge";
+import { FileDropField, ScopeField, TextField } from "./UploadFields";
 import {
   assetCardClassName,
   assetGridClassName,
   cardActionsClassName,
   cardBodyClassName,
   dangerActionClassName,
-  fileFieldClassName,
-  filePickerClassName,
-  fileRowClassName,
-  formRowClassName,
-  formPanelClassName,
   formatSize,
-  inputClassName,
+  listHeadingClassName,
   mediaPreviewClassName,
   primaryActionClassName,
   secondaryActionClassName,
-  uploadButtonClassName,
+  submitButtonClassName,
 } from "./assetStyles";
+import {
+  BUNDLE_DATA,
+  BUNDLE_TOTAL_MAX_BYTES,
+  BUNDLE_VIDEO,
+  formatLimit,
+} from "./uploadRules";
 
 type CharactersPanelProps = {
   characters: AvatarCharacter[];
@@ -27,17 +27,15 @@ type CharactersPanelProps = {
   uploading: boolean;
   uploadId: string;
   uploadLabel: string;
-  selectedVideoName: string;
-  selectedDataName: string;
-  videoRef: RefObject<HTMLInputElement>;
-  dataRef: RefObject<HTMLInputElement>;
+  videoFile: File | null;
+  dataFile: File | null;
   projects?: Array<{ project_id: string; label: string }>;
   selectedProjectId?: string;
   onProjectIdChange?: (value: string) => void;
   onUploadIdChange: (value: string) => void;
   onUploadLabelChange: (value: string) => void;
-  onVideoChange: (fileName: string) => void;
-  onDataChange: (fileName: string) => void;
+  onVideoChange: (file: File | null) => void;
+  onDataChange: (file: File | null) => void;
   onUpload: () => void;
   onTry: (character: AvatarCharacter) => void;
   onRename: (character: AvatarCharacter) => void;
@@ -52,10 +50,8 @@ export default function CharactersPanel({
   uploading,
   uploadId,
   uploadLabel,
-  selectedVideoName,
-  selectedDataName,
-  videoRef,
-  dataRef,
+  videoFile,
+  dataFile,
   projects,
   selectedProjectId,
   onProjectIdChange,
@@ -73,96 +69,87 @@ export default function CharactersPanel({
     <>
       {/* 上傳、改名、刪除都只開放管理員；一般帳號只看清單。 */}
       {canManage && (
-        <div className={formPanelClassName}>
-          <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
-            <span className="material-symbols-outlined text-base">upload</span>
-            上傳新人物
-          </p>
-          <div className={formRowClassName}>
-            <input
-              type="text"
-              placeholder="人物 ID（char_id）"
-              value={uploadId}
-              onChange={(e) => onUploadIdChange(e.target.value)}
-              className={inputClassName}
-            />
-            <input
-              type="text"
-              placeholder="顯示名稱"
-              value={uploadLabel}
-              onChange={(e) => onUploadLabelChange(e.target.value)}
-              className={inputClassName}
-            />
-            {projects && projects.length > 0 && onProjectIdChange && (
-              <select
-                value={selectedProjectId || ""}
-                onChange={(e) => onProjectIdChange(e.target.value)}
-                className={inputClassName}
-              >
-                <option value="">全域資源（所有專案可用）</option>
-                {projects.map((p) => (
-                  <option key={p.project_id} value={p.project_id}>
-                    專案專屬：{p.label || p.project_id}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div className={fileRowClassName}>
-            <div className={fileFieldClassName}>
-              <span className="text-xs font-medium text-content-muted">
-                影片（.webm）：
-              </span>
-              <label className={filePickerClassName(selectedVideoName)}>
-                <span className="material-symbols-outlined text-sm">movie</span>
-                <span className="min-w-0 truncate">
-                  {selectedVideoName || "選擇 WebM 影片"}
-                </span>
-                <input
-                  ref={videoRef}
-                  type="file"
-                  accept=".webm"
-                  className="hidden"
-                  aria-label="影片"
-                  onChange={(e) => onVideoChange(e.target.files?.[0]?.name || "")}
-                />
-              </label>
-            </div>
-
-            <div className={fileFieldClassName}>
-              <span className="text-xs font-medium text-content-muted">
-                資料檔（.gz）：
-              </span>
-              <label className={filePickerClassName(selectedDataName)}>
-                <span
-                  aria-hidden="true"
-                  className="material-symbols-outlined inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden text-[1rem] leading-none"
-                >
-                  folder_zip
-                </span>
-                <span className="min-w-0 truncate">
-                  {selectedDataName || "選擇 GZ 資料檔"}
-                </span>
-                <input
-                  ref={dataRef}
-                  type="file"
-                  accept=".gz"
-                  className="hidden"
-                  aria-label="資料檔"
-                  onChange={(e) => onDataChange(e.target.files?.[0]?.name || "")}
-                />
-              </label>
-            </div>
-
-            <button
-              onClick={onUpload}
-              disabled={uploading}
-              className={uploadButtonClassName}
+        // 現成素材包是給已經有 01.webm 與資料檔的人走的進階路徑，平常收起來。
+        <details className="group card min-w-0 shrink-0">
+          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-sm text-content-muted hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined inline-flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden text-[1.25rem] leading-none transition-transform group-open:rotate-90 motion-reduce:transition-none"
             >
-              {uploading ? "上傳中…" : "上傳"}
-            </button>
+              chevron_right
+            </span>
+            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+              <span className="font-medium text-content">上傳現成素材包</span>
+              <span>已有 01.webm 與資料檔時用，不經過轉換</span>
+            </span>
+          </summary>
+          <div className="flex min-w-0 flex-col gap-4 border-t border-border px-4 pb-4 pt-4">
+            <p className="text-sm text-content-muted">
+              兩個檔案合計 {formatLimit(BUNDLE_TOTAL_MAX_BYTES)} 內。
+            </p>
+            <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-6">
+              <div className="flex min-w-0 flex-col gap-3">
+                <FileDropField
+                  label="影片"
+                  kinds={[BUNDLE_VIDEO]}
+                  file={videoFile}
+                  onChange={onVideoChange}
+                  chooseText="選擇 WebM 影片"
+                  icon="movie"
+                  disabled={uploading}
+                  hint="01.webm（VP9、無音軌）"
+                />
+                <FileDropField
+                  label="資料檔"
+                  kinds={[BUNDLE_DATA]}
+                  file={dataFile}
+                  onChange={onDataChange}
+                  chooseText="選擇 GZ 資料檔"
+                  icon="folder_zip"
+                  disabled={uploading}
+                  hint="combined_data.json.gz"
+                />
+              </div>
+              <div className="flex min-w-0 flex-col gap-3">
+                <TextField
+                  label="人物 ID"
+                  value={uploadId}
+                  onChange={onUploadIdChange}
+                  hint="英數字與 . _ -，最多 64 字，建立後不能改。"
+                  disabled={uploading}
+                  mono
+                />
+                <TextField
+                  label="顯示名稱"
+                  value={uploadLabel}
+                  onChange={onUploadLabelChange}
+                  disabled={uploading}
+                />
+                <ScopeField
+                  projects={projects}
+                  value={selectedProjectId || ""}
+                  onChange={onProjectIdChange}
+                  disabled={uploading}
+                />
+                <button
+                  type="button"
+                  onClick={onUpload}
+                  disabled={uploading}
+                  className={`${submitButtonClassName} mt-1`}
+                >
+                  {uploading ? "上傳中…" : "上傳素材包"}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
+      )}
+
+      {!loading && characters.length > 0 && (
+        <h2 className={listHeadingClassName}>
+          人物
+          <span className="font-normal text-content-subtle">{characters.length}</span>
+        </h2>
       )}
 
       {loading && <p className="text-sm text-content-muted">載入中…</p>}
@@ -190,21 +177,21 @@ export default function CharactersPanel({
               </div>
               <div className={cardBodyClassName}>
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-1">
-                  <p className="min-w-0 font-mono text-sm font-semibold text-content">
-                    {character.char_id}
-                  </p>
+                  <p className="min-w-0 text-sm font-semibold text-content">{character.label}</p>
                   <ResourceSourceBadge
                     source={character.source}
                     ownerProjectId={character.owner_project_id}
                   />
                 </div>
-                <p className="text-sm text-content-muted">{character.label}</p>
                 <p className="text-xs text-content-subtle">
+                  <span className="font-mono">{character.char_id}</span>
+                  {" · "}
                   {formatSize(character.size_bytes)}
                 </p>
               </div>
               <div className={cardActionsClassName}>
                 <button
+                  type="button"
                   onClick={() => onTry(character)}
                   aria-label={`試用 ${character.char_id}`}
                   className={primaryActionClassName}
@@ -214,12 +201,14 @@ export default function CharactersPanel({
                 {canManage && (
                   <>
                     <button
+                      type="button"
                       onClick={() => onRename(character)}
                       className={secondaryActionClassName}
                     >
                       改名
                     </button>
                     <button
+                      type="button"
                       onClick={() => onDelete(character.char_id)}
                       className={dangerActionClassName}
                     >

@@ -27,7 +27,12 @@
 
 ## 上架
 
-用後台 Avatar 頁或 `POST /api/v1/avatar`（admin 以上）上傳：form `char_id`、`label`、`video`（`01.webm`）、`data`（`combined_data.json.gz`），選填 `project_id`。
+後台 Avatar 頁「人物」分頁有兩條路，都限 admin 以上：
+
+- 從影片或圖片產生人物（主要路徑，`POST /api/v1/avatar/jobs`）：上傳一段正面、無聲的說話影片（MP4／MOV／WebM，200 MB、60 秒內）或一張正面人像（PNG／JPG／WebP，25 MB、最長邊 8192 像素內），由 `avatar-pipeline` 轉成素材包後自動登錄。圖片會做成 10 秒循環片段；透明背景會保留，前台的舞台背景會從人物後方透出；影片最後一格接不回第一格時會自動接上一段倒放。進度依序顯示排隊中、準備來源、檢查首尾銜接、擷取臉部特徵、轉成 VP9、計算姿態、打包加密。
+- 上傳現成素材包（進階，`POST /api/v1/avatar`）：form `char_id`、`label`、`video`（`01.webm`）、`data`（`combined_data.json.gz`），選填 `project_id`，兩個檔案合計 100 MB 內。
+
+後台在送出前先檢查副檔名與檔案大小，擋下明顯不符的檔案；影片長度與圖片尺寸只在伺服器檢查，伺服器回的 413／415 說明會原樣顯示。檔案可點選或拖放到欄位上，選好後顯示預覽，透明圖片以棋盤格襯底。
 
 - 帶 `project_id`：建成該專案的專屬人物，只有能讀該專案的帳號（與綁定該專案的 Embed key）看得到、下載得到；公開的 `GET /api/v1/characters` 不列。
 - 不帶：全域人物，照帳號授權。

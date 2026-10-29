@@ -1,25 +1,27 @@
-import type { RefObject } from "react";
+import { useId } from "react";
 
 import type { AvatarBackground } from "../../api";
 import { ResourceSourceBadge } from "./ResourceSourceBadge";
+import { FileDropField, ScopeField, TextField } from "./UploadFields";
 import {
   assetCardClassName,
   assetGridClassName,
   cardActionsClassName,
   cardBodyClassName,
   dangerActionClassName,
-  fileFieldClassName,
-  filePickerClassName,
-  fileRowClassName,
-  formRowClassName,
-  formPanelClassName,
   formatSize,
-  inputClassName,
+  listHeadingClassName,
   mediaPreviewClassName,
   primaryActionClassName,
   secondaryActionClassName,
-  uploadButtonClassName,
+  submitButtonClassName,
+  uploadCardClassName,
+  uploadFieldsClassName,
+  uploadGridClassName,
+  uploadHeadingClassName,
+  uploadLeadClassName,
 } from "./assetStyles";
+import { BACKGROUND_IMAGE, formatLimit } from "./uploadRules";
 
 type BackgroundsPanelProps = {
   backgrounds: AvatarBackground[];
@@ -27,14 +29,13 @@ type BackgroundsPanelProps = {
   uploading: boolean;
   uploadId: string;
   uploadLabel: string;
-  selectedImageName: string;
-  imageRef: RefObject<HTMLInputElement>;
+  imageFile: File | null;
   projects?: Array<{ project_id: string; label: string }>;
   selectedProjectId?: string;
   onProjectIdChange?: (value: string) => void;
   onUploadIdChange: (value: string) => void;
   onUploadLabelChange: (value: string) => void;
-  onImageChange: (fileName: string) => void;
+  onImageChange: (file: File | null) => void;
   onUpload: () => void;
   onUse: (background: AvatarBackground) => void;
   onRename: (background: AvatarBackground) => void;
@@ -49,8 +50,7 @@ export default function BackgroundsPanel({
   uploading,
   uploadId,
   uploadLabel,
-  selectedImageName,
-  imageRef,
+  imageFile,
   projects,
   selectedProjectId,
   onProjectIdChange,
@@ -63,75 +63,67 @@ export default function BackgroundsPanel({
   onDelete,
   canManage,
 }: BackgroundsPanelProps) {
+  const headingId = useId();
   return (
     <>
       {/* 上傳、改名、刪除都只開放管理員；一般帳號只看清單。 */}
       {canManage && (
-        <div className={formPanelClassName}>
-          <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
-            <span className="material-symbols-outlined text-base">image</span>
-            上傳背景
-          </p>
-          <div className={formRowClassName}>
-            <input
-              type="text"
-              placeholder="背景 ID（background_id）"
-              value={uploadId}
-              onChange={(e) => onUploadIdChange(e.target.value)}
-              className={inputClassName}
-            />
-            <input
-              type="text"
-              placeholder="顯示名稱"
-              value={uploadLabel}
-              onChange={(e) => onUploadLabelChange(e.target.value)}
-              className={inputClassName}
-            />
-            {projects && projects.length > 0 && onProjectIdChange && (
-              <select
-                value={selectedProjectId || ""}
-                onChange={(e) => onProjectIdChange(e.target.value)}
-                className={inputClassName}
-              >
-                <option value="">全域資源（所有專案可用）</option>
-                {projects.map((p) => (
-                  <option key={p.project_id} value={p.project_id}>
-                    專案專屬：{p.label || p.project_id}
-                  </option>
-                ))}
-              </select>
-            )}
+        <section aria-labelledby={headingId} className={uploadCardClassName}>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 id={headingId} className={uploadHeadingClassName}>新增背景</h2>
+            <p className={uploadLeadClassName}>放在人物後方的舞台背景圖。</p>
           </div>
-          <div className={fileRowClassName}>
-            <div className={fileFieldClassName}>
-              <span className="text-xs font-medium text-content-muted">
-                圖片（.png、.jpg、.webp）：
-              </span>
-              <label className={filePickerClassName(selectedImageName)}>
-                <span className="material-symbols-outlined text-sm">image</span>
-                <span className="min-w-0 truncate">
-                  {selectedImageName || "選擇背景圖片"}
-                </span>
-                <input
-                  ref={imageRef}
-                  type="file"
-                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  aria-label="圖片"
-                  onChange={(e) => onImageChange(e.target.files?.[0]?.name || "")}
-                />
-              </label>
-            </div>
-
-            <button
-              onClick={onUpload}
+          <div className={uploadGridClassName}>
+            <FileDropField
+              variant="media"
+              label="背景圖片"
+              kinds={[BACKGROUND_IMAGE]}
+              file={imageFile}
+              onChange={onImageChange}
+              chooseText="選擇圖片"
+              icon="image"
               disabled={uploading}
-              className={uploadButtonClassName}
-            >
-              {uploading ? "上傳中…" : "上傳背景"}
-            </button>
+              hint={`${BACKGROUND_IMAGE.formats.join("／")}，${formatLimit(BACKGROUND_IMAGE.maxBytes)} 內。`}
+            />
+            <div className={uploadFieldsClassName}>
+              <TextField
+                label="背景 ID"
+                value={uploadId}
+                onChange={onUploadIdChange}
+                hint="英數字與 . _ -，最多 64 字，建立後不能改。"
+                disabled={uploading}
+                mono
+              />
+              <TextField
+                label="顯示名稱"
+                value={uploadLabel}
+                onChange={onUploadLabelChange}
+                disabled={uploading}
+              />
+              <ScopeField
+                projects={projects}
+                value={selectedProjectId || ""}
+                onChange={onProjectIdChange}
+                disabled={uploading}
+              />
+              <button
+                type="button"
+                onClick={onUpload}
+                disabled={uploading}
+                className={`${submitButtonClassName} mt-1`}
+              >
+                {uploading ? "上傳中…" : "上傳背景"}
+              </button>
+            </div>
           </div>
-        </div>
+        </section>
+      )}
+
+      {!loading && backgrounds.length > 0 && (
+        <h2 className={listHeadingClassName}>
+          背景
+          <span className="font-normal text-content-subtle">{backgrounds.length}</span>
+        </h2>
       )}
 
       {loading && <p className="text-sm text-content-muted">載入中…</p>}
@@ -156,21 +148,21 @@ export default function BackgroundsPanel({
               </div>
               <div className={cardBodyClassName}>
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-1">
-                  <p className="min-w-0 font-mono text-sm font-semibold text-content">
-                    {background.background_id}
-                  </p>
+                  <p className="min-w-0 text-sm font-semibold text-content">{background.label}</p>
                   <ResourceSourceBadge
                     source={background.source}
                     ownerProjectId={background.owner_project_id}
                   />
                 </div>
-                <p className="text-sm text-content-muted">{background.label}</p>
                 <p className="text-xs text-content-subtle">
+                  <span className="font-mono">{background.background_id}</span>
+                  {" · "}
                   {background.mime_type} · {formatSize(background.size_bytes)}
                 </p>
               </div>
               <div className={cardActionsClassName}>
                 <button
+                  type="button"
                   onClick={() => onUse(background)}
                   aria-label={`使用 ${background.background_id}`}
                   className={primaryActionClassName}
@@ -180,12 +172,14 @@ export default function BackgroundsPanel({
                 {canManage && (
                   <>
                     <button
+                      type="button"
                       onClick={() => onRename(background)}
                       className={secondaryActionClassName}
                     >
                       改名
                     </button>
                     <button
+                      type="button"
                       onClick={() => onDelete(background.background_id)}
                       className={dangerActionClassName}
                     >

@@ -125,11 +125,11 @@ describe("MascotWidget", () => {
 
   it("builds a video mascot source from the character id", () => {
     window.localStorage.setItem("admin-mascot-open", "1");
-    window.localStorage.setItem("avatar.mascot_id", "matex-000");
+    window.localStorage.setItem("avatar.mascot_id", "video-000");
 
     render(
       <MascotProvider initialOptions={[
-        { id: "matex-000", label: "Matex", engine: "video", characterId: "000" },
+        { id: "video-000", label: "人物 000", engine: "video", characterId: "000" },
       ]}>
         <MascotWidget />
       </MascotProvider>,
