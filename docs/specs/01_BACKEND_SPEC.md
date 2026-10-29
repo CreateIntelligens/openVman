@@ -271,9 +271,28 @@ ws.send(JSON.stringify(payload));
 
 ### 影片轉素材包（`POST/GET /api/v1/avatar/jobs`、`GET/DELETE /api/v1/avatar/jobs/{job_id}`，管理員）
 
-管理員上傳一段無聲正面說話影片（multipart：`char_id`、`label`、`video`、選填 `project_id`；`.mp4`／`.mov`／`.m4v`／`.webm`，上限 `AVATAR_SOURCE_MAX_UPLOAD_BYTES`，預設 512MB），Backend 先做與直接上傳素材包相同的 `char_id` 與專案權限檢查（已存在回 409），把影片寫到 `AVATAR_JOBS_DIR/<job_id>/`，在 Redis 建立工作紀錄 `vman:avatar-pipeline:job:<job_id>`（24 小時），再排進 arq 佇列 `vman:avatar-pipeline`（函式 `build_avatar_bundle`）。Redis 或佇列不可用時回 503，不做同步備援，因為一件要跑數十秒到數分鐘。
+管理員上傳一段無聲正面說話影片或一張正面人像圖片（multipart：`char_id`、`label`、`video`、選填 `project_id`；影片 `.mp4`／`.mov`／`.m4v`／`.webm`，圖片 `.png`／`.jpg`／`.webp`，上限見下方「上傳限制」），Backend 先做與直接上傳素材包相同的 `char_id` 與專案權限檢查（已存在回 409），把影片寫到 `AVATAR_JOBS_DIR/<job_id>/`，在 Redis 建立工作紀錄 `vman:avatar-pipeline:job:<job_id>`（24 小時），再排進 arq 佇列 `vman:avatar-pipeline`（函式 `build_avatar_bundle`）。Redis 或佇列不可用時回 503，不做同步備援，因為一件要跑數十秒到數分鐘。
 
 `avatar-pipeline` 容器把進度（`state`：queued／running／done／failed，`stage`、`done`、`total`、`error`）合併寫回同一筆紀錄，產物寫在 `<job_id>/out/`。Backend 在管理員讀取該工作（單筆或列表）且 `state` 為 `done` 時才收尾：把 `01.webm` 與 `combined_data.json.gz` 搬進角色 store、依提交時記下的 `project_id`／可見性登錄 `avatar_character` 資源、刪掉工作目錄，並在紀錄標記已登錄，之後再讀不重複建立。收尾不重做權限檢查，權限以提交當下為準。`DELETE` 只接受 done／failed 的工作（排隊中或執行中回 409，否則 worker 之後會對不存在的輸入失敗並留下沒有 `char_id` 的紀錄）。
+
+### 上傳限制（2026-10-29）
+
+每個上傳端點都邊讀邊數，超過上限立刻停止，不先把整個檔案讀進記憶體；格式依實際內容判斷，不只看副檔名或 Content-Type。超過大小、長度或圖片尺寸回 **413**，格式不符或讀不出來回 **415**，回應都帶簡短中文 `detail`（`upload_failed_response` 系列的端點同時保留 `error_code`／`error`）。圖片以 magic bytes 認 PNG／JPEG／WebP，最長邊不超過 `UPLOAD_IMAGE_MAX_SIDE_PX`（預設 8192）；音訊與影片一律先過 ffprobe，讀不出來就 415。後台各上傳畫面從 `GET /api/v1/uploads/limits` 取得同一組數字，用來顯示提示並在送出前先擋過大的檔案。
+
+| 端點 | 大小上限（環境變數，預設） | 內容與其他限制 |
+|---|---|---|
+| `POST /api/v1/uploads` | `GATEWAY_MAX_FILE_SIZE_MB`，100 MB | Content-Type 須在 `MEDIA_SUPPORTED_TYPES`；圖片驗 magic 與尺寸（存檔類型以實際內容為準）；影片 ffprobe、長度 ≤ `GATEWAY_VIDEO_MAX_DURATION_SECONDS`（120 秒），送 VLM 的影格最多 `GATEWAY_VIDEO_MAX_FRAMES`（60 張，短片每秒 1 張，長片平均取樣）；音訊 ffprobe、長度 ≤ `ASR_MAX_DURATION_SECONDS`；PDF 驗 `%PDF-`，Office 檔做 zip 檢查 |
+| `POST /api/v1/knowledge/upload`、`POST /api/v1/knowledge/raw/upload`、`POST /api/v1/documents/convert` | `DOCUMENT_MAX_UPLOAD_BYTES`，100 MB | 副檔名限 `.md` `.markdown` `.txt` `.csv` `.pdf` `.docx` `.pptx` `.xlsx` `.html` `.htm`；PDF 驗 `%PDF-`；docx／pptx／xlsx 解壓後總量 ≤ `DOCUMENT_ZIP_MAX_UNCOMPRESSED_BYTES`（500 MB）且檔案數 ≤ `DOCUMENT_ZIP_MAX_ENTRIES`（10,000）；`target_dir` 不可含 `..`、絕對路徑或反斜線（400），raw 上傳一律正規化到 `raw/` 底下 |
+| `POST /api/v1/asr/transcribe`、`POST /api/v1/asr/preview` | `ASR_MAX_UPLOAD_BYTES`，25 MB | ffprobe 讀得出音訊；長度 ≤ `ASR_MAX_DURATION_SECONDS`（300 秒），在呼叫任何辨識引擎前檢查 |
+| `POST /api/v1/avatar`（素材包） | `AVATAR_MAX_UPLOAD_BYTES`，影片＋驅動資料合計 100 MB | 影片 `.webm`（EBML magic）、驅動資料 `.gz`（gzip magic） |
+| `POST /api/v1/avatar/jobs`（影片或人像） | 影片 `AVATAR_SOURCE_MAX_UPLOAD_BYTES`，200 MB；圖片 `AVATAR_SOURCE_IMAGE_MAX_UPLOAD_BYTES`，25 MB | 影片 `.mp4`／`.mov`／`.m4v` 看 `ftyp`、`.webm` 看 EBML，ffprobe 須有影像軌、長度 ≤ `AVATAR_SOURCE_MAX_DURATION_SECONDS`（60 秒）；圖片依 magic bytes 認 PNG／JPEG／WebP、驗尺寸、不檢查時長，存檔副檔名跟著實際格式（`.png`／`.jpg`／`.webp`），素材管線靠它判斷是圖片 |
+| `POST /api/v1/backgrounds` | `AVATAR_BACKGROUND_MAX_UPLOAD_BYTES`，25 MB | PNG／JPEG／WebP，副檔名與內容一致 |
+| `POST /api/v1/avatar/mascots` | 模型 `AVATAR_MASCOT_MAX_UPLOAD_BYTES`，100 MB；縮圖 `AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES`，10 MB | 模型 `.vrm`（glTF magic）；縮圖 PNG／JPEG／WebP |
+| `POST /api/v1/avatar/mascots/{mascot_id}/thumbnail` | `AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES`，10 MB | PNG／JPEG／WebP |
+| `POST /api/v1/vision/describe` | `VISION_FRAME_MAX_BYTES`，10 MB（先比 base64 長度，再比解碼後大小） | 依解碼後的 magic 判斷格式並以此送判讀，用戶端帶的 `mime_type` 不採信 |
+| Brain 代理（`/api/v1/*` 轉發，例如 `/api/v1/knowledge/qa/images`） | `BRAIN_PROXY_MAX_BODY_BYTES`，110 MB | 讀取請求本體時累計，超過即 413，不轉給 Brain；Brain 端另有自己的上限（見 `brain/README.md`） |
+
+Nginx：外圈 host vhost 與 admin 容器的 `/api/` 都是 `client_max_body_size 100m`，只有 `POST /api/v1/avatar/jobs` 另開 `location` 放寬到 200m（兩層都有）。
 
 ### 後台試辨識（`POST /api/v1/asr/preview`，管理員）
 

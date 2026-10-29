@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -34,6 +36,14 @@ from app.avatar.validation import (
     validate_video_bytes,
 )
 from app.config import get_tts_config
+from app.utils.upload import (
+    UploadLimitError,
+    as_http_exception,
+    cleanup_temp_path,
+    format_limit,
+    persist_upload_to_tempfile,
+    read_upload_limited,
+)
 
 logger = logging.getLogger("backend.avatar")
 router = APIRouter()
@@ -70,8 +80,21 @@ def _normalize_char_id_or_400(char_id: str) -> str:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-async def _read_upload_pair(video: UploadFile, data: UploadFile) -> tuple[bytes, bytes]:
-    return await video.read(), await data.read()
+async def _read_upload_pair(
+    video: UploadFile, data: UploadFile, *, max_bytes: int,
+) -> tuple[bytes, bytes]:
+    """Read both files against one shared budget, stopping as soon as it runs out."""
+    try:
+        video_bytes = await read_upload_limited(video, max_bytes=max_bytes)
+        data_bytes = await read_upload_limited(
+            data, max_bytes=max_bytes - len(video_bytes),
+        )
+    except UploadLimitError as exc:
+        raise HTTPException(
+            status_code=413,
+            detail=f"上傳檔案過大（影片與驅動資料合計上限 {format_limit(max_bytes)}）",
+        ) from exc
+    return video_bytes, data_bytes
 
 
 def _resolve_upload_project(
@@ -200,16 +223,15 @@ async def create_character(
     cid = _normalize_char_id_or_400(char_id)
     norm_project_id = _resolve_upload_project(runtime, _admin, project_id)
 
-    video_bytes, data_bytes = await _read_upload_pair(video, data)
-    total = len(video_bytes) + len(data_bytes)
-    if total > cfg.avatar_max_upload_bytes:
-        raise HTTPException(status_code=413, detail="上傳檔案過大")
+    video_bytes, data_bytes = await _read_upload_pair(
+        video, data, max_bytes=cfg.avatar_max_upload_bytes,
+    )
 
     try:
         validate_video_bytes(video_bytes, filename=video.filename or "")
         validate_data_bytes(data_bytes, filename=data.filename or "")
     except InvalidUpload as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
 
     try:
         character = get_store().create_character(
@@ -245,7 +267,11 @@ async def create_character_job(
     _admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ):
-    """把一段無聲正面影片交給 avatar-pipeline，轉好後自動建成角色。
+    """把一段無聲正面影片或一張正面人像交給 avatar-pipeline，轉好後自動建成角色。
+
+    影片（mp4／mov／m4v／webm）上限 AVATAR_SOURCE_MAX_UPLOAD_BYTES、長度上限
+    AVATAR_SOURCE_MAX_DURATION_SECONDS；圖片（png／jpg／webp，依 magic bytes 判斷）
+    上限 AVATAR_SOURCE_IMAGE_MAX_UPLOAD_BYTES，不檢查時長。過大 413、格式不符 415。
 
     回傳 job_id；用 GET /api/v1/avatar/jobs/{job_id} 追進度，state 變成 done
     時角色已經建好並登錄到指定專案。
@@ -256,10 +282,23 @@ async def create_character_job(
     if get_store().exists(cid):
         raise HTTPException(status_code=409, detail=f"角色已存在：{cid}")
 
-    source_bytes = await video.read()
-    if len(source_bytes) > cfg.avatar_source_max_upload_bytes:
-        raise HTTPException(status_code=413, detail="上傳影片過大")
+    source_name = video.filename or "source.mp4"
+    # 暫存檔直接放在工作目錄，驗完搬進 job 資料夾不必跨檔案系統複製。
+    jobs_dir = Path(cfg.avatar_jobs_dir)
+    jobs_dir.mkdir(parents=True, exist_ok=True)
+    tmp_path: str | None = None
+    max_bytes, kind_label = avatar_jobs.source_upload_limit(source_name, cfg)
     try:
+        tmp_path, _ = await persist_upload_to_tempfile(
+            video,
+            suffix=".upload",
+            max_bytes=max_bytes,
+            dir=str(jobs_dir),
+            label=kind_label,
+        )
+        suffix = await asyncio.to_thread(
+            avatar_jobs.validate_source_file, tmp_path, filename=source_name, cfg=cfg,
+        )
         job = await avatar_jobs.submit_job(
             char_id=cid,
             label=label,
@@ -270,13 +309,20 @@ async def create_character_job(
                 else ResourceVisibility.SYSTEM_PUBLIC
             ),
             created_by=_admin.user.id,
-            source_name=video.filename or "source.mp4",
-            source_bytes=source_bytes,
+            source_name=source_name,
+            source_path=tmp_path,
+            suffix=suffix,
         )
+        tmp_path = None
+    except UploadLimitError as exc:
+        raise as_http_exception(exc) from exc
     except avatar_jobs.InvalidSource as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
     except avatar_jobs.QueueUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        await video.close()
+        cleanup_temp_path(tmp_path)
     return {"status": "queued", "job": job}
 
 

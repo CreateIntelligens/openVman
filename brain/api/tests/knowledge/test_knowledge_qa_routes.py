@@ -188,9 +188,21 @@ def test_qa_nodes_merged_and_update_route(client):
     assert items[1]["q"] == "Q2-new"
 
 
+_IMAGE_SAMPLES = {
+    "png": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x02\x00\x00\x00\x02\x08\x02\x00\x00\x00",
+    "gif": b"GIF89a\x02\x00\x02\x00\x00\x00\x00;",
+    "jpg": b"\xff\xd8\xff\xc0\x00\x11\x08\x00\x02\x00\x02\x03\x01\x11\x00\x02\x11\x00\x03\x11\x00\xff\xd9",
+    "webp": b"RIFF\x1a\x00\x00\x00WEBPVP8X\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x01\x00\x00",
+    "bmp": b"BM" + b"\x00" * 16 + b"\x02\x00\x00\x00\x02\x00\x00\x00" + b"\x00" * 8,
+    "ico": b"\x00\x00\x01\x00\x01\x00" + b"\x00" * 16,
+    "avif": b"\x00\x00\x00\x1cftypavif" + b"\x00" * 16,
+}
+_IMAGE_SAMPLES["jpeg"] = _IMAGE_SAMPLES["jpg"]
+
+
 def test_qa_images_routes(client):
     # 1. POST /brain/knowledge/qa/images (upload)
-    img_data = b"fake image bytes"
+    img_data = _IMAGE_SAMPLES["png"]
     file_payload = {"file": ("test.png", img_data, "image/png")}
     response = client.post("/brain/knowledge/qa/images", files=file_payload)
     assert response.status_code == 200
@@ -230,7 +242,7 @@ def test_qa_images_routes(client):
     ],
 )
 def test_qa_image_routes_support_web_image_formats(client, suffix, media_type):
-    image_data = f"fake {suffix} image".encode()
+    image_data = _IMAGE_SAMPLES[suffix]
     response = client.post(
         "/brain/knowledge/qa/images",
         files={"file": (f"test.{suffix}", image_data, media_type)},
@@ -251,8 +263,45 @@ def test_qa_image_upload_rejects_active_svg_content(client):
         files={"file": ("unsafe.svg", b"<svg></svg>", "image/svg+xml")},
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Unsupported image type"
+    assert response.status_code == 415
+    assert response.json()["detail"] == "不支援的圖片格式"
+
+
+def test_qa_image_upload_rejects_content_that_does_not_match_extension(client):
+    response = client.post(
+        "/brain/knowledge/qa/images",
+        files={"file": ("x.png", _IMAGE_SAMPLES["gif"], "image/png")},
+    )
+    assert response.status_code == 415
+
+
+def test_qa_image_upload_without_filename_is_rejected_not_500(client):
+    response = client.post(
+        "/brain/knowledge/qa/images",
+        files={"file": ("", b"\x89PNG", "image/png")},
+    )
+    assert response.status_code in (415, 422)
+
+
+def test_qa_image_upload_enforces_size_and_dimensions(client, monkeypatch):
+    import struct
+
+    huge = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", 9000, 10) + b"\x08\x02\x00\x00\x00"
+    response = client.post(
+        "/brain/knowledge/qa/images",
+        files={"file": ("big.png", huge, "image/png")},
+    )
+    assert response.status_code == 413
+    assert "最長邊" in response.json()["detail"]
+
+    from config import get_settings
+
+    monkeypatch.setattr(get_settings(), "qa_image_max_bytes", 16)
+    response = client.post(
+        "/brain/knowledge/qa/images",
+        files={"file": ("a.png", _IMAGE_SAMPLES["png"] + b"\0" * 32, "image/png")},
+    )
+    assert response.status_code == 413
 
 
 def test_qa_image_id_matches_filename_with_spacing(client):

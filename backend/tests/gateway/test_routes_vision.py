@@ -43,7 +43,17 @@ def client():
     app.include_router(router)
     return TestClient(app)
 
-_B64 = base64.b64encode(b"\xff\xd8\xff\xe0jpeg").decode()
+def _jpeg(width: int = 4, height: int = 4) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height)).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+_B64 = base64.b64encode(_jpeg()).decode()
 _PERSON_CONTEXT = EVENT_DEFINITION_BY_KEY["person"].context_text
 _GREEN_SIGNAL = {
     "event_key": "person",
@@ -185,3 +195,61 @@ def test_vision_health_disabled(client):
     body = resp.json()
     assert body["available"] is False
     assert body["status"] == "disabled"
+
+
+def _png_b64(width: int = 4, height: int = 4) -> str:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height)).save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+def test_vision_rejects_oversized_frame_before_decoding(client, monkeypatch):
+    monkeypatch.setenv("VISION_FRAME_MAX_BYTES", "30")
+    from app.config import get_tts_config
+
+    get_tts_config.cache_clear()
+    camera = MagicMock()
+    camera.describe_frame = AsyncMock()
+    try:
+        with (
+            patch("app.gateway.routes_vision.get_camera_plugin", return_value=camera),
+            patch("app.gateway.routes_vision.decode_frame_base64") as decode,
+        ):
+            resp = client.post(
+                "/api/v1/vision/describe",
+                json={"frame_base64": base64.b64encode(b"x" * 64).decode()},
+            )
+    finally:
+        get_tts_config.cache_clear()
+    assert resp.status_code == 413
+    assert "影格超過大小上限" in resp.json()["detail"]
+    decode.assert_not_called()
+    camera.describe_frame.assert_not_awaited()
+
+
+def test_vision_rejects_non_image_frame(client):
+    camera = MagicMock()
+    camera.describe_frame = AsyncMock()
+    with patch("app.gateway.routes_vision.get_camera_plugin", return_value=camera):
+        resp = client.post(
+            "/api/v1/vision/describe",
+            json={"frame_base64": base64.b64encode(b"GIF89a....").decode()},
+        )
+    assert resp.status_code == 415
+    camera.describe_frame.assert_not_awaited()
+
+
+def test_vision_uses_mime_from_magic_not_from_client(client):
+    camera = MagicMock()
+    camera.describe_frame = AsyncMock(return_value={"status": "skipped"})
+    with patch("app.gateway.routes_vision.get_camera_plugin", return_value=camera):
+        resp = client.post(
+            "/api/v1/vision/describe",
+            json={"frame_base64": _png_b64(), "mime_type": "image/jpeg"},
+        )
+    assert resp.status_code == 200
+    assert camera.describe_frame.await_args.args[1] == "image/png"

@@ -25,6 +25,7 @@ def _mock_cfg():
     return MagicMock(
         brain_url="http://brain:8100",
         gateway_internal_token="internal-secret",
+        brain_proxy_max_body_bytes=110 * 1024 * 1024,
     )
 
 
@@ -523,3 +524,87 @@ def test_embed_key_bound_to_default_alias_uses_the_default_project(monkeypatch) 
     enforce_project_binding(key, "default")
     with pytest.raises(Exception):
         enforce_project_binding(key, "other")
+
+
+def _chunked_request(chunks: list[bytes], headers: list[tuple[bytes, bytes]] | None = None):
+    pulled: list[int] = []
+
+    async def receive():
+        index = len(pulled)
+        pulled.append(index)
+        if index >= len(chunks):
+            return {"type": "http.request", "body": b"", "more_body": False}
+        return {
+            "type": "http.request",
+            "body": chunks[index],
+            "more_body": index < len(chunks) - 1,
+        }
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/api/v1/knowledge/qa/images",
+            "raw_path": b"/api/v1/knowledge/qa/images",
+            "query_string": b"",
+            "headers": headers or [],
+            "client": ("testclient", 50000),
+            "server": ("testserver", 80),
+        },
+        receive,
+    )
+    return request, pulled
+
+
+@pytest.mark.asyncio
+async def test_read_capped_body_stops_pulling_once_over_the_cap():
+    from app.brain_proxy import _BodyTooLarge, _read_capped_body
+
+    request, pulled = _chunked_request([b"x" * 4] * 50)
+    with pytest.raises(_BodyTooLarge):
+        await _read_capped_body(request, 10)
+    # 第 3 塊就超過 10 bytes，後面 47 塊不應再讀。
+    assert len(pulled) == 3
+
+
+@pytest.mark.asyncio
+async def test_read_capped_body_rejects_declared_length_without_reading():
+    from app.brain_proxy import _BodyTooLarge, _read_capped_body
+
+    request, pulled = _chunked_request([b"x"], headers=[(b"content-length", b"999")])
+    with pytest.raises(_BodyTooLarge):
+        await _read_capped_body(request, 10)
+    assert pulled == []
+
+
+@pytest.mark.asyncio
+async def test_read_capped_body_returns_body_within_cap():
+    from app.brain_proxy import _read_capped_body
+
+    request, _ = _chunked_request([b"ab", b"cd"])
+    assert await _read_capped_body(request, 10) == b"abcd"
+
+
+@pytest.mark.asyncio
+async def test_proxy_returns_413_and_never_calls_brain_when_body_too_large():
+    from app.brain_proxy import proxy_to_brain
+
+    cfg = _mock_cfg()
+    cfg.brain_proxy_max_body_bytes = 10
+    mock_client = MagicMock()
+    mock_client.send = AsyncMock()
+    request, _ = _chunked_request([b"x" * 8] * 4)
+    with (
+        patch("app.brain_proxy.get_tts_config", return_value=cfg),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
+        patch(
+            "app.brain_proxy._authorize_project_context",
+            new=AsyncMock(return_value="default"),
+        ),
+    ):
+        response = await proxy_to_brain(request, "knowledge/qa/images", current=None)
+
+    assert response.status_code == 413
+    assert b"detail" in response.body
+    mock_client.send.assert_not_awaited()

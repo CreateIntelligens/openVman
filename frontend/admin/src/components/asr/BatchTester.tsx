@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { fetchAsrEngines, previewAsr, type AsrPreview } from "../../api/settings";
+import { useUploadLimits } from "../../hooks/useUploadLimits";
 import { useVad } from "../../hooks/useVad";
 import { charErrorRate } from "../../utils/charErrorRate";
+import { formatUploadDuration, formatUploadSize, validateUploadFiles } from "../../utils/uploadLimits";
 import {
   BROWSER_ASR,
   BrowserRecognizer,
@@ -74,6 +76,7 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
   // 連續講時上一句還沒辨識完下一句就送了，用計數而不是布林。
   const [pending, setPending] = useState(0);
   const [error, setError] = useState("");
+  const uploadLimits = useUploadLimits();
   const nextId = useRef(1);
   const nextRun = useRef(1);
   // 瀏覽器辨識上一句定稿之後累積的文字，VAD 切出下一段時整包交給那一段。
@@ -320,12 +323,18 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
             onChange={(event) => {
               const input = event.target;
               const picked = input.files?.[0];
-              if (picked) void runClip(picked, picked.name, picked.name);
+              const tooLarge = picked && validateUploadFiles([picked], uploadLimits.asr_max_upload_bytes);
+              if (tooLarge) setError(tooLarge);
+              else if (picked) void runClip(picked, picked.name, picked.name);
               // 清 value 要等取完檔案：先清就讀不到 files。清它是為了讓同一個檔案能再選一次。
               input.value = "";
             }}
           />
         </label>
+        <span className="text-xs text-content-muted">
+          音檔 {formatUploadSize(uploadLimits.asr_max_upload_bytes)}、
+          {formatUploadDuration(uploadLimits.asr_max_duration_seconds)}以內
+        </span>
         {listening && (
           <span role="status" className="text-xs text-content-muted">
             {vad.starting ? "麥克風準備中…" : vad.speaking ? "聽到聲音了…" : "請說話，講完一句會自動送出"}

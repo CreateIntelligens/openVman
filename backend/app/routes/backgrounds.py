@@ -41,6 +41,8 @@ from app.avatar.background_validation import (
     normalize_background_id,
 )
 from app.config import get_tts_config
+from app.utils.images import validate_image
+from app.utils.upload import UploadLimitError, as_http_exception, read_upload_limited
 
 logger = logging.getLogger("backend.backgrounds")
 router = APIRouter()
@@ -171,10 +173,13 @@ async def create_background(
                 detail=f"背景 {bid} 已存在於其他專案",
             )
 
-    image_bytes = await image.read()
-
-    if len(image_bytes) > cfg.avatar_background_max_upload_bytes:
-        raise HTTPException(status_code=413, detail="上傳檔案過大")
+    try:
+        image_bytes = await read_upload_limited(
+            image, max_bytes=cfg.avatar_background_max_upload_bytes, label="背景圖",
+        )
+        validate_image(image_bytes, max_side=cfg.upload_image_max_side_px)
+    except UploadLimitError as exc:
+        raise as_http_exception(exc) from exc
 
     try:
         background = get_store().create_background(
@@ -204,7 +209,7 @@ async def create_background(
                 metadata={"label": label or bid},
             )
     except InvalidBackgroundUpload as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
     except BackgroundExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"status": "ok", "background": background}

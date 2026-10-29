@@ -25,6 +25,9 @@ from app.avatar.store import AvatarStore, CharacterExists
 from app.config import get_tts_config
 from app.gateway.queue import get_arq_pool
 from app.gateway.redis_pool import get_redis
+from app.utils import media as media_mod
+from app.utils.images import IMAGE_EXTENSIONS, sniff_image_mime, validate_image_file
+from app.utils.upload import UploadTooLargeError, format_limit
 
 logger = logging.getLogger("backend.avatar.jobs")
 
@@ -40,6 +43,8 @@ STATE_DONE = "done"
 STATE_FAILED = "failed"
 
 SOURCE_EXTENSIONS = (".mp4", ".mov", ".m4v", ".webm")
+# 靜態人像：素材管線靠副檔名判斷是圖片，做成 10 秒靜止影片。
+IMAGE_SOURCE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 _EBML_MAGIC = b"\x1a\x45\xdf\xa3"
 _PUBLIC_FIELDS = (
     "job_id", "state", "stage", "done", "total", "error",
@@ -57,16 +62,46 @@ class QueueUnavailable(RuntimeError):
     """Redis or the arq pool is down; the job cannot be accepted."""
 
 
-def validate_source_bytes(data: bytes, *, filename: str) -> str:
-    """Return the normalized extension or raise ``InvalidSource``."""
+def source_upload_limit(filename: str, cfg: Any) -> tuple[int, str]:
+    """Byte limit (and label) to stream with, picked from the claimed extension."""
+    if Path(filename).suffix.lower() in IMAGE_SOURCE_EXTENSIONS:
+        return cfg.avatar_source_image_max_upload_bytes, "圖片"
+    return cfg.avatar_source_max_upload_bytes, "影片"
+
+
+def validate_source_file(path: str, *, filename: str, cfg: Any) -> str:
+    """Check a streamed source by content; return the suffix to store it under.
+
+    Images are recognised by magic bytes (the stored suffix follows the real
+    format, not the client's name); videos must match their container magic
+    and pass ffprobe within the duration limit.
+    """
+    with open(path, "rb") as handle:
+        head = handle.read(16)
+    image_mime = sniff_image_mime(head)
+    if image_mime is not None:
+        limit = cfg.avatar_source_image_max_upload_bytes
+        if Path(path).stat().st_size > limit:
+            raise UploadTooLargeError(limit, f"圖片超過大小上限（{format_limit(limit)}）")
+        validate_image_file(path, max_side=cfg.upload_image_max_side_px)
+        return IMAGE_EXTENSIONS[image_mime]
+
     suffix = Path(filename).suffix.lower()
+    if suffix in IMAGE_SOURCE_EXTENSIONS:
+        raise InvalidSource("圖片內容不是有效的 PNG、JPEG 或 WebP")
     if suffix not in SOURCE_EXTENSIONS:
-        raise InvalidSource("影片必須是 .mp4、.mov、.m4v 或 .webm 檔")
+        raise InvalidSource("來源必須是 .mp4、.mov、.m4v、.webm 影片或 .png、.jpg、.webp 圖片")
     if suffix == ".webm":
-        if not data.startswith(_EBML_MAGIC):
+        if not head.startswith(_EBML_MAGIC):
             raise InvalidSource("影片內容不是有效的 webm")
-    elif data[4:8] != b"ftyp":
+    elif head[4:8] != b"ftyp":
         raise InvalidSource("影片內容不是有效的 MP4／MOV")
+    probe = media_mod.probe_media(path)
+    if not probe.has_video:
+        raise InvalidSource("影片裡沒有影像軌")
+    media_mod.require_duration(
+        probe, max_seconds=cfg.avatar_source_max_duration_seconds, what="影片",
+    )
     return suffix
 
 
@@ -116,10 +151,10 @@ async def submit_job(
     visibility: ResourceVisibility,
     created_by: str,
     source_name: str,
-    source_bytes: bytes,
+    source_path: str,
+    suffix: str,
 ) -> dict[str, Any]:
-    """Persist the clip, record the job and enqueue it for the worker."""
-    suffix = validate_source_bytes(source_bytes, filename=source_name)
+    """Move the validated source into place, record the job and enqueue it."""
     redis = await get_redis()
     pool = await get_arq_pool()
     if redis is None or pool is None:
@@ -128,7 +163,7 @@ async def submit_job(
     job_id = uuid.uuid4().hex
     paths = job_paths(job_id, suffix)
     paths.output.mkdir(parents=True, exist_ok=False)
-    paths.source.write_bytes(source_bytes)
+    shutil.move(source_path, paths.source)
 
     record = {
         "job_id": job_id,

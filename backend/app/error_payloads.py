@@ -59,3 +59,22 @@ def upload_failed_response(
         error=error,
         **extra,
     )
+
+
+def upload_rejected_response(exc: Exception, **extra: Any) -> JSONResponse:
+    """413 / 415 for a limit violation; ``detail`` carries the short reason."""
+    from app.utils.upload import UnsupportedUploadError, UploadTooLargeError
+
+    if isinstance(exc, UploadTooLargeError):
+        status_code = 413
+    elif isinstance(exc, UnsupportedUploadError):
+        status_code = 415
+    else:  # pragma: no cover - callers only pass the two limit errors
+        raise TypeError(type(exc).__name__)
+    message = str(exc)
+    extra.setdefault("error", message)
+    return upload_failed_response(
+        status_code=status_code,
+        detail=message,
+        **extra,
+    )

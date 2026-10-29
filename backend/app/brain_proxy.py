@@ -452,6 +452,26 @@ async def _stream_upstream_bytes(upstream: httpx.Response) -> AsyncIterator[byte
         await upstream.aclose()
 
 
+class _BodyTooLarge(Exception):
+    pass
+
+
+async def _read_capped_body(request: Request, max_bytes: int) -> bytes:
+    """Buffer the body for Brain, refusing as soon as it passes ``max_bytes``."""
+    too_large = _BodyTooLarge(f"請求內容超過上限（{max_bytes // (1024 * 1024)} MB）")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > max_bytes:
+        raise too_large
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > max_bytes:
+            raise too_large
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 async def proxy_to_brain(
     request: Request,
     path: str,
@@ -489,7 +509,10 @@ async def proxy_to_brain(
         current=current,
         project_id=project_id,
     )
-    body = await request.body()
+    try:
+        body = await _read_capped_body(request, get_tts_config().brain_proxy_max_body_bytes)
+    except _BodyTooLarge as exc:
+        return JSONResponse(status_code=413, content={"detail": str(exc)})
     client = _http.get()
 
     try:

@@ -12,6 +12,7 @@ export default function SourcePanel({
   crawling,
   onCrawl,
   onShowNote,
+  uploadLimitHint,
 }: {
   activeMode: SourceMode;
   setActiveMode: (m: SourceMode) => void;
@@ -23,6 +24,7 @@ export default function SourcePanel({
   crawling: boolean;
   onCrawl: () => void;
   onShowNote: () => void;
+  uploadLimitHint?: string;
 }) {
   return (
     <div className="border-b border-border bg-surface-raised dark:bg-surface/30 px-4 py-3 space-y-3 shrink-0">
@@ -62,6 +64,9 @@ export default function SourcePanel({
           >
             <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">cloud_upload</span>
             {uploading ? "上傳中..." : `選擇檔案上傳到 ${currentDir}`}
+            {uploadLimitHint && !uploading && (
+              <span className="text-xs text-content-subtle">（{uploadLimitHint}）</span>
+            )}
           </button>
         )}
 

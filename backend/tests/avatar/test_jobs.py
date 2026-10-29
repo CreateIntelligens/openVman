@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.avatar import jobs as avatar_jobs
 from app.routes import avatar as avatar_routes
+from app.utils.media import MediaProbe
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 16
 WEBM_BYTES = b"\x1a\x45\xdf\xa3" + b"v" * 8
@@ -68,6 +69,11 @@ def env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(avatar_jobs, "get_redis", _redis)
     monkeypatch.setattr(avatar_jobs, "get_arq_pool", _pool)
+    # 測試用的影片 bytes 只有檔頭；時長檢查另有測試，這裡當成 10 秒的影片。
+    monkeypatch.setattr(
+        avatar_jobs.media_mod, "probe_media",
+        lambda path: MediaProbe("mov,mp4", 10.0, has_audio=False, has_video=True),
+    )
 
     from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account, require_admin
     from app.auth.models import AccountRole
@@ -129,9 +135,90 @@ def test_submit_accepts_webm_source(env):
     [("clip.avi", MP4_BYTES), ("clip.mp4", b"not a video"), ("clip.webm", MP4_BYTES)],
 )
 def test_submit_rejects_bad_sources(env, filename, payload):
-    client, _, pool, _ = env
-    assert _submit(client, filename=filename, payload=payload).status_code == 400
+    client, _, pool, tmp_path = env
+    r = _submit(client, filename=filename, payload=payload)
+    assert r.status_code == 415
+    assert r.json()["detail"]
     assert pool.calls == []
+    # 驗不過的暫存檔不能留在工作目錄。
+    assert not list((tmp_path / "jobs").glob("*.upload"))
+
+
+def _png(width: int = 4, height: int = 4) -> bytes:
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGBA", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize("filename", ["face.png", "face.jpg", "face"])
+def test_submit_accepts_a_portrait_image_and_keeps_its_real_suffix(env, filename):
+    client, _, pool, _ = env
+    r = _submit(client, filename=filename, payload=_png())
+    assert r.status_code == 200, r.text
+    source = Path(pool.calls[0][1]["input_path"])
+    # 素材管線靠副檔名判斷是圖片；副檔名跟著實際內容走。
+    assert source.suffix == ".png"
+    assert source.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_submit_rejects_an_image_whose_magic_does_not_match(env):
+    client, _, pool, _ = env
+    r = _submit(client, filename="face.png", payload=b"GIF89a" + b"\0" * 32)
+    assert r.status_code == 415
+    assert pool.calls == []
+
+
+def test_submit_rejects_an_image_over_the_size_limit(env, monkeypatch):
+    client, _, pool, _ = env
+    monkeypatch.setenv("AVATAR_SOURCE_IMAGE_MAX_UPLOAD_BYTES", "64")
+    from app.config import get_tts_config
+
+    get_tts_config.cache_clear()
+    r = _submit(client, filename="face.png", payload=_png() + b"\0" * 128)
+    assert r.status_code == 413
+    assert "圖片超過大小上限" in r.json()["detail"]
+    assert pool.calls == []
+
+
+def test_submit_rejects_an_image_over_the_max_side(env):
+    client, _, pool, _ = env
+    r = _submit(client, filename="wide.png", payload=_png(8193, 1))
+    assert r.status_code == 413
+    assert pool.calls == []
+
+
+def test_submit_rejects_a_video_over_the_size_limit(env, monkeypatch):
+    client, _, pool, _ = env
+    monkeypatch.setenv("AVATAR_SOURCE_MAX_UPLOAD_BYTES", "16")
+    from app.config import get_tts_config
+
+    get_tts_config.cache_clear()
+    r = _submit(client, payload=MP4_BYTES)
+    assert r.status_code == 413
+    assert pool.calls == []
+
+
+def test_submit_rejects_a_video_longer_than_the_limit(env, monkeypatch):
+    client, _, pool, _ = env
+    monkeypatch.setattr(
+        avatar_jobs.media_mod, "probe_media",
+        lambda path: MediaProbe("mov,mp4", 61.0, has_audio=False, has_video=True),
+    )
+    r = _submit(client)
+    assert r.status_code == 413
+    assert "影片長度超過上限" in r.json()["detail"]
+    assert pool.calls == []
+
+
+def test_default_source_limits():
+    from app.config import TTSRouterConfig
+
+    cfg = TTSRouterConfig()
+    assert cfg.avatar_source_max_upload_bytes == 200 * 1024 * 1024
+    assert cfg.avatar_source_image_max_upload_bytes == 25 * 1024 * 1024
+    assert cfg.avatar_source_max_duration_seconds == 60
 
 
 def test_submit_conflicts_with_existing_character(env):

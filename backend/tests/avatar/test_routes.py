@@ -70,7 +70,7 @@ def test_upload_bad_extension(client):
             "data": ("d.gz", io.BytesIO(b"\x1f\x8b"), "application/gzip"),
         },
     )
-    assert r.status_code == 400
+    assert r.status_code == 415
 
 
 def test_upload_bad_magic(client):
@@ -82,7 +82,18 @@ def test_upload_bad_magic(client):
             "data": ("d.gz", io.BytesIO(b"\x1f\x8b"), "application/gzip"),
         },
     )
-    assert r.status_code == 400
+    assert r.status_code == 415
+
+
+def test_upload_stops_once_the_combined_limit_is_passed(client, monkeypatch):
+    monkeypatch.setenv("AVATAR_MAX_UPLOAD_BYTES", "16")
+    from app.config import get_tts_config
+
+    get_tts_config.cache_clear()
+    r = _upload(client, video=b"\x1a\x45\xdf\xa3" + b"v" * 8, data=b"\x1f\x8b" + b"d" * 8)
+    assert r.status_code == 413
+    assert "合計上限" in r.json()["detail"]
+    assert client.get("/api/v1/avatar").json() == {"characters": []}
 
 
 def test_upload_duplicate_conflict(client):

@@ -25,6 +25,26 @@ describe("SourcePanel", () => {
     expect(screen.queryByText(/題庫/)).toBeNull();
   });
 
+  it("shows the per-file upload limit next to the picker", () => {
+    render(
+      <SourcePanel
+        activeMode="upload"
+        setActiveMode={vi.fn()}
+        uploading={false}
+        uploadInputRef={createRef<HTMLInputElement>()}
+        currentDir="knowledge"
+        crawlUrlValue=""
+        setCrawlUrlValue={vi.fn()}
+        crawling={false}
+        onCrawl={vi.fn()}
+        onShowNote={vi.fn()}
+        uploadLimitHint="每檔 100 MB 以內"
+      />,
+    );
+
+    expect(screen.getByText("（每檔 100 MB 以內）")).toBeTruthy();
+  });
+
   it("opens note creation immediately when manual mode is selected", () => {
     const setActiveMode = vi.fn();
     const onShowNote = vi.fn();

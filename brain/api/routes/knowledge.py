@@ -53,6 +53,11 @@ from knowledge.knowledge_admin import (
     update_workspace_document_meta,
 )
 from knowledge import commit_jobs
+from knowledge.upload_limits import (
+    read_upload_limited,
+    require_raw_suffix,
+    require_target_under,
+)
 from knowledge.workspace import get_workspace_root
 from protocol.schemas import (
     AdminActionRequest,
@@ -282,16 +287,22 @@ async def upload_knowledge_raw_documents_route(
     project_id: str = Form("default"),
     relative_paths: list[str] = Form(default_factory=list),
 ):
+    from config import get_settings
+
+    max_bytes = get_settings().knowledge_upload_max_bytes
+    # raw 是暫存區：只能寫進 raw/，不能借這個端點改 personas/、memory/ 或核心文件。
+    target_dir = require_target_under(target_dir, "raw")
     uploaded: list[dict[str, object]] = []
     try:
         for index, upload in enumerate(files):
             relative_path = (
                 relative_paths[index] if index < len(relative_paths) else ""
             )
+            require_raw_suffix(upload.filename or "", relative_path)
             uploaded.append(
                 save_uploaded_artifact(
                     upload.filename or "",
-                    await upload.read(),
+                    await read_upload_limited(upload, max_bytes),
                     target_dir,
                     project_id,
                     relative_path=relative_path,
@@ -431,6 +442,10 @@ async def upload_knowledge_documents_route(
     project_id: str = Form("default"),
     relative_paths: list[str] = Form(default_factory=list),
 ):
+    from config import get_settings
+
+    max_bytes = get_settings().knowledge_upload_max_bytes
+    target_dir = require_target_under(target_dir, "knowledge")
     uploaded: list[dict[str, object]] = []
     try:
         for index, upload in enumerate(files):
@@ -438,7 +453,7 @@ async def upload_knowledge_documents_route(
             uploaded.append(
                 save_uploaded_document(
                     upload.filename or "",
-                    await upload.read(),
+                    await read_upload_limited(upload, max_bytes),
                     target_dir,
                     project_id,
                     relative_path=relative_path,

@@ -7,7 +7,15 @@ from fastapi.testclient import TestClient
 from app.routes import backgrounds as background_routes
 
 
-PNG_BYTES = b"\x89PNG\r\n\x1a\nimage"
+def _png(width: int = 4, height: int = 4) -> bytes:
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+PNG_BYTES = _png()
 
 
 @pytest.fixture
@@ -73,7 +81,7 @@ def test_upload_bad_extension(client):
         files={"image": ("clinic.gif", io.BytesIO(PNG_BYTES), "image/gif")},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 415
 
 
 def test_upload_bad_magic(client):
@@ -83,7 +91,7 @@ def test_upload_bad_magic(client):
         files={"image": ("clinic.png", io.BytesIO(b"NOTPNG"), "image/png")},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 415
 
 
 def test_upload_duplicate_conflict(client):
@@ -106,3 +114,19 @@ def test_update_label(client):
     assert response.status_code == 200
     assert response.json()["background"]["background_id"] == "clinic"
     assert response.json()["background"]["label"] == "新的診間"
+
+
+def test_upload_rejects_oversized_image_while_reading(client, monkeypatch):
+    monkeypatch.setenv("AVATAR_BACKGROUND_MAX_UPLOAD_BYTES", "32")
+    from app.config import get_tts_config
+
+    get_tts_config.cache_clear()
+    response = _upload(client, image=PNG_BYTES + b"\0" * 64)
+    assert response.status_code == 413
+    assert "背景圖超過大小上限" in response.json()["detail"]
+
+
+def test_upload_rejects_image_over_max_side(client):
+    response = _upload(client, image=_png(8193, 2))
+    assert response.status_code == 413
+    assert "最長邊" in response.json()["detail"]

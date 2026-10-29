@@ -75,6 +75,19 @@ class TempStorageService:
 
     # --- validate ---
 
+    def store_file(self, session_id: str, source_path: str, mime_type: str) -> str:
+        """Move an already-streamed upload into the session directory."""
+        if ".." in session_id or "/" in session_id or "%2F" in session_id:
+            raise ValueError("INVALID_SESSION_ID: path traversal detected")
+
+        ext = _MIME_EXT.get(mime_type, "bin")
+        session_dir = os.path.join(self.base_dir, session_id)
+        os.makedirs(session_dir, exist_ok=True)
+        file_path = os.path.join(session_dir, f"{uuid.uuid4().hex}.{ext}")
+        shutil.move(source_path, file_path)
+        logger.info("file_written path=%s", file_path)
+        return file_path
+
     def validate_file_size(self, size_bytes: int) -> bool:
         cfg = get_tts_config()
         limit_bytes = cfg.gateway_max_file_size_mb * 1024 * 1024

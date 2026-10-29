@@ -88,13 +88,13 @@ def test_upload_bad_extension(client):
         files={"model": ("custom.glb", io.BytesIO(VRM_BYTES), "model/gltf-binary")},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 415
 
 
 def test_upload_bad_magic(client):
     response = _upload(client, model=b"NOTVRM")
 
-    assert response.status_code == 400
+    assert response.status_code == 415
 
 
 @pytest.mark.parametrize("mascot_id", [".", "..", ".hidden", "bad-", "_bad"])
@@ -284,3 +284,54 @@ def test_explicit_video_mascot_suppresses_the_derived_entry(client, character_st
     mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
     video_ids = [m["mascot_id"] for m in mascots if m["engine"] == "video"]
     assert video_ids == ["matex-000"]
+
+
+def _png(width: int = 4, height: int = 4) -> bytes:
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_upload_with_thumbnail_validates_it(client):
+    response = client.post(
+        "/api/v1/avatar/mascots",
+        data={"mascot_id": "thumbed", "label": "x"},
+        files={
+            "model": ("thumbed.vrm", io.BytesIO(VRM_BYTES), "model/gltf-binary"),
+            "thumbnail": ("t.png", io.BytesIO(b"NOTANIMAGE"), "image/png"),
+        },
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"]
+
+
+def test_thumbnail_endpoint_rejects_wrong_magic_and_oversize(client, monkeypatch):
+    assert _upload(client).status_code == 200
+    bad = client.post(
+        "/api/v1/avatar/mascots/custom/thumbnail",
+        files={"thumbnail": ("t.png", io.BytesIO(b"<svg/>"), "image/png")},
+    )
+    assert bad.status_code == 415
+
+    monkeypatch.setenv("AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES", "32")
+    from app.config import get_tts_config
+
+    get_tts_config.cache_clear()
+    big = client.post(
+        "/api/v1/avatar/mascots/custom/thumbnail",
+        files={"thumbnail": ("t.png", io.BytesIO(_png() + b"\0" * 64), "image/png")},
+    )
+    assert big.status_code == 413
+    assert "縮圖超過大小上限" in big.json()["detail"]
+
+
+def test_thumbnail_endpoint_accepts_a_real_png(client):
+    assert _upload(client).status_code == 200
+    response = client.post(
+        "/api/v1/avatar/mascots/custom/thumbnail",
+        files={"thumbnail": ("t.png", io.BytesIO(_png()), "image/png")},
+    )
+    assert response.status_code == 200

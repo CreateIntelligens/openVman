@@ -21,6 +21,7 @@ from knowledge.knowledge_admin import (
     save_uploaded_artifact,
     save_workspace_document,
 )
+from knowledge.upload_limits import read_upload_limited, validate_qa_image
 from knowledge.qa_csv import (
     extract_image_id,
     parse_qa_csv,
@@ -486,14 +487,12 @@ async def upload_image_route(
     file: UploadFile = File(...),
     project_id: str = "default",
 ) -> dict[str, str]:
-    max_bytes = get_settings().qa_image_max_bytes
-    file_bytes = await file.read(max_bytes + 1)
-    if len(file_bytes) > max_bytes:
-        raise HTTPException(status_code=413, detail="Image file is too large")
-
-    ext = Path(file.filename).suffix.lower()
+    settings = get_settings()
+    ext = Path(file.filename or "").suffix.lower()
     if ext not in _ALLOWED_QA_IMAGE_SUFFIXES:
-        raise HTTPException(status_code=400, detail="Unsupported image type")
+        raise HTTPException(status_code=415, detail="不支援的圖片格式")
+    file_bytes = await read_upload_limited(file, settings.qa_image_max_bytes)
+    validate_qa_image(file_bytes, ext, settings.qa_image_max_side_px)
     image_id = f"{uuid4()}{ext}"
 
     await asyncio.to_thread(

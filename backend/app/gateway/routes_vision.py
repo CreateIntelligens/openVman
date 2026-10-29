@@ -23,6 +23,8 @@ from app.gateway.vision_clef import probe_clef_health
 from app.gateway.vlm_client import probe_vlm_health
 from app.gateway.worker import get_camera_plugin
 from app.http_client import SharedAsyncClient
+from app.utils.images import validate_image
+from app.utils.upload import UploadLimitError, UploadTooLargeError, as_http_exception
 
 logger = logging.getLogger("gateway.routes.vision")
 
@@ -36,8 +38,15 @@ def _vision_session_id(session_id: str | None) -> str:
 
 
 class VisionDescribeRequest(BaseModel):
-    frame_base64: str = Field(..., min_length=1, description="Base64 JPEG frame")
-    mime_type: str = Field("image/jpeg", description="Frame MIME type")
+    frame_base64: str = Field(
+        ...,
+        min_length=1,
+        description="Base64 影格（JPEG／PNG／WebP），解碼後上限 VISION_FRAME_MAX_BYTES（預設 10 MB）",
+    )
+    mime_type: str = Field(
+        "image/jpeg",
+        description="僅供參考；實際格式依解碼後的 magic bytes 判斷",
+    )
     timestamp: int = Field(0, ge=0)
     persona_id: str = Field("default")
     project_id: str = Field("default")
@@ -63,16 +72,28 @@ async def vision_describe(
         )
     except ResourceNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Resource not found") from exc
+    cfg = get_tts_config()
+    max_bytes = cfg.vision_frame_max_bytes
+    # base64 每 3 bytes 變 4 個字元；先看字串長度，超過就不必解碼。
+    if len(payload.frame_base64) > (max_bytes + 2) // 3 * 4:
+        raise as_http_exception(UploadTooLargeError(max_bytes, label="影格"))
     try:
         image_bytes = decode_frame_base64(payload.frame_base64)
     except InvalidFrameError as exc:
         logger.warning("vision_describe_decode_err err=%s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        if len(image_bytes) > max_bytes:
+            raise UploadTooLargeError(max_bytes, label="影格")
+        # 用者自報的 mime_type 不可信；送給判讀服務的是實際格式。
+        mime_type = validate_image(image_bytes, max_side=cfg.upload_image_max_side_px)
+    except UploadLimitError as exc:
+        raise as_http_exception(exc) from exc
 
     session_id = _vision_session_id(payload.session_id)
     result = await get_camera_plugin().describe_frame(
         image_bytes,
-        payload.mime_type,
+        mime_type,
         session_id,
     )
 

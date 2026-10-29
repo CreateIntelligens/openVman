@@ -46,6 +46,8 @@ from app.avatar.mascot_validation import (
 from app.avatar.validation import InvalidCharId, normalize_char_id
 from app.config import get_tts_config
 from app.routes.avatar import get_store as get_character_store
+from app.utils.images import validate_image
+from app.utils.upload import UploadLimitError, as_http_exception, read_upload_limited
 
 logger = logging.getLogger("backend.mascots")
 router = APIRouter()
@@ -190,6 +192,14 @@ async def list_mascots(
     return {"mascots": mascots}
 
 
+async def _read_thumbnail(thumbnail: UploadFile, cfg: Any) -> bytes:
+    data = await read_upload_limited(
+        thumbnail, max_bytes=cfg.avatar_mascot_thumbnail_max_upload_bytes, label="縮圖",
+    )
+    validate_image(data, max_side=cfg.upload_image_max_side_px)
+    return data
+
+
 @router.post("/api/v1/avatar/mascots", summary="上傳右下角小助理 VRM")
 async def create_mascot(
     mascot_id: str = Form(...),
@@ -238,11 +248,13 @@ async def create_mascot(
                 detail=f"小助理 {mid} 已存在於其他專案",
             )
 
-    model_bytes = await model.read()
-    thumbnail_bytes = await thumbnail.read() if thumbnail else None
-
-    if len(model_bytes) > cfg.avatar_mascot_max_upload_bytes:
-        raise HTTPException(status_code=413, detail="上傳檔案過大")
+    try:
+        model_bytes = await read_upload_limited(
+            model, max_bytes=cfg.avatar_mascot_max_upload_bytes, label="模型",
+        )
+        thumbnail_bytes = await _read_thumbnail(thumbnail, cfg) if thumbnail else None
+    except UploadLimitError as exc:
+        raise as_http_exception(exc) from exc
 
     try:
         validate_vrm_bytes(model_bytes, filename=model.filename or "")
@@ -273,7 +285,7 @@ async def create_mascot(
                 metadata={"label": label or mid},
             )
     except InvalidMascotUpload as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
     except MascotExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"status": "ok", "mascot": mascot}
@@ -421,7 +433,10 @@ async def update_mascot_thumbnail(
     _admin: CurrentAccount = Depends(require_admin),
 ) -> dict[str, Any]:
     mid = _normalize_mascot_id_or_400(mascot_id)
-    thumbnail_bytes = await thumbnail.read()
+    try:
+        thumbnail_bytes = await _read_thumbnail(thumbnail, get_tts_config())
+    except UploadLimitError as exc:
+        raise as_http_exception(exc) from exc
     try:
         mascot = get_store().update_thumbnail(mid, thumbnail_bytes)
     except MascotNotFound as exc:

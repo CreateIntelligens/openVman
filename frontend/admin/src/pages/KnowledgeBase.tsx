@@ -25,6 +25,8 @@ import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
 import { useQaNodeModals } from "../hooks/useQaNodeModals";
 import { useQaNodeSelection } from "../hooks/useQaNodeSelection";
 import { useQaNodes } from "../hooks/useQaNodes";
+import { useUploadLimits } from "../hooks/useUploadLimits";
+import { formatUploadSize } from "../utils/uploadLimits";
 import { removeScoped, writeScoped } from "../utils/scopedStorage";
 
 const KNOWLEDGE_TABS = ["documents", "graph"] as const;
@@ -128,6 +130,7 @@ export default function KnowledgeBase() {
   } = useQaNodes(projectId);
 
   const [mergedRefreshKey, setMergedRefreshKey] = useState(0);
+  const uploadLimits = useUploadLimits();
 
   useEffect(() => {
     void fetchQaTree().catch(() => undefined);
@@ -302,6 +305,7 @@ export default function KnowledgeBase() {
                 setActiveMode={setActiveSourceMode}
                 uploading={uploading}
                 uploadInputRef={uploadInputRef}
+                uploadLimitHint={`每檔 ${formatUploadSize(uploadLimits.document_max_upload_bytes)} 以內`}
                 currentDir={currentDir}
                 crawlUrlValue={crawlUrlValue}
                 setCrawlUrlValue={setCrawlUrlValue}

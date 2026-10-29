@@ -109,13 +109,17 @@ _fake_pytesseract = types.ModuleType("pytesseract")
 _fake_pytesseract.image_to_string = MagicMock(return_value="")  # type: ignore[attr-defined]
 sys.modules.setdefault("pytesseract", _fake_pytesseract)
 
-# Stub PIL/Pillow (may not be installed in test env)
-_fake_pil = types.ModuleType("PIL")
-_fake_pil_image = types.ModuleType("PIL.Image")
-_fake_pil_image.open = MagicMock()  # type: ignore[attr-defined]
-_fake_pil.Image = _fake_pil_image  # type: ignore[attr-defined]
-sys.modules.setdefault("PIL", _fake_pil)
-sys.modules.setdefault("PIL.Image", _fake_pil_image)
+# Stub PIL/Pillow only when it is missing: upload validation reads real image
+# headers through it, so a stub would hide size/format checks.
+try:
+    import PIL.Image  # noqa: F401
+except ImportError:
+    _fake_pil = types.ModuleType("PIL")
+    _fake_pil_image = types.ModuleType("PIL.Image")
+    _fake_pil_image.open = MagicMock()  # type: ignore[attr-defined]
+    _fake_pil.Image = _fake_pil_image  # type: ignore[attr-defined]
+    sys.modules.setdefault("PIL", _fake_pil)
+    sys.modules.setdefault("PIL.Image", _fake_pil_image)
 
 # Stub readability (may not be installed in test env)
 _fake_readability = types.ModuleType("readability")

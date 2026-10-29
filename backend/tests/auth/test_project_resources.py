@@ -23,6 +23,16 @@ from app.auth.repository_errors import InvalidProjectPolicyError
 from app.auth.runtime import get_auth_runtime
 
 
+def _tiny_png() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (2, 2)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("AVATAR_ASSETS_DIR", str(tmp_path / "avatar"))
@@ -656,7 +666,7 @@ def test_upload_with_project_id_by_scoped_admin(env, monkeypatch):
     )
 
     # admin 有 proj-1 權限 -> 帶 project_id=proj-1 上傳成功 (200)
-    files = {"image": ("bg.png", BytesIO(b"\x89PNG\r\n\x1a\nfake"), "image/png")}
+    files = {"image": ("bg.png", BytesIO(_tiny_png()), "image/png")}
     data = {"background_id": "bg-new-proj1", "label": "Proj1 BG", "project_id": "proj-1"}
     r = env.client.post(
         "/api/v1/backgrounds",
@@ -671,7 +681,7 @@ def test_upload_with_project_id_by_scoped_admin(env, monkeypatch):
     assert rec.visibility is ResourceVisibility.PROJECT
 
     # admin 沒有 proj-2 權限 -> 帶 project_id=proj-2 上傳失敗 (403)
-    files2 = {"image": ("bg.png", BytesIO(b"\x89PNG\r\n\x1a\nfake"), "image/png")}
+    files2 = {"image": ("bg.png", BytesIO(_tiny_png()), "image/png")}
     data2 = {"background_id": "bg-new-proj2", "label": "Proj2 BG", "project_id": "proj-2"}
     r2 = env.client.post(
         "/api/v1/backgrounds",
@@ -906,7 +916,7 @@ def test_duplicate_upload_409_conflict_and_reupload_update(env, monkeypatch):
     )
 
     # 情況 1：與現有全域資源同名上傳 -> 409
-    files = {"image": ("bg.png", BytesIO(b"\x89PNG\r\n\x1a\nfake"), "image/png")}
+    files = {"image": ("bg.png", BytesIO(_tiny_png()), "image/png")}
     r_global = env.client.post(
         "/api/v1/backgrounds",
         data={"background_id": "bg-global-1", "label": "Dup Global", "project_id": "proj-1"},
@@ -918,7 +928,7 @@ def test_duplicate_upload_409_conflict_and_reupload_update(env, monkeypatch):
 
     # 情況 2：與其他專案的專案資源同名上傳 -> 409
     # bg-proj-1 屬於 proj-1，嘗試上傳到 proj-2
-    files2 = {"image": ("bg.png", BytesIO(b"\x89PNG\r\n\x1a\nfake"), "image/png")}
+    files2 = {"image": ("bg.png", BytesIO(_tiny_png()), "image/png")}
     r_other = env.client.post(
         "/api/v1/backgrounds",
         data={"background_id": "bg-proj-1", "label": "Cross Proj", "project_id": "proj-2"},
@@ -929,7 +939,7 @@ def test_duplicate_upload_409_conflict_and_reupload_update(env, monkeypatch):
     assert "其他專案" in r_other.json()["detail"]
 
     # 情況 3：同一專案重複上傳同一資源 -> 200 成功更新 metadata
-    files3 = {"image": ("bg.png", BytesIO(b"\x89PNG\r\n\x1a\nfake"), "image/png")}
+    files3 = {"image": ("bg.png", BytesIO(_tiny_png()), "image/png")}
     r_same = env.client.post(
         "/api/v1/backgrounds",
         data={"background_id": "bg-proj-1", "label": "Updated Label", "project_id": "proj-1"},

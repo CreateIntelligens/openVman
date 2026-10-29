@@ -114,6 +114,14 @@ describe("nginx default config", () => {
     expect(api).toContain("proxy_pass $backend$request_uri;");
   });
 
+  it("caps API bodies at 100m and only widens the avatar job upload to 200m", () => {
+    // 外圈 host nginx 也是 100m；後端各上傳端點再各自設更小的上限。
+    expect(locationBody("/api/")).toContain("client_max_body_size 100m;");
+    const jobs = locationBody("/api/v1/avatar/jobs");
+    expect(jobs).toContain("client_max_body_size 200m;");
+    expect(jobs).toContain("proxy_pass $backend$request_uri;");
+  });
+
   it("streams TTS unbuffered ahead of the generic API location", () => {
     const stream = source.indexOf("location /api/v1/tts/stream {");
     const api = source.indexOf("location /api/ {");

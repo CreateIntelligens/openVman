@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import types
+import zipfile
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -23,7 +24,17 @@ def _mock_cfg():
         docling_api_key="",
         docling_fallback_to_anydoc=True,
         gateway_internal_token="internal-secret",
+        document_zip_max_uncompressed_bytes=500 * 1024 * 1024,
+        document_zip_max_entries=10_000,
     )
+
+
+def _zip_bytes(entries: dict[str, bytes]) -> bytes:
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in entries.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
 
 
 def _mock_brain_response(payload: dict):
@@ -178,7 +189,8 @@ def test_pdf_knowledge_upload_converts_to_markdown_before_forwarding(client: Tes
     }
     raw_filename, raw_uploaded, raw_content_type = raw_call.kwargs["files"]["files"]
     assert raw_filename == "report.pdf"
-    assert raw_uploaded == b"%PDF-1.4 fake"
+    # 原始檔以檔案串流轉送，不再整份讀回記憶體。
+    assert not isinstance(raw_uploaded, bytes)
     assert raw_content_type == "application/octet-stream"
 
     post_call = route_client.post.await_args_list[1]
@@ -276,7 +288,7 @@ def test_pptx_knowledge_upload_converts_to_markdown_before_forwarding(client: Te
             files={
                 "files": (
                     "deck.pptx",
-                    BytesIO(b"pptx-bytes"),
+                    BytesIO(_zip_bytes({"ppt/slides/slide1.xml": b"<p/>"})),
                     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 )
             },
@@ -349,12 +361,18 @@ def test_knowledge_upload_is_not_documented_as_brain_proxy_mirror(client: TestCl
 
 @pytest.mark.parametrize("limit", [8, 1024 * 1024])
 def test_upload_limits_reports_configured_document_limit(client, limit):
-    cfg = _mock_cfg()
-    cfg.document_max_upload_bytes = limit
+    from app.config import get_tts_config
+
+    cfg = get_tts_config().model_copy(update={"document_max_upload_bytes": limit})
     with patch("app.gateway.routes.get_tts_config", return_value=cfg):
         response = client.get("/api/v1/uploads/limits")
     assert response.status_code == 200
-    assert response.json() == {"document_max_upload_bytes": limit}
+    body = response.json()
+    assert body["document_max_upload_bytes"] == limit
+    assert body["asr_max_upload_bytes"] == 25 * 1024 * 1024
+    assert body["avatar_background_max_upload_bytes"] == 25 * 1024 * 1024
+    assert body["avatar_source_max_upload_bytes"] == 200 * 1024 * 1024
+    assert body["image_max_side_px"] == 8192
 
 
 @pytest.mark.parametrize("path", ["upload", "raw/upload"])
@@ -499,3 +517,149 @@ def test_raw_upload_requires_portal_user_project_edit_access(
         route_client.post.assert_awaited_once()
     else:
         route_client.post.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "target_dir",
+    ["../personas", "/etc", "raw/../memory", "knowledge/./x", "C:/x", "a\\..\\b"],
+)
+@pytest.mark.parametrize("path", ["upload", "raw/upload"])
+def test_knowledge_upload_rejects_target_dir_traversal(client, path, target_dir):
+    route_client = MagicMock()
+    route_client.post = AsyncMock()
+    with (
+        patch("app.gateway.routes.get_tts_config", return_value=_mock_cfg()),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+    ):
+        response = client.post(
+            f"/api/v1/knowledge/{path}",
+            data={"project_id": "default", "target_dir": target_dir},
+            files={"files": ("report.md", b"# hi", "text/markdown")},
+        )
+    assert response.status_code == 400
+    assert response.json()["detail"]
+    route_client.post.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("target_dir", "forwarded"),
+    [("", "raw"), ("raw", "raw"), ("knowledge/faq", "raw/faq"), ("faq/sub", "raw/faq/sub")],
+)
+def test_raw_upload_forwards_target_dir_normalized_under_raw(client, target_dir, forwarded):
+    route_client = MagicMock()
+    route_client.post = AsyncMock(
+        return_value=_mock_brain_response({"status": "ok", "files": []}),
+    )
+    with (
+        patch("app.gateway.routes.get_tts_config", return_value=_mock_cfg()),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+    ):
+        response = client.post(
+            "/api/v1/knowledge/raw/upload",
+            data={"project_id": "default", "target_dir": target_dir},
+            files={"files": ("report.md", b"# hi", "text/markdown")},
+        )
+    assert response.status_code == 200
+    assert route_client.post.await_args.kwargs["data"]["target_dir"] == forwarded
+
+
+@pytest.mark.parametrize("filename", ["run.exe", "script.py", "photo.png", "noext"])
+@pytest.mark.parametrize("path", ["upload", "raw/upload"])
+def test_knowledge_upload_rejects_unlisted_extensions(client, path, filename):
+    route_client = MagicMock()
+    route_client.post = AsyncMock()
+    with (
+        patch("app.gateway.routes.get_tts_config", return_value=_mock_cfg()),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+    ):
+        response = client.post(
+            f"/api/v1/knowledge/{path}",
+            data={"project_id": "default"},
+            files={"files": (filename, b"data", "application/octet-stream")},
+        )
+    assert response.status_code == 415
+    assert response.json()["detail"]
+    route_client.post.assert_not_awaited()
+
+
+@pytest.mark.parametrize("path", ["upload", "raw/upload"])
+@pytest.mark.parametrize(
+    ("archive", "cfg_update", "status"),
+    [
+        # 1 MB 的零壓縮後只有幾 KB，但宣告的解壓大小超過上限。
+        (lambda: _zip_bytes({"word/document.xml": b"\0" * (1024 * 1024)}),
+         {"document_zip_max_uncompressed_bytes": 512 * 1024}, 413),
+        (lambda: _zip_bytes({f"f{i}.xml": b"" for i in range(21)}),
+         {"document_zip_max_entries": 20}, 413),
+        (lambda: b"not a zip at all", {}, 415),
+    ],
+)
+def test_office_upload_zip_guard_runs_before_brain(client, path, archive, cfg_update, status):
+    cfg = _mock_cfg()
+    for key, value in cfg_update.items():
+        setattr(cfg, key, value)
+    route_client = MagicMock()
+    route_client.post = AsyncMock()
+    ingest = MagicMock()
+    with (
+        patch("app.gateway.routes.get_tts_config", return_value=cfg),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+        patch("app.gateway.routes.ingest_document", ingest),
+    ):
+        response = client.post(
+            f"/api/v1/knowledge/{path}",
+            data={"project_id": "default"},
+            files={"files": ("bomb.docx", archive(), "application/octet-stream")},
+        )
+    assert response.status_code == status
+    route_client.post.assert_not_awaited()
+    ingest.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["upload", "raw/upload"])
+def test_pdf_upload_requires_pdf_magic(client, path):
+    route_client = MagicMock()
+    route_client.post = AsyncMock()
+    with (
+        patch("app.gateway.routes.get_tts_config", return_value=_mock_cfg()),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+    ):
+        response = client.post(
+            f"/api/v1/knowledge/{path}",
+            data={"project_id": "default"},
+            files={"files": ("report.pdf", b"<html>not pdf</html>", "application/pdf")},
+        )
+    assert response.status_code == 415
+    route_client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_raw_artifact_is_streamed_from_disk_through_a_real_httpx_client(tmp_path):
+    """The original file goes out as a file handle; httpx must send its bytes."""
+    import httpx
+
+    from app.gateway.routes import _upload_raw_artifact
+
+    source = tmp_path / "report.pdf"
+    source.write_bytes(b"%PDF-1.4 streamed body")
+    seen: dict[str, bytes] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = request.read()
+        seen["url"] = str(request.url).encode()
+        return httpx.Response(200, json={"status": "ok"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await _upload_raw_artifact(
+            client,
+            brain_url="http://brain:8100",
+            file_path=str(source),
+            original_filename="report.pdf",
+            target_dir="knowledge/faq",
+            project_id="default",
+            headers={},
+        )
+
+    assert seen["url"] == b"http://brain:8100/brain/knowledge/raw/upload"
+    assert b"%PDF-1.4 streamed body" in seen["body"]
+    assert b"raw/faq" in seen["body"]

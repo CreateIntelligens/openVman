@@ -24,6 +24,19 @@ if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
 
+def _silent_wav(seconds: float = 0.05) -> bytes:
+    import io
+    import wave
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16000)
+        audio.writeframes(b"\x00\x00" * int(16000 * seconds))
+    return buffer.getvalue()
+
+
 def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
     base = {
         "document_max_upload_bytes": max_upload_bytes,
@@ -46,12 +59,16 @@ def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
         "tts_cache_ttl_seconds": 86400,
         "session_jwt_secret": "x" * 32,
         "asr_provider": "breeze",
+        "document_zip_max_uncompressed_bytes": 500 * 1024 * 1024,
+        "document_zip_max_entries": 10_000,
+        "asr_max_upload_bytes": 25 * 1024 * 1024,
+        "asr_max_duration_seconds": 300,
     }
     base.update(overrides)
     return types.SimpleNamespace(**base)
 
 
-def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
+def _load_main(monkeypatch, *, max_upload_bytes: int = 1024, **cfg_overrides):
     fake_anydoc_mod = types.ModuleType("anydoc")
     fake_anydoc_mod.convert_paths = []
 
@@ -76,7 +93,7 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
             monkeypatch.delattr(sys.modules[parent], attribute, raising=False)
         monkeypatch.delitem(sys.modules, name, raising=False)
     module = importlib.import_module("app.main")
-    _cfg = lambda: _make_test_config(max_upload_bytes=max_upload_bytes)
+    _cfg = lambda: _make_test_config(max_upload_bytes=max_upload_bytes, **cfg_overrides)
     for target in (
         module, module.tts_routes, module.asr_routes, module.document_routes,
     ):
@@ -254,6 +271,44 @@ def test_convert_preserves_plaintext_without_anydoc(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["markdown"] == "plain text"
+    assert fake_anydoc.convert_paths == []
+
+
+def test_convert_rejects_unlisted_extension_before_anydoc(monkeypatch):
+    module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=1024)
+    client, _ = _authenticated_client(module)
+
+    response = client.post(
+        "/api/v1/documents/convert",
+        files={"file": ("tool.exe", b"MZ", "application/octet-stream")},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"]
+    assert fake_anydoc.convert_paths == []
+
+
+def test_convert_rejects_zip_bomb_before_anydoc(monkeypatch):
+    import io
+    import zipfile
+
+    module, fake_anydoc = _load_main(
+        monkeypatch,
+        max_upload_bytes=1024 * 1024,
+        document_zip_max_uncompressed_bytes=64 * 1024,
+    )
+    client, _ = _authenticated_client(module)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("word/document.xml", b"\0" * (256 * 1024))
+
+    response = client.post(
+        "/api/v1/documents/convert",
+        files={"file": ("bomb.docx", buffer.getvalue(), "application/octet-stream")},
+    )
+
+    assert response.status_code == 413
+    assert "解壓" in response.json()["detail"]
     assert fake_anydoc.convert_paths == []
 
 
@@ -1705,7 +1760,7 @@ def test_asr_preview_returns_the_transcript_and_the_engine_that_answered(monkeyp
     client, _ = _authenticated_client(module)
     response = client.post(
         "/api/v1/asr/preview",
-        files={"file": ("preview.webm", b"fake-audio-bytes", "audio/webm")},
+        files={"file": ("preview.webm", _silent_wav(), "audio/webm")},
         data={"provider": "sensevoice"},
     )
 
@@ -1786,7 +1841,7 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
     client, _ = _authenticated_client(module, admin=False)
     response = client.post(
         "/api/v1/asr/transcribe",
-        files={"file": ("speech.webm", b"fake-audio-bytes", "audio/webm")},
+        files={"file": ("speech.webm", _silent_wav(), "audio/webm")},
     )
 
     assert response.status_code == 200
@@ -1811,7 +1866,7 @@ def test_chat_transcribe_rejects_an_ungranted_client_supplied_engine(monkeypatch
     response = client.post(
         "/api/v1/asr/transcribe",
         data={"provider": "openai"},
-        files={"file": ("speech.webm", b"fake-audio-bytes", "audio/webm")},
+        files={"file": ("speech.webm", _silent_wav(), "audio/webm")},
     )
 
     assert response.status_code == 403
@@ -1861,7 +1916,7 @@ def test_asr_preview_with_a_project_uses_its_glossary_and_taiwanese_check(monkey
     client, _ = _authenticated_client(module)
     response = client.post(
         "/api/v1/asr/preview",
-        files={"file": ("preview.wav", b"fake-audio-bytes", "audio/wav")},
+        files={"file": ("preview.wav", _silent_wav(), "audio/wav")},
         data={"provider": "r2t2", "project_id": "p1", "language_routes": "zh,nan"},
     )
 
@@ -1883,7 +1938,7 @@ def test_chat_transcribe_still_switches_to_breeze_on_the_taiwanese_route(monkeyp
     client, _ = _authenticated_client(module, admin=False)
     response = client.post(
         "/api/v1/asr/transcribe",
-        files={"file": ("speech.wav", b"fake-audio-bytes", "audio/wav")},
+        files={"file": ("speech.wav", _silent_wav(), "audio/wav")},
         data={"project_id": "p1"},
     )
 
@@ -1896,7 +1951,7 @@ def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
     module, _ = _load_main(monkeypatch)
     monkeypatch.setattr(
         module.asr_routes, "get_tts_config",
-        lambda: _make_test_config(document_max_upload_bytes=8),
+        lambda: _make_test_config(asr_max_upload_bytes=8),
     )
 
     client, _ = _authenticated_client(module)
@@ -1906,6 +1961,49 @@ def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
     )
 
     assert response.status_code == 413
+
+
+def _asr_cfg_with_real_probe(monkeypatch, module, **overrides):
+    import app.gateway.ingestion_audio as ingestion_audio
+
+    transcribe = AsyncMock()
+    monkeypatch.setattr(ingestion_audio, "transcribe", transcribe)
+    monkeypatch.setattr(
+        module.asr_routes, "get_tts_config",
+        lambda: _make_test_config(**overrides),
+    )
+    return transcribe
+
+
+@pytest.mark.parametrize("path", ["/api/v1/asr/preview", "/api/v1/asr/transcribe"])
+def test_asr_rejects_content_ffprobe_cannot_read_before_any_engine(monkeypatch, path):
+    module, _ = _load_main(monkeypatch)
+    transcribe = _asr_cfg_with_real_probe(monkeypatch, module)
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        path,
+        files={"file": ("speech.wav", b"definitely not audio" * 4, "audio/wav")},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"]
+    transcribe.assert_not_awaited()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/asr/preview", "/api/v1/asr/transcribe"])
+def test_asr_rejects_clips_longer_than_the_limit_before_any_engine(monkeypatch, path):
+    module, _ = _load_main(monkeypatch)
+    # 0.2 秒的真 WAV，對 0.1 秒的上限來說太長。
+    transcribe = _asr_cfg_with_real_probe(monkeypatch, module, asr_max_duration_seconds=0.1)
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        path,
+        files={"file": ("speech.wav", _silent_wav(seconds=0.2), "audio/wav")},
+    )
+
+    assert response.status_code == 413
+    assert "長度" in response.json()["detail"]
+    transcribe.assert_not_awaited()
 
 
 def _flat_routes(routes):
@@ -2011,7 +2109,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
 
     from starlette.datastructures import UploadFile
 
-    upload = UploadFile(filename="clip.webm", file=__import__("io").BytesIO(b"fake-audio"))
+    upload = UploadFile(filename="clip.wav", file=__import__("io").BytesIO(_silent_wav()))
     runtime = get_auth_runtime()
     user = runtime.users.create_root(username="ai360", password_hash="unused")
     for engine in ("sensevoice", "breeze"):

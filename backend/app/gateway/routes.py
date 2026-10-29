@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import uuid
@@ -21,7 +22,7 @@ from app.auth.resources import ResourceAccess, ResourceNotFoundError, resolve_re
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.brain_proxy import _http as _brain_http
 from app.config import get_tts_config
-from app.error_payloads import upload_failed_response
+from app.error_payloads import upload_failed_response, upload_rejected_response
 from app.gateway.crawl_adapter import CrawlResult, fetch_page
 from app.gateway.ingestion import ingest_document
 from app.gateway.ingestion_youtube import (
@@ -35,10 +36,17 @@ from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
 from app.gateway.temp_storage import get_temp_storage
 from app.gateway.worker import process_media
+from app.utils import media as media_mod
+from app.utils.document_checks import check_document_upload, require_document_suffix
+from app.utils.images import validate_image_file
 from app.utils.upload import (
+    MIB,
+    UnsupportedUploadError,
+    UploadLimitError,
     UploadTooLargeError,
     cleanup_temp_path,
     persist_upload_to_tempfile,
+    read_upload_limited,
 )
 
 logger = logging.getLogger("gateway.routes")
@@ -77,6 +85,41 @@ def _require_project_edit(
         raise HTTPException(status_code=404, detail="Resource not found") from exc
 
 
+_OFFICE_MIME_SUFFIXES = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+}
+
+
+def _validate_media_upload(path: str, mime_type: str, cfg: Any) -> str:
+    """Check the stored upload's real content; return the MIME type to keep."""
+    family = mime_type.split("/", 1)[0]
+    if family == "image":
+        return validate_image_file(path, max_side=cfg.upload_image_max_side_px)
+    if family == "video":
+        probe = media_mod.probe_media(path)
+        if not probe.has_video:
+            raise UnsupportedUploadError("影片裡沒有影像軌")
+        media_mod.require_duration(
+            probe, max_seconds=cfg.gateway_video_max_duration_seconds, what="影片",
+        )
+        return mime_type
+    if family == "audio":
+        probe = media_mod.probe_media(path)
+        if not probe.has_audio:
+            raise UnsupportedUploadError("音檔裡沒有音訊")
+        media_mod.require_duration(
+            probe, max_seconds=cfg.asr_max_duration_seconds, what="音檔",
+        )
+        return mime_type
+    if mime_type == "application/pdf":
+        check_document_upload(path, ".pdf", cfg=cfg)
+    elif mime_type in _OFFICE_MIME_SUFFIXES:
+        check_document_upload(path, _OFFICE_MIME_SUFFIXES[mime_type], cfg=cfg)
+    return mime_type
+
+
 async def _process_media_sync(data: dict[str, Any]) -> None:
     """Sync fallback: run process_media in-process when no queue is available."""
     await process_media({}, data)
@@ -86,11 +129,12 @@ async def _prepare_passthrough_upload(
     upload: UploadFile,
     *,
     max_bytes: int,
+    cfg: Any,
 ) -> tuple[str, bytes, str]:
     try:
-        content = await upload.read(max_bytes + 1)
-        if len(content) > max_bytes:
-            raise UploadTooLargeError(max_bytes)
+        suffix = require_document_suffix(upload.filename or "")
+        content = await read_upload_limited(upload, max_bytes=max_bytes)
+        check_document_upload(io.BytesIO(content), suffix, cfg=cfg)
         return (
             upload.filename or "",
             content,
@@ -115,17 +159,18 @@ async def _prepare_document_upload(
     max_bytes: int,
     headers: dict[str, str],
 ) -> tuple[str, bytes, str]:
-    suffix = Path(upload.filename or "").suffix
     safe_stem = Path(upload.filename or "document").stem or "document"
     trace_id = uuid.uuid4().hex
     tmp_path: str | None = None
 
     try:
+        suffix = require_document_suffix(upload.filename or "")
         tmp_path, _ = await persist_upload_to_tempfile(
             upload,
             suffix=suffix,
             max_bytes=max_bytes,
         )
+        await asyncio.to_thread(check_document_upload, tmp_path, suffix, cfg=cfg)
         await _upload_raw_artifact(
             brain_client,
             brain_url=brain_url,
@@ -146,11 +191,19 @@ async def _prepare_document_upload(
         cleanup_temp_path(tmp_path)
 
 
+class InvalidTargetDirError(ValueError):
+    """target_dir 試圖跳出 knowledge／raw 區。"""
+
+
 def _clean_target_dir(target_dir: str) -> list[str]:
-    cleaned = target_dir.strip().strip("/")
+    cleaned = target_dir.strip()
+    if cleaned.startswith("/") or "\\" in cleaned or ":" in cleaned:
+        raise InvalidTargetDirError("target_dir 必須是知識庫內的相對路徑")
     if not cleaned:
         return []
-    parts = cleaned.split("/")
+    parts = cleaned.rstrip("/").split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        raise InvalidTargetDirError("target_dir 不可包含 . 或 .. 片段")
     if parts[0] in ("knowledge", "raw"):
         return parts[1:]
     return parts
@@ -192,22 +245,23 @@ async def _upload_raw_artifact(
     project_id: str,
     headers: dict[str, str],
 ) -> None:
-    raw_path = Path(file_path)
-    response = await client.post(
-        f"{brain_url}/brain/knowledge/raw/upload",
-        files={
-            "files": (
-                Path(original_filename).name,
-                raw_path.read_bytes(),
-                "application/octet-stream",
-            )
-        },
-        data={
-            "target_dir": _build_raw_target_dir(target_dir),
-            "project_id": project_id,
-        },
-        headers=headers,
-    )
+    # 以檔案串流轉送，不再把整個原始檔讀回記憶體。
+    with Path(file_path).open("rb") as raw_file:
+        response = await client.post(
+            f"{brain_url}/brain/knowledge/raw/upload",
+            files={
+                "files": (
+                    Path(original_filename).name,
+                    raw_file,
+                    "application/octet-stream",
+                )
+            },
+            data={
+                "target_dir": _build_raw_target_dir(target_dir),
+                "project_id": project_id,
+            },
+            headers=headers,
+        )
     response.raise_for_status()
 
 
@@ -246,22 +300,41 @@ async def upload(
     # 1-3. Quota, MIME, and Size checks
     quota = storage.check_quota()
     mime_type = file.content_type or "application/octet-stream"
-    
+
     if not quota.ok:
         return upload_failed_response(status_code=413, error="storage_quota_exceeded", usage_mb=quota.usage_mb, limit_mb=quota.limit_mb)
     if mime_type not in cfg.supported_mime_types:
-        return upload_failed_response(status_code=400, error="unsupported_mime_type", mime_type=mime_type)
+        return upload_failed_response(
+            status_code=415,
+            error="unsupported_mime_type",
+            detail="不支援的檔案類型",
+            mime_type=mime_type,
+        )
 
-    data = await file.read()
-    if not storage.validate_file_size(len(data)):
-        return upload_failed_response(status_code=413, error="file_too_large", size_bytes=len(data))
+    # 4. 邊收邊數，超過上限立刻停；再依實際內容（不是 Content-Type）驗格式與時長。
+    tmp_path: str | None = None
     try:
-        file_path = storage.write_file(session_id, data, mime_type)
+        tmp_path, _size = await persist_upload_to_tempfile(
+            file,
+            suffix="",
+            max_bytes=cfg.gateway_max_file_size_mb * MIB,
+            dir=storage.base_dir,
+        )
+        mime_type = await asyncio.to_thread(_validate_media_upload, tmp_path, mime_type, cfg)
+        file_path = storage.store_file(session_id, tmp_path, mime_type)
+        tmp_path = None
+    except UploadTooLargeError as exc:
+        return upload_rejected_response(exc, error="file_too_large")
+    except UnsupportedUploadError as exc:
+        return upload_rejected_response(exc, error="unsupported_content")
     except ValueError as exc:
         return upload_failed_response(
             status_code=400,
             error=str(exc),
         )
+    finally:
+        await file.close()
+        cleanup_temp_path(tmp_path)
 
     # 5. enqueue job
     job_data = {
@@ -457,8 +530,22 @@ async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
 )
 async def get_upload_limits(
     _current: CurrentAccount = Depends(get_current_account),
-) -> dict[str, int]:
-    return {"document_max_upload_bytes": get_tts_config().document_max_upload_bytes}
+) -> dict[str, int | float]:
+    cfg = get_tts_config()
+    # 後台上傳畫面據此顯示上限並先擋過大的檔案；伺服器端仍會再驗一次。
+    return {
+        "document_max_upload_bytes": cfg.document_max_upload_bytes,
+        "asr_max_upload_bytes": cfg.asr_max_upload_bytes,
+        "asr_max_duration_seconds": cfg.asr_max_duration_seconds,
+        "avatar_max_upload_bytes": cfg.avatar_max_upload_bytes,
+        "avatar_background_max_upload_bytes": cfg.avatar_background_max_upload_bytes,
+        "avatar_mascot_max_upload_bytes": cfg.avatar_mascot_max_upload_bytes,
+        "avatar_mascot_thumbnail_max_upload_bytes": cfg.avatar_mascot_thumbnail_max_upload_bytes,
+        "avatar_source_max_upload_bytes": cfg.avatar_source_max_upload_bytes,
+        "avatar_source_max_duration_seconds": cfg.avatar_source_max_duration_seconds,
+        "avatar_source_image_max_upload_bytes": cfg.avatar_source_image_max_upload_bytes,
+        "image_max_side_px": cfg.upload_image_max_side_px,
+    }
 
 
 @router.post(
@@ -477,11 +564,13 @@ async def upload_raw_knowledge_documents(
     cfg = get_tts_config()
     _require_project_edit(runtime, current, project_id)
     try:
+        # raw 區只收原始文件；target_dir 一律正規化成 raw/ 底下，不能指到 personas/、memory/ 等。
+        raw_target_dir = _build_raw_target_dir(target_dir)
         forwarded_files = [
             (
                 "files",
                 await _prepare_passthrough_upload(
-                    upload, max_bytes=cfg.document_max_upload_bytes,
+                    upload, max_bytes=cfg.document_max_upload_bytes, cfg=cfg,
                 ),
             )
             for upload in files
@@ -490,7 +579,7 @@ async def upload_raw_knowledge_documents(
             f"{cfg.brain_url}/brain/knowledge/raw/upload",
             files=forwarded_files,
             data={
-                "target_dir": target_dir,
+                "target_dir": raw_target_dir,
                 "project_id": project_id,
                 "relative_paths": relative_paths,
             },
@@ -499,11 +588,10 @@ async def upload_raw_knowledge_documents(
             ),
         )
         return _relay_brain_response(response)
-    except UploadTooLargeError as exc:
-        return upload_failed_response(
-            status_code=413,
-            error=f"檔案超過大小限制（上限 {exc.limit_bytes} bytes）",
-        )
+    except InvalidTargetDirError as exc:
+        return upload_failed_response(status_code=400, error=str(exc), detail=str(exc))
+    except UploadLimitError as exc:
+        return upload_rejected_response(exc)
     except httpx.TimeoutException:
         return _error_response(504, "brain request timeout")
     except httpx.RequestError:
@@ -544,7 +632,7 @@ async def upload_knowledge_documents(
             client_relative = relative_paths[index] if index < len(relative_paths) else ""
             if _should_passthrough_knowledge_upload(upload):
                 forwarded = await _prepare_passthrough_upload(
-                    upload, max_bytes=cfg.document_max_upload_bytes,
+                    upload, max_bytes=cfg.document_max_upload_bytes, cfg=cfg,
                 )
                 forwarded_relative_path = client_relative or (upload.filename or "")
             else:
@@ -574,11 +662,10 @@ async def upload_knowledge_documents(
             headers=trusted_headers,
         )
         return _relay_brain_response(resp)
-    except UploadTooLargeError as exc:
-        return upload_failed_response(
-            status_code=413,
-            error=f"檔案超過大小限制（上限 {exc.limit_bytes} bytes）",
-        )
+    except InvalidTargetDirError as exc:
+        return upload_failed_response(status_code=400, error=str(exc), detail=str(exc))
+    except UploadLimitError as exc:
+        return upload_rejected_response(exc)
     except httpx.ConnectError:
         logger.warning("knowledge_upload_brain_unreachable target_dir=%s project_id=%s", target_dir, project_id)
         return _error_response(502, "brain service unavailable")
@@ -643,7 +730,10 @@ async def ingest_youtube_transcript(
 
     client = _brain_http.get()
     cfg = get_tts_config()
-    target_dir = _build_markdown_target_dir(req.target_dir)
+    try:
+        target_dir = _build_markdown_target_dir(req.target_dir)
+    except InvalidTargetDirError as exc:
+        return _error_response(400, str(exc))
 
     try:
         resp = await client.post(

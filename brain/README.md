@@ -348,6 +348,16 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 
 `POST /chat` 一次回傳完整結果；`POST /chat/stream` 以 SSE 逐句送出同一份回答（見「逐句串流」）；即時語音走 Live WebSocket。
 
+### 上傳限制
+
+Backend 會先檢查一次，Brain 自己再擋一次，內部呼叫端也不能繞過。大小都是邊讀邊數，超過就停。
+
+| 端點 | 限制 | 超過時 |
+|---|---|---|
+| `POST /knowledge/upload` | 每檔 `KNOWLEDGE_UPLOAD_MAX_BYTES`（預設 100 MB）；`target_dir` 必須在 `knowledge/` 底下 | 413；路徑不合 400 |
+| `POST /knowledge/raw/upload` | 每檔 `KNOWLEDGE_UPLOAD_MAX_BYTES`；`target_dir` 必須在 `raw/` 底下（不能寫到 `personas/`、`memory/`、`.learnings/` 或核心文件）；副檔名限 `.md` `.markdown` `.txt` `.csv` `.pdf` `.docx` `.pptx` `.xlsx` `.html` `.htm` | 413；路徑不合 400；副檔名不符 415 |
+| `POST /knowledge/qa/images` | 每檔 `QA_IMAGE_MAX_BYTES`（預設 10 MB）；內容的 magic bytes 要跟副檔名一致（png、jpg、webp、gif、bmp、ico、avif）；png／jpg／webp／gif／bmp 最長邊 `QA_IMAGE_MAX_SIDE_PX`（預設 8192） | 太大 413；格式不符 415 |
+
 ## 設定
 
 Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/api/config.py` 與根目錄 `.env.example`。
@@ -365,6 +375,7 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 | 網路工具 | `URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`URL2MD_BASE_URLS`、`URL2MD_TOTAL_BUDGET_S`、`URL2MD_CIRCUIT_COOLDOWN_S`、`REDIS_URL`、`WEB_SEARCH_BLOCKED_DOMAINS`（結果重排門檻在 `EMBEDDING_THRESHOLDS`） |
 | Wiki | `WIKI_PUBLISH_ENABLED`、`WIKI_API_BASE_URL`、`WIKI_PUBLISH_MAX_CHARS` |
 | 隱私 | `PRIVACY_FILTER_ENABLED`、`PRIVACY_CLEF_TIMEOUT_SECONDS`、`PRIVACY_MAX_INFLIGHT`、`PRIVACY_FILTER_BLOCK_CATEGORIES` |
+| 上傳 | `KNOWLEDGE_UPLOAD_MAX_BYTES`、`QA_IMAGE_MAX_BYTES`、`QA_IMAGE_MAX_SIDE_PX`（見「上傳限制」） |
 | 安全 | `MAX_INPUT_LENGTH`、`ENABLE_CONTENT_FILTER`、`BLOCK_PROMPT_INJECTION`、`REQUEST_RATE_LIMIT_PER_MINUTE`、`ALLOWED_CHANNELS` |
 | Live | `LIVE_GEMINI_MODEL`、`LIVE_GEMINI_TOOLS_ENABLED`、`LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`、`LIVE_AUDIO_LANGUAGE_ID_MODEL`、`LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS` |
 

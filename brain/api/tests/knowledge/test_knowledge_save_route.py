@@ -4,8 +4,25 @@ import asyncio
 import importlib
 import sys
 import types
+import io
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
+from fastapi import HTTPException, UploadFile
+
+
+@pytest.fixture(autouse=True)
+def _restore_stubbed_modules():
+    """The loader below swaps real modules for stubs; put them back afterwards
+    so other test files in the same worker see the real ones."""
+    saved = dict(sys.modules)
+    yield
+    for name in set(sys.modules) - set(saved):
+        del sys.modules[name]
+    for name, module in saved.items():
+        if sys.modules.get(name) is not module:
+            sys.modules[name] = module
 
 
 def _stub_module(name: str, **attrs: object) -> None:
@@ -148,3 +165,122 @@ def test_create_note_route_passes_target_dir(monkeypatch):
     assert response["path"] == "knowledge/faq/FAQ.md"
     assert captured["reindex_project_id"] == "default"
     assert "task" in captured
+
+
+# ---------------------------------------------------------------------------
+# Upload limits (defence in depth behind the Backend checks)
+# ---------------------------------------------------------------------------
+
+
+
+class _CountingStream(io.BytesIO):
+    def __init__(self, data: bytes) -> None:
+        super().__init__(data)
+        self.reads = 0
+
+    def read(self, size: int = -1) -> bytes:
+        self.reads += 1
+        return super().read(size)
+
+
+def _upload(name: str, data: bytes = b"# hi") -> UploadFile:
+    return UploadFile(filename=name, file=_CountingStream(data))
+
+
+def _saved_calls(monkeypatch, knowledge_routes, attr: str) -> list[tuple]:
+    calls: list[tuple] = []
+    monkeypatch.setattr(
+        knowledge_routes,
+        attr,
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"path": "x"},
+    )
+    monkeypatch.setattr(knowledge_routes, "schedule_reindex", lambda project_id: None)
+    return calls
+
+
+@pytest.mark.parametrize(
+    "target_dir",
+    ["personas/doctor", "memory", ".learnings", "../raw", "/raw", "raw/../SOUL", "knowledge", "raw\\x"],
+)
+def test_raw_upload_route_only_writes_under_raw(monkeypatch, target_dir):
+    knowledge_routes = _load_knowledge_routes_module()
+    calls = _saved_calls(monkeypatch, knowledge_routes, "save_uploaded_artifact")
+
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(knowledge_routes.upload_knowledge_raw_documents_route(
+            files=[_upload("a.md")], target_dir=target_dir, project_id="default",
+            relative_paths=[],
+        ))
+    assert caught.value.status_code == 400
+    assert calls == []
+
+
+@pytest.mark.parametrize("target_dir", ["raw", "raw/faq", "raw/faq/sub/"])
+def test_raw_upload_route_accepts_raw_subdirectories(monkeypatch, target_dir):
+    knowledge_routes = _load_knowledge_routes_module()
+    calls = _saved_calls(monkeypatch, knowledge_routes, "save_uploaded_artifact")
+
+    asyncio.run(knowledge_routes.upload_knowledge_raw_documents_route(
+        files=[_upload("a.pdf", b"%PDF-1.4")], target_dir=target_dir,
+        project_id="default", relative_paths=[],
+    ))
+    assert calls[0][0][2] == target_dir.rstrip("/")
+
+
+@pytest.mark.parametrize(("filename", "relative"), [("a.exe", ""), ("a.md", "sub/SOUL.py")])
+def test_raw_upload_route_rejects_unlisted_extensions(monkeypatch, filename, relative):
+    knowledge_routes = _load_knowledge_routes_module()
+    calls = _saved_calls(monkeypatch, knowledge_routes, "save_uploaded_artifact")
+
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(knowledge_routes.upload_knowledge_raw_documents_route(
+            files=[_upload(filename)], target_dir="raw", project_id="default",
+            relative_paths=[relative] if relative else [],
+        ))
+    assert caught.value.status_code == 415
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("route", "attr", "target_dir"),
+    [
+        ("upload_knowledge_raw_documents_route", "save_uploaded_artifact", "raw"),
+        ("upload_knowledge_documents_route", "save_uploaded_document", "knowledge"),
+    ],
+)
+def test_knowledge_upload_routes_enforce_size_while_reading(monkeypatch, route, attr, target_dir):
+    from config import get_settings
+
+    knowledge_routes = _load_knowledge_routes_module()
+    calls = _saved_calls(monkeypatch, knowledge_routes, attr)
+    monkeypatch.setattr(get_settings(), "knowledge_upload_max_bytes", 2 * 1024 * 1024)
+    upload = _upload("big.md", b"x" * (8 * 1024 * 1024))
+
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(getattr(knowledge_routes, route)(
+            files=[upload], target_dir=target_dir, project_id="default",
+            relative_paths=[],
+        ))
+    assert caught.value.status_code == 413
+    # 1 MB 一塊，第 3 塊就超過 2 MB；剩下的不該再讀。
+    assert upload.file.reads <= 3
+    assert calls == []
+
+
+def test_knowledge_upload_route_only_writes_under_knowledge(monkeypatch):
+    knowledge_routes = _load_knowledge_routes_module()
+    calls = _saved_calls(monkeypatch, knowledge_routes, "save_uploaded_document")
+
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(knowledge_routes.upload_knowledge_documents_route(
+            files=[_upload("SOUL.md")], target_dir="knowledge/../", project_id="default",
+            relative_paths=[],
+        ))
+    assert caught.value.status_code == 400
+    assert calls == []
+
+
+def test_brain_knowledge_upload_default_limit():
+    from config import BrainSettings
+
+    assert BrainSettings().knowledge_upload_max_bytes == 100 * 1024 * 1024

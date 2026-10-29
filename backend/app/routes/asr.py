@@ -26,14 +26,16 @@ from app.auth.dependencies import (
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.settings_repository import SERVER_ASR_PROVIDERS
 from app.config import get_tts_config
-from app.error_payloads import upload_failed_response
+from app.error_payloads import upload_failed_response, upload_rejected_response
 from app.usage_ledger_client import (
     UNIT_SECONDS,
     record_usage_event,
     usage_scope_for,
 )
+from app.utils import media as media_mod
 from app.utils.upload import (
-    UploadTooLargeError,
+    UnsupportedUploadError,
+    UploadLimitError,
     cleanup_temp_path,
     persist_upload_to_tempfile,
 )
@@ -75,6 +77,29 @@ def _audio_seconds(file_path: str) -> float | None:
         return seconds if math.isfinite(seconds) and seconds > 0 else None
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
+
+
+def _check_asr_clip(file_path: str, max_seconds: float) -> None:
+    """ffprobe 讀得出音訊且長度在上限內，才交給任何（可能計費的）辨識引擎。"""
+    probe = media_mod.probe_media(file_path)
+    if not probe.has_audio:
+        raise UnsupportedUploadError("檔案裡沒有音訊")
+    media_mod.require_duration(probe, max_seconds=max_seconds, what="音檔")
+
+
+async def _persist_asr_clip(file: UploadFile, cfg: Any) -> str:
+    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
+    tmp_path, _ = await persist_upload_to_tempfile(
+        file,
+        suffix=suffix,
+        max_bytes=cfg.asr_max_upload_bytes,
+    )
+    try:
+        await asyncio.to_thread(_check_asr_clip, tmp_path, cfg.asr_max_duration_seconds)
+    except BaseException:
+        cleanup_temp_path(tmp_path)
+        raise
+    return tmp_path
 
 
 async def _record_transcription_usage(
@@ -196,6 +221,8 @@ async def _transcribe_routed(
     response_model=AsrTranscription,
     responses={
         403: {"description": "指定引擎未授權"},
+        413: {"description": "音檔超過 ASR_MAX_UPLOAD_BYTES（預設 25 MB）或長度超過 ASR_MAX_DURATION_SECONDS（預設 5 分鐘）"},
+        415: {"description": "ffprobe 讀不出音訊"},
         422: {"description": "無效的批次引擎或請求欄位"},
         502: {"description": "明確指定的辨識引擎失敗，不執行備援"},
         503: {"description": "指定引擎尚未完成部署設定"},
@@ -236,7 +263,6 @@ async def transcribe_for_account(
     明確指定時先驗證批次模式、授權與部署設定，只執行該引擎，不修改帳號偏好。
     省略時保留帳號偏好與部署預設；備援限於授權引擎及既有部署預設。
     """
-    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
     tmp_path: str | None = None
     cfg = get_tts_config()
     try:
@@ -265,11 +291,7 @@ async def transcribe_for_account(
         # without explicit grants, unless the project policy excludes it. A
         # fallback must not expose other engines.
         providers = {requested} if requested else set(scope.allowed)
-        tmp_path, _ = await persist_upload_to_tempfile(
-            file,
-            suffix=suffix,
-            max_bytes=cfg.document_max_upload_bytes,
-        )
+        tmp_path = await _persist_asr_clip(file, cfg)
         return JSONResponse(content=await _transcribe_routed(
             account, tmp_path,
             project_id=project_id,
@@ -283,12 +305,8 @@ async def transcribe_for_account(
         ))
     except HTTPException:
         raise
-    except UploadTooLargeError as exc:
-        limit_mb = exc.limit_bytes / (1024 * 1024)
-        return upload_failed_response(
-            status_code=413,
-            error=f"音檔超過大小限制（上限 {limit_mb:.0f} MB）",
-        )
+    except UploadLimitError as exc:
+        return upload_rejected_response(exc)
     except Exception as exc:
         logger.error("asr transcribe failed: %s", exc)
         return upload_failed_response(status_code=500, error=str(exc))
@@ -343,6 +361,10 @@ async def list_asr_engines(
     "/api/v1/asr/preview",
     tags=["ASR"],
     response_model=AsrTranscription,
+    responses={
+        413: {"description": "音檔超過大小或長度上限（同 /api/v1/asr/transcribe）"},
+        415: {"description": "ffprobe 讀不出音訊"},
+    },
     summary="用指定的引擎試辨識一段語音",
 )
 async def preview_asr(
@@ -366,15 +388,10 @@ async def preview_asr(
             status_code=422,
             error=f"provider must be one of: {', '.join(sorted(SERVER_ASR_PROVIDERS))}",
         )
-    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
     tmp_path: str | None = None
     cfg = get_tts_config()
     try:
-        tmp_path, _ = await persist_upload_to_tempfile(
-            file,
-            suffix=suffix,
-            max_bytes=cfg.document_max_upload_bytes,
-        )
+        tmp_path = await _persist_asr_clip(file, cfg)
         return JSONResponse(content=await _transcribe_routed(
             admin, tmp_path,
             project_id=project_id,
@@ -383,12 +400,8 @@ async def preview_asr(
             trace_id="asr-preview",
             taiwanese_engine=None,
         ))
-    except UploadTooLargeError as exc:
-        limit_mb = exc.limit_bytes / (1024 * 1024)
-        return upload_failed_response(
-            status_code=413,
-            error=f"音檔超過大小限制（上限 {limit_mb:.0f} MB）",
-        )
+    except UploadLimitError as exc:
+        return upload_rejected_response(exc)
     except Exception as exc:
         logger.error("asr preview failed: %s", exc)
         return upload_failed_response(status_code=500, error=str(exc))

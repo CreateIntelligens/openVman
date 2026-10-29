@@ -291,6 +291,12 @@ class BrainSettings(BaseSettings):
     gateway_internal_token: str = ""
     max_input_length: int = 500
     qa_image_max_bytes: int = 10 * 1024 * 1024
+    qa_image_max_side_px: int = Field(default=8192, gt=0, validation_alias="QA_IMAGE_MAX_SIDE_PX")
+    # Backend 已先擋一次；Brain 自己也要有上限，內部呼叫端才不能塞無限大的檔。
+    knowledge_upload_max_bytes: int = Field(
+        default=100 * 1024 * 1024,
+        validation_alias="KNOWLEDGE_UPLOAD_MAX_BYTES",
+    )
     enable_content_filter: bool = True
     request_rate_limit_per_minute: int = 90
     block_prompt_injection: bool = True
