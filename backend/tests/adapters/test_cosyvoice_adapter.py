@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import httpx
 import pytest
@@ -71,7 +71,9 @@ def test_cosyvoice_adapter_synthesis_success(monkeypatch):
             "format": "mp3",
         },
         headers={"Authorization": "Bearer secret"},
+        timeout=ANY,
     )
+    assert mock_post.call_args.kwargs["timeout"].connect == 2.0
 
 
 def test_cosyvoice_adapter_default_voice_and_no_auth_header(monkeypatch):

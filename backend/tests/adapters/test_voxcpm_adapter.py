@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import httpx
 import pytest
@@ -72,7 +72,12 @@ def test_voxcpm_adapter_synthesis_success(monkeypatch):
             "voice_id": "voxcpm2-cosy-teen-female-01",
         },
         headers={"Authorization": "Bearer secret"},
+        timeout=ANY,
     )
+    timeout = mock_post.call_args.kwargs["timeout"]
+    # 連線 2 秒；兩個字的整站預算約 10 秒（base 10 + 每字 0.1），httpx 多留 1 秒收尾。
+    assert timeout.connect == 2.0
+    assert 10.0 < timeout.read < 12.0
 
 
 def test_voxcpm_adapter_default_voice_and_no_auth_header(monkeypatch):

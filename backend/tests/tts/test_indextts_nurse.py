@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import types
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import httpx
 import pytest
@@ -103,6 +103,7 @@ def test_nurse_synthesis_goes_to_nurse_url_without_internal_token():
         f"{_NURSE}/tts",
         json={"text": "你好", "character": "healthy2"},
         headers={},
+        timeout=ANY,
     )
     assert (result.provider, result.route_target) == (
         INDEXTTS_NURSE_PROVIDER_NAME, INDEXTTS_NURSE_PROVIDER_NAME,
@@ -133,6 +134,7 @@ def test_primary_adapter_is_unchanged():
         f"{_PRIMARY}/tts",
         json={"text": "你好", "character": "hayley"},
         headers={"X-Internal-Token": "test-internal-token"},
+        timeout=ANY,
     )
     assert result.provider == "indextts"
 

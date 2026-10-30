@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import json
@@ -12,6 +13,7 @@ from time import monotonic
 import httpx
 
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.upstream_guard import knob, HopTimeout
 
 GOOGLE_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 SAMPLE_RATE = 24000
@@ -139,9 +141,18 @@ class _ProjectGeminiStream:
 async def open_stream(
     request: SynthesizeRequest, credential, model: str,
 ) -> AsyncIterator[bytes]:
-    client = httpx.AsyncClient(timeout=60.0)
+    from app.config import get_tts_config
+
+    cfg = get_tts_config()
+    first_byte = knob(cfg, "tts_stream_first_byte_seconds")
+    connect = min(knob(cfg, "tts_connect_timeout_seconds"), first_byte)
+    client = httpx.AsyncClient(timeout=httpx.Timeout(
+        connect=connect, read=max(first_byte, knob(cfg, "tts_stream_stall_seconds")),
+        write=first_byte, pool=connect,
+    ))
     response = None
     chunks = None
+    started = monotonic()
     try:
         upstream = client.build_request(
             "POST", f"{GOOGLE_API_BASE}/{model}:streamGenerateContent?alt=sse",
@@ -149,7 +160,12 @@ async def open_stream(
             json=request_payload(request),
         )
         try:
-            response = await client.send(upstream, stream=True)
+            async with asyncio.timeout(first_byte):
+                response = await client.send(upstream, stream=True)
+        except TimeoutError:
+            raise RuntimeError("Project Gemini TTS timed out") from HopTimeout(
+                "first_byte", first_byte, "gemini-tts",
+            )
         except httpx.HTTPError:
             raise RuntimeError("Project Gemini TTS request failed") from None
         if response.status_code >= 400:
@@ -177,7 +193,14 @@ async def open_stream(
                     yield chunk
 
         chunks = audio()
-        first = await anext(chunks, None)
+        try:
+            remaining = max(0.05, first_byte - (monotonic() - started))
+            async with asyncio.timeout(remaining):
+                first = await anext(chunks, None)
+        except TimeoutError:
+            raise RuntimeError("Project Gemini TTS timed out") from HopTimeout(
+                "first_byte", first_byte, "gemini-tts",
+            )
         if not first:
             raise RuntimeError("Project Gemini TTS returned no audio")
     except BaseException:

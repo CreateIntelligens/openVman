@@ -57,6 +57,7 @@ from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import get_auth_runtime
 from app.config import TTSRouterConfig, get_tts_config
 from app.http_client import SharedAsyncClient
+from app.upstream_guard import OK, classify_outcome, emit_attempt, host_of
 from app.usage_ledger_client import (
     UNIT_SECONDS,
     record_usage_event,
@@ -460,6 +461,7 @@ async def asr_stream(websocket: WebSocket) -> None:
     languages = _gemini_languages(routes)
     audio_bytes = 0
     started = time.monotonic()
+    outcome, error = OK, ""
 
     def count_audio(size: int) -> None:
         nonlocal audio_bytes
@@ -544,13 +546,19 @@ async def asr_stream(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     except Exception as exc:  # noqa: BLE001 - 上游失敗時讓前台退回批次 ASR
-        logger.warning("asr stream failed: %s", exc)
+        outcome, error = classify_outcome(exc)
+        logger.warning("asr stream failed engine=%s: %s", engine, error)
         try:
             await websocket.send_json({"type": "error", "code": "upstream_failed"})
             await websocket.close()
         except Exception:  # noqa: BLE001
             pass
     finally:
+        emit_attempt(
+            "asr_stream", engine, outcome, (time.monotonic() - started) * 1000,
+            host=host_of(endpoint[0]) if endpoint else host_of(_GEMINI_LIVE_URL),
+            error=error, audio_seconds=round(audio_bytes / (2 * _SAMPLE_RATE), 2),
+        )
         seconds = audio_bytes / (2 * _SAMPLE_RATE)
         if seconds > 0:
             record_usage_event(

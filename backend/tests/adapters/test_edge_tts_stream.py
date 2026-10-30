@@ -17,7 +17,7 @@ def _make_config(edge_enabled: bool = True) -> TTSRouterConfig:
 class _FakeCommunicate:
     """Mimics edge_tts.Communicate, yielding a fixed chunk sequence."""
 
-    def __init__(self, text: str, voice: str) -> None:
+    def __init__(self, text: str, voice: str, **_timeouts) -> None:
         self.text = text
         self.voice = voice
 
@@ -58,7 +58,7 @@ async def test_synthesize_stream_falls_back_for_non_edge_voice(monkeypatch):
     captured: dict[str, str] = {}
 
     class _CapturingCommunicate(_FakeCommunicate):
-        def __init__(self, text: str, voice: str) -> None:
+        def __init__(self, text: str, voice: str, **_timeouts) -> None:
             super().__init__(text, voice)
             captured["voice"] = voice
 
@@ -79,7 +79,7 @@ async def test_synthesize_stream_uses_voice_hint(monkeypatch):
     captured: dict[str, str] = {}
 
     class _CapturingCommunicate(_FakeCommunicate):
-        def __init__(self, text: str, voice: str) -> None:
+        def __init__(self, text: str, voice: str, **_timeouts) -> None:
             super().__init__(text, voice)
             captured["voice"] = voice
 
@@ -93,3 +93,16 @@ async def test_synthesize_stream_uses_voice_hint(monkeypatch):
     )
 
     assert captured["voice"] == "zh-TW-HsiaoChenNeural"
+
+
+def test_real_communicate_accepts_the_configured_timeouts(monkeypatch):
+    """edge-tts 只收整數秒；這裡用真的 Communicate 建構（不連網），float 會 TypeError。"""
+    import importlib
+    import sys
+
+    # conftest 在沒裝 edge-tts 的環境放了空殼模組；這裡要真的那個。
+    monkeypatch.delitem(sys.modules, "edge_tts", raising=False)
+    real = importlib.import_module("edge_tts")
+    adapter = EdgeTTSAdapter(_make_config())
+    real.Communicate("x", "zh-TW-HsiaoChenNeural", **adapter._timeouts)
+    assert adapter._timeouts == {"connect_timeout": 2, "receive_timeout": 10}

@@ -27,6 +27,7 @@ from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.settings_repository import SERVER_ASR_PROVIDERS
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response, upload_rejected_response
+from app.upstream_guard import set_clip_seconds
 from app.usage_ledger_client import (
     UNIT_SECONDS,
     record_usage_event,
@@ -79,12 +80,13 @@ def _audio_seconds(file_path: str) -> float | None:
         return None
 
 
-def _check_asr_clip(file_path: str, max_seconds: float) -> None:
-    """ffprobe 讀得出音訊且長度在上限內，才交給任何（可能計費的）辨識引擎。"""
+def _check_asr_clip(file_path: str, max_seconds: float) -> float:
+    """ffprobe 讀得出音訊且長度在上限內，才交給任何（可能計費的）辨識引擎；回傳秒數。"""
     probe = media_mod.probe_media(file_path)
     if not probe.has_audio:
         raise UnsupportedUploadError("檔案裡沒有音訊")
     media_mod.require_duration(probe, max_seconds=max_seconds, what="音檔")
+    return probe.duration_seconds
 
 
 async def _persist_asr_clip(file: UploadFile, cfg: Any) -> str:
@@ -95,10 +97,12 @@ async def _persist_asr_clip(file: UploadFile, cfg: Any) -> str:
         max_bytes=cfg.asr_max_upload_bytes,
     )
     try:
-        await asyncio.to_thread(_check_asr_clip, tmp_path, cfg.asr_max_duration_seconds)
+        seconds = await asyncio.to_thread(_check_asr_clip, tmp_path, cfg.asr_max_duration_seconds)
     except BaseException:
         cleanup_temp_path(tmp_path)
         raise
+    # 已經量過長度：transcribe() 拿它算每一站的逾時，不必再 ffprobe 一次。
+    set_clip_seconds(seconds)
     return tmp_path
 
 

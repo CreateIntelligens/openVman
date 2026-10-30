@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 from urllib.parse import urlencode
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from starlette.requests import Request
@@ -631,7 +632,7 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
             )
 
     fake_service = FakeService()
-    monkeypatch.setattr(module.tts_routes.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(module.tts_routes, "_get_service", lambda: fake_service)
     monkeypatch.setattr(module.tts_routes, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
@@ -777,7 +778,7 @@ def test_tts_stream_sends_selected_nurse_voice_to_the_nurse_server(monkeypatch):
         monkeypatch, max_upload_bytes=1024, tts_indextts_nurse_url="http://nurse-tts:8001",
     )
     _RecordingStreamClient.requests = []
-    monkeypatch.setattr(module.tts_routes.httpx, "AsyncClient", _RecordingStreamClient)
+    monkeypatch.setattr(httpx, "AsyncClient", _RecordingStreamClient)
     client, _ = _authenticated_client(module)
     _register_nurse_voice()
 
@@ -800,7 +801,7 @@ def test_tts_stream_without_provider_stays_on_the_primary_indextts(monkeypatch):
         monkeypatch, max_upload_bytes=1024, tts_indextts_nurse_url="http://nurse-tts:8001",
     )
     _RecordingStreamClient.requests = []
-    monkeypatch.setattr(module.tts_routes.httpx, "AsyncClient", _RecordingStreamClient)
+    monkeypatch.setattr(httpx, "AsyncClient", _RecordingStreamClient)
     client, _ = _authenticated_client(module)
 
     response = client.post("/api/v1/tts/stream", json={"text": "你好", "character": "hayley"})

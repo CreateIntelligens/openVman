@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import httpx
 import pytest
@@ -39,7 +39,9 @@ def test_gemini_adapter_synthesis_success(monkeypatch):
     mock_post.assert_called_once_with(
         "http://localhost:8206/api/tts",
         json={"text": "你好", "voice": "Zephyr"},
+        timeout=ANY,
     )
+    assert mock_post.call_args.kwargs["timeout"].connect == 2.0
 
 
 def test_gemini_adapter_synthesis_http_error(monkeypatch):

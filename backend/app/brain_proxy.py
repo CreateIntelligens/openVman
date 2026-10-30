@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable
+import json
 import logging
+from time import monotonic
 from typing import Any, TypeVar
 
 import httpx
@@ -35,6 +37,17 @@ from app.client_disconnect import wait_for_client_disconnect
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
 from app.project_ids import canonical_project_id
+from app.upstream_guard import (
+    ERROR,
+    OK,
+    REQUEST_ID_HEADER,
+    classify_outcome,
+    current_request_id,
+    describe_error,
+    emit_attempt,
+    host_of,
+    knob,
+)
 
 logger = logging.getLogger("backend.brain_proxy")
 
@@ -162,7 +175,20 @@ _BACKEND_OWNED_PREFIXES = (
     "usage",
 )
 
-_http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
+def _brain_http_timeout() -> httpx.Timeout:
+    # Brain 在同一個 docker 網路：連不上 2 秒就夠判斷；read 是兩個 chunk 之間的上限，
+    # LLM 跑工具時一句話之間可能停很久，維持 120 秒。
+    cfg = get_tts_config()
+    connect = knob(cfg, "brain_proxy_connect_timeout_seconds")
+    return httpx.Timeout(
+        connect=connect,
+        read=knob(cfg, "brain_proxy_read_timeout_seconds"),
+        write=30,
+        pool=connect,
+    )
+
+
+_http = SharedAsyncClient(timeout_factory=_brain_http_timeout)
 
 
 class _EventStreamResponse(StreamingResponse):
@@ -416,6 +442,9 @@ def _trusted_upstream_headers(
 ) -> dict[str, str]:
     headers = _filter_external_request_headers(request.headers)
     headers[_INTERNAL_TOKEN_HEADER] = get_tts_config().gateway_internal_token
+    if request_id := current_request_id():
+        # 同一個 id 帶到 Brain，兩邊的 log 才串得起來。
+        headers[REQUEST_ID_HEADER] = request_id
     if current is None:
         return headers
 
@@ -444,11 +473,43 @@ def _target_url(path: str, query: str) -> str:
     return target_url
 
 
-async def _stream_upstream_bytes(upstream: httpx.Response) -> AsyncIterator[bytes]:
+def _brain_host() -> str:
+    return host_of(get_tts_config().brain_url)
+
+
+async def _stream_upstream_bytes(
+    upstream: httpx.Response,
+    *,
+    path: str = "",
+    started: float | None = None,
+    sse: bool = False,
+) -> AsyncIterator[bytes]:
+    """Relay Brain's stream; a mid-stream timeout ends it with an SSE ``error`` event.
+
+    header 已經送出，沒辦法再改成 504；SSE 就補一個跟 Brain 同格式的 error 事件，
+    前台照一般錯誤處理，不會卡在等下一句。
+    """
+    started = monotonic() if started is None else started
+    outcome, error, tail = OK, "", b"\n\n"
     try:
         async for chunk in upstream.aiter_bytes():
+            if chunk:
+                tail = chunk[-2:]
             yield chunk
+    except httpx.HTTPError as exc:
+        outcome, error = classify_outcome(exc)
+        logger.warning("brain stream interrupted path=%s error=%s", path, error)
+        if sse:
+            status = 504 if outcome.startswith("timeout") else 502
+            body = json.dumps({"status": status, "detail": f"brain stream interrupted: {outcome}"})
+            prefix = b"" if tail.endswith(b"\n\n") else b"\n\n"
+            yield prefix + f"event: error\ndata: {body}\n\n".encode()
     finally:
+        emit_attempt(
+            "brain", "brain", outcome, (monotonic() - started) * 1000,
+            host=_brain_host(), error=error, path=path,
+            status=upstream.status_code, streaming=True,
+        )
         await upstream.aclose()
 
 
@@ -514,6 +575,13 @@ async def proxy_to_brain(
     except _BodyTooLarge as exc:
         return JSONResponse(status_code=413, content={"detail": str(exc)})
     client = _http.get()
+    started = monotonic()
+
+    def _attempt(outcome: str, error: str = "", status: int | None = None) -> None:
+        emit_attempt(
+            "brain", "brain", outcome, (monotonic() - started) * 1000,
+            host=_brain_host(), error=error, path=path, status=status,
+        )
 
     try:
         upstream = await _unless_client_gone(
@@ -533,7 +601,9 @@ async def proxy_to_brain(
 
         # SSE / streaming responses — forward chunks via StreamingResponse.
         if "text/event-stream" in content_type:
-            body_stream = _stream_upstream_bytes(upstream)
+            body_stream = _stream_upstream_bytes(
+                upstream, path=path, started=started, sse=True,
+            )
             if normalized_path in TTS_TEXT_STREAM_PATHS and upstream.status_code == 200:
                 body_stream = annotate_sse(body_stream)
             return StreamingResponse(
@@ -549,6 +619,7 @@ async def proxy_to_brain(
         finally:
             await upstream.aclose()
 
+        _attempt(OK, status=upstream.status_code)
         if (
             normalized_path in TTS_TEXT_PATHS
             and upstream.status_code == 200
@@ -565,37 +636,44 @@ async def proxy_to_brain(
             headers=resp_headers,
         )
     except _ClientDisconnected:
+        _attempt(ERROR, "client disconnected")
         logger.info(
             "client disconnected; closed brain request method=%s path=%s",
             request.method, path,
         )
         return Response(status_code=CLIENT_CLOSED_REQUEST)
     except httpx.TimeoutException as exc:
-        logger.warning("brain request timeout path=%s error=%s", path, exc)
+        outcome, error = classify_outcome(exc)
+        _attempt(outcome, error)
+        logger.warning("brain request timeout path=%s outcome=%s error=%s", path, outcome, error)
         return JSONResponse(
             content={"error": "brain request timeout"},
             status_code=504,
         )
-    except httpx.ConnectError:
-        logger.warning("brain unreachable at %s", get_tts_config().brain_url)
+    except httpx.ConnectError as exc:
+        _attempt(*classify_outcome(exc))
+        logger.warning("brain unreachable at %s: %s", _brain_host(), describe_error(exc))
         return JSONResponse(
             content={"error": "brain service unavailable"},
             status_code=502,
         )
     except httpx.RemoteProtocolError as exc:
-        logger.warning("brain upstream disconnected path=%s error=%s", path, exc)
+        _attempt(*classify_outcome(exc))
+        logger.warning("brain upstream disconnected path=%s error=%s", path, describe_error(exc))
         return JSONResponse(
             content={"error": "brain upstream disconnected"},
             status_code=502,
         )
     except httpx.ReadError as exc:
-        logger.warning("brain upstream read error path=%s error=%s", path, exc)
+        _attempt(*classify_outcome(exc))
+        logger.warning("brain upstream read error path=%s error=%s", path, describe_error(exc))
         return JSONResponse(
             content={"error": "brain upstream read error"},
             status_code=502,
         )
     except httpx.RequestError as exc:
-        logger.warning("brain request error path=%s error=%s", path, exc)
+        _attempt(*classify_outcome(exc))
+        logger.warning("brain request error path=%s error=%s", path, describe_error(exc))
         return JSONResponse(
             content={"error": "brain request error"},
             status_code=502,

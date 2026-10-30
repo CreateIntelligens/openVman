@@ -227,7 +227,11 @@ class TestVoxCPMRoute:
 
         assert result.result.provider == "voxcpm"
         assert result.fallback is False
-        svc._voxcpm.synthesize.assert_called_once_with(request)
+        svc._voxcpm.synthesize.assert_called_once()
+        sent = svc._voxcpm.synthesize.call_args.args[0]
+        # service 只多填這一站的預算，其餘原樣送出。
+        assert replace(sent, timeout_seconds=0.0) == request
+        assert sent.timeout_seconds > 0
         svc._indextts.synthesize.assert_not_called()
 
 

@@ -365,6 +365,93 @@ class TTSRouterConfig(BaseSettings):
     # p50 1.9 秒、p90 2.2 秒，但有一句拖到 22.7 秒；逾時就當不是台語，照原本的 TTS。
     asr_language_check_timeout_seconds: float = 2.5
 
+    # >>> 上游逾時、鏈期限與斷路器（TTS／ASR／Brain proxy）
+    # 每個預設值的量測依據寫在 docs/specs/01_BACKEND_SPEC.md「上游逾時與斷路器」。
+    # 節點預算 = base + 每字（或每秒音訊）× 長度，封頂 max；鏈期限 = 節點預算 × chain
+    # factor（封頂 chain max），TTS 另外保留 Edge 的尾段，前面的站用不到。
+    tts_connect_timeout_seconds: float = Field(
+        default=2.0, gt=0, validation_alias="TTS_CONNECT_TIMEOUT_SECONDS",
+    )
+    tts_node_base_seconds: float = Field(
+        default=10.0, gt=0, validation_alias="TTS_NODE_BASE_SECONDS",
+    )
+    tts_node_per_char_seconds: float = Field(
+        default=0.1, ge=0, validation_alias="TTS_NODE_PER_CHAR_SECONDS",
+    )
+    tts_node_max_seconds: float = Field(
+        default=120.0, gt=0, validation_alias="TTS_NODE_MAX_SECONDS",
+    )
+    # 管理員指定未載入的 full:: 模型時 VoxCPM 要重載 30～40 秒。
+    tts_voxcpm_model_load_seconds: float = Field(
+        default=45.0, ge=0, validation_alias="TTS_VOXCPM_MODEL_LOAD_SECONDS",
+    )
+    tts_hanji_timeout_seconds: float = Field(
+        default=0.8, gt=0, validation_alias="TTS_HANJI_TIMEOUT_SECONDS",
+    )
+    tts_stream_first_byte_seconds: float = Field(
+        default=10.0, gt=0, validation_alias="TTS_STREAM_FIRST_BYTE_SECONDS",
+    )
+    tts_stream_stall_seconds: float = Field(
+        default=10.0, gt=0, validation_alias="TTS_STREAM_STALL_SECONDS",
+    )
+    tts_edge_base_seconds: float = Field(
+        default=8.0, gt=0, validation_alias="TTS_EDGE_BASE_SECONDS",
+    )
+    tts_edge_per_char_seconds: float = Field(
+        default=0.03, ge=0, validation_alias="TTS_EDGE_PER_CHAR_SECONDS",
+    )
+    tts_chain_factor: float = Field(
+        default=1.5, ge=1, validation_alias="TTS_CHAIN_FACTOR",
+    )
+    tts_chain_max_seconds: float = Field(
+        default=150.0, gt=0, validation_alias="TTS_CHAIN_MAX_SECONDS",
+    )
+    asr_connect_timeout_seconds: float = Field(
+        default=2.0, gt=0, validation_alias="ASR_CONNECT_TIMEOUT_SECONDS",
+    )
+    asr_node_base_seconds: float = Field(
+        default=8.0, gt=0, validation_alias="ASR_NODE_BASE_SECONDS",
+    )
+    asr_node_per_audio_second: float = Field(
+        default=0.5, ge=0, validation_alias="ASR_NODE_PER_AUDIO_SECOND",
+    )
+    asr_node_max_seconds: float = Field(
+        default=120.0, gt=0, validation_alias="ASR_NODE_MAX_SECONDS",
+    )
+    asr_chain_factor: float = Field(
+        default=1.5, ge=1, validation_alias="ASR_CHAIN_FACTOR",
+    )
+    asr_chain_max_seconds: float = Field(
+        default=180.0, gt=0, validation_alias="ASR_CHAIN_MAX_SECONDS",
+    )
+    asr_ffmpeg_base_seconds: float = Field(
+        default=15.0, gt=0, validation_alias="ASR_FFMPEG_BASE_SECONDS",
+    )
+    asr_ffmpeg_per_audio_second: float = Field(
+        default=0.2, ge=0, validation_alias="ASR_FFMPEG_PER_AUDIO_SECOND",
+    )
+    brain_proxy_connect_timeout_seconds: float = Field(
+        default=2.0, gt=0, validation_alias="BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS",
+    )
+    brain_proxy_read_timeout_seconds: float = Field(
+        default=120.0, gt=0, validation_alias="BRAIN_PROXY_READ_TIMEOUT_SECONDS",
+    )
+    upstream_breaker_failures: int = Field(
+        default=2, ge=1, validation_alias="UPSTREAM_BREAKER_FAILURES",
+    )
+    upstream_breaker_cooldown_seconds: float = Field(
+        default=60.0, ge=0, validation_alias="UPSTREAM_BREAKER_COOLDOWN_SECONDS",
+    )
+    # 背景健康探測：每隔這麼久探一次各個 TTS／批次 ASR 節點，掛掉的節點在自動備援裡
+    # 直接跳過，第一個碰到故障的使用者也不必等逾時。0 表示不探測。
+    upstream_probe_interval_seconds: float = Field(
+        default=10.0, ge=0, validation_alias="UPSTREAM_PROBE_INTERVAL_SECONDS",
+    )
+    upstream_probe_timeout_seconds: float = Field(
+        default=1.5, gt=0, validation_alias="UPSTREAM_PROBE_TIMEOUT_SECONDS",
+    )
+    # <<< 上游逾時、鏈期限與斷路器
+
     # --- Camera ---
     camera_snapshot_interval_sec: int = 5
 

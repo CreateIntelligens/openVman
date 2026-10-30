@@ -7,7 +7,18 @@ REASON_RATE_LIMITED = "rate_limited"
 REASON_BAD_REQUEST = "bad_request"
 REASON_NETWORK_ERROR = "network_error"
 REASON_PROVIDER_UNAVAILABLE = "provider_unavailable"
+#: 節點有接但沒在時限內回完（連線、首包、讀取或整站預算任一段逾時）。跟
+#: provider_unavailable（節點回 5xx、或根本連不上）分開，看 log 才分得出是慢還是掛。
+REASON_TIMEOUT = "timeout"
 REASON_UNKNOWN = "unknown_error"
+
+
+def classify_timeout(exc: BaseException) -> str | None:
+    """``REASON_TIMEOUT`` when any exception in the cause chain is a timeout."""
+    from app.upstream_guard import TIMEOUT_OUTCOMES, classify_outcome
+
+    outcome, _ = classify_outcome(exc)
+    return REASON_TIMEOUT if outcome in TIMEOUT_OUTCOMES else None
 
 
 def classify_aws_error(exc: Exception) -> str:
@@ -100,8 +111,8 @@ def _classify_network_error(exc: Exception) -> str | None:
     exc_type = type(exc).__name__
     message = str(exc).lower()
 
-    if exc_type in ("TimeoutException", "ReadTimeout", "ConnectTimeout", "PoolTimeout"):
-        return REASON_NETWORK_ERROR
+    if timeout := classify_timeout(exc):
+        return timeout
     if exc_type in ("ConnectError", "RemoteProtocolError"):
         return REASON_NETWORK_ERROR
     if "timeout" in message or "connection" in message or "refused" in message:
@@ -112,6 +123,8 @@ def _classify_network_error(exc: Exception) -> str | None:
 
 def _classify_http_provider_error(exc: Exception, error_class: type) -> str:
     """Classify an HTTP provider error by status code."""
+    if timeout := classify_timeout(exc):
+        return timeout
     if isinstance(exc, error_class):
         if exc.status_code == 422:
             return REASON_BAD_REQUEST
@@ -151,6 +164,8 @@ def classify_voxcpm_error(exc: Exception) -> str:
     """
     from app.providers.voxcpm_adapter import VoxCPMHTTPError
 
+    if timeout := classify_timeout(exc):
+        return timeout
     if isinstance(exc, VoxCPMHTTPError):
         if exc.status_code in (401, 403):
             return REASON_AUTH_ERROR
@@ -172,6 +187,8 @@ def classify_cosyvoice_error(exc: Exception) -> str:
     """
     from app.providers.cosyvoice_adapter import CosyVoiceHTTPError
 
+    if timeout := classify_timeout(exc):
+        return timeout
     if isinstance(exc, CosyVoiceHTTPError):
         if exc.status_code in (401, 403):
             return REASON_AUTH_ERROR

@@ -67,6 +67,10 @@
 
 ### Fixed
 
+<!-- >>> 上游逾時與斷路器 -->
+- **[2026-10-30]** **TTS、批次／串流 ASR 與 Brain proxy 的逾時改成分段、隨長度計算，備援鏈有期限，掛掉的節點會被跳過**：原本各節點只有單一 float 逾時（等於每個階段各等那麼久）、沒有鏈期限，一句台語最壞要等約 378 秒、auto 約 438 秒，OpenAI 轉寫沿用 SDK 的 600 秒並重試兩次。現在連線一律 2 秒；整段 TTS 每站預算 = 10 秒＋每字 0.1 秒（封頂 120，後台試聽指定 VoxCPM `model_id` 再加 45 秒重載時間），以牆鐘等待；整條鏈期限 = 每站 ×1.5（封頂 150）再保留 Edge 尾段（8 秒＋每字 0.03 秒），一句 30 字最壞 28.4 秒。台語詞表查詢 0.8 秒。串流（`/api/v1/tts/stream` 的 VoxCPM、IndexTTS、Gemini）header 加第一段聲音 10 秒內沒到就換引擎，聲音開始後停頓超過 10 秒就把串流正常收尾，不再掛著；`/tts/stream` 一開始就算好整個請求的期限，後面的整段備援只用剩下的時間。批次 ASR 每站 = 8 秒＋每秒音訊 0.5 秒（封頂 120）、鏈 ×1.5（封頂 180），OpenAI 改用同一公式且不重試，ffmpeg 轉檔 15 秒＋每秒音訊 0.2 秒；Brain proxy 連線 10→2 秒，串流中途逾時補一個 SSE `error` 事件後結束。斷路器：連不上立刻冷卻、逾時與 5xx 連續 2 次冷卻 60 秒，自動備援跳過冷卻中的引擎；指名的引擎照試，專案順位被跳過時標在 `X-TTS-Fallback-Reason`。背景健康探測每 10 秒探一次 TTS 與批次 ASR 節點（沿用 `health_payloads.py` 的探測，ASR 打 `/health`），掛掉的立刻標成 down、恢復就標回 up，只在狀態改變時記 log；/health 正常但合成逾時造成的冷卻不因探測成功而解除。每一站記一行 `upstream_attempt` JSON（`kind`、`node`、`host`、`outcome`、`elapsed_ms`、`request_id`、空訊息時記錯誤型別），`X-Request-ID` 由新的 middleware 產生或沿用前台帶的值、轉發給 Brain；TTS reason 新增 `timeout`，與 `provider_unavailable` 分開；`/tts/stream` 的 IndexTTS→Edge、VoxCPM 串流退回都記 hop。前台 `useTtsStreamer` 等 header 的上限為後端鏈期限加 5 秒、共用批次 ASR client 為 185 秒，逾時走一般錯誤，不再無限轉圈。新增 `TTS_*`／`ASR_*`／`BRAIN_PROXY_*`／`UPSTREAM_*` 共 26 個選填變數，預設與理由見 `docs/specs/01_BACKEND_SPEC.md` 6.4。新增以真的 socket（收了請求就不回、送完 header 就卡住）驗證各條鏈的測試。
+<!-- <<< 上游逾時與斷路器 -->
+
 - **[2026-10-30]** **TTS 合成與 ASR 轉檔不再卡住整個 backend**：`/v1/audio/speech`、`/api/v1/tts/stream` 原本在 async 路由裡同步呼叫 TTS 引擎，backend 只有一個 process，任一台引擎卡住（最久 120 秒）時所有請求都跟著停；批次 ASR 的 ffmpeg 轉檔（最久 60 秒）也一樣。兩者改在 worker thread 執行，新增測試確認合成與轉檔不在 event loop 上跑。各節點逾時上限與整條鏈的總時限另案調整。
 
 - **[2026-10-29]** **後台上傳欄位的圖示跟著選到的檔案類型**：「從影片或圖片產生人物」選了圖片時，檔名旁仍顯示影片圖示；現在選好檔案後依實際類型顯示影片或圖片圖示，沒選檔案時維持欄位原本的圖示。

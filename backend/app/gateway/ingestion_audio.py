@@ -8,16 +8,35 @@ import re
 import subprocess
 import tempfile
 import time
+import wave
 from pathlib import Path
 
 import httpx
-import openai
 from openai import AsyncOpenAI
 
 from app import language_routes as language_routes_mod
 from app.config import get_tts_config
 from app.gateway.ingestion import IngestionResult
 from app.http_client import SharedAsyncClient
+from app.upstream_guard import (
+    ASR_BREAKER,
+    OK,
+    SKIPPED_BREAKER,
+    SKIPPED_DEADLINE,
+    Deadline,
+    HopTimeout,
+    asr_chain_seconds,
+    asr_node_seconds,
+    classify_outcome,
+    clip_seconds,
+    describe_error,
+    emit_attempt,
+    ffmpeg_seconds,
+    host_of,
+    knob,
+    set_clip_seconds,
+    worth_trying,
+)
 from app.utils.chinese import convert_to_traditional
 
 logger = logging.getLogger("gateway.ingestion_audio")
@@ -25,7 +44,21 @@ logger = logging.getLogger("gateway.ingestion_audio")
 # 分開設 connect 與 read：轉寫是 GPU 推論，排隊時久一點正常（實測 5 秒音檔
 # 0.8–1.5 秒），但機器整台不通時不該也等兩分鐘——那會把一台死掉的 ASR 變成
 # 卡住整個 gateway 的請求槽，連回「音訊轉錄失敗」都得等到逾時才輪得到。
-_http = SharedAsyncClient(connect=5, read=120, write=30, pool=5)
+# read 只是單次讀取的上限；每一站真正的牆鐘由 transcribe() 依音訊長度另外管。
+def _asr_http_timeout() -> httpx.Timeout:
+    cfg = get_tts_config()
+    connect = knob(cfg, "asr_connect_timeout_seconds")
+    longest = knob(cfg, "asr_node_max_seconds")
+    return httpx.Timeout(connect=connect, read=longest, write=longest, pool=connect)
+
+
+_http = SharedAsyncClient(timeout_factory=_asr_http_timeout)
+
+
+def _bounded_timeout(seconds: float) -> httpx.Timeout:
+    """R2T2 dev's own short wait, with the shared short connect."""
+    connect = min(seconds, knob(get_tts_config(), "asr_connect_timeout_seconds"))
+    return httpx.Timeout(connect=connect, read=seconds, write=seconds, pool=connect)
 
 
 async def _transcribe_openai(file_path: str, trace_id: str, prompt: str = "") -> str:
@@ -38,7 +71,15 @@ async def _transcribe_openai(file_path: str, trace_id: str, prompt: str = "") ->
     if cfg.asr_openai_base_url:
         client_kwargs["base_url"] = cfg.asr_openai_base_url
 
-    client = AsyncOpenAI(**client_kwargs)
+    # SDK 預設等 600 秒、失敗再重試兩次；這裡只等這一站的預算、不重試，換下一家。
+    client = AsyncOpenAI(
+        **client_kwargs,
+        timeout=httpx.Timeout(
+            asr_node_seconds(cfg, clip_seconds()),
+            connect=knob(cfg, "asr_connect_timeout_seconds"),
+        ),
+        max_retries=0,
+    )
     extra = {"prompt": prompt} if prompt else {}
     with open(file_path, "rb") as audio_file:
         response = await client.audio.transcriptions.create(
@@ -81,7 +122,7 @@ def _as_wav(file_path: str) -> tuple[str, str | None]:
         ],
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=ffmpeg_seconds(get_tts_config(), clip_seconds()),
     )
     if result.returncode != 0:
         Path(handle.name).unlink(missing_ok=True)
@@ -226,7 +267,7 @@ async def _r2t2_request(
         f"{url}/transcribe",
         files={"file": (filename, audio)},
         data={"language": language, "context": prompt},
-        **({"timeout": timeout} if timeout else {}),
+        **({"timeout": _bounded_timeout(timeout)} if timeout else {}),
     )
     response.raise_for_status()
     body = response.json()
@@ -285,19 +326,40 @@ def _resolve_chain(
     return ordered
 
 
-# 連不上的引擎暫停這麼久，期間直接跳過：備援裡有一台停機時，主引擎一掛每句話
-# 都要先白等 3 秒多連線失敗才換下一家。時間到讓下一個請求去試，通了就恢復原順序。
-# 每個 worker 各記各的，重啟就清空，最多多試一次。
+# 暫停中的引擎直接跳過：備援裡有一台停機時，主引擎一掛每句話都要先白等連線失敗
+# 才換下一家。連不上立刻暫停；逾時與 5xx 連續兩次才暫停（upstream_guard.Breaker）。
+# 時間到讓下一個請求去試，通了就恢復原順序。每個 worker 各記各的，重啟就清空。
+# 暫停長度是 UPSTREAM_BREAKER_COOLDOWN_SECONDS，這裡是它的預設值。
 _UNREACHABLE_COOLDOWN_SECONDS = 60.0
 _unreachable_until: dict[str, float] = {}
 
 
-def _is_unreachable(exc: Exception) -> bool:
-    """Connection-level failures only: an HTTP error means the node is up and answering."""
-    return isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, openai.APIConnectionError))
+def _provider_host(cfg, name: str) -> str:
+    if name == "openai":
+        return host_of(getattr(cfg, "asr_openai_base_url", "") or "https://api.openai.com")
+    url = getattr(cfg, f"asr_{name.replace('-', '_')}_url", "")
+    return host_of(url) if isinstance(url, str) else ""
+
+
+def _clip_seconds(file_path: str) -> float | None:
+    """Clip length for the timeout formula; ``None`` (= assume the longest) when unknown."""
+    try:
+        with wave.open(file_path, "rb") as audio:
+            return audio.getnframes() / audio.getframerate()
+    except (wave.Error, EOFError, OSError, ZeroDivisionError):
+        pass
+    try:
+        from app.utils.media import probe_media
+
+        return probe_media(file_path).duration_seconds
+    except Exception:  # noqa: BLE001 - 量不到就用上限，不擋辨識
+        return None
 
 
 def _cooling_down(name: str) -> bool:
+    # 背景健康探測判定掛掉的也算（upstream_probe）。
+    if ASR_BREAKER.probe_down(name):
+        return True
     until = _unreachable_until.get(name)
     if until is None:
         return False
@@ -340,6 +402,7 @@ async def transcribe(
     *,
     allowed_providers: set[str] | None = None,
     order: tuple[str, ...] | list[str] = (),
+    audio_seconds: float | None = None,
 ) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
 
@@ -363,25 +426,70 @@ async def transcribe(
         ",".join(name for name in configured if name not in chain) or "-",
     )
 
+    for name in configured:
+        if name not in chain:
+            emit_attempt(
+                "asr", name, SKIPPED_BREAKER, 0.0, host=_provider_host(cfg, name),
+                error="cooling down", trace_id=trace_id,
+            )
+
+    if audio_seconds is None:
+        # 上傳路由量過長度就放在 context 裡；其他呼叫端（聊天附件）才自己量。
+        audio_seconds = clip_seconds()
+    if audio_seconds is None:
+        audio_seconds = await asyncio.to_thread(_clip_seconds, file_path)
+    # ffmpeg 轉檔在 worker thread 裡讀這個值決定逾時。
+    set_clip_seconds(audio_seconds)
+    node_seconds = asr_node_seconds(cfg, audio_seconds)
+    deadline = Deadline(asr_chain_seconds(cfg, audio_seconds))
     language = {"language": language_routes_mod.r2t2_language(routes or [])}
     for name in chain:
         transcriber = _TRANSCRIBERS[name]
         extra = language if name in _LANGUAGE_AWARE_TRANSCRIBERS else {}
+        host = _provider_host(cfg, name)
+        seconds = deadline.hop_seconds(node_seconds)
+        if name == "r2t2-dev":
+            seconds = min(seconds, float(getattr(cfg, "asr_r2t2_dev_timeout_seconds", seconds) or seconds))
+        if not worth_trying(seconds, node_seconds):
+            emit_attempt(
+                "asr", name, SKIPPED_DEADLINE, 0.0, host=host,
+                error="chain deadline reached", trace_id=trace_id,
+            )
+            continue
+        started = time.monotonic()
         try:
-            content = await transcriber(file_path, trace_id, prompt=prompt, **extra)
+            try:
+                content = await asyncio.wait_for(
+                    transcriber(file_path, trace_id, prompt=prompt, **extra), seconds,
+                )
+            except TimeoutError:
+                raise HopTimeout("total", seconds, name) from None
         except Exception as exc:
+            outcome, error = classify_outcome(exc)
             logger.warning(
                 "transcription_attempt_failed trace_id=%s provider=%s err=%s",
-                trace_id, name, exc,
+                trace_id, name, describe_error(exc),
             )
-            if _is_unreachable(exc):
-                _unreachable_until[name] = time.monotonic() + _UNREACHABLE_COOLDOWN_SECONDS
+            opened = ASR_BREAKER.record_failure(name, exc)
+            emit_attempt(
+                "asr", name, outcome, (time.monotonic() - started) * 1000, host=host,
+                error=error, trace_id=trace_id, budget_ms=round(seconds * 1000),
+                audio_seconds=audio_seconds, breaker_opened=opened or None,
+            )
+            if opened:
+                cooldown = knob(cfg, "upstream_breaker_cooldown_seconds")
+                _unreachable_until[name] = time.monotonic() + cooldown
                 logger.warning(
                     "asr_provider_unreachable provider=%s skip_for=%.0fs",
-                    name, _UNREACHABLE_COOLDOWN_SECONDS,
+                    name, cooldown,
                 )
             continue
         _unreachable_until.pop(name, None)
+        ASR_BREAKER.record_success(name)
+        emit_attempt(
+            "asr", name, OK, (time.monotonic() - started) * 1000, host=host,
+            trace_id=trace_id, budget_ms=round(seconds * 1000), audio_seconds=audio_seconds,
+        )
 
         logger.info(
             "transcription_ok trace_id=%s provider=%s chars=%d",

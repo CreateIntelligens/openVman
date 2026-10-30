@@ -41,12 +41,15 @@ from app.routes import public_characters as public_characters_routes
 from app.routes import static_assets as static_assets_routes
 from app.routes import tts as tts_routes
 from app.server_logging import _UVICORN_LOG_CONFIG, configure_server_logging
+from app.upstream_guard import RequestIdMiddleware
 
 configure_server_logging()
 app = FastAPI(title="openVman Backend", lifespan=lifespan)
 app.add_middleware(FailClosedAuthMiddleware)
 app.middleware("http")(http_metrics_middleware)
 app.middleware("http")(record_request_origin)
+# 每個請求一個 X-Request-ID，上游嘗試紀錄（upstream_attempt）都帶它。
+app.add_middleware(RequestIdMiddleware)
 # 最後加的在最外層：要在 BaseHTTPMiddleware 吞掉斷線訊息之前先看到它。
 app.add_middleware(ClientDisconnectMiddleware)
 app.state.openapi_builder = BackendOpenAPI(app)

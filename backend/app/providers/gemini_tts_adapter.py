@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from time import monotonic
@@ -12,6 +13,14 @@ from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.config import TTSRouterConfig
 from app.providers import project_gemini_tts
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.upstream_guard import (
+    knob,
+    HopTimeout,
+    describe_error,
+    host_of,
+    tts_http_timeout,
+    tts_request_timeout,
+)
 
 logger = logging.getLogger("provider.gemini")
 
@@ -31,7 +40,14 @@ class GeminiTTSAdapter:
         base = config.tts_gemini_url.rstrip("/") if config.tts_gemini_url else ""
         self._url = f"{base}/api/tts" if base else ""
         self._default_voice = GEMINI_DEFAULT_VOICE
-        self._client = httpx.Client(timeout=60.0)
+        self._host = host_of(base)
+        self._client = httpx.Client(
+            timeout=tts_http_timeout(config, knob(config, "tts_node_max_seconds")),
+        )
+
+    @property
+    def host(self) -> str:
+        return self._host
 
     @property
     def provider_name(self) -> str:
@@ -84,13 +100,33 @@ class GeminiTTSAdapter:
         if not self._url:
             raise RuntimeError("Gemini TTS URL is not configured")
 
-        client = httpx.AsyncClient(timeout=60.0)
+        cfg = self._config
+        first_byte = knob(cfg, "tts_stream_first_byte_seconds")
+        connect = min(knob(cfg, "tts_connect_timeout_seconds"), first_byte)
+        client = httpx.AsyncClient(timeout=httpx.Timeout(
+            connect=connect,
+            read=max(first_byte, knob(cfg, "tts_stream_stall_seconds")),
+            write=first_byte,
+            pool=connect,
+        ))
         req = client.build_request(
             "POST",
             self._url,
             json=self._build_payload(request, stream=True),
         )
-        resp = await client.send(req, stream=True)
+        try:
+            async with asyncio.timeout(first_byte):
+                resp = await client.send(req, stream=True)
+        except TimeoutError:
+            await client.aclose()
+            raise GeminiTTSHTTPError(
+                status_code=504, detail=f"no response in {first_byte:.1f}s",
+            ) from HopTimeout("first_byte", first_byte, GEMINI_PROVIDER_NAME)
+        except httpx.RequestError as exc:
+            await client.aclose()
+            raise GeminiTTSHTTPError(
+                status_code=503, detail=f"Request failed: {describe_error(exc)}",
+            ) from exc
 
         if resp.status_code >= 400:
             detail = (await resp.aread()).decode("utf-8", errors="replace")[:500]
@@ -123,7 +159,10 @@ class GeminiTTSAdapter:
 
         t0 = monotonic()
         try:
-            resp = self._client.post(self._url, json=payload)
+            resp = self._client.post(
+                self._url, json=payload,
+                timeout=tts_request_timeout(self._config, request),
+            )
             latency_ms = (monotonic() - t0) * 1000
 
             if resp.status_code >= 400:
@@ -147,7 +186,9 @@ class GeminiTTSAdapter:
                 },
             )
         except httpx.RequestError as exc:
-            raise GeminiTTSHTTPError(status_code=503, detail=f"Request failed: {exc}")
+            raise GeminiTTSHTTPError(
+                status_code=503, detail=f"Request failed: {describe_error(exc)}",
+            ) from exc
 
 
 class GeminiTTSHTTPError(Exception):

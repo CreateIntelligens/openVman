@@ -19,6 +19,8 @@ class SynthesizeRequest:
     usage_scope: dict[str, Any] = field(default_factory=dict)
     #: 只有 VoxCPM 看：指定 catalog 裡的模型（``full::…``、``lora::…``），空字串沿用目前載入的。
     model_id: str = ""
+    #: 這一站最多能用的秒數，由 service 依鏈期限分配；0 表示 adapter 用自己的節點預算。
+    timeout_seconds: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

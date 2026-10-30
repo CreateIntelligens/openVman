@@ -28,6 +28,8 @@ from app.gateway.worker import (
 from app.internal_routes import _http as _internal_http
 from app.openapi import _health_http
 from app.providers.edge_tts_probe import run_edge_tts_probe_loop
+from app.upstream_guard import knob
+from app.upstream_probe import run_upstream_probe_loop
 from app.providers.voice_catalog import _http as _voice_catalog_http
 from app.routes import admin as admin_routes
 from app.system_resources import sync_asr_engines, sync_system_resources
@@ -90,12 +92,22 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if cfg.edge_tts_enabled and cfg.edge_tts_probe_interval_seconds > 0
         else None
     )
+    probe_interval = knob(cfg, "upstream_probe_interval_seconds")
+    upstream_probe = (
+        asyncio.create_task(
+            run_upstream_probe_loop(probe_interval), name="upstream-probe",
+        )
+        if probe_interval > 0
+        else None
+    )
     logger.info("backend startup complete")
     try:
         yield
     finally:
         if edge_probe:
             edge_probe.cancel()
+        if upstream_probe:
+            upstream_probe.cancel()
         if a2a_daemon:
             await a2a_daemon.stop()
         clients = [

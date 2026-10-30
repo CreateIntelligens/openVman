@@ -11,6 +11,13 @@ import { extractErrorMessage } from '../http'
 export const MY_ASR_PROVIDER_PATH = '/api/v1/settings/my-asr-provider'
 export const TRANSCRIBE_PATH = '/api/v1/asr/transcribe'
 
+/**
+ * 批次辨識的前端保險：比後端整條 ASR 備援鏈的上限（ASR_CHAIN_MAX_SECONDS 預設 180 秒）
+ * 多 5 秒。前端不知道音檔多長，用上限；後端正常會先回「轉錄失敗」，這裡只防後端整個卡住。
+ * 後端預設改了要一起改（tests/test_upstream_timeouts.py 會檢查）。
+ */
+export const ASR_REQUEST_TIMEOUT_MS = (180 + 5) * 1000
+
 export interface MyAsrProvider {
   /** 使用者自選的值；空字串代表沿用全站設定。 */
   value: string
@@ -82,16 +89,29 @@ export async function transcribeOnServer(
   clip: Blob,
   filename: string,
   formFields?: TranscribeFormFields,
+  timeoutMs: number = ASR_REQUEST_TIMEOUT_MS,
 ): Promise<ServerTranscription> {
   const form = new FormData()
   form.append('file', clip, filename)
   for (const [key, value] of Object.entries(formFields?.() ?? {})) {
     form.append(key, value)
   }
-  const res = await http.request(TRANSCRIBE_PATH, {
-    method: 'POST',
-    body: form,
-  })
-  await checkOk(res, http)
-  return (await res.json()) as ServerTranscription
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), timeoutMs)
+  try {
+    const res = await http.request(TRANSCRIBE_PATH, {
+      method: 'POST',
+      body: form,
+      signal: abort.signal,
+    })
+    await checkOk(res, http)
+    return (await res.json()) as ServerTranscription
+  } catch (err) {
+    if (abort.signal.aborted) {
+      throw new Error(`語音辨識逾時（${Math.round(timeoutMs / 1000)} 秒）`)
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 }

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import httpx
 
 
@@ -28,15 +30,18 @@ class SharedAsyncClient:
         write: float = 10,
         pool: float = 5,
         follow_redirects: bool = False,
+        timeout_factory: Callable[[], httpx.Timeout] | None = None,
     ) -> None:
         self._timeout = httpx.Timeout(connect=connect, read=read, write=write, pool=pool)
+        # 逾時要讀環境設定時用 factory：模組載入時設定還沒準備好，第一次用到才建 client。
+        self._timeout_factory = timeout_factory
         self._follow_redirects = follow_redirects
         self._client: httpx.AsyncClient | None = None
 
     def get(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
-                timeout=self._timeout,
+                timeout=self._timeout_factory() if self._timeout_factory else self._timeout,
                 follow_redirects=self._follow_redirects,
             )
         return self._client

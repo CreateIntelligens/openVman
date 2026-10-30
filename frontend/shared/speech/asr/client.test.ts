@@ -7,6 +7,7 @@ import {
   setMyAsrProvider,
   TRANSCRIBE_PATH,
   transcribeOnServer,
+  ASR_REQUEST_TIMEOUT_MS,
 } from './client'
 import {
   ASR_ERROR_MESSAGES,
@@ -103,6 +104,22 @@ describe('ASR API Client (shared core)', () => {
     )
     expect(result.text).toBe('測試文字')
     expect(result.provider).toBe('sensevoice')
+  })
+
+  it('transcribeOnServer 在後端一直不回時逾時，不讓辨識卡住', async () => {
+    const mockRequest = vi.fn((_path: string, init?: RequestInit) => new Promise<Response>(
+      (_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        })
+      },
+    ))
+    const http: HttpAdapter = { request: mockRequest }
+    const clip = new Blob(['sample-pcm'], { type: 'audio/wav' })
+
+    await expect(transcribeOnServer(http, clip, 'speech.wav', undefined, 10))
+      .rejects.toThrow('語音辨識逾時')
+    expect(ASR_REQUEST_TIMEOUT_MS).toBe(185_000)
   })
 
   it('當 API 失敗時呼叫 http.parseError 或拋出自訂錯誤', async () => {

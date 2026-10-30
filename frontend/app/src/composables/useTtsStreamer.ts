@@ -32,6 +32,27 @@ const SPEECH_ENDPOINT = "/v1/audio/speech";
 const DEFAULT_CHARACTER = "hayley";
 const PCM_SAMPLE_RATE = 16000;
 
+/**
+ * 等後端回 header 的上限：後端 TTS 鏈期限再多 5 秒。照後端預設計算
+ * （TTS_NODE_* 每站 10 秒＋每字 0.1 秒、封頂 120；鏈 ×1.5、封頂 150；Edge 尾段 8 秒＋每字
+ * 0.03 秒），後端正常會在期限內回音檔或錯誤，這裡只防後端整個卡住讓畫面一直轉。
+ * header 到了就不再計時：串流的停頓由後端收尾，整段合成的 header 本來就在合成完才來。
+ * 後端預設改了要一起改（tests/test_upstream_timeouts.py 會檢查）。
+ */
+export function ttsResponseTimeoutMs(chars: number): number {
+  const node = Math.min(120, 10 + 0.1 * chars);
+  const hops = Math.min(150, 1.5 * node);
+  const edge = Math.min(120, 8 + 0.03 * chars);
+  return Math.round((hops + edge + 5) * 1000);
+}
+
+export class TtsTimeoutError extends Error {
+  constructor(seconds: number) {
+    super(`語音合成逾時（${seconds} 秒沒有回應）`);
+    this.name = "TtsTimeoutError";
+  }
+}
+
 type SpeakOptions = {
   character?: string;
   provider?: string;
@@ -190,6 +211,16 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
 
     const provider = opts.provider ?? '';
     const currentVoice = opts.voice ?? opts.character ?? '';
+    const timeoutMs = ttsResponseTimeoutMs(trimmed.length);
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      timedOut = true;
+      abort.abort();
+    }, timeoutMs);
+    const stopTimer = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+    };
 
     try {
       const useStream = shouldUseStream(provider);
@@ -209,6 +240,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
           signal: abort.signal,
         },
       );
+      stopTimer();
 
       if (response.status === 403) {
         let fallbackVoice = "";
@@ -309,10 +341,14 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
       const isAbort =
         (err instanceof DOMException && err.name === "AbortError") ||
         (err instanceof Error && err.name === "AbortError");
-      if (!isAbort) {
+      if (timedOut) {
+        // 是我們自己的逾時，不是使用者打斷：照一般錯誤處理，畫面才不會停在等待。
+        options.onError?.(new TtsTimeoutError(Math.round(timeoutMs / 1000)));
+      } else if (!isAbort) {
         options.onError?.(err);
       }
     } finally {
+      stopTimer();
       if (controller === abort) controller = null;
       activeReader = null;
     }

@@ -19,6 +19,14 @@ import httpx
 from app.config import TTSRouterConfig
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.tts_hanji import HanjiConverter
+from app.upstream_guard import (
+    knob,
+    describe_error,
+    exempt,
+    host_of,
+    tts_http_timeout,
+    tts_request_timeout,
+)
 
 logger = logging.getLogger("provider.cosyvoice")
 
@@ -29,8 +37,7 @@ COSYVOICE_DEFAULT_VOICE = "young-female-02"
 # 服務端以 ffmpeg 轉 mp3 後回傳；此值只作為 cache metadata。
 COSYVOICE_SAMPLE_RATE = 24000
 COSYVOICE_CONTENT_TYPE = "audio/mpeg"
-# 長文會在服務端自動分段合成再串接，GPU 排隊時可能超過一分鐘。
-_REQUEST_TIMEOUT_SECONDS = 120.0
+# 長文會在服務端自動分段合成再串接；逾時依文字長度計算（upstream_guard.tts_node_seconds）。
 
 
 class CosyVoiceAdapter:
@@ -50,7 +57,15 @@ class CosyVoiceAdapter:
         self._headers = _auth_headers(config.tts_cosyvoice_api_key)
         self._hanji = HanjiConverter(config)
         self._hanji_version = getattr(config, "tts_cosyvoice_hanji_version", "v1")
-        self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_SECONDS)
+        self._config = config
+        self._host = host_of(base_url)
+        self._client = httpx.Client(
+            timeout=tts_http_timeout(config, knob(config, "tts_node_max_seconds")),
+        )
+
+    @property
+    def host(self) -> str:
+        return self._host
 
     @property
     def default_voice(self) -> str:
@@ -77,7 +92,9 @@ class CosyVoiceAdapter:
                     request.text, self._hanji_version,
                 )
             except (httpx.HTTPError, RuntimeError) as exc:
-                raise CosyVoiceHTTPError(503, "Taiwanese word table unavailable") from exc
+                raise exempt(
+                    CosyVoiceHTTPError(503, "Taiwanese word table unavailable"),
+                ) from exc
             # 已依引擎設定選表，上游不能再套自己的預設表。
             payload["annotate"] = "none"
         return payload
@@ -95,6 +112,7 @@ class CosyVoiceAdapter:
                 self._url,
                 json=payload,
                 headers=self._headers,
+                timeout=tts_request_timeout(self._config, request),
             )
             latency_ms = (monotonic() - t0) * 1000
 
@@ -133,7 +151,7 @@ class CosyVoiceAdapter:
         except httpx.RequestError as exc:
             raise CosyVoiceHTTPError(
                 status_code=503,
-                detail=f"Request failed: {exc}",
+                detail=f"Request failed: {describe_error(exc)}",
             ) from exc
 
 

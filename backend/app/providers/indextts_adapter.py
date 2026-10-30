@@ -9,6 +9,13 @@ import httpx
 
 from app.config import TTSRouterConfig
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.upstream_guard import (
+    knob,
+    describe_error,
+    host_of,
+    tts_http_timeout,
+    tts_request_timeout,
+)
 
 logger = logging.getLogger("provider.indextts")
 
@@ -73,7 +80,10 @@ class IndexTTSAdapter:
             {_INTERNAL_TOKEN_HEADER: config.gateway_internal_token}
             if send_internal_token else {}
         )
-        self._client = httpx.Client(timeout=60.0)
+        self._host = host_of(base)
+        self._client = httpx.Client(
+            timeout=tts_http_timeout(config, knob(config, "tts_node_max_seconds")),
+        )
         self._opencc_t2s = _NOT_LOADED
 
     @classmethod
@@ -99,6 +109,10 @@ class IndexTTSAdapter:
     @property
     def provider_name(self) -> str:
         return self._provider_name
+
+    @property
+    def host(self) -> str:
+        return self._host
 
     @property
     def enabled(self) -> bool:
@@ -127,6 +141,7 @@ class IndexTTSAdapter:
                 self._url,
                 json=payload,
                 headers=self._internal_headers,
+                timeout=tts_request_timeout(self._config, request),
             )
             latency_ms = (monotonic() - t0) * 1000
 
@@ -150,7 +165,9 @@ class IndexTTSAdapter:
                 },
             )
         except httpx.RequestError as exc:
-            raise IndexTTSHTTPError(status_code=503, detail=f"Request failed: {exc}")
+            raise IndexTTSHTTPError(
+                status_code=503, detail=f"Request failed: {describe_error(exc)}",
+            ) from exc
 
 
 class IndexTTSHTTPError(Exception):

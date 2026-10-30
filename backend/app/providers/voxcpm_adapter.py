@@ -8,6 +8,7 @@ engines and reference presets a given deployment exposes.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import AsyncIterator
@@ -19,6 +20,16 @@ import httpx
 from app.config import TTSRouterConfig
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.tts_hanji import HanjiConverter
+from app.upstream_guard import (
+    knob,
+    HopTimeout,
+    describe_error,
+    exempt,
+    first_chunk,
+    host_of,
+    tts_http_timeout,
+    tts_request_timeout,
+)
 
 logger = logging.getLogger("provider.voxcpm")
 
@@ -36,8 +47,7 @@ VOXCPM_MODEL_ID = re.compile(r"(?:full|lora)::[A-Za-z0-9._-]{1,128}")
 VOXCPM_SAMPLE_RATE = 48000
 VOXCPM_CONTENT_TYPE = "audio/mpeg"
 VOXCPM_STREAM_CONTENT_TYPE = "audio/wav; rate=48000"
-# 一次合成整段（非串流），GPU 排隊時可能超過一分鐘；上游 nginx 為 900s。
-_REQUEST_TIMEOUT_SECONDS = 120.0
+# 整段合成的逾時依文字長度計算（upstream_guard.tts_node_seconds），上游 nginx 為 900s。
 # 合成前先看 /api/v1/health：推論 worker 死掉時回 503。2026-10-01 worker 被 OOM 殺掉、
 # health 卻照回 ok，每句都等滿 120 秒才退到 Edge，持續約 7 小時。結果快取一小段時間，
 # 不讓每句多一次往返。
@@ -69,7 +79,15 @@ class VoxCPMAdapter:
         self._headers = _auth_headers(config.tts_voxcpm_api_key)
         self._hanji = HanjiConverter(config)
         self._hanji_version = getattr(config, "tts_voxcpm_hanji_version", "v6")
-        self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_SECONDS)
+        self._config = config
+        self._host = host_of(base_url)
+        self._client = httpx.Client(
+            timeout=tts_http_timeout(config, knob(config, "tts_node_max_seconds")),
+        )
+
+    @property
+    def host(self) -> str:
+        return self._host
 
     @property
     def default_voice(self) -> str:
@@ -109,11 +127,14 @@ class VoxCPMAdapter:
             try:
                 response = httpx.get(self._health_url, headers=self._headers, timeout=_HEALTH_TIMEOUT_SECONDS)
             except httpx.RequestError as exc:
-                problem = self._remember_health(None, f"health request failed: {exc}")
+                problem = self._remember_health(
+                    None, f"health request failed: {describe_error(exc)}",
+                )
             else:
                 problem = self._remember_health(response)
         if problem:
-            raise VoxCPMHTTPError(status_code=503, detail=problem)
+            # 健康檢查自己有 10 秒快取，不再算進斷路器，免得同一次故障被記兩次。
+            raise exempt(VoxCPMHTTPError(status_code=503, detail=problem))
 
     async def _ensure_healthy_async(self) -> None:
         problem = self._cached_health()
@@ -122,11 +143,13 @@ class VoxCPMAdapter:
                 async with httpx.AsyncClient(timeout=_HEALTH_TIMEOUT_SECONDS) as client:
                     response = await client.get(self._health_url, headers=self._headers)
             except httpx.RequestError as exc:
-                problem = self._remember_health(None, f"health request failed: {exc}")
+                problem = self._remember_health(
+                    None, f"health request failed: {describe_error(exc)}",
+                )
             else:
                 problem = self._remember_health(response)
         if problem:
-            raise VoxCPMHTTPError(status_code=503, detail=problem)
+            raise exempt(VoxCPMHTTPError(status_code=503, detail=problem))
 
     def _build_payload(self, request: SynthesizeRequest) -> dict[str, str]:
         """JSON body for the CastVoice endpoint (``/api/v1/tts/synthesize``).
@@ -174,7 +197,7 @@ class VoxCPMAdapter:
                 text=self._hanji.convert(request.text, self._hanji_version),
             )
         except (httpx.HTTPError, RuntimeError) as exc:
-            raise VoxCPMHTTPError(503, "Taiwanese word table unavailable") from exc
+            raise exempt(VoxCPMHTTPError(503, "Taiwanese word table unavailable")) from exc
         payload = self._build_payload(request)
 
         t0 = monotonic()
@@ -183,6 +206,10 @@ class VoxCPMAdapter:
                 self._url,
                 json=payload,
                 headers=self._headers,
+                # 指定了未載入的 full:: 模型要重載 30～40 秒，這一站多給載入時間。
+                timeout=tts_request_timeout(
+                    self._config, request, model_load=bool(request.model_id),
+                ),
             )
             latency_ms = (monotonic() - t0) * 1000
 
@@ -210,7 +237,9 @@ class VoxCPMAdapter:
                 },
             )
         except httpx.RequestError as exc:
-            raise VoxCPMHTTPError(status_code=503, detail=f"Request failed: {exc}")
+            raise VoxCPMHTTPError(
+                status_code=503, detail=f"Request failed: {describe_error(exc)}",
+            ) from exc
 
     async def open_stream(
         self, request: SynthesizeRequest, *, sample_rate: int | None = None,
@@ -232,7 +261,7 @@ class VoxCPMAdapter:
                 ),
             )
         except (httpx.HTTPError, RuntimeError) as exc:
-            raise VoxCPMHTTPError(503, "Taiwanese word table unavailable") from exc
+            raise exempt(VoxCPMHTTPError(503, "Taiwanese word table unavailable")) from exc
         form_data = self._build_stream_form(request)
         if sample_rate is not None:
             # 2026-10-14 起 GB10 節點可直接輸出 16 kHz WAV，省掉我們這端 48k→16k 的重採樣。
@@ -253,18 +282,41 @@ class VoxCPMAdapter:
             return await self._send_stream(form_data)
 
     async def _send_stream(self, form_data: dict[str, str]) -> AsyncIterator[bytes]:
-        client = httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS)
+        """Open the stream and wait for the first audio chunk before returning.
+
+        第一段聲音到之前都還能換引擎（呼叫端還沒送 200 header），所以 header 加上
+        第一個 chunk 一起受 TTS_STREAM_FIRST_BYTE_SECONDS 限制；之後 chunk 之間的
+        停頓由路由層的 guard_stream 管。
+        """
+        cfg = self._config
+        first_byte = knob(cfg, "tts_stream_first_byte_seconds")
+        connect = min(knob(cfg, "tts_connect_timeout_seconds"), first_byte)
+        client = httpx.AsyncClient(timeout=httpx.Timeout(
+            connect=connect,
+            read=max(first_byte, knob(cfg, "tts_stream_stall_seconds")),
+            write=first_byte,
+            pool=connect,
+        ))
         req = client.build_request(
             "POST",
             self._stream_url,
             data=form_data,
             headers=self._headers,
         )
+        started = monotonic()
         try:
-            resp = await client.send(req, stream=True)
+            async with asyncio.timeout(first_byte):
+                resp = await client.send(req, stream=True)
+        except TimeoutError:
+            await client.aclose()
+            raise VoxCPMHTTPError(
+                status_code=503, detail=f"no response in {first_byte:.1f}s",
+            ) from HopTimeout("first_byte", first_byte, VOXCPM_PROVIDER_NAME)
         except httpx.RequestError as exc:
             await client.aclose()
-            raise VoxCPMHTTPError(status_code=503, detail=f"Request failed: {exc}")
+            raise VoxCPMHTTPError(
+                status_code=503, detail=f"Request failed: {describe_error(exc)}",
+            ) from exc
 
         if resp.status_code >= 400:
             detail = (await resp.aread()).decode("utf-8", errors="replace")[:500]
@@ -281,7 +333,33 @@ class VoxCPMAdapter:
                 await resp.aclose()
                 await client.aclose()
 
-        return _iter_and_close()
+        stream = _iter_and_close()
+        remaining = max(0.05, first_byte - (monotonic() - started))
+        try:
+            head = await first_chunk(stream, remaining, VOXCPM_PROVIDER_NAME)
+        except BaseException as exc:
+            await stream.aclose()
+            if isinstance(exc, HopTimeout):
+                raise VoxCPMHTTPError(
+                    status_code=503, detail=f"no audio in {first_byte:.1f}s",
+                ) from exc
+            if isinstance(exc, httpx.RequestError):
+                raise VoxCPMHTTPError(
+                    status_code=503, detail=f"Request failed: {describe_error(exc)}",
+                ) from exc
+            raise
+        if head is None:
+            raise VoxCPMHTTPError(status_code=503, detail="stream ended without audio")
+
+        async def _with_head() -> AsyncIterator[bytes]:
+            try:
+                yield head
+                async for chunk in stream:
+                    yield chunk
+            finally:
+                await stream.aclose()
+
+        return _with_head()
 
 
 def _auth_headers(api_key: str) -> dict[str, str]:

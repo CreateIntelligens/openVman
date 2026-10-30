@@ -173,6 +173,68 @@ Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/tts/health`
 - 失敗處理同其他指名的引擎：`/api/v1/tts/stream` 代理失敗時往下退 Edge 串流（專案允許時），`/v1/audio/speech` 失敗退 Edge 並標 `X-TTS-Fallback`。
 - 快取：`/v1/audio/speech` 的快取 key 含 provider，兩台同名聲音各存一份，不會互相命中。
 
+<!-- >>> 上游逾時與斷路器（TTS／ASR／Brain proxy） -->
+#### 6.4 上游逾時、鏈期限與斷路器（2026-10-30）
+
+每個外部節點的等待都分成「連線」與「整站預算」，整條備援鏈另有期限；節點、主機、結果、耗時與 request id 都記一行 `upstream_attempt`。程式在 `backend/app/upstream_guard.py`（預算、期限、斷路器、紀錄）與 `backend/app/upstream_probe.py`（背景健康探測），設定都在 `config.py` 的「上游逾時、鏈期限與斷路器」區塊。環境變數全部選填，下表是預設值與理由。
+
+**預算公式**：節點預算 = base + 每單位 × 長度，封頂 max。TTS 的長度是字數，ASR 是音訊秒數。鏈期限 = 節點預算 × chain factor（封頂 chain max）；TTS 另外保留 Edge 尾段，前面的站用不到。每一站的預算是「自己的預算」與「鏈剩下的時間」取小；剩不到 0.5 秒（或節點預算的四分之一）就不開這一站，記 `skipped_deadline`。
+
+| 變數 | 預設 | 理由 |
+|------|------|------|
+| `TTS_CONNECT_TIMEOUT_SECONDS` | 2 | 內網／同機房節點連線毫秒等級；連不上不該等 10 秒以上 |
+| `TTS_NODE_BASE_SECONDS` | 10 | VoxCPM 一句（約 30 字）實測約 4 秒，留約 3 倍給 GPU 排隊 |
+| `TTS_NODE_PER_CHAR_SECONDS` | 0.1 | 31 字 10 步實測 3.2 秒（約 0.1 秒／字）；試聽可送 1000 字，長文不能切在十幾秒 |
+| `TTS_NODE_MAX_SECONDS` | 120 | 沿用舊的 VoxCPM／CosyVoice 單一上限，長文不退步 |
+| `TTS_VOXCPM_MODEL_LOAD_SECONDS` | 45 | 管理員指定未載入的 `full::` 模型時 VoxCPM 重載 30～40 秒；只加在帶 `model_id` 的 VoxCPM 這一站與它的鏈期限 |
+| `TTS_HANJI_TIMEOUT_SECONDS` | 0.8 | 詞表實測中位數 25 ms、最慢 44 ms；查不到照舊讓這一站失敗、換下一家。非同步路徑是總時間，同步路徑是每個階段 |
+| `TTS_STREAM_FIRST_BYTE_SECONDS` | 10 | 串流端點（`/api/v1/tts/stream` 的 VoxCPM、IndexTTS、Gemini）header 加第一段聲音的上限；到之前都還能換引擎 |
+| `TTS_STREAM_STALL_SECONDS` | 10 | 聲音開始流之後兩段之間的最長停頓；超過就把串流正常收尾（header 已送出，換不了引擎），記 `timeout_read` |
+| `TTS_EDGE_BASE_SECONDS`／`TTS_EDGE_PER_CHAR_SECONDS` | 8／0.03 | Edge 是最後一道，鏈期限另外保留這段給它，前面的站不能吃掉 |
+| `TTS_CHAIN_FACTOR`／`TTS_CHAIN_MAX_SECONDS` | 1.5／150 | 第一站卡滿後，第二站還有半站的時間；超過就直接交給 Edge |
+| `ASR_CONNECT_TIMEOUT_SECONDS` | 2 | 同上 |
+| `ASR_NODE_BASE_SECONDS`／`ASR_NODE_PER_AUDIO_SECOND`／`ASR_NODE_MAX_SECONDS` | 8／0.5／120 | 5 秒音檔實測 0.8～1.5 秒；上傳上限 5 分鐘，最長那段封頂在舊的 120 秒 |
+| `ASR_CHAIN_FACTOR`／`ASR_CHAIN_MAX_SECONDS` | 1.5／180 | 同 TTS；前端批次辨識的保險時間跟著這個上限 |
+| `ASR_FFMPEG_BASE_SECONDS`／`ASR_FFMPEG_PER_AUDIO_SECOND` | 15／0.2 | 原本固定 60 秒；短句轉檔不到一秒，5 分鐘音檔仍有 75 秒 |
+| `BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS` | 2 | Brain 在同一個 docker 網路，原本 10 秒 |
+| `BRAIN_PROXY_READ_TIMEOUT_SECONDS` | 120 | 兩個 chunk 之間的上限；LLM 跑工具時句子之間會停很久，維持原值 |
+| `UPSTREAM_BREAKER_FAILURES`／`UPSTREAM_BREAKER_COOLDOWN_SECONDS` | 2／60 | 同 Brain `provider_health`：逾時或 5xx 連續兩次冷卻一分鐘 |
+| `UPSTREAM_PROBE_INTERVAL_SECONDS`／`UPSTREAM_PROBE_TIMEOUT_SECONDS` | 10／1.5 | 背景健康探測的週期與單次上限；0 表示不探測 |
+
+`ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20）仍是 r2t2-dev 這一站的上限，連線另用 `ASR_CONNECT_TIMEOUT_SECONDS`。OpenAI 轉寫改成這一站的預算、`max_retries=0`（SDK 預設 600 秒並重試兩次）。
+
+**實際上限（預設值）**
+
+| 情境 | 改前最壞 | 改後最壞 |
+|------|----------|----------|
+| 一句 30 字，台語鏈（CosyVoice → VoxCPM → IndexTTS → Edge） | 約 378 秒 | 28.4 秒（前面各站共 19.5 秒＋Edge 8.9 秒） |
+| 一句 30 字，華語／auto 整條鏈 | 約 130／438 秒 | 同上 28.4 秒 |
+| 試聽 1000 字 | 每站 120 秒累加 | 188 秒（150＋38）；帶 `model_id` 的 VoxCPM 再加 45 秒 |
+| 批次 ASR，5 秒音檔 | 每站 120 秒累加，OpenAI 最多 3 × 600 秒 | 15.75 秒 |
+| 批次 ASR，5 分鐘音檔 | 同上 | 180 秒 |
+
+整段合成（`/v1/audio/speech` 與串流路由裡的整段備援）的端點合成完才回 header，所以「首包」就是整站預算；`service.py` 在一個專用 thread pool 裡以牆鐘等到預算（httpx 的 read 是兩個 chunk 之間的上限，伺服器一點一點吐就能拖過），adapter 的 httpx read 設成預算加 1 秒，逾時的 thread 隨後自己結束。這個 pool 有 64 條（比 `asyncio.to_thread` 預設的 32 大），節點故障時逾時的 thread 多活的那一秒與下一站重疊，排隊時間才不會吃掉下一站的預算。AWS／GCP 的 SDK 沒有逐請求逾時，只受這個牆鐘限制。`/api/v1/tts/stream` 在一開始就算好整個請求的期限，先試的串流站花掉的時間，後面的整段合成鏈就少用這麼多。
+
+**斷路器**（每個 worker 各記各的，重啟清空）：連不上（connect 失敗）立刻冷卻；逾時與 5xx 連續 `UPSTREAM_BREAKER_FAILURES` 次才冷卻；成功或 4xx 歸零。冷卻中的引擎在自動備援裡跳過（記 `skipped_breaker`），全部都在冷卻時照樣全部試。被指名的引擎照試：`provider` 指定、後台試聽帶 `model_id`、`/tts/stream` 指名 VoxCPM 都不跳過；專案引擎順位裡的引擎被跳過時，回應標 `X-TTS-Fallback: true`，`X-TTS-Fallback-Reason` 寫「`<引擎>: skipped: cooling down (…s left)`」。批次 ASR 只剩一家（使用者指定、不備援）時照試。詞表查詢失敗與 VoxCPM 自己的健康檢查（已有 10 秒快取）不計入斷路器。
+
+**背景健康探測**：lifespan 啟動一個背景 task，每 `UPSTREAM_PROBE_INTERVAL_SECONDS` 探一次有設定網址的節點，單次上限 `UPSTREAM_PROBE_TIMEOUT_SECONDS`，永遠不在請求路徑上。TTS 用 `health_payloads.py` 的既有探測（VoxCPM `/api/v1/tts/health`、CosyVoice `/health`、IndexTTS `/health/ready`、nurse `/health`，回 ready 才算正常）；Gemini Console 與批次 ASR（breeze、r2t2、r2t2-dev、sensevoice）沒有確認過的 health 格式，打 `<網址>/health`，有 HTTP 回應且不是 5xx 就算活著。不探 Edge、OpenAI 與 Google 的雲端 API。探測失敗把節點標成 down（維持三個週期，探測停了也會自己過期），自動備援直接跳過它；探測成功解除 down，也解除「連不上」造成的冷卻，但**不**解除逾時／5xx 造成的冷卻：/health 會綠、合成卻卡住的情況真的發生過（VoxCPM worker 被 OOM 殺掉、health 照回 ok）。只在狀態改變時記一行 `upstream_probe`（`node`、`host`、`state`、`elapsed_ms`、`error`）。
+
+**嘗試紀錄**：logger `upstream_attempt`（自己的 stderr handler，不開 root INFO），每一站一行 JSON：
+
+```json
+{"event": "upstream_attempt", "kind": "tts", "node": "cosyvoice", "host": "cosy.example:50010", "outcome": "timeout_total", "elapsed_ms": 13004, "request_id": "3f2a9c0d1b7e4a55", "error": "HopTimeout: cosyvoice total timeout after 13.0s", "reason": "timeout", "budget_ms": 13000, "chars": 30}
+```
+
+- `kind`：`tts`、`tts_stream`、`asr`、`asr_stream`、`brain`。
+- `outcome`：`ok`、`timeout_connect`、`timeout_first_byte`、`timeout_read`、`timeout_total`、`http_error`、`error`、`skipped_breaker`、`skipped_deadline`。
+- `error`：`型別: 訊息`；訊息是空字串時（非同步 `ReadTimeout`）只寫型別。
+- `request_id`：`X-Request-ID`，前台有帶就沿用（合法字元 `[A-Za-z0-9._:-]`，最長 64），沒帶由 backend 產生；回應標頭帶回，轉發 Brain 時一併帶上。
+- TTS 的 `reason` 分得出逾時（`timeout`）與節點不可用（`provider_unavailable`）；`tts_route_attempt`、`tts_fallback_hop` 也帶 `request_id`。`/tts/stream` 的 IndexTTS→Edge 與 VoxCPM 串流退回都會記 hop，原因照實際分類。
+- Brain proxy 串流中途逾時：SSE 補一個與 Brain 同格式的 `event: error`（`{"status": 504, "detail": "brain stream interrupted: timeout_read"}`）後結束。
+
+**前台保險**：`useTtsStreamer` 在拿到回應 header 前以後端鏈期限加 5 秒為上限（`ttsResponseTimeoutMs`，一句 30 字 33.4 秒），逾時當一般錯誤走 `onError`；使用者打斷仍不報錯。共用批次 ASR client 以 `ASR_CHAIN_MAX_SECONDS` 加 5 秒（185 秒）為上限，逾時丟「語音辨識逾時」。兩邊照後端預設寫死，`backend/tests/test_upstream_timeouts.py` 會在後端預設改了而前端沒跟上時失敗。
+<!-- <<< 上游逾時與斷路器 -->
+
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
 將完成的 Audio 封裝成 JSON 透過 WebSocket 發送。
@@ -210,7 +272,7 @@ ws.send(JSON.stringify(payload));
 
 `POST /api/v1/asr/transcribe` 的 multipart 欄位為必填 `file`、選填 `project_id`、`language_routes`、`provider`。明確指定非批次引擎回 422、未授權回 403、未設定回 503；指定時僅呼叫該引擎，台語分流不覆蓋選擇，失敗回 502，不暗中備援，不修改帳號偏好。`project_id` 保留原始 opaque ID，不接受以顯示 label 取代。
 
-省略或空白 `provider` 時，依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、r2t2、sensevoice、openai；r2t2-dev 只在被選或設成 `ASR_PROVIDER` 時排入），並限於帳號授權候選，保留原部署預設的相容例外；既有台語 Breeze 分流維持。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後暫停 60 秒不排入，時間到由下一個請求再試，成功就解除；HTTP 錯誤碼代表機器還在回應，不暫停。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。此既有路徑全部失敗可能仍回 HTTP 200、空 `provider` 及「（音訊轉錄失敗）」；client 必須檢查結果。
+省略或空白 `provider` 時，依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、r2t2、sensevoice、openai；r2t2-dev 只在被選或設成 `ASR_PROVIDER` 時排入），並限於帳號授權候選，保留原部署預設的相容例外；既有台語 Breeze 分流維持。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後立刻暫停、逾時或 5xx 連續兩次才暫停（預設 60 秒，`UPSTREAM_BREAKER_COOLDOWN_SECONDS`），背景健康探測判定掛掉的也跳過；時間到由下一個請求再試，成功就解除；4xx 代表機器還在回應，不暫停。每一站依音訊長度有自己的預算，整條鏈有期限（見 6.4）。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。此既有路徑全部失敗可能仍回 HTTP 200、空 `provider` 及「（音訊轉錄失敗）」；client 必須檢查結果。
 
 ### 帳號能力探索（`GET /api/v1/me/capabilities`）
 
@@ -371,6 +433,34 @@ TTS_SPEAKER_PRIMARY=brand_zh_tw_female_a
 TTS_SPEAKER_SECONDARY=brand_zh_tw_female_b
 TTS_OUTPUT_FORMAT=audio-16khz-32kbitrate-mono-mp3
 TTS_REQUIRE_LOCALE=zh-TW      # 強制台灣中文口音
+# >>> 上游逾時與斷路器（全部選填，預設與理由見 6.4）
+TTS_CONNECT_TIMEOUT_SECONDS=2
+TTS_NODE_BASE_SECONDS=10
+TTS_NODE_PER_CHAR_SECONDS=0.1
+TTS_NODE_MAX_SECONDS=120
+TTS_VOXCPM_MODEL_LOAD_SECONDS=45
+TTS_HANJI_TIMEOUT_SECONDS=0.8
+TTS_STREAM_FIRST_BYTE_SECONDS=10
+TTS_STREAM_STALL_SECONDS=10
+TTS_EDGE_BASE_SECONDS=8
+TTS_EDGE_PER_CHAR_SECONDS=0.03
+TTS_CHAIN_FACTOR=1.5
+TTS_CHAIN_MAX_SECONDS=150
+ASR_CONNECT_TIMEOUT_SECONDS=2
+ASR_NODE_BASE_SECONDS=8
+ASR_NODE_PER_AUDIO_SECOND=0.5
+ASR_NODE_MAX_SECONDS=120
+ASR_CHAIN_FACTOR=1.5
+ASR_CHAIN_MAX_SECONDS=180
+ASR_FFMPEG_BASE_SECONDS=15
+ASR_FFMPEG_PER_AUDIO_SECOND=0.2
+BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS=2
+BRAIN_PROXY_READ_TIMEOUT_SECONDS=120
+UPSTREAM_BREAKER_FAILURES=2
+UPSTREAM_BREAKER_COOLDOWN_SECONDS=60
+UPSTREAM_PROBE_INTERVAL_SECONDS=10
+UPSTREAM_PROBE_TIMEOUT_SECONDS=1.5
+# <<< 上游逾時與斷路器
 
 # === 訊息處理層 ===
 MESSAGE_DEDUP_WINDOW_MS=3000

@@ -75,6 +75,12 @@ _prom_ws_errors_total = Counter("live_ws_errors_total", "WebSocket errors", ["er
 _prom_ws_reconnect_total = Counter("live_ws_reconnect_total", "WebSocket reconnections")
 
 
+def _request_id() -> str:
+    from app.upstream_guard import current_request_id
+
+    return current_request_id()
+
+
 def log_event(event: str, **fields: Any) -> None:
     """Emit a structured log line and store the event."""
     entry = {"event": event, **fields}
@@ -203,6 +209,7 @@ def record_route_attempt(
         result=result,
         latency_s=round(latency_ms / 1000, 3),
         reason=reason,
+        request_id=_request_id(),
     )
 
 
@@ -222,6 +229,7 @@ def record_fallback_hop(
         from_target=from_target,
         to_target=to_target,
         reason=reason,
+        request_id=_request_id(),
     )
 
 

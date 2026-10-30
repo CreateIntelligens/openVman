@@ -28,6 +28,21 @@ from app.providers.error_mapping import (
 )
 from app.providers.gcp_adapter import GCPTTSAdapter
 from app.providers.gemini_tts_adapter import GeminiTTSAdapter
+from app.upstream_guard import (
+    OK,
+    SKIPPED_BREAKER,
+    SKIPPED_DEADLINE,
+    TTS_BREAKER,
+    Deadline,
+    call_with_deadline,
+    classify_outcome,
+    emit_attempt,
+    tts_chain_end,
+    tts_chain_seconds,
+    tts_edge_seconds,
+    tts_node_seconds,
+    worth_trying,
+)
 from app.usage_ledger_client import UNIT_CHARS, record_usage_event
 
 #: 一個 WAV 檔頭就是 44 bytes；只有檔頭沒有取樣，或根本零長度，都是空檔。
@@ -47,6 +62,8 @@ from app.providers.indextts_adapter import (
     IndexTTSAdapter,
 )
 from app.providers.voxcpm_adapter import VoxCPMAdapter
+
+EDGE_TARGET = "edge-tts"
 
 #: 只在被指名（請求的 provider、帳號／專案選的聲音、專案順位）時才用的引擎，
 #: 不排進部署預設的備援鏈：另一台機器慢或掛掉不該拖累沒選它的人。
@@ -168,22 +185,76 @@ class TTSRouterService:
         if not chain:
             raise RuntimeError("TTS fallback chain 為空：無可用的 provider")
 
+        deadline = self._chain_deadline(request)
         if provider and provider != "auto":
             # 指定了引擎就照指定的走；專案順位只管沒指定的請求。
             return self._synthesize_targeted(
                 request, provider, self.build_chain(request, include_opt_in=True),
-                edge_fallback_voice, partners,
+                edge_fallback_voice, partners, deadline=deadline,
             )
 
-        return self._synthesize_chain(request, chain)
+        return self._synthesize_chain(request, chain, deadline=deadline, ordered=bool(order))
+
+    def _chain_deadline(self, request: SynthesizeRequest) -> Deadline:
+        """The whole chain's deadline, with Edge's tail kept for the last hop.
+
+        路由層（/tts/stream 先試過串流的站）若已設了期限，取兩者較早的那個。
+        """
+        hops, tail = tts_chain_seconds(
+            self._config, len(request.text), model_load=bool(request.model_id),
+        )
+        deadline = Deadline(hops, tail=tail)
+        outer = tts_chain_end()
+        if outer is not None and outer < deadline.end:
+            deadline = Deadline.until(outer, tail=min(tail, max(0.0, outer - monotonic())))
+        return deadline
+
+    def _node_seconds(self, target: RouteTarget, request: SynthesizeRequest) -> float:
+        if target.target == EDGE_TARGET:
+            return tts_edge_seconds(self._config, len(request.text))
+        return tts_node_seconds(
+            self._config, len(request.text),
+            model_load=target.target == "voxcpm" and bool(request.model_id),
+        )
+
+    def _skip(self, target: RouteTarget, outcome: str, detail: str) -> str:
+        emit_attempt(
+            "tts", target.target, outcome, 0.0,
+            host=getattr(target.adapter, "host", ""), error=detail,
+        )
+        return f"{target.target}: skipped: {detail}"
+
+    def _hop(
+        self,
+        target: RouteTarget,
+        request: SynthesizeRequest,
+        deadline: Deadline,
+        *,
+        explicit: bool = False,
+    ) -> tuple[NormalizedTTSResult | None, str, str]:
+        """One hop under the chain deadline and the breaker.
+
+        ``explicit``：管理員或請求指名的引擎，冷卻中也照試，不默默跳過。
+        """
+        cooling = TTS_BREAKER.cooling(target.target)
+        if cooling and not explicit:
+            return None, "provider_unavailable", self._skip(
+                target, SKIPPED_BREAKER, f"cooling down ({cooling:.0f}s left)",
+            )
+        node_seconds = self._node_seconds(target, request)
+        seconds = deadline.hop_seconds(node_seconds, last=target.target == EDGE_TARGET)
+        if not worth_trying(seconds, node_seconds):
+            return None, "timeout", self._skip(
+                target, SKIPPED_DEADLINE, "chain deadline reached",
+            )
+        return self._try_synthesize(target, replace(request, timeout_seconds=seconds))
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
     def _try_synthesize(
-        target: RouteTarget, request: SynthesizeRequest,
+        self, target: RouteTarget, request: SynthesizeRequest,
     ) -> tuple[NormalizedTTSResult | None, str, str]:
         """Try one provider and record metrics.
 
@@ -193,8 +264,13 @@ class TTSRouterService:
         human-readable summary.
         """
         t0 = monotonic()
+        host = getattr(target.adapter, "host", "")
         try:
-            result = target.adapter.synthesize(request)
+            # 牆鐘：httpx 的 read 只管兩個 chunk 之間，這裡管整站。
+            result = call_with_deadline(
+                target.adapter.synthesize, request.timeout_seconds or self._node_seconds(target, request),
+                request, node=target.target,
+            )
             # IndexTTS 沒在跑時會回 200 空音檔；任何引擎回太短的音訊都當失敗，
             # 否則備援會「成功」地吐一段無聲。
             if is_empty_audio(result.audio_bytes):
@@ -202,6 +278,11 @@ class TTSRouterService:
                     f"{target.target} returned {len(result.audio_bytes)} bytes of audio"
                 )
             latency_ms = (monotonic() - t0) * 1000
+            TTS_BREAKER.record_success(target.target)
+            emit_attempt(
+                "tts", target.target, OK, latency_ms, host=host,
+                budget_ms=round(request.timeout_seconds * 1000), chars=len(request.text),
+            )
             record_route_attempt(
                 target=target.target, result="success", latency_ms=latency_ms,
             )
@@ -228,6 +309,13 @@ class TTSRouterService:
         except Exception as exc:
             latency_ms = (monotonic() - t0) * 1000
             reason = target.error_classifier(exc)
+            outcome, error = classify_outcome(exc)
+            opened = TTS_BREAKER.record_failure(target.target, exc)
+            emit_attempt(
+                "tts", target.target, outcome, latency_ms, host=host, error=error,
+                reason=reason, budget_ms=round(request.timeout_seconds * 1000),
+                chars=len(request.text), breaker_opened=opened or None,
+            )
             record_route_attempt(
                 target=target.target,
                 result="failure",
@@ -235,23 +323,43 @@ class TTSRouterService:
                 reason=reason,
             )
             record_provider_request(provider=target.target, result="failure")
-            desc = f"{target.target}: {type(exc).__name__}: {exc}"
+            desc = f"{target.target}: {error}"
             return None, reason, desc
 
     def _synthesize_chain(
-        self, request: SynthesizeRequest, chain: list[RouteTarget],
+        self,
+        request: SynthesizeRequest,
+        chain: list[RouteTarget],
+        *,
+        deadline: Deadline | None = None,
+        ordered: bool = False,
     ) -> SynthesisOutput:
-        """Full fallback chain (existing behaviour)."""
+        """Full fallback chain under one deadline; cooled engines are skipped.
+
+        全部都在冷卻時照試（總比直接失敗好）。專案自己排的順位跳過時要在回應標出來，
+        管理員才看得出為什麼不是第一順位的聲音。
+        """
+        deadline = deadline or self._chain_deadline(request)
         errors: list[str] = []
+        skipped: list[str] = []
         last_reason = ""
+        all_cooling = all(TTS_BREAKER.cooling(target.target) for target in chain)
 
         for i, target in enumerate(chain):
-            result, reason, error_desc = self._try_synthesize(target, request)
+            result, reason, error_desc = self._hop(
+                target, request, deadline, explicit=all_cooling,
+            )
             if result is not None:
+                if ordered and skipped:
+                    return SynthesisOutput(
+                        result=result, fallback=True, fallback_reason=" | ".join(skipped),
+                    )
                 return SynthesisOutput(result=result)
 
             last_reason = reason
             errors.append(error_desc)
+            if ": skipped: cooling down" in error_desc:
+                skipped.append(error_desc)
 
             if i + 1 < len(chain):
                 record_fallback_hop(
@@ -272,15 +380,21 @@ class TTSRouterService:
         chain: list[RouteTarget],
         edge_fallback_voice: str | None = "",
         partners: tuple[tuple[str, str], ...] = (),
+        *,
+        deadline: Deadline | None = None,
     ) -> SynthesisOutput:
-        """Try a specific provider, then its partners, then Edge-TTS."""
+        """Try a specific provider, then its partners, then Edge-TTS.
+
+        指名的引擎冷卻中也照試；夥伴引擎是自動備援，冷卻中就跳過。
+        """
         target = next(
             (t for t in chain if t.adapter.provider_name == provider), None,
         )
         if target is None:
             raise RuntimeError(f"未知的 TTS provider: {provider}")
+        deadline = deadline or self._chain_deadline(request)
 
-        result, reason, primary_error = self._try_synthesize(target, request)
+        result, reason, primary_error = self._hop(target, request, deadline, explicit=True)
         if result is not None:
             return SynthesisOutput(result=result)
 
@@ -294,8 +408,8 @@ class TTSRouterService:
             record_fallback_hop(
                 from_target=previous.target, to_target=partner.target, reason=reason,
             )
-            partner_result, reason, _ = self._try_synthesize(
-                partner, replace(request, voice_hint=partner_voice),
+            partner_result, reason, _ = self._hop(
+                partner, replace(request, voice_hint=partner_voice), deadline,
             )
             if partner_result is not None:
                 return SynthesisOutput(
@@ -319,7 +433,7 @@ class TTSRouterService:
         )
 
         edge_request = replace(request, voice_hint=edge_fallback_voice)
-        edge_result, _, edge_error = self._try_synthesize(edge, edge_request)
+        edge_result, _, edge_error = self._hop(edge, edge_request, deadline, explicit=True)
         if edge_result is not None:
             return SynthesisOutput(
                 result=edge_result,

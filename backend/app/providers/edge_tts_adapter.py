@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import io
+import math
 from collections.abc import AsyncIterator
 from time import monotonic
 
@@ -12,6 +13,9 @@ import edge_tts
 
 from app.config import TTSRouterConfig
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.upstream_guard import knob, HopTimeout, tts_edge_seconds
+
+EDGE_TTS_HOST = "speech.platform.bing.com"
 
 # Single shared thread pool for running async edge-tts from sync contexts.
 _THREAD_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=2)
@@ -25,6 +29,17 @@ class EdgeTTSAdapter:
         self._sample_rate = config.edge_tts_sample_rate
         self._max_text_length = config.edge_tts_max_text_length
         self._enabled = config.edge_tts_enabled
+        self._config = config
+        # aiohttp 的連線與「兩次收到資料之間」上限；整句的牆鐘另外由 _run_synthesis 管。
+        # edge-tts 只收整數秒（傳 float 會 TypeError），無條件進位、至少 1 秒。
+        self._timeouts = {
+            "connect_timeout": max(1, math.ceil(knob(config, "tts_connect_timeout_seconds"))),
+            "receive_timeout": max(1, math.ceil(knob(config, "tts_stream_stall_seconds"))),
+        }
+
+    @property
+    def host(self) -> str:
+        return EDGE_TTS_HOST
 
     @property
     def provider_name(self) -> str:
@@ -63,7 +78,8 @@ class EdgeTTSAdapter:
         text, voice = self._prepare(request)
 
         t0 = monotonic()
-        audio_bytes = _run_synthesis(text, voice)
+        seconds = request.timeout_seconds or tts_edge_seconds(self._config, len(text))
+        audio_bytes = _run_synthesis(text, voice, seconds, self._timeouts)
         latency_ms = (monotonic() - t0) * 1000
 
         return NormalizedTTSResult(
@@ -86,7 +102,7 @@ class EdgeTTSAdapter:
         每個 audio chunk，讓呼叫端可以邊收邊播。content_type 為 audio/mpeg。
         """
         text, voice = self._prepare(request)
-        communicate = edge_tts.Communicate(text, voice)
+        communicate = edge_tts.Communicate(text, voice, **self._timeouts)
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 yield chunk["data"]
@@ -101,17 +117,26 @@ class EdgeTTSError(Exception):
         super().__init__(f"Edge-TTS error: {detail}")
 
 
-async def _synthesize_async(text: str, voice: str) -> bytes:
-    """Async edge-tts streaming to bytes."""
-    communicate = edge_tts.Communicate(text, voice)
+async def _synthesize_async(
+    text: str, voice: str, seconds: float | None = None,
+    timeouts: dict[str, float] | None = None,
+) -> bytes:
+    """Async edge-tts streaming to bytes, cut off after ``seconds`` (None: no cut-off)."""
+    communicate = edge_tts.Communicate(text, voice, **(timeouts or {}))
     buf = io.BytesIO()
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            buf.write(chunk["data"])
+    try:
+        async with asyncio.timeout(seconds):
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    buf.write(chunk["data"])
+    except TimeoutError:
+        raise HopTimeout("total", seconds, "edge-tts") from None
     return buf.getvalue()
 
 
-def _run_synthesis(text: str, voice: str) -> bytes:
+def _run_synthesis(
+    text: str, voice: str, seconds: float, timeouts: dict[str, float],
+) -> bytes:
     """Run edge-tts async synthesis from a sync context.
 
     If an event loop is already running (e.g. inside FastAPI), offloads to
@@ -120,8 +145,10 @@ def _run_synthesis(text: str, voice: str) -> bytes:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(_synthesize_async(text, voice))
+        return asyncio.run(_synthesize_async(text, voice, seconds, timeouts))
 
     # Inside an async context -- run in a worker thread with its own loop.
-    future = _THREAD_POOL.submit(asyncio.run, _synthesize_async(text, voice))
+    future = _THREAD_POOL.submit(
+        asyncio.run, _synthesize_async(text, voice, seconds, timeouts),
+    )
     return future.result()

@@ -118,7 +118,10 @@ def test_dev_engine_uses_the_dev_host_with_a_short_timeout(dev_host):
     audio, calls = dev_host
     assert asyncio.run(ingestion_audio._transcribe_r2t2_dev(audio, "t")) == "測試機"
     # .35 同時多句會卡死：只等設定的秒數，等不到就交給下一家引擎。
-    assert calls == [("http://dev:8040/transcribe", 20.0)]
+    # 讀取等設定的秒數；連線共用 ASR_CONNECT_TIMEOUT_SECONDS（2 秒），機器不通不必等 20 秒。
+    assert [url for url, _ in calls] == ["http://dev:8040/transcribe"]
+    timeout = calls[0][1]
+    assert (timeout.read, timeout.connect) == (20.0, 2.0)
 
 
 def test_main_engine_never_touches_the_dev_host(dev_host):

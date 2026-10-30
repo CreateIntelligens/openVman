@@ -106,6 +106,8 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 台語詞表預設啟用，可用 `TTS_HANJI_CONVERT_ENABLED=false` 停用。以 `TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION` 分別指定詞表版本（兩家都只講台語，一律套用）；備援換引擎會從原文重選詞表，CosyVoice 關閉上游二次轉換。此設定由 Backend 執行，前台與後台沿用原本 TTS API。契約與故障處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md#台語-tts-詞表2026-10-28)。
 
+TTS、批次 ASR 與 Brain proxy 的每個外部節點都有連線上限（預設 2 秒）與依文字或音訊長度計算的整站預算，整條備援鏈另有期限：一句 30 字的 TTS 最多約 28 秒（最後保留一段給 Edge），5 秒音檔的批次 ASR 最多約 16 秒。逾時、5xx 連續兩次或連不上的節點冷卻 60 秒，背景每 10 秒探測一次各節點，掛掉的在自動備援裡直接跳過；被指名的引擎照試。每一站記一行 `upstream_attempt` JSON log（節點、主機、結果、耗時、`X-Request-ID`）。設定都是選填的 `TTS_*`／`ASR_*`／`BRAIN_PROXY_*`／`UPSTREAM_*` 變數，預設與理由見 [Backend 規格 6.4](docs/specs/01_BACKEND_SPEC.md#64-上游逾時鏈期限與斷路器2026-10-30)。
+
 - 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
 - 部署以 `DEFAULT_PROJECT_ID` 指定預設專案，沒帶專案的請求與 `project_id=default` 都落在這個專案，前後台找不到上次選的專案時也退回它；預設專案不可刪除。
 - 專案可在「專案與權限 → 專案 → 資源與語音設定」限制能用的人物、背景、小助理、ASR 引擎與聲音、指定預設值與台語分流引擎，並自訂 TTS 與批次 ASR 的引擎順位（沒指定引擎時照順位試，台語分流也照它挑 CosyVoice／VoxCPM 誰先）；一般帳號實際能用的是帳號授權與專案限制的交集加上專案專屬與 ROOT 指派資源；ROOT 帳號則豁免於專案白名單限制（但仍套用專案預設值），選單中超出專案範圍之項目以紅字加註提示。讀不到目前設定時對話框不開放儲存，避免以空清單（不限制）覆蓋原有限制。規則見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。

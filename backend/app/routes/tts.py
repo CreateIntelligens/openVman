@@ -7,9 +7,9 @@ import hashlib
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from time import monotonic
 from typing import Literal
 
-import httpx
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -29,6 +29,8 @@ from app.config import get_tts_config
 from app.observability import record_fallback_hop
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
+from app.providers.edge_tts_adapter import EDGE_TTS_HOST
+from app.providers.error_mapping import classify_voxcpm_error
 from app.providers.gemini_tts_adapter import (
     GEMINI_PROVIDER_NAME,
     GEMINI_STREAM_CONTENT_TYPE,
@@ -54,7 +56,21 @@ from app.tts_pcm import (
     convert_to_pcm16k,
     iter_bytes,
 )
+from app.tts_stream_upstream import (
+    _STREAM_FAILURE,
+    _guarded,
+    _proxy_indextts_stream,
+    _stream_failed,
+)
 from app.tts_text import prepare_tts_text_async
+from app.upstream_guard import (
+    SKIPPED_BREAKER,
+    TTS_BREAKER,
+    emit_attempt,
+    host_of,
+    set_tts_chain_end,
+    tts_chain_seconds,
+)
 from app.usage_ledger_client import (
     UNIT_CHARS,
     record_usage_event,
@@ -579,62 +595,6 @@ def _buffered_audio(
     return response
 
 
-async def _proxy_indextts_stream(
-    *,
-    indextts_stream_url: str,
-    text: str,
-    character: str,
-    send_internal_token: bool = True,
-) -> StreamingResponse | None:
-    cfg = get_tts_config()
-    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
-    # nurse 那台是外部節點、沒有驗證，不把內部 token 送出去。
-    headers = {"X-Internal-Token": cfg.gateway_internal_token} if send_internal_token else {}
-    try:
-        request = client.build_request(
-            "POST",
-            indextts_stream_url,
-            json={"text": text, "character": character},
-            headers=headers,
-        )
-        resp = await client.send(request, stream=True)
-    except Exception as exc:
-        await client.aclose()
-        logger.error("tts_stream proxy error: %s", exc)
-        return None
-
-    if resp.status_code >= 400:
-        detail = ""
-        try:
-            detail = (await resp.aread()).decode("utf-8", errors="replace")[:500]
-        finally:
-            await resp.aclose()
-            await client.aclose()
-        logger.warning(
-            "tts_stream indextts error url=%s status=%s detail=%s",
-            indextts_stream_url,
-            resp.status_code,
-            detail,
-        )
-        return None
-
-    async def _proxy_stream() -> AsyncIterator[bytes]:
-        try:
-            async for chunk in resp.aiter_bytes(chunk_size=4096):
-                if chunk:
-                    yield chunk
-        except Exception as exc:
-            logger.error("tts_stream proxy read error: %s", exc)
-        finally:
-            await resp.aclose()
-            await client.aclose()
-
-    return StreamingResponse(
-        _proxy_stream(),
-        media_type=resp.headers.get("content-type", "audio/wav") or "audio/wav",
-    )
-
-
 @router.post("/api/v1/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
 async def tts_stream_endpoint(
     body: TtsStreamRequest,
@@ -669,6 +629,9 @@ async def tts_stream_endpoint(
     )) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
+    # 整個 /tts/stream 共用一個期限：串流站花掉的時間，後面的整段合成鏈就少用這麼多。
+    hops_seconds, edge_tail = tts_chain_seconds(cfg, len(cleaned))
+    set_tts_chain_end(monotonic() + hops_seconds + edge_tail)
     scope = usage_scope_for(
         current, project_id=project_id or "", channel="http",
     )
@@ -699,15 +662,20 @@ async def tts_stream_endpoint(
             voice_hint=voice, usage_scope=scope,
         )
         if gemini.enabled_for(gemini_request):
+            gemini_host = getattr(gemini, "host", "")
+            started = monotonic()
             try:
                 stream = await gemini.open_stream(gemini_request)
             except GeminiTTSHTTPError as exc:
+                _stream_failed(GEMINI_PROVIDER_NAME, gemini_host, exc, started, "")
                 return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
             except RuntimeError as exc:
+                _stream_failed(GEMINI_PROVIDER_NAME, gemini_host, exc, started, "")
                 return JSONResponse(status_code=502, content={"error": str(exc)})
             _meter_stream(GEMINI_PROVIDER_NAME)
             return _stream_audio(
-                stream, GEMINI_STREAM_CONTENT_TYPE, body.format, GEMINI_PROVIDER_NAME,
+                _guarded(stream, GEMINI_PROVIDER_NAME, gemini_host, started=started),
+                GEMINI_STREAM_CONTENT_TYPE, body.format, GEMINI_PROVIDER_NAME,
             )
 
     # 專案設了引擎順位：沒指定引擎時由順位第一個（有在跑的）決定走哪條串流分支。
@@ -720,13 +688,24 @@ async def tts_stream_endpoint(
 
     # provider 未指定（auto）且沒有 IndexTTS 時，VoxCPM 是 fallback 鏈的第一站，
     # 直接走它的串流端點，否則 auto 會掉到整段合成的路徑，前端要等好幾秒。
+    auto_selected = not provider
     if not provider and not cfg.tts_indextts_url and _get_service().voxcpm_adapter.enabled:
         provider = VOXCPM_PROVIDER_NAME
 
     # VoxCPM 支援 /api/v1/synthesize/stream 串流，邊生成邊吐 48kHz mono WAV。
     if provider == VOXCPM_PROVIDER_NAME:
         voxcpm = _get_service().voxcpm_adapter
-        if voxcpm.enabled:
+        vox_host = getattr(voxcpm, "host", "")
+        vox_cooling = TTS_BREAKER.cooling(VOXCPM_PROVIDER_NAME)
+        if voxcpm.enabled and vox_cooling and auto_selected:
+            # 自動挑到的才跳過；指名 VoxCPM 的照試，冷卻中也一樣。
+            emit_attempt(
+                "tts_stream", VOXCPM_PROVIDER_NAME, SKIPPED_BREAKER, 0.0,
+                host=vox_host, error=f"cooling down ({vox_cooling:.0f}s left)",
+            )
+            provider = ""
+        elif voxcpm.enabled:
+            started = monotonic()
             try:
                 stream = await voxcpm.open_stream(
                     SynthesizeRequest(
@@ -737,17 +716,21 @@ async def tts_stream_endpoint(
                     sample_rate=16000 if body.format == "pcm16k" else None,
                 )
                 _meter_stream(VOXCPM_PROVIDER_NAME)
+                TTS_BREAKER.record_success(VOXCPM_PROVIDER_NAME)
                 return _stream_audio(
-                    stream, VOXCPM_STREAM_CONTENT_TYPE, body.format, VOXCPM_PROVIDER_NAME,
+                    _guarded(stream, VOXCPM_PROVIDER_NAME, vox_host, started=started),
+                    VOXCPM_STREAM_CONTENT_TYPE, body.format, VOXCPM_PROVIDER_NAME,
                 )
             except (VoxCPMHTTPError, RuntimeError) as exc:
                 # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
-                logger.warning("tts_stream voxcpm error: %s", exc)
+                reason = classify_voxcpm_error(exc)
+                logger.warning("tts_stream voxcpm error host=%s reason=%s: %s", vox_host, reason, exc)
+                _stream_failed(VOXCPM_PROVIDER_NAME, vox_host, exc, started, reason)
                 if partners:
                     partner, partner_voice = partners[0]
                     record_fallback_hop(
                         from_target=VOXCPM_PROVIDER_NAME, to_target=partner,
-                        reason="provider_unavailable",
+                        reason=reason,
                     )
                     try:
                         output = await asyncio.to_thread(
@@ -763,6 +746,10 @@ async def tts_stream_endpoint(
                     except RuntimeError as partner_exc:
                         return JSONResponse(status_code=502, content={"error": str(partner_exc)})
                     return _buffered_audio(output, body.format, partner)
+                record_fallback_hop(
+                    from_target=VOXCPM_PROVIDER_NAME,
+                    to_target=voice_access.EDGE_TTS_PROVIDER, reason=reason,
+                )
 
     # 明確指定的非串流 provider（CosyVoice 等）直接走整段合成。不這樣做的話
     # 會掉進下面的 IndexTTS／Edge 串流，回的是別的引擎的聲音——CosyVoice 是
@@ -786,13 +773,31 @@ async def tts_stream_endpoint(
 
     # Primary: proxy stream directly from IndexTTS — 只在沒指定或指定 IndexTTS 時。明確指定
     # Edge（或 VoxCPM 掛掉往下退）卻先送 IndexTTS，IndexTTS 沒在跑時會回 200 空音檔。
-    if cfg.tts_indextts_url and provider in ("", INDEXTTS_PROVIDER):
+    indextts_cooling = TTS_BREAKER.cooling(INDEXTTS_PROVIDER)
+    if cfg.tts_indextts_url and provider == "" and indextts_cooling:
+        # 沒指定引擎才會自動走 IndexTTS；冷卻中就直接 Edge，不先白等首包逾時。
+        emit_attempt(
+            "tts_stream", INDEXTTS_PROVIDER, SKIPPED_BREAKER, 0.0,
+            host=host_of(cfg.tts_indextts_url),
+            error=f"cooling down ({indextts_cooling:.0f}s left)",
+        )
+        _STREAM_FAILURE.set("provider_unavailable")
+        record_fallback_hop(
+            from_target=INDEXTTS_PROVIDER, to_target=voice_access.EDGE_TTS_PROVIDER,
+            reason="breaker_open",
+        )
+    elif cfg.tts_indextts_url and provider in ("", INDEXTTS_PROVIDER):
         indextts_stream_url = cfg.tts_indextts_url.rstrip("/") + "/tts_stream"
         proxied = await _proxy_indextts_stream(
             indextts_stream_url=indextts_stream_url,
             text=cleaned,
             character=character,
         )
+        if proxied is None:
+            record_fallback_hop(
+                from_target=INDEXTTS_PROVIDER, to_target=voice_access.EDGE_TTS_PROVIDER,
+                reason=_STREAM_FAILURE.get() or "provider_unavailable",
+            )
         if proxied is not None:
             _meter_stream(INDEXTTS_PROVIDER)
             return _stream_audio(
@@ -814,6 +819,12 @@ async def tts_stream_endpoint(
             ),
             send_internal_token=False,
         )
+        if proxied is None:
+            record_fallback_hop(
+                from_target=INDEXTTS_NURSE_PROVIDER_NAME,
+                to_target=voice_access.EDGE_TTS_PROVIDER,
+                reason=_STREAM_FAILURE.get() or "provider_unavailable",
+            )
         if proxied is not None:
             _meter_stream(INDEXTTS_NURSE_PROVIDER_NAME)
             return _stream_audio(
@@ -840,7 +851,10 @@ async def tts_stream_endpoint(
             )
         )
         _meter_stream(voice_access.EDGE_TTS_PROVIDER)
-        return _stream_audio(stream, "audio/mpeg", body.format, voice_access.EDGE_TTS_PROVIDER)
+        return _stream_audio(
+            _guarded(stream, voice_access.EDGE_TTS_PROVIDER, EDGE_TTS_HOST),
+            "audio/mpeg", body.format, voice_access.EDGE_TTS_PROVIDER,
+        )
 
     # Fallback (buffered): 其餘 provider 仍走 service chain 一次性回傳。
     try:
