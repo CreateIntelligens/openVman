@@ -15,6 +15,7 @@ from live_agent_stress import (
     validate_cases,
 )
 from ablation_matrix import ARMS
+from pipeline_matrix import ARMS as PIPELINES
 
 
 MAIN_FILES = (
@@ -98,6 +99,9 @@ runtime = module("readonly_runtime", p["runtime"])
 probe = module("latency_probe", p["probe"])
 stages = module("stage_profiler", p["stage_profiler"])
 matrix = module("ablation_matrix", p["ablation_matrix"])
+pipeline_matrix = module("pipeline_matrix", p["pipeline_matrix"])
+corpus_helper = module("corpus_recall", p["corpus_helper"])
+pipeline_module = module("pipeline_runtime", p["pipeline_runtime"])
 history = module("benchmark_history", p["history"])
 retention = module("benchmark_retention", p["retention"])
 answer_policy = module("benchmark_answer_policy", p["answer_policy"])
@@ -177,6 +181,12 @@ def timed_tool(name, handler, arguments):
         row_metrics[name + "_calls"] += 1
 
 def knowledge(arguments):
+    if p.get("pipelines"):
+        if current_arm == "main":
+            return timed_tool("knowledge", production_tool.handler, arguments)
+        return timed_tool("knowledge", lambda args:pipeline.search(
+            args.get("queries", []), {k:v for k,v in pipeline_matrix.ARMS[current_arm].items()
+                                      if k in ("banks", "multi", "rewrite")}), arguments)
     settings = matrix.ARMS[current_arm] if p["ablation"] else {}
     if p["ablation"] and not settings.get("units"):
         supplied = dict(arguments)
@@ -216,10 +226,20 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     stack.enter_context(patch.object(embedder, "encode_query_with_fallback", production_encode))
     registry = ToolRegistry()
     registry.register(replace(production_tool, handler=knowledge))
+    corpus_registry = ToolRegistry()
+    corpus_registry.register(replace(production_tool, handler=knowledge))
     product = filter_products_tool()
     registry.register(replace(product, handler=lambda args:timed_tool("products", product.handler, args)))
-    stack.enter_context(patch.object(agent_loop, "get_tool_registry", lambda:registry))
-    stack.enter_context(patch.object(tool_executor, "get_tool_registry", lambda:registry))
+    def products_enabled():
+        return (not p["pipelines"] or current_arm == "main"
+                or pipeline_matrix.ARMS[current_arm].get("products", False))
+    def selected_registry():
+        return registry if products_enabled() else corpus_registry
+    stack.enter_context(patch.object(agent_loop, "get_tool_registry", selected_registry))
+    stack.enter_context(patch.object(tool_executor, "get_tool_registry", selected_registry))
+    original_product_line = prompt_builder.product_prompt_line
+    stack.enter_context(patch.object(prompt_builder, "product_prompt_line",
+        lambda project:original_product_line(project) if products_enabled() else ""))
     stack.enter_context(patch.object(llm_client, "record_usage_event", collect_usage))
     stack.enter_context(patch.object(usage_ledger, "record_usage_event", collect_usage))
     stack.enter_context(patch.object(provider_router, "record_error_event", lambda **_:None))
@@ -235,6 +255,8 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     stack.enter_context(patch.object(dynamic_module.LexicalIndex, "hits", measured("lexical_rank", dynamic_module.LexicalIndex.hits)))
     stack.enter_context(patch.object(dynamic_module, "exact_documents", measured("exact_document", dynamic_module.exact_documents)))
     stack.enter_context(patch.object(gate, "validate_sections", measured("validate_sections", gate.validate_sections)))
+    stack.enter_context(patch.object(corpus_helper, "rank_hits", measured("corpus_rank", corpus_helper.rank_hits)))
+    stack.enter_context(patch.object(corpus_helper, "merge_ranks", measured("corpus_merge", corpus_helper.merge_ranks)))
     from tools.builtin import knowledge_tools
     stack.enter_context(patch.object(knowledge_tools, "_search_one", measured("formal_single_query", knowledge_tools._search_one)))
     stack.enter_context(patch.object(knowledge_tools, "_expand_via_graph", measured("graph_expand", knowledge_tools._expand_via_graph)))
@@ -259,6 +281,12 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     started = time.perf_counter()
     wiki = dynamic_module.SearchRuntime(p["dynamic"], measured("formal_search", formal), gate)
     wiki_startup_ms = round((time.perf_counter() - started) * 1000, 2)
+    pipeline = None
+    pipeline_prepare_ms = 0
+    if p["pipelines"]:
+        started = time.perf_counter()
+        pipeline = pipeline_module.Runtime(p["dynamic"], wiki, corpus_helper)
+        pipeline_prepare_ms = round((time.perf_counter() - started) * 1000, 2)
     policy = TurnPolicy(needs_knowledge=True, needs_web=False, needs_memory=False, auto_recall=False)
     settings = {k:getattr(get_settings(), k) for k in (
         "llm_provider", "llm_model", "chat_prefetch_knowledge_search",
@@ -266,13 +294,14 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     for rep in range(p["reps"]):
         for index, case in enumerate(p["cases"]):
             current_case = case
-            order = matrix.ordered_arms(index, rep) if p["ablation"] else (["main", "wiki"] if (rep + index) % 2 == 0 else ["wiki", "main"])
+            order = pipeline_matrix.ordered_arms(index) if p["pipelines"] else matrix.ordered_arms(index, rep) if p["ablation"] else (["main", "wiki"] if (rep + index) % 2 == 0 else ["wiki", "main"])
             for position, current_arm in enumerate(order):
                 usage.clear(); calls.clear()
                 if p["cold_queries"]:
                     wiki.query_cache.clear()
                     wiki.rewrite_cache.clear()
                 trace_start = len(wiki.trace)
+                pipeline_trace_start = len(pipeline.trace) if pipeline else 0
                 row_metrics = {"knowledge_ms":0.0, "products_ms":0.0,
                                "knowledge_calls":0, "products_calls":0}
                 row = {"id":case["id"], "rep":rep, "variant":current_arm,
@@ -322,6 +351,8 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                 row["providers"] = sorted({u["provider"] for u in usage if u["provider"]})
                 row["models"] = sorted({c["model"] for c in calls if c.get("model")})
                 row["retrieval_trace"] = copy.deepcopy(wiki.trace[trace_start:])
+                if pipeline:
+                    row["pipeline_trace"] = copy.deepcopy(pipeline.trace[pipeline_trace_start:])
                 row["evidence_chars"] = sum(len(item.get("text", "")) for step in row["tool_steps"]
                     for field in ("results", "related")
                     for item in json.loads(step["result"]).get("data", {}).get(field, []))
@@ -345,11 +376,12 @@ print(json.dumps({"project_id":pid, "persona_id":persona, "records":records,
     "production_settings":settings, "wiki_profile":p["wiki_profile"],
     "reply_mode":p["mode"],
     "wiki_startup_ms":wiki_startup_ms, "answer_check_policy":"none",
+    "pipeline_prepare_ms":pipeline_prepare_ms, "pipelines":p["pipelines"],
     "answer_policy":"per_arm" if p["ablation"] else "production",
     "history_policy":"per_arm" if p["ablation"] else "production",
     "context_policy":"per_arm" if p["ablation"] else "production",
     "experiment_embedding_cache":False,
-    "ablation":p["ablation"], "arms":matrix.ARMS if p["ablation"] else {"main":{}, "wiki":{}},
+    "ablation":p["ablation"], "arms":pipeline_matrix.ARMS if p["pipelines"] else matrix.ARMS if p["ablation"] else {"main":{}, "wiki":{}},
     "cold_queries":p["cold_queries"],
     "scope":"Isolated main knowledge/product read path, alternating paired order; no HTTP decisions, sessions, memory, web, media or TTS; no checker or repair",
 }, ensure_ascii=False))
@@ -369,9 +401,13 @@ def main():
     parser.add_argument("--reps", type=int, default=2)
     parser.add_argument("--ablation", action="store_true")
     parser.add_argument("--cold-queries", action="store_true")
+    parser.add_argument("--pipelines", action="store_true")
+    parser.add_argument("--compiled-sections", type=Path)
     args = parser.parse_args()
     if args.ablation and args.wiki_profile != "focused_v2":
         parser.error("Ablation requires focused_v2 controls")
+    if args.pipelines and (args.ablation or not args.compiled_sections):
+        parser.error("Pipelines require compiled sections and cannot combine with ablation")
     if args.reps < 1:
         parser.error("--reps must be positive")
     cases = json.loads(args.cases.read_text())
@@ -389,14 +425,19 @@ def main():
     commit, hashes = main_sources(args.main_ref)
     dynamic = dynamic_payload(args.snapshot, args.project, [args.wiki_profile])
     dynamic["persona_id"] = args.persona
+    if args.pipelines:
+        dynamic["compiled_sections"] = json.loads(args.compiled_sections.read_text())
     generation = Path(dynamic["snapshot"])
     inputs = [args.cases, *sorted(p for p in generation.rglob("*") if p.is_file())]
+    if args.pipelines:
+        inputs.append(args.compiled_sections)
     input_hashes = {str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}
     sources = {name:(HERE/name).read_text() for name in (
         "readonly_runtime.py", "latency_probe.py", "focused_recall.py",
         "repaired_retrieval.py", "grounded_claims.py",
         "stage_profiler.py", "ablation_matrix.py", "history_query.py",
         "context_retention.py", "answer_policy.py",
+        "pipeline_matrix.py", "pipeline_runtime.py", "corpus_recall.py",
     )}
     payload = {"project_id":args.project, "persona_id":args.persona,
                "cases":answering_cases(cases), "dynamic":dynamic,
@@ -406,6 +447,10 @@ def main():
                "stage_profiler":sources["stage_profiler.py"], "ablation_matrix":sources["ablation_matrix.py"],
                "history":sources["history_query.py"], "retention":sources["context_retention.py"],
                "answer_policy":sources["answer_policy.py"],
+               "pipeline_matrix":sources["pipeline_matrix.py"],
+               "pipeline_runtime":sources["pipeline_runtime.py"],
+               "corpus_helper":sources["corpus_recall.py"],
+               "pipelines":args.pipelines,
                "ablation":args.ablation, "cold_queries":args.cold_queries}
     with checkpoint.open("x") as stream:
         process = subprocess.Popen(
@@ -437,7 +482,7 @@ def main():
         target.with_suffix(".failure.json").write_text(json.dumps(failure))
         print(json.dumps(failure))
         raise SystemExit("Benchmark failed; checkpoint retained; no accepted batch")
-    validate_records(data, cases, args.reps, ARMS if args.ablation else ("main", "wiki"))
+    validate_records(data, cases, args.reps, PIPELINES if args.pipelines else ARMS if args.ablation else ("main", "wiki"))
     if not inputs_unchanged(input_hashes):
         raise SystemExit("Input snapshot changed; checkpoint retained, no accepted batch")
     data["inputs_sha256"] = input_hashes
