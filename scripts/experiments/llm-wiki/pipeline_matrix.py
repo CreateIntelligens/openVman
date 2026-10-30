@@ -13,7 +13,38 @@ ARMS = {
 }
 
 
-def ordered_arms(index):
-    arms = list(ARMS)
-    offset = index % len(arms)
-    return arms[offset:] + arms[:offset]
+FOLLOWUP_ARMS = {
+    **ARMS,
+    "raw_multi": {"banks": ["raw"], "multi": True},
+    "raw_guarded": {
+        "banks": ["raw"], "multi": True, "products": True,
+        "force_products": True, "policy": "evidence_v2",
+    },
+    "md_guarded": {
+        "banks": ["compiled"], "multi": True, "products": True,
+        "force_products": True, "policy": "evidence_v2",
+    },
+}
+
+FOLLOWUP_ARMS.update({
+    name + "_cached": {**FOLLOWUP_ARMS[name], "catalog_cache": True}
+    for name in ("raw_guarded", "md_guarded")
+})
+
+
+def selected_arms(followup=False, names=None):
+    matrix = FOLLOWUP_ARMS if followup else ARMS
+    if names is None:
+        return dict(matrix)
+    if not names or len(set(names)) != len(names) or set(names) - matrix.keys():
+        raise ValueError("Invalid pipeline arm selection")
+    if "main" not in names:
+        raise ValueError("Pipeline comparison requires the main control")
+    return {name: matrix[name] for name in names}
+
+
+def ordered_arms(index, rep=0, arms=None):
+    arms = list(ARMS if arms is None else arms)
+    offset = (index + rep) % len(arms)
+    order = arms[offset:] + arms[:offset]
+    return order if rep % 2 == 0 else list(reversed(order))

@@ -4,7 +4,7 @@ from copy import deepcopy
 import hashlib
 
 
-POLICIES = ("production", "evidence_v1")
+POLICIES = ("production", "evidence_v1", "evidence_v2")
 EVIDENCE_V1 = """【本輪回答的證據核對規則】
 先在內部核對使用者目前問的對象、屬性與適用條件，再回答；不用輸出核對過程。
 以當前問題為準，前文只用來理解指涉。使用者改口、排除某對象或切換主題後，不沿用舊對象；先前助理的回答不算證據。
@@ -17,11 +17,16 @@ EVIDENCE_V1 = """【本輪回答的證據核對規則】
 送出前再核對：問題的主詞與條件是否相同、核心問題是否答到、每個數字與否定是否有對應原文。以使用者語言簡潔回答。
 """
 
+EVIDENCE_V2 = EVIDENCE_V1 + """拒答時說明與問題相應的限制及理由，保留能確定的部分與核心區別。
+對無法保證的要求，明確區分已知的一般規則與尚未確認的特定情況；對跨專案挪用資料的要求，明確拒絕該挪用。不要把這些核心理由縮成通用的資料不足或轉介句。
+"""
+
 
 def policy_text(name):
     if name not in POLICIES:
         raise ValueError("Unknown answer policy")
-    return EVIDENCE_V1 if name == "evidence_v1" else ""
+    return {"production": "", "evidence_v1": EVIDENCE_V1,
+            "evidence_v2": EVIDENCE_V2}[name]
 
 
 def policy_metadata(name):

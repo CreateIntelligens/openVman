@@ -3,6 +3,7 @@
 import ast
 from dataclasses import dataclass, replace
 import hashlib
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -13,10 +14,132 @@ from unittest.mock import patch
 
 import ablation_matrix as matrix
 import main_wiki_benchmark as benchmark
+import pipeline_matrix
 import stage_profiler
 
 
 class MainWikiBenchmarkTests(unittest.TestCase):
+    def test_catalog_cache_never_changes_the_main_control_or_hides_invalidations(self):
+        from unittest.mock import Mock
+
+        node = next(n for n in ast.walk(ast.parse(benchmark.SCRIPT))
+                    if isinstance(n, ast.FunctionDef) and n.name == "catalog_for_request")
+        original = Mock(return_value="formal catalog")
+        cached = Mock(return_value="verified copy")
+        scope = {
+            "p":{"pipelines":True}, "current_arm":"main",
+            "pipeline_arms":{"main":{}, "guarded":{}, "cached":{"catalog_cache":True}},
+            "load_product_catalog":original,
+            "verified_catalog":types.SimpleNamespace(load=cached),
+            "timed_tool":lambda name, function, value:function(value),
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "catalog scope", "exec"), scope)
+        for arm in ("main", "guarded"):
+            scope["current_arm"] = arm
+            self.assertEqual(scope["catalog_for_request"]("fixture"), "formal catalog")
+        cached.assert_not_called()
+        scope["current_arm"] = "cached"
+        self.assertEqual(scope["catalog_for_request"]("fixture"), "verified copy")
+        cached.side_effect = RuntimeError("catalog changed")
+        with self.assertRaisesRegex(RuntimeError, "catalog changed"):
+            scope["catalog_for_request"]("fixture")
+        self.assertEqual(original.call_count, 2)
+
+    def test_container_exit_before_input_keeps_failure_and_empty_checkpoint(self):
+        class ClosedInput:
+            def write(self, value):
+                raise BrokenPipeError("synthetic stopped container")
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = root / "cases.json"
+            cases.write_text(json.dumps([{"id":"fixture", "q":"question"}]))
+            generation = root / "generation"
+            generation.mkdir()
+            target = root / "result.json"
+            process = types.SimpleNamespace(
+                stdin=ClosedInput(), stdout=[],
+                stderr=io.StringIO("container is not running"), wait=lambda:1,
+            )
+            argv = [benchmark.__file__, "--project", "fixture", "--cases", str(cases),
+                    "--snapshot", str(generation), "--output", str(target)]
+            with (
+                patch("sys.argv", argv),
+                patch.object(benchmark, "main_sources", return_value=("fixture-commit", {})),
+                patch.object(benchmark, "dynamic_payload", return_value={"snapshot":str(generation)}),
+                patch.object(benchmark, "output_path", return_value=target),
+                patch.object(benchmark.subprocess, "Popen", return_value=process),
+            ):
+                with self.assertRaises(SystemExit):
+                    benchmark.main()
+            self.assertFalse(target.exists())
+            self.assertEqual(target.with_suffix(".checkpoint.jsonl").read_text(), "")
+            failure = json.loads(target.with_suffix(".failure.json").read_text())
+            self.assertFalse(failure["accepted"])
+            self.assertEqual(failure["input_error_type"], "BrokenPipeError")
+            self.assertEqual(failure["checkpoint_records"], 0)
+
+    def test_legacy_ablation_records_the_policy_that_was_actually_applied(self):
+        from unittest.mock import Mock
+
+        tree = ast.parse(benchmark.SCRIPT)
+        node = next(n for n in ast.walk(tree) if isinstance(n, ast.If)
+                    and isinstance(n.test, ast.BoolOp)
+                    and any(isinstance(call, ast.Call) and call.args
+                            and isinstance(call.args[0], ast.Constant)
+                            and call.args[0].value == "policy"
+                            for call in ast.walk(n.test)))
+        apply = Mock(return_value=[{"role":"system", "content":"policy applied"}])
+        scope = {
+            "p":{"ablation":True},
+            "matrix":types.SimpleNamespace(ARMS={"fixture":{"policy":True}}),
+            "current_arm":"fixture", "messages":[],
+            "answer_policy":types.SimpleNamespace(apply_policy=apply),
+            "get_settings":lambda:types.SimpleNamespace(prompt_total_char_budget=10000),
+            "row":{"answer_policy":"production"},
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "policy metadata", "exec"), scope)
+        self.assertEqual(scope["row"]["answer_policy"], "evidence_v1")
+        self.assertEqual(apply.call_args.args[1], "evidence_v1")
+
+    def test_followup_rotates_repeats_and_requires_unchanged_main_control(self):
+        arms = pipeline_matrix.selected_arms(True)
+        self.assertIn("raw_multi", arms)
+        self.assertEqual(arms["raw_multi"], {"banks":["raw"], "multi":True})
+        self.assertTrue(arms["raw_guarded"]["force_products"])
+        for rep in range(3):
+            orders = [pipeline_matrix.ordered_arms(i, rep, arms) for i in range(len(arms))]
+            self.assertEqual({order[0] for order in orders}, set(arms))
+            self.assertTrue(all(set(order) == set(arms) for order in orders))
+        for names in ([], ["raw_multi"], ["main", "main"], ["main", "unknown"]):
+            with self.subTest(names=names), self.assertRaises(ValueError):
+                pipeline_matrix.selected_arms(True, names)
+
+    def test_forced_product_prefetch_preserves_knowledge_and_passes_exact_route_arguments(self):
+        tree = ast.parse(benchmark.SCRIPT)
+        node = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef) and n.name == "prefetched_turn")
+        arguments = {"scenarios":[{"name":"synthetic", "conditions":[]}]}
+        calls = []
+        scope = {
+            "original_prefetched_turn":lambda args:{"knowledge":args},
+            "p":{"pipelines":True}, "pipeline_arms":{"candidate":{"force_products":True}},
+            "current_arm":"candidate", "row":{"product_route":{"required":True,"arguments":arguments}},
+            "agent_loop":types.SimpleNamespace(_append_synthetic_call=lambda *args:calls.append(args) or args),
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "prefetch", "exec"), scope)
+        knowledge_args = {"queries":["synthetic question"]}
+        scope["prefetched_turn"](knowledge_args)
+        self.assertIs(calls[0][0]["knowledge"], knowledge_args)
+        self.assertEqual(calls[0][1:3], ("prefetch-spec-products", "filter_products"))
+        self.assertIs(calls[0][3], arguments)
+        scope["row"]["product_route"]["required"] = False
+        self.assertEqual(scope["prefetched_turn"](knowledge_args), {"knowledge":knowledge_args})
+        self.assertEqual(len(calls), 1)
+
     def test_input_byte_changes_and_deleted_snapshot_are_not_accepted(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory)/"sources.json"

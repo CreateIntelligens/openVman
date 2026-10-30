@@ -7,7 +7,7 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-from corpus_recall import merge_ranks, rank_hits
+from corpus_recall import PreparedIndex, merge_ranks, rank_hits
 from pipeline_runtime import Runtime
 
 
@@ -206,6 +206,19 @@ class PipelineRuntimeTests(unittest.TestCase):
         self.assertEqual(self.validator._valid.call_count, 2)
         self.assertEqual(self.runtime.trace[-1]["rejected_sections"],
                          [{"id": "valid-original", "reason": "disabled"}])
+
+    def test_prepared_index_uses_current_source_gate_and_compiled_admission(self):
+        self.runtime.indexes = {
+            bank: PreparedIndex(rows, self.runtime.vectors[bank])
+            for bank, rows in self.runtime.records.items()
+        }
+        first = self.runtime.search(["first query"], {"banks":["compiled"]})
+        self.assertEqual([r["id"] for r in first["results"]], ["compiled-only"])
+        self.validator.gate.validate_sections.return_value = ([], [{"reason":"modified"}])
+        self.assertEqual(self.runtime.search(["first query"], {"banks":["compiled"]})["results"], [])
+        self.validator._valid.return_value = ([], [{"reason":"disabled"}])
+        self.assertEqual(self.runtime.search(["first query"], {"banks":["raw"]})["results"], [])
+        self.runtime.helper.rank_hits.assert_not_called()
 
     def test_empty_normalized_query_fails_before_any_retrieval(self):
         with self.assertRaisesRegex(ValueError, "actual runtime query"):

@@ -2,8 +2,8 @@
 
 No model calls, text rewriting, chunk splitting or inferred facts occur here.
 Callers supply current valid source refs and vectors from one embedding identity;
-identity verification remains the caller's responsibility. Every call validates
-dimensions and finite unit norms before using vector inner products as cosine.
+identity verification remains the caller's responsibility. Prepared indexes
+validate document vectors once; query vectors are validated on every call.
 """
 
 import copy
@@ -124,15 +124,8 @@ def _select(ranked, top_k, char_budget, diagnostics):
     return selected
 
 
-def rank_hits(records, vectors, query_vector, valid_refs, top_k=5,
-              threshold=.68, char_budget=8000, *, diagnostics=None):
-    """Rank full visible rows by cosine descending, then string ID ascending.
-
-    ``vectors`` align positionally with ``records``. ``diagnostics`` optionally
-    receives IDs/counts only. Text deduplication is exact; the shared budget is
-    Python character count, matching the experiment's existing 8000-char rule.
-    """
-    _records(records)
+def _query_controls(query_vector, top_k, threshold, char_budget, diagnostics,
+                    dimension=None):
     _limits(top_k, char_budget)
     if isinstance(threshold, bool) or not isinstance(threshold, Real) or not (
         math.isfinite(threshold) and -1 <= threshold <= 1
@@ -140,21 +133,38 @@ def rank_hits(records, vectors, query_vector, valid_refs, top_k=5,
         raise ValueError("threshold must be finite and between -1 and 1")
     if diagnostics is not None:
         diagnostics.clear()
-    query = _vector(query_vector)
+    return _vector(query_vector, dimension)
+
+
+def _document_vectors(vectors, count, dimension=None):
     try:
         vectors = list(vectors)
     except TypeError as exc:
         raise ValueError("vectors must be a sequence") from exc
-    if len(vectors) != len(records):
+    if len(vectors) != count:
         raise ValueError("Record/vector count mismatch")
-    checked = [_vector(vector, len(query)) for vector in vectors]
+    checked = []
+    for vector in vectors:
+        checked.append(_vector(vector, dimension))
+        if dimension is None:
+            dimension = len(checked[-1])
+    return checked
+
+
+def _valid_refs(valid_refs):
     if not isinstance(valid_refs, (set, frozenset, list, tuple)):
         raise ValueError("valid_refs must be a collection of source refs")
     for ref in valid_refs:
         _text(ref, "valid ref")
-    valid = set(valid_refs)
+    return set(valid_refs)
+
+
+def _rank(records, vectors, query, valid, top_k, threshold, char_budget,
+          diagnostics, allowed_ids=None):
     ranked = []
-    for row, vector in zip(records, checked):
+    for row, vector in zip(records, vectors):
+        if allowed_ids is not None and row["id"] not in allowed_ids:
+            continue
         if not set(row["source_refs"]) <= valid:
             if diagnostics is not None:
                 diagnostics.setdefault("invalid_ref_ids", []).append(row["id"])
@@ -167,6 +177,61 @@ def rank_hits(records, vectors, query_vector, valid_refs, top_k=5,
         ranked.append({**row, "score": score})
     ranked.sort(key=lambda row: (-row["score"], row["id"]))
     return _select(ranked, top_k, char_budget, diagnostics)
+
+
+def rank_hits(records, vectors, query_vector, valid_refs, top_k=5,
+              threshold=.68, char_budget=8000, *, diagnostics=None):
+    """Rank full visible rows by cosine descending, then string ID ascending.
+
+    ``vectors`` align positionally with ``records``. ``diagnostics`` optionally
+    receives IDs/counts only. Text deduplication is exact; the shared budget is
+    Python character count, matching the experiment's existing 8000-char rule.
+    """
+    _records(records)
+    query = _query_controls(query_vector, top_k, threshold, char_budget,
+                            diagnostics)
+    checked = _document_vectors(vectors, len(records), len(query))
+    valid = _valid_refs(valid_refs)
+    return _rank(records, checked, query, valid, top_k, threshold, char_budget,
+                 diagnostics)
+
+
+class PreparedIndex:
+    """Own a detached snapshot whose document vectors are validated once.
+
+    Source visibility remains request-specific: every reference of a section
+    must still be in the current ``valid_refs``, even for allowed record IDs.
+    """
+
+    def __init__(self, records, vectors):
+        records = copy.deepcopy(records)
+        _records(records)
+        checked = _document_vectors(vectors, len(records))
+        self.__records = tuple(records)
+        self.__vectors = tuple(tuple(vector) for vector in checked)
+        self.__dimension = len(checked[0]) if checked else None
+        self.__ids = frozenset(row["id"] for row in records)
+
+    def rank(self, query_vector, valid_refs, top_k=5, threshold=.68,
+             char_budget=8000, *, diagnostics=None, allowed_ids=None):
+        """Apply the same scoring and budget rules as ``rank_hits``.
+
+        ``allowed_ids`` optionally limits scoring to known index IDs. It never
+        grants source visibility or returns references to the stored records.
+        """
+        query = _query_controls(query_vector, top_k, threshold, char_budget,
+                                diagnostics, self.__dimension)
+        valid = _valid_refs(valid_refs)
+        if allowed_ids is not None:
+            if not isinstance(allowed_ids, (set, frozenset, list, tuple)):
+                raise ValueError("allowed_ids must be a collection of record IDs")
+            for record_id in allowed_ids:
+                _text(record_id, "allowed ID")
+            allowed_ids = set(allowed_ids)
+            if not allowed_ids <= self.__ids:
+                raise ValueError("allowed_ids contains an unknown record ID")
+        return _rank(self.__records, self.__vectors, query, valid, top_k,
+                     threshold, char_budget, diagnostics, allowed_ids)
 
 
 def merge_ranks(ranklists, top_k=5, char_budget=8000, *, diagnostics=None):

@@ -44,6 +44,19 @@ class AnswerPolicyTests(unittest.TestCase):
         self.assertGreater(meta["added_chars"], 0)
         self.assertIn("no deterministic", meta["scope"])
 
+    def test_refusal_variant_preserves_v1_and_the_complete_original_context(self):
+        self.assertEqual(
+            policy_metadata("evidence_v1")["sha256"],
+            "6be08f2aedd34ed643384f5646570e41fc16dbffcd57ba3546bbde2b723403ea",
+        )
+        prior = apply_policy(self.messages, "evidence_v1", total_char_budget=10000)
+        result = apply_policy(self.messages, "evidence_v2", total_char_budget=10000)
+        self.assertTrue(result[0]["content"].startswith(prior[0]["content"]))
+        self.assertEqual(result[1:], self.messages[1:])
+        self.assertNotEqual(policy_metadata("evidence_v1"), policy_metadata("evidence_v2"))
+        with self.assertRaisesRegex(ValueError, "history preserved"):
+            apply_policy(self.messages, "evidence_v2", total_char_budget=10)
+
 
 if __name__ == "__main__":
     unittest.main()

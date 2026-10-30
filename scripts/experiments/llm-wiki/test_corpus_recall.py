@@ -3,8 +3,9 @@
 import copy
 import math
 import unittest
+from unittest.mock import patch
 
-from corpus_recall import build_corpora, merge_ranks, rank_hits
+from corpus_recall import PreparedIndex, build_corpora, merge_ranks, rank_hits
 
 
 def row(row_id, text=None, refs=None):
@@ -144,6 +145,125 @@ class RankingTests(unittest.TestCase):
                 rank_hits([row("a")], [[1., 0.]], [1., 0.], {"ref-a"}, **kwargs)
         with self.assertRaisesRegex(ValueError, "Duplicate"):
             rank_hits([row("a"), row("a")], [[1., 0.]] * 2, [1., 0.], {"ref-a"})
+
+
+class PreparedIndexTests(unittest.TestCase):
+    def test_exact_hit_and_diagnostic_parity_across_dynamic_controls(self):
+        records = [row("z", "duplicate"), row("a", "duplicate"),
+                   row("oversized", "甲" * 8001), row("large", "乙" * 7900),
+                   row("budget", "丙" * 110), row("small", "丁" * 100),
+                   row("mixed", refs=["ref-a", "ref-b"]), row("equal"),
+                   row("below")]
+        scores = [1., 1., 1., .99, .98, .97, .96, .68, .679]
+        vectors = [[score, math.sqrt(1 - score ** 2)] for score in scores]
+        index = PreparedIndex(records, vectors)
+        for refs in ({"ref-a"}, {"ref-a", "ref-b"}, set()):
+            for controls in ({}, {"top_k": 0}, {"char_budget": 0},
+                             {"top_k": 9}, {"char_budget": 10},
+                             {"threshold": -.5}):
+                with self.subTest(refs=refs, controls=controls):
+                    expected_diagnostic, diagnostic = {"stale": 1}, {"stale": 1}
+                    expected = rank_hits(records, vectors, [1., 0.], refs,
+                                         diagnostics=expected_diagnostic, **controls)
+                    actual = index.rank([1., 0.], refs, diagnostics=diagnostic,
+                                        **controls)
+                    self.assertEqual(actual, expected)
+                    self.assertEqual(diagnostic, expected_diagnostic)
+
+    def test_changed_or_removed_refs_reject_the_whole_section_each_call(self):
+        index = PreparedIndex([row("mixed", refs=["ref-a", "ref-b"])],
+                              [[1., 0.]])
+        self.assertEqual(len(index.rank([1., 0.], {"ref-a", "ref-b"})), 1)
+        for refs in ({"ref-a"}, {"ref-a", "ref-b-changed"}, set()):
+            with self.subTest(refs=refs):
+                diagnostic = {}
+                self.assertEqual(index.rank([1., 0.], refs,
+                                            allowed_ids={"mixed"},
+                                            diagnostics=diagnostic), [])
+                self.assertEqual(diagnostic["invalid_ref_ids"], ["mixed"])
+        self.assertEqual(len(index.rank([1., 0.], {"ref-a", "ref-b"})), 1)
+
+    def test_allowed_ids_match_filtered_baseline_and_never_score_other_rows(self):
+        records = [row("hidden", refs=["ref-hidden"]), row("b"), row("a")]
+        vectors = [[1., 0.]] * 3
+        index = PreparedIndex(records, vectors)
+        for allowed in ({"a", "b"}, {"a"}, set()):
+            with self.subTest(allowed=allowed):
+                chosen = [(r, v) for r, v in zip(records, vectors)
+                          if r["id"] in allowed]
+                expected_diagnostic, diagnostic = {}, {}
+                expected = rank_hits([r for r, _ in chosen],
+                                     [v for _, v in chosen], [1., 0.], {"ref-a"},
+                                     diagnostics=expected_diagnostic)
+                with patch("corpus_recall.math.fsum", wraps=math.fsum) as score:
+                    actual = index.rank([1., 0.], {"ref-a"},
+                                        allowed_ids=allowed, diagnostics=diagnostic)
+                self.assertEqual(score.call_count, len(allowed))
+                self.assertEqual(actual, expected)
+                self.assertEqual(diagnostic, expected_diagnostic)
+        for invalid in ("a", {"missing"}, [1], [""]):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                index.rank([1., 0.], {"ref-a"}, allowed_ids=invalid)
+
+    def test_external_and_returned_mutation_cannot_change_prepared_snapshot(self):
+        records = [row("a")]
+        records[0]["metadata"] = {"nested": ["original"]}
+        vectors = [[1., 0.]]
+        expected = rank_hits(records, vectors, [1., 0.], {"ref-a"})
+        index = PreparedIndex(records, vectors)
+        records[0]["source_refs"].clear()
+        records[0]["metadata"]["nested"].append("mutated")
+        records[0]["text"] = "changed"
+        records.clear()
+        vectors[0][:] = [0., 1.]
+        vectors.clear()
+        actual = index.rank([1., 0.], {"ref-a"})
+        self.assertEqual(actual, expected)
+        actual[0]["metadata"]["nested"].clear()
+        actual[0]["source_refs"].clear()
+        actual[0]["text"] = "changed again"
+        self.assertEqual(index.rank([1., 0.], {"ref-a"}), expected)
+
+    def test_document_validation_is_once_and_query_validation_is_each_call(self):
+        from corpus_recall import _vector
+
+        with patch("corpus_recall._vector", wraps=_vector) as validate:
+            index = PreparedIndex([row("a"), row("b")], [[1., 0.]] * 2)
+            self.assertEqual(validate.call_count, 2)
+            for _ in range(3):
+                index.rank([1., 0.], {"ref-a"})
+            self.assertEqual(validate.call_count, 5)
+
+    def test_invalid_documents_and_queries_still_fail(self):
+        for vector in ([0., 0.], [float("nan"), 0.], [float("inf"), 0.],
+                       [1e308, 0.], [True, 0.], ["1", 0.], []):
+            with self.subTest(vector=vector), self.assertRaises(ValueError):
+                PreparedIndex([row("a")], [vector])
+        for records, vectors in (([row("a")], []),
+                                 ([row("a"), row("a")], [[1., 0.]] * 2),
+                                 ([row("a"), row("b")], [[1., 0.], [1.]])):
+            with self.subTest(vectors=vectors), self.assertRaises(ValueError):
+                PreparedIndex(records, vectors)
+        index = PreparedIndex([row("a")], [[1., 0.]])
+        for query in ([0., 0.], [float("nan"), 0.], [1.], [], [True, 0.]):
+            with self.subTest(query=query), self.assertRaises(ValueError):
+                index.rank(query, {"ref-a"})
+        for controls in ({"top_k": -1}, {"top_k": True}, {"char_budget": 1.5},
+                         {"threshold": float("nan")}, {"threshold": 1.1}):
+            with self.subTest(controls=controls), self.assertRaises(ValueError):
+                index.rank([1., 0.], {"ref-a"}, **controls)
+        for refs in ("ref-a", [None], [""]):
+            with self.subTest(refs=refs), self.assertRaises(ValueError):
+                index.rank([1., 0.], refs)
+
+    def test_empty_index_retains_baseline_behavior(self):
+        expected_diagnostic, diagnostic = {}, {}
+        expected = rank_hits([], [], [1., 0.], {"ref-a"},
+                             diagnostics=expected_diagnostic)
+        actual = PreparedIndex([], []).rank([1., 0.], {"ref-a"},
+                                            diagnostics=diagnostic)
+        self.assertEqual(actual, expected)
+        self.assertEqual(diagnostic, expected_diagnostic)
 
 
 class FusionTests(unittest.TestCase):

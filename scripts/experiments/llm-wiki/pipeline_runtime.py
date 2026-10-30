@@ -25,6 +25,7 @@ class Runtime:
             for record in records:
                 record["src"] = bank
         self.vectors = {}
+        self.indexes = {}
         embedder = get_embedder()
         for name, records in self.records.items():
             vectors = []
@@ -39,6 +40,7 @@ class Runtime:
                     raise ValueError("Corpus embedding identity differs")
                 vectors.extend([list(map(float, v)) for v in result])
             self.vectors[name] = vectors
+            self.indexes[name] = helper.PreparedIndex(records, vectors)
         # Citation membership and file hashes establish provenance, not fidelity.
         self.compiled = payload["compiled_sections"]
 
@@ -82,14 +84,21 @@ class Runtime:
                 vector = list(map(float, self.validator._vector(query)))
                 for bank in controls["banks"]:
                     records, vectors = self.records[bank], self.vectors[bank]
-                    if bank == "compiled":
+                    if bank == "compiled" and not hasattr(self, "indexes"):
                         pairs = [(r,v) for r,v in zip(records,vectors) if r["id"] in compiled_refs]
                         records = [r for r,_ in pairs]
                         vectors = [v for _,v in pairs]
                     diagnostic = {}
-                    hits = self.helper.rank_hits(records, vectors, vector,
-                        valid_refs, top_k=5, threshold=.68, char_budget=8000,
-                        diagnostics=diagnostic)
+                    if hasattr(self, "indexes"):
+                        hits = self.indexes[bank].rank(
+                            vector, valid_refs, top_k=5, threshold=.68,
+                            char_budget=8000, diagnostics=diagnostic,
+                            allowed_ids=compiled_refs if bank == "compiled" else None,
+                        )
+                    else:
+                        hits = self.helper.rank_hits(records, vectors, vector,
+                            valid_refs, top_k=5, threshold=.68, char_budget=8000,
+                            diagnostics=diagnostic)
                     ranked.append(hits)
                     diagnostics.append({"bank":bank, "query_index":queries.index(query), **diagnostic})
             results = self.helper.merge_ranks(ranked, top_k=5, char_budget=8000)

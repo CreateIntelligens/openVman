@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 
+from ablation_matrix import ARMS
 from live_agent_stress import (
     HERE,
     answering_cases,
@@ -14,8 +15,7 @@ from live_agent_stress import (
     output_path,
     validate_cases,
 )
-from ablation_matrix import ARMS
-from pipeline_matrix import ARMS as PIPELINES
+from pipeline_matrix import selected_arms
 
 
 MAIN_FILES = (
@@ -26,6 +26,11 @@ MAIN_FILES = (
     "memory/embedder.py", "memory/retrieval.py", "knowledge/doc_meta.py",
     "tools/tool_executor.py", "tools/tool_registry.py",
     "tools/builtin/knowledge_tools.py", "tools/builtin/product_tools.py",
+)
+
+OPTIONAL_MAIN_FILES = (
+    "core/key_pool.py", "core/turn_budget.py", "knowledge/graph_rag.py",
+    "memory/auto_recall.py", "safety/observability.py",
 )
 
 
@@ -40,7 +45,15 @@ def main_sources(ref):
         check=True, capture_output=True, text=True,
     ).stdout.strip()
     hashes = {}
-    for name in MAIN_FILES:
+    names = list(MAIN_FILES)
+    for name in OPTIONAL_MAIN_FILES:
+        present = subprocess.run(
+            ["git", "ls-tree", "--name-only", commit, "brain/api/" + name],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        if present:
+            names.append(name)
+    for name in names:
         source = subprocess.run(
             ["git", "show", f"{commit}:brain/api/{name}"],
             check=True, capture_output=True,
@@ -71,6 +84,7 @@ def validate_records(data, cases, reps, arms=("main", "wiki")):
 SCRIPT = r'''
 import copy
 from contextlib import ExitStack, nullcontext
+import dataclasses
 from dataclasses import replace
 import hashlib
 import json
@@ -102,6 +116,9 @@ matrix = module("ablation_matrix", p["ablation_matrix"])
 pipeline_matrix = module("pipeline_matrix", p["pipeline_matrix"])
 corpus_helper = module("corpus_recall", p["corpus_helper"])
 pipeline_module = module("pipeline_runtime", p["pipeline_runtime"])
+product_route = module("spec_product_route", p["spec_product_route"])
+catalog_cache = module("catalog_cache", p["catalog_cache"])
+pipeline_arms = p.get("pipeline_arms", pipeline_matrix.ARMS)
 history = module("benchmark_history", p["history"])
 retention = module("benchmark_retention", p["retention"])
 answer_policy = module("benchmark_answer_policy", p["answer_policy"])
@@ -185,7 +202,7 @@ def knowledge(arguments):
         if current_arm == "main":
             return timed_tool("knowledge", production_tool.handler, arguments)
         return timed_tool("knowledge", lambda args:pipeline.search(
-            args.get("queries", []), {k:v for k,v in pipeline_matrix.ARMS[current_arm].items()
+            args.get("queries", []), {k:v for k,v in pipeline_arms[current_arm].items()
                                       if k in ("banks", "multi", "rewrite")}), arguments)
     settings = matrix.ARMS[current_arm] if p["ablation"] else {}
     if p["ablation"] and not settings.get("units"):
@@ -232,7 +249,7 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     registry.register(replace(product, handler=lambda args:timed_tool("products", product.handler, args)))
     def products_enabled():
         return (not p["pipelines"] or current_arm == "main"
-                or pipeline_matrix.ARMS[current_arm].get("products", False))
+                or pipeline_arms[current_arm].get("products", False))
     def selected_registry():
         return registry if products_enabled() else corpus_registry
     stack.enter_context(patch.object(agent_loop, "get_tool_registry", selected_registry))
@@ -240,6 +257,50 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     original_product_line = prompt_builder.product_prompt_line
     stack.enter_context(patch.object(prompt_builder, "product_prompt_line",
         lambda project:original_product_line(project) if products_enabled() else ""))
+    from knowledge.product_catalog import load_product_catalog
+    from knowledge.workspace import get_workspace_root
+    from tools.builtin import product_tools
+    cache_enabled = p["pipelines"] and any(a.get("catalog_cache") for a in pipeline_arms.values())
+    catalog_started = time.perf_counter()
+    catalog_workspace = get_workspace_root(pid) if cache_enabled else None
+    fingerprint_catalog = lambda:catalog_cache.catalog_source_fingerprint(catalog_workspace)
+    catalog_sources_before = fingerprint_catalog() if cache_enabled else None
+    product_catalog = load_product_catalog(pid) if p["pipelines"] else None
+    verified_catalog = None
+    if cache_enabled:
+        verified_catalog = catalog_cache.VerifiedCatalogCache(
+            pid, product_catalog, fingerprint=fingerprint_catalog,
+        )
+        if fingerprint_catalog() != catalog_sources_before:
+            raise RuntimeError("Catalog sources changed during preparation")
+    catalog_prepare_ms = round((time.perf_counter() - catalog_started) * 1000, 2)
+    route_catalog = None if product_catalog is None else {
+        "title": product_catalog.title, "key": product_catalog.key,
+        "fields": {name:dataclasses.asdict(field)
+                   for name,field in product_catalog.fields.items()},
+        "products": [copy.deepcopy(product.values) for product in product_catalog.products],
+    }
+    def catalog_for_request(project_id):
+        if (p["pipelines"] and pipeline_arms[current_arm].get("catalog_cache")):
+            return timed_tool("catalog_cache", verified_catalog.load, project_id)
+        return load_product_catalog(project_id)
+    stack.enter_context(patch.object(product_tools, "load_product_catalog", catalog_for_request))
+    def planned_product_route(case):
+        previous = next((m.get("content", "") for m in reversed(case.get("history", []))
+                         if m.get("role") == "user"), "")
+        return product_route.route_spec_question(case["q"], previous,
+                                                catalog=route_catalog)
+    original_prefetched_turn = agent_loop._prefetched_knowledge_turn
+    def prefetched_turn(arguments):
+        turn = original_prefetched_turn(arguments)
+        if p["pipelines"] and pipeline_arms[current_arm].get("force_products"):
+            route = row.get("product_route")
+            if route and route["required"]:
+                turn = agent_loop._append_synthetic_call(
+                    turn, "prefetch-spec-products", "filter_products", route["arguments"],
+                )
+        return turn
+    stack.enter_context(patch.object(agent_loop, "_prefetched_knowledge_turn", prefetched_turn))
     stack.enter_context(patch.object(llm_client, "record_usage_event", collect_usage))
     stack.enter_context(patch.object(usage_ledger, "record_usage_event", collect_usage))
     stack.enter_context(patch.object(provider_router, "record_error_event", lambda **_:None))
@@ -256,6 +317,7 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     stack.enter_context(patch.object(dynamic_module, "exact_documents", measured("exact_document", dynamic_module.exact_documents)))
     stack.enter_context(patch.object(gate, "validate_sections", measured("validate_sections", gate.validate_sections)))
     stack.enter_context(patch.object(corpus_helper, "rank_hits", measured("corpus_rank", corpus_helper.rank_hits)))
+    stack.enter_context(patch.object(corpus_helper.PreparedIndex, "rank", measured("corpus_rank", corpus_helper.PreparedIndex.rank)))
     stack.enter_context(patch.object(corpus_helper, "merge_ranks", measured("corpus_merge", corpus_helper.merge_ranks)))
     from tools.builtin import knowledge_tools
     stack.enter_context(patch.object(knowledge_tools, "_search_one", measured("formal_single_query", knowledge_tools._search_one)))
@@ -294,7 +356,7 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     for rep in range(p["reps"]):
         for index, case in enumerate(p["cases"]):
             current_case = case
-            order = pipeline_matrix.ordered_arms(index) if p["pipelines"] else matrix.ordered_arms(index, rep) if p["ablation"] else (["main", "wiki"] if (rep + index) % 2 == 0 else ["wiki", "main"])
+            order = pipeline_matrix.ordered_arms(index, rep, pipeline_arms) if p["pipelines"] else matrix.ordered_arms(index, rep) if p["ablation"] else (["main", "wiki"] if (rep + index) % 2 == 0 else ["wiki", "main"])
             for position, current_arm in enumerate(order):
                 usage.clear(); calls.clear()
                 if p["cold_queries"]:
@@ -303,7 +365,8 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                 trace_start = len(wiki.trace)
                 pipeline_trace_start = len(pipeline.trace) if pipeline else 0
                 row_metrics = {"knowledge_ms":0.0, "products_ms":0.0,
-                               "knowledge_calls":0, "products_calls":0}
+                               "knowledge_calls":0, "products_calls":0,
+                               "catalog_cache_ms":0.0, "catalog_cache_calls":0}
                 row = {"id":case["id"], "rep":rep, "variant":current_arm,
                        "q":case["q"], "history":case.get("history", []),
                        "answer":"", "tool_steps":[], "error":None,
@@ -315,6 +378,12 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                 worker_profiles = {}
                 try:
                     with measure("prompt_build"):
+                        route = None
+                        arm_settings = pipeline_arms[current_arm] if p["pipelines"] else {}
+                        row["answer_policy"] = arm_settings.get("policy", "production")
+                        if arm_settings.get("force_products"):
+                            route = planned_product_route(case)
+                        row["product_route"] = copy.deepcopy(route)
                         messages = build_chat_messages(
                             case["q"], {"project_id":pid, "persona_id":persona,
                                         "metadata":case.get("metadata", {})},
@@ -323,6 +392,12 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                         )
                         if p["ablation"] and matrix.ARMS[current_arm].get("policy"):
                             messages = answer_policy.apply_policy(messages, "evidence_v1", total_char_budget=get_settings().prompt_total_char_budget)
+                            row["answer_policy"] = "evidence_v1"
+                        if arm_settings.get("policy"):
+                            messages = answer_policy.apply_policy(messages, arm_settings["policy"], total_char_budget=get_settings().prompt_total_char_budget)
+                        if route and route["required"]:
+                            messages = product_route.apply_route_policy(messages, route,
+                                total_char_budget=get_settings().prompt_total_char_budget)
                     row["prompt_messages"] = copy.deepcopy(messages)
                     def capture(steps):
                         row["tool_steps"] = copy.deepcopy(steps)
@@ -333,6 +408,12 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                         reply_mode=p["mode"], on_tool_round=capture, text_listener=timer,
                     )
                     row.update(answer=result.reply, tool_steps=result.tool_steps)
+                    if route and route["required"] and not any(
+                        step["name"] == "filter_products"
+                        and step["tool_call_id"] == "prefetch-spec-products"
+                        for step in result.tool_steps
+                    ):
+                        raise RuntimeError("Required product prefetch did not execute")
                     if not result.reply or not result.tool_steps:
                         raise RuntimeError("Missing answer or required knowledge step")
                     if any(json.loads(s["result"]).get("status") != "ok" for s in result.tool_steps):
@@ -377,13 +458,15 @@ print(json.dumps({"project_id":pid, "persona_id":persona, "records":records,
     "reply_mode":p["mode"],
     "wiki_startup_ms":wiki_startup_ms, "answer_check_policy":"none",
     "pipeline_prepare_ms":pipeline_prepare_ms, "pipelines":p["pipelines"],
-    "answer_policy":"per_arm" if p["ablation"] else "production",
+    "catalog_prepare_ms":catalog_prepare_ms,
+    "answer_policy":"per_arm" if p["ablation"] or any(a.get("policy") for a in pipeline_arms.values()) else "production",
     "history_policy":"per_arm" if p["ablation"] else "production",
     "context_policy":"per_arm" if p["ablation"] else "production",
     "experiment_embedding_cache":False,
-    "ablation":p["ablation"], "arms":pipeline_matrix.ARMS if p["pipelines"] else matrix.ARMS if p["ablation"] else {"main":{}, "wiki":{}},
+    "ablation":p["ablation"], "arms":pipeline_arms if p["pipelines"] else matrix.ARMS if p["ablation"] else {"main":{}, "wiki":{}},
     "cold_queries":p["cold_queries"],
-    "scope":"Isolated main knowledge/product read path, alternating paired order; no HTTP decisions, sessions, memory, web, media or TTS; no checker or repair",
+    "prepared_vector_validation":p["pipelines"],
+    "scope":"Isolated main knowledge/product read path, rotated and repeat-reversed order; no HTTP decisions, sessions, memory, web, media or TTS; no checker or repair",
 }, ensure_ascii=False))
 '''
 
@@ -403,11 +486,16 @@ def main():
     parser.add_argument("--cold-queries", action="store_true")
     parser.add_argument("--pipelines", action="store_true")
     parser.add_argument("--compiled-sections", type=Path)
+    parser.add_argument("--followup", action="store_true")
+    parser.add_argument("--pipeline-arms", nargs="+")
     args = parser.parse_args()
     if args.ablation and args.wiki_profile != "focused_v2":
         parser.error("Ablation requires focused_v2 controls")
     if args.pipelines and (args.ablation or not args.compiled_sections):
         parser.error("Pipelines require compiled sections and cannot combine with ablation")
+    if (args.followup or args.pipeline_arms) and not args.pipelines:
+        parser.error("Follow-up controls require --pipelines")
+    arms = selected_arms(args.followup, args.pipeline_arms)
     if args.reps < 1:
         parser.error("--reps must be positive")
     cases = json.loads(args.cases.read_text())
@@ -438,6 +526,8 @@ def main():
         "stage_profiler.py", "ablation_matrix.py", "history_query.py",
         "context_retention.py", "answer_policy.py",
         "pipeline_matrix.py", "pipeline_runtime.py", "corpus_recall.py",
+        "spec_product_route.py",
+        "catalog_cache.py",
     )}
     payload = {"project_id":args.project, "persona_id":args.persona,
                "cases":answering_cases(cases), "dynamic":dynamic,
@@ -451,14 +541,25 @@ def main():
                "pipeline_runtime":sources["pipeline_runtime.py"],
                "corpus_helper":sources["corpus_recall.py"],
                "pipelines":args.pipelines,
+               "pipeline_arms":arms,
+               "spec_product_route":sources["spec_product_route.py"],
+               "catalog_cache":sources["catalog_cache.py"],
                "ablation":args.ablation, "cold_queries":args.cold_queries}
     with checkpoint.open("x") as stream:
         process = subprocess.Popen(
             ["docker", "exec", "-i", "-w", "/app", args.container, "python", "-c", SCRIPT],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
-        process.stdin.write(json.dumps(payload, ensure_ascii=False))
-        process.stdin.close()
+        input_error = None
+        try:
+            process.stdin.write(json.dumps(payload, ensure_ascii=False))
+        except (BrokenPipeError, OSError) as exc:
+            input_error = type(exc).__name__
+        finally:
+            try:
+                process.stdin.close()
+            except (BrokenPipeError, OSError) as exc:
+                input_error = input_error or type(exc).__name__
         data = None
         count = 0
         for line in process.stdout:
@@ -476,13 +577,15 @@ def main():
                 data = item
         stderr = process.stderr.read()
         status = process.wait()
-    if status or data is None:
+    if status or data is None or input_error:
         failure = {**classify_failure(stderr), "returncode":status,
                    "checkpoint_records":count}
+        if input_error:
+            failure["input_error_type"] = input_error
         target.with_suffix(".failure.json").write_text(json.dumps(failure))
         print(json.dumps(failure))
         raise SystemExit("Benchmark failed; checkpoint retained; no accepted batch")
-    validate_records(data, cases, args.reps, PIPELINES if args.pipelines else ARMS if args.ablation else ("main", "wiki"))
+    validate_records(data, cases, args.reps, arms if args.pipelines else ARMS if args.ablation else ("main", "wiki"))
     if not inputs_unchanged(input_hashes):
         raise SystemExit("Input snapshot changed; checkpoint retained, no accepted batch")
     data["inputs_sha256"] = input_hashes
