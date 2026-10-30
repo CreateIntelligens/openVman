@@ -54,7 +54,7 @@ test("apiFetch keeps the full-page forbidden except for asset, TTS and ASR 403s"
     assert.equal(forbiddenCalls, 2, "/api/v1/asr/transcribe 403 must NOT trigger forbiddenHandler");
 
     // 3. Static assets must NOT trigger global forbidden on 403
-    await apiFetch("/static/characters/c1/model.vrm");
+    await apiFetch("/static/characters/c1/data.json");
     assert.equal(forbiddenCalls, 2, "/static/characters 403 must NOT trigger forbiddenHandler");
 
     // 4. 其他 API 的 403 照舊換成整頁「權限不足」。
@@ -299,16 +299,12 @@ test("SettingsModal maps in_project_scope across Voice, ASR, Character, and Back
   assert.equal(asrOptions.find((a) => a.value === "gemini-live")?.in_project_scope, true);
   assert.equal(asrOptions.find((a) => a.value === "breeze")?.in_project_scope, false);
 
-  // 3. Character: 2D 與 VRM 角色保留 in_project_scope
+  // 3. Character: 人物保留 in_project_scope，只顯示人物名稱
   const charOptions = buildCharacterOptions(
     [{ id: "char-1", name: "角色1", in_project_scope: false }],
-    [{ id: "vrm-1", label: "VRM1", in_project_scope: true }],
   );
   assert.equal(charOptions.find((c) => c.value === "matesx:char-1")?.in_project_scope, false);
-  assert.equal(charOptions.find((c) => c.value === "vrm:vrm-1")?.in_project_scope, true);
-  // 2D 只顯示人物名稱；VRM 與 2D 同一個選單，才需要標「· VRM」區分。
   assert.equal(charOptions.find((c) => c.value === "matesx:char-1")?.label, "角色1");
-  assert.equal(charOptions.find((c) => c.value === "vrm:vrm-1")?.label, "VRM1 · VRM");
 
   // 4. Background: 內建與上傳背景正確保留 in_project_scope
   const bgOptions = buildBackgroundOptions(
@@ -329,27 +325,14 @@ test("settings-modal.css styles background out-of-scope items with theme danger 
   assert.match(cssSource, /\.background-option__scope-note\s*\{[\s\S]*?color:\s*rgb\(var\(--ov-color-danger\)\);/);
 });
 
-test("MascotSwitcher renders out-of-scope mascots with theme danger token and note", () => {
-  const mascotSource = read("components/mascot/MascotSwitcher.vue");
-
-  assert.match(mascotSource, /'mascot-switcher__option--out-of-scope':\s*mascot\.in_project_scope === false/);
-  assert.match(mascotSource, /class="mascot-switcher__scope-note"/);
-  assert.match(mascotSource, /不在專案範圍內，一般使用者無法使用/);
-  assert.match(mascotSource, /'mascot-switcher__label--out-of-scope':\s*currentMascot\?\.in_project_scope === false/);
-
-  assert.match(mascotSource, /\.mascot-switcher__option--out-of-scope \.mascot-switcher__option-text strong\s*\{[\s\S]*?color:\s*rgb\(var\(--ov-color-danger\)\);/);
-  assert.match(mascotSource, /\.mascot-switcher__scope-note\s*\{[\s\S]*?color:\s*rgb\(var\(--ov-color-danger\)\);/);
-  assert.match(mascotSource, /\.mascot-switcher__label--out-of-scope\s*\{[\s\S]*?color:\s*rgb\(var\(--ov-color-danger\)\);/);
-});
-
 test("useAvatarBootstrap passes project_id to fetchTtsProviders when project is set", () => {
   const bootSource = read("composables/useAvatarBootstrap.ts");
   assert.match(bootSource, /const res = projectId\s*\?\s*await apiFetch\(`\/api\/v1\/tts\/providers\?project_id=\${encodeURIComponent\(projectId\)}`\)\s*:\s*await apiFetch\("\/api\/v1\/tts\/providers"\)/);
 });
 
-test("menus list in-scope options first and park numbered sample characters and VRM last", async () => {
+test("menus list in-scope options first and park numbered sample characters last", async () => {
   // 2026-10-16 使用者回報：紅字（範圍外）跟黑字混在一起；000～007 這類只有編號的
-  // 範例人物和 3D 很礙眼。黑字在前、紅字往後，編號人物與 3D 統一放最後。
+  // 範例人物很礙眼。黑字在前、紅字往後，編號人物統一放最後。
   const optionsSource = read("utils/settingsOptions.ts");
   const compiled = transpileModule(optionsSource).replace(
     /import\s*\{\s*ASR_ENGINE_LABELS\s*\}\s*from\s*['"]@shared\/speech['"];?/,
@@ -367,10 +350,9 @@ test("menus list in-scope options first and park numbered sample characters and 
       { id: "009", name: "專業解說員", in_project_scope: false },
       { id: "002", name: "002", in_project_scope: false },
     ],
-    [{ id: "qqman", label: "QQ", in_project_scope: false }],
   );
   assert.deepEqual(characters.map((o) => o.label), [
-    "AWS 初階虛擬人", "ESG-AIKKA雀斑", "專業解說員", "001", "002", "QQ · VRM",
+    "AWS 初階虛擬人", "ESG-AIKKA雀斑", "專業解說員", "001", "002",
   ]);
 
   const voices = buildTtsVoiceOptions({

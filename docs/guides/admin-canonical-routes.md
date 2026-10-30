@@ -31,13 +31,13 @@
 |------|------------------------|----------------|
 | 語音 | TTS 試聽：`/admin/voice` | ASR 試辨識：`/admin/voice/asr` |
 | 知識庫 | 文件：`/admin/knowledge` | 圖譜：`/admin/knowledge/graph` |
-| Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds`；小助理：`/admin/avatar/mascots` |
+| Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
 | 專案與權限 | 專案：`/admin/access` | 帳號：`/admin/access/accounts`（正式建立）、`/admin/access/accounts/temporary`（臨時建立）、`/admin/access/accounts/manage`（編輯／管理）；API 金鑰：`/admin/access/api-keys`；權限圖譜：`/admin/access/graph`；Embed 金鑰：`/admin/access/embed-keys` |
 | 模型供應商 | 主對話模型：`/admin/model-providers` | 決策模型：`/admin/model-providers/decision`；API 金鑰：`/admin/model-providers/keys` |
 | 系統狀態 | 健康：`/admin/system` | 監控（Grafana）：`/admin/system/monitoring` |
 
-子路徑最多兩層，只有「專案與權限 → 帳號」用到第二層；合法組合集中在 `adminSubViews`，其他組合（例如 `/admin/access/graph/extra`）解析為無效路由。
+子路徑最多兩層，只有「專案與權限 → 帳號」用到第二層；合法組合集中在 `adminSubViews`，其他組合（例如 `/admin/access/graph/extra`）解析為無效路由。已拿掉的小助理分頁 `/admin/avatar/mascots` 也一樣，不轉址。
 
 ### 分頁權限
 
@@ -94,7 +94,7 @@ API 金鑰分頁在既有後台門禁內開放正式帳號管理本人 key，入
 另以本機 Chrome + Playwright，mock 本地帳號／專案及頁面讀取 API，驗證以下結果：
 
 - `/admin/voice/asr?project=audit` 直達 ASR，切換 TTS、重新整理及上一頁／下一頁均還原對應畫面與網址。
-- `/admin/avatar/mascots`、`/admin/accounts/temporary`（2026-10-15 起改為 `/admin/access/accounts/temporary`）直達指定子頁；省略 project 採 default。
+- `/admin/accounts/temporary`（2026-10-15 起改為 `/admin/access/accounts/temporary`）直達指定子頁；省略 project 採 default。
 - 舊 `?view=asr` 正規化為 `/admin/voice/asr`。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址（2026-10-05 起）。
 - Chat lazy module 載入前保留 `session`／`persona`，掛載後對指定對話讀取 history 並清除一次性參數。
 

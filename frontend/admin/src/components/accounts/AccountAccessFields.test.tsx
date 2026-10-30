@@ -126,7 +126,7 @@ describe("accessFromOptions", () => {
 
   it("辨識引擎區塊不畫登入後預設值", () => {
     render(<AccountAccessFields form={formWith({ asr_engines: ["breeze"] })} />);
-    // 只數「預設值」下拉的 label（說明文字也含這幾個字）：專案、2D 人物、VRM、聲音、背景。
+    // 只數「預設值」下拉的 label（說明文字也含這幾個字）：專案、2D 人物、小助理、聲音、背景。
     const selects = screen.getAllByText(/^登入後預設值/).filter((node) => node.tagName === "LABEL");
     expect(selects).toHaveLength(5);
   });

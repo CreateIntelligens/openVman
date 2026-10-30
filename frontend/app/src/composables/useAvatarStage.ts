@@ -1,8 +1,6 @@
 import { computed, onUnmounted, ref } from "vue";
-import { useStageAvatarBridge } from "./useStageAvatarBridge";
 import { useOpenVmanAvatarRuntime } from "./useOpenVmanAvatarRuntime";
 import type { useAvatarBootstrap } from "./useAvatarBootstrap";
-import { buildMascotWidgetSrc, type MascotOption } from "../data/mascotCatalog";
 import { savedSettings, saveSettings, type useSettingsStore } from "../stores/useSettingsStore";
 import { isUploadedAvatarBackgroundId, type AvatarBackgroundId,
   type AvatarBackgroundFit } from "../types/avatarBackground";
@@ -13,30 +11,9 @@ const RUNTIME_RELOAD_COOLDOWN_MS = 5 * 60 * 1000;
 export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bootstrap: ReturnType<typeof useAvatarBootstrap>) {
   const rendererBootstrapState = ref<"loading" | "ready" | "error">("loading");
   const fatalError = ref<{ code: string; message: string } | null>(null);
-  const { avatarCatalog, characters, vrmAvatarOptions, preferSaved, accountDefault,
-    addSelectionNotice, resolveVrmAvatarOption, stageBackgroundFitStyle,
+  const { avatarCatalog, characters, preferSaved, accountDefault,
+    addSelectionNotice, stageBackgroundFitStyle,
     PREFERRED_CHARACTER_ID } = bootstrap;
-  const {
-    frameRef: stageAvatarFrameRef,
-    driveMouth: driveStageAvatarMouth,
-    stopMouth: stopStageAvatarMouth,
-    triggerGesture: triggerStageAvatarGesture,
-  } = useStageAvatarBridge({ renderMode: () => settings.renderMode });
-  const selectedVrmAvatar = computed(() =>
-    resolveVrmAvatarOption(settings.vrmAvatarId, vrmAvatarOptions.value),
-  );
-  const vrmCharacterOptions = computed(() =>
-    vrmAvatarOptions.value.map((mascot: MascotOption) => ({
-      id: mascot.id,
-      label: mascot.label,
-      in_project_scope: mascot.in_project_scope,
-    })),
-  );
-  const stageAvatarWidgetSrc = computed(() => {
-    const mascot = selectedVrmAvatar.value;
-    if (!mascot) return "";
-    return `${buildMascotWidgetSrc(mascot)}&chrome=stage`;
-  });
   const stageBackgroundClass = computed(() =>
     isUploadedAvatarBackgroundId(settings.backgroundId)
       ? "stage-background--custom"
@@ -56,17 +33,12 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
   });
   const wasm = useOpenVmanAvatarRuntime();
   const rendererDisabled = computed(() =>
-    settings.renderMode === "2d" && (
-      rendererBootstrapState.value !== "ready"
-      || !wasm.isReady.value
-      || wasm.isLoading.value
-    ),
+    rendererBootstrapState.value !== "ready"
+    || !wasm.isReady.value
+    || wasm.isLoading.value,
   );
-  const rendererErrorMessage = computed(() =>
-    settings.renderMode === "2d" ? wasm.error.value : null,
-  );
+  const rendererErrorMessage = computed(() => wasm.error.value);
   const loadingText = computed(() => {
-    if (settings.renderMode !== "2d") return "";
     if (rendererBootstrapState.value === "error") return "虛擬人載入失敗";
     if (!wasm.isReady.value) return "載入引擎中...";
     if (wasm.isLoading.value) return "切換展示角色中...";
@@ -75,8 +47,8 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
 
   const chatPlaceholder = computed(() => {
     if (!settings.projectId) return "此帳號沒有可使用的知識庫專案";
-    if (settings.renderMode === "2d" && !wasm.isReady.value) return "正在準備...";
-    if (settings.renderMode === "2d" && wasm.isLoading.value) return "切換展示角色中...";
+    if (!wasm.isReady.value) return "正在準備...";
+    if (wasm.isLoading.value) return "切換展示角色中...";
     return "向數位虛擬人提問...";
   });
   async function handleCharChange(charId: string): Promise<void> {
@@ -88,27 +60,6 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
       await wasm.loadCharacter(charId, undefined, settings.projectId);
     }
   }
-  function handleRenderModeChange(mode: '2d' | '3d'): void {
-    if (settings.renderMode === mode) return;
-    saveSettings({ renderMode: mode });
-    if (mode === "3d") {
-      wasm.clearAudio();
-      wasm.resetSpeaking();
-      wasm.disposeMotion();
-      return;
-    }
-    stopStageAvatarMouth();
-    const charId = settings.characterId || pickInitialCharacter();
-    if (wasm.isReady.value) {
-      void wasm.loadCharacter(charId, undefined, settings.projectId);
-    }
-  }
-
-  function handleVrmAvatarChange(vrmId: string): void {
-    const resolved = resolveVrmAvatarOption(vrmId, vrmAvatarOptions.value)?.id;
-    if (resolved) saveSettings({ vrmAvatarId: resolved });
-  }
-
   function handleBackgroundChange(
     backgroundId: AvatarBackgroundId,
     backgroundUrl: string,
@@ -130,8 +81,7 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
       if (selected && selected !== preferred && !characters.value.some((character) => character.id === preferred)) {
         addSelectionNotice(`預設人物 ${preferred} 未獲授權，已改用 ${selected}。`);
       }
-    } else if (!selected && vrmAvatarOptions.value.length === 0) {
-      // 只授權 VRM 的帳號沒有 2D 角色是正常的，不該當成沒有人物。
+    } else if (!selected) {
       addSelectionNotice("目前帳號沒有可使用的虛擬人物。");
     }
     return selected;
@@ -147,36 +97,21 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     bootstrapRun += 1;
   });
 
-  async function bootstrapOnce(
-    vrmReady?: Promise<unknown>,
-    projectReady?: Promise<unknown>,
-  ): Promise<void> {
+  async function bootstrapOnce(projectReady?: Promise<unknown>): Promise<void> {
     // 等專案決定再挑人物：專案還沒回來時拿不分專案的清單挑，會載到帳號預設，
     // 之後專案偏好與專案預設改了設定值卻沒人重新載入，舞台跟選單對不上。
     await Promise.all([
       wasm.initWasm(),
       // 專案資料失敗時照舊用不分專案的清單，不要每次重試都卡在同一個失敗上。
       (projectReady ?? Promise.resolve()).catch(() => undefined),
-      // 需要知道有沒有 VRM 才能判斷「沒有 2D 角色」是否為錯誤。
-      vrmReady ?? Promise.resolve(),
     ]);
     await avatarCatalog.load(settings.projectId || undefined);
     if (avatarCatalog.error.value) {
-      // 2D 清單暫時載不到：不拿空清單去挑人物（會把選擇當成失效），也不因此切到 3D。
-      // 本來就用 3D 的人不需要 2D 清單；用 2D 的人看錯誤畫面按重試。
-      if (settings.renderMode === "3d" && vrmAvatarOptions.value.length > 0) return;
+      // 清單暫時載不到：不拿空清單去挑人物（會把選擇當成失效），看錯誤畫面按重試。
       throw new Error(avatarCatalog.error.value);
     }
     const characterId = pickInitialCharacter();
-    if (!characterId) {
-      // 帳號可能只被授權 VRM。這種情況切到 3D 舞台，而不是視為載入失敗；
-      // 只改這次的生效值，不存——之後被授權 2D 時仍照使用者存的模式。
-      if (vrmAvatarOptions.value.length > 0) {
-        settings.renderMode = "3d";
-        return;
-      }
-      throw new NoCharacterError("帳號沒有可使用的虛擬人物");
-    }
+    if (!characterId) throw new NoCharacterError("帳號沒有可使用的虛擬人物");
     await wasm.loadCharacter(characterId, undefined, settings.projectId);
   }
 
@@ -194,15 +129,12 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     return true;
   }
 
-  async function bootstrapRenderer(
-    vrmReady?: Promise<unknown>,
-    projectReady?: Promise<unknown>,
-  ): Promise<void> {
+  async function bootstrapRenderer(projectReady?: Promise<unknown>): Promise<void> {
     const run = ++bootstrapRun;
     rendererBootstrapState.value = "loading";
     for (let attempt = 0; ; attempt += 1) {
       try {
-        await bootstrapOnce(vrmReady, projectReady);
+        await bootstrapOnce(projectReady);
         if (run !== bootstrapRun) return;
         rendererBootstrapState.value = "ready";
         return;
@@ -231,8 +163,7 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
   function syncCharacter(): void {
     const charId = settings.characterId;
     if (
-      settings.renderMode !== "2d"
-      || rendererBootstrapState.value !== "ready"
+      rendererBootstrapState.value !== "ready"
       || !wasm.isReady.value
       || !charId
       || (wasm.currentCharId.value === charId && wasm.currentProjectId.value === settings.projectId)
@@ -244,5 +175,5 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     });
   }
 
-  return { wasm, fatalError, rendererBootstrapState, rendererDisabled, rendererErrorMessage, loadingText, chatPlaceholder, stageAvatarFrameRef, driveStageAvatarMouth, stopStageAvatarMouth, triggerStageAvatarGesture, vrmCharacterOptions, stageAvatarWidgetSrc, stageBackgroundClass, stageBackgroundStyle, handleCharChange, handleRenderModeChange, handleVrmAvatarChange, handleBackgroundChange, bootstrapRenderer, syncCharacter };
+  return { wasm, fatalError, rendererBootstrapState, rendererDisabled, rendererErrorMessage, loadingText, chatPlaceholder, stageBackgroundClass, stageBackgroundStyle, handleCharChange, handleBackgroundChange, bootstrapRenderer, syncCharacter };
 }

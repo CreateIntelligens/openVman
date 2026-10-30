@@ -24,7 +24,7 @@ The Backend authentication middleware SHALL accept an `X-Embed-Key` header and, 
 Embed principals SHALL be limited to `POST /api/v1/chat`, `POST /api/v1/chat/stream`, `GET /api/v1/characters`, `GET /api/v1/tts/providers`, `POST /api/v1/tts/stream`, `POST /v1/audio/speech`, `GET /api/v1/health`, `GET /static/characters/{char_id}/*`, and the `OPTIONS` preflights for those paths. Every other path SHALL return 403 before any handler executes.
 
 #### Scenario: Denied path
-- **WHEN** an embed principal calls `GET /api/v1/sessions`, `GET /api/v1/knowledge/documents`, `GET /api/v1/users`, or `GET /static/mascots/{id}/model.vrm`
+- **WHEN** an embed principal calls `GET /api/v1/sessions`, `GET /api/v1/knowledge/documents`, `GET /api/v1/users`, or `GET /static/backgrounds/{id}/image.png`
 - **THEN** the response is 403
 
 #### Scenario: Project override is rejected

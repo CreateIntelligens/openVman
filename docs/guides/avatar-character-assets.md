@@ -21,7 +21,7 @@
 1. 幀同步標記：引擎每格讀影片右上角 2×2 像素（`(width − 2, 0)`）的灰階平均，以 `round(avg / 40)` 當作 `幀號 % 7`。製作時每格右上角要寫入 `(幀號 % 7) × 40` 的灰階。VP9 低碼率會把太小的標記糊掉（2026-10-16 local_01 有 3 格讀錯，皆在開頭關鍵幀附近），標記區塊建議比 2×2 大，或提高該區域品質。
 2. 臉部姿態資料：每格的姿態資料必須讓嘴型網格落在 180×180 的嘴型貼圖範圍內。資料錯了，網格會整塊被裁掉，嘴型貼圖是全透明的：人物照常顯示、待機正常，只有講話時嘴巴不動。2026-10-16 local_01 第一版就是這個情況，由素材製作管線修正後解決。
 
-顯示修復集中在共用 TypeScript 模組 `frontend/shared/avatar/avatarFrameSyncRepair.ts`，由前台與 SDK 的 runtime adapter 安裝及卸載，不手動拆改 WASM 工具產生的引擎內容。讀取 2×2 標記時，先保留原始 RGBA 供引擎判斷幀號，再依左側與下側乾淨邊界重建右上角 16×16 背景，外緣 4 像素逐步融合原始畫面，避免複製另一塊背景造成方形亮度接縫。標記本體建議不超過 8×8，壓縮污染須留在修復區域內，修復邊界須保留背景；不要放人物或文字。修復使用 `putImageData`，不受影片繪製的 `globalCompositeOperation = "copy"` 影響。前台、Avatar SDK 與 SDK 嵌入 widget 共用此修正；3D VRM 不使用這項標記。
+顯示修復集中在共用 TypeScript 模組 `frontend/shared/avatar/avatarFrameSyncRepair.ts`，由前台與 SDK 的 runtime adapter 安裝及卸載，不手動拆改 WASM 工具產生的引擎內容。讀取 2×2 標記時，先保留原始 RGBA 供引擎判斷幀號，再依左側與下側乾淨邊界重建右上角 16×16 背景，外緣 4 像素逐步融合原始畫面，避免複製另一塊背景造成方形亮度接縫。標記本體建議不超過 8×8，壓縮污染須留在修復區域內，修復邊界須保留背景；不要放人物或文字。修復使用 `putImageData`，不受影片繪製的 `globalCompositeOperation = "copy"` 影響。前台、Avatar SDK 與 SDK 嵌入 widget 共用此修正。
 
 引擎入口與 WASM 統一命名為 `OpenVmanAvatarRuntime.js`、`OpenVmanAvatarRuntime.wasm`，引擎本身為 DHLiveMini2（Emscripten 編譯），一律從同源載入。SDK 公開路徑 `/static/sdk/runtime/OpenVmanAvatarRuntime.js`、`.wasm` 不變；舊的 `/js/DHLiveMini2.js`、`/wasm/DHLiveMini2.wasm` 不再提供。
 

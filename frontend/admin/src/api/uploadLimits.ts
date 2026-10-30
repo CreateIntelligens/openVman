@@ -7,8 +7,6 @@ export interface UploadLimits {
   asr_max_duration_seconds: number;
   avatar_max_upload_bytes: number;
   avatar_background_max_upload_bytes: number;
-  avatar_mascot_max_upload_bytes: number;
-  avatar_mascot_thumbnail_max_upload_bytes: number;
   avatar_source_max_upload_bytes: number;
   avatar_source_image_max_upload_bytes: number;
   avatar_source_max_duration_seconds: number;
@@ -24,8 +22,6 @@ export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
   asr_max_duration_seconds: 300,
   avatar_max_upload_bytes: 100 * MB,
   avatar_background_max_upload_bytes: 25 * MB,
-  avatar_mascot_max_upload_bytes: 100 * MB,
-  avatar_mascot_thumbnail_max_upload_bytes: 10 * MB,
   avatar_source_max_upload_bytes: 200 * MB,
   avatar_source_image_max_upload_bytes: 25 * MB,
   avatar_source_max_duration_seconds: 60,

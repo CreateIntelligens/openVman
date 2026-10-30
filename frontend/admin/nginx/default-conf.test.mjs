@@ -17,6 +17,7 @@ const RETIRED_LOCATIONS = [
   "/embed/avatar",
   "/assets/",
   "/mascots/",
+  "/static/mascots/",
   "/backgrounds/",
   "/tts/",
   "/uploads",
@@ -39,7 +40,7 @@ function locationBody(prefix) {
 
 describe("nginx default config", () => {
   it.each(RETIRED_LOCATIONS)("carries no location for the retired %s", (prefix) => {
-    // /static/mascots/ 之類的新路徑本身含有舊前綴字串，所以比對整個
+    // /static/backgrounds/ 之類的現行路徑本身含有舊前綴字串，所以比對整個
     // location 指令而不是裸字串。
     expect(source).not.toMatch(
       new RegExp(`location (?:= |\\^~ )?${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[ {]`),
@@ -54,17 +55,6 @@ describe("nginx default config", () => {
     expect(backgrounds).toBeLessThan(avatarFallback);
     expect(source).toMatch(
       /location \/static\/backgrounds\/[\s\S]*proxy_pass \$backend\$request_uri;/,
-    );
-  });
-
-  it("proxies avatar mascot files to backend before the avatar fallback", () => {
-    const mascots = source.indexOf("location /static/mascots/");
-    const avatarFallback = source.indexOf("location / {");
-
-    expect(mascots).not.toBe(-1);
-    expect(mascots).toBeLessThan(avatarFallback);
-    expect(source).toMatch(
-      /location \/static\/mascots\/[\s\S]*proxy_pass \$backend\$request_uri;/,
     );
   });
 

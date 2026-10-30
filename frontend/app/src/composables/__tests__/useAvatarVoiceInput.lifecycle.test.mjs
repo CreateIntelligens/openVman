@@ -75,7 +75,6 @@ function openVoice(provider = "r2t2-live", decision = "IGNORE", { interruptWhile
       async handleSend(...args) { sent.push(args); return { accepted: true }; },
     },
     preferences: { myAsrProvider },
-    stage: { triggerStageAvatarGesture: (gesture) => calls.push(gesture) },
     languageRoutes: { taiwaneseOn, asrFormFields: () => ({ project_id: "p1" }) },
     turnTiming: {
       asrDone: () => calls.push("asrDone"),

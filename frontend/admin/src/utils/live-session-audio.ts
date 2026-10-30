@@ -25,7 +25,7 @@ type PlaybackRefs = {
 type PlaybackCallbacks = {
   onError: (message: string) => void;
   onPlayingChange: (playing: boolean) => void;
-  /** 每段音訊解碼後、排程前呼叫；小助理用它拿 PCM 驅動 matex 嘴型。 */
+  /** 每段音訊解碼後、排程前呼叫；小助理用它接上 analyser 量音量驅動嘴型。 */
   onDecodedChunk?: (audioBuffer: AudioBuffer, context: AudioContext) => void;
 };
 

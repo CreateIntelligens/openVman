@@ -60,18 +60,6 @@ vi.mock("../api", () => ({
       },
     ],
   }),
-  fetchAvatarMascots: vi.fn().mockResolvedValue({
-    mascots: [
-      {
-        mascot_id: "qqman",
-        label: "QQman",
-        engine: "3d",
-        builtin: false,
-        size_bytes: 2048,
-        updated_at: "2026-07-07T00:00:00Z",
-      },
-    ],
-  }),
   saveKnowledgeDocument: vi.fn(),
   setPersonaAvatar: vi.fn().mockResolvedValue({ status: "ok" }),
 }));
@@ -91,7 +79,7 @@ describe("Personas page", () => {
     expect(trigger.textContent).toContain("未綁定");
 
     fireEvent.click(trigger);
-    fireEvent.mouseDown(await screen.findByRole("option", { name: "ESG-AIKKA半身 (2D)" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "ESG-AIKKA半身" }));
 
     await waitFor(() => {
       expect(setPersonaAvatar).toHaveBeenCalledWith("default", "0616");

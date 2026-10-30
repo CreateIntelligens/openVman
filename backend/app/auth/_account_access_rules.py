@@ -33,14 +33,14 @@ def _normalize_account_access(
         raise InvalidResourceGrantError(
             "project and voice grants are required"
         )
-    # 舞台人物可以是 openVman 2D 角色或 VRM，管理端也是併成同一張清單，
-    # 所以只要求兩者至少擇一，不強制一定要有 2D 角色。
+    # 人物與小助理在管理端併成同一張清單，只要求兩者至少擇一，
+    # 不強制一定要有 2D 角色。
     if not grant_types & {
         ResourceType.AVATAR_CHARACTER,
         ResourceType.AVATAR_MASCOT,
     }:
         raise InvalidResourceGrantError(
-            "at least one avatar character or VRM grant is required"
+            "at least one avatar character or mascot grant is required"
         )
 
     normalized_defaults = tuple(value.strip() for value in defaults)
@@ -55,10 +55,10 @@ def _normalize_account_access(
 
     if not all((project_id, voice_id)):
         raise InvalidResourceGrantError("all required account defaults are required")
-    # 預設登入人物同樣可以是 2D 角色或 VRM，兩者至少要指定一個。
+    # 預設值同樣是人物或小助理至少指定一個。
     if not character_id and not mascot_id:
         raise InvalidResourceGrantError(
-            "a default avatar character or VRM is required"
+            "a default avatar character or mascot is required"
         )
 
     default_resources = {

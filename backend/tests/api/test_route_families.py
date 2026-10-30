@@ -100,9 +100,8 @@ def test_static_character_family_is_public_and_others_require_auth(monkeypatch) 
     anonymous = TestClient(module.app, raise_server_exceptions=False)
 
     # Route-level policy answers 404 for an unknown public character, while
-    # mascots and backgrounds stay behind the fail-closed middleware (401).
+    # backgrounds stay behind the fail-closed middleware (401).
     assert anonymous.get("/static/characters/missing/01.webm").status_code == 404
-    assert anonymous.get("/static/mascots/missing/model.vrm").status_code == 401
     assert anonymous.get("/static/backgrounds/missing/image.png").status_code == 401
 
 

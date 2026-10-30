@@ -14,13 +14,6 @@ export {
   rmsVolume,
 };
 
-/** 把解碼後的 AudioBuffer 轉成小助理 matex 引擎要的 16kHz mono int16 分段。 */
-export function audioBufferToMascotPcm(audioBuffer: AudioBuffer, targetSampleRate: number, chunkBytes: number): ArrayBuffer[] {
-  const mono = downmixToMono(audioBuffer);
-  const resampled = resamplePcm(mono, audioBuffer.sampleRate, targetSampleRate);
-  return chunkArrayBuffer(encodePcm16(resampled), chunkBytes);
-}
-
 export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const batchSize = 8192;

@@ -29,7 +29,7 @@ const ORPHAN_KEY = "orphan";
 export const GLOBAL_SECTION_LABEL = "全域（所有專案可用）";
 export const ORPHAN_SECTION_LABEL = "專案已刪除";
 
-/** 人物、VRM 與背景有專案歸屬；聲音分引擎；其餘一張清單。 */
+/** 人物、小助理與背景有專案歸屬；聲音分引擎；其餘一張清單。 */
 export function sectionModeOf(grantType: GrantType): "project" | "provider" | "flat" {
   switch (grantType) {
     case "avatar_characters":

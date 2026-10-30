@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import {
        AvatarCharacter,
-       AvatarMascot,
        clonePersona,
        createPersona,
        deletePersona,
        fetchAvatarCharacters,
-       fetchAvatarMascots,
        fetchPersonas,
        fetchKnowledgeDocument,
        PersonaSummary,
@@ -31,20 +29,14 @@ const EDITOR_MODES: readonly EditorMode[] = ["edit", "split", "preview"];
 type Status = { type: "success" | "error"; message: string } | null;
 type AvatarBindingOption = Pick<AvatarCharacter, "char_id" | "label">;
 
+// 前台舞台只有 2D 影片人物，虛擬人只能綁人物；小助理不是舞台上的角色。
 function buildAvatarBindingOptions(
        characters: AvatarCharacter[],
-       mascots: AvatarMascot[],
 ): AvatarBindingOption[] {
-       return [
-              ...characters.map((character) => ({
-                     char_id: character.char_id,
-                     label: `${character.label || character.char_id} (2D)`,
-              })),
-              ...mascots.map((mascot) => ({
-                     char_id: mascot.mascot_id,
-                     label: `${mascot.label || mascot.mascot_id} (3D VRM)`,
-              })),
-       ];
+       return characters.map((character) => ({
+              char_id: character.char_id,
+              label: character.label || character.char_id,
+       }));
 }
 
 export default function Personas() {
@@ -246,14 +238,11 @@ export default function Personas() {
        }, [projectId]);
 
        useEffect(() => {
-              Promise.all([
-                     fetchAvatarCharacters().catch(() => ({ characters: [] })),
-                     fetchAvatarMascots().catch(() => ({ mascots: [] })),
-              ]).then(([charsRes, mascotsRes]) => {
-                     setAvatarChars(
-                            buildAvatarBindingOptions(charsRes.characters, mascotsRes.mascots),
-                     );
-              });
+              fetchAvatarCharacters()
+                     .catch(() => ({ characters: [] }))
+                     .then((charsRes) => {
+                            setAvatarChars(buildAvatarBindingOptions(charsRes.characters));
+                     });
        }, []);
 
        const onBindAvatar = async (personaId: string, charId: string | null) => {

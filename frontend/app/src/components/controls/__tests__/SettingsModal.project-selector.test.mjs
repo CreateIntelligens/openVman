@@ -67,37 +67,22 @@ test("settings modal exposes stage background controls", () => {
   assert.match(source, /resolvedDraftBackgroundUrl/);
 });
 
-test("character selector lists 2D characters by name and marks VRM avatars", () => {
-  assert.match(source, /renderMode:\s*'2d' \| '3d'/);
-  assert.match(source, /renderModeChange:\s*\[mode:\s*'2d' \| '3d'\]/);
-  assert.match(source, /export interface VrmCharacterSummary/);
-  assert.match(source, /vrmCharacters:\s*VrmCharacterSummary\[\]/);
-  assert.match(source, /currentVrmId:\s*string/);
-  assert.match(source, /vrmCharacterChange:\s*\[vrmId:\s*string\]/);
+test("character selector lists 2D characters by name only", () => {
   assert.match(source, /toOpenVmanCharacterValue/);
-  assert.match(source, /toVrmCharacterValue/);
   assert.match(source, /draftCharacterValue/);
   assert.match(source, /v-model="draftCharacterValue"/);
-  assert.match(source, /buildCharacterOptions\(props\.characters, props\.vrmCharacters\)/);
+  assert.match(source, /buildCharacterOptions\(props\.characters\)/);
   assert.doesNotMatch(source, /openVman 2D/);
   assert.doesNotMatch(source, /· 2D/);
   assert.doesNotMatch(source, /· 3D/);
   assert.doesNotMatch(source, />顯示模式</);
 });
 
-test("render mode stays internal to character selection", () => {
-  assert.match(source, /draftRenderMode/);
-  assert.doesNotMatch(source, /renderModeOptions/);
-  assert.doesNotMatch(source, /v-for="option in renderModeOptions"/);
-  assert.doesNotMatch(source, /v-model="draftRenderMode"/);
-});
-
-test("renderer choice changes remain applyable when renderer controls are disabled", () => {
-  assert.match(source, /const isRenderModeDirty = computed/);
-  assert.match(source, /const isVrmDirty = computed/);
-  assert.match(source, /const rendererChoiceDirty = computed/);
-  assert.match(source, /const applyDisabled = computed\(\(\) =>\s*Boolean\(props\.personasLoading\) \|\|\s*\(Boolean\(props\.disabled\) && !rendererChoiceDirty\.value\)\s*\)/);
-  assert.match(source, /v-model="draftCharacterValue"/);
+// 3D（VRM）渲染模式已拿掉：設定視窗不再有渲染模式或 VRM 角色的欄位與事件。
+test("settings modal has no render mode or VRM choices", () => {
+  assert.doesNotMatch(source, /renderMode|RenderMode/);
+  assert.doesNotMatch(source, /vrm|Vrm|VRM/);
+  assert.match(source, /const applyDisabled = computed\(\(\) =>\s*Boolean\(props\.personasLoading\) \|\| Boolean\(props\.disabled\)\s*\)/);
 });
 
 test("background changes apply without forcing chat reconnect", () => {

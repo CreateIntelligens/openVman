@@ -7,19 +7,15 @@ import { build } from "esbuild";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// 舞台只透過這兩個模組碰 WASM 與 iframe；換成假的才能在 node 裡跑真正的啟動流程。
+// 舞台只透過這個模組碰 WASM；換成假的才能在 node 裡跑真正的啟動流程。
 const fakeModules = {
   name: "fake-runtime",
   setup(builder) {
-    builder.onResolve({ filter: /\/useOpenVmanAvatarRuntime$|\/useStageAvatarBridge$/ }, (args) => ({
+    builder.onResolve({ filter: /\/useOpenVmanAvatarRuntime$/ }, (args) => ({
       path: args.path, namespace: "fake",
     }));
-    builder.onLoad({ filter: /.*/, namespace: "fake" }, (args) => ({
-      contents: args.path.endsWith("useOpenVmanAvatarRuntime")
-        ? "export const useOpenVmanAvatarRuntime = () => globalThis.__fakeWasm;"
-        : `export const useStageAvatarBridge = () => ({
-            frameRef: { value: null }, driveMouth() {}, stopMouth() {}, triggerGesture() {},
-          });`,
+    builder.onLoad({ filter: /.*/, namespace: "fake" }, () => ({
+      contents: "export const useOpenVmanAvatarRuntime = () => globalThis.__fakeWasm;",
       loader: "js",
     }));
   },
@@ -84,7 +80,7 @@ function createFakeWasm({ initFailures = 0 } = {}) {
 function createStage(wasm) {
   globalThis.__fakeWasm = wasm;
   const settings = reactive({
-    projectId: "", characterId: "", renderMode: "2d", vrmAvatarId: "",
+    projectId: "", characterId: "",
     backgroundId: "dark", backgroundUrl: "", backgroundFit: "cover",
   });
   const catalogLoads = [];
@@ -97,13 +93,11 @@ function createStage(wasm) {
       },
     },
     characters,
-    vrmAvatarOptions: ref([]),
     // 專案確定後挑專案預設 1014；專案還沒回來時只能挑帳號預設 0713。
     pickPreferredCharacterId: (projectId) => (projectId ? "1014" : "0713"),
     preferSaved: (_saved, _isValid, fallback) => fallback,
     accountDefault: (_key, fallback) => fallback,
     addSelectionNotice() {},
-    resolveVrmAvatarOption: () => null,
     stageBackgroundFitStyle: () => ({}),
     PREFERRED_CHARACTER_ID: "0713",
   };
@@ -118,7 +112,7 @@ test("the stage waits for the project before picking and loading a character", a
   const { stage, settings, catalogLoads } = createStage(wasm);
   const project = deferred();
 
-  const booting = stage.bootstrapRenderer(Promise.resolve(), project.promise);
+  const booting = stage.bootstrapRenderer(project.promise);
   await flush();
   assert.deepEqual(wasm.loads, [], "專案決定前不能載入人物");
 
@@ -136,7 +130,7 @@ test("a transient startup failure retries by itself instead of needing a reload"
   const wasm = createFakeWasm({ initFailures: 1 });
   const { stage } = createStage(wasm);
 
-  const booting = stage.bootstrapRenderer(Promise.resolve(), Promise.resolve());
+  const booting = stage.bootstrapRenderer(Promise.resolve());
   await flush();
   assert.equal(wasm.initCalls, 1);
   assert.equal(stage.rendererBootstrapState.value, "loading");
@@ -191,7 +185,7 @@ test("when the engine never starts the page reloads once, then shows the error",
 test("switching project loads the character the new project picked", async () => {
   const wasm = createFakeWasm();
   const { stage, settings } = createStage(wasm);
-  await stage.bootstrapRenderer(Promise.resolve(), Promise.resolve());
+  await stage.bootstrapRenderer(Promise.resolve());
   assert.deepEqual(wasm.loads, ["0713"]);
 
   stage.syncCharacter();
@@ -206,7 +200,7 @@ test("the same character is reloaded when its project motion scope changes", asy
   const wasm = createFakeWasm();
   const { stage, settings } = createStage(wasm);
   settings.projectId = "hospital-a";
-  await stage.bootstrapRenderer(Promise.resolve(), Promise.resolve());
+  await stage.bootstrapRenderer(Promise.resolve());
   const character = wasm.currentCharId.value;
   settings.projectId = "hospital-b";
   stage.syncCharacter();

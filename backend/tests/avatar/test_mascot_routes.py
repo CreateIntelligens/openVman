@@ -1,32 +1,34 @@
-import io
-
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.routes import mascots as mascot_routes
-
-
-VRM_BYTES = b"glTFvrm"
+from app.routes import static_assets
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("AVATAR_MASCOTS_DIR", str(tmp_path))
-    from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account, require_admin
-    from app.auth.models import AccountRole, AccountType, ResourceType, ResourceVisibility, UserRecord
+def runtime():
+    from app.auth.models import ResourceType
     from app.auth.runtime import get_auth_runtime
-    from app.config import get_tts_config
 
-    get_tts_config.cache_clear()
-    mascot_routes.reset_store()
     runtime = get_auth_runtime()
-    for mid, label in [("haru-live2d", "Haru")]:
-        runtime.resources.upsert_system_resource(
-            resource_type=ResourceType.AVATAR_MASCOT,
-            resource_id=mid,
-            metadata={"label": label},
-        )
+    runtime.resources.upsert_system_resource(
+        resource_type=ResourceType.AVATAR_MASCOT,
+        resource_id="haru-live2d",
+        metadata={"label": "Haru"},
+    )
+    return runtime
+
+
+@pytest.fixture
+def client(runtime):
+    from app.auth.dependencies import (
+        AuthTransport,
+        CurrentAccount,
+        get_current_account,
+        require_admin,
+    )
+    from app.auth.models import AccountRole, AccountType, UserRecord
 
     admin_user = UserRecord(
         id="test-admin",
@@ -43,295 +45,57 @@ def client(tmp_path, monkeypatch):
     )
     admin_account = CurrentAccount(user=admin_user, transport=AuthTransport.BEARER)
 
-    # 列表會自動把 avatar 角色衍生成小助理；預設給一個空的角色庫，避免碰到 /data/avatar
-    monkeypatch.setattr(mascot_routes, "get_character_store", lambda: _FakeCharacterStore([]))
-
     app = FastAPI()
     app.include_router(mascot_routes.router)
+    app.include_router(static_assets.router)
     app.dependency_overrides[get_current_account] = lambda: admin_account
     app.dependency_overrides[require_admin] = lambda: admin_account
     return TestClient(app)
 
 
-def _upload(client, mascot_id="custom", label="自訂小助理", model=VRM_BYTES):
-    return client.post(
-        "/api/v1/avatar/mascots",
-        data={"mascot_id": mascot_id, "label": label},
-        files={"model": ("custom.vrm", io.BytesIO(model), "model/gltf-binary")},
-    )
-
-
-def test_list_builtin_mascots(client):
+def test_list_returns_only_builtin_haru(client):
     response = client.get("/api/v1/avatar/mascots")
 
     assert response.status_code == 200
     mascots = response.json()["mascots"]
-    assert mascots[0]["mascot_id"] == "haru-live2d"
+    assert [m["mascot_id"] for m in mascots] == ["haru-live2d"]
+    assert mascots[0]["engine"] == "2d"
     assert mascots[0]["builtin"] is True
-    # 內建的 Frieren（qqman）與 VRM 3D（vrm-sample）已經拿掉。
-    assert not {"qqman", "vrm-sample"} & {mascot["mascot_id"] for mascot in mascots}
+    assert mascots[0]["model_url"].endswith(".model3.json")
 
 
-def test_upload_then_list(client):
-    response = _upload(client)
-
-    assert response.status_code == 200
-    assert response.json()["mascot"]["mascot_id"] == "custom"
-    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    assert mascots[-1]["vrm_url"] == "/static/mascots/custom/model.vrm"
-
-
-def test_upload_bad_extension(client):
-    response = client.post(
-        "/api/v1/avatar/mascots",
-        data={"mascot_id": "custom", "label": "x"},
-        files={"model": ("custom.glb", io.BytesIO(VRM_BYTES), "model/gltf-binary")},
-    )
-
-    assert response.status_code == 415
-
-
-def test_upload_bad_magic(client):
-    response = _upload(client, model=b"NOTVRM")
-
-    assert response.status_code == 415
-
-
-@pytest.mark.parametrize("mascot_id", [".", "..", ".hidden", "bad-", "_bad"])
-def test_upload_bad_mascot_id(client, mascot_id):
-    response = _upload(client, mascot_id=mascot_id)
-
-    assert response.status_code == 400
-
-
-def test_upload_duplicate_conflict(client):
-    assert _upload(client).status_code == 200
-
-    assert _upload(client).status_code == 409
-
-
-def test_upload_duplicate_builtin_conflict(client):
-    response = _upload(client, mascot_id="haru-live2d")
-
-    assert response.status_code == 409
-
-
-def test_update_label(client):
-    _upload(client)
-    response = client.patch("/api/v1/avatar/mascots/custom", json={"label": "新名稱"})
-
-    assert response.status_code == 200
-    assert response.json()["mascot"]["label"] == "新名稱"
-
-
-def test_delete(client):
-    _upload(client)
-
-    assert client.delete("/api/v1/avatar/mascots/custom").status_code == 200
-    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    assert [mascot["mascot_id"] for mascot in mascots] == ["haru-live2d"]
-
-
-def test_delete_builtin_404(client):
-    response = client.delete("/api/v1/avatar/mascots/haru-live2d")
-
-    assert response.status_code == 404
-
-
-class _FakeCharacterStore:
-    def __init__(self, characters):
-        self._characters = characters
-
-    def list_characters(self):
-        return list(self._characters)
-
-
-@pytest.fixture
-def character_store(monkeypatch):
-    store = _FakeCharacterStore(
-        [
-            {
-                "char_id": "000",
-                "label": "預設角色",
-                "has_video": True,
-                "has_data": True,
-            },
-            {
-                "char_id": "broken",
-                "label": "缺資料",
-                "has_video": True,
-                "has_data": False,
-            },
-        ]
-    )
-    monkeypatch.setattr(mascot_routes, "get_character_store", lambda: store)
-    return store
-
-
-def test_create_video_mascot_from_character(client, character_store):
+def test_list_ignores_other_registered_mascot_resources(client, runtime):
     from app.auth.models import ResourceType
-    from app.auth.runtime import get_auth_runtime
 
-    # 列表同時要求角色授權，測試先把角色資源登記為系統資源
-    get_auth_runtime().resources.upsert_system_resource(
-        resource_type=ResourceType.AVATAR_CHARACTER,
-        resource_id="000",
-        metadata={"label": "預設角色"},
-    )
-    response = client.post(
-        "/api/v1/avatar/mascots/from-character",
-        json={"mascot_id": "matex-000", "label": "", "character_id": "000"},
-    )
-
-    assert response.status_code == 200
-    mascot = response.json()["mascot"]
-    assert mascot["engine"] == "video"
-    assert mascot["character_id"] == "000"
-    # 未填 label 時沿用角色名稱
-    assert mascot["label"] == "預設角色"
-
-    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    assert mascots[-1]["mascot_id"] == "matex-000"
-
-
-def test_create_video_mascot_unknown_character(client, character_store):
-    response = client.post(
-        "/api/v1/avatar/mascots/from-character",
-        json={"mascot_id": "matex-x", "character_id": "nope"},
-    )
-
-    assert response.status_code == 404
-
-
-def test_create_video_mascot_incomplete_character(client, character_store):
-    response = client.post(
-        "/api/v1/avatar/mascots/from-character",
-        json={"mascot_id": "matex-broken", "character_id": "broken"},
-    )
-
-    assert response.status_code == 400
-
-
-def test_create_video_mascot_duplicate(client, character_store):
-    _upload(client)
-
-    response = client.post(
-        "/api/v1/avatar/mascots/from-character",
-        json={"mascot_id": "custom", "character_id": "000"},
-    )
-
-    assert response.status_code == 409
-
-
-def test_video_mascot_hidden_without_character_access(client, character_store):
-    from app.auth.models import ResourceType
-    from app.auth.runtime import get_auth_runtime
-
-    client.post(
-        "/api/v1/avatar/mascots/from-character",
-        json={"mascot_id": "matex-000", "character_id": "000"},
-    )
-    runtime = get_auth_runtime()
-    # 角色資源尚未登記時，即使小助理資源存在也不該列出
-    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    assert all(m["mascot_id"] != "matex-000" for m in mascots)
-
+    # 舊環境可能還留著上傳 VRM 或影片小助理的資源列；它們沒有檔案也沒有引擎，不能列出。
     runtime.resources.upsert_system_resource(
-        resource_type=ResourceType.AVATAR_CHARACTER,
-        resource_id="000",
-        metadata={"label": "預設角色"},
-    )
-    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    assert any(m["mascot_id"] == "matex-000" for m in mascots)
-
-
-def test_video_characters_are_listed_automatically(client, character_store):
-    from app.auth.models import ResourceType
-    from app.auth.runtime import get_auth_runtime
-
-    runtime = get_auth_runtime()
-    for cid in ("000", "broken"):
-        runtime.resources.upsert_system_resource(
-            resource_type=ResourceType.AVATAR_CHARACTER,
-            resource_id=cid,
-            metadata={"label": cid},
-        )
-
-    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    derived = [m for m in mascots if m["engine"] == "video"]
-
-    # 素材齊全的 000 自動出現，缺嘴型資料的 broken 不出現
-    assert [m["mascot_id"] for m in derived] == ["video-000"]
-    assert derived[0]["character_id"] == "000"
-    assert derived[0]["label"] == "預設角色"
-    assert derived[0]["builtin"] is True
-
-
-def test_explicit_video_mascot_suppresses_the_derived_entry(client, character_store):
-    from app.auth.models import ResourceType
-    from app.auth.runtime import get_auth_runtime
-
-    get_auth_runtime().resources.upsert_system_resource(
-        resource_type=ResourceType.AVATAR_CHARACTER,
-        resource_id="000",
-        metadata={"label": "預設角色"},
-    )
-    client.post(
-        "/api/v1/avatar/mascots/from-character",
-        json={"mascot_id": "matex-000", "character_id": "000"},
+        resource_type=ResourceType.AVATAR_MASCOT,
+        resource_id="custom-vrm",
+        metadata={"label": "Custom"},
     )
 
     mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
-    video_ids = [m["mascot_id"] for m in mascots if m["engine"] == "video"]
-    assert video_ids == ["matex-000"]
+
+    assert [m["mascot_id"] for m in mascots] == ["haru-live2d"]
+    assert {m["engine"] for m in mascots} == {"2d"}
 
 
-def _png(width: int = 4, height: int = 4) -> bytes:
-    from PIL import Image
-
-    buffer = io.BytesIO()
-    Image.new("RGB", (width, height)).save(buffer, format="PNG")
-    return buffer.getvalue()
-
-
-def test_upload_with_thumbnail_validates_it(client):
-    response = client.post(
-        "/api/v1/avatar/mascots",
-        data={"mascot_id": "thumbed", "label": "x"},
-        files={
-            "model": ("thumbed.vrm", io.BytesIO(VRM_BYTES), "model/gltf-binary"),
-            "thumbnail": ("t.png", io.BytesIO(b"NOTANIMAGE"), "image/png"),
-        },
-    )
-
-    assert response.status_code == 415
-    assert response.json()["detail"]
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("POST", "/api/v1/avatar/mascots/from-character"),
+        ("PATCH", "/api/v1/avatar/mascots/haru-live2d"),
+        ("DELETE", "/api/v1/avatar/mascots/haru-live2d"),
+        ("POST", "/api/v1/avatar/mascots/haru-live2d/thumbnail"),
+        ("GET", "/static/mascots/haru-live2d/thumbnail.png"),
+        ("GET", "/static/mascots/video-0713/thumbnail.png"),
+        ("GET", "/static/mascots/custom/model.vrm"),
+    ],
+)
+def test_mascot_mutation_and_file_routes_are_gone(client, method, path):
+    assert client.request(method, path).status_code == 404
 
 
-def test_thumbnail_endpoint_rejects_wrong_magic_and_oversize(client, monkeypatch):
-    assert _upload(client).status_code == 200
-    bad = client.post(
-        "/api/v1/avatar/mascots/custom/thumbnail",
-        files={"thumbnail": ("t.png", io.BytesIO(b"<svg/>"), "image/png")},
-    )
-    assert bad.status_code == 415
-
-    monkeypatch.setenv("AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES", "32")
-    from app.config import get_tts_config
-
-    get_tts_config.cache_clear()
-    big = client.post(
-        "/api/v1/avatar/mascots/custom/thumbnail",
-        files={"thumbnail": ("t.png", io.BytesIO(_png() + b"\0" * 64), "image/png")},
-    )
-    assert big.status_code == 413
-    assert "縮圖超過大小上限" in big.json()["detail"]
-
-
-def test_thumbnail_endpoint_accepts_a_real_png(client):
-    assert _upload(client).status_code == 200
-    response = client.post(
-        "/api/v1/avatar/mascots/custom/thumbnail",
-        files={"thumbnail": ("t.png", io.BytesIO(_png()), "image/png")},
-    )
-    assert response.status_code == 200
+def test_mascot_collection_no_longer_accepts_uploads(client):
+    # 集合路徑只剩 GET，上傳會被當成不支援的方法。
+    assert client.post("/api/v1/avatar/mascots").status_code == 405

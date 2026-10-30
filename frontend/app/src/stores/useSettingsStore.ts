@@ -16,10 +16,6 @@ import {
   writeProjectPref,
 } from "../utils/storageUtils"
 
-function normalizeAvatarRenderMode(value: string): '2d' | '3d' {
-  return value === '3d' ? '3d' : '2d'
-}
-
 function normalizeCameraPreviewScale(value: string): number {
   const scale = Number.parseFloat(value)
   if (!Number.isFinite(scale)) return 1
@@ -38,8 +34,6 @@ function loadState() {
     backgroundUrl: readPref(STORAGE_KEYS.BACKGROUND_URL, ""),
     backgroundFit: normalizeAvatarBackgroundFit(readPref(STORAGE_KEYS.BACKGROUND_FIT, "cover")),
     cameraPreviewScale: normalizeCameraPreviewScale(readPref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, "1")),
-    renderMode: normalizeAvatarRenderMode(readPref(STORAGE_KEYS.RENDER_MODE, "2d")),
-    vrmAvatarId: readPref(STORAGE_KEYS.VRM_AVATAR_ID, ""),
     replyMode: normalizeReplyMode(readPref(STORAGE_KEYS.REPLY_MODE, "fast")),
   }
 }
@@ -57,8 +51,6 @@ const PREF_KEYS: Record<keyof SettingsState, string> = {
   backgroundUrl: STORAGE_KEYS.BACKGROUND_URL,
   backgroundFit: STORAGE_KEYS.BACKGROUND_FIT,
   cameraPreviewScale: STORAGE_KEYS.CAMERA_PREVIEW_SCALE,
-  renderMode: STORAGE_KEYS.RENDER_MODE,
-  vrmAvatarId: STORAGE_KEYS.VRM_AVATAR_ID,
   replyMode: STORAGE_KEYS.REPLY_MODE,
 }
 
@@ -153,7 +145,7 @@ export function saveSettings(patch: Partial<SettingsState>): void {
     writePref(key, val)
     if (
       currentProjectId &&
-      (field === "characterId" || field === "backgroundId" || field === "vrmAvatarId")
+      (field === "characterId" || field === "backgroundId")
     ) {
       writeProjectPref(currentProjectId, key, val)
     }

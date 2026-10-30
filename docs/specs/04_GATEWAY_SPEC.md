@@ -62,7 +62,7 @@
 
 兩個知識庫上傳端點均要求登入及目標專案的編輯權限，未授權或不存在的專案回 404。Backend 以 internal token 和已驗證的帳號／專案 headers 呼叫 Brain；不信任 client 自帶的內部 headers。通用 Brain proxy 不接受這兩條上傳路徑及其子路徑／尾斜線變體，並拒絕含 `.`／`..` 路徑片段的請求，以免上游 URL 正規化繞過大小或授權檢查。
 
-每檔上限與 nginx 整批 request body 上限不同。目前共用 edge 設定 `frontend/admin/nginx/http.d/default.conf` 的 `/api/` location（包含 `/api/v1/knowledge/*`）body 上限為 `100m`，與外圈 host vhost 一致，只有 `POST /api/v1/avatar/jobs` 放寬到 `200m`；整批檔案加 multipart overhead 仍可能觸發 nginx 413。角色、背景與吉祥物沿用各自的 `AVATAR_MAX_UPLOAD_BYTES`、`AVATAR_BACKGROUND_MAX_UPLOAD_BYTES`、`AVATAR_MASCOT_MAX_UPLOAD_BYTES`，不使用本端點的文件上限。
+每檔上限與 nginx 整批 request body 上限不同。目前共用 edge 設定 `frontend/admin/nginx/http.d/default.conf` 的 `/api/` location（包含 `/api/v1/knowledge/*`）body 上限為 `100m`，與外圈 host vhost 一致，只有 `POST /api/v1/avatar/jobs` 放寬到 `200m`；整批檔案加 multipart overhead 仍可能觸發 nginx 413。角色與背景沿用各自的 `AVATAR_MAX_UPLOAD_BYTES`、`AVATAR_BACKGROUND_MAX_UPLOAD_BYTES`，不使用本端點的文件上限。
 
 Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-8786}` / `${HTTPS_PORT:-8787}` 入口；容器內診斷才使用 `http://127.0.0.1:8200`。
 

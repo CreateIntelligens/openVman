@@ -17,7 +17,6 @@ export const MEMORIES_PATH = "/memories";
 export const SESSIONS_PATH = "/sessions";
 export const AVATAR_PATH = "/avatar";
 export const AVATAR_BACKGROUNDS_PATH = "/backgrounds";
-export const AVATAR_MASCOTS_PATH = "/avatar/mascots";
 
 type HttpStatusHandler = () => void;
 

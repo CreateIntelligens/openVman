@@ -2,7 +2,7 @@
  * useAvatarBootstrap — load the catalogs this account may actually use.
  *
  * 從 App.vue 搬出來的，行為未改。這裡管的是「開場要抓哪些清單，抓回來之後
- * 該選哪一個」：專案、人設、語音、背景、VRM 角色。
+ * 該選哪一個」：專案、人設、語音、背景、人物。
  *
  * 每個 fetch 都成對出現「偏好值」與「退而求其次」兩條路：帳號的預設值可能
  * 已經被收回授權，那時要自動改選一個還能用的，並且留一則提示告訴使用者為
@@ -22,11 +22,6 @@ import { useAuth } from './useAuth'
 import { useAvatarCatalog } from './useAvatarCatalog'
 import { resolveTtsVoiceSelection } from '@shared/speech'
 import type { TtsProvider } from './useTtsStreamer'
-import {
-  toMascotOption,
-  type MascotApiRecord,
-  type MascotOption,
-} from '../data/mascotCatalog'
 import { bindSettingsToAccount, savedSettings } from '../stores/useSettingsStore'
 import { hasPref, readProjectPref, STORAGE_KEYS } from '../utils/storageUtils'
 import {
@@ -53,13 +48,11 @@ export interface ProjectResourceItem {
 export interface ProjectResourcesResponse {
   avatar_character?: ProjectResourceItem[]
   avatar_background?: ProjectResourceItem[]
-  avatar_mascot?: ProjectResourceItem[]
   custom_voice?: ProjectResourceItem[]
   asr_engine?: ProjectResourceItem[]
   defaults?: {
     avatar_character?: string | null
     avatar_background?: string | null
-    avatar_mascot?: string | null
     custom_voice?: string | null
     asr_engine?: string | null
   }
@@ -72,10 +65,6 @@ interface ProjectSummary {
   persona_count?: number
   /** 部署的預設專案（DEFAULT_PROJECT_ID）。 */
   is_default?: boolean
-}
-
-interface VrmMascotsResponse {
-  mascots?: MascotApiRecord[]
 }
 
 interface AvatarBootstrapOptions {
@@ -96,9 +85,6 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   const backgrounds = ref<AvatarBackgroundSummary[]>([]);
   const personasLoading = ref(false);
   const ttsProviders = ref<TtsProvider[]>([]);
-  // 初始為空：清單一律以後端回傳為準。用寫死的 catalog 當初始值會在
-  // fetchVrmAvatars() 回來前就去抓未授權的 VRM，換來一個 403。
-  const vrmAvatarOptions = ref<MascotOption[]>([])
   const avatarCatalog = useAvatarCatalog();
     const auth = useAuth();
   // 偏好是每個帳號各自一份。store 在登入前就初始化了，所以帳號一確定就要重新
@@ -156,15 +142,6 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       ?? DEFAULT_PERSONA.persona_id;
   }
 
-  function resolveVrmAvatarOption(
-    vrmId: string | null | undefined,
-    catalog: readonly MascotOption[],
-  ): MascotOption | null {
-    return catalog.find((mascot) => mascot.id === vrmId)
-      ?? catalog[0]
-      ?? null;
-  }
-
   const currentProjectResources = ref<ProjectResourcesResponse | null>(null);
 
   async function fetchProjectResources(projectId: string): Promise<ProjectResourcesResponse | null> {
@@ -214,66 +191,6 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     if (accDefault && isValid(accDefault)) return accDefault;
     // 4. 清單第一個
     return items[0]?.id ?? "";
-  }
-
-  async function fetchVrmAvatars(): Promise<void> {
-    const projectId = settings.projectId;
-    let items: MascotOption[];
-    try {
-      const res = projectId
-        ? await apiFetch(`/api/v1/avatar/mascots?project_id=${encodeURIComponent(projectId)}`)
-        : await apiFetch("/api/v1/avatar/mascots");
-      if (!res.ok) return;
-      const data = (await res.json()) as VrmMascotsResponse;
-      items = (data.mascots ?? [])
-        .map(toMascotOption)
-        .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
-    } catch {
-      // 清單沒拿到就不挑：拿空清單去挑，存的 VRM 會被當成失效換掉。
-      return;
-    }
-    vrmAvatarOptions.value = items;
-    const isValid = (id: string) => items.some((m) => m.id === id);
-
-    // 1. 本專案存的偏好，或同專案舊偏好
-    let preferred = "";
-    if (projectId) {
-      const projectPref = readProjectPref(projectId, STORAGE_KEYS.VRM_AVATAR_ID, "");
-      if (isValid(projectPref)) preferred = projectPref;
-    }
-    const saved = savedSettings();
-    const savedPid = saved.projectId ?? "";
-    const currentPid = projectId ?? "";
-    if (!preferred && savedPid === currentPid) {
-      preferred = preferSaved(
-        savedSettings().vrmAvatarId,
-        (id) => hasPref(STORAGE_KEYS.VRM_AVATAR_ID) && isValid(id),
-        "",
-      );
-    }
-    if (preferred) {
-      settings.vrmAvatarId = preferred;
-      return;
-    }
-
-    // 2. 專案預設
-    if (projectId) {
-      const projectDefault = currentProjectResources.value?.defaults?.avatar_mascot;
-      if (projectDefault && isValid(projectDefault)) {
-        settings.vrmAvatarId = projectDefault;
-        return;
-      }
-    }
-
-    // 3. 帳號預設
-    const accDefault = accountDefault("mascot_id", "");
-    if (accDefault && isValid(accDefault)) {
-      settings.vrmAvatarId = accDefault;
-      return;
-    }
-
-    // 4. 清單第一個
-    settings.vrmAvatarId = items[0]?.id ?? "";
   }
 
   function stageBackgroundFitStyle(fit: AvatarBackgroundFit): Record<string, string> {
@@ -346,7 +263,6 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       await Promise.allSettled([
         fetchPersonas(settings.projectId),
         fetchBackgrounds(),
-        fetchVrmAvatars(),
         avatarCatalog.load(settings.projectId),
         fetchTtsProviders(),
       ]);
@@ -365,7 +281,6 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     await Promise.allSettled([
       fetchPersonas(projectId, { syncSelected: true }),
       fetchBackgrounds(),
-      fetchVrmAvatars(),
       avatarCatalog.load(projectId),
       fetchTtsProviders(),
     ]);
@@ -527,14 +442,12 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     backgrounds,
     characters,
     selectionNotices,
-    vrmAvatarOptions,
     currentProjectResources,
     accountDefault,
     addSelectionNotice,
     fetchProjectResources,
     pickPreferredCharacterId,
     switchProject,
-    fetchVrmAvatars,
     fetchProjects,
     fetchInitialProjectData,
     fetchPersonas,
@@ -542,7 +455,6 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     fetchBackgrounds,
     preferSaved,
     stageBackgroundFitStyle,
-    resolveVrmAvatarOption,
     PREFERRED_CHARACTER_ID,
   }
 }

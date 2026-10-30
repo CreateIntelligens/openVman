@@ -15,19 +15,15 @@ import { build } from "esbuild";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(__dirname, "../../..");
 
-// 舞台只透過這兩個模組碰 WASM 與 iframe；換成假的才能在 node 裡跑真正的啟動流程。
+// 舞台只透過這個模組碰 WASM；換成假的才能在 node 裡跑真正的啟動流程。
 const fakeModules = {
   name: "fake-runtime",
   setup(builder) {
-    builder.onResolve({ filter: /\/useOpenVmanAvatarRuntime$|\/useStageAvatarBridge$/ }, (args) => ({
+    builder.onResolve({ filter: /\/useOpenVmanAvatarRuntime$/ }, (args) => ({
       path: args.path, namespace: "fake",
     }));
-    builder.onLoad({ filter: /.*/, namespace: "fake" }, (args) => ({
-      contents: args.path.endsWith("useOpenVmanAvatarRuntime")
-        ? "export const useOpenVmanAvatarRuntime = () => globalThis.__fakeWasm;"
-        : `export const useStageAvatarBridge = () => ({
-            frameRef: { value: null }, driveMouth() {}, stopMouth() {}, triggerGesture() {},
-          });`,
+    builder.onLoad({ filter: /.*/, namespace: "fake" }, () => ({
+      contents: "export const useOpenVmanAvatarRuntime = () => globalThis.__fakeWasm;",
       loader: "js",
     }));
   },
@@ -90,11 +86,13 @@ function createFakeWasm() {
     isLoading: { value: false },
     error: { value: null },
     currentCharId: { value: null },
+    currentProjectId: { value: null },
     loads: [],
     async initWasm() { wasm.isReady.value = true; },
-    async loadCharacter(charId) {
+    async loadCharacter(charId, _options, projectId) {
       wasm.loads.push(charId);
       wasm.currentCharId.value = charId;
+      wasm.currentProjectId.value = projectId;
     },
     clearAudio() {},
     resetSpeaking() {},
@@ -139,7 +137,6 @@ async function openApp(storage, { serverPrefs = {}, kiosk = false, runBootstrap 
     if (path.endsWith("/api/v1/tts/providers")) {
       return json([{ id: "indextts", name: "IndexTTS", default_voice: "hayley", voices: ["hayley"] }]);
     }
-    if (path.endsWith("/api/v1/avatar/mascots")) return json({ mascots: [] });
     if (path.endsWith("/api/v1/avatar")) {
       return json({
         characters: (CHARACTERS[pid] ?? ["c1"]).map((id) => ({
@@ -170,10 +167,9 @@ async function openApp(storage, { serverPrefs = {}, kiosk = false, runBootstrap 
   if (runBootstrap) {
     // 與 App.vue 的 onMounted 相同順序。
     await m.settingsReady();
-    const vrmReady = boot.fetchVrmAvatars();
     const projectReady = boot.fetchInitialProjectData();
     await Promise.allSettled([
-      vrmReady, boot.fetchBackgrounds(), projectReady, stage.bootstrapRenderer(vrmReady, projectReady),
+      boot.fetchBackgrounds(), projectReady, stage.bootstrapRenderer(projectReady),
     ]);
   }
   return { m, settings, boot, stage, puts, applyAdminHandoff, wasm: globalThis.__fakeWasm };
@@ -183,8 +179,23 @@ function writeHandoff(storage, payload) {
   storage.set(HANDOFF_KEY, JSON.stringify({ v: 1, accountId: ACCOUNT, createdAt: Date.now(), ...payload }));
 }
 
-// 伺服器存的偏好：專案 A、人物 c1、3D 舞台——就是以前蓋掉後台寫入值的那一份。
+// 伺服器存的偏好：專案 A、人物 c1——就是以前蓋掉後台寫入值的那一份。renderMode 是
+// 已移除的 3D 舞台留下的舊值，前台要照常忽略它。
 const SERVER_PREFS = { projectId: "proj-A", characterId: "c1", renderMode: "3d" };
+
+test("a legacy 3D render mode, stored or on the server, still opens the 2D stage", async () => {
+  const storage = new Map([
+    [key("avatar.render_mode"), "3d"],
+    [key("avatar.vrm_avatar_id"), "myvrm"],
+  ]);
+  const app = await openApp(storage, { serverPrefs: SERVER_PREFS });
+
+  assert.equal(app.stage.rendererBootstrapState.value, "ready");
+  assert.equal(app.wasm.loads.at(-1), "c1");
+  assert.equal("renderMode" in app.settings, false);
+  assert.equal("vrmAvatarId" in app.settings, false);
+  assert.deepEqual(app.boot.selectionNotices.value, []);
+});
 
 test("試用 switches to the character's owner project and character and saves them", async () => {
   const storage = new Map();
@@ -198,12 +209,10 @@ test("試用 switches to the character's owner project and character and saves t
   assert.equal(storage.has(HANDOFF_KEY), false);
   assert.equal(app.settings.projectId, "proj-B");
   assert.equal(app.settings.characterId, "cB");
-  assert.equal(app.settings.renderMode, "2d");
   assert.equal(app.wasm.loads.at(-1), "cB");
   assert.equal(storage.get(key("avatar.project_id")), "proj-B");
   assert.equal(storage.get(key("avatar.character_id")), "cB");
   assert.equal(storage.get(key("avatar.character_id::proj::proj-B")), "cB");
-  assert.equal(storage.get(key("avatar.render_mode")), "2d");
   // 也送回伺服器，換台電腦或重新整理不會又被舊偏好蓋回去。
   assert.ok(app.puts.some((values) => values.characterId === "cB"));
   assert.ok(app.puts.some((values) => values.projectId === "proj-B"));
@@ -211,7 +220,7 @@ test("試用 switches to the character's owner project and character and saves t
 
   // 再開一次前台：指令已經用掉，留下的是存好的選擇。
   const again = await openApp(storage, {
-    serverPrefs: { projectId: "proj-B", characterId: "cB", renderMode: "2d" },
+    serverPrefs: { projectId: "proj-B", characterId: "cB" },
   });
   await again.applyAdminHandoff();
   assert.equal(again.settings.projectId, "proj-B");
@@ -233,7 +242,6 @@ for (const [name, payload, options] of [
     assert.equal(storage.has(HANDOFF_KEY), false);
     assert.equal(app.settings.projectId, "proj-A");
     assert.equal(app.settings.characterId, "c1");
-    assert.equal(app.settings.renderMode, "3d");
     assert.notEqual(app.settings.backgroundId, "uploaded:bg-B");
     assert.equal(storage.get(key("avatar.character_id")), "c1");
     assert.deepEqual(app.puts, []);
@@ -283,8 +291,6 @@ test("a background is applied with the URL from the server list, not the handoff
   assert.equal(app.settings.backgroundUrl, bgUrl("bg-B"));
   assert.equal(storage.get(key("avatar.background_url")), bgUrl("bg-B"));
   assert.equal(storage.get(key("avatar.background_id::proj::proj-B")), "uploaded:bg-B");
-  // 沒指定人物就不動舞台模式。
-  assert.equal(app.settings.renderMode, "3d");
 });
 
 test("a background outside the list is ignored with a notice", async () => {
@@ -312,5 +318,5 @@ test("a stage still loading (about to reload the page) leaves the handoff for af
 test("App.vue applies the handoff once the initial bootstrap has settled", () => {
   const app = readFileSync(resolve(appRoot, "src/App.vue"), "utf8");
   assert.match(app, /useAdminHandoff\(\{[^}]*handleProjectChange[^}]*\}\)/);
-  assert.match(app, /stage\.bootstrapRenderer\(vrmReady, projectReady\),\s*\]\)\.then\(applyAdminHandoff\)/);
+  assert.match(app, /stage\.bootstrapRenderer\(projectReady\),\s*\]\)\.then\(applyAdminHandoff\)/);
 });

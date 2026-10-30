@@ -66,14 +66,13 @@ for (const streaming of [true, false]) {
     assert.ok(start >= 0 && end > start);
     const install = new Function(
       'watch', 'chat', 'activeAsr', 'streamAsr', 'avatarSpeaking', 'avatarResponding',
-      'asrStarting',
-      'triggerStageAvatarGesture', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
+      'asrStarting', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
       `let resumeAsrAfterReply = false; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000; const INTERRUPT_WHILE_SPEAKING = false;\n${voice.slice(start, end)}`,
     );
     const scope = effectScope();
     try {
       scope.run(() => install(watch, chat, { value: active }, streaming ? active : {},
-        avatarSpeaking, avatarResponding, ref(false), () => {}, () => calls.push('clear'), ms => calls.push(ms)));
+        avatarSpeaking, avatarResponding, ref(false), () => calls.push('clear'), ms => calls.push(ms)));
       // 在想：不出聲，麥克風照開（可以補一句），只是不倒數。
       chat.state.value = 'THINKING'; await nextTick();
       assert.deepEqual(calls, ['clear']);
@@ -101,14 +100,13 @@ test("a reply that never speaks starts the idle countdown on the open microphone
   const end = voice.indexOf('onUnmounted(() => {', start);
   const install = new Function(
     'watch', 'chat', 'activeAsr', 'streamAsr', 'avatarSpeaking', 'avatarResponding',
-    'asrStarting',
-    'triggerStageAvatarGesture', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
+    'asrStarting', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
     `let resumeAsrAfterReply = false; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000; const INTERRUPT_WHILE_SPEAKING = false;\n${voice.slice(start, end)}`,
   );
   const scope = effectScope();
   try {
     scope.run(() => install(watch, chat, { value: active }, {}, avatarSpeaking, avatarResponding, ref(false),
-      () => {}, () => calls.push('clear'), ms => calls.push(ms)));
+      () => calls.push('clear'), ms => calls.push(ms)));
     chat.state.value = 'THINKING'; await nextTick();
     // 出錯：沒出聲就結束，麥克風還開著，不能一直開下去。
     chat.state.value = 'ERROR'; await nextTick();

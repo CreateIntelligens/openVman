@@ -185,10 +185,6 @@ class TTSRouterConfig(BaseSettings):
         default="/data/backgrounds",
         validation_alias="AVATAR_BACKGROUNDS_DIR",
     )
-    avatar_mascots_dir: str = Field(
-        default="/data/mascots",
-        validation_alias="AVATAR_MASCOTS_DIR",
-    )
     avatar_max_upload_bytes: int = Field(
         default=100 * 1024 * 1024,
         validation_alias="AVATAR_MAX_UPLOAD_BYTES",
@@ -196,10 +192,6 @@ class TTSRouterConfig(BaseSettings):
     avatar_background_max_upload_bytes: int = Field(
         default=25 * 1024 * 1024,
         validation_alias="AVATAR_BACKGROUND_MAX_UPLOAD_BYTES",
-    )
-    avatar_mascot_max_upload_bytes: int = Field(
-        default=100 * 1024 * 1024,
-        validation_alias="AVATAR_MASCOT_MAX_UPLOAD_BYTES",
     )
     # 影片轉素材包的工作目錄；backend 與 avatar-pipeline 容器掛同一個 /data，
     # 路徑才能直接交給 worker。
@@ -219,10 +211,6 @@ class TTSRouterConfig(BaseSettings):
         default=60,
         gt=0,
         validation_alias="AVATAR_SOURCE_MAX_DURATION_SECONDS",
-    )
-    avatar_mascot_thumbnail_max_upload_bytes: int = Field(
-        default=10 * 1024 * 1024,
-        validation_alias="AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES",
     )
     # 所有圖片上傳（背景、縮圖、視覺影格、/api/v1/uploads）共用的最長邊上限。
     upload_image_max_side_px: int = Field(

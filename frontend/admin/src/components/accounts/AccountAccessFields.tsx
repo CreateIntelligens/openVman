@@ -50,12 +50,11 @@ const GROUPS: Array<{
     description: "選擇可查詢的知識庫，並指定登入後預設專案。",
   },
   {
-    // 前台的人物選單就是 2D 人物 + VRM 併成一張清單（SettingsModal 的
-    // characterOptions），後台跟著併，不要讓管理者面對兩個分類。
+    // 小助理（內建 Live2D Haru）的授權跟人物放同一張清單，不另開分類。
     grantType: "avatar_characters",
     extraGrantType: "avatar_mascots",
     title: "虛擬人物",
-    description: "選擇可使用的人物與 VRM，並指定登入後預設值。",
+    description: "選擇可使用的人物與小助理，並指定登入後預設值。",
   },
   {
     grantType: "custom_voices",
@@ -123,7 +122,7 @@ export function accessFromOptions(
     "",
     true,
   );
-  // 背景預設給深色（前台的 fallback 也是它），VRM 才是完全選填。
+  // 背景預設給深色（前台的 fallback 也是它），小助理才是完全選填。
   const backgrounds = initialSelection(
     current?.grants.avatar_backgrounds,
     options.avatar_backgrounds ?? [],
@@ -323,8 +322,8 @@ export function useAccountAccessForm(
     }
   }
 
-  // 舞台人物可以是 openVman 2D 角色或 VRM，兩者擇一即可（與後端
-  // _normalize_account_access 的規則一致）。VRM 與背景本身都是選填，
+  // 人物與小助理至少擇一（與後端 _normalize_account_access 的規則一致）。
+  // 小助理與背景本身都是選填，
   // 但一旦選了就必須指定預設值，否則後端會擋下整批。
   const hasStageAvatar = (
     access.grants.avatar_characters.length > 0
@@ -454,7 +453,7 @@ export default function AccountAccessFields({
 /** 併入同一張清單時，用後綴標示這筆屬於哪個分類（與前台選單一致）。*/
 const GRANT_SUFFIX: Partial<Record<GrantType, string>> = {
   avatar_characters: "openVman 2D",
-  avatar_mascots: "VRM",
+  avatar_mascots: "小助理",
 };
 
 interface MergedOption extends AccountAccessOption {

@@ -738,7 +738,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mascots-dir",
         type=Path,
-        default=Path(config.avatar_mascots_dir),
+        # 小助理已不再有檔案目錄；這支一次性遷移仍可指定舊資料夾。
+        default=Path("/data/mascots"),
     )
     parser.add_argument(
         "--indextts-speaker-json",

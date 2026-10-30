@@ -4,8 +4,6 @@ import {
   BACKGROUND_IMAGE,
   BUNDLE_DATA,
   BUNDLE_VIDEO,
-  MASCOT_MODEL,
-  MASCOT_THUMBNAIL,
   SOURCE_KINDS,
   acceptList,
   checkBundleTotal,
@@ -26,8 +24,6 @@ describe("upload rules", () => {
     expect(acceptList([BUNDLE_VIDEO])).toBe(".webm");
     expect(acceptList([BUNDLE_DATA])).toBe(".gz");
     expect(acceptList([BACKGROUND_IMAGE])).toBe(".png,.jpg,.jpeg,.webp");
-    expect(acceptList([MASCOT_MODEL])).toBe(".vrm");
-    expect(acceptList([MASCOT_THUMBNAIL])).toBe(".png,.jpg,.jpeg,.webp");
   });
 
   it("applies the video or image limit by file type", () => {
@@ -45,18 +41,17 @@ describe("upload rules", () => {
     expect(checkFile(fileOf("face.gif", 1, "image/gif"), SOURCE_KINDS)).toBe(
       "「face.gif」不是支援的格式，請改選 MP4、MOV、WebM、PNG、JPG 或 WebP 檔。",
     );
-    // .vrm 常沒有 MIME；照副檔名收。
-    expect(checkFile(fileOf("model.vrm", 1), [MASCOT_MODEL])).toBeNull();
-    expect(checkFile(fileOf("model.glb", 1), [MASCOT_MODEL])).toBe(
-      "「model.glb」不是支援的格式，請改選 VRM 檔。",
+    // .gz 常沒有 MIME；照副檔名收。
+    expect(checkFile(fileOf("combined_data.json.gz", 1), [BUNDLE_DATA])).toBeNull();
+    expect(checkFile(fileOf("combined_data.json", 1), [BUNDLE_DATA])).toBe(
+      "「combined_data.json」不是支援的格式，請改選 GZ 檔。",
     );
   });
 
   it("enforces the per-field size limits", () => {
     expect(checkFile(fileOf("bg.jpg", 26 * MB), [BACKGROUND_IMAGE])).not.toBeNull();
-    expect(checkFile(fileOf("model.vrm", 101 * MB), [MASCOT_MODEL])).not.toBeNull();
-    expect(checkFile(fileOf("thumb.png", 11 * MB), [MASCOT_THUMBNAIL])).toBe(
-      "「thumb.png」有 11.0 MB，縮圖上限是 10 MB。",
+    expect(checkFile(fileOf("d.gz", 101 * MB), [BUNDLE_DATA])).toBe(
+      "「d.gz」有 101.0 MB，資料檔上限是 100 MB。",
     );
   });
 

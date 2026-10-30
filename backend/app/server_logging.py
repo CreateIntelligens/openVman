@@ -30,8 +30,8 @@ _UVICORN_LOG_CONFIG = {
 }
 
 
-# 角色影片、VRM、背景圖由瀏覽器分段抓取，一次播放就是幾十行 200/206
-_ACCESS_LOG_SILENT_PREFIXES = ("/static/characters/", "/static/mascots/", "/static/backgrounds/")
+# 角色影片、背景圖由瀏覽器分段抓取，一次播放就是幾十行 200/206
+_ACCESS_LOG_SILENT_PREFIXES = ("/static/characters/", "/static/backgrounds/")
 _ACCESS_LOG_SILENT_PATHS = frozenset({
     "/api/v1/health",
     "/api/v1/health/detailed",

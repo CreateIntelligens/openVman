@@ -1,49 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { writeAdminHandoff } from "@shared/avatar/adminHandoff";
 import {
   AvatarBackground,
   AvatarCharacter,
-  AvatarMascot,
   deleteAvatarBackground,
   deleteAvatarCharacter,
-  deleteAvatarMascot,
   fetchAvatarBackgrounds,
   fetchAvatarCharacters,
-  fetchAvatarMascots,
   updateAvatarBackgroundLabel,
   updateAvatarCharacterLabel,
-  updateAvatarMascotLabel,
   uploadAvatarBackground,
   uploadAvatarCharacter,
-  uploadAvatarMascot,
 } from "../api";
 import { isAtLeastAdmin } from "../api/auth";
 import { fetchProjects, type ProjectSummary } from "../api/projects";
 import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
 import { useAuth } from "../context/AuthContext";
-import { useMascot } from "../context/MascotContext";
 import { useProject } from "../context/ProjectContext";
-import {
-  DEFAULT_MASCOT_ID,
-  buildMascotWidgetSrc,
-  toMascotOption,
-} from "../data/mascotCatalog";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 import { PageHeader, PageTabs } from "../components/app/PageHeader";
 import BackgroundsPanel from "../components/avatar/BackgroundsPanel";
 import CharacterJobsPanel from "../components/avatar/CharacterJobsPanel";
 import CharactersPanel from "../components/avatar/CharactersPanel";
-import MascotsPanel from "../components/avatar/MascotsPanel";
-import { useMascotSnapshotQueue } from "../hooks/useMascotSnapshotQueue";
 import { publicAdminPath } from "../components/app/navigation";
 import {
   BACKGROUND_IMAGE,
   BUNDLE_DATA,
   BUNDLE_VIDEO,
-  MASCOT_MODEL,
-  MASCOT_THUMBNAIL,
   checkBundleTotal,
   checkFile,
 } from "../components/avatar/uploadRules";
@@ -51,26 +35,13 @@ import {
 type Status = { type: "success" | "error"; message: string } | null;
 type RenameTarget =
   | { kind: "character"; character: AvatarCharacter }
-  | { kind: "background"; background: AvatarBackground }
-  | { kind: "mascot"; mascot: AvatarMascot };
-const ASSET_TABS = ["characters", "backgrounds", "mascots"] as const;
+  | { kind: "background"; background: AvatarBackground };
+const ASSET_TABS = ["characters", "backgrounds"] as const;
 const ASSET_TAB_LABELS: Record<(typeof ASSET_TABS)[number], string> = {
   characters: "人物",
   backgrounds: "背景",
-  mascots: "小助理",
 };
 type AssetTab = (typeof ASSET_TABS)[number];
-// 一般帳號不截縮圖：上傳縮圖要管理員權限，送出去只會換來 403。
-const NO_SNAPSHOT_MASCOTS: AvatarMascot[] = [];
-const hiddenSnapshotFrameStyle: CSSProperties = {
-  position: "absolute",
-  left: "-62.5rem",
-  top: "-62.5rem",
-  width: "25rem",
-  height: "31.25rem",
-  pointerEvents: "none",
-};
-
 
 function firstProblem(...problems: Array<string | null>): string | null {
   return problems.find((problem) => problem !== null) ?? null;
@@ -78,12 +49,6 @@ function firstProblem(...problems: Array<string | null>): string | null {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function snapshotWidgetSrc(mascots: AvatarMascot[], mascotId: string | null): string | null {
-  if (!mascotId) return null;
-  const mascot = mascots.find((item) => item.mascot_id === mascotId);
-  return mascot ? buildMascotWidgetSrc(toMascotOption(mascot)) : null;
 }
 
 function renameTargetLabel(target: RenameTarget | null): string {
@@ -94,8 +59,6 @@ function renameTargetLabel(target: RenameTarget | null): string {
       return target.character.label;
     case "background":
       return target.background.label;
-    case "mascot":
-      return target.mascot.label;
   }
 }
 
@@ -106,7 +69,6 @@ export default function Avatar() {
   const { projectId } = useProject();
   // 一般帳號只看得到所屬專案的素材，不帶專案時後端回空清單；管理員要管所有專案，不帶。
   const listProjectId = canManage ? undefined : projectId;
-  const { selectedMascotId, setMascotOptions, setSelectedMascotId } = useMascot();
   const [activeTab, setActiveTab] = useAdminSubView<AssetTab>(
     "Avatar",
     "characters",
@@ -114,12 +76,10 @@ export default function Avatar() {
   );
   const [characters, setCharacters] = useState<AvatarCharacter[]>([]);
   const [backgrounds, setBackgrounds] = useState<AvatarBackground[]>([]);
-  const [mascots, setMascots] = useState<AvatarMascot[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [backgroundsLoading, setBackgroundsLoading] = useState(false);
-  const [mascotsLoading, setMascotsLoading] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   // 一般帳號切換專案時，前一個專案的清單可能比新專案晚回來；回應只在
   // 仍是目前專案時套用，「載入中」也記是哪個專案，才不會擋掉新專案的載入。
@@ -127,8 +87,6 @@ export default function Avatar() {
   currentListProject.current = listProjectId;
   const backgroundsLoaded = useRef(false);
   const backgroundsLoadingFor = useRef<string | undefined | null>(null);
-  const mascotsLoaded = useRef(false);
-  const mascotsLoadingFor = useRef<string | undefined | null>(null);
 
   const [uploadCharId, setUploadCharId] = useState("");
   const [uploadLabel, setUploadLabel] = useState("");
@@ -141,32 +99,12 @@ export default function Avatar() {
   const [uploadBgProjectId, setUploadBgProjectId] = useState("");
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const [uploadImageFile, setUploadImageFile] = useState<File | null>(null);
-  const [uploadMascotId, setUploadMascotId] = useState("");
-  const [uploadMascotLabel, setUploadMascotLabel] = useState("");
-  const [uploadMascotProjectId, setUploadMascotProjectId] = useState("");
-  const [mascotUploading, setMascotUploading] = useState(false);
-  const [uploadModelFile, setUploadModelFile] = useState<File | null>(null);
-  const [uploadThumbnailFile, setUploadThumbnailFile] = useState<File | null>(null);
-
-  const handleSnapshotUploaded = useCallback(() => {
-    void loadMascots();
-  }, []);
-  const currentSnapshotId = useMascotSnapshotQueue({
-    mascots: canManage ? mascots : NO_SNAPSHOT_MASCOTS,
-    loading: mascotsLoading,
-    onUploaded: handleSnapshotUploaded,
-  });
 
   useEffect(() => {
     void fetchProjects()
       .then((res) => setProjects(res.projects ?? []))
       .catch(() => {});
   }, []);
-
-  function syncMascots(nextMascots: AvatarMascot[]): void {
-    setMascots(nextMascots);
-    setMascotOptions(nextMascots.map(toMascotOption));
-  }
 
   function resetUploadForm(): void {
     setUploadCharId("");
@@ -181,14 +119,6 @@ export default function Avatar() {
     setUploadBackgroundLabel("");
     setUploadBgProjectId("");
     setUploadImageFile(null);
-  }
-
-  function resetMascotUploadForm(): void {
-    setUploadMascotId("");
-    setUploadMascotLabel("");
-    setUploadMascotProjectId("");
-    setUploadModelFile(null);
-    setUploadThumbnailFile(null);
   }
 
   async function load(): Promise<void> {
@@ -229,32 +159,9 @@ export default function Avatar() {
     }
   }
 
-  async function loadMascots(): Promise<void> {
-    const project = listProjectId;
-    if (mascotsLoadingFor.current === project) return;
-    mascotsLoadingFor.current = project;
-    setMascotsLoading(true);
-    setStatus(null);
-    try {
-      const res = await fetchAvatarMascots(project);
-      if (currentListProject.current !== project) return;
-      syncMascots(res.mascots);
-      mascotsLoaded.current = true;
-    } catch (err) {
-      if (currentListProject.current !== project) return;
-      setStatus({ type: "error", message: errorMessage(err) });
-    } finally {
-      if (mascotsLoadingFor.current === project) {
-        mascotsLoadingFor.current = null;
-        setMascotsLoading(false);
-      }
-    }
-  }
-
   useEffect(() => {
-    // 一般帳號換專案時清單跟著換；背景與小助理切到該分頁時重新載入。
+    // 一般帳號換專案時清單跟著換；背景切到該分頁時重新載入。
     backgroundsLoaded.current = false;
-    mascotsLoaded.current = false;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listProjectId]);
@@ -262,9 +169,6 @@ export default function Avatar() {
   useEffect(() => {
     if (activeTab === "backgrounds" && !backgroundsLoaded.current) {
       void loadBackgrounds();
-    }
-    if (activeTab === "mascots" && !mascotsLoaded.current) {
-      void loadMascots();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, listProjectId]);
@@ -360,67 +264,12 @@ export default function Avatar() {
     }
   }
 
-  async function handleMascotUpload(): Promise<void> {
-    const mascotId = uploadMascotId.trim();
-    const label = uploadMascotLabel.trim();
-    const model = uploadModelFile;
-    const thumbnail = uploadThumbnailFile ?? undefined;
-    if (!mascotId || !label || !model) {
-      setStatus({
-        type: "error",
-        message: "請填寫所有欄位，並選好 VRM 模型",
-      });
-      return;
-    }
-    const mascotProblem = firstProblem(
-      checkFile(model, [MASCOT_MODEL]),
-      thumbnail ? checkFile(thumbnail, [MASCOT_THUMBNAIL]) : null,
-    );
-    if (mascotProblem) {
-      setStatus({ type: "error", message: mascotProblem });
-      return;
-    }
-    setMascotUploading(true);
-    setStatus(null);
-    try {
-      await uploadAvatarMascot({
-        mascotId,
-        label,
-        model,
-        thumbnail,
-        projectId: uploadMascotProjectId || undefined,
-      });
-      resetMascotUploadForm();
-      setStatus({ type: "success", message: "小助理上傳完成" });
-      await loadMascots();
-    } catch (err) {
-      setStatus({ type: "error", message: errorMessage(err) });
-    } finally {
-      setMascotUploading(false);
-    }
-  }
-
   async function handleBackgroundDelete(backgroundId: string): Promise<void> {
     setStatus(null);
     try {
       await deleteAvatarBackground(backgroundId);
       setBackgrounds((prev) => prev.filter((bg) => bg.background_id !== backgroundId));
       setStatus({ type: "success", message: `已刪除 ${backgroundId}` });
-    } catch (err) {
-      setStatus({ type: "error", message: errorMessage(err) });
-    }
-  }
-
-  async function handleMascotDelete(mascotId: string): Promise<void> {
-    setStatus(null);
-    try {
-      await deleteAvatarMascot(mascotId);
-      const nextMascots = mascots.filter((mascot) => mascot.mascot_id !== mascotId);
-      syncMascots(nextMascots);
-      if (selectedMascotId === mascotId) {
-        setSelectedMascotId(DEFAULT_MASCOT_ID);
-      }
-      setStatus({ type: "success", message: `已刪除 ${mascotId}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
@@ -470,21 +319,6 @@ export default function Avatar() {
         }
         return;
       }
-      case "mascot": {
-        if (!newLabel || newLabel === target.mascot.label) return;
-        setStatus(null);
-        try {
-          const res = await updateAvatarMascotLabel(target.mascot.mascot_id, newLabel);
-          syncMascots(
-            mascots.map((mascot) =>
-              mascot.mascot_id === target.mascot.mascot_id ? res.mascot : mascot,
-            ),
-          );
-          setStatus({ type: "success", message: `已改名為 ${newLabel}` });
-        } catch (err) {
-          setStatus({ type: "error", message: errorMessage(err) });
-        }
-      }
     }
   }
 
@@ -518,13 +352,6 @@ export default function Avatar() {
       background.owner_project_id,
     );
   }
-
-  // 只換後台自己右下角的小助理；前台不讀這個設定，開前台沒有意義。
-  function handleUseMascot(mascot: AvatarMascot): void {
-    setSelectedMascotId(mascot.mascot_id);
-  }
-
-  const currentSnapshotSrc = snapshotWidgetSrc(mascots, currentSnapshotId);
 
   return (
     <div
@@ -602,31 +429,6 @@ export default function Avatar() {
         />
       )}
 
-      {activeTab === "mascots" && (
-        <MascotsPanel
-          canManage={canManage}
-          mascots={mascots}
-          selectedMascotId={selectedMascotId}
-          loading={mascotsLoading}
-          uploading={mascotUploading}
-          uploadId={uploadMascotId}
-          uploadLabel={uploadMascotLabel}
-          modelFile={uploadModelFile}
-          thumbnailFile={uploadThumbnailFile}
-          projects={projects}
-          selectedProjectId={uploadMascotProjectId}
-          onProjectIdChange={setUploadMascotProjectId}
-          onUploadIdChange={setUploadMascotId}
-          onUploadLabelChange={setUploadMascotLabel}
-          onModelChange={setUploadModelFile}
-          onThumbnailChange={setUploadThumbnailFile}
-          onUpload={handleMascotUpload}
-          onUse={handleUseMascot}
-          onRename={(mascot) => setRenameTarget({ kind: "mascot", mascot })}
-          onDelete={handleMascotDelete}
-        />
-      )}
-
       <PromptModal
         open={renameTarget !== null}
         title="修改顯示名稱"
@@ -642,14 +444,6 @@ export default function Avatar() {
         onSubmit={handleRenameSubmit}
         onCancel={() => setRenameTarget(null)}
       />
-      {currentSnapshotSrc && (
-        <iframe
-          key={currentSnapshotId}
-          src={currentSnapshotSrc}
-          title="小助理縮圖擷取"
-          style={hiddenSnapshotFrameStyle}
-        />
-      )}
       </div>
     </div>
   );

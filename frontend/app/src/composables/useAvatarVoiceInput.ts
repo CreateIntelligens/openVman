@@ -7,7 +7,6 @@ import { useVadAsr } from "./useVadAsr";
 import { useStreamAsr } from "./useStreamAsr";
 import type { useAsrPreferences } from "./useAsrPreferences";
 import type { useAvatarConversation } from "./useAvatarConversation";
-import type { useAvatarStage } from "./useAvatarStage";
 import type { useLanguageRoutes } from "./useLanguageRoutes";
 import type { useTurnTiming } from "./useTurnTiming";
 import type { Ref } from "vue";
@@ -16,15 +15,13 @@ import type StatusToast from "../components/StatusToast.vue";
 interface VoiceInputOptions {
   conversation: ReturnType<typeof useAvatarConversation>;
   preferences: ReturnType<typeof useAsrPreferences>;
-  stage: ReturnType<typeof useAvatarStage>;
   languageRoutes: ReturnType<typeof useLanguageRoutes>;
   turnTiming: ReturnType<typeof useTurnTiming>;
   statusToastRef: Ref<InstanceType<typeof StatusToast> | null>;
 }
-export function useAvatarVoiceInput({ conversation, preferences, stage, languageRoutes, turnTiming, statusToastRef }: VoiceInputOptions) {
+export function useAvatarVoiceInput({ conversation, preferences, languageRoutes, turnTiming, statusToastRef }: VoiceInputOptions) {
   const { chat, avatarSpeaking, avatarResponding, handleSend } = conversation;
   const { myAsrProvider } = preferences;
-  const { triggerStageAvatarGesture } = stage;
   const asrError = ref("");
   // 這幾種錯誤代表這台裝置的瀏覽器辨識用不了，換引擎才有意義；
   // no-speech 之類是這一次沒講話，重試即可，不該換掉引擎。
@@ -295,12 +292,8 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
     void active.start();
   }
   watch(() => chat.state.value, (newState) => {
-    if (newState === 'THINKING') {
-      triggerStageAvatarGesture("thinking-hand");
-      // 等回答期間不倒數；回答完再重新計時。
-      clearAsrIdleTimer();
-    }
-    if (newState === 'SPEAKING') triggerStageAvatarGesture("explain-open-hand");
+    // 等回答期間不倒數；回答完再重新計時。
+    if (newState === 'THINKING') clearAsrIdleTimer();
   });
 
   watch(() => avatarSpeaking.value && (

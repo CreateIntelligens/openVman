@@ -9,9 +9,7 @@ import {
   buildTtsProviderOptions,
   buildTtsVoiceOptions,
   parseOpenVmanCharacterValue,
-  parseVrmCharacterValue,
   toOpenVmanCharacterValue,
-  toVrmCharacterValue,
 } from '../../utils/settingsOptions'
 import { LANGUAGE_ROUTE_LABELS } from "../../composables/useLanguageRoutes";
 import type { AvatarState } from "../../composables/useAvatarChat";
@@ -30,8 +28,6 @@ interface Character {
   name: string
   in_project_scope?: boolean
 }
-
-type AvatarRenderMode = '2d' | '3d'
 
 export interface PersonaSummary {
   persona_id: string
@@ -52,21 +48,13 @@ export interface AvatarBackgroundSummary {
   in_project_scope?: boolean
 }
 
-export interface VrmCharacterSummary {
-  id: string
-  label: string
-  in_project_scope?: boolean
-}
-
 const props = defineProps<{
   /** 展示機台狀態：off 可開啟、device 這台開著可關、account 帳號固定。 */
   kioskSource?: 'off' | 'device' | 'account'
 
   open: boolean
   characters: Character[]
-  vrmCharacters: VrmCharacterSummary[]
   currentCharId: string | null
-  currentVrmId: string
   ttsProvider: string
   ttsVoice: string
   ttsProviders: TtsProvider[]
@@ -80,7 +68,6 @@ const props = defineProps<{
   personasLoading?: boolean
   voiceMode?: 'live' | 'text'
   replyMode: ReplyMode
-  renderMode: '2d' | '3d'
   backgroundId: AvatarBackgroundId
   backgroundUrl: string
   backgroundFit: AvatarBackgroundFit
@@ -104,8 +91,6 @@ const emit = defineEmits<{
   personaChange: [personaId: string]
   voiceModeChange: [mode: 'live' | 'text']
   replyModeChange: [mode: ReplyMode]
-  renderModeChange: [mode: '2d' | '3d']
-  vrmCharacterChange: [vrmId: string]
   backgroundChange: [
     backgroundId: AvatarBackgroundId,
     backgroundUrl: string,
@@ -137,13 +122,11 @@ type DraftFields = {
   projectId: string
   personaId: string
   charId: string
-  vrmId: string
   ttsProvider: string
   ttsVoice: string
   asrProvider: string
   voiceMode: 'live' | 'text'
   replyMode: ReplyMode
-  renderMode: AvatarRenderMode
   backgroundId: AvatarBackgroundId
   backgroundUrl: string
   backgroundFit: AvatarBackgroundFit
@@ -173,13 +156,11 @@ function forget(...keys: (keyof DraftFields)[]): void {
 
 const draftProjectId = draftField('projectId', () => props.currentProjectId)
 const draftCharId = draftField('charId', () => props.currentCharId ?? '')
-const draftVrmId = draftField('vrmId', () => props.currentVrmId)
 const draftTtsProvider = draftField('ttsProvider', () => props.ttsProvider)
 const draftAsrProvider = draftField('asrProvider', () => props.asrProvider)
 const draftTtsVoice = draftField('ttsVoice', () => props.ttsVoice)
 const draftVoiceMode = draftField('voiceMode', () => props.voiceMode ?? 'text')
 const draftReplyMode = draftField('replyMode', () => props.replyMode)
-const draftRenderMode = draftField('renderMode', () => props.renderMode)
 const draftBackgroundId = draftField('backgroundId', () => props.backgroundId)
 const draftBackgroundUrl = draftField('backgroundUrl', () => props.backgroundUrl)
 const draftBackgroundFit = draftField('backgroundFit', () => props.backgroundFit)
@@ -193,18 +174,8 @@ const dialogRef = ref<HTMLDialogElement | null>(null)
 let previouslyFocused: HTMLElement | null = null
 
 const draftCharacterValue = computed({
-  get() {
-    return draftRenderMode.value === '3d'
-      ? toVrmCharacterValue(draftVrmId.value)
-      : toOpenVmanCharacterValue(draftCharId.value)
-  },
-  set(value: string) {
-    if (value.startsWith('vrm:')) {
-      draftRenderMode.value = '3d'
-      draftVrmId.value = parseVrmCharacterValue(value)
-      return
-    }
-    draftRenderMode.value = '2d'
+  get: () => toOpenVmanCharacterValue(draftCharId.value),
+  set: (value: string) => {
     draftCharId.value = parseOpenVmanCharacterValue(value)
   },
 })
@@ -260,7 +231,7 @@ const personaOptions = computed(() =>
 )
 
 const characterOptions = computed(() =>
-  buildCharacterOptions(props.characters, props.vrmCharacters)
+  buildCharacterOptions(props.characters)
 )
 
 const ttsProviderOptions = computed(() => buildTtsProviderOptions(props.ttsProviders))
@@ -292,17 +263,9 @@ const isBackgroundDirty = computed(() =>
   resolvedDraftBackgroundUrl.value !== props.backgroundUrl.trim() ||
   draftBackgroundFit.value !== props.backgroundFit
 )
-const isRenderModeDirty = computed(() => draftRenderMode.value !== props.renderMode)
-const isVrmDirty = computed(() => draftVrmId.value !== props.currentVrmId)
-const rendererChoiceDirty = computed(() => isRenderModeDirty.value || isVrmDirty.value)
-const isDirty = computed(() =>
-  needsReconnect.value ||
-  isBackgroundDirty.value ||
-  rendererChoiceDirty.value
-)
+const isDirty = computed(() => needsReconnect.value || isBackgroundDirty.value)
 const applyDisabled = computed(() =>
-  Boolean(props.personasLoading) ||
-  (Boolean(props.disabled) && !rendererChoiceDirty.value)
+  Boolean(props.personasLoading) || Boolean(props.disabled)
 )
 const applyLabel = computed(() => {
   if (!isDirty.value) return '關閉'
@@ -333,7 +296,7 @@ function handleProjectDraftChange(): void {
   const projectId = draftProjectId.value
   if (projectId !== props.currentProjectId) emit('projectChange', projectId)
   forget(
-    'projectId', 'personaId', 'charId', 'vrmId', 'renderMode',
+    'projectId', 'personaId', 'charId',
     'ttsProvider', 'ttsVoice', 'asrProvider',
     'backgroundId', 'backgroundUrl', 'backgroundFit',
   )
@@ -363,12 +326,6 @@ function applyAndClose(): void {
   }
   if (draftReplyMode.value !== props.replyMode) {
     emit('replyModeChange', draftReplyMode.value)
-  }
-  if (draftRenderMode.value !== props.renderMode) {
-    emit('renderModeChange', draftRenderMode.value)
-  }
-  if (draftVrmId.value !== props.currentVrmId) {
-    emit('vrmCharacterChange', draftVrmId.value)
   }
   if (isBackgroundDirty.value) {
     emit(

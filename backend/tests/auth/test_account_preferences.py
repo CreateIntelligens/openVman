@@ -66,6 +66,17 @@ def test_unknown_keys_and_huge_values_are_rejected(setup):
     assert get_my_preferences(account=account, runtime=runtime).values == {}
 
 
+def test_retired_3d_keys_are_dropped_not_rejected(setup):
+    runtime, account = setup
+    # 舊版前台還會送 3D 模式欄位；整份設定要照存，只是那兩個欄位不留。
+    saved = update_my_preferences(
+        MyPreferences(values={"renderMode": "3d", "vrmAvatarId": "x", "projectId": "p"}),
+        account=account, runtime=runtime,
+    ).values
+    assert saved == {"projectId": "p"}
+    assert get_my_preferences(account=account, runtime=runtime).values == {"projectId": "p"}
+
+
 def test_embed_keys_neither_read_nor_save(setup):
     runtime, account = setup
     update_my_preferences(

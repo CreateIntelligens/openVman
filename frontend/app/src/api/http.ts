@@ -37,7 +37,6 @@ const AUTH_WHITELIST = [
 // 語音那幾條由呼叫端自己退回專案預設並提示。其餘 403 照舊換成整頁。
 const LOCAL_FORBIDDEN_PREFIXES = [
   "/static/characters/",
-  "/static/mascots/",
   "/static/backgrounds/",
   "/api/v1/tts/",
   "/v1/audio/speech",

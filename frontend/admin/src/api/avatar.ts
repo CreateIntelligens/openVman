@@ -1,6 +1,5 @@
 import {
   AVATAR_BACKGROUNDS_PATH,
-  AVATAR_MASCOTS_PATH,
   AVATAR_PATH,
   apiUrl,
   fetchJson,
@@ -45,31 +44,6 @@ export interface AvatarBackgroundListResponse {
 export interface AvatarBackgroundMutationResponse {
   status: string;
   background: AvatarBackground;
-}
-
-export interface AvatarMascot {
-  mascot_id: string;
-  label: string;
-  engine: "2d" | "3d" | "video";
-  model_url: string;
-  vrm_url: string;
-  character_id?: string;
-  thumbnail_url?: string;
-  fit: "" | "half" | "full";
-  builtin: boolean;
-  size_bytes: number;
-  updated_at: string;
-  owner_project_id?: string | null;
-  source?: "system" | "project" | "assigned" | "orphan";
-}
-
-export interface AvatarMascotListResponse {
-  mascots: AvatarMascot[];
-}
-
-export interface AvatarMascotMutationResponse {
-  status: string;
-  mascot: AvatarMascot;
 }
 
 export async function fetchAvatarCharacters(projectId?: string): Promise<AvatarListResponse> {
@@ -246,106 +220,6 @@ export async function updateAvatarBackgroundLabel(
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ label }),
-    },
-  );
-}
-
-export async function fetchAvatarMascots(projectId?: string): Promise<AvatarMascotListResponse> {
-  const url = projectId
-    ? `${AVATAR_MASCOTS_PATH}?project_id=${encodeURIComponent(projectId)}`
-    : AVATAR_MASCOTS_PATH;
-  return fetchJson<AvatarMascotListResponse>(apiUrl(url));
-}
-
-export interface UploadMascotArgs {
-  mascotId: string;
-  label: string;
-  model: File;
-  thumbnail?: File;
-  projectId?: string;
-}
-
-export async function uploadAvatarMascot(
-  args: UploadMascotArgs,
-): Promise<AvatarMascotMutationResponse> {
-  const form = new FormData();
-  form.append("mascot_id", args.mascotId);
-  form.append("label", args.label);
-  form.append("model", args.model);
-  if (args.thumbnail) {
-    form.append("thumbnail", args.thumbnail);
-  }
-  if (args.projectId) {
-    form.append("project_id", args.projectId);
-  }
-  return fetchJson<AvatarMascotMutationResponse>(apiUrl(AVATAR_MASCOTS_PATH), {
-    method: "POST",
-    body: form,
-  });
-}
-
-export interface CreateVideoMascotArgs {
-  mascotId: string;
-  label: string;
-  characterId: string;
-  projectId?: string;
-}
-
-export async function createAvatarMascotFromCharacter(
-  args: CreateVideoMascotArgs,
-): Promise<AvatarMascotMutationResponse> {
-  const payload: Record<string, string> = {
-    mascot_id: args.mascotId,
-    label: args.label,
-    character_id: args.characterId,
-  };
-  if (args.projectId) {
-    payload.project_id = args.projectId;
-  }
-  return fetchJson<AvatarMascotMutationResponse>(
-    apiUrl(`${AVATAR_MASCOTS_PATH}/from-character`),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-  );
-}
-
-export async function deleteAvatarMascot(
-  mascotId: string,
-): Promise<{ status: string; mascot_id: string }> {
-  return fetchJson<{ status: string; mascot_id: string }>(
-    apiUrl(itemPath(AVATAR_MASCOTS_PATH, mascotId)),
-    { method: "DELETE" },
-  );
-}
-
-export async function updateAvatarMascotLabel(
-  mascotId: string,
-  label: string,
-): Promise<AvatarMascotMutationResponse> {
-  return fetchJson<AvatarMascotMutationResponse>(
-    apiUrl(itemPath(AVATAR_MASCOTS_PATH, mascotId)),
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label }),
-    },
-  );
-}
-
-export async function uploadAvatarMascotThumbnail(
-  mascotId: string,
-  thumbnail: File,
-): Promise<AvatarMascotMutationResponse> {
-  const form = new FormData();
-  form.append("thumbnail", thumbnail);
-  return fetchJson<AvatarMascotMutationResponse>(
-    apiUrl(`${itemPath(AVATAR_MASCOTS_PATH, mascotId)}/thumbnail`),
-    {
-      method: "POST",
-      body: form,
     },
   );
 }

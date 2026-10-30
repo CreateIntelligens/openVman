@@ -104,16 +104,6 @@
   background-color: #0a0a0f;
 }
 
-.stage-avatar-frame {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-  background: transparent;
-}
-
 /* Immersive mode: avatar fills the entire viewport, other panels float on top */
 .app-shell.immersive {
   /* 手機的一般頁面可隨內容增高；全螢幕的絕對定位舞台仍需要確定的參照高度。 */

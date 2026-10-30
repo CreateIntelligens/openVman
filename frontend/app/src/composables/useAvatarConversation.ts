@@ -28,8 +28,7 @@ interface ConversationOptions {
   getProjectDefaultVoice?: () => { provider?: string; voice?: string } | string | null | undefined;
 }
 export function useAvatarConversation({ settings, stage, languageRoutes, turnTiming, ttsProviders, statusToastRef, fetchPersonas, getProjectDefaultVoice }: ConversationOptions) {
-  const { wasm, fatalError, rendererDisabled, bootstrapRenderer,
-    driveStageAvatarMouth, stopStageAvatarMouth } = stage;
+  const { wasm, fatalError, rendererDisabled, bootstrapRenderer } = stage;
   const isStarted = ref(false);
   const isTyping = ref(false);
   const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
@@ -58,25 +57,21 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     }
   }
   const audio = useAudioPlayer({
-    onPcmChunk: (pcm) => {
-      if (settings.renderMode === "2d") wasm.pushAudio(pcm);
-    },
-    onPlaybackVolume: driveStageAvatarMouth,
+    onPcmChunk: (pcm) => wasm.pushAudio(pcm),
     onPlaybackStart: () => {
-      if (settings.renderMode === "2d") wasm.beginSpeaking();
+      wasm.beginSpeaking();
       turnTiming.playbackStarted();
     },
     onPlaybackReset: wasm.resetSpeaking,
     onPlaybackEnd: () => {
       wasm.clearAudio();
       wasm.endSpeaking();
-      stopStageAvatarMouth();
     },
     onQueueEmpty: onAudioQueueEmpty,
   });
   const motionAudioPreparing = ref(false);
   const motionAudio = createAvatarMotionAudioGate<ArrayBuffer | string>({
-    enabled: () => settings.renderMode === "2d" && wasm.motionEnabled.value,
+    enabled: () => wasm.motionEnabled.value,
     playing: () => audio.isPlaying.value,
     prepare: () => wasm.setMotionState("speaking"),
     play: audio.playChunk,
@@ -233,7 +228,6 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       ttsStreamer.cancel();
       audio.flush();
       wasm.clearAudio();
-      stopStageAvatarMouth();
       typewriter.flush();
       pendingText = "";
       isTyping.value = false;
@@ -303,9 +297,9 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   );
   watch([
     () => chat.state.value, () => audio.isPlaying.value, ttsPending,
-    motionAudioPreparing, () => wasm.motionEnabled.value, () => settings.renderMode,
+    motionAudioPreparing, () => wasm.motionEnabled.value,
   ], () => {
-    if (settings.renderMode !== "2d" || !wasm.motionEnabled.value) return;
+    if (!wasm.motionEnabled.value) return;
     const intent = resolveAvatarMotionIntent({
       playing: audio.isPlaying.value, preparing: motionAudioPreparing.value,
       thinking: chat.state.value === "THINKING", ttsPending: ttsPending.value,
@@ -376,7 +370,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
         await audio.resumeContext();
         await chat.connect();
 
-        if (settings.renderMode === "2d" && window.characterVideo && window.characterVideo.paused) {
+        if (window.characterVideo && window.characterVideo.paused) {
           window.characterVideo.play().catch(e => console.warn("[App] characterVideo play failed:", e));
         }
 

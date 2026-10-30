@@ -172,7 +172,7 @@ def test_embed_key_takes_precedence_over_a_session_cookie(embed_env):
         ("GET", "/api/v1/sessions"),
         ("GET", "/api/v1/knowledge/documents"),
         ("GET", "/api/v1/users"),
-        ("GET", "/static/mascots/some-mascot/model.vrm"),
+        ("GET", "/static/backgrounds/some-background/image.png"),
         ("POST", "/api/v1/projects"),
         ("GET", "/api/v1/usage/summary"),
     ],

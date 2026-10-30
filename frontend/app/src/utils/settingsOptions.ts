@@ -13,12 +13,6 @@ export interface CharacterItem {
   in_project_scope?: boolean;
 }
 
-export interface VrmCharacterItem {
-  id: string;
-  label: string;
-  in_project_scope?: boolean;
-}
-
 export interface BackgroundItem {
   background_id: string;
   label: string;
@@ -32,18 +26,10 @@ export function toOpenVmanCharacterValue(charId: string): string {
   return `${LEGACY_2D_CHARACTER_PREFIX}${charId}`;
 }
 
-export function toVrmCharacterValue(vrmId: string): string {
-  return `vrm:${vrmId}`;
-}
-
 export function parseOpenVmanCharacterValue(value: string): string {
   return value.startsWith(LEGACY_2D_CHARACTER_PREFIX)
     ? value.slice(LEGACY_2D_CHARACTER_PREFIX.length)
     : value;
-}
-
-export function parseVrmCharacterValue(value: string): string {
-  return value.startsWith("vrm:") ? value.slice(4) : value;
 }
 
 /** 專案範圍內（黑字）排前面、範圍外（紅字）往後；同組內維持原本順序。 */
@@ -57,10 +43,7 @@ export function scopeFirst<T extends { in_project_scope?: boolean }>(items: T[])
 // 只有編號、沒取名字的人物（000～007 這類範例人物）。
 const UNNAMED_CHARACTER = /^\d+$/;
 
-export function buildCharacterOptions(
-  characters: CharacterItem[],
-  vrmCharacters: VrmCharacterItem[],
-): SelectOption[] {
+export function buildCharacterOptions(characters: CharacterItem[]): SelectOption[] {
   const named = characters.filter((c) => !UNNAMED_CHARACTER.test(c.name.trim()));
   const unnamed = characters.filter((c) => UNNAMED_CHARACTER.test(c.name.trim()));
   const toOption = (c: CharacterItem): SelectOption => ({
@@ -68,17 +51,10 @@ export function buildCharacterOptions(
     label: c.name,
     in_project_scope: c.in_project_scope,
   });
-  // 有名字的人物在前（範圍內優先），編號範例人物與 3D 一律放最後，不搶版面。
+  // 有名字的人物在前（範圍內優先），編號範例人物一律放最後，不搶版面。
   return [
     ...scopeFirst(named).map(toOption),
-    ...scopeFirst([
-      ...unnamed.map(toOption),
-      ...vrmCharacters.map((v) => ({
-        value: toVrmCharacterValue(v.id),
-        label: `${v.label} · VRM`,
-        in_project_scope: v.in_project_scope,
-      })),
-    ]),
+    ...scopeFirst(unnamed).map(toOption),
   ];
 }
 

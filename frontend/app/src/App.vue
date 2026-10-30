@@ -36,12 +36,9 @@
               :style="stageBackgroundStyle"
             />
             <AvatarCanvas
-              v-show="settings.renderMode === '2d'"
               :width="800"
               :height="800"
-              :show-loading="settings.renderMode === '2d' && (
-                rendererBootstrapState === 'loading' || wasm.isLoading.value
-              )"
+              :show-loading="rendererBootstrapState === 'loading' || wasm.isLoading.value"
               :loading-text="loadingText"
               :background-id="settings.backgroundId"
               :custom-background-url="settings.backgroundUrl"
@@ -54,17 +51,9 @@
               :motion-pending="wasm.motionSnapshot.value.cache?.pending ?? 0"
             />
             <AvatarMotionControls
-              v-if="settings.renderMode === '2d' && wasm.motionEnabled.value"
+              v-if="wasm.motionEnabled.value"
               :disabled="rendererDisabled || avatarResponding"
               @gesture="handleMotionGesture"
-            />
-            <iframe
-              v-if="settings.renderMode === '3d' && stageAvatarWidgetSrc"
-              ref="stageAvatarFrameRef"
-              class="stage-avatar-frame"
-              :src="stageAvatarWidgetSrc"
-              title="VRM 虛擬人"
-              allow="autoplay"
             />
             <CameraPreview
               :stream="webcam.stream.value"
@@ -139,9 +128,7 @@
     <SettingsModal
       v-model:open="showSettings"
       :characters="characters"
-      :vrm-characters="vrmCharacterOptions"
       :current-char-id="settings.characterId"
-      :current-vrm-id="settings.vrmAvatarId"
       :tts-provider="settings.ttsProvider"
       :tts-voice="settings.ttsVoice"
       :tts-providers="ttsProviders"
@@ -154,7 +141,6 @@
       :personas-loading="personasLoading"
       :voice-mode="settings.voiceMode"
       :reply-mode="settings.replyMode"
-      :render-mode="settings.renderMode"
       :background-id="settings.backgroundId"
       :background-url="settings.backgroundUrl"
       :background-fit="settings.backgroundFit"
@@ -172,8 +158,6 @@
       @persona-change="handlePersonaChange"
       @voice-mode-change="handleVoiceModeChange"
       @reply-mode-change="handleReplyModeChange"
-      @render-mode-change="handleRenderModeChange"
-      @vrm-character-change="handleVrmAvatarChange"
       @background-change="handleBackgroundChange"
       @apply="handleSettingsApply"
       :kiosk-source="visitor.kioskSource.value"
@@ -269,10 +253,9 @@ const asrEngines = computed(() => {
 });
 const stage = useAvatarStage(settings, bootstrap);
 const { wasm, fatalError, rendererBootstrapState, rendererDisabled,
-  rendererErrorMessage, loadingText, chatPlaceholder, stageAvatarFrameRef,
-  stageAvatarWidgetSrc, stageBackgroundClass, stageBackgroundStyle,
-  vrmCharacterOptions, handleCharChange, handleRenderModeChange,
-  handleVrmAvatarChange, handleBackgroundChange } = stage;
+  rendererErrorMessage, loadingText, chatPlaceholder,
+  stageBackgroundClass, stageBackgroundStyle,
+  handleCharChange, handleBackgroundChange } = stage;
 const turnTiming = useTurnTiming({ context: () => ({
   project_id: settings.projectId,
   session_id: conversation.chat.sessionId.value ?? "",
@@ -293,7 +276,7 @@ function handleMotionGesture(state: "greeting" | "bye"): void {
     showMessage("動作暫時無法播放，已回到待機。");
   });
 }
-const voice = useAvatarVoiceInput({ conversation, preferences, stage,
+const voice = useAvatarVoiceInput({ conversation, preferences,
   languageRoutes, turnTiming, statusToastRef });
 const { activeAsr, serverAsr, vadAsr, streamAsr, asrSpeaking,
   asrInputMode, asrInterim, asrError, handleAsrToggle } = voice;
@@ -357,12 +340,11 @@ const { applyAdminHandoff } = useAdminHandoff({ settings, bootstrap, stage, visi
 
 onMounted(async () => {
   await settingsReady();
-  const vrmReady = bootstrap.fetchVrmAvatars();
   const projectReady = bootstrap.fetchInitialProjectData();
   void Promise.allSettled([
-    vrmReady, bootstrap.fetchTtsProviders(), bootstrap.fetchBackgrounds(),
+    bootstrap.fetchTtsProviders(), bootstrap.fetchBackgrounds(),
     projectReady, camera.fetchVisionHealth(),
-    stage.bootstrapRenderer(vrmReady, projectReady),
+    stage.bootstrapRenderer(projectReady),
   ]).then(applyAdminHandoff);
 });
 </script>

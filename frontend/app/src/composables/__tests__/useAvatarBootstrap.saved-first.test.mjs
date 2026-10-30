@@ -22,7 +22,6 @@ test("bootstrap picks from what the user saved, not from the live field", () => 
   // 開場會先把欄位清空；偏好一律取 savedSettings()，清空或退回都不會影響下次。
   assert.match(body(bootstrap, "async function fetchProjects()"), /const savedProjectId = savedSettings\(\)\.projectId/);
   assert.match(body(bootstrap, "async function fetchTtsProviders()"), /savedSettings\(\)/);
-  assert.match(body(bootstrap, "async function fetchVrmAvatars()"), /preferSaved\(\s*savedSettings\(\)\.vrmAvatarId,/);
   assert.match(app, /preferSaved\(\s*savedSettings\(\)\.characterId,/);
 });
 
@@ -45,7 +44,7 @@ test("no bootstrap path applies an account default without checking the saved va
   const calls = [...(bootstrap + app).matchAll(/accountDefault\("(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     [...new Set(calls)].sort(),
-    ["background_id", "character_id", "mascot_id", "project_id", "voice_id", "voice_provider"],
+    ["background_id", "character_id", "project_id", "voice_id", "voice_provider"],
     "多了新的帳號預設欄位：確認它有讓存的值優先，再更新這份清單",
   );
 });

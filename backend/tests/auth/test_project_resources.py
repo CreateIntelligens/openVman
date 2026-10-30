@@ -37,13 +37,11 @@ def _tiny_png() -> bytes:
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("AVATAR_ASSETS_DIR", str(tmp_path / "avatar"))
     monkeypatch.setenv("AVATAR_BACKGROUNDS_DIR", str(tmp_path / "backgrounds"))
-    monkeypatch.setenv("AVATAR_MASCOTS_DIR", str(tmp_path / "mascots"))
     from app.config import get_tts_config
     get_tts_config.cache_clear()
-    from app.routes import avatar as avatar_routes, backgrounds as background_routes, mascots as mascot_routes
+    from app.routes import avatar as avatar_routes, backgrounds as background_routes
     avatar_routes.reset_store()
     background_routes.reset_store()
-    mascot_routes.reset_store()
 
     runtime = get_auth_runtime()
     root = runtime.users.create_root(username="ai360", password_hash="unused")
@@ -522,10 +520,10 @@ def test_mascots_route_project_scope(env, monkeypatch):
     from app.routes import mascots as mascot_routes
 
     monkeypatch.setattr(
-        mascot_routes.get_store(),
-        "list_mascots",
+        mascot_routes,
+        "builtin_mascots",
         lambda: [
-            {"mascot_id": "mascot-global-1", "label": "Global Mascot 1", "engine": "vrm"},
+            {"mascot_id": "mascot-global-1", "label": "Global Mascot 1", "engine": "2d"},
         ],
     )
 

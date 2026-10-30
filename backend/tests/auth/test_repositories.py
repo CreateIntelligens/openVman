@@ -225,5 +225,5 @@ def test_stage_avatar_accepts_character_or_vrm(character: str, mascot: str):
 def test_stage_avatar_requires_at_least_one_of_character_or_vrm():
     grants, defaults = _access()
 
-    with pytest.raises(InvalidResourceGrantError, match="character or VRM"):
+    with pytest.raises(InvalidResourceGrantError, match="character or mascot"):
         _normalize_account_access(grants, defaults)

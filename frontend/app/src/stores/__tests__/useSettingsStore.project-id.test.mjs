@@ -39,18 +39,11 @@ test("avatar settings persist camera preview scale", () => {
   assert.match(storeSource, /cameraPreviewScale: STORAGE_KEYS\.\w+/);
 });
 
-test("avatar settings persist the selected render mode", () => {
-  assert.match(storageSource, /RENDER_MODE:\s*"avatar\.render_mode"/);
-  assert.match(storeSource, /function normalizeAvatarRenderMode\(value: string\): '2d' \| '3d'/);
-  assert.match(storeSource, /renderMode:\s*normalizeAvatarRenderMode\(readPref\(STORAGE_KEYS\.RENDER_MODE,\s*"2d"\)\)/);
-  assert.match(storeSource, /renderMode: STORAGE_KEYS\.\w+/);
-});
-
-test("avatar settings persist the selected VRM avatar id", () => {
-  assert.match(storageSource, /VRM_AVATAR_ID:\s*"avatar\.vrm_avatar_id"/);
-  // 內建 VRM 已拿掉，沒存過就不指定，等清單載入後再挑。
-  assert.match(storeSource, /vrmAvatarId:\s*readPref\(STORAGE_KEYS\.VRM_AVATAR_ID,\s*""\)/);
-  assert.match(storeSource, /vrmAvatarId: STORAGE_KEYS\.\w+/);
+// 3D（VRM）舞台已拿掉：舊的 render mode／VRM 偏好不再讀寫，伺服器回來的舊值也被忽略
+// （實際開場行為見 useAdminHandoff.test.mjs 的 legacy 3D 測試）。
+test("settings no longer carry a render mode or VRM avatar", () => {
+  assert.doesNotMatch(storageSource, /RENDER_MODE|VRM_AVATAR_ID/);
+  assert.doesNotMatch(storeSource, /renderMode|vrmAvatarId/);
 });
 
 test("only saveSettings writes preferences; bootstrap choices stay in memory", () => {

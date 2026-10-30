@@ -90,13 +90,10 @@ def env(monkeypatch):
         lambda: SimpleNamespace(list_characters=lambda: characters),
     )
     monkeypatch.setattr(
-        mascots, "get_character_store", avatar.get_store,
-    )
-    monkeypatch.setattr(
-        mascots, "get_store", lambda: SimpleNamespace(list_mascots=lambda: [
-            {"mascot_id": "mascot-a", "engine": "vrm"},
-            {"mascot_id": "mascot-other", "engine": "vrm"},
-        ]),
+        mascots, "builtin_mascots", lambda: [
+            {"mascot_id": "mascot-a", "engine": "2d"},
+            {"mascot_id": "mascot-other", "engine": "2d"},
+        ],
     )
     monkeypatch.setattr(
         backgrounds, "get_store",

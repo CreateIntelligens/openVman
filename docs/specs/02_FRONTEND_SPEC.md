@@ -137,9 +137,15 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 ### 5.3 後台試用交接（2026-10-22）
 
-後台 Avatar 頁人物的「試用」與背景的「使用」不直接寫前台的偏好鍵（登入後會被伺服器存的偏好與專案別偏好蓋掉），改用 `@shared/avatar/adminHandoff` 在同源 localStorage 留一筆一次性指令 `avatar.admin_handoff`：`{ v: 1, accountId, projectId?, characterId?, backgroundId?, backgroundUrl?, createdAt }`，`projectId` 是資源的 `owner_project_id`（全域資源不帶），再以新分頁開前台（公開前綴下開 `/openvman/`）。不用網址參數：nginx 轉址會丟掉 query，網址也能被第三方偽造。小助理的「使用」只換後台自己右下角的小助理，不開前台。
+後台 Avatar 頁人物的「試用」與背景的「使用」不直接寫前台的偏好鍵（登入後會被伺服器存的偏好與專案別偏好蓋掉），改用 `@shared/avatar/adminHandoff` 在同源 localStorage 留一筆一次性指令 `avatar.admin_handoff`：`{ v: 1, accountId, projectId?, characterId?, backgroundId?, backgroundUrl?, createdAt }`，`projectId` 是資源的 `owner_project_id`（全域資源不帶），再以新分頁開前台（公開前綴下開 `/openvman/`）。不用網址參數：nginx 轉址會丟掉 query，網址也能被第三方偽造。
 
-前台 `useAdminHandoff` 在 `App.vue` 開場的 `Promise.allSettled`（專案、專案資源、人物與背景清單、舞台）結束後執行一次：`takeAdminHandoff` 讀取後一律刪除，只接受帳號相符、`createdAt` 在 0～120 秒內的指令；舞台還停在 loading（開場失敗要整頁重新載入）時先不取。訪客模式未解鎖時直接忽略。之後走設定視窗「套用」的同一批處理：專案不同且在帳號清單內就 `handleProjectChange` 並等新專案清單載完，不在清單內只留提示；人物要在目前專案的清單內才 `handleCharChange`，舞台是 3D 時再 `handleRenderModeChange('2d')`；背景要在伺服器回傳的清單內，網址取清單的、不取指令的。結果照一般「套用」存成帳號偏好；提示是固定字句，不放指令內容。
+前台 `useAdminHandoff` 在 `App.vue` 開場的 `Promise.allSettled`（專案、專案資源、人物與背景清單、舞台）結束後執行一次：`takeAdminHandoff` 讀取後一律刪除，只接受帳號相符、`createdAt` 在 0～120 秒內的指令；舞台還停在 loading（開場失敗要整頁重新載入）時先不取。訪客模式未解鎖時直接忽略。之後走設定視窗「套用」的同一批處理：專案不同且在帳號清單內就 `handleProjectChange` 並等新專案清單載完，不在清單內只留提示；人物要在目前專案的清單內才 `handleCharChange`；背景要在伺服器回傳的清單內，網址取清單的、不取指令的。結果照一般「套用」存成帳號偏好；提示是固定字句，不放指令內容。
+
+### 5.4 舞台只有 2D 影片角色，小助理只有 Haru（2026-10-30）
+
+前台移除 3D（VRM）渲染模式與小助理清單，舞台只保留 2D 影片角色（OpenVmanAvatarRuntime WASM）；設定視窗不再列出 VRM 角色，舊的 `avatar.render_mode`／`vrmAvatarId` 偏好（含伺服器端存的 `renderMode: "3d"`）一律忽略，開場照常載入 2D 人物。`public/vendor/ai-avatar-bot/widget.html` 只剩內建 Live2D（Haru），僅接受 `model`、`fit` 參數與 `mouth`／`mouth-stop` 訊息，VRM、VRMA 手勢與影片角色引擎皆已移除。
+
+後台每頁右下角的浮動助理（`MascotWidget`）固定載入這個 widget 的 Haru（`buildMascotWidgetSrc` 只帶 `model` 與 `fit`），沒有切換選單，也不向後端拿小助理清單；可收合、可拖曳，收合後 iframe 留在 DOM 只隱藏。對話與即時語音的回覆音訊經 analyser 量音量，以 `mouth`／`mouth-stop` 驅動嘴型；widget 送回的 `close` 會收合並停掉所有播放中的語音。後台 Avatar 頁只有「人物」與「背景」兩個分頁，虛擬人（Persona）的綁定選單只列 2D 人物。
 
 ### 6. ASR 與語音輸入 (Speech Recognition)
 
@@ -394,7 +400,7 @@ ws.onclose = () => { reconnect(); };
 * **合併分頁頁面**：「專案與權限」（`/admin/access`）與「系統狀態」（`/admin/system`）以 `PageTabsShell` 呈現第一層底線分頁，分頁狀態綁在網址子路徑；「帳號」分頁內的第二層（建立／編輯管理）改用分段控制，與第一層區隔。分頁可見性與直連擋法共用 `navigation.ts` 的 `requiredRouteAccess()`，路由表見 [Canonical Routes](../guides/admin-canonical-routes.md)。
 * **對話紀錄管理與匯出**：`Sessions` workspace 集中提供跨角色瀏覽、文字與秒級時間篩選、排序、批次選取、匯出及刪除。匯出由 Backend 驗證專案讀取權限後交由 Brain 組裝，不從前端逐筆抓取歷史；從紀錄列開啟 Chat 時，以一次性 URL deep link 還原角色與 session，消費後立即移除該參數。
 * **設計 Token (RGB channels)**：`tailwind.config.js` 與 `index.css` 將語意色 (`primary`、`surface`、`danger` 等) 以 `R G B` 三通道形式暴露，讓 Tailwind 透明度修飾符 (`bg-primary/20` 等) 能夠正確運算。
-* **Avatar 響應式版面（2026-10-19）**：`/admin/avatar` 的角色、背景、小助理及影片轉換表單在 `md` 以下採單欄、全寬控制項，`md` 起橫向排列並允許換列。素材網格使用 Tailwind `grid-cols-*` 的 `repeat(n, minmax(0, 1fr))`，預設單欄，`lg`／`xl`／`2xl` 分別為 2／3／4 欄；卡片長名稱與工作進度可斷行，檔名截斷，操作按鈕文字維持單行，手機直向堆疊。手機頁面內距為 `p-4`，共用頂列允許專案名稱縮短，專案清單寬度不超出視窗；側欄沿用既有 `md` 以下隱藏並以導覽抽屜開啟的行為。此變更僅影響後台版面，前台 Avatar、Embed SDK 與後端契約無需調整。
+* **Avatar 響應式版面（2026-10-19）**：`/admin/avatar` 的角色、背景及影片轉換表單在 `md` 以下採單欄、全寬控制項，`md` 起橫向排列並允許換列。素材網格使用 Tailwind `grid-cols-*` 的 `repeat(n, minmax(0, 1fr))`，預設單欄，`lg`／`xl`／`2xl` 分別為 2／3／4 欄；卡片長名稱與工作進度可斷行，檔名截斷，操作按鈕文字維持單行，手機直向堆疊。手機頁面內距為 `p-4`，共用頂列允許專案名稱縮短，專案清單寬度不超出視窗；側欄沿用既有 `md` 以下隱藏並以導覽抽屜開啟的行為。此變更僅影響後台版面，前台 Avatar、Embed SDK 與後端契約無需調整。
 
 * **共用控制元件樣式**：Admin 頁面標題與副標題統一使用 `page-title`／`page-subtitle`，按鈕與輸入欄位優先使用 `btn`／`input`，並以 semantic color token 取代頁面專屬色碼。
 

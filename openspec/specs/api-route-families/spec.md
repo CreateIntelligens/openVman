@@ -19,11 +19,13 @@ The Backend SHALL expose every HTTP and WebSocket endpoint under exactly one of 
 - **THEN** the Backend responds 404
 
 #### Scenario: Served files live under /static
-- **WHEN** a client requests `/static/characters/{char_id}/01.webm`, `/static/mascots/{mascot_id}/model.vrm`, or `/static/backgrounds/{background_id}/{file}`
-- **THEN** the file is served with the same authorization rules that applied to `/assets`, `/mascots`, and `/backgrounds`
+- **WHEN** a client requests `/static/characters/{char_id}/01.webm` or `/static/backgrounds/{background_id}/{file}`
+- **THEN** the file is served with the same authorization rules that applied to `/assets` and `/backgrounds`
+- **WHEN** a client requests anything under `/static/mascots/`
+- **THEN** the response status is 404, because the only mascot is the built-in Live2D Haru and it has no served files
 
 #### Scenario: Asset URLs in API responses use the new family
-- **WHEN** the mascot, background, or character APIs return `vrm_url`, `thumbnail_url`, `url`, or asset base paths
+- **WHEN** the background or character APIs return `thumbnail_url`, `url`, or asset base paths
 - **THEN** every returned URL starts with `/static/`
 
 ### Requirement: Retired paths fail hard
@@ -39,7 +41,7 @@ Retired paths SHALL return 404 from the Backend and from both nginx configuratio
 
 #### Scenario: nginx carries no retired location
 - **WHEN** the Admin nginx configuration test runs
-- **THEN** it fails if the configuration contains a location for `/embed/`, `/api/embed/`, `/ws/embed/`, `/vman-embed.js`, `/assets/`, `/mascots/`, `/backgrounds/`, `/tts/`, `/uploads`, `/jobs/`, `/documents/`, `/admin/dlq`, `/characters`, `/openvman-avatar-sdk.js`, or `/sdk/runtime/`
+- **THEN** it fails if the configuration contains a location for `/embed/`, `/api/embed/`, `/ws/embed/`, `/vman-embed.js`, `/assets/`, `/mascots/`, `/static/mascots/`, `/backgrounds/`, `/tts/`, `/uploads`, `/jobs/`, `/documents/`, `/admin/dlq`, `/characters`, `/openvman-avatar-sdk.js`, or `/sdk/runtime/`
 
 ### Requirement: Frontends and SDK use only the new families
 The Admin portal, the App, `widget.html`, and the Avatar SDK SHALL build every request and asset URL from the new families, and their test suites SHALL fail if a retired path is referenced.

@@ -50,17 +50,12 @@ const DEFAULTS = {
   character_id: "c1",
   voice_provider: "indextts",
   voice_id: "hayley",
-  mascot_id: "",
 };
 const PERSONAS = { "proj-A": ["default", "pA"], "proj-B": ["default", "pB"] };
 const PROVIDERS = [
   { id: "auto", name: "自動", default_voice: "", voices: [] },
   { id: "indextts", name: "IndexTTS", default_voice: "hayley", voices: ["hayley", "amy"] },
   { id: "voxcpm", name: "VoxCPM", default_voice: "v1", voices: ["v1", "v2"] },
-];
-const MASCOTS = [
-  { mascot_id: "qqman", label: "QQ", engine: "3d", vrm_url: "/q.vrm" },
-  { mascot_id: "myvrm", label: "Mine", engine: "3d", vrm_url: "/m.vrm" },
 ];
 
 const json = (body, status = 200) =>
@@ -97,7 +92,6 @@ async function openApp(storage, api = {}) {
       return json({ personas: (PERSONAS[pid] ?? []).map((id) => ({ persona_id: id, label: id })) });
     }
     if (path.endsWith("/api/v1/tts/providers")) return json(PROVIDERS);
-    if (path.endsWith("/api/v1/avatar/mascots")) return json({ mascots: MASCOTS });
     if (path.endsWith("/api/v1/avatar")) {
       return json({
         characters: [
@@ -209,18 +203,6 @@ test("a TTS node missing once does not replace the saved voice", async () => {
   assert.equal(second.settings.ttsVoice, "v2");
 });
 
-test("a failed VRM list keeps the saved VRM", async () => {
-  const storage = savedStorage({ "avatar.vrm_avatar_id": "myvrm" });
-  const first = await openApp(storage, { "/api/v1/avatar/mascots": () => json({}, 502) });
-  await first.boot.fetchVrmAvatars();
-  assert.equal(first.settings.vrmAvatarId, "myvrm");
-  assert.equal(storage.get(key("avatar.vrm_avatar_id")), "myvrm");
-
-  const second = await openApp(storage);
-  await second.boot.fetchVrmAvatars();
-  assert.equal(second.settings.vrmAvatarId, "myvrm");
-});
-
 test("only saveSettings writes, and engine and voice are written as a pair", async () => {
   const storage = new Map();
   const { m, settings } = await openApp(storage);
@@ -305,35 +287,34 @@ test("switching project falls back to project default resources", async () => {
   const storage = savedStorage({ "avatar.project_id": "proj-A" });
   const { m, settings, boot } = await openApp(storage, {
     "/api/v1/projects/proj-A/resources": () => json({
-      defaults: { avatar_character: "c1", avatar_background: "bg-A", avatar_mascot: "qqman" },
+      defaults: { avatar_character: "c1", avatar_background: "bg-A" },
       avatar_character: [{ resource_id: "c1", label: "C1", source: "project" }],
       avatar_background: [{ resource_id: "bg-A", label: "BG-A", source: "project" }],
-      avatar_mascot: [{ resource_id: "qqman", label: "QQ", source: "project" }],
     }),
     "/api/v1/projects/proj-B/resources": () => json({
-      defaults: { avatar_character: "c2", avatar_background: "bg-B", avatar_mascot: "myvrm" },
+      defaults: { avatar_character: "c2", avatar_background: "bg-B" },
       avatar_character: [{ resource_id: "c2", label: "C2", source: "project" }],
       avatar_background: [{ resource_id: "bg-B", label: "BG-B", source: "project" }],
-      avatar_mascot: [{ resource_id: "myvrm", label: "Mine", source: "project" }],
     }),
   });
   await m.settingsReady();
   await boot.fetchInitialProjectData();
   assert.equal(settings.projectId, "proj-A");
-  assert.equal(settings.vrmAvatarId, "qqman");
+  assert.equal(settings.characterId, "c1");
+  assert.equal(settings.backgroundId, "uploaded:bg-A");
 
   // 切換到 proj-B
   await boot.switchProject("proj-B");
   assert.equal(settings.projectId, "proj-B");
-  assert.equal(settings.vrmAvatarId, "myvrm");
+  assert.equal(settings.characterId, "c2");
+  assert.equal(settings.backgroundId, "uploaded:bg-B");
 });
 
 test("legacy saved preferences survive when projectId matches and reset on mismatched project", async () => {
-  // 1. 同專案時：舊格式偏好存了 characterId="c2"、vrmAvatarId="myvrm"、backgroundId="uploaded:bg-B"，且 projectId="proj-A"
+  // 1. 同專案時：舊格式偏好存了 characterId="c2"、backgroundId="uploaded:bg-B"，且 projectId="proj-A"
   const storage1 = savedStorage({
     "avatar.project_id": "proj-A",
     "avatar.character_id": "c2",
-    "avatar.vrm_avatar_id": "myvrm",
     "avatar.background_id": "uploaded:bg-B",
   });
   const app1 = await openApp(storage1, {
@@ -342,10 +323,6 @@ test("legacy saved preferences survive when projectId matches and reset on misma
       avatar_character: [
         { resource_id: "c1", label: "C1", source: "project" },
         { resource_id: "c2", label: "C2", source: "project" },
-      ],
-      avatar_mascot: [
-        { resource_id: "qqman", label: "QQ", source: "project" },
-        { resource_id: "myvrm", label: "Mine", source: "project" },
       ],
       avatar_background: [
         { resource_id: "bg-A", label: "BG-A", source: "project" },
@@ -357,26 +334,20 @@ test("legacy saved preferences survive when projectId matches and reset on misma
   await app1.boot.fetchInitialProjectData();
   await app1.boot.fetchBackgrounds();
   assert.equal(app1.settings.characterId, "c2");
-  assert.equal(app1.settings.vrmAvatarId, "myvrm");
   assert.equal(app1.settings.backgroundId, "uploaded:bg-B");
 
   // 2. 專案不同時：舊偏好是 proj-B，進入 proj-A 時不沿用 proj-B 的偏好
   const storage2 = savedStorage({
     "avatar.project_id": "proj-B",
     "avatar.character_id": "c2",
-    "avatar.vrm_avatar_id": "myvrm",
     "avatar.background_id": "uploaded:bg-B",
   });
   const app2 = await openApp(storage2, {
     "/api/v1/projects/proj-A/resources": () => json({
-      defaults: { avatar_character: "c1", avatar_mascot: "qqman", avatar_background: "bg-A" },
+      defaults: { avatar_character: "c1", avatar_background: "bg-A" },
       avatar_character: [
         { resource_id: "c1", label: "C1", source: "project" },
         { resource_id: "c2", label: "C2", source: "project" },
-      ],
-      avatar_mascot: [
-        { resource_id: "qqman", label: "QQ", source: "project" },
-        { resource_id: "myvrm", label: "Mine", source: "project" },
       ],
       avatar_background: [
         { resource_id: "bg-A", label: "BG-A", source: "project" },
@@ -388,91 +359,7 @@ test("legacy saved preferences survive when projectId matches and reset on misma
   // 強制切到 proj-A
   await app2.boot.switchProject("proj-A");
   assert.equal(app2.settings.characterId, "c1");
-  assert.equal(app2.settings.vrmAvatarId, "qqman");
   assert.equal(app2.settings.backgroundId, "uploaded:bg-A");
-});
-
-test("four-level selection order for mascots: project pref > project default > account default > catalog first", async () => {
-  // 1. 本專案存的偏好優先於專案預設
-  const storage1 = savedStorage({
-    "avatar.project_id": "proj-A",
-    "avatar.vrm_avatar_id::proj::proj-A": "myvrm",
-  });
-  const app1 = await openApp(storage1, {
-    "/api/v1/projects/proj-A/resources": () => json({
-      defaults: { avatar_mascot: "qqman" },
-      avatar_mascot: [
-        { resource_id: "qqman", label: "QQ", source: "project" },
-        { resource_id: "myvrm", label: "Mine", source: "project" },
-      ],
-    }),
-  });
-  await app1.m.settingsReady();
-  await app1.boot.fetchInitialProjectData();
-  assert.equal(app1.settings.vrmAvatarId, "myvrm");
-
-  // 2. 專案預設優先於帳號預設
-  const storage2 = savedStorage({ "avatar.project_id": "proj-A" });
-  const app2 = await openApp(storage2, {
-    "/api/v1/auth/me": () => json({
-      id: ACCOUNT,
-      role: "user",
-      username: "u",
-      defaults: { ...DEFAULTS, mascot_id: "qqman" },
-    }),
-    "/api/v1/projects/proj-A/resources": () => json({
-      defaults: { avatar_mascot: "myvrm" },
-      avatar_mascot: [
-        { resource_id: "qqman", label: "QQ", source: "project" },
-        { resource_id: "myvrm", label: "Mine", source: "project" },
-      ],
-    }),
-  });
-  await app2.m.settingsReady();
-  await app2.boot.fetchInitialProjectData();
-  assert.equal(app2.settings.vrmAvatarId, "myvrm");
-
-  // 3. 帳號預設優先於清單第一個
-  const storage3 = savedStorage({ "avatar.project_id": "proj-A" });
-  const app3 = await openApp(storage3, {
-    "/api/v1/auth/me": () => json({
-      id: ACCOUNT,
-      role: "user",
-      username: "u",
-      defaults: { ...DEFAULTS, mascot_id: "myvrm" },
-    }),
-    "/api/v1/projects/proj-A/resources": () => json({
-      defaults: {},
-      avatar_mascot: [
-        { resource_id: "qqman", label: "QQ", source: "project" },
-        { resource_id: "myvrm", label: "Mine", source: "project" },
-      ],
-    }),
-  });
-  await app3.m.settingsReady();
-  await app3.boot.fetchInitialProjectData();
-  assert.equal(app3.settings.vrmAvatarId, "myvrm");
-
-  // 4. 清單第一個 fallback
-  const storage4 = savedStorage({ "avatar.project_id": "proj-A" });
-  const app4 = await openApp(storage4, {
-    "/api/v1/auth/me": () => json({
-      id: ACCOUNT,
-      role: "user",
-      username: "u",
-      defaults: { ...DEFAULTS, mascot_id: "" },
-    }),
-    "/api/v1/projects/proj-A/resources": () => json({
-      defaults: {},
-      avatar_mascot: [
-        { resource_id: "qqman", label: "QQ", source: "project" },
-        { resource_id: "myvrm", label: "Mine", source: "project" },
-      ],
-    }),
-  });
-  await app4.m.settingsReady();
-  await app4.boot.fetchInitialProjectData();
-  assert.equal(app4.settings.vrmAvatarId, "qqman");
 });
 
 test("four-level selection order for characters: project pref > project default > account default > catalog first", async () => {

@@ -29,7 +29,6 @@ x-backend-runtime: &backend-runtime
     - VISION_LLM_API_KEY=${VISION_LLM_API_KEY:-${GATEWAY_INTERNAL_TOKEN:-}}
     - AVATAR_ASSETS_DIR=/data/avatar
     - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
-    - AVATAR_MASCOTS_DIR=/data/mascots
     - AVATAR_JOBS_DIR=/data/avatar-jobs
 
 services:

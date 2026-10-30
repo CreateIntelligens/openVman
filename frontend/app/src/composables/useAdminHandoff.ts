@@ -31,7 +31,6 @@ interface AdminHandoffOptions {
   stage: {
     rendererBootstrapState: Readonly<Ref<"loading" | "ready" | "error">>;
     handleCharChange: (charId: string) => Promise<void>;
-    handleRenderModeChange: (mode: "2d" | "3d") => void;
     handleBackgroundChange: (id: AvatarBackgroundId, url: string, fit: AvatarBackgroundFit) => void;
   };
   /** 設定視窗看不到（展示機台、未解鎖）時，來賓不能換專案與人物，後台指令也不行。 */
@@ -85,8 +84,6 @@ export function useAdminHandoff({ settings, bootstrap, stage, visitor, handlePro
       } catch {
         // 載入錯誤已記在 wasm.error，舞台會顯示；選擇已經存下。
       }
-      // 試用的是 2D 人物；停在 3D 舞台的話看不到它。等載完再切，才不會同一個人物載兩次。
-      if (settings.renderMode === "3d") stage.handleRenderModeChange("2d");
     }
   }
 

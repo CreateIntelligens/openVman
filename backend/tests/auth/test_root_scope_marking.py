@@ -45,7 +45,6 @@ from app.voice_policy import (
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("AVATAR_ASSETS_DIR", str(tmp_path / "avatar"))
     monkeypatch.setenv("AVATAR_BACKGROUNDS_DIR", str(tmp_path / "backgrounds"))
-    monkeypatch.setenv("AVATAR_MASCOTS_DIR", str(tmp_path / "mascots"))
     monkeypatch.setenv("ASR_PROVIDER", "breeze")
     monkeypatch.setenv("ASR_BREEZE_URL", "https://private-breeze.example")
     monkeypatch.setenv("ASR_R2T2_URL", "https://private-r2t2.example")
@@ -53,7 +52,6 @@ def env(tmp_path, monkeypatch):
     get_tts_config.cache_clear()
     avatar.reset_store()
     backgrounds.reset_store()
-    mascots.reset_store()
 
     runtime = get_auth_runtime()
     root = runtime.users.create_root(username="ai360", password_hash="unused")
@@ -159,17 +157,13 @@ def env(tmp_path, monkeypatch):
             {"char_id": "char-b", "label": "Char B"},
         ],
     )
+    # 正式目錄只有 Haru；這裡換成兩筆才測得出專案範圍內外的標記。
     monkeypatch.setattr(
         mascots,
-        "get_character_store",
-        avatar.get_store,
-    )
-    monkeypatch.setattr(
-        mascots.get_store(),
-        "list_mascots",
+        "builtin_mascots",
         lambda: [
-            {"mascot_id": "mascot-a", "engine": "vrm"},
-            {"mascot_id": "mascot-b", "engine": "vrm"},
+            {"mascot_id": "mascot-a", "engine": "2d"},
+            {"mascot_id": "mascot-b", "engine": "2d"},
         ],
     )
     monkeypatch.setattr(

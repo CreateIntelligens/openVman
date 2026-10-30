@@ -15,7 +15,7 @@
     "character_id": "<character-id>",
     "voice_provider": "<provider-id>",
     "voice_id": "<voice-id>",
-    "mascot_id": "<mascot-id>",
+    "mascot_id": "haru-live2d",
     "background_id": "<background-id>"
   },
   "projects": [],
@@ -72,13 +72,13 @@
 {
   "avatar_character": [{"resource_id": "char-1", "label": "角色1", "source": "project"}],
   "avatar_background": [{"resource_id": "bg-1", "label": "背景1", "source": "grant"}],
-  "avatar_mascot": [{"resource_id": "mascot-1", "label": "小助理1", "source": "assigned"}],
+  "avatar_mascot": [{"resource_id": "haru-live2d", "label": "Haru", "source": "grant"}],
   "custom_voice": [{"resource_id": "voice-1", "label": "Hayley", "source": "grant"}],
   "asr_engine": [{"resource_id": "breeze", "label": "breeze", "source": "grant"}],
   "defaults": {
     "avatar_character": "char-1",
     "avatar_background": "bg-1",
-    "avatar_mascot": "mascot-1",
+    "avatar_mascot": "haru-live2d",
     "custom_voice": "voice-1",
     "asr_engine": "breeze"
   }
@@ -94,7 +94,7 @@
 | 專案全部有效資源 | `GET /api/v1/projects/{project_id}/resources` |
 | 專案清單 | `GET /api/v1/projects` |
 | 角色 | `GET /api/v1/avatar`（選填 `project_id`） |
-| 吉祥物／小助理 | `GET /api/v1/avatar/mascots`（選填 `project_id`） |
+| 小助理（只有內建 Live2D Haru，`engine: "2d"`） | `GET /api/v1/avatar/mascots`（選填 `project_id`） |
 | 背景 | `GET /api/v1/backgrounds`（選填 `project_id`） |
 | TTS 供應商及聲音 | `GET /api/v1/tts/providers`（選填 `project_id`） |
 

@@ -20,7 +20,7 @@ export const EMPTY_SCOPE_RESOURCES: AdminScopeResources = {
 export const SCOPE_GROUPS: Array<{ key: ScopeKey; title: string }> = [
   { key: "projects", title: "知識庫專案" },
   { key: "avatar_characters", title: "虛擬人物" },
-  { key: "avatar_mascots", title: "VRM" },
+  { key: "avatar_mascots", title: "小助理" },
   { key: "custom_voices", title: "自訂聲音" },
   { key: "avatar_backgrounds", title: "舞台背景" },
   { key: "asr_engines", title: "語音辨識引擎" },

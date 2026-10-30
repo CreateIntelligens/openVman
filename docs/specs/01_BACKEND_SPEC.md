@@ -191,8 +191,8 @@ ws.send(JSON.stringify(payload));
 
 虛擬人前台設定視窗按「套用」的欄位存在 auth 資料庫 `account_preferences`（migration 15，每帳號一列 JSON），換電腦、換瀏覽器也在。
 `GET` 回 `{"values": {...}}`；`PUT` 送 `{"values": {欄位: 字串}}`，只合併送來的欄位（兩台裝置各改各的不互蓋），回合併後的結果。
-只收白名單欄位（`settings_routes.PREFERENCE_KEYS`，對應前台 `SettingsState`：專案、人設、角色、語音引擎與聲音、模式、回覆深度、背景、VRM、鏡頭預覽大小），
-其他欄位或單值超過 2048 字回 422。嵌入金鑰是訪客共用帳號，`GET` 一律回空、`PUT` 不存（不回 403，前台遇 403 會整頁換成權限不足）。
+只收白名單欄位（`settings_routes.PREFERENCE_KEYS`，對應前台 `SettingsState`：專案、人設、角色、語音引擎與聲音、模式、回覆深度、背景、鏡頭預覽大小），
+其他欄位或單值超過 2048 字回 422；前台拿掉 3D 模式後不用的 `renderMode`、`vrmAvatarId` 不在白名單，`PUT` 收到時直接丟掉、不回 422，免得舊版前台整份存不進去。嵌入金鑰是訪客共用帳號，`GET` 一律回空、`PUT` 不存（不回 403，前台遇 403 會整頁換成權限不足）。
 前台開場先等這個（最多 3 秒）再挑專案與聲音；帳號沒存過時把這台瀏覽器存的上傳一次；後端失敗就用瀏覽器存的值。ASR 引擎另存於 `/my-asr-provider`。
 
 ### 8. 打斷機制處理 (Interruption Handling)
@@ -232,7 +232,7 @@ ws.send(JSON.stringify(payload));
 | `taiwanese_asr_engine` | `string \| null` | 台語分流使用的批次引擎；`null` 沿用 Breeze |
 | `allowed_tts_voices` | `string[]` | 允許的聲音資源 ID（provider 由聲音 metadata 決定）；空陣列＝不限制 |
 | `default_tts_voice` | `string \| null` | 專案預設聲音 |
-| `allowed_characters` | `string[]` | 允許的人物資源 ID（2D/VRM/Live2D）；空陣列＝不限制 |
+| `allowed_characters` | `string[]` | 允許的 2D 影片人物資源 ID；空陣列＝不限制 |
 | `default_character_id` | `string \| null` | 專案預設人物 |
 | `allowed_backgrounds` | `string[]` | 允許的背景資源 ID；空陣列＝不限制 |
 | `default_background_id` | `string \| null` | 專案預設背景 |
@@ -255,7 +255,8 @@ ws.send(JSON.stringify(payload));
 - `POST /api/v1/projects/{project_id}/assignments`：**僅限 ROOT**（非 ROOT 回 403）。指派特定資源給專案（body: `{"resource_type": "...", "resource_id": "..."}`）；資源不存在回 422；已存在回 200 冪等處理。
 - `DELETE /api/v1/projects/{project_id}/assignments/{resource_type}/{resource_id}`：**僅限 ROOT**（非 ROOT 回 403）。解除指派特定資源，不存在回 404。
 - 專案刪除保護：專案被刪除時，其專案專屬資源不會連帶刪除檔案或資料庫記錄，而是將 `owner_project_id` 置 NULL，成為只有 ROOT 可見的「孤兒資源」；指派關聯表記錄自動 CASCADE 刪除。
-- 靜態檔案授權（`/static/characters/`、`/static/backgrounds/`、`/static/mascots/`）：驗證呼叫者具備該資源所屬專案或任一指派專案的 `ResourceAccess.READ` 權限；Embed key 僅限綁定專案。由人物自動衍生、沒有登錄成小助理資源的 `video-<char_id>` 小助理，`/static/mascots/video-<char_id>/` 只提供 `thumbnail.png`，改依底下人物（`avatar_character`／`<char_id>`）的權限判斷，沒有權限回 404。
+- 靜態檔案授權（`/static/characters/`、`/static/backgrounds/`）：驗證呼叫者具備該資源所屬專案或任一指派專案的 `ResourceAccess.READ` 權限；Embed key 僅限綁定專案。小助理沒有檔案，`/static/mascots/` 不是路由。
+- 小助理（`GET /api/v1/avatar/mascots`，選填 `project_id`）：只有內建的 Live2D Haru（`haru-live2d`，`engine: "2d"`），模型由 `model_url` 指向外部 CDN 的 `.model3.json`，`thumbnail_url` 為空字串。回應項目為 `mascot_id`、`label`、`engine`、`model_url`、`thumbnail_url`、`fit`、`builtin`，不帶專案時加 `source`、`owner_project_id`，帶專案時加 `source`、`in_project_scope`；看不看得到 Haru 照 `avatar_mascot` 資源的帳號授權與專案範圍判斷，auth 資料庫裡其他小助理資源列不會列出。沒有上傳、改名、刪除或縮圖端點。
 
 
 套用位置（沒有專案、專案讀不到、或限制為空時，行為與改版前完全相同）：
@@ -287,8 +288,6 @@ ws.send(JSON.stringify(payload));
 | `POST /api/v1/avatar`（素材包） | `AVATAR_MAX_UPLOAD_BYTES`，影片＋驅動資料合計 100 MB | 影片 `.webm`（EBML magic）、驅動資料 `.gz`（gzip magic） |
 | `POST /api/v1/avatar/jobs`（影片或人像） | 影片 `AVATAR_SOURCE_MAX_UPLOAD_BYTES`，200 MB；圖片 `AVATAR_SOURCE_IMAGE_MAX_UPLOAD_BYTES`，25 MB | 影片 `.mp4`／`.mov`／`.m4v` 看 `ftyp`、`.webm` 看 EBML，ffprobe 須有影像軌、長度 ≤ `AVATAR_SOURCE_MAX_DURATION_SECONDS`（60 秒）；圖片依 magic bytes 認 PNG／JPEG／WebP、驗尺寸、不檢查時長，存檔副檔名跟著實際格式（`.png`／`.jpg`／`.webp`），素材管線靠它判斷是圖片 |
 | `POST /api/v1/backgrounds` | `AVATAR_BACKGROUND_MAX_UPLOAD_BYTES`，25 MB | PNG／JPEG／WebP，副檔名與內容一致 |
-| `POST /api/v1/avatar/mascots` | 模型 `AVATAR_MASCOT_MAX_UPLOAD_BYTES`，100 MB；縮圖 `AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES`，10 MB | 模型 `.vrm`（glTF magic）；縮圖 PNG／JPEG／WebP |
-| `POST /api/v1/avatar/mascots/{mascot_id}/thumbnail` | `AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES`，10 MB | PNG／JPEG／WebP |
 | `POST /api/v1/vision/describe` | `VISION_FRAME_MAX_BYTES`，10 MB（先比 base64 長度，再比解碼後大小） | 依解碼後的 magic 判斷格式並以此送判讀，用戶端帶的 `mime_type` 不採信 |
 | Brain 代理（`/api/v1/*` 轉發，例如 `/api/v1/knowledge/qa/images`） | `BRAIN_PROXY_MAX_BODY_BYTES`，110 MB | 讀取請求本體時累計，超過即 413，不轉給 Brain；Brain 端另有自己的上限（見 `brain/README.md`） |
 

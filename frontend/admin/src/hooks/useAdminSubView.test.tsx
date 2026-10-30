@@ -3,20 +3,20 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { NavigationProvider } from "../context/NavigationContext";
 import { useAdminSubView } from "./useAdminSubView";
-const views = ["characters", "backgrounds", "mascots"] as const;
+const views = ["characters", "backgrounds"] as const;
 describe("useAdminSubView", () => {
   it("uses the route over stale storage and follows route changes", () => {
-    localStorage.setItem("admin.avatar.assets_tab", "mascots");
+    localStorage.setItem("admin.avatar.assets_tab", "backgrounds");
     const navigate = vi.fn();
-    let routeView: string | undefined = "backgrounds";
+    let routeView: string | undefined = "characters";
     function Wrapper({ children }: { children: ReactNode }) {
       return <NavigationProvider currentTab="Avatar" currentSubView={routeView} onSelectTab={navigate}>{children}</NavigationProvider>;
     }
     const { result, rerender } = renderHook(() => useAdminSubView("Avatar", "characters", views), { wrapper: Wrapper });
-    expect(result.current[0]).toBe("backgrounds");
-    routeView = "mascots";
+    expect(result.current[0]).toBe("characters");
+    routeView = "backgrounds";
     rerender();
-    expect(result.current[0]).toBe("mascots");
+    expect(result.current[0]).toBe("backgrounds");
     routeView = undefined;
     rerender();
     expect(result.current[0]).toBe("characters");

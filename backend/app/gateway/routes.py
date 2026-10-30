@@ -539,8 +539,6 @@ async def get_upload_limits(
         "asr_max_duration_seconds": cfg.asr_max_duration_seconds,
         "avatar_max_upload_bytes": cfg.avatar_max_upload_bytes,
         "avatar_background_max_upload_bytes": cfg.avatar_background_max_upload_bytes,
-        "avatar_mascot_max_upload_bytes": cfg.avatar_mascot_max_upload_bytes,
-        "avatar_mascot_thumbnail_max_upload_bytes": cfg.avatar_mascot_thumbnail_max_upload_bytes,
         "avatar_source_max_upload_bytes": cfg.avatar_source_max_upload_bytes,
         "avatar_source_max_duration_seconds": cfg.avatar_source_max_duration_seconds,
         "avatar_source_image_max_upload_bytes": cfg.avatar_source_image_max_upload_bytes,

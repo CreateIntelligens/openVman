@@ -9,11 +9,6 @@ import {
   uploadAvatarBackground,
   deleteAvatarBackground,
   updateAvatarBackgroundLabel,
-  fetchAvatarMascots,
-  uploadAvatarMascot,
-  uploadAvatarMascotThumbnail,
-  deleteAvatarMascot,
-  updateAvatarMascotLabel,
 } from "./avatar";
 
 afterEach(() => vi.restoreAllMocks());
@@ -109,52 +104,5 @@ describe("avatar api", () => {
     expect(url).toBe("/api/v1/backgrounds/clinic");
     expect((init as RequestInit).method).toBe("PATCH");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({ label: "新的診間" });
-  });
-
-  it("fetchAvatarMascots GETs /api/v1/avatar/mascots", async () => {
-    const f = mockFetch({ mascots: [{ mascot_id: "qqman" }] });
-    const res = await fetchAvatarMascots();
-    expect(f).toHaveBeenCalledWith(
-      "/api/v1/avatar/mascots",
-      expect.objectContaining({ credentials: "include" }),
-    );
-    expect(res.mascots[0].mascot_id).toBe("qqman");
-  });
-
-  it("uploadAvatarMascot POSTs multipart", async () => {
-    const f = mockFetch({ status: "ok", mascot: { mascot_id: "custom" } });
-    const model = new File([new Uint8Array([0x67])], "custom.vrm");
-    await uploadAvatarMascot({ mascotId: "custom", label: "自訂", model });
-    const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/v1/avatar/mascots");
-    expect((init as RequestInit).method).toBe("POST");
-    expect((init as RequestInit).body).toBeInstanceOf(FormData);
-  });
-
-  it("deleteAvatarMascot DELETEs by id", async () => {
-    const f = mockFetch({ status: "ok", mascot_id: "custom" });
-    await deleteAvatarMascot("custom");
-    const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/v1/avatar/mascots/custom");
-    expect((init as RequestInit).method).toBe("DELETE");
-  });
-
-  it("updateAvatarMascotLabel PATCHes display name", async () => {
-    const f = mockFetch({ status: "ok", mascot: { mascot_id: "custom", label: "新名稱" } });
-    await updateAvatarMascotLabel("custom", "新名稱");
-    const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/v1/avatar/mascots/custom");
-    expect((init as RequestInit).method).toBe("PATCH");
-    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ label: "新名稱" });
-  });
-
-  it("uploadAvatarMascotThumbnail POSTs multipart thumbnail", async () => {
-    const f = mockFetch({ status: "ok", mascot: { mascot_id: "custom" } });
-    const thumbnail = new File([new Uint8Array([0x89])], "custom.png");
-    await uploadAvatarMascotThumbnail("custom", thumbnail);
-    const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/v1/avatar/mascots/custom/thumbnail");
-    expect((init as RequestInit).method).toBe("POST");
-    expect((init as RequestInit).body).toBeInstanceOf(FormData);
   });
 });

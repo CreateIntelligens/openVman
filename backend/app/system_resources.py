@@ -219,8 +219,8 @@ async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
             logger.warning("failed to register aws voice: %s", exc)
 
     try:
-        from app.routes.mascots import get_store as get_mascot_store
-        for mascot in get_mascot_store().list_mascots():
+        from app.avatar.mascot_store import builtin_mascots
+        for mascot in builtin_mascots():
             mid = mascot.get("mascot_id")
             mlabel = mascot.get("label") or mid
             if mid:

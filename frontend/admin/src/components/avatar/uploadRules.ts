@@ -64,20 +64,6 @@ export const BACKGROUND_IMAGE: FileKind = {
   maxBytes: 25 * MB,
 };
 
-export const MASCOT_MODEL: FileKind = {
-  noun: "VRM 模型",
-  extensions: [".vrm"],
-  formats: ["VRM"],
-  maxBytes: 100 * MB,
-};
-
-export const MASCOT_THUMBNAIL: FileKind = {
-  noun: "縮圖",
-  extensions: IMAGE_EXTENSIONS,
-  formats: IMAGE_FORMATS,
-  maxBytes: 10 * MB,
-};
-
 /** 從影片產生人物：影片或圖片都收，各自有上限。 */
 export const SOURCE_KINDS: readonly MediaKind[] = [SOURCE_VIDEO, SOURCE_IMAGE];
 
@@ -100,7 +86,7 @@ function extensionOf(name: string): string {
   return dot < 0 ? "" : name.slice(dot).toLowerCase();
 }
 
-/** 依副檔名找出檔案屬於哪一種；瀏覽器給的 MIME 對 .mov、.vrm 常是空的，不可靠。 */
+/** 依副檔名找出檔案屬於哪一種；瀏覽器給的 MIME 對 .mov 常是空的，不可靠。 */
 export function matchKind<K extends FileKind>(file: File, kinds: readonly K[]): K | null {
   const extension = extensionOf(file.name);
   return kinds.find((kind) => kind.extensions.includes(extension)) ?? null;

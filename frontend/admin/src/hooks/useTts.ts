@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTtsProviders, openSpeechStream, synthesizeSpeech, type TtsProvider } from "../api";
 import { isPcmStreamContentType, playPcmStream } from "../utils/ttsStream";
 import { useMascot } from "../context/MascotContext";
-import { resolveMascotOption } from "../data/mascotCatalog";
-import { audioBufferToMascotPcm, blobToPcm16Chunks, rmsVolume } from "../utils/liveAudioUtils";
+import { rmsVolume } from "../utils/liveAudioUtils";
 import { readScoped, writeScoped } from "../utils/scopedStorage";
 
 type WebAudioWindow = Window & typeof globalThis & {
@@ -20,10 +19,6 @@ function createAudioContext(): AudioContext | null {
               window.AudioContext || (window as WebAudioWindow).webkitAudioContext;
        return AudioContextConstructor ? new AudioContextConstructor() : null;
 }
-
-// 影片型小助理的 WASM runtime 吃 16kHz mono int16；4096 samples 一包與 Avatar SDK 一致。
-const MASCOT_PCM_SAMPLE_RATE = 16000;
-const MASCOT_PCM_CHUNK_BYTES = 4096 * 2;
 
 import {
   parseTtsFallback,
@@ -63,15 +58,9 @@ export function useTts() {
        const mascotRafRef = useRef<number | null>(null);
        const {
               driveMouth,
-              pushPcm,
               stopMouth,
-              mascotOptions,
-              selectedMascotId,
               registerSpeechStopper,
        } = useMascot();
-       const mascotEngine = resolveMascotOption(selectedMascotId, mascotOptions).engine;
-       const mascotEngineRef = useRef(mascotEngine);
-       mascotEngineRef.current = mascotEngine;
 
        const ttsProviderRef = useRef(ttsProvider);
        ttsProviderRef.current = ttsProvider;
@@ -188,7 +177,7 @@ export function useTts() {
               }
        }, [ensureMascotContext, startMascotAnalyser, stopMascotAnalyser]);
 
-       // 邊收邊播：串流一到就排進 AudioContext，小助理同步拿音量與 PCM。
+       // 邊收邊播：串流一到就排進 AudioContext，小助理同步拿音量。
        // 回傳 false 表示這個回應不能串流（例如 mp3），交給整段路徑。
        const playStreamedSpeech = useCallback(async (response: Response, cacheKey: string, fallback?: string): Promise<boolean> => {
               const contentType = response.headers.get("Content-Type") ?? "";
@@ -207,16 +196,7 @@ export function useTts() {
               }
               stopMascotAnalyser();
               const analyser = startMascotAnalyser(ctx);
-              const wantsPcm = mascotEngineRef.current === "video";
-              const playback = playPcmStream(response, ctx, {
-                     outputNode: analyser,
-                     onChunk: (buffer) => {
-                            if (!wantsPcm) return;
-                            for (const chunk of audioBufferToMascotPcm(buffer, MASCOT_PCM_SAMPLE_RATE, MASCOT_PCM_CHUNK_BYTES)) {
-                                   pushPcm(chunk);
-                            }
-                     },
-              });
+              const playback = playPcmStream(response, ctx, { outputNode: analyser });
               streamStopRef.current = playback.stop;
               try {
                      const wav = await playback.done;
@@ -229,32 +209,7 @@ export function useTts() {
                      }
               }
               return true;
-       }, [ensureMascotContext, pushPcm, startMascotAnalyser, stopMascotAnalyser]);
-
-       // 只有影片型小助理需要 PCM；解碼在 play() 之前完成，讓嘴型與聲音同時起跑。
-       const decodeMascotPcm = useCallback(async (buffer: ArrayBuffer): Promise<ArrayBuffer[]> => {
-              if (mascotEngineRef.current !== "video") {
-                     return [];
-              }
-              if (!mascotAudioCtxRef.current) {
-                     const ctx = createAudioContext();
-                     if (!ctx) {
-                            return [];
-                     }
-                     mascotAudioCtxRef.current = ctx;
-              }
-              try {
-                     return await blobToPcm16Chunks(
-                            new Blob([buffer]),
-                            mascotAudioCtxRef.current,
-                            MASCOT_PCM_SAMPLE_RATE,
-                            MASCOT_PCM_CHUNK_BYTES,
-                     );
-              } catch (reason) {
-                     console.warn("Failed to decode TTS audio for mascot lip sync:", reason);
-                     return [];
-              }
-       }, []);
+       }, [ensureMascotContext, startMascotAnalyser, stopMascotAnalyser]);
 
        const playAudioBuffer = useCallback(async (buffer: ArrayBuffer, fallback?: string) => {
               if (fallback) {
@@ -276,19 +231,10 @@ export function useTts() {
               };
 
               audio.onended = cleanup;
-              const pcmChunks = await decodeMascotPcm(buffer);
-              if (audioRef.current !== audio) {
-                     // 解碼期間被 stopAudio 取消
-                     URL.revokeObjectURL(url);
-                     return;
-              }
               audio.play()
-                     .then(() => {
-                            driveMascotFromAudio(audio);
-                            for (const chunk of pcmChunks) pushPcm(chunk);
-                     })
+                     .then(() => driveMascotFromAudio(audio))
                      .catch(cleanup);
-       }, [decodeMascotPcm, driveMascotFromAudio, pushPcm, stopMascotAnalyser]);
+       }, [driveMascotFromAudio, stopMascotAnalyser]);
 
        const prefetchTts = useCallback(async (text: string, speechLanguage = "") => {
               ttsPrefetchAbortRef.current?.abort();

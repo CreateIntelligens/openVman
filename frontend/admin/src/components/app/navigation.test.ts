@@ -91,7 +91,12 @@ describe("canonical subpage routes", () => {
   it("opens subpages directly without depending on saved browser state", () => {
     expect(parseAdminRoute("/admin/voice/asr")).toEqual({ tab: "Voice", subView: "asr" });
     expect(parseAdminRoute("/admin/access/accounts/temporary")).toEqual({ tab: "Access", subView: "accounts/temporary" });
-    expect(parseAdminRoute("/openvman/admin/avatar/mascots/")).toEqual({ tab: "Avatar", subView: "mascots" });
+    expect(parseAdminRoute("/openvman/admin/avatar/backgrounds/")).toEqual({ tab: "Avatar", subView: "backgrounds" });
+  });
+
+  it("does not route the removed mascots subpage", () => {
+    // 小助理分頁已拿掉；舊網址不轉址，直接不是頁面路由。
+    expect(parseAdminRoute("/admin/avatar/mascots")).toBeNull();
   });
 
   it("accepts legacy query views and emits a single canonical path", () => {
@@ -243,9 +248,9 @@ describe("sub view memory", () => {
     const { recallSubView, rememberSubView } = await import("./navigation");
     expect(recallSubView("Access")).toBeUndefined();
     rememberSubView("Access", "accounts/manage");
-    rememberSubView("Avatar", "mascots");
+    rememberSubView("Avatar", "backgrounds");
     expect(recallSubView("Access")).toBe("accounts/manage");
-    expect(recallSubView("Avatar")).toBe("mascots");
+    expect(recallSubView("Avatar")).toBe("backgrounds");
     // 選回預設頁也要記住，不能還原成上一次的非預設頁。
     rememberSubView("Avatar", undefined);
     expect(recallSubView("Avatar")).toBeUndefined();

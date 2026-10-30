@@ -13,7 +13,6 @@
                font-family:"Noto Sans TC", system-ui, sans-serif; -webkit-font-smoothing:antialiased; }
   #stage { position:absolute; inset:0; }
   .avatar-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
-  .avatar-video-stage { position:absolute; inset:0; }
 
   /* ===== 底部控制 dock（毛玻璃）===== */
   #control-bar {
@@ -94,7 +93,6 @@
   #control-bar .dock-row:last-child > *:not(#btn-close) { display:none !important; }
   #control-bar #btn-close { background:rgba(20,20,30,.4); }
   #control-bar #btn-close:hover { background:rgba(20,20,30,.6); }
-  html.stage-mode #control-bar { display:none !important; }
 </style>
 </head>
 <body>
@@ -105,55 +103,17 @@
   </div>
   <div id="direct-warn">請透過 <code>embed.js</code> 載入此元件。</div>
 
-  <!-- 3D(VRM) 引擎用的 importmap：宣告在這「不會」下載，等真的 import('three') 才抓 → lazy。
-       2D(Live2D) 的 pixi/live2d 改成 bootAvatar() 裡用到才動態載入。 -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.4/lib/three-vrm.module.min.js",
-      "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.5.4/lib/three-vrm-animation.module.min.js"
-    }
-  }
-  </script>
   <script>
-  // ===== 可設定（由 embed.js 透過 query 帶入）：皮=模型 / 肉的語音=後端 / 內容=知識庫 =====
+  // ===== 可設定（由父頁透過 query 帶入）：model=Live2D 模型（.model3.json）、fit=half|full =====
+  // 小助理只剩內建 Live2D（Haru）；其他舊參數（例如 engine）一律忽略，永遠走 Live2D。
   const CFG = new URLSearchParams(location.search);
-  if (CFG.get('chrome') === 'stage') document.documentElement.classList.add('stage-mode');
-  function readNumberParam(name, fallback, min, max) {
-    const value = Number.parseFloat(CFG.get(name) || '');
-    if (!Number.isFinite(value)) return fallback;
-    return Math.min(max, Math.max(min, value));
-  }
   const MODEL_URL = CFG.get('model') || 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json';
-
-  // 皮的引擎判斷：data-vrm 指向 .vrm → 走 3D(VRM)；否則 data-model(.model3.json) → 走 2D(Live2D)
-  let VRM_URL = CFG.get('vrm') || (/\.vrm($|\?)/i.test(MODEL_URL) ? MODEL_URL : ''); // let：拖放自己的 VRM 時可換
-  const VRM_TARGET_HEIGHT = readNumberParam('vrmTargetHeight', 1.68, 0.8, 2.4);
-  const VRM_FIT_PADDING = readNumberParam('vrmFitPadding', 1.18, 1.05, 1.6);
-  // 影片皮（matex）：指定 avatar 角色 id，透過 OpenVman Avatar SDK 載入 WASM 嘴型 runtime
-  const CHARACTER_ID = CFG.get('character') || '';
-  const ENGINE  = VRM_URL ? '3d' : '2d';
-  // 切換用：embedder 兩個皮都給(data-model + data-vrm) → 長出 2D/3D 切換鈕。
-  // 預設引擎：data-engine 優先；否則有明確 2D 皮就 2D、只有 3D 就 3D、只有影片角色就 video。
-  const has2D = !!CFG.get('model');
-  const has3D = !!VRM_URL;
-  function resolveStartMode() {
-    const configuredMode = CFG.get('engine');
-    if (configuredMode) return configuredMode;
-    if (has2D) return '2d';
-    if (has3D) return '3d';
-    return CHARACTER_ID ? 'video' : '2d';
-  }
-  const startMode = resolveStartMode();
 
   // ===== 模組層狀態 =====
   let model = null, app = null;
   let isSpeaking = false, mouthValue = 0;
   let lipIds = ['ParamMouthOpenY'];
   let audioMouth = 0, useAudioMouth = false;
-  let gesture3D = null; // 3D 手勢觸發 hook（bootVRM 設定；2D 模式為 null → 自動 no-op）
 
   // ===== 防止被直接開（常見網站 widget 的「禁止直接訪問」提示；純 UX，非安全控制），留 ?dev=1 給開發 =====
   const isEmbedded = window.self !== window.top;
@@ -162,7 +122,7 @@
     document.getElementById('stage').style.display = 'none';
     document.getElementById('direct-warn').style.display = 'flex';
   } else {
-    initEngines();
+    bootAvatar();
   }
 
   // ===== 跟父頁溝通 =====
@@ -196,19 +156,12 @@
     const d = e.data || {};
     if (d.ns !== 'avatar-widget-host') return;
     if (d.type === 'mouth') driveMouth(d.volume);
-    if (d.type === 'mouth-stop') {
-      stopMouth();
-      if (_videoDriver) _videoDriver.interrupt();
-    }
-    // 影片皮需要真正的 PCM（16kHz mono int16）才能算嘴型，不能只靠音量
-    if (d.type === 'pcm' && d.buffer instanceof ArrayBuffer && _videoDriver) {
-      _videoDriver.pushPcm(d.buffer);
-    }
-    if (d.type === 'gesture' && typeof d.name === 'string') gesture3D && gesture3D(d.name);
+    if (d.type === 'mouth-stop') stopMouth();
+    // 其他類型（舊父頁送的 pcm、gesture）屬於已移除的引擎，直接略過。
     // 注意：不接受用 postMessage 遠端啟動麥克風（listen），避免惡意父頁偷開麥；麥克風只由使用者點擊觸發
   });
 
-  // ===== 共用：每幀算出嘴巴開合 0..1（2D 寫 ParamMouthOpenY、3D 寫 aa 表情，共用同一套計算）=====
+  // ===== 每幀算出嘴巴開合 0..1，寫進 Live2D 的 ParamMouthOpenY =====
   // 純被動模式下嘴型永遠跟隨父頁送來的即時音量（audioMouth），沒有語音時平滑閉嘴。
   function computeMouth() {
     if (isSpeaking && useAudioMouth) {
@@ -219,7 +172,7 @@
     return mouthValue;
   }
 
-  // 2D 引擎相依（pixi + live2d）改成「用到才載」，3D 模式就不會下載 Live2D
+  // pixi + live2d 在 bootAvatar() 裡才載入。
   // 注意：用 var 不用 let —— bootAvatar() 在腳本上方就被呼叫，let 會有 TDZ「used before init」錯
   var _umd = null;
   function loadUMD() {
@@ -235,430 +188,14 @@
     return _umd;
   }
 
-  // ===== 引擎切換外殼：每個引擎建自己的 canvas、回傳 dispose；切換＝dispose 舊的再 boot 新的 =====
   function newCanvas() {
     const st = document.getElementById('stage');
-    st.querySelectorAll('canvas.avatar-canvas').forEach((old) => old.remove()); // 切換時保證不留舊 canvas（殘骸）
+    st.querySelectorAll('canvas.avatar-canvas').forEach((old) => old.remove());
     const c = document.createElement('canvas'); c.className = 'avatar-canvas';
     st.insertBefore(c, st.firstChild); // 放最底層，UI 疊在上面
     return c;
   }
-  var _renderer = null, _engineMode = null, _switching = false; // var 不用 let：setEngine 在宣告前就被呼叫(TDZ)
-  async function bootEngine(mode) {
-    if (mode === '3d') return bootVRM();
-    if (mode === 'video') return bootVideo();
-    return bootAvatar();
-  }
-  async function setEngine(mode) {
-    if (_switching || mode === _engineMode) return;
-    _switching = true;
-    if (_renderer) { try { _renderer.dispose(); } catch (e) {} _renderer = null; }
-    _engineMode = mode;
-    const eb = document.getElementById('btn-engine'); if (eb) eb.textContent = (mode === '3d') ? '3D' : '2D';
-    try {
-      _renderer = await bootEngine(mode);
-    } catch (e) { console.error(e); }
-    _switching = false;
-  }
-  function initEngines() {
-    setEngine(startMode);
-    if (has2D && has3D) {  // 兩個皮都給 → 顯示切換鈕，讓使用者即時切
-      const eb = document.getElementById('btn-engine');
-      if (eb) { eb.style.display = ''; eb.onclick = () => setEngine(_engineMode === '3d' ? '2d' : '3d'); }
-    }
-  }
-
-  // ===== 拖放自己的 VRM：把 .vrm 拖到角色上就直接換成你的 3D 角色（零改 code）=====
-  function loadVRMFile(file) {
-    if (!file || !/\.vrm$/i.test(file.name)) { showBubble('請拖一個 .vrm 檔喔'); return; }
-    try { if (VRM_URL && VRM_URL.indexOf('blob:') === 0) URL.revokeObjectURL(VRM_URL); } catch (e) {}
-    VRM_URL = URL.createObjectURL(file);
-    const eb = document.getElementById('btn-engine');          // 換上後也顯示 2D/3D 切換鈕
-    if (eb) { eb.style.display = ''; if (!eb.onclick) eb.onclick = () => setEngine(_engineMode === '3d' ? '2d' : '3d'); }
-    _engineMode = null;                                         // 強制重 boot（即使已在 3D）
-    setEngine('3d');
-    showBubble('換上你的角色了！🎭');
-  }
-  ['dragenter', 'dragover'].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); }));
-  document.addEventListener('drop', (e) => {
-    e.preventDefault();
-    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) loadVRMFile(f);
-  });
-
-  // ===== 影片皮：matex 角色（OpenVman Avatar SDK + WASM 嘴型 runtime）=====
-  // 音訊一律由父頁播放；這裡以 silent 輸出只驅動嘴型，避免同一段語音出聲兩次。
-  var _videoDriver = null;   // { pushPcm(ArrayBuffer), interrupt() }，bootVideo 設定、dispose 清掉
-  function loadAvatarSdk() {
-    if (window.OpenVmanAvatar) return Promise.resolve();
-    return new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = location.origin + '/static/sdk/openvman-avatar-sdk.js';
-      s.onload = res; s.onerror = () => rej(new Error('無法載入 Avatar SDK'));
-      document.head.appendChild(s);
-    });
-  }
-  async function bootVideo() {
-    try {
-      if (!CHARACTER_ID) throw new Error('video 引擎需要 character 參數');
-      const stage = document.getElementById('stage');
-      stage.querySelectorAll('canvas.avatar-canvas, .avatar-video-stage').forEach((old) => old.remove());
-      const host = document.createElement('div');
-      host.className = 'avatar-video-stage';
-      stage.insertBefore(host, stage.firstChild);
-      await loadAvatarSdk();
-      const inst = await window.OpenVmanAvatar.init({
-        container: host,
-        characterId: CHARACTER_ID,
-        assetsBaseUrl: '/static/characters/',
-        audioOutput: 'silent',
-      });
-      let alive = true;
-      _videoDriver = {
-        pushPcm(buffer) {
-          if (!alive || buffer.byteLength < 2) return;
-          inst.pushPcm(new Int16Array(buffer, 0, Math.floor(buffer.byteLength / 2)))
-            .catch((e) => console.warn('PCM 推送失敗：', e && e.message));
-        },
-        interrupt() {
-          if (alive) inst.interrupt();
-        },
-      };
-      inst.on('error', (e) => postToParent('error', { message: e.message }));
-      postToParent('ready');
-      setTimeout(() => {
-        if (!alive) return;
-        try {
-          const c = host.querySelector('#canvas_video');
-          if (c) postToParent('screenshot', { dataUrl: c.toDataURL('image/png') });
-        } catch (e) { console.warn('自動擷取影片頭像失敗：', e); }
-      }, 2500);
-      return {
-        dispose() {
-          alive = false;
-          _videoDriver = null;
-          try { inst.destroy(); } catch (e) {}
-          host.remove();
-        },
-      };
-    } catch (err) {
-      console.error(err);
-      const w = document.getElementById('direct-warn');
-      if (w) {
-        w.textContent = '影片角色啟動失敗：' + (err && err.message || err);
-        w.style.display = 'flex';
-      }
-      postToParent('error', { message: err && err.message || String(err) });
-    }
-  }
-
-  // ===== 3D 皮：VRM（three + three-vrm，ESM 動態 import）=====
-  async function bootVRM() {
-    try {
-      // 抑制特定 VRM 動畫載入的 console warnings
-      const _originalWarn = console.warn;
-      console.warn = (...args) => {
-        const msg = args[0];
-        if (typeof msg === 'string' && (
-          msg.includes('specVersion of the VRMA is not defined') ||
-          msg.includes('VRMLookAtQuaternionProxy is not found')
-        )) {
-          return;
-        }
-        _originalWarn.apply(console, args);
-      };
-
-      const THREE = await import('three');
-      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
-      const { VRMLoaderPlugin, VRMUtils } = await import('@pixiv/three-vrm');
-      const { VRMAnimationLoaderPlugin, createVRMAnimationClip } = await import('@pixiv/three-vrm-animation');
-      const TK = 'https://cdn.jsdelivr.net/gh/tk256ailab/vrm-viewer@main/VRMA/';
-      const VRMA_GESTURES = {        // 情境手勢 + 待機變化（body-only，不碰嘴）
-        'wave-soft': TK + 'Goodbye.vrma',
-        'thinking-hand': TK + 'Thinking.vrma',
-        'look-around': TK + 'LookAround.vrma',
-        'relax-shift': TK + 'Relax.vrma',
-        'bow-light': 'https://cdn.jsdelivr.net/gh/hirokazuniimoto/virtual-avatar-sdk@main/assets/animations/quick_formal_bow.vrma'
-      };
-      const PROCEDURAL_GESTURES = {
-        'nod-small': { duration: 0.9 },
-        'explain-open-hand': { duration: 1.6 },
-      };
-      const GESTURE_ALIASES = { wave: 'wave-soft', bow: 'bow-light', thinking: 'thinking-hand', look: 'look-around', relax: 'relax-shift' };
-      const TAP_GESTURES = ['wave-soft', 'bow-light', 'nod-small']; // 點一下隨機：揮手/鞠躬/小點頭
-      const IDLE_GESTURES = ['look-around', 'relax-shift'];
-
-      const stage = document.getElementById('stage');
-      const canvas = newCanvas();
-      const r3 = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
-      r3.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      r3.setClearColor(0x000000, 0);
-
-      const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 20);
-      camera.position.set(0, 1, 4); camera.lookAt(0, 0.8, 0);
-      let fittedVRMScene = null;
-      const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; r3.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (fittedVRMScene) fitVRMToCamera(THREE, fittedVRMScene, camera); };
-      resize(); window.addEventListener('resize', resize);
-
-      const scene = new THREE.Scene();
-      // 調暗：原本 key=π / fill=π*0.35 / ambient=0.6 太亮（MToon 易過曝），整體降約 4 成
-      const key = new THREE.DirectionalLight(0xffffff, Math.PI * 0.6); key.position.set(1, 1.5, 2);
-      const fill = new THREE.DirectionalLight(0xfff0e8, Math.PI * 0.2); fill.position.set(-1.5, 0.5, 1);
-      scene.add(key, fill, new THREE.AmbientLight(0xffffff, 0.38));
-      const lookTarget = new THREE.Object3D(); scene.add(lookTarget);   // lookAt 目標：跟著滑鼠
-      let mx = 0, my = 0;                                                // 游標相對位置 -1..1
-      let lookTargetBaseY = 1.3, lookTargetRangeX = 0.9, lookTargetRangeY = 0.55, lookTargetZ = 4;
-      const onMove = (ev) => { const r = stage.getBoundingClientRect(); if (!r.width) return; mx = Math.max(-1, Math.min(1, ((ev.clientX - r.left) / r.width) * 2 - 1)); my = Math.max(-1, Math.min(1, ((ev.clientY - r.top) / r.height) * 2 - 1)); };
-      window.addEventListener('pointermove', onMove);
-
-      function fitVRMToCamera(THREE, vrmScene, camera) {
-        vrmScene.position.set(0, 0, 0);
-        vrmScene.scale.setScalar(1);
-        vrmScene.updateMatrixWorld(true);
-
-        const box = new THREE.Box3().setFromObject(vrmScene);
-        const size = box.getSize(new THREE.Vector3());
-        if (!Number.isFinite(size.y) || size.y <= 0) return;
-        const scale = VRM_TARGET_HEIGHT / Math.max(size.y, 0.001);
-        vrmScene.scale.setScalar(scale);
-        vrmScene.updateMatrixWorld(true);
-
-        const scaledBox = new THREE.Box3().setFromObject(vrmScene);
-        const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
-        vrmScene.position.x -= scaledCenter.x;
-        vrmScene.position.y -= scaledBox.min.y;
-        vrmScene.position.z -= scaledCenter.z;
-        vrmScene.updateMatrixWorld(true);
-
-        const fittedBox = new THREE.Box3().setFromObject(vrmScene);
-        const fittedSize = fittedBox.getSize(new THREE.Vector3());
-        const center = fittedBox.getCenter(new THREE.Vector3());
-        const halfVerticalFov = THREE.MathUtils.degToRad(camera.fov) / 2;
-        const aspect = Number.isFinite(camera.aspect) && camera.aspect > 0 ? camera.aspect : 1;
-        const halfHorizontalFov = Math.atan(Math.tan(halfVerticalFov) * aspect);
-        const verticalDistance = (fittedSize.y / 2) / Math.tan(halfVerticalFov);
-        const horizontalDistance = (fittedSize.x / 2) / Math.tan(halfHorizontalFov);
-        const halfDepth = fittedSize.z / 2;
-        const distance = Math.max(verticalDistance, horizontalDistance, 0.8) * VRM_FIT_PADDING;
-        camera.position.set(0, center.y, distance + halfDepth);
-        camera.lookAt(center);
-        camera.updateProjectionMatrix();
-
-        lookTargetBaseY = fittedBox.min.y + fittedSize.y * 0.78;
-        lookTargetRangeX = Math.max(fittedSize.x * 0.45, 0.35);
-        lookTargetRangeY = Math.max(fittedSize.y * 0.22, 0.25);
-        lookTargetZ = camera.position.z;
-      }
-
-      let vrm = null, armSign = 1, nextBlink = 2 + Math.random() * 3, blinkT = -1, mixer = null, waving = false; const BLINK = 0.12;
-      let mouthExpressionName = 'aa', blinkExpressionName = 'blink';
-      const gestureActions = {}; let currentGesture = null, proceduralGesture = null, idleBreak = 0;
-      const clock = new THREE.Clock();
-      const loader = new GLTFLoader();
-      loader.register((p) => new VRMLoaderPlugin(p));
-      loader.register((p) => new VRMAnimationLoaderPlugin(p));   // 同一個 loader 也能讀 .vrma
-      loader.load(VRM_URL, (gltf) => {
-        vrm = gltf.userData.vrm;
-        VRMUtils.removeUnnecessaryVertices(gltf.scene);
-        VRMUtils.combineSkeletons(gltf.scene);
-        VRMUtils.combineMorphs(vrm);
-        VRMUtils.rotateVRM0(vrm); // VRM0.x 轉正；VRM1 為安全 no-op
-        // VRM0 被 rotateVRM0 轉 180°，手臂 z 旋轉方向會相反；VRM1 不轉 → 用版本決定正負號
-        armSign = (String(vrm.meta && vrm.meta.metaVersion) === '1') ? -1 : 1;
-        vrm.scene.traverse((o) => { o.frustumCulled = false; });
-        fittedVRMScene = vrm.scene;
-        fitVRMToCamera(THREE, vrm.scene, camera);
-        scene.add(vrm.scene);
-        window.__avatarVrm = vrm;
-        try {
-          const em = vrm.expressionManager;
-          const names = em ? em.expressions.map(x => x.name) : [];
-          console.log("3D Mascot Expressions:", names);
-          if (em && names.length > 0) {
-            // Find mouth expression
-            if (names.includes('aa')) mouthExpressionName = 'aa';
-            else if (names.includes('a')) mouthExpressionName = 'a';
-            else {
-              const foundAa = names.find(n => n.toLowerCase().includes('aa'));
-              if (foundAa) mouthExpressionName = foundAa;
-              else {
-                const foundA = names.find(n => {
-                  const l = n.toLowerCase();
-                  return l.includes('a') && !l.includes('sad') && !l.includes('happy') && !l.includes('angry') && !l.includes('relaxed');
-                });
-                if (foundA) mouthExpressionName = foundA;
-              }
-            }
-
-            // Find blink expression
-            if (names.includes('blink')) blinkExpressionName = 'blink';
-            else {
-              const foundBlink = names.find(n => n.toLowerCase().includes('blink') && !n.toLowerCase().includes('left') && !n.toLowerCase().includes('right'));
-              if (foundBlink) blinkExpressionName = foundBlink;
-            }
-            console.log('Mapped 3D mouth expression:', mouthExpressionName);
-            console.log('Mapped 3D blink expression:', blinkExpressionName);
-          }
-        } catch (e) {
-          console.warn("Failed to dynamically map expressions:", e);
-        }
-        try { if (vrm.lookAt) vrm.lookAt.target = lookTarget; } catch (e) {}   // 眼睛跟著滑鼠
-        // VRMA 情境手勢庫（body-only，不碰嘴）：點擊/出場揮手、思考托腮、待機變化(環顧/放鬆)
-        (async () => {
-          const bodyOnly = (cl) => { cl.tracks = cl.tracks.filter((tr) => /\.quaternion$/.test(tr.name)); return cl; }; // 只留骨架旋轉、剝臉部表情與位移
-          try {
-            mixer = new THREE.AnimationMixer(vrm.scene);
-            for (const [name, file] of Object.entries(VRMA_GESTURES)) {
-              try {
-                const gg = await loader.loadAsync(file);
-                const a = gg.userData.vrmAnimations && gg.userData.vrmAnimations[0];
-                if (!a) continue;
-                const act = mixer.clipAction(bodyOnly(createVRMAnimationClip(a, vrm)));
-                act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true;
-                gestureActions[name] = act;
-              } catch (e) { console.warn('VRMA ' + name + ' 載入失敗：', e && e.message); }
-            }
-            mixer.addEventListener('finished', (e) => {        // 手勢播完 → 立刻停、交回程序化站姿（不 fadeOut，避免露出 bind T-pose）
-              if (e.action === currentGesture) { try { e.action.stop(); } catch (er) {} currentGesture = null; proceduralGesture = null; waving = false; }
-            });
-            gesture3D = playGesture;                            // 對外 hook：思考等時機可從對話流程觸發
-            if (gestureActions['wave-soft']) setTimeout(() => playGesture('wave-soft'), 800);    // 出場招呼
-            idleBreak = setInterval(() => {                     // 待機變化：偶爾環顧/放鬆，不死板
-              if (!waving && !isSpeaking && Math.random() < 0.65) playGesture(IDLE_GESTURES[Math.floor(Math.random() * IDLE_GESTURES.length)]);
-            }, 15000);
-          } catch (e) { console.warn('VRMA 手勢庫載入失敗：', e && e.message); }
-        })();
-        setTimeout(() => showBubble('點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋'), 700);
-        postToParent('ready');
-        setTimeout(() => {
-          if (!alive || !vrm) return;
-          try {
-            r3.render(scene, camera);
-            const dataUrl = canvas.toDataURL('image/png');
-            postToParent('screenshot', { dataUrl });
-          } catch (e) {
-            console.warn('自動擷取 3D 頭像失敗：', e);
-          }
-        }, 1500);
-      }, undefined, (e) => { console.error(e); postToParent('error', { message: String(e) }); });
-
-      function canonicalGestureName(name) {
-        return GESTURE_ALIASES[name] || name;
-      }
-      function startProceduralGesture(name) {
-        const def = PROCEDURAL_GESTURES[name];
-        if (!def || waving) return false;
-        proceduralGesture = { name, elapsed: 0, duration: def.duration };
-        currentGesture = null;
-        waving = true;
-        return true;
-      }
-      function proceduralGesturePose(dt) {
-        if (!proceduralGesture) return null;
-        proceduralGesture.elapsed += dt;
-        const p = Math.min(1, proceduralGesture.elapsed / proceduralGesture.duration);
-        const ease = Math.sin(Math.PI * p);
-        const settle = Math.sin(Math.PI * Math.min(1, p * 2));
-        const pose = {};
-        if (proceduralGesture.name === 'nod-small') {
-          pose.headX = ease * 0.16;
-          pose.spineX = ease * 0.025;
-        } else if (proceduralGesture.name === 'explain-open-hand') {
-          pose.headY = Math.sin(Math.PI * p * 1.5) * 0.035;
-          pose.spineY = ease * 0.04;
-          pose.leftUpperArmZ = -ease * 0.22 * armSign;
-          pose.rightUpperArmZ = ease * 0.22 * armSign;
-          pose.leftLowerArmX = -settle * 0.25;
-          pose.rightLowerArmX = -settle * 0.25;
-        }
-        if (p >= 1) {
-          proceduralGesture = null;
-          waving = false;
-        }
-        return pose;
-      }
-      function playGesture(name) {                               // 播一個手勢（期間 mixer 控身體），平時用程序化站姿
-        const gestureName = canonicalGestureName(name);
-        const act = gestureActions[gestureName];
-        if (!act) {
-          startProceduralGesture(gestureName);
-          return;
-        }
-        if (waving) return;                                      // 一次一個，播放中不打斷
-        waving = true; currentGesture = act;
-        act.reset(); act.setEffectiveWeight(1); act.play();      // 硬切，不 fadeIn（fade 低權重會露出 bind T-pose）
-      }
-      canvas.addEventListener('pointerdown', () => { playGesture(TAP_GESTURES[Math.floor(Math.random() * TAP_GESTURES.length)]); onTap(); });
-
-      let alive = true;
-      (function loop() {
-        if (!alive) return;
-        requestAnimationFrame(loop);
-        const dt = clock.getDelta(), t = clock.elapsedTime;
-        if (vrm) {
-          if (mixer) mixer.update(dt);                            // 揮手時 mixer 控身體
-          const em = vrm.expressionManager;
-          // 對嘴 + 眨眼（永遠歸我們，mixer 之後 vrm.update 之前）
-          const mv = computeMouth();
-          if (em) {
-            em.setValue(mouthExpressionName, mv);
-          }
-          if (blinkT < 0) { nextBlink -= dt; if (nextBlink <= 0) { blinkT = 0; nextBlink = 2 + Math.random() * 4; } }
-          else { blinkT += dt / BLINK; if (em) { em.setValue(blinkExpressionName, Math.sin(Math.min(blinkT, 1) * Math.PI)); } if (blinkT >= 1) { blinkT = -1; if (em) { em.setValue(blinkExpressionName, 0); } } }
-          lookTarget.position.set(mx * lookTargetRangeX, lookTargetBaseY - my * lookTargetRangeY, lookTargetZ); // 眼睛 lookAt 目標跟游標（永遠更新）
-          if (!currentGesture) {                                  // 待機：直立、手放下、輕呼吸、頭跟游標
-            const h = vrm.humanoid;
-            const lUA = h.getNormalizedBoneNode('leftUpperArm'), rUA = h.getNormalizedBoneNode('rightUpperArm'), lLA = h.getNormalizedBoneNode('leftLowerArm'), rLA = h.getNormalizedBoneNode('rightLowerArm'), sp = h.getNormalizedBoneNode('spine'), hd = h.getNormalizedBoneNode('head');
-            let armL = 1.15 * armSign, armR = -1.15 * armSign;
-            let spX = Math.sin(t * 0.9) * 0.018, spY = Math.sin(t * 0.5) * 0.012;
-            let hdY = mx * 0.3, hdX = my * 0.12 + Math.sin(t * 0.5) * 0.01;
-            let lowerArmLX = 0, lowerArmRX = 0;
-            if (isSpeaking) {                                     // 講話時：身體/頭/手持續小動作（疊在站姿上）
-              const ts = t * 3.0;
-              spY += Math.sin(ts) * 0.03;
-              hdX += Math.abs(Math.sin(ts * 0.9)) * 0.045;        // 點頭
-              hdY += Math.sin(ts * 0.55) * 0.05;                  // 轉頭
-              armL += Math.sin(ts * 0.7) * 0.06;                  // 手臂比劃
-              armR -= Math.sin(ts * 0.62) * 0.06;
-            }
-            const gesturePose = proceduralGesturePose(dt);
-            if (gesturePose) {
-              hdX += gesturePose.headX || 0;
-              hdY += gesturePose.headY || 0;
-              spX += gesturePose.spineX || 0;
-              spY += gesturePose.spineY || 0;
-              armL += gesturePose.leftUpperArmZ || 0;
-              armR += gesturePose.rightUpperArmZ || 0;
-              lowerArmLX += gesturePose.leftLowerArmX || 0;
-              lowerArmRX += gesturePose.rightLowerArmX || 0;
-            }
-            if (lUA) lUA.rotation.z = armL;
-            if (rUA) rUA.rotation.z = armR;
-            if (lLA) lLA.rotation.x = lowerArmLX;
-            if (rLA) rLA.rotation.x = lowerArmRX;
-            if (sp) { sp.rotation.x = spX; sp.rotation.y = spY; }
-            if (hd) { hd.rotation.y = hdY; hd.rotation.x = hdX; }
-          }
-          vrm.update(dt);                                         // 套用骨架/表情/springbone
-        }
-        r3.render(scene, camera);
-      })();
-
-      return { dispose() {
-        alive = false; gesture3D = null;
-        try { clearInterval(idleBreak); } catch (e) {}
-        window.removeEventListener('resize', resize);
-        window.removeEventListener('pointermove', onMove);
-        try { mixer && mixer.stopAllAction(); } catch (e) {}
-        try { if (vrm) VRMUtils.deepDispose(vrm.scene); } catch (e) {}   // 釋放 3D 幾何/材質，避免殘骸與 WebGL context 累積
-        try { r3.dispose(); } catch (e) {}
-        try { r3.forceContextLoss(); } catch (e) {}
-        canvas.remove(); window.__avatarVrm = null;
-      } };
-    } catch (err) { console.error(err); postToParent('error', { message: err.message }); }
-  }
-
-  // ===== 2D 皮：Live2D 載入 + 對嘴 =====
+  // ===== Live2D 載入 + 對嘴 =====
   async function bootAvatar() {
     try {
       await loadUMD();                       // 用到才載 pixi + live2d
@@ -713,7 +250,7 @@
         const core = model.internalModel.coreModel;
         const origUpdate = core.update.bind(core);
         core.update = function () {
-          const m = computeMouth();                                // 共用嘴型計算（與 3D 同一套）
+          const m = computeMouth();
           for (const id of lipIds) { try { core.setParameterValueById(id, m); } catch (e) {} }
           return origUpdate();
         };
@@ -736,15 +273,9 @@
           console.warn('自動擷取 2D 頭像失敗：', e);
         }
       }, 1500);
-
-      return { dispose() {
-        try { window.removeEventListener('resize', fit); } catch (e) {}
-        try { app && app.destroy(true, { children: true, texture: true, baseTexture: true }); } catch (e) {}
-        app = null; model = null; canvas.remove();
-      } };
     } catch (err) {
       console.error(err);
-      const w = document.getElementById('direct-warn'); if (w) { w.textContent = '2D 啟動失敗：' + (err && err.message || err); w.style.display = 'flex'; }
+      const w = document.getElementById('direct-warn'); if (w) { w.textContent = 'Live2D 啟動失敗：' + (err && err.message || err); w.style.display = 'flex'; }
       postToParent('error', { message: err.message });
     }
   }

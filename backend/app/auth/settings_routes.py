@@ -88,8 +88,11 @@ def set_my_asr_provider(
 PREFERENCE_KEYS = frozenset({
     "ttsProvider", "characterId", "projectId", "personaId", "voiceMode",
     "ttsVoice", "backgroundId", "backgroundUrl", "backgroundFit",
-    "cameraPreviewScale", "renderMode", "vrmAvatarId", "replyMode",
+    "cameraPreviewScale", "replyMode",
 })
+# 前台拿掉 3D 模式後不再用的欄位。舊版前台快取可能還會送，寫入時直接丟掉，
+# 不回 422，免得整份設定存不進去。
+_RETIRED_PREFERENCE_KEYS = frozenset({"renderMode", "vrmAvatarId"})
 _PREFERENCE_VALUE_MAX_CHARS = 2048
 
 
@@ -129,13 +132,17 @@ def update_my_preferences(
     """Merge the fields the user just applied; fields not sent are kept."""
     if _shared_by_visitors(account):
         return MyPreferences(values={})
-    unknown = sorted(set(body.values) - PREFERENCE_KEYS)
+    values = {
+        key: value for key, value in body.values.items()
+        if key not in _RETIRED_PREFERENCE_KEYS
+    }
+    unknown = sorted(set(values) - PREFERENCE_KEYS)
     if unknown:
         raise HTTPException(status_code=422, detail=f"unknown preference keys: {', '.join(unknown)}")
-    too_long = sorted(k for k, v in body.values.items() if len(v) > _PREFERENCE_VALUE_MAX_CHARS)
+    too_long = sorted(k for k, v in values.items() if len(v) > _PREFERENCE_VALUE_MAX_CHARS)
     if too_long:
         raise HTTPException(status_code=422, detail=f"preference values too long: {', '.join(too_long)}")
-    merged = runtime.account_access.merge_preferences(account.user.id, body.values)
+    merged = runtime.account_access.merge_preferences(account.user.id, values)
     return MyPreferences(values={
         key: str(value) for key, value in merged.items() if key in PREFERENCE_KEYS
     })

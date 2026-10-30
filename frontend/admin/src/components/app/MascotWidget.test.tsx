@@ -1,12 +1,6 @@
 import { useEffect } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const fetchAvatarMascotsMock = vi.hoisted(() => vi.fn());
-vi.mock("../../api/avatar", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../api/avatar")>()),
-  fetchAvatarMascots: fetchAvatarMascotsMock,
-}));
 
 import { MascotProvider, useMascot } from "../../context/MascotContext";
 import MascotWidget from "./MascotWidget";
@@ -14,30 +8,15 @@ import MascotWidget from "./MascotWidget";
 describe("MascotWidget", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    fetchAvatarMascotsMock.mockReset();
-    fetchAvatarMascotsMock.mockRejectedValue(new Error("offline"));
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("loads the selected mascot iframe source from localStorage", async () => {
-    fetchAvatarMascotsMock.mockResolvedValue({
-      mascots: [{
-        mascot_id: "custom-vrm",
-        label: "自訂 VRM",
-        engine: "3d",
-        model_url: "",
-        vrm_url: "/static/mascots/custom-vrm/model.vrm",
-        fit: "",
-        builtin: false,
-        size_bytes: 1024,
-        updated_at: "",
-      }],
-    });
-    window.localStorage.setItem("avatar.mascot_id", "custom-vrm");
-    // VRM 最大可到 20MB，widget 預設收合；展開過才會掛 iframe。
+  it("always loads the built-in Live2D Haru, ignoring any old stored mascot choice", () => {
+    // 舊版存過的 VRM／影片小助理選擇不再有意義，一律是 Haru。
+    window.localStorage.setItem("avatar.mascot_id", "video-0713");
     window.localStorage.setItem("admin-mascot-open", "1");
 
     render(
@@ -46,14 +25,16 @@ describe("MascotWidget", () => {
       </MascotProvider>,
     );
 
-    await waitFor(() => {
-      const src = screen.getByTitle("AI 虛擬人小助理").getAttribute("src") ?? "";
-      expect(src).toContain("engine=3d");
-      expect(decodeURIComponent(src)).toContain("/static/mascots/custom-vrm/model.vrm");
-    });
+    const src = decodeURIComponent(screen.getByTitle("AI 虛擬人小助理").getAttribute("src") ?? "");
+    expect(src).toContain("/vendor/ai-avatar-bot/widget.html?");
+    expect(src).toContain("haru_greeter_t03.model3.json");
+    expect(src).toContain("fit=half");
+    expect(src).not.toMatch(/engine=|vrm=|character=/);
+    // 只有一個小助理，沒有切換選單。
+    expect(screen.queryByText("Haru")).toBeNull();
   });
 
-  it("starts collapsed by default so the VRM is not downloaded eagerly", () => {
+  it("starts collapsed by default so the model is not downloaded eagerly", () => {
     render(
       <MascotProvider>
         <MascotWidget />
@@ -121,55 +102,6 @@ describe("MascotWidget", () => {
     expect(
       screen.getByRole("button", { name: "打開 AI 虛擬人小助理" }),
     ).not.toBeNull();
-  });
-
-  it("builds a video mascot source from the character id", () => {
-    window.localStorage.setItem("admin-mascot-open", "1");
-    window.localStorage.setItem("avatar.mascot_id", "video-000");
-
-    render(
-      <MascotProvider initialOptions={[
-        { id: "video-000", label: "人物 000", engine: "video", characterId: "000" },
-      ]}>
-        <MascotWidget />
-      </MascotProvider>,
-    );
-
-    const src = screen.getByTitle("AI 虛擬人小助理").getAttribute("src") ?? "";
-    expect(src).toContain("engine=video");
-    expect(src).toContain("character=000");
-  });
-
-  it("loads the backend mascot list on mount so derived video characters appear everywhere", async () => {
-    window.localStorage.setItem("admin-mascot-open", "1");
-    window.localStorage.setItem("avatar.mascot_id", "video-000");
-    fetchAvatarMascotsMock.mockResolvedValue({
-      mascots: [
-        {
-          mascot_id: "video-000",
-          label: "預設角色",
-          engine: "video",
-          model_url: "",
-          vrm_url: "",
-          character_id: "000",
-          thumbnail_url: "",
-          fit: "",
-          builtin: true,
-        },
-      ],
-    });
-
-    render(
-      <MascotProvider>
-        <MascotWidget />
-      </MascotProvider>,
-    );
-
-    await waitFor(() => {
-      const src = screen.getByTitle("AI 虛擬人小助理").getAttribute("src") ?? "";
-      expect(src).toContain("character=000");
-    });
-    expect(screen.getByText("預設角色")).not.toBeNull();
   });
 
   it("stops all speech when the mascot is closed", () => {

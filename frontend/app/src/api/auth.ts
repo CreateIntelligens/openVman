@@ -8,7 +8,6 @@ export interface AccountDefaults {
   character_id: string
   voice_provider: string
   voice_id: string
-  mascot_id?: string
   background_id?: string
 }
 

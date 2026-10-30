@@ -617,7 +617,7 @@ export default function ProjectPolicyDialog({
               {/* 小助理設定 */}
               <div className="space-y-4 border-b border-border px-6 py-5">
                 <Checklist
-                  legend="允許的小助理 (VRM / 影片)"
+                  legend="允許的小助理"
                   grantType="avatar_mascots"
                   options={mascotOptions}
                   selected={policy.allowed_mascots ?? []}

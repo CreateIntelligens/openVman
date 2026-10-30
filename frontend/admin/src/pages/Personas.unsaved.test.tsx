@@ -21,7 +21,6 @@ vi.mock("../api", () => ({
   createPersona: vi.fn(),
   deletePersona: vi.fn().mockResolvedValue({ status: "ok" }),
   fetchAvatarCharacters: vi.fn().mockResolvedValue({ characters: [] }),
-  fetchAvatarMascots: vi.fn().mockResolvedValue({ mascots: [] }),
   fetchKnowledgeDocument: vi.fn(async (path: string) => ({ path, content: `內容：${path}` })),
   fetchPersonas: vi.fn(async () => ({ personas: PERSONAS })),
   saveKnowledgeDocument: vi.fn().mockResolvedValue({ status: "ok" }),
