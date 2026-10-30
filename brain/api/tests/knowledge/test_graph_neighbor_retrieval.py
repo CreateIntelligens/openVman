@@ -102,10 +102,14 @@ def test_expand_via_graph_threads_query_vector_into_fetch(monkeypatch):
     # expand_with_graph just invokes the fetch closure for a neighbour file.
     fake_graph_rag = types.ModuleType("knowledge.graph_rag")
 
-    def fake_expand(hits, project_id, fetch_chunks):
+    def fake_expand(hits, project_id, fetch_chunks, deadline=None):
         return fetch_chunks("notes/insulin.md", 1)
 
+    class GraphExpansionCut(Exception):
+        pass
+
     fake_graph_rag.expand_with_graph = fake_expand
+    fake_graph_rag.GraphExpansionCut = GraphExpansionCut
     monkeypatch.setitem(sys.modules, "knowledge.graph_rag", fake_graph_rag)
 
     query_vector = [0.7, 0.2, 0.1]
@@ -256,9 +260,10 @@ def test_expand_via_graph_skips_disabled_documents(monkeypatch):
     kt = _load_knowledge_tools()
 
     fake_graph_rag = types.ModuleType("knowledge.graph_rag")
-    fake_graph_rag.expand_with_graph = lambda hits, project_id, fetch_chunks: fetch_chunks(
+    fake_graph_rag.expand_with_graph = lambda hits, project_id, fetch_chunks, deadline=None: fetch_chunks(
         "knowledge/EVAK_QA.en.md", 2,
     )
+    fake_graph_rag.GraphExpansionCut = type("GraphExpansionCut", (Exception,), {})
     monkeypatch.setitem(sys.modules, "knowledge.graph_rag", fake_graph_rag)
     import knowledge.doc_meta as doc_meta
 

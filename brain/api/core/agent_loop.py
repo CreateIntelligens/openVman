@@ -23,8 +23,10 @@ from core.llm_client import (
     stream_chat_turn,
 )
 from core.reply_modes import ModeSettings, ReplyMode, resolve_mode
+from core.turn_budget import current_trace_id, current_turn_budget
 from core.turn_reads import planned_reads, previous_user_text, user_texts
 from core.usage import current_usage_scope
+from safety.observability import log_event
 from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, fit_product_tool
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
@@ -423,6 +425,9 @@ def _run_tool_phase(
             _notify_tool_round(on_tool_round, tool_steps)
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             raise_if_cancelled(f"llm_round_{iteration}", tool_steps=len(tool_steps))
+            if iteration >= 1 and _turn_budget_exhausted(iteration, len(tool_steps)):
+                # 回合預算用完：不再開下一輪，交給 ToolPhaseError 的退路用已拿到的工具結果作答。
+                return working_messages, tool_steps, None
             current_forced = first_forced if iteration == 0 else None
             if iteration == 0:
                 current_tools = (later_tools or None) if prefetch else tools
@@ -534,6 +539,23 @@ def _run_tool_phase(
             return working_messages, tool_steps, turn
 
     return working_messages, tool_steps, None
+
+
+def _turn_budget_exhausted(iteration: int, tool_steps: int) -> bool:
+    budget = current_turn_budget()
+    if budget is None or not budget.expired():
+        return False
+    log_event(
+        "turn_budget_exhausted",
+        node="agent_loop",
+        outcome="budget_exhausted",
+        trace_id=current_trace_id(),
+        round=iteration,
+        tool_steps=tool_steps,
+        elapsed_ms=round(budget.elapsed_ms(), 2),
+        timeout_s=budget.seconds,
+    )
+    return True
 
 
 def _assistant_tool_message(turn: LLMReply) -> dict[str, Any]:

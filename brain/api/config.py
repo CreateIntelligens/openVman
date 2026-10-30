@@ -51,7 +51,21 @@ class BrainSettings(BaseSettings):
     llm_fallback_chain: str = ""
     llm_max_fallback_hops: int = 4
     llm_disable_model_discovery: bool = False
+    # 單一 hop 最長多久：聊天回合以外的非串流呼叫（建圖譜、摘要）照這個等完整回應；
+    # 串流的 hop 從送出到最後一個 chunk 也不超過它（防止慢慢滴的串流）。
     llm_request_timeout_seconds: float = 20.0
+    # --- 回答路徑逾時（docs/specs/03_BRAIN_SPEC.md「回答路徑逾時」）---
+    # 連不上就換下一站；正常建連線在 0.3 秒內。
+    llm_connect_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
+    # 串流的 socket 讀取逾時：第一個 chunk 前算 timeout_first_token，之後兩個 chunk 間隔
+    # 超過算 timeout_stall（httpx 一個請求只有一個讀取逾時，兩者共用）。flash-lite 首字
+    # 約 1.1–1.4 秒，7 秒是 5 倍餘裕。
+    llm_first_token_timeout_seconds: float = Field(default=7.0, gt=0, le=60)
+    # 聊天回合內的非串流 hop（強制工具那一輪、/chat 不帶工具的單輪）等整段回應的上限。
+    llm_nonstream_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    # 聊天回合內每一次 LLM 呼叫，跨所有 hop 到拿到回應的總預算；用完就不再換站，
+    # 直接走原本的失敗路徑（502 LLM_OVERLOAD），使用者不必等每一站各自逾時。
+    llm_first_token_budget_seconds: float = Field(default=15.0, gt=0, le=120)
     prompt_system_char_budget: int = 100000
     prompt_total_char_budget: int = 150000
     prompt_context_char_budget: int = 20000
@@ -91,6 +105,10 @@ class BrainSettings(BaseSettings):
     embedding_service_max_retries: int = 3
     embedding_service_retry_base_delay: float = 0.25
     embedding_service_retry_max_delay: float = 8.0
+    # 查詢時的 embedding（使用者那一句）：GPU 上單句幾十毫秒，等不起建索引那套 30 秒×3 次。
+    # 每次嘗試 2 秒、最多重試 1 次；建索引、記憶整理照上面的長設定。
+    embedding_query_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+    embedding_query_max_retries: int = Field(default=1, ge=0, le=3)
     embedding_write_identity: str = ""
     embedding_identity_aliases: str = ""
     embedding_gemma_model: str = "google/embeddinggemma-2"
@@ -173,6 +191,14 @@ class BrainSettings(BaseSettings):
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6
     tool_call_timeout_seconds: int = 30
+    # 整個聊天回合（準備、檢索、工具輪）的預算：用完就不再開下一輪工具，改用已拿到的
+    # 工具結果直接作答（ToolPhaseError 的既有退路）；工具逾時也不會超過剩下的預算。
+    chat_turn_budget_seconds: float = Field(default=30.0, gt=0, le=600)
+    # search_knowledge（含伺服器先查的那一次）的上限：查詢多條時超過就不再查下一條、
+    # 也略過圖譜擴展，帶已查到的回答；整個工具逾時則這輪不帶知識庫作答。
+    knowledge_search_timeout_seconds: float = Field(default=6.0, gt=0, le=60)
+    # 圖譜鄰居擴展的預算（逐個鄰居檢查），超過就只用直接命中的段落。
+    knowledge_graph_timeout_seconds: float = Field(default=1.0, gt=0, le=10)
     tool_document_char_limit: int = 4000
     # e.g. "gemini-2.0-flash-lite" for faster forced tool calls
     forced_tool_model_override: str = ""

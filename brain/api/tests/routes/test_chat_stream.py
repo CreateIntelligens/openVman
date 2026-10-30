@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -316,3 +317,65 @@ def test_route_is_served_as_event_stream(chat_route, monkeypatch) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     assert [name for name, _ in _parse(response.text)] == ["sentence", "sentence", "done"]
+
+
+def _generation_until_cancelled(seen: dict[str, Any]):
+    """Stand-in for a node with no timeout: runs until the request deadline cancels it."""
+
+    def generate(context, text_listener=None):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if is_cancelled():
+                seen["cancelled"] = True
+                raise_if_cancelled("llm_call")
+            time.sleep(0.02)
+        raise AssertionError("the request deadline never cancelled generation")
+
+    return generate
+
+
+def test_stream_request_deadline_ends_with_gateway_timeout(chat_route, monkeypatch) -> None:
+    module, observed = chat_route
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(module, "execute_generation", _generation_until_cancelled(seen))
+    monkeypatch.setattr(module, "_response_deadline_seconds", lambda: 0.3)
+
+    async def run() -> list[tuple[str, Any]]:
+        events = await _collect_stream(module)
+        await asyncio.sleep(0.2)  # 讓生成執行緒看到取消
+        return events
+
+    started = time.monotonic()
+    events = asyncio.run(run())
+
+    assert time.monotonic() - started < 2
+    assert [name for name, _ in events] == ["error"]
+    assert events[0][1]["status"] == 504
+    assert events[0][1]["detail"]["error_code"] == "GATEWAY_TIMEOUT"
+    assert seen.get("cancelled") is True
+    exceeded = [fields for name, fields in observed["events"] if name == "chat_deadline_exceeded"]
+    assert exceeded and exceeded[0]["trace_id"] == "trace-1"
+    assert exceeded[0]["timeout_s"] == 0.3
+    cancelled = [fields for name, fields in observed["events"] if name == "chat_cancelled"]
+    assert cancelled and cancelled[0]["cause"] == "deadline"
+
+
+def test_chat_request_deadline_answers_504(chat_route, monkeypatch) -> None:
+    module, observed = chat_route
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(module, "execute_generation", _generation_until_cancelled(seen))
+    monkeypatch.setattr(module, "_response_deadline_seconds", lambda: 0.3)
+
+    async def run() -> None:
+        try:
+            await module.chat(_Request(), _payload())
+        finally:
+            await asyncio.sleep(0.2)
+
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(run())
+
+    assert caught.value.status_code == 504
+    assert caught.value.detail["error_code"] == "GATEWAY_TIMEOUT"
+    assert seen.get("cancelled") is True
+    assert [name for name, _ in observed["events"]] == ["chat_deadline_exceeded"]

@@ -13,6 +13,8 @@ from typing import Any, Protocol
 import httpx
 
 from config import EmbeddingBackend, get_settings
+from core.turn_budget import number_setting
+from safety.observability import record_node_attempt
 
 logger = logging.getLogger("brain.memory.embedder")
 
@@ -152,15 +154,31 @@ def encode_query_with_fallback(
 
     embedder = get_embedder(active_version)
     if hasattr(embedder, "encode_with_metadata"):
+        started = time.monotonic()
+        # 查詢是使用者那一句：短逾時、最多重試一次；建索引走 encode()／encode_with_metadata 預設的長設定。
+        query_limits: dict[str, Any] = {}
+        if isinstance(embedder, GatewayRemoteTextEmbedder):
+            query_limits = {
+                "timeout": number_setting(cfg, "embedding_query_timeout_seconds", 2.0),
+                "max_retries": int(number_setting(cfg, "embedding_query_max_retries", 1)),
+            }
         try:
             vectors, spec, attempts = embedder.encode_with_metadata(
                 [query],
                 input_type="query",
                 acceptable_identities=candidate_versions,
+                **query_limits,
             )
             selected_identity = spec.get("identity", "") if spec else ""
             if selected_identity not in candidate_versions:
                 raise RuntimeError("Gateway returned an unrequested embedding identity")
+            record_node_attempt(
+                "rag_embed_query",
+                outcome="ok",
+                elapsed_ms=(time.monotonic() - started) * 1000,
+                component=selected_identity,
+                timeout_s=query_limits.get("timeout"),
+            )
             return QueryEmbeddingRoute(
                 version=selected_identity,
                 vector=vectors[0],
@@ -168,6 +186,14 @@ def encode_query_with_fallback(
                 embedding_spec=spec,
             )
         except Exception as exc:
+            record_node_attempt(
+                "rag_embed_query",
+                outcome="timeout" if _is_timeout(exc) else "error",
+                elapsed_ms=(time.monotonic() - started) * 1000,
+                component=active_version,
+                timeout_s=query_limits.get("timeout"),
+                exc=exc,
+            )
             logger.warning("Gateway query encode failed: %s", exc)
             attempted_versions.append({"version": active_version, "status": "error", "reason": type(exc).__name__})
             raise RuntimeError(f"沒有可用的 embedding version 可供查詢: {exc}")
@@ -191,6 +217,17 @@ def encode_query_with_fallback(
             continue
 
     raise RuntimeError("沒有可用的 embedding version 可供查詢")
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        if isinstance(current, (httpx.TimeoutException, TimeoutError)):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def _build_embedder(backend: EmbeddingBackend) -> TextEmbedder:
@@ -269,18 +306,25 @@ class GatewayRemoteTextEmbedder:
         payload: dict[str, Any],
         chunk_idx: int,
         chunk_len: int,
+        *,
+        timeout: float | None = None,
+        max_retries: int | None = None,
     ) -> dict[str, Any]:
         retryable_statuses = frozenset({429, 500, 502, 503, 504})
         last_exc: Exception | None = None
+        retries = self.max_retries if max_retries is None else max(0, max_retries)
+        # 查詢用短逾時時，退避也要短：等 8 秒再重試對使用者那一句沒有意義。
+        max_delay = self.retry_max_delay if timeout is None else min(self.retry_max_delay, timeout / 4)
+        post_kwargs: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
 
-        for attempt in range(self.max_retries + 1):
+        for attempt in range(retries + 1):
             try:
-                resp = client.post("/embed", json=payload)
+                resp = client.post("/embed", json=payload, **post_kwargs)
                 status_code = getattr(resp, "status_code", 200)
-                if status_code in retryable_statuses and attempt < self.max_retries:
+                if status_code in retryable_statuses and attempt < retries:
                     retry_headers = getattr(resp, "headers", {})
-                    retry_after = _parse_retry_after(retry_headers.get("retry-after"), self.retry_max_delay)
-                    delay = self._calculate_backoff(attempt, retry_after)
+                    retry_after = _parse_retry_after(retry_headers.get("retry-after"), max_delay)
+                    delay = min(self._calculate_backoff(attempt, retry_after), max_delay)
                     logger.warning(
                         "Embedding gateway returned %d on chunk %d (len %d), retrying in %.2fs (attempt %d/%d)...",
                         status_code,
@@ -288,7 +332,7 @@ class GatewayRemoteTextEmbedder:
                         chunk_len,
                         delay,
                         attempt + 1,
-                        self.max_retries,
+                        retries,
                     )
                     time.sleep(delay)
                     continue
@@ -296,15 +340,15 @@ class GatewayRemoteTextEmbedder:
                 return resp.json()
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_exc = exc
-                if attempt < self.max_retries:
-                    delay = self._calculate_backoff(attempt)
+                if attempt < retries:
+                    delay = min(self._calculate_backoff(attempt), max_delay)
                     logger.warning(
                         "Embedding gateway network/timeout error on chunk %d (%s), retrying in %.2fs (attempt %d/%d)...",
                         chunk_idx,
                         type(exc).__name__,
                         delay,
                         attempt + 1,
-                        self.max_retries,
+                        retries,
                     )
                     time.sleep(delay)
                     continue
@@ -338,8 +382,14 @@ class GatewayRemoteTextEmbedder:
         acceptable_identities: list[str] | None = None,
         forced_identity: str | None = None,
         titles: list[str] | None = None,
+        timeout: float | None = None,
+        max_retries: int | None = None,
     ) -> tuple[list[list[float]], dict[str, Any], list[dict[str, Any]]]:
-        """*titles*：每段文件的標題（跟 texts 等長），EmbeddingGemma 會一起嵌入，其他模型忽略。"""
+        """*titles*：每段文件的標題（跟 texts 等長），EmbeddingGemma 會一起嵌入，其他模型忽略。
+
+        *timeout*／*max_retries* 覆寫每次請求的逾時與重試次數（查詢時用短的）；
+        不給就用建構時的設定（建索引、記憶整理）。
+        """
         if not texts:
             return [], {}, []
         if titles is not None and len(titles) != len(texts):
@@ -367,10 +417,14 @@ class GatewayRemoteTextEmbedder:
                 payload["acceptable_identities"] = acceptable_identities
 
             try:
-                data = self._post_chunk_with_retry(client, payload, i // self.chunk_size, len(chunk))
+                data = self._post_chunk_with_retry(
+                    client, payload, i // self.chunk_size, len(chunk),
+                    timeout=timeout, max_retries=max_retries,
+                )
             except Exception as exc:
-                logger.error("Failed chunk embed request (range %d-%d): %s", i, i + len(chunk), exc)
-                raise RuntimeError(f"Embedding gateway call failed: {exc}")
+                detail = str(exc) or type(exc).__name__
+                logger.error("Failed chunk embed request (range %d-%d): %s", i, i + len(chunk), detail)
+                raise RuntimeError(f"Embedding gateway call failed: {detail}") from exc
 
             chunk_vectors = data.get("vectors", [])
             chunk_spec = data.get("embedding_spec", {})

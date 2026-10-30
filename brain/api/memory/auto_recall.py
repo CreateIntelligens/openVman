@@ -266,6 +266,36 @@ def _run_recall(
     )
 
 
+def _record_attempt(outcome: str, start: float, timeout_s: float) -> None:
+    from safety.observability import record_node_attempt
+
+    record_node_attempt(
+        "auto_recall",
+        outcome=outcome,
+        elapsed_ms=(monotonic() - start) * 1000,
+        component="memories",
+        timeout_s=timeout_s,
+    )
+
+
+def _log_orphan_on_finish(future: Any, start: float, timeout_s: float) -> None:
+    from core.turn_budget import current_trace_id
+    from safety.observability import log_event
+
+    trace_id = current_trace_id()
+
+    def _done(_: Any) -> None:
+        log_event(
+            "node_orphan_finished",
+            node="auto_recall",
+            elapsed_ms=round((monotonic() - start) * 1000, 2),
+            timeout_s=timeout_s,
+            trace_id=trace_id,
+        )
+
+    future.add_done_callback(_done)
+
+
 # ------------------------------------------------------------------
 # 3.7 Public entry point
 # ------------------------------------------------------------------
@@ -318,10 +348,14 @@ def run_auto_recall(
         try:
             result = future.result(timeout=timeout_s)
         except TimeoutError:
-            future.cancel()
+            if not future.cancel():
+                # 已在跑的工作取消不了，只能讓它跑完；跑完時記一筆，才知道實際卡多久。
+                _log_orphan_on_finish(future, start, timeout_s)
             logger.warning("auto_recall timeout after %.0fms", timeout_s * 1000)
+            _record_attempt("timeout", start, timeout_s)
             return _make_result(status="timeout")
 
+        _record_attempt(result.status, start, timeout_s)
         # Cache on success
         if result.status in ("ok", "empty"):
             cache.set(cache_key, result.summary)

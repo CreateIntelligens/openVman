@@ -278,7 +278,7 @@ def test_stream_chat_turn_announces_every_hop(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(llm_client, "get_provider_router", lambda: MagicMock())
     monkeypatch.setattr(llm_client, "get_settings", lambda: MagicMock(llm_temperature=0.3))
     monkeypatch.setattr(llm_client, "_get_sync_client", lambda key, url: clients[key])
-    monkeypatch.setattr(llm_client, "_record_hop_failure", lambda *args: "error")
+    monkeypatch.setattr(llm_client, "_record_hop_failure", lambda *args, **kwargs: "error")
     monkeypatch.setattr(llm_client, "provider_health", lambda: MagicMock())
     monkeypatch.setattr(llm_client, "record_route_attempt", lambda **kwargs: None)
     monkeypatch.setattr(llm_client, "_record_llm_usage", lambda *args: None)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from time import monotonic
 from typing import Any, Callable
 
 from infra.db import (
@@ -22,6 +23,7 @@ from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
 from memory.language_detect import DEFAULT_LANGUAGE
 from memory.thresholds import distance_for
 from personas.personas import normalize_persona_id
+from safety.observability import record_node_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -194,11 +196,19 @@ def _hybrid_search(
     """Hybrid search:原文與擴展詞各跑 vector + FTS,所有名次表一次 RRF 融合。
 
     只剩原文 vector 一路時退回 vector-only(仍輸出正規化 _score)。
+    LanceDB 在本機執行、無法中途打斷，這裡只量時間記節點事件；上限由呼叫端的
+    工具逾時（search_knowledge）把關。
     """
+    started = monotonic()
     vector_records = _search_to_records(table.search(query_vector).limit(limit))
+    _record_search_node("rag_vector", started, len(vector_records), limit)
 
     ranked_lists: list[list[dict[str, Any]]] = [vector_records]
-    if fts_records := _try_fts_search(table, query_text, limit, query_vector):
+    started = monotonic()
+    fts_records = _try_fts_search(table, query_text, limit, query_vector)
+    if query_text:
+        _record_search_node("rag_lexical", started, len(fts_records), limit)
+    if fts_records:
         ranked_lists.append(fts_records)
 
     if expansion_vectors is None:
@@ -222,6 +232,17 @@ def _hybrid_search(
     return min_max_normalize(fused, source_field="_rrf_score", out_field="_score")[
         :limit
     ]
+
+
+def _record_search_node(node: str, started: float, hits: int, limit: int) -> None:
+    record_node_attempt(
+        node,
+        outcome="ok" if hits else "empty",
+        elapsed_ms=(monotonic() - started) * 1000,
+        component="lancedb",
+        hits=hits,
+        limit=limit,
+    )
 
 
 def _try_fts_search(

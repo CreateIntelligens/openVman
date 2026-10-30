@@ -265,11 +265,35 @@ LLM 呼叫一律經 `core/llm_client.py`，不假設單一金鑰、單一模型�
 * **Provider 端點與金鑰**：`gemini`、`groq` 有內建的 OpenAI 相容 base URL；其他 provider 以 `LLM_BASE_URL` 指定端點。各 provider 金鑰為 `GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`，主 provider 另可用 `LLM_API_KEYS`（逗號分隔）／`LLM_API_KEY`。
 * **Key pool**（`core/key_pool.py`）：失敗依類型分類並處置——401／403 停用該金鑰；429 或 quota／insufficient／exhausted 長冷卻（`LLM_KEY_LONG_COOLDOWN_SECONDS`，300 秒）；其他限流、5xx、連線與逾時短冷卻（`LLM_KEY_COOLDOWN_SECONDS`，60 秒）。fallback chain 解析不出任何 hop 時，才改用主 provider 的 key pool，依上述冷卻與停用狀態逐一輪替金鑰與模型；chain 的每個 provider 只用其第一把金鑰。
 * **觀測**：每一跳的成功或失敗、切換原因與整條鏈耗盡都記入 metrics 與 structured logs（`trace_id` 綁定同一條鏈），route 失敗另寫入 `.learnings/ERRORS.md`。所有 hop 皆失敗時回 502（`LLM_OVERLOAD`）。
-* **逾時**：單次呼叫 `LLM_REQUEST_TIMEOUT_SECONDS`（預設 20 秒）。
+* **逾時**：見 8.1。不在聊天回合內的呼叫（建圖譜、正規化、摘要）照 `LLM_REQUEST_TIMEOUT_SECONDS`（預設 20 秒）等完整回應。
 
 ```env
 LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b
 ```
+
+#### 8.1 回答路徑逾時 (Answer-Path Timeouts)
+
+`POST /brain/chat` 與 `/brain/chat/stream` 綁定一個回合預算（`core/turn_budget.py`，context var，跟取消旗標一樣傳進工具與 LLM 執行緒）。綁定時：
+
+| 節點 | 設定（預設） | 逾時處置與原因碼 |
+|---|---|---|
+| LLM 連線 | `LLM_CONNECT_TIMEOUT_SECONDS`（3） | 換下一站；`timeout_connect` |
+| LLM 串流讀取（首字與 chunk 間隔共用） | `LLM_FIRST_TOKEN_TIMEOUT_SECONDS`（7） | 換下一站；尚未收到字為 `timeout_first_token`，之後為 `timeout_stall` |
+| LLM 串流整段 | `LLM_REQUEST_TIMEOUT_SECONDS`（20） | 換下一站；`timeout_total` |
+| LLM 非串流整段 | `LLM_NONSTREAM_TIMEOUT_SECONDS`（10） | 換下一站；`timeout_total` |
+| 一次 LLM 呼叫的跨站預算 | `LLM_FIRST_TOKEN_BUDGET_SECONDS`（15） | 每站時限取「站時限」與「剩餘預算」較小者；剩不到 0.5 秒不開下一站，整條鏈以 `budget_exhausted` 結束 → 502 `LLM_OVERLOAD` |
+| 整輪 | `CHAT_TURN_BUDGET_SECONDS`（30，從收到請求起算） | 第 2 輪起不再開新的 LLM／工具輪，以 `ToolPhaseError` 的退路用已取得的工具結果作答（退路那次 LLM 呼叫有自己的跨站預算）；工具時限取 min(工具時限, 剩餘預算)，至少 1 秒 |
+| `search_knowledge` | `KNOWLEDGE_SEARCH_TIMEOUT_SECONDS`（6） | 整個工具逾時：該輪不帶知識庫作答。到 80% 時不再查下一條查詢、不做圖譜擴展；某條查詢逾時後其餘查詢略過 |
+| 圖譜鄰居擴展 | `KNOWLEDGE_GRAPH_TIMEOUT_SECONDS`（1） | 逐個鄰居檢查，超過即回傳已抓到的鄰居 |
+| 查詢 embedding | `EMBEDDING_QUERY_TIMEOUT_SECONDS`（2）、`EMBEDDING_QUERY_MAX_RETRIES`（1） | 該條查詢失敗；退避上限為時限的 1/4 |
+| 向量／全文檢索、RRF 融合 | 無獨立時限 | LanceDB 在本機執行、無法中途打斷；記時間，由 `search_knowledge` 時限把關 |
+| 整個請求 | 回合預算＋2×跨站預算＋`LLM_REQUEST_TIMEOUT_SECONDS`＋10（90） | 設取消旗標，回 504 `GATEWAY_TIMEOUT`（串流為 `error` 事件） |
+
+未綁定回合預算的呼叫（索引、記憶整理、背景摘要）沒有跨站預算，非串流 LLM 照 `LLM_REQUEST_TIMEOUT_SECONDS`，embedding 照 `EMBEDDING_SERVICE_TIMEOUT`（30 秒）與 `EMBEDDING_SERVICE_MAX_RETRIES`（3）。
+
+* **原因碼**：`timeout_connect`、`timeout_first_token`、`timeout_stall`、`timeout_total` 與 `transient_error`（連線被拒、其他錯誤）、`provider_error`（5xx）等分開記。key pool 與 `provider_health` 仍把逾時當暫時性失敗（短冷卻、連續 2 次冷卻 60 秒）。
+* **串流中途失敗**：已有句子送出的站逾時，仍換下一站重答，`ReplyStream.finish` 補送完整答案，並記 `llm_restart_after_partial_text`。
+* **事件**：每次節點嘗試一筆。LLM 為 `llm_route_attempt`（`node=llm_hop`、`provider`、`model`、`hop_index`、`outcome`、`elapsed_ms`、`mode`、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`、`error`）；檢索與其他節點為 `node_attempt`（`node` 為 `rag_embed_query`／`rag_query`／`rag_vector`／`rag_lexical`／`rag_graph`／`auto_recall`，`outcome` 為 `ok`／`empty`／`timeout`／`error`／`skipped`，加 `component`、`elapsed_ms`、`timeout_s`、`error_type`）。另有 `llm_chain_budget_exhausted`、`turn_budget_exhausted`、`tool_timeout`、`chat_deadline_exceeded`，以及逾時後仍在跑的工具或 auto recall 執行緒跑完時的 `node_orphan_finished`。所有事件帶本輪 `trace_id`；`str(exc)` 為空時 `error` 用例外型別名稱。
 
 ### 9. 工具調用 (Tool Calling)
 
@@ -498,7 +522,11 @@ LLM_FALLBACK_MODEL=
 LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b
 LLM_MAX_FALLBACK_HOPS=4
 LLM_API_KEYS=                    # 主 provider 的金鑰池（逗號分隔）
-LLM_REQUEST_TIMEOUT_SECONDS=20
+LLM_REQUEST_TIMEOUT_SECONDS=20   # 單站整段上限；回合外的非串流呼叫照這個等
+LLM_CONNECT_TIMEOUT_SECONDS=3
+LLM_FIRST_TOKEN_TIMEOUT_SECONDS=7
+LLM_NONSTREAM_TIMEOUT_SECONDS=10
+LLM_FIRST_TOKEN_BUDGET_SECONDS=15
 LLM_DISABLE_MODEL_DISCOVERY=false
 LLM_STREAM_INCLUDE_USAGE=true
 GEMINI_API_KEY=***
@@ -510,6 +538,8 @@ EMBEDDING_SERVICE_URL=           # 外部 gateway 才填；空白為 http://embe
 EMBEDDING_SERVICE_TOKEN=         # 空白沿用 GATEWAY_INTERNAL_TOKEN
 EMBEDDING_ACTIVE_VERSION=gemma
 EMBEDDING_THRESHOLDS=            # JSON，依版本覆寫向量門檻
+EMBEDDING_QUERY_TIMEOUT_SECONDS=2
+EMBEDDING_QUERY_MAX_RETRIES=1
 CHUNK_CHAR_LIMIT=500
 CHUNK_OVERLAP_RATIO=0.15
 
@@ -527,6 +557,9 @@ FORCED_TOOL_MODEL_OVERRIDE=
 FORCED_TOOL_MAX_TOKENS=400
 TOOL_CALL_TIMEOUT_SECONDS=30
 TOOL_DOCUMENT_CHAR_LIMIT=4000
+CHAT_TURN_BUDGET_SECONDS=30
+KNOWLEDGE_SEARCH_TIMEOUT_SECONDS=6
+KNOWLEDGE_GRAPH_TIMEOUT_SECONDS=1
 
 # === 記憶 ===
 SHORT_TERM_MEMORY_ROUNDS=20      # 短期記憶保留輪次

@@ -142,7 +142,42 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ### 用戶端斷線時停止生成
 
-`POST /brain/chat` 在生成期間監看 HTTP 連線（Backend 代理在用戶端中斷時會關掉往 Brain 的請求）。斷線時設下這個請求的取消旗標（`core/generation_cancel.py`，以 context var 傳進 `asyncio.to_thread` 與工具執行緒），生成在下一個安全點拋出 `GenerationCancelled`：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前；每輪決策的 `decide()` 也收到同一個 `cancel_event`，進行中的請求立刻放棄。已送出的 LLM 請求收不回來，只是不開下一步。取消時不挑附圖、不呼叫 `finalize_generation`／`stage_turn`，所以不寫對話、日誌、記憶，也不暫存可合併回合；回 499（用戶端已離開），記 `chat_cancelled` 事件（`trace_id`、`stage`、`tool_steps`、`llm_calls`、`elapsed_s`），不記成生成失敗。
+`POST /brain/chat` 在生成期間監看 HTTP 連線（Backend 代理在用戶端中斷時會關掉往 Brain 的請求）。斷線時設下這個請求的取消旗標（`core/generation_cancel.py`，以 context var 傳進 `asyncio.to_thread` 與工具執行緒），生成在下一個安全點拋出 `GenerationCancelled`：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前；每輪決策的 `decide()` 也收到同一個 `cancel_event`，進行中的請求立刻放棄。已送出的 LLM 請求收不回來，只是不開下一步。取消時不挑附圖、不呼叫 `finalize_generation`／`stage_turn`，所以不寫對話、日誌、記憶，也不暫存可合併回合；回 499（用戶端已離開），記 `chat_cancelled` 事件（`trace_id`、`stage`、`tool_steps`、`llm_calls`、`elapsed_s`，`cause` 分 `client_disconnect` 與請求逾時的 `deadline`），不記成生成失敗。
+
+### 回答路徑逾時
+
+使用者在等第一個字的路上，每個節點都有自己的短時限，再加上整輪的預算；某一站卡住時換下一站或少帶一個來源作答，不讓使用者等到每一站各自逾時。數值都可用環境變數調整，規格見 `docs/specs/03_BRAIN_SPEC.md` §8.1。
+
+| 節點 | 時限（預設） | 逾時後 |
+|---|---|---|
+| LLM 連線 | `LLM_CONNECT_TIMEOUT_SECONDS` 3 秒 | 換下一站，原因 `timeout_connect` |
+| LLM 串流第一個字／兩個 chunk 之間 | `LLM_FIRST_TOKEN_TIMEOUT_SECONDS` 7 秒（flash-lite 首字約 1.1–1.4 秒） | 換下一站，`timeout_first_token`／`timeout_stall` |
+| LLM 串流整段 | `LLM_REQUEST_TIMEOUT_SECONDS` 20 秒 | 換下一站，`timeout_total` |
+| LLM 非串流（聊天回合內） | `LLM_NONSTREAM_TIMEOUT_SECONDS` 10 秒 | 換下一站，`timeout_total` |
+| 一次 LLM 呼叫跨所有站 | `LLM_FIRST_TOKEN_BUDGET_SECONDS` 15 秒 | 不再開下一站（剩不到 0.5 秒也不開），回 502 `LLM_OVERLOAD`，原因 `budget_exhausted` |
+| 整輪（準備、檢索、工具輪） | `CHAT_TURN_BUDGET_SECONDS` 30 秒 | 不再開下一輪工具，用已拿到的工具結果作答；工具逾時也不超過剩下的預算（至少 1 秒） |
+| `search_knowledge`（含伺服器先查） | `KNOWLEDGE_SEARCH_TIMEOUT_SECONDS` 6 秒 | 這輪不帶知識庫作答；用到 8 成時就不再查下一條查詢、不做圖譜擴展，帶已查到的段落 |
+| 圖譜鄰居擴展 | `KNOWLEDGE_GRAPH_TIMEOUT_SECONDS` 1 秒 | 只用直接命中的段落與已抓到的鄰居 |
+| 查詢 embedding | `EMBEDDING_QUERY_TIMEOUT_SECONDS` 2 秒、`EMBEDDING_QUERY_MAX_RETRIES` 1 次 | 這條查詢放棄，後面的查詢也不再等 |
+| 其他工具 | `TOOL_CALL_TIMEOUT_SECONDS` 30 秒（網路搜尋最長約 20 秒） | 工具回錯誤，模型照常作答 |
+| 整個請求（保險） | 回合預算＋2×跨站預算＋串流整段＋10 秒，預設 90 秒 | 設下取消旗標、回 504 `GATEWAY_TIMEOUT`（串流是 `error` 事件），記 `chat_deadline_exceeded` |
+
+既有的時限不變：每輪決策 2 秒（每站 0.8 秒）、auto recall 3 秒、Live 預取 1 秒、附圖選擇 1 秒、Jev 定稿判斷 1 秒。
+
+- 非串流呼叫只有在聊天回合內才用 10 秒；建圖譜、正規化、摘要這類不在回合內的呼叫照 `LLM_REQUEST_TIMEOUT_SECONDS` 等完整回應，也沒有跨站預算。embedding 也一樣分開：使用者那一句用短時限，建索引、記憶整理仍是 `EMBEDDING_SERVICE_TIMEOUT` 30 秒、重試 3 次。
+- httpx 一個請求只有一個讀取逾時，所以第一個字與串流中斷共用 `LLM_FIRST_TOKEN_TIMEOUT_SECONDS`，以逾時當下有沒有收到字來分 `timeout_first_token` 與 `timeout_stall`；慢慢滴的串流由整段上限切掉。
+- 已經有句子送到用戶端的站中途逾時，照舊換下一站重答（`ReplyStream.finish` 補送完整答案），另記 `llm_restart_after_partial_text`。
+- 逾時跟其他暫時性錯誤分開記，斷路器仍把它們當暫時性失敗：key pool 短冷卻、`provider_health` 連續 2 次冷卻 60 秒。
+- LanceDB 在本機執行、無法中途打斷，向量與全文檢索只量時間記事件；上限由 `search_knowledge` 的工具時限把關。逾時後還在跑的工具與 auto recall 執行緒，跑完時記 `node_orphan_finished`（實際耗時）。
+
+每個節點的每次嘗試記一筆結構化事件，`trace_id` 是這一輪的 trace id（綁在用量 scope 上，準備階段就有）：
+
+- LLM：`llm_route_attempt`，欄位 `node: "llm_hop"`、`provider`、`model`、`hop_index`、`outcome`（成功是 `ok`，失敗是原因碼）、`elapsed_ms`、`mode`（`stream`／`nonstream`）、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`、`error`（訊息是空的就用型別名稱）；跨站預算用完記 `llm_chain_budget_exhausted`（`skipped_hops`）。
+- 檢索與其他節點：`node_attempt`，`node` 為 `rag_embed_query`、`rag_query`、`rag_vector`、`rag_lexical`、`rag_graph`、`auto_recall`，`outcome` 為 `ok`／`empty`／`timeout`／`error`／`skipped`，加上 `component`、`elapsed_ms`、`timeout_s`、`error_type`。工具逾時記 `tool_timeout`（`clamped_by_turn_budget`），整輪預算用完記 `turn_budget_exhausted`。
+
+```json
+{"event": "llm_route_attempt", "node": "llm_hop", "trace_id": "4f2c…", "provider": "gemini", "model": "gemini-3.5-flash-lite", "hop_index": 0, "result": "failure", "outcome": "timeout_first_token", "reason": "timeout_first_token", "elapsed_ms": 7003.1, "mode": "stream", "timeout_s": 7.0, "first_token_ms": null, "streamed_chars": 0, "error_type": "LLMTimeoutError", "error": "timeout_first_token after 7.00s (limit 7.00s)", "chain_length": 3}
+```
 
 ### 逐句串流（`POST /brain/chat/stream`）
 
@@ -365,10 +400,10 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 | 類別 | 主要變數 |
 |---|---|
 | 環境 | `ENV`（`prod`／`dev`）、`GATEWAY_INTERNAL_TOKEN` |
-| LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY` |
-| Embedding | `EMBEDDING_THRESHOLDS`、`EMBEDDING_SERVICE_URL`（外部 gateway 才填）、`EMBEDDING_SERVICE_TOKEN`；模型與 identity 的預設值在 `config.py` |
-| 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`EMBEDDING_THRESHOLDS`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
-| Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
+| LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_CONNECT_TIMEOUT_SECONDS`、`LLM_FIRST_TOKEN_TIMEOUT_SECONDS`、`LLM_NONSTREAM_TIMEOUT_SECONDS`、`LLM_FIRST_TOKEN_BUDGET_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY` |
+| Embedding | `EMBEDDING_THRESHOLDS`、`EMBEDDING_SERVICE_URL`（外部 gateway 才填）、`EMBEDDING_SERVICE_TOKEN`、`EMBEDDING_QUERY_TIMEOUT_SECONDS`、`EMBEDDING_QUERY_MAX_RETRIES`；模型與 identity 的預設值在 `config.py` |
+| 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`EMBEDDING_THRESHOLDS`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`KNOWLEDGE_SEARCH_TIMEOUT_SECONDS`、`KNOWLEDGE_GRAPH_TIMEOUT_SECONDS`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
+| Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_SEARCH`、`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`CHAT_TURN_BUDGET_SECONDS`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
 | 記憶 | `SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`、`MAX_SESSION_TTL_MINUTES`、`AUTO_RECALL_ENABLED`、`DREAMING_ENABLED`、`DREAMING_CRON`、`DREAMING_TIMEZONE`、`SESSION_BACKUP_ENABLED`、`SESSION_BACKUP_HOUR`、`SESSION_BACKUP_KEEP` |
 | 決策供應鏈 | `CLEF_API_KEY`（選填）、`TYPESAFE_API_KEY`、`JEV_BASE_URL`、`OPENAI_API_KEY`、`JEV_MEMORY_GATE_ENABLED`、`JEV_LANGUAGE_ENABLED`、`JEV_GATE_TIMEOUT_SECONDS`、`AUTO_RECALL_USE_JEV_FILTER`、`ASR_FINAL_JUDGE_ENABLED` |
 | 每輪決策 | `TURN_DECISIONS_ENABLED`、`TURN_DECISIONS_RETRIEVAL_ENABLED`、`TURN_DECISIONS_LANGUAGE_ENABLED`、`TURN_DECISIONS_TONE_ENABLED`、`TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED`、`TURN_DECISIONS_TIMEOUT_SECONDS`、`TURN_DECISIONS_HOP_TIMEOUT_SECONDS`、`TURN_DECISIONS_NOUL_*`、`TURN_DECISIONS_CHOICE_*` |

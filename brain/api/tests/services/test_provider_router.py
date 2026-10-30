@@ -175,13 +175,36 @@ class TestFailureClassification:
         result = key_pool.classify_failure(_make_api_status_error(500))
         assert result == key_pool.FAILURE_PROVIDER_ERROR
 
-    def test_classify_timeout_as_transient(self, monkeypatch):
+    def test_classify_timeout_separately_from_transient(self, monkeypatch):
         key_pool, _ = _stub_deps(monkeypatch)
+        import httpx
         from openai import APITimeoutError
 
         exc = APITimeoutError(request=MagicMock())
-        result = key_pool.classify_failure(exc)
-        assert result == key_pool.FAILURE_TRANSIENT_ERROR
+        assert key_pool.classify_failure(exc) == key_pool.FAILURE_TIMEOUT_TOTAL
+
+        try:
+            try:
+                raise httpx.ConnectTimeout("")
+            except httpx.ConnectTimeout as cause:
+                raise APITimeoutError(request=MagicMock()) from cause
+        except APITimeoutError as wrapped:
+            assert key_pool.classify_failure(wrapped) == key_pool.FAILURE_TIMEOUT_CONNECT
+
+        stalled = key_pool.LLMTimeoutError(
+            key_pool.FAILURE_TIMEOUT_STALL, limit_s=1.0, waited_s=1.0,
+        )
+        assert key_pool.classify_failure(stalled) == key_pool.FAILURE_TIMEOUT_STALL
+
+    def test_timeouts_get_the_short_cooldown(self, monkeypatch):
+        key_pool, _ = _stub_deps(monkeypatch)
+        pool = key_pool.KeyPoolManager(["k1"], short_cooldown=60.0, long_cooldown=300.0)
+        pool.mark_failure("k1", key_pool.FAILURE_TIMEOUT_FIRST_TOKEN)
+        state = pool.get_state("k1")
+        assert state is not None and not state.disabled
+        assert state.last_failure_reason == key_pool.FAILURE_TIMEOUT_FIRST_TOKEN
+        from time import monotonic
+        assert 0 < state.cooldown_until - monotonic() <= 60.0
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from time import monotonic
 from typing import Any
 
 from infra.db import get_db
@@ -23,6 +24,15 @@ from knowledge.graph import NOTE_GRAPH_TABLE
 logger = logging.getLogger("brain.knowledge.graph_rag")
 
 FetchChunks = Callable[[str, int], list[dict[str, Any]]]
+
+
+class GraphExpansionCut(Exception):
+    """The deadline passed mid-expansion; *related* holds what was fetched in time."""
+
+    def __init__(self, related: list[dict[str, Any]], skipped: int) -> None:
+        super().__init__(f"graph expansion cut, {skipped} neighbour files skipped")
+        self.related = related
+        self.skipped = skipped
 
 # Neighbours connected to more than this many files are treated as hubs and
 # skipped during expansion — they pull in broad, low-signal noise.
@@ -101,6 +111,7 @@ def expand_with_graph(
     fetch_chunks: FetchChunks,
     per_file: int = 1,
     max_related: int = 5,
+    deadline: float | None = None,
 ) -> list[dict[str, Any]]:
     """Return related chunks one hop away from the vector hits.
 
@@ -109,6 +120,9 @@ def expand_with_graph(
     returned records are tagged ``_graph_related=True`` and carry ``_via`` (the
     relations that linked them) so the caller and the LLM can tell them apart
     from direct hits.
+
+    *deadline* (``time.monotonic()``) stops fetching more neighbours once passed;
+    the chunks gathered so far are returned and ``expansion_cut`` is logged.
     """
     hit_files: set[str] = {h["path"] for h in hits if h.get("path")}
     if not hit_files:
@@ -116,9 +130,11 @@ def expand_with_graph(
 
     neighbours = _neighbour_files(hit_files, project_id)
     related: list[dict[str, Any]] = []
-    for neighbour in neighbours:
+    for index, neighbour in enumerate(neighbours):
         if len(related) >= max_related:
             break
+        if deadline is not None and monotonic() > deadline:
+            raise GraphExpansionCut(related[:max_related], len(neighbours) - index)
         try:
             chunks = fetch_chunks(neighbour.file, per_file)
         except Exception as exc:

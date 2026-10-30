@@ -6,11 +6,12 @@ import contextvars
 import json
 from dataclasses import asdict, dataclass
 from queue import Empty, Queue
-from threading import Thread
+from threading import Event, Thread
 from time import perf_counter
 from typing import Any, Callable
 
 from config import get_settings
+from core.turn_budget import current_trace_id, current_turn_budget, number_setting
 from safety.observability import get_metrics_store, log_event, log_exception
 from tools.tool_registry import get_tool_registry
 
@@ -39,6 +40,29 @@ class ToolResult:
 
 class ToolCallTimeoutError(Exception):
     """Raised when a tool handler does not finish within the configured timeout."""
+
+
+# 知識庫查詢的上限比通用工具短：它在使用者等第一個字的路上（伺服器先查），
+# search_web 這類外部工具仍照 TOOL_CALL_TIMEOUT_SECONDS（網路搜尋最長約 20 秒）。
+_TOOL_TIMEOUT_SETTINGS = {
+    "search_knowledge": "knowledge_search_timeout_seconds",
+}
+# 回合預算快用完時，工具仍至少有這麼多時間，不會一開始就逾時。
+_MIN_TOOL_TIMEOUT_SECONDS = 1.0
+
+
+def tool_timeout_seconds(tool_name: str) -> tuple[float, bool]:
+    """This call's timeout and whether the chat turn's remaining budget shortened it."""
+    cfg = get_settings()
+    timeout = number_setting(cfg, "tool_call_timeout_seconds", 30.0)
+    if setting := _TOOL_TIMEOUT_SETTINGS.get(tool_name):
+        timeout = number_setting(cfg, setting, timeout)
+    budget = current_turn_budget()
+    if budget is not None:
+        remaining = max(budget.remaining(), _MIN_TOOL_TIMEOUT_SECONDS)
+        if remaining < timeout:
+            return remaining, True
+    return timeout, False
 
 
 def execute_tool_call(tool_name: str, raw_arguments: str | dict[str, Any]) -> str:
@@ -74,12 +98,27 @@ def execute_tool_call(tool_name: str, raw_arguments: str | dict[str, Any]) -> st
             reason="schema_validation",
         )
 
-    timeout = get_settings().tool_call_timeout_seconds
+    timeout, clamped = tool_timeout_seconds(tool_name)
     try:
-        result = _run_tool_handler_with_timeout(tool.handler, arguments, timeout)
+        result = _run_tool_handler_with_timeout(
+            tool.handler, arguments, timeout, tool_name=tool_name,
+        )
     except ToolCallTimeoutError:
-        log_event("tool_timeout", tool_name=tool_name, timeout_seconds=timeout)
-        return _finalize(tool_name, "timeout", start, ToolResult.fail(tool_name, f"工具執行逾時（{timeout}s）"))
+        log_event(
+            "tool_timeout",
+            node="tool",
+            component=tool_name,
+            outcome="timeout",
+            tool_name=tool_name,
+            timeout_seconds=round(timeout, 3),
+            clamped_by_turn_budget=clamped,
+            elapsed_ms=round((perf_counter() - start) * 1000, 2),
+            trace_id=current_trace_id(),
+        )
+        return _finalize(
+            tool_name, "timeout", start,
+            ToolResult.fail(tool_name, f"工具執行逾時（{timeout:g}s）"),
+        )
     except Exception as exc:
         log_exception("tool_execution_error", exc, tool_name=tool_name)
         return _finalize(tool_name, "error", start, ToolResult.fail(tool_name, f"工具執行失敗：{exc}"))
@@ -156,24 +195,41 @@ def _coerce_tool_data(result: Any) -> dict[str, Any]:
 def _run_tool_handler_with_timeout(
     handler: Callable[[dict[str, Any]], Any],
     arguments: dict[str, Any],
-    timeout: int,
+    timeout: float,
+    *,
+    tool_name: str = "",
 ) -> Any:
     queue: Queue[tuple[str, Any]] = Queue(maxsize=1)
     # Capture current context so ContextVars (project_id, persona_id)
     # propagate into the worker thread.
     ctx = contextvars.copy_context()
+    abandoned = Event()
+    started = perf_counter()
+    trace_id = current_trace_id()
 
     def runner() -> None:
         try:
             queue.put(("result", ctx.run(handler, arguments)))
         except Exception as exc:  # pragma: no cover - exercised via queue consumer
             queue.put(("error", exc))
+        finally:
+            if abandoned.is_set():
+                # 逾時後執行緒停不下來，只能讓它跑完；跑完時留紀錄，才看得出它實際花多久。
+                log_event(
+                    "node_orphan_finished",
+                    node="tool",
+                    component=tool_name,
+                    elapsed_ms=round((perf_counter() - started) * 1000, 2),
+                    timeout_s=round(timeout, 3),
+                    trace_id=trace_id,
+                )
 
     thread = Thread(target=runner, daemon=True, name="brain-tool-call")
     thread.start()
     try:
         outcome, payload = queue.get(timeout=timeout)
     except Empty as exc:
+        abandoned.set()
         raise ToolCallTimeoutError from exc
 
     if outcome == "error":

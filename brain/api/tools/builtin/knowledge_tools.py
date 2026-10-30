@@ -1,9 +1,12 @@
 import logging
+from time import monotonic
 from typing import Any
 
 from config import get_settings
+from core.turn_budget import number_setting
 from knowledge.kb_settings import primary_language
 from memory.language_detect import detect_language, route_language
+from safety.observability import record_node_attempt
 from tools.context import (
     active_persona_id,
     active_project_id,
@@ -21,6 +24,22 @@ from tools.search_helpers import (
 )
 
 logger = logging.getLogger("brain.tools.builtin.knowledge")
+
+# 查詢迴圈與圖譜擴展在工具硬逾時的這個比例處收手，留時間把已查到的結果送回去。
+_SOFT_BUDGET_SHARE = 0.8
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    import httpx
+
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        if isinstance(current, (httpx.TimeoutException, TimeoutError)):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def _search_one(
@@ -75,10 +94,26 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
         language = "nan"
 
     # 2. Execute searches and collect unique embedding versions
+    # 工具本身有硬逾時（knowledge_search_timeout_seconds，整個呼叫作廢）；這裡提早一點收手，
+    # 多條查詢時超過就不再查下一條、也不做圖譜擴展，帶著已查到的段落回答。
+    budget_s = number_setting(get_settings(), "knowledge_search_timeout_seconds", 6.0)
+    started = monotonic()
+    soft_deadline = started + budget_s * _SOFT_BUDGET_SHARE
     grouped: list[tuple[str, list[dict[str, Any]]]] = []
     embedding_versions: set[str] = set()
     primary_vector: list[float] | None = None
-    for query in queries:
+    for index, query in enumerate(queries):
+        if index > 0 and monotonic() > soft_deadline:
+            record_node_attempt(
+                "rag_query",
+                outcome="skipped",
+                elapsed_ms=(monotonic() - started) * 1000,
+                component=table_name,
+                timeout_s=budget_s * _SOFT_BUDGET_SHARE,
+                skipped_queries=len(queries) - index,
+            )
+            break
+        query_started = monotonic()
         try:
             records, version, vector = _search_one(
                 table_name,
@@ -88,17 +123,37 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
                 project_id,
                 language,
             )
+            record_node_attempt(
+                "rag_query",
+                outcome="ok" if records else "empty",
+                elapsed_ms=(monotonic() - query_started) * 1000,
+                component=table_name,
+                hits=len(records),
+                query_index=index,
+            )
             grouped.append((query, records))
             embedding_versions.add(version)
             if primary_vector is None:
                 primary_vector = vector
         except Exception as exc:
+            timed_out = _is_timeout(exc)
+            record_node_attempt(
+                "rag_query",
+                outcome="timeout" if timed_out else "error",
+                elapsed_ms=(monotonic() - query_started) * 1000,
+                component=table_name,
+                exc=exc,
+                query_index=index,
+            )
             logger.warning(
                 "search_one failed table=%s query=%r err=%s",
                 table_name,
                 query[:60],
-                exc,
+                str(exc) or type(exc).__name__,
             )
+            if timed_out:
+                # embedding 服務逾時時，下一條查詢多半一樣逾時，不要每條都等滿。
+                break
 
     merged = merge_search_results(grouped, limit=fused_limit(top_k, mode_settings()))
 
@@ -108,8 +163,10 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     #    The primary query vector ranks each neighbour's chunks so the most
     #    relevant segment surfaces, not the file's opening.
     related: list[dict[str, Any]] = []
-    if table_name == "knowledge":
-        related = _expand_via_graph(merged, project_id, primary_vector)
+    if table_name == "knowledge" and merged:
+        graph_budget = number_setting(get_settings(), "knowledge_graph_timeout_seconds", 1.0)
+        deadline = min(monotonic() + graph_budget, soft_deadline)
+        related = _expand_via_graph(merged, project_id, primary_vector, deadline=deadline)
         # 有分流時相關段落只留命中段落有的語言；只有一條分流就不篩。
         if route_language(language, project_id):
             related = _same_language_as(merged, related, project_id)
@@ -185,9 +242,11 @@ def _expand_via_graph(
     hits: list[dict[str, Any]],
     project_id: str,
     query_vector: list[float] | None = None,
+    *,
+    deadline: float | None = None,
 ) -> list[dict[str, Any]]:
     from knowledge.doc_meta import list_disabled_document_paths
-    from knowledge.graph_rag import expand_with_graph
+    from knowledge.graph_rag import GraphExpansionCut, expand_with_graph
 
     # 向量檢索會略過後台停用的文件，圖譜鄰居直接按路徑抓段落，也要略過：
     # 不然停用的文件只要在圖上跟命中的文件相鄰，就會被帶回答案（鶴記停用的
@@ -199,11 +258,46 @@ def _expand_via_graph(
             return []
         return _fetch_chunks_by_file(file_path, limit, project_id, query_vector)
 
-    try:
-        return expand_with_graph(hits, project_id, fetch_project_chunks)
-    except Exception as exc:
-        logger.warning("graph expansion failed: %s", exc)
+    started = monotonic()
+    timeout_s = None if deadline is None else max(0.0, deadline - started)
+    if timeout_s is not None and timeout_s <= 0:
+        record_node_attempt(
+            "rag_graph", outcome="skipped", elapsed_ms=0.0, component="note_graph", timeout_s=0.0,
+        )
         return []
+    try:
+        related = expand_with_graph(hits, project_id, fetch_project_chunks, deadline=deadline)
+    except GraphExpansionCut as cut:
+        record_node_attempt(
+            "rag_graph",
+            outcome="timeout",
+            elapsed_ms=(monotonic() - started) * 1000,
+            component="note_graph",
+            timeout_s=timeout_s,
+            related=len(cut.related),
+            skipped_files=cut.skipped,
+        )
+        return cut.related
+    except Exception as exc:
+        record_node_attempt(
+            "rag_graph",
+            outcome="error",
+            elapsed_ms=(monotonic() - started) * 1000,
+            component="note_graph",
+            timeout_s=timeout_s,
+            exc=exc,
+        )
+        logger.warning("graph expansion failed: %s", str(exc) or type(exc).__name__)
+        return []
+    record_node_attempt(
+        "rag_graph",
+        outcome="ok" if related else "empty",
+        elapsed_ms=(monotonic() - started) * 1000,
+        component="note_graph",
+        timeout_s=timeout_s,
+        related=len(related),
+    )
+    return related
 
 
 def _get_document(args: dict[str, Any]) -> dict[str, Any]:

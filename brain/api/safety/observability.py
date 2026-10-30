@@ -155,8 +155,14 @@ def record_route_attempt(
     latency_ms: float,
     reason: str = "",
     chain_length: int = 0,
+    **details: object,
 ) -> None:
-    """Record a routing attempt with metrics and structured log."""
+    """Record a routing attempt with metrics and structured log.
+
+    The log line also carries the node-attempt fields every answer-path node
+    shares (``node``, ``outcome``, ``elapsed_ms``), plus *details* such as
+    ``mode``, ``timeout_s``, ``error_type``, ``streamed_chars``.
+    """
     store = get_metrics_store()
     store.increment("llm_route_attempts_total", provider=provider, model=model, result=result)
     store.observe("llm_route_latency_ms", latency_ms, provider=provider, model=model, result=result)
@@ -167,14 +173,55 @@ def record_route_attempt(
     log_event(
         "llm_route_attempt",
         trace_id=trace_id,
+        node="llm_hop",
         provider=provider,
         model=model,
         hop_index=hop_index,
         result=result,
+        outcome="ok" if result == "success" else (reason or result),
         reason=reason,
         latency_ms=round(latency_ms, 2),
+        elapsed_ms=round(latency_ms, 2),
         chain_length=chain_length,
+        **details,
     )
+
+
+def record_node_attempt(
+    node: str,
+    *,
+    outcome: str,
+    elapsed_ms: float,
+    component: str = "",
+    timeout_s: float | None = None,
+    trace_id: str | None = None,
+    exc: BaseException | None = None,
+    **fields: object,
+) -> None:
+    """One structured event per attempt of an answer-path node (RAG, tool, budget).
+
+    *outcome* is ``ok`` / ``empty`` / ``timeout`` / ``error`` / ``skipped``; the
+    event says which node, how long it waited and under which limit, so a slow
+    turn can be traced to the node that held it up.
+    """
+    from core.turn_budget import current_trace_id, error_fields
+
+    store = get_metrics_store()
+    store.increment("node_attempts_total", node=node, outcome=outcome)
+    store.observe("node_attempt_ms", elapsed_ms, node=node, outcome=outcome)
+    payload: dict[str, object] = {
+        "node": node,
+        "outcome": outcome,
+        "elapsed_ms": round(elapsed_ms, 2),
+        "trace_id": trace_id if trace_id is not None else current_trace_id(),
+    }
+    if component:
+        payload["component"] = component
+    if timeout_s is not None:
+        payload["timeout_s"] = round(timeout_s, 3)
+    payload.update(error_fields(exc))
+    payload.update(fields)
+    log_event("node_attempt", **payload)
 
 
 def record_fallback_hop(

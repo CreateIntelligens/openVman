@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response, StreamingResponse
 
+from config import get_settings
 from core.chat_service import (
     execute_generation,
     finalize_generation,
@@ -35,6 +36,7 @@ from core.sse_events import (
     build_exception_protocol_error,
     build_protocol_error,
 )
+from core.turn_budget import bind_turn_budget, number_setting
 from core.usage import UsageScope, summarize_collected, usage_scope
 from infra.client_disconnect import wait_for_client_disconnect
 from protocol.history import serialize_history_messages
@@ -147,6 +149,45 @@ def _handle_generation_error(exc: Exception, action: str, request: Request) -> N
 
 # nginx 的慣例：用戶端先斷線。對方已經不在，這個狀態碼只會進 log。
 _CLIENT_CLOSED_REQUEST = 499
+_GATEWAY_TIMEOUT = 504
+
+
+def _response_deadline_seconds() -> float:
+    """Backstop for the whole request, above every inner budget.
+
+    回合預算用完後還可能跑完最後一輪（一次 LLM 呼叫的首字預算）再加一次退路作答
+    （再一次首字預算＋串流整段上限），外加準備與寫紀錄的餘裕。正常情況走不到這裡；
+    走到代表某個節點沒有逾時，不讓請求永遠掛著。
+    """
+    cfg = get_settings()
+    turn = number_setting(cfg, "chat_turn_budget_seconds", 30.0)
+    first_token = number_setting(cfg, "llm_first_token_budget_seconds", 15.0)
+    hop_total = number_setting(cfg, "llm_request_timeout_seconds", 20.0)
+    return turn + 2 * first_token + hop_total + 10.0
+
+
+def _deadline_error() -> HTTPException:
+    return HTTPException(
+        status_code=_GATEWAY_TIMEOUT,
+        detail=build_protocol_error("GATEWAY_TIMEOUT", "回答逾時", retry_after_ms=3000),
+    )
+
+
+def _log_deadline_exceeded(request: Request, payload: ChatRequest, run: "_ChatRun", deadline_s: float) -> None:
+    log_event(
+        "chat_deadline_exceeded",
+        node="chat_request",
+        outcome="timeout",
+        trace_id=(
+            getattr(run.context, "trace_id", "")
+            or getattr(request.state, "trace_id", "")
+        ),
+        session_id=payload.session_id or "",
+        project_id=payload.project_id or "default",
+        elapsed_ms=round((time.monotonic() - run.started) * 1000, 2),
+        timeout_s=round(deadline_s, 3),
+        llm_calls=len(run.scope.collected) if run.scope is not None else 0,
+    )
 
 
 async def _cancel_on_disconnect(request: Request, cancel_event: threading.Event) -> None:
@@ -162,6 +203,7 @@ def _log_chat_cancelled(
     context: Any,
     scope: UsageScope | None,
     started: float,
+    run: Any = None,
 ) -> None:
     if isinstance(exc, GenerationCancelled):
         stage, tool_steps = exc.stage, exc.tool_steps
@@ -171,6 +213,8 @@ def _log_chat_cancelled(
         stage, tool_steps = f"error:{type(exc).__name__}", 0
     log_event(
         "chat_cancelled",
+        # 回答逾時也會設 cancel_event 讓生成停下，log 要分得出不是用戶端離開。
+        cause="deadline" if getattr(run, "deadline_exceeded", False) else "client_disconnect",
         trace_id=(
             getattr(context, "trace_id", "")
             or getattr(request.state, "trace_id", "")
@@ -192,6 +236,7 @@ class _ChatRun:
     started: float = field(default_factory=time.monotonic)
     context: Any = None
     scope: UsageScope | None = None
+    deadline_exceeded: bool = False
 
 
 async def _generate_chat_response(
@@ -202,7 +247,8 @@ async def _generate_chat_response(
     reply_stream: ReplyStream | None = None,
 ) -> dict[str, Any]:
     """Run one chat turn and build the /chat payload; shared by /chat and /chat/stream."""
-    with bind_cancel_event(cancel_event):
+    turn_budget_s = number_setting(get_settings(), "chat_turn_budget_seconds", 30.0)
+    with bind_cancel_event(cancel_event), bind_turn_budget(turn_budget_s, started=run.started):
         if payload.turn_id is not None:
             await asyncio.to_thread(register_turn, request, payload)
         logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
@@ -221,6 +267,8 @@ async def _generate_chat_response(
             project_id=payload.project_id or "default",
             session_id=payload.session_id or "",
             persona_id=payload.persona_id or "default",
+            # 先用 middleware 的 trace id，準備階段（檢索、決策）的節點事件才對得上這一輪。
+            trace_id=getattr(request.state, "trace_id", "") or "",
         ) as scope:
             run.scope = scope
             context = await asyncio.to_thread(_prepare_chat_context, request, payload)
@@ -282,17 +330,28 @@ async def chat(request: Request, payload: ChatRequest):
     run = _ChatRun()
     cancel_event = threading.Event()
     watcher = asyncio.create_task(_cancel_on_disconnect(request, cancel_event))
+    deadline_s = _response_deadline_seconds()
+    deadline = asyncio.timeout(deadline_s)
     try:
-        return await _generate_chat_response(request, payload, cancel_event, run)
+        try:
+            async with deadline:
+                return await _generate_chat_response(request, payload, cancel_event, run)
+        except TimeoutError:
+            if not deadline.expired():
+                raise
+            run.deadline_exceeded = True
+            cancel_event.set()
+            _log_deadline_exceeded(request, payload, run, deadline_s)
+            raise _deadline_error() from None
     except HTTPException:
         raise
     except (GenerationCancelled, DecisionProviderCancelled) as exc:
-        _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started)
+        _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started, run=run)
         return Response(status_code=_CLIENT_CLOSED_REQUEST)
     except Exception as exc:
         if cancel_event.is_set():
             # 斷線後才冒出的錯誤（例如串流被關掉）是取消的結果，不算生成失敗。
-            _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started)
+            _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started, run=run)
             return Response(status_code=_CLIENT_CLOSED_REQUEST)
         _handle_generation_error(exc, "chat", request)
     finally:
@@ -331,13 +390,13 @@ async def _stream_chat_events(request: Request, payload: ChatRequest) -> AsyncIt
             )
             put(("done", response))
         except (GenerationCancelled, DecisionProviderCancelled) as exc:
-            _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started)
+            _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started, run=run)
             put(None)
         except HTTPException as exc:
             put(_error_event(exc))
         except Exception as exc:
             if cancel_event.is_set():
-                _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started)
+                _log_chat_cancelled(request, payload, exc, context=run.context, scope=run.scope, started=run.started, run=run)
                 put(None)
                 return
             try:
@@ -355,9 +414,18 @@ async def _stream_chat_events(request: Request, payload: ChatRequest) -> AsyncIt
     producer = asyncio.create_task(produce())
     _background_runs.add(producer)
     producer.add_done_callback(_background_runs.discard)
+    deadline_s = _response_deadline_seconds()
+    deadline_at = loop.time() + deadline_s
     try:
         while True:
-            item = await queue.get()
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=max(0.0, deadline_at - loop.time()))
+            except TimeoutError:
+                run.deadline_exceeded = True
+                cancel_event.set()
+                _log_deadline_exceeded(request, payload, run, deadline_s)
+                yield _sse(*_error_event(_deadline_error()))
+                return
             if item is None:
                 return
             event, data = item

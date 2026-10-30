@@ -9,6 +9,7 @@ from threading import Lock
 from time import monotonic
 from typing import Any, Protocol, cast
 
+import httpx
 from openai import OpenAI
 
 from config import get_settings
@@ -28,13 +29,27 @@ from core.key_pool import (
     FAILURE_AUTH_FORBIDDEN,
     FAILURE_AUTH_INVALID,
     FAILURE_QUOTA_EXHAUSTED,
+    FAILURE_TIMEOUT_CONNECT,
+    FAILURE_TIMEOUT_FIRST_TOKEN,
+    FAILURE_TIMEOUT_STALL,
+    FAILURE_TIMEOUT_TOTAL,
+    LLMTimeoutError,
     classify_failure,
+    is_connect_timeout,
+    is_timeout,
 )
 from core.provider_health import FailureKind, provider_health
 from core.provider_router import LLMRoute, get_provider_router
+from core.turn_budget import (
+    current_trace_id,
+    current_turn_budget,
+    error_fields,
+    number_setting,
+)
 from core.usage import LLMUsage, usage_from_response
 from infra.usage_ledger import record_usage_event
 from safety.observability import (
+    log_event,
     record_chain_exhausted,
     record_fallback_hop,
     record_route_attempt,
@@ -69,6 +84,178 @@ _HEALTH_KINDS: dict[str, FailureKind] = {
     FAILURE_AUTH_FORBIDDEN: "auth",
     FAILURE_QUOTA_EXHAUSTED: "quota",
 }
+
+
+# 剩不到這麼多預算就不開下一站：開了也只會在連線或第一個字前被切掉。
+_MIN_HOP_SECONDS = 0.5
+BUDGET_EXHAUSTED = "budget_exhausted"
+
+
+@dataclass(frozen=True, slots=True)
+class _HopLimits:
+    """Timeouts for one provider attempt.
+
+    *read* is the socket read timeout. For a stream httpx applies it to every read,
+    so it is both the wait for the first token and the longest gap between chunks;
+    *total* caps the whole stream's wall-clock time. For a non-stream call *read* is
+    the wait for the whole response.
+    """
+
+    mode: str
+    connect: float
+    read: float
+    total: float
+
+    def httpx_timeout(self) -> httpx.Timeout:
+        return httpx.Timeout(connect=self.connect, read=self.read, write=self.read, pool=self.connect)
+
+    def log_fields(self) -> dict[str, Any]:
+        return {"mode": self.mode, "timeout_s": round(self.read, 3)}
+
+
+class _ChainClock:
+    """Per-call budget across hops while a chat turn is bound (``core.turn_budget``).
+
+    Outside a chat turn (graph extraction, summaries) there is no cross-hop budget
+    and non-stream hops keep ``llm_request_timeout_seconds``.
+    """
+
+    def __init__(self, cfg: Any) -> None:
+        self.cfg = cfg
+        self.started = monotonic()
+        self.in_turn = current_turn_budget() is not None
+        self.deadline = (
+            self.started + number_setting(cfg, "llm_first_token_budget_seconds", 15.0)
+            if self.in_turn
+            else None
+        )
+
+    def remaining(self) -> float | None:
+        return None if self.deadline is None else self.deadline - monotonic()
+
+    def limits(self, *, stream: bool) -> _HopLimits | None:
+        """Limits for the next hop, or None when the budget cannot fit another hop."""
+        cfg = self.cfg
+        connect = number_setting(cfg, "llm_connect_timeout_seconds", 3.0)
+        total = number_setting(cfg, "llm_request_timeout_seconds", 20.0)
+        if stream:
+            read = number_setting(cfg, "llm_first_token_timeout_seconds", 7.0)
+        elif self.in_turn:
+            read = number_setting(cfg, "llm_nonstream_timeout_seconds", 10.0)
+        else:
+            read = total
+        remaining = self.remaining()
+        if remaining is not None:
+            if remaining < _MIN_HOP_SECONDS:
+                return None
+            connect, read = min(connect, remaining), min(read, remaining)
+        return _HopLimits(
+            mode="stream" if stream else "nonstream",
+            connect=connect,
+            read=read,
+            total=max(total, read),
+        )
+
+
+@dataclass(slots=True)
+class _StreamProgress:
+    """What one streamed hop delivered before it ended, for timeout codes and logs."""
+
+    started: float
+    first_token_at: float | None = None
+    streamed_chars: int = 0
+
+    def first_token_ms(self) -> float | None:
+        if self.first_token_at is None:
+            return None
+        return round((self.first_token_at - self.started) * 1000, 2)
+
+
+def _timeout_error(
+    exc: BaseException, limits: _HopLimits, progress: _StreamProgress | None, started: float,
+) -> LLMTimeoutError:
+    waited = monotonic() - started
+    if is_connect_timeout(exc):
+        return LLMTimeoutError(FAILURE_TIMEOUT_CONNECT, limit_s=limits.connect, waited_s=waited)
+    if progress is None:
+        return LLMTimeoutError(FAILURE_TIMEOUT_TOTAL, limit_s=limits.read, waited_s=waited)
+    reason = FAILURE_TIMEOUT_STALL if progress.first_token_at is not None else FAILURE_TIMEOUT_FIRST_TOKEN
+    return LLMTimeoutError(reason, limit_s=limits.read, waited_s=waited)
+
+
+def _run_stream_hop(
+    client: OpenAI,
+    *,
+    model: str,
+    messages: list[dict[str, Any]],
+    cfg: Any,
+    create_kwargs: dict[str, Any],
+    limits: _HopLimits,
+    progress: _StreamProgress,
+    text_listener: TextDeltaListener | None,
+) -> LLMReply:
+    try:
+        stream = client.chat.completions.create(
+            model=model,
+            messages=cast(Any, messages),
+            temperature=cfg.llm_temperature,
+            stream=True,
+            timeout=limits.httpx_timeout(),
+            **create_kwargs,
+        )
+        return _consume_stream(
+            stream,
+            model=model,
+            text_listener=text_listener,
+            progress=progress,
+            total_deadline=progress.started + limits.total,
+            total_limit=limits.total,
+        )
+    except LLMTimeoutError:
+        raise
+    except Exception as exc:
+        if is_timeout(exc):
+            raise _timeout_error(exc, limits, progress, progress.started) from exc
+        raise
+
+
+def _run_nonstream_hop(
+    client: OpenAI,
+    *,
+    model: str,
+    messages: list[dict[str, Any]],
+    cfg: Any,
+    create_kwargs: dict[str, Any],
+    limits: _HopLimits,
+) -> Any:
+    started = monotonic()
+    try:
+        return client.chat.completions.create(
+            model=model,
+            messages=cast(Any, messages),
+            temperature=cfg.llm_temperature,
+            timeout=limits.httpx_timeout(),
+            **create_kwargs,
+        )
+    except Exception as exc:
+        if is_timeout(exc):
+            raise _timeout_error(exc, limits, None, started) from exc
+        raise
+
+
+def _record_budget_exhausted(
+    trace_id: str, clock: _ChainClock, chain: list[RouteHop], next_index: int,
+) -> None:
+    skipped = [f"{hop.provider}:{hop.model}" for hop in chain[next_index:]]
+    log_event(
+        "llm_chain_budget_exhausted",
+        trace_id=trace_id,
+        node="llm_chain",
+        outcome=BUDGET_EXHAUSTED,
+        elapsed_ms=round((monotonic() - clock.started) * 1000, 2),
+        budget_s=number_setting(clock.cfg, "llm_first_token_budget_seconds", 15.0),
+        skipped_hops=skipped,
+    )
 
 
 def _require_api_key() -> None:
@@ -221,7 +408,8 @@ def stream_chat_turn(
     _require_api_key()
     cfg = get_settings()
     router = get_provider_router()
-    tid = trace_id or uuid.uuid4().hex[:12]
+    tid = trace_id or current_trace_id() or uuid.uuid4().hex[:12]
+    clock = _ChainClock(cfg)
 
     gemini_client = _get_gemini_client()
     chain, legacy_routes = _resolve_chain_or_routes(tid, client=gemini_client)
@@ -235,28 +423,34 @@ def stream_chat_turn(
 
     if legacy_routes:
         return _stream_routes(
-            legacy_routes, messages, cfg, router, create_kwargs, text_listener=text_listener,
+            legacy_routes, messages, cfg, router, create_kwargs,
+            text_listener=text_listener, clock=clock,
         )
 
     errors: list[str] = []
     last_reason = ""
-    for hop in chain:
+    for position, hop in enumerate(chain):
         # 用戶端已離開就不再換下一站重試。
         raise_if_cancelled("llm_call")
+        limits = clock.limits(stream=True)
+        if limits is None:
+            _record_budget_exhausted(tid, clock, chain, position)
+            last_reason = BUDGET_EXHAUSTED
+            break
         if text_listener is not None:
             text_listener.attempt_started()
         t0 = _now_ms()
+        progress = _StreamProgress(started=monotonic())
         client = _get_sync_client(hop.api_key, hop.base_url)
         try:
-            reply = _consume_stream(
-                client.chat.completions.create(
-                    model=hop.model,
-                    messages=cast(Any, messages),
-                    temperature=cfg.llm_temperature,
-                    stream=True,
-                    **create_kwargs,
-                ),
+            reply = _run_stream_hop(
+                client,
                 model=hop.model,
+                messages=messages,
+                cfg=cfg,
+                create_kwargs=create_kwargs,
+                limits=limits,
+                progress=progress,
                 text_listener=text_listener,
             )
             router.mark_success(hop.api_key)
@@ -270,12 +464,33 @@ def stream_chat_turn(
                 result="success",
                 latency_ms=_now_ms() - t0,
                 chain_length=len(chain),
+                first_token_ms=progress.first_token_ms(),
+                **limits.log_fields(),
             )
             return reply
         except (ValueError, GenerationCancelled):
             raise
         except Exception as exc:
-            last_reason = _record_hop_failure(hop, exc, _now_ms() - t0, chain, errors, tid)
+            last_reason = _record_hop_failure(
+                hop, exc, _now_ms() - t0, chain, errors, tid,
+                details={
+                    **limits.log_fields(),
+                    "first_token_ms": progress.first_token_ms(),
+                    "streamed_chars": progress.streamed_chars,
+                },
+            )
+            if progress.streamed_chars and position + 1 < len(chain):
+                # 已經有句子送到用戶端：照舊換下一站重答，ReplyStream.finish 會把整段補送；
+                # 這裡留紀錄，log 才看得出那一輪的答案是兩站拼起來的。
+                log_event(
+                    "llm_restart_after_partial_text",
+                    trace_id=tid,
+                    provider=hop.provider,
+                    model=hop.model,
+                    hop_index=hop.hop_index,
+                    reason=last_reason,
+                    streamed_chars=progress.streamed_chars,
+                )
 
     _raise_chain_exhausted(tid, errors, last_reason, len(chain))
     raise RuntimeError("unreachable")
@@ -327,6 +542,7 @@ def _record_hop_failure(
     chain: list[RouteHop],
     errors: list[str],
     trace_id: str,
+    details: dict[str, Any] | None = None,
 ) -> str:
     """Shared failure handling for a single hop. Returns the failure reason."""
     reason = classify_failure(exc)
@@ -345,10 +561,13 @@ def _record_hop_failure(
         latency_ms=latency_ms,
         reason=reason,
         chain_length=len(chain),
+        **(details or {}),
+        **error_fields(exc),
     )
+    failure = error_fields(exc)
     errors.append(
         f"hop{hop.hop_index} {hop.provider}:{hop.model}: "
-        f"{type(exc).__name__}: {exc}"
+        f"{failure['error_type']}: {failure['error']}"
     )
 
     next_idx = hop.hop_index + 1
@@ -389,7 +608,8 @@ def _create_sync_completion(
     _require_api_key()
     cfg = get_settings()
     router = get_provider_router()
-    tid = trace_id or uuid.uuid4().hex[:12]
+    tid = trace_id or current_trace_id() or uuid.uuid4().hex[:12]
+    clock = _ChainClock(cfg)
 
     gemini_client = _get_gemini_client()
     chain, legacy_routes = _resolve_chain_or_routes(tid, client=gemini_client)
@@ -408,6 +628,7 @@ def _create_sync_completion(
             router,
             forced_tool_name=forced_tool_name,
             max_tokens=max_tokens,
+            clock=clock,
         )
 
     errors: list[str] = []
@@ -416,16 +637,23 @@ def _create_sync_completion(
     if max_tokens:
         create_kwargs["max_tokens"] = max_tokens
 
-    for hop in chain:
+    for position, hop in enumerate(chain):
         raise_if_cancelled("llm_call")
+        limits = clock.limits(stream=False)
+        if limits is None:
+            _record_budget_exhausted(tid, clock, chain, position)
+            last_reason = BUDGET_EXHAUSTED
+            break
         t0 = _now_ms()
         client = _get_sync_client(hop.api_key, hop.base_url)
         try:
-            response = client.chat.completions.create(
+            response = _run_nonstream_hop(
+                client,
                 model=hop.model,
-                messages=cast(Any, messages),
-                temperature=cfg.llm_temperature,
-                **create_kwargs,
+                messages=messages,
+                cfg=cfg,
+                create_kwargs=create_kwargs,
+                limits=limits,
             )
             router.mark_success(hop.api_key)
             provider_health().record_success(health_id(hop.provider, hop.model, hop.api_key))
@@ -444,11 +672,12 @@ def _create_sync_completion(
                 result="success",
                 latency_ms=_now_ms() - t0,
                 chain_length=len(chain),
+                **limits.log_fields(),
             )
             return response
         except Exception as exc:
             last_reason = _record_hop_failure(
-                hop, exc, _now_ms() - t0, chain, errors, tid
+                hop, exc, _now_ms() - t0, chain, errors, tid, details=limits.log_fields(),
             )
 
     _raise_chain_exhausted(tid, errors, last_reason, len(chain))
@@ -502,8 +731,10 @@ def _try_routes_sync(
     *,
     forced_tool_name: str | None = None,
     max_tokens: int | None = None,
+    clock: _ChainClock | None = None,
 ) -> Any:
     """Legacy route loop for when no fallback chain is configured."""
+    clock = clock or _ChainClock(cfg)
     errors: list[str] = []
     create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
     if max_tokens:
@@ -511,14 +742,20 @@ def _try_routes_sync(
     provider = str(getattr(cfg, "llm_provider", "") or "")
     for route in routes:
         raise_if_cancelled("llm_call")
+        limits = clock.limits(stream=False)
+        if limits is None:
+            errors.append(BUDGET_EXHAUSTED)
+            break
         client = _get_sync_client(route.api_key, route.base_url)
         t0 = _now_ms()
         try:
-            response = client.chat.completions.create(
+            response = _run_nonstream_hop(
+                client,
                 model=route.model,
-                messages=cast(Any, messages),
-                temperature=cfg.llm_temperature,
-                **create_kwargs,
+                messages=messages,
+                cfg=cfg,
+                create_kwargs=create_kwargs,
+                limits=limits,
             )
             router.mark_success(route.api_key)
             _record_llm_usage(
@@ -530,13 +767,20 @@ def _try_routes_sync(
             return response
         except Exception as exc:
             router.mark_failure(route.api_key, route.model, exc)
-            errors.append(f"{route.model}: {type(exc).__name__}: {exc}")
+            failure = error_fields(exc)
+            errors.append(f"{route.model}: {failure['error_type']}: {failure['error']}")
 
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
 def _consume_stream(
-    stream: Any, *, model: str, text_listener: TextDeltaListener | None = None,
+    stream: Any,
+    *,
+    model: str,
+    text_listener: TextDeltaListener | None = None,
+    progress: _StreamProgress | None = None,
+    total_deadline: float | None = None,
+    total_limit: float = 0.0,
 ) -> LLMReply:
     """Drain a streaming completion and return an LLMReply.
 
@@ -544,6 +788,9 @@ def _consume_stream(
     index. Raises ValueError if the stream ends with neither content nor tool calls.
     Text deltas go to *text_listener* until the first tool-call fragment shows up:
     a tool-call turn's text is discarded, so it must not reach the caller either.
+    *progress* records when the first token arrived and how much text reached the
+    listener; past *total_deadline* the stream is closed (``timeout_total``) even
+    if it is still dripping.
     """
     text_buf = ""
     tool_call_acc: dict[int, dict[str, str]] = {}
@@ -557,6 +804,14 @@ def _consume_stream(
             if callable(close):
                 close()
             raise GenerationCancelled("llm_stream")
+        if total_deadline is not None and monotonic() > total_deadline:
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()
+            started = progress.started if progress is not None else total_deadline - total_limit
+            raise LLMTimeoutError(
+                FAILURE_TIMEOUT_TOTAL, limit_s=total_limit, waited_s=monotonic() - started,
+            )
         # include_usage 時最後一個 chunk 只有 usage、choices 為空。
         chunk_usage = usage_from_response(getattr(chunk, "usage", None))
         if chunk_usage is not None:
@@ -567,12 +822,18 @@ def _consume_stream(
         if choice.finish_reason:
             finish_reason = choice.finish_reason
         delta = choice.delta
+        if progress is not None and progress.first_token_at is None and (
+            delta.content or delta.tool_calls
+        ):
+            progress.first_token_at = monotonic()
         if delta.tool_calls:
             text_listener = None
         if delta.content:
             text_buf += delta.content
             if text_listener is not None:
                 text_listener.text_delta(delta.content)
+                if progress is not None:
+                    progress.streamed_chars += len(delta.content)
         if delta.tool_calls:
             for tc_delta in delta.tool_calls:
                 idx = tc_delta.index if tc_delta.index is not None else 0
@@ -624,26 +885,31 @@ def _stream_routes(
     create_kwargs: dict[str, Any],
     *,
     text_listener: TextDeltaListener | None = None,
+    clock: _ChainClock | None = None,
 ) -> LLMReply:
     """Legacy route loop for streaming when no fallback chain is configured."""
+    clock = clock or _ChainClock(cfg)
     errors: list[str] = []
     provider = str(getattr(cfg, "llm_provider", "") or "")
     for route in routes:
         raise_if_cancelled("llm_call")
+        limits = clock.limits(stream=True)
+        if limits is None:
+            errors.append(BUDGET_EXHAUSTED)
+            break
         if text_listener is not None:
             text_listener.attempt_started()
         client = _get_sync_client(route.api_key, route.base_url)
         t0 = _now_ms()
         try:
-            reply = _consume_stream(
-                client.chat.completions.create(
-                    model=route.model,
-                    messages=cast(Any, messages),
-                    temperature=cfg.llm_temperature,
-                    stream=True,
-                    **create_kwargs,
-                ),
+            reply = _run_stream_hop(
+                client,
                 model=route.model,
+                messages=messages,
+                cfg=cfg,
+                create_kwargs=create_kwargs,
+                limits=limits,
+                progress=_StreamProgress(started=monotonic()),
                 text_listener=text_listener,
             )
             router.mark_success(route.api_key)
@@ -653,7 +919,8 @@ def _stream_routes(
             raise
         except Exception as exc:
             router.mark_failure(route.api_key, route.model, exc)
-            errors.append(f"{route.model}: {type(exc).__name__}: {exc}")
+            failure = error_fields(exc)
+            errors.append(f"{route.model}: {failure['error_type']}: {failure['error']}")
 
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 

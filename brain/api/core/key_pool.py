@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from threading import Lock
 from time import monotonic
 
+import httpx
 from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
 
 from safety.observability import log_event, record_circuit_state_change
@@ -22,6 +23,48 @@ FAILURE_QUOTA_EXHAUSTED = "quota_exhausted"
 FAILURE_RATE_LIMITED = "rate_limited"
 FAILURE_PROVIDER_ERROR = "provider_error"
 FAILURE_TRANSIENT_ERROR = "transient_error"
+# 逾時跟其他暫時性錯誤分開記，log 才看得出是哪一段在等：連線、第一個字、串流中斷、整段。
+# 斷路器仍把它們當暫時性失敗（provider_health 的 transient、key pool 的短冷卻）。
+FAILURE_TIMEOUT_CONNECT = "timeout_connect"
+FAILURE_TIMEOUT_FIRST_TOKEN = "timeout_first_token"
+FAILURE_TIMEOUT_STALL = "timeout_stall"
+FAILURE_TIMEOUT_TOTAL = "timeout_total"
+TIMEOUT_FAILURES = frozenset({
+    FAILURE_TIMEOUT_CONNECT,
+    FAILURE_TIMEOUT_FIRST_TOKEN,
+    FAILURE_TIMEOUT_STALL,
+    FAILURE_TIMEOUT_TOTAL,
+})
+
+
+class LLMTimeoutError(Exception):
+    """One LLM hop hit one of its limits; *reason* is a ``timeout_*`` failure code.
+
+    Not a ValueError on purpose: the fallback chain re-raises ValueError without
+    trying the next hop, and a timed-out hop must fall through to the next one.
+    """
+
+    def __init__(self, reason: str, *, limit_s: float, waited_s: float) -> None:
+        super().__init__(f"{reason} after {waited_s:.2f}s (limit {limit_s:.2f}s)")
+        self.reason = reason
+        self.limit_s = limit_s
+        self.waited_s = waited_s
+
+
+def is_connect_timeout(exc: BaseException) -> bool:
+    """True for httpx connect/pool timeouts, bare or wrapped in ``APITimeoutError``."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, (httpx.ConnectTimeout, httpx.PoolTimeout)):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def is_timeout(exc: BaseException) -> bool:
+    return isinstance(exc, (APITimeoutError, httpx.TimeoutException, LLMTimeoutError))
 
 _DISABLE_FAILURES = frozenset({FAILURE_AUTH_INVALID, FAILURE_AUTH_FORBIDDEN})
 _LONG_COOLDOWN_FAILURES = frozenset({FAILURE_QUOTA_EXHAUSTED})
@@ -29,6 +72,13 @@ _LONG_COOLDOWN_FAILURES = frozenset({FAILURE_QUOTA_EXHAUSTED})
 
 def classify_failure(exc: Exception) -> str:
     """Classify an LLM exception into a failure category."""
+    if isinstance(exc, LLMTimeoutError):
+        return exc.reason
+    if isinstance(exc, (APITimeoutError, httpx.TimeoutException)):
+        # 呼叫端（llm_client）會把串流的讀取逾時換成 first_token／stall；
+        # 走到這裡的是非串流整段沒回來，或連線階段就逾時。
+        return FAILURE_TIMEOUT_CONNECT if is_connect_timeout(exc) else FAILURE_TIMEOUT_TOTAL
+
     if isinstance(exc, RateLimitError):
         body = getattr(exc, "body", None) or {}
         message = ""

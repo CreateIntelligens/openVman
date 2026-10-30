@@ -19,7 +19,7 @@ def test_search_knowledge_passes_user_language(monkeypatch):
         lambda *a, **kw: types.SimpleNamespace(vector=[0.1], version="gemma"),
     )
     monkeypatch.setattr(retrieval, "search_records", lambda *a, **kw: seen.append(kw.get("language")) or [])
-    monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a: [])
+    monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a, **kw: [])
 
     token = active_user_message.set("¿Qué bomba me recomiendas para agua sucia?")
     project = active_project_id.set("proj-x")
@@ -42,7 +42,7 @@ def test_short_greeting_searches_in_the_primary_language(monkeypatch):
         lambda *a, **kw: types.SimpleNamespace(vector=[0.1], version="gemma"),
     )
     monkeypatch.setattr(retrieval, "search_records", lambda *a, **kw: seen.append(kw.get("language")) or [])
-    monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a: [])
+    monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a, **kw: [])
     monkeypatch.setattr(knowledge_tools, "primary_language", lambda project_id: "en")
 
     token = active_user_message.set("hi")

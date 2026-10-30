@@ -43,3 +43,34 @@ def test_code_only_reads_settings_that_exist():
         if not hasattr(settings, attr)
     ]
     assert not missing, "設定裡沒有這些欄位：\n" + "\n".join(missing)
+
+
+def _settings_names_read_by_string():
+    """Setting names passed as strings: ``number_setting(cfg, "x", ...)`` and the
+    tool-timeout table. 逾時設定多半這樣讀，改名後只會悄悄退回預設值。"""
+    for path in API_ROOT.rglob("*.py"):
+        if "tests" in path.relative_to(API_ROOT).parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "number_setting"
+                and len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and isinstance(node.args[1].value, str)
+            ):
+                yield path.relative_to(API_ROOT), node.lineno, node.args[1].value
+
+
+def test_settings_read_by_name_exist():
+    from tools.tool_executor import _TOOL_TIMEOUT_SETTINGS
+
+    settings = BrainSettings()
+    found = list(_settings_names_read_by_string())
+    assert found, "number_setting() calls were not found; the scan is broken"
+    missing = [
+        f"{path}:{line} {name}" for path, line, name in found if not hasattr(settings, name)
+    ] + [name for name in _TOOL_TIMEOUT_SETTINGS.values() if not hasattr(settings, name)]
+    assert not missing, "設定裡沒有這些欄位：\n" + "\n".join(missing)
