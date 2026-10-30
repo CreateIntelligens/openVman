@@ -236,7 +236,8 @@ async def create_speech(
             return _cached_speech_response(cached)
 
     try:
-        output = svc.synthesize(
+        output = await asyncio.to_thread(
+            svc.synthesize,
             request, provider=provider, edge_fallback_voice=edge_fallback_voice,
             partners=plan.partners, order=_project_engine_order(policy),
         )
@@ -749,7 +750,8 @@ async def tts_stream_endpoint(
                         reason="provider_unavailable",
                     )
                     try:
-                        output = _get_service().synthesize(
+                        output = await asyncio.to_thread(
+                            _get_service().synthesize,
                             SynthesizeRequest(
                                 text=cleaned, locale=locale,
                                 voice_hint=partner_voice, usage_scope=scope,
@@ -768,7 +770,8 @@ async def tts_stream_endpoint(
     if provider == COSYVOICE_PROVIDER_NAME:
         svc = _get_service()
         try:
-            output = svc.synthesize(
+            output = await asyncio.to_thread(
+                svc.synthesize,
                 SynthesizeRequest(
                     text=cleaned, locale=locale,
                     voice_hint=voice or character, usage_scope=scope,
@@ -841,7 +844,8 @@ async def tts_stream_endpoint(
 
     # Fallback (buffered): 其餘 provider 仍走 service chain 一次性回傳。
     try:
-        output = svc.synthesize(
+        output = await asyncio.to_thread(
+            svc.synthesize,
             SynthesizeRequest(
                 text=cleaned, locale=locale,
                 voice_hint=voice or character, usage_scope=scope,

@@ -448,6 +448,33 @@ class TestAudioConversion:
             ingestion_audio._as_wav(str(clip))
 
 
+@pytest.mark.asyncio
+async def test_ffmpeg_conversion_runs_off_the_event_loop(tmp_path):
+    """ffmpeg 最久跑 60 秒，在 event loop 上跑會讓所有請求一起卡住。"""
+    clip = tmp_path / "clip.webm"
+    clip.write_bytes(b"webm")
+    seen: list[bool] = []
+
+    def fake_as_wav(path: str):
+        try:
+            import asyncio
+
+            asyncio.get_running_loop()
+            seen.append(True)
+        except RuntimeError:
+            seen.append(False)
+        raise RuntimeError("stop after conversion")
+
+    with (
+        patch.object(ingestion_audio, "get_tts_config", return_value=_breeze_cfg()),
+        patch.object(ingestion_audio, "_as_wav", side_effect=fake_as_wav),
+        pytest.raises(RuntimeError, match="stop after conversion"),
+    ):
+        await ingestion_audio._transcribe_breeze(str(clip), "trace")
+
+    assert seen == [False]
+
+
 class TestPreferredProvider:
     """使用者自己選的引擎排最前面，但不取消備援。"""
 

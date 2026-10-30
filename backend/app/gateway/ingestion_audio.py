@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import subprocess
@@ -101,7 +102,7 @@ async def _transcribe_sensevoice(file_path: str, trace_id: str, prompt: str = ""
     if not url:
         raise RuntimeError("ASR_SENSEVOICE_URL is not configured")
 
-    source, scratch = _as_wav(file_path)
+    source, scratch = await asyncio.to_thread(_as_wav, file_path)
     try:
         name = Path(source).name
         response = await _http.get().post(
@@ -131,7 +132,7 @@ async def _transcribe_breeze(file_path: str, trace_id: str, prompt: str = "") ->
     if not url:
         raise RuntimeError("ASR_BREEZE_URL is not configured")
 
-    source, scratch = _as_wav(file_path)
+    source, scratch = await asyncio.to_thread(_as_wav, file_path)
     try:
         response = await _http.get().post(
             f"{url}/transcribe",
@@ -206,7 +207,7 @@ async def _transcribe_r2t2_dev(
 async def _r2t2_file(
     url: str, file_path: str, prompt: str, language: str, timeout: float | None,
 ) -> str:
-    source, scratch = _as_wav(file_path)
+    source, scratch = await asyncio.to_thread(_as_wav, file_path)
     try:
         return await _r2t2_request(
             url.rstrip("/"), Path(source).read_bytes(), Path(source).name,

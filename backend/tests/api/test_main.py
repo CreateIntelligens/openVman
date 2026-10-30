@@ -856,6 +856,39 @@ def test_speech_cache_keys_differ_between_the_two_indextts_servers(monkeypatch):
     assert len(keys) == 2 and keys[0] != keys[1]
 
 
+def test_create_speech_runs_synthesis_off_the_event_loop(monkeypatch):
+    # 引擎卡住時不能拖住整個 backend：合成要在 worker thread 跑，那裡沒有 running loop。
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    loops_seen: list[bool] = []
+
+    class FakeService:
+        def synthesize(self, request, provider="", edge_fallback_voice="", partners=(), order=()):
+            try:
+                asyncio.get_running_loop()
+                loops_seen.append(True)
+            except RuntimeError:
+                loops_seen.append(False)
+            return types.SimpleNamespace(
+                result=types.SimpleNamespace(
+                    audio_bytes=b"wav", content_type="audio/wav", provider="edge-tts",
+                    route_kind="provider", route_target="edge-tts",
+                    sample_rate=16000, latency_ms=1.0,
+                ),
+                fallback=False,
+                fallback_reason="",
+            )
+
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: FakeService())
+    client, _ = _authenticated_client(module)
+
+    response = client.post(
+        "/v1/audio/speech", json={"input": "你好", "voice": "hayley", "provider": "indextts"},
+    )
+
+    assert response.status_code == 200
+    assert loops_seen == [False]
+
+
 class FakeRelay:
     instances: list["FakeRelay"] = []
 
