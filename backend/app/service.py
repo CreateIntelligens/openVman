@@ -42,8 +42,15 @@ def is_empty_audio(audio: bytes) -> bool:
     if not audio:
         return True
     return audio.startswith(b"RIFF") and len(audio) <= WAV_HEADER_BYTES
-from app.providers.indextts_adapter import IndexTTSAdapter
+from app.providers.indextts_adapter import (
+    INDEXTTS_NURSE_PROVIDER_NAME,
+    IndexTTSAdapter,
+)
 from app.providers.voxcpm_adapter import VoxCPMAdapter
+
+#: 只在被指名（請求的 provider、帳號／專案選的聲音、專案順位）時才用的引擎，
+#: 不排進部署預設的備援鏈：另一台機器慢或掛掉不該拖累沒選它的人。
+OPT_IN_PROVIDERS = frozenset({INDEXTTS_NURSE_PROVIDER_NAME})
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +77,7 @@ class TTSRouterService:
     def __init__(self, config: TTSRouterConfig | None = None) -> None:
         self._config = config or get_tts_config()
         self._indextts = IndexTTSAdapter(self._config)
+        self._indextts_nurse = IndexTTSAdapter.for_nurse(self._config)
         self._voxcpm = VoxCPMAdapter(self._config)
         self._cosyvoice = CosyVoiceAdapter(self._config)
         self._gemini = GeminiTTSAdapter(self._config)
@@ -93,6 +101,11 @@ class TTSRouterService:
         return self._gemini
 
     @property
+    def indextts_nurse_adapter(self) -> IndexTTSAdapter:
+        """Second IndexTTS server (nurse24h), used only when selected."""
+        return self._indextts_nurse
+
+    @property
     def voxcpm_adapter(self) -> VoxCPMAdapter:
         """VoxCPM adapter, exposed for the /tts/stream targeted path."""
         return self._voxcpm
@@ -100,17 +113,22 @@ class TTSRouterService:
     def build_chain(
         self, request: SynthesizeRequest | None = None,
         order: tuple[str, ...] = (),
+        *,
+        include_opt_in: bool = False,
     ) -> list[RouteTarget]:
         """Build the ordered fallback chain based on config.
 
         ``order`` is a project's own engine order: only those engines, in that
         order (an admin who lists two engines means "never the others here").
-        Empty keeps the deployment chain.
+        Empty keeps the deployment chain, which leaves out ``OPT_IN_PROVIDERS``
+        unless ``include_opt_in`` (a targeted request looking up its engine).
         """
         routes = self._provider_routes()
         if order:
             by_name = {target_id: route for route in routes for target_id in (route[0],)}
             routes = tuple(by_name[name] for name in order if name in by_name)
+        elif not include_opt_in:
+            routes = tuple(route for route in routes if route[0] not in OPT_IN_PROVIDERS)
         return [
             RouteTarget(
                 target=target_id,
@@ -153,7 +171,8 @@ class TTSRouterService:
         if provider and provider != "auto":
             # 指定了引擎就照指定的走；專案順位只管沒指定的請求。
             return self._synthesize_targeted(
-                request, provider, self.build_chain(request), edge_fallback_voice, partners,
+                request, provider, self.build_chain(request, include_opt_in=True),
+                edge_fallback_voice, partners,
             )
 
         return self._synthesize_chain(request, chain)
@@ -318,6 +337,7 @@ class TTSRouterService:
     ) -> tuple[tuple[str, ProviderAdapter, Callable[[Exception], str]], ...]:
         return (
             ("indextts", self._indextts, classify_indextts_error),
+            (INDEXTTS_NURSE_PROVIDER_NAME, self._indextts_nurse, classify_indextts_error),
             ("voxcpm", self._voxcpm, classify_voxcpm_error),
             ("cosyvoice", self._cosyvoice, classify_cosyvoice_error),
             ("gemini-tts", self._gemini, classify_gemini_error),

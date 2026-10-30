@@ -150,6 +150,36 @@ test("explicit IndexTTS provider sends the selected voice as character", async (
   }
 });
 
+test("the second IndexTTS server streams with provider and its prefixed voice", async () => {
+  const fetchMock = installFetch(() => streamingWavResponse());
+
+  try {
+    const streamer = useTtsStreamer({
+      ttsProviders: () => [
+        { id: "indextts", name: "IndexTTS", default_voice: "hayley", voices: ["hayley"] },
+        {
+          id: "indextts-nurse",
+          name: "IndexTTS（nurse24h）",
+          default_voice: "indextts-nurse:hayley",
+          voices: ["indextts-nurse:hayley", "indextts-nurse:jay"],
+        },
+      ],
+      onPcmChunk: () => undefined,
+    });
+
+    await streamer.speak("測試", { provider: "indextts-nurse", voice: "indextts-nurse:jay" });
+
+    assert.equal(fetchMock.calls[0].url, "/api/v1/tts/stream");
+    assert.deepEqual(fetchMock.calls[0].body, {
+      text: "測試",
+      provider: "indextts-nurse",
+      voice: "indextts-nurse:jay",
+    });
+  } finally {
+    fetchMock.restore();
+  }
+});
+
 test("gemini-tts uses the streaming endpoint with provider and voice fields", async () => {
   const fetchMock = installFetch(() => streamingWavResponse());
 

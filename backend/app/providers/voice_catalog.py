@@ -17,6 +17,13 @@ from app.providers.cosyvoice_adapter import (
     COSYVOICE_PROVIDER_NAME,
 )
 from app.providers.gemini_tts_adapter import GEMINI_DEFAULT_VOICE, GEMINI_PROVIDER_NAME
+from app.providers.indextts_adapter import (
+    INDEXTTS_NURSE_PROVIDER_NAME,
+    INDEXTTS_NURSE_VOICE_PREFIX,
+    indextts_nurse_default_character,
+    indextts_nurse_url,
+    indextts_nurse_voice_id,
+)
 from app.providers.voxcpm_adapter import (
     VOXCPM_DEFAULT_VOICE,
     VOXCPM_MODEL_ID,
@@ -29,6 +36,8 @@ TTS_PROVIDER_TIMEOUT_SECONDS = 5
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 _http = SharedAsyncClient()
 
+INDEXTTS_NURSE_LABEL = "IndexTTS（nurse24h）"
+
 PROVIDER_NAMES = {
     "aws": "AWS Polly",
     "aws-polly": "AWS Polly",
@@ -37,6 +46,7 @@ PROVIDER_NAMES = {
     "gcp-tts": "GCP TTS",
     GEMINI_PROVIDER_NAME: "Gemini TTS",
     "indextts": "IndexTTS",
+    INDEXTTS_NURSE_PROVIDER_NAME: INDEXTTS_NURSE_LABEL,
     VOXCPM_PROVIDER_NAME: "VoxCPM",
     COSYVOICE_PROVIDER_NAME: "CosyVoice",
 }
@@ -65,11 +75,12 @@ VOICE_SPEAKERS = {
 
 def voice_display_label(voice_id: str, upstream_label: str = "") -> str:
     """選單上顯示的聲音名稱：有登記錄音者就以名字開頭，其餘沿用上游名稱。"""
-    label = upstream_label.strip() or voice_id
-    speaker = VOICE_SPEAKERS.get(voice_id.removeprefix(VOXCPM_COSY_PREFIX))
+    bare_id = voice_id.removeprefix(INDEXTTS_NURSE_VOICE_PREFIX)
+    label = upstream_label.strip() or bare_id
+    speaker = VOICE_SPEAKERS.get(bare_id.removeprefix(VOXCPM_COSY_PREFIX))
     if not speaker:
         return label
-    if label == voice_id or label == speaker:
+    if label == bare_id or label == speaker:
         return speaker
     # 登錄時已經換過的名稱再讀一次也要原樣回來。
     if label.startswith(f"{speaker} · "):
@@ -122,6 +133,13 @@ async def fetch_indextts_voices(base_url: str, internal_token: str) -> list[str]
         "/audio/voices",
         "indextts",
         headers={_INTERNAL_TOKEN_HEADER: internal_token},
+    )
+
+
+async def fetch_indextts_nurse_voices(base_url: str) -> list[str]:
+    """nurse 那台的上游聲音名稱（未加前綴）；它沒有驗證，不送內部 token。"""
+    return await fetch_provider_voices(
+        base_url, "/audio/voices", INDEXTTS_NURSE_PROVIDER_NAME,
     )
 
 
@@ -300,6 +318,25 @@ async def build_tts_provider_catalog(cfg: Any) -> list[dict]:
                 "default_voice": cfg.tts_indextts_default_character,
                 "voices": indextts_voices,
                 "voice_items": voice_items(indextts_voices, {}),
+            })
+
+    nurse_url = indextts_nurse_url(cfg)
+    if nurse_url:
+        # 同 IndexTTS：抓不到 voices 就不列。聲音 ID 加上引擎前綴，跟 .35 同名的
+        # hayley 才不會撞在一起；送上游前由授權解析換回原名稱。
+        fetched_voices = await fetch_indextts_nurse_voices(nurse_url)
+        if fetched_voices:
+            default_voice = indextts_nurse_voice_id(indextts_nurse_default_character(cfg))
+            nurse_voices = prepend_default_voice(
+                [indextts_nurse_voice_id(name) for name in fetched_voices],
+                default_voice,
+            )
+            providers.append({
+                "id": INDEXTTS_NURSE_PROVIDER_NAME,
+                "name": INDEXTTS_NURSE_LABEL,
+                "default_voice": default_voice,
+                "voices": nurse_voices,
+                "voice_items": voice_items(nurse_voices, {}),
             })
 
     if cfg.tts_voxcpm_url:

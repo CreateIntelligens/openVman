@@ -14,12 +14,18 @@ from app.auth.models import ResourceType
 from app.auth.runtime import AuthRuntime
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
 from app.providers.gemini_tts_adapter import GEMINI_PROVIDER_NAME
+from app.providers.indextts_adapter import (
+    INDEXTTS_NURSE_PROVIDER_NAME,
+    indextts_nurse_url,
+    indextts_nurse_voice_id,
+)
 from app.providers.voice_catalog import (
     EDGE_TTS_VOICE_LABELS,
     EDGE_TTS_VOICES,
     excluded_voices,
     fetch_cosyvoice_voices,
     fetch_gemini_voices,
+    fetch_indextts_nurse_voices,
     fetch_indextts_voices,
     fetch_voxcpm_voices,
     voice_display_label,
@@ -148,6 +154,24 @@ async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
                 )
         except Exception as exc:
             logger.warning("failed to sync indextts voices: %s", exc)
+
+    nurse_url = indextts_nurse_url(cfg)
+    if nurse_url:
+        # 跟 .35 那台同名的聲音（hayley…）不能共用一筆資源，否則後登錄的會把
+        # provider 蓋掉；資源 ID 加前綴，runtime_key 記上游的原名稱。
+        try:
+            for name in await fetch_indextts_nurse_voices(nurse_url):
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.CUSTOM_VOICE,
+                    resource_id=indextts_nurse_voice_id(name),
+                    metadata={
+                        "provider": INDEXTTS_NURSE_PROVIDER_NAME,
+                        "runtime_key": name,
+                        "label": voice_display_label(name),
+                    },
+                )
+        except Exception as exc:
+            logger.warning("failed to sync indextts-nurse voices: %s", exc)
 
     if cfg.tts_gemini_url:
         try:

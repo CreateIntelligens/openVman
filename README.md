@@ -100,6 +100,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | 開發節點 | `r2t2-dev`、`r2t2-dev-live`（帳號選了才用，不進備援） | `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_SECRET_KEY`；串流網址預設自動推導 |
 | 瀏覽器 | 瀏覽器內建辨識（`browser`） | 無 |
 | TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語改用 CosyVoice，停用時 VoxCPM；國語、英文在沒指定聲音時用 IndexTTS） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
+| 第二台 IndexTTS | `indextts-nurse`（IndexTTS（nurse24h）；帳號或專案選了才用，不進備援） | `TTS_INDEXTTS_NURSE_URL`、`TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER`（預設 `hayley`） |
 
 同服務只需設定一個主要網址：R2T2 的 `ASR_R2T2_URL` 自動推導串流端點（HTTPS 對應 WSS），開發節點同理；Cosy 的 `TTS_COSYVOICE_URL` 自動推導詞表端點。不同服務位置才另填 `ASR_R2T2_STREAM_URL`、`ASR_R2T2_DEV_STREAM_URL`、`TTS_HANJI_CONVERT_URL` 覆寫。
 

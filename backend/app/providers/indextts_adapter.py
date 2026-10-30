@@ -15,20 +15,76 @@ logger = logging.getLogger("provider.indextts")
 _NOT_LOADED = object()
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 
+INDEXTTS_PROVIDER_NAME = "indextts"
+# 第二台 IndexTTS（nurse24h）：同一套 API、不同的聲音，選了才用，不進部署備援鏈。
+INDEXTTS_NURSE_PROVIDER_NAME = "indextts-nurse"
+INDEXTTS_NURSE_DEFAULT_CHARACTER = "hayley"
+# 兩台都有 hayley 這類同名聲音，資源表只認 resource_id，nurse 的聲音登錄成
+# 「indextts-nurse:<名稱>」，送上游時用 metadata 的 runtime_key（原名稱）。
+INDEXTTS_NURSE_VOICE_PREFIX = f"{INDEXTTS_NURSE_PROVIDER_NAME}:"
+
+
+def indextts_nurse_url(config: object) -> str:
+    return (getattr(config, "tts_indextts_nurse_url", "") or "").strip()
+
+
+def indextts_nurse_default_character(config: object) -> str:
+    raw = getattr(config, "tts_indextts_nurse_default_character", "") or ""
+    return raw.strip() or INDEXTTS_NURSE_DEFAULT_CHARACTER
+
+
+def indextts_nurse_voice_id(name: str) -> str:
+    """nurse 上游的聲音名稱 → 資源表與選單用的聲音 ID。"""
+    return f"{INDEXTTS_NURSE_VOICE_PREFIX}{name}" if name else ""
+
+
+def indextts_nurse_runtime_voice(voice: str) -> str:
+    """選單 ID 或原名稱都收，回上游認得的角色名。"""
+    return voice.removeprefix(INDEXTTS_NURSE_VOICE_PREFIX)
+
 
 class IndexTTSAdapter:
-    """Synthesize speech via IndexTTS (HTTP) and return a NormalizedTTSResult."""
+    """Synthesize speech via IndexTTS (HTTP) and return a NormalizedTTSResult.
 
-    def __init__(self, config: TTSRouterConfig) -> None:
+    預設接 ``TTS_INDEXTTS_URL``；同一套 API 的另一台（nurse24h）用 ``for_nurse``
+    建立，provider 名稱、網址、預設角色各自獨立。
+    """
+
+    def __init__(
+        self,
+        config: TTSRouterConfig,
+        *,
+        provider_name: str = INDEXTTS_PROVIDER_NAME,
+        base_url: str | None = None,
+        default_character: str | None = None,
+        send_internal_token: bool = True,
+    ) -> None:
         self._config = config
-        base = config.tts_indextts_url.rstrip("/") if config.tts_indextts_url else ""
+        self._provider_name = provider_name
+        raw_base = config.tts_indextts_url if base_url is None else base_url
+        base = raw_base.strip().rstrip("/") if raw_base else ""
         self._url = f"{base}/tts" if base else ""
-        self._default_character = config.tts_indextts_default_character
-        self._internal_headers = {
-            _INTERNAL_TOKEN_HEADER: config.gateway_internal_token,
-        }
+        self._default_character = (
+            config.tts_indextts_default_character
+            if default_character is None else default_character
+        )
+        # 內部 token 只給自家部署的那台；外部節點不需要驗證，也不該拿到它。
+        self._internal_headers = (
+            {_INTERNAL_TOKEN_HEADER: config.gateway_internal_token}
+            if send_internal_token else {}
+        )
         self._client = httpx.Client(timeout=60.0)
         self._opencc_t2s = _NOT_LOADED
+
+    @classmethod
+    def for_nurse(cls, config: TTSRouterConfig) -> IndexTTSAdapter:
+        return cls(
+            config,
+            provider_name=INDEXTTS_NURSE_PROVIDER_NAME,
+            base_url=indextts_nurse_url(config),
+            default_character=indextts_nurse_default_character(config),
+            send_internal_token=False,
+        )
 
     def _get_opencc(self):
         if self._opencc_t2s is _NOT_LOADED:
@@ -42,7 +98,7 @@ class IndexTTSAdapter:
 
     @property
     def provider_name(self) -> str:
-        return "indextts"
+        return self._provider_name
 
     @property
     def enabled(self) -> bool:
@@ -57,9 +113,12 @@ class IndexTTSAdapter:
         if converter := self._get_opencc():
             text = converter.convert(text)
 
+        character = request.voice_hint or self._default_character
+        if self._provider_name == INDEXTTS_NURSE_PROVIDER_NAME:
+            character = indextts_nurse_runtime_voice(character)
         payload = {
             "text": text,
-            "character": request.voice_hint or self._default_character,
+            "character": character,
         }
 
         t0 = monotonic()
@@ -81,9 +140,9 @@ class IndexTTSAdapter:
                 audio_bytes=resp.content,
                 content_type=resp.headers.get("content-type", "audio/wav"),
                 sample_rate=16000,
-                provider="indextts",
+                provider=self._provider_name,
                 route_kind="provider",
-                route_target="indextts",
+                route_target=self._provider_name,
                 latency_ms=round(latency_ms, 2),
                 raw_metadata={
                     "character": payload["character"],

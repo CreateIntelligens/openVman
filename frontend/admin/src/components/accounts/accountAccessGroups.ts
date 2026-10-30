@@ -12,6 +12,7 @@ export interface AccessSection<T extends AccountAccessOption = AccountAccessOpti
 
 export const PROVIDER_LABELS: Record<string, string> = {
   indextts: "IndexTTS",
+  "indextts-nurse": "IndexTTS（nurse24h）",
   voxcpm: "VoxCPM",
   cosyvoice: "CosyVoice",
   "gemini-tts": "Gemini TTS",

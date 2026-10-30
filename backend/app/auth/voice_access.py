@@ -9,6 +9,11 @@ from fastapi import HTTPException
 
 from app.config import get_tts_config
 from app.providers.cosyvoice_adapter import COSYVOICE_DEFAULT_VOICE, COSYVOICE_PROVIDER_NAME
+from app.providers.indextts_adapter import (
+    INDEXTTS_NURSE_PROVIDER_NAME,
+    indextts_nurse_default_character,
+    indextts_nurse_voice_id,
+)
 from app.providers.voice_catalog import PROVIDER_NAMES, voice_display_label
 from app.providers.voxcpm_adapter import VOXCPM_DEFAULT_VOICE, VOXCPM_PROVIDER_NAME
 
@@ -344,6 +349,9 @@ def deployment_default_voice(provider: str) -> str:
         return cfg.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
     if provider == "indextts":
         return cfg.tts_indextts_default_character
+    if provider == INDEXTTS_NURSE_PROVIDER_NAME:
+        # 清單裡是加了前綴的資源 ID，要比對得上才選得到。
+        return indextts_nurse_voice_id(indextts_nurse_default_character(cfg))
     if provider == EDGE_TTS_PROVIDER:
         return cfg.edge_tts_voice
     return ""

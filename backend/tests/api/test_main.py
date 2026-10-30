@@ -730,6 +730,132 @@ def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
     assert fake_service.synthesize_called is False
 
 
+def _register_nurse_voice(name: str = "hayley") -> None:
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
+    get_auth_runtime().resources.upsert_system_resource(
+        resource_type=ResourceType.CUSTOM_VOICE,
+        resource_id=f"indextts-nurse:{name}",
+        metadata={"provider": "indextts-nurse", "runtime_key": name},
+    )
+
+
+class _RecordingStreamClient:
+    """Fake httpx.AsyncClient for the IndexTTS /tts_stream proxy."""
+
+    requests: list[object] = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def build_request(self, method: str, url: str, *, json: dict[str, str], **kwargs):
+        request = types.SimpleNamespace(method=method, url=url, json=json, **kwargs)
+        type(self).requests.append(request)
+        return request
+
+    async def send(self, request, *, stream: bool = False):
+        async def _chunks(chunk_size=4096):
+            yield b"RIFF-nurse"
+
+        async def _close():
+            return None
+
+        return types.SimpleNamespace(
+            status_code=200,
+            headers={"content-type": "audio/wav"},
+            aiter_bytes=_chunks,
+            aclose=_close,
+        )
+
+    async def aclose(self):
+        return None
+
+
+def test_tts_stream_sends_selected_nurse_voice_to_the_nurse_server(monkeypatch):
+    module, _ = _load_main(
+        monkeypatch, max_upload_bytes=1024, tts_indextts_nurse_url="http://nurse-tts:8001",
+    )
+    _RecordingStreamClient.requests = []
+    monkeypatch.setattr(module.tts_routes.httpx, "AsyncClient", _RecordingStreamClient)
+    client, _ = _authenticated_client(module)
+    _register_nurse_voice()
+
+    response = client.post("/api/v1/tts/stream", json={
+        "text": "你好", "provider": "indextts-nurse", "voice": "indextts-nurse:hayley",
+    })
+
+    assert response.status_code == 200
+    assert response.content == b"RIFF-nurse"
+    assert response.headers["X-TTS-Provider"] == "indextts-nurse"
+    [request] = _RecordingStreamClient.requests
+    assert request.url == "http://nurse-tts:8001/tts_stream"
+    assert request.json == {"text": "你好", "character": "hayley"}
+    # 外部節點不拿我們的內部 token。
+    assert request.headers == {}
+
+
+def test_tts_stream_without_provider_stays_on_the_primary_indextts(monkeypatch):
+    module, _ = _load_main(
+        monkeypatch, max_upload_bytes=1024, tts_indextts_nurse_url="http://nurse-tts:8001",
+    )
+    _RecordingStreamClient.requests = []
+    monkeypatch.setattr(module.tts_routes.httpx, "AsyncClient", _RecordingStreamClient)
+    client, _ = _authenticated_client(module)
+
+    response = client.post("/api/v1/tts/stream", json={"text": "你好", "character": "hayley"})
+
+    assert response.status_code == 200
+    assert response.headers["X-TTS-Provider"] == "indextts"
+    assert [r.url for r in _RecordingStreamClient.requests] == [
+        "http://index-tts-vllm:8011/tts_stream",
+    ]
+
+
+def test_speech_cache_keys_differ_between_the_two_indextts_servers(monkeypatch):
+    module, _ = _load_main(
+        monkeypatch, max_upload_bytes=1024,
+        tts_indextts_nurse_url="http://nurse-tts:8001", tts_cache_enabled=True,
+    )
+    keys: list[str] = []
+    synthesized: list[tuple[str, str]] = []
+
+    async def _cache_get(key: str):
+        keys.append(key)
+        return None
+
+    async def _cache_put(*args, **kwargs):
+        return None
+
+    class FakeService:
+        def synthesize(self, request, provider="", edge_fallback_voice="", partners=(), order=()):
+            synthesized.append((provider, request.voice_hint))
+            return types.SimpleNamespace(
+                result=types.SimpleNamespace(
+                    audio_bytes=b"wav", content_type="audio/wav", provider=provider,
+                    route_kind="provider", route_target=provider,
+                    sample_rate=16000, latency_ms=1.0,
+                ),
+                fallback=False,
+                fallback_reason="",
+            )
+
+    monkeypatch.setattr(module.tts_routes, "cache_get", _cache_get)
+    monkeypatch.setattr(module.tts_routes, "cache_put", _cache_put)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: FakeService())
+    client, _ = _authenticated_client(module)
+    _register_nurse_voice()
+
+    for body in (
+        {"input": "你好", "provider": "indextts", "voice": "hayley"},
+        {"input": "你好", "provider": "indextts-nurse", "voice": "indextts-nurse:hayley"},
+    ):
+        assert client.post("/v1/audio/speech", json=body).status_code == 200
+
+    assert synthesized == [("indextts", "hayley"), ("indextts-nurse", "hayley")]
+    assert len(keys) == 2 and keys[0] != keys[1]
+
+
 class FakeRelay:
     instances: list["FakeRelay"] = []
 

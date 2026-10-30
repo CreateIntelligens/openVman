@@ -12,9 +12,11 @@ from .models import ProjectPolicyRecord, ResourceType
 from .repository_errors import InvalidProjectPolicyError
 from .settings_repository import SERVER_ASR_PROVIDERS
 
-#: 後端 TTS 備援鏈認得的引擎名（與 service._provider_routes 一致）。
+#: 後端 TTS 備援鏈認得的引擎名（與 service._provider_routes 一致）。indextts-nurse
+#: 不在部署預設鏈裡，但專案順位明確列了就照用。
 TTS_ENGINES = (
-    "indextts", "voxcpm", "cosyvoice", "gemini-tts", "gcp-tts", "aws-polly", "edge-tts",
+    "indextts", "indextts-nurse", "voxcpm", "cosyvoice", "gemini-tts", "gcp-tts",
+    "aws-polly", "edge-tts",
 )
 
 

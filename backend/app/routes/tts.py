@@ -34,6 +34,12 @@ from app.providers.gemini_tts_adapter import (
     GEMINI_STREAM_CONTENT_TYPE,
     GeminiTTSHTTPError,
 )
+from app.providers.indextts_adapter import (
+    INDEXTTS_NURSE_PROVIDER_NAME,
+    indextts_nurse_default_character,
+    indextts_nurse_runtime_voice,
+    indextts_nurse_url,
+)
 from app.providers.voxcpm_adapter import (
     VOXCPM_MODEL_ID,
     VOXCPM_PROVIDER_NAME,
@@ -260,7 +266,7 @@ class TtsStreamRequest(BaseModel):
     provider: str = Field(
         "",
         description=(
-            "TTS 引擎（indextts、voxcpm、cosyvoice、gemini-tts、edge-tts 等，"
+            "TTS 引擎（indextts、indextts-nurse、voxcpm、cosyvoice、gemini-tts、edge-tts 等，"
             "可用的引擎與聲音見 GET /api/v1/tts/providers）。省略時由 voice 推導或用帳號預設"
         ),
     )
@@ -328,6 +334,8 @@ _STREAM_ADAPTERS = {
 def _stream_engine_running(name: str, cfg) -> bool:
     if name == INDEXTTS_PROVIDER:
         return bool(cfg.tts_indextts_url)
+    if name == INDEXTTS_NURSE_PROVIDER_NAME:
+        return bool(indextts_nurse_url(cfg))
     attribute = _STREAM_ADAPTERS.get(name)
     if attribute is None:
         return False
@@ -404,6 +412,8 @@ def _same_person_voice(provider: str, voice: str, target: str) -> str:
         return source
     if target == INDEXTTS_PROVIDER:
         return cfg.tts_indextts_default_character
+    if target == INDEXTTS_NURSE_PROVIDER_NAME:
+        return indextts_nurse_default_character(cfg)
     return ""
 
 
@@ -504,12 +514,13 @@ async def plan_tts_voice(
         explicit = (
             requested_provider.strip() or requested_voice.strip() or requested_character.strip()
         )
-        # 帳號／專案預設本來就是 IndexTTS 的聲音就照用，不換成部署預設。
+        # 帳號／專案預設本來就是 IndexTTS 的聲音就照用，不換成部署預設；預設選了
+        # nurse 那台也一樣，那是帳號自己選的。
         if (
             language in _INDEXTTS_LANGUAGES
             and not explicit
             and cfg.tts_indextts_url
-            and provider != INDEXTTS_PROVIDER
+            and provider not in (INDEXTTS_PROVIDER, INDEXTTS_NURSE_PROVIDER_NAME)
         ):
             picked = _switch_voice(runtime, policy, (INDEXTTS_PROVIDER,), is_root=is_root)
             if picked:
@@ -572,15 +583,18 @@ async def _proxy_indextts_stream(
     indextts_stream_url: str,
     text: str,
     character: str,
+    send_internal_token: bool = True,
 ) -> StreamingResponse | None:
     cfg = get_tts_config()
     client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
+    # nurse 那台是外部節點、沒有驗證，不把內部 token 送出去。
+    headers = {"X-Internal-Token": cfg.gateway_internal_token} if send_internal_token else {}
     try:
         request = client.build_request(
             "POST",
             indextts_stream_url,
             json={"text": text, "character": character},
-            headers={"X-Internal-Token": cfg.gateway_internal_token},
+            headers=headers,
         )
         resp = await client.send(request, stream=True)
     except Exception as exc:
@@ -596,7 +610,8 @@ async def _proxy_indextts_stream(
             await resp.aclose()
             await client.aclose()
         logger.warning(
-            "tts_stream indextts error status=%s detail=%s",
+            "tts_stream indextts error url=%s status=%s detail=%s",
+            indextts_stream_url,
             resp.status_code,
             detail,
         )
@@ -782,6 +797,27 @@ async def tts_stream_endpoint(
                 proxied.media_type or "audio/wav",
                 body.format,
                 INDEXTTS_PROVIDER,
+            )
+
+    # 第二台 IndexTTS（nurse24h）：只有明確選了（provider、聲音或專案順位）才走到這裡，
+    # 不接沒指定引擎的請求。失敗時跟上面那台一樣往下退 Edge（專案允許的話）。
+    nurse_url = indextts_nurse_url(cfg)
+    if nurse_url and provider == INDEXTTS_NURSE_PROVIDER_NAME:
+        proxied = await _proxy_indextts_stream(
+            indextts_stream_url=nurse_url.rstrip("/") + "/tts_stream",
+            text=cleaned,
+            character=(
+                indextts_nurse_runtime_voice(voice) or indextts_nurse_default_character(cfg)
+            ),
+            send_internal_token=False,
+        )
+        if proxied is not None:
+            _meter_stream(INDEXTTS_NURSE_PROVIDER_NAME)
+            return _stream_audio(
+                proxied.body_iterator,
+                proxied.media_type or "audio/wav",
+                body.format,
+                INDEXTTS_NURSE_PROVIDER_NAME,
             )
 
     svc = _get_service()

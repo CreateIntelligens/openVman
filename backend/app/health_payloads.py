@@ -169,6 +169,21 @@ async def probe_cosyvoice_health(
     )
 
 
+async def probe_indextts_nurse_health(
+    client: httpx.AsyncClient,
+    cfg: TTSRouterConfig | None = None,
+) -> dict[str, Any]:
+    """第二台 IndexTTS（nurse24h）只有 /health（沒有 /health/ready），也不收內部 token。"""
+    if cfg is None:
+        cfg = get_tts_config()
+    return await _probe_castvoice_service_health(
+        client,
+        "index-tts-nurse",
+        getattr(cfg, "tts_indextts_nurse_url", "") or "",
+        "/health",
+    )
+
+
 async def _probe_downstream_services(
     client: httpx.AsyncClient,
 ) -> dict[str, dict[str, Any]]:
@@ -198,6 +213,7 @@ async def _probe_downstream_services(
 
     indextts_probe = await probe_indextts_health(client, cfg)
     probes["index-tts"] = indextts_probe
+    probes["index-tts-nurse"] = await probe_indextts_nurse_health(client, cfg)
 
     probes["voxcpm"] = await probe_voxcpm_health(client, cfg)
     probes["cosyvoice"] = await probe_cosyvoice_health(client, cfg)

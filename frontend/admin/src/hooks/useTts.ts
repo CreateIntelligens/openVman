@@ -289,7 +289,7 @@ export function useTts() {
               try {
                      // 先試串流端點：auto 或支援串流的 provider 會邊生成邊回 PCM；
                      // 回的不是 PCM（例如 mp3）就退回整段路徑。
-                     if (!selection.provider || selection.provider === "voxcpm" || selection.provider === "gemini-tts" || selection.provider === "indextts") {
+                     if (!selection.provider || selection.provider === "voxcpm" || selection.provider === "gemini-tts" || selection.provider === "indextts" || selection.provider === "indextts-nurse") {
                             const response = await openSpeechStream(text, {
                                    ...selection, speechLanguage, signal: controller.signal,
                             });

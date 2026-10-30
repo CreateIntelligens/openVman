@@ -144,7 +144,7 @@ async function synthesizeWithFallback(text, session) {
   throw new Error("All TTS targets failed");
 }
 ```
-> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → CosyVoice → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /api/v1/tts/stream`，VoxCPM 與 CosyVoice 則由同一路徑回傳完整 MP3。
+> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → CosyVoice → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /api/v1/tts/stream`，VoxCPM 與 CosyVoice 則由同一路徑回傳完整 MP3。第二台 IndexTTS（`indextts-nurse`，見 6.3）不在這條鏈裡，只有被指名時才用。
 >
 > `POST /api/v1/tts/stream` 的選填 `format`：省略或 `""` 時照引擎原樣回傳（Gemini `audio/l16;rate=24000;channels=1`、VoxCPM／IndexTTS WAV、Edge／CosyVoice MP3），前台虛擬人依賴此行為；`"pcm16k"` 時所有路徑（含台語分流、VoxCPM 失敗退回、IndexTTS 代理、Edge 串流與整段合成）都經 `app/tts_pcm.py` 轉成串流的 16 kHz mono s16le raw PCM，`Content-Type: audio/l16;rate=16000;channels=1`；其他值回 422。判斷順序為先看內容是否為 `RIFF`／`RF64` WAV（逐 chunk 解析，未知長度讀到串流結束），再看 `audio/l16`／`audio/pcm`（視為 16-bit LE），其餘交給 ffmpeg 子程序（`-i pipe:0 -f s16le -ac 1 -ar 16000 pipe:1`）邊收邊解碼。VoxCPM 串流在 `pcm16k` 時帶 `sample_rate=16000`，由節點直接輸出 16 kHz WAV（節點回 422 則不帶重送、改由我們轉換）。程序內重採樣為純 Python 有狀態 polyphase FIR，在執行緒中計算不佔 event loop，不新增相依；不支援的 WAV 編碼（μ-law、ADPCM 等）改走 ffmpeg。
 
@@ -163,6 +163,15 @@ Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/tts/health`
 連線由 `TTS_COSYVOICE_URL` 啟用，`/voices` 與 `/synthesize` 都需要 `TTS_COSYVOICE_API_KEY` 的 Bearer token（與 VoxCPM360 不同，後者的 `/voices` 不驗證）。`TTS_COSYVOICE_DEFAULT_VOICE` 可覆寫預設聲線，`TTS_COSYVOICE_EXCLUDED_VOICES` 濾掉不想出現在選單的 voice_id。錯誤碼歸類與 VoxCPM360 相同。
 
 服務端的串流端點用自訂的 JSON-line＋WAV chunk 格式，與本服務的 PCM 串流不相容，因此 CosyVoice 只走整段合成；`POST /api/v1/tts/stream` 指名 `provider=cosyvoice` 時會直接回完整 MP3，不落入 IndexTTS／Edge-TTS 的串流 fallback——那會把台語請求默默換成華語音色。台語這一輪（`speech_language`／`language` 為 `nan` 且專案分流含台語）兩個台語引擎互為備援：CosyVoice 失敗先換 VoxCPM、VoxCPM 失敗先換 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設；專案限制了聲音則只能換到清單裡那家的聲音），都失敗再退 IndexTTS 的部署預設角色（hayley，同一位、念華語），IndexTTS 也失敗才退 Edge；partners 的順序就是專案 `tts_engine_order`，沒設則用 `TTS_TAIWANESE_FALLBACK_ORDER`（預設 `cosyvoice,voxcpm,indextts`）；跳過正在用的那家與 Edge，沒列的不試。華語指定 CosyVoice 失敗仍只退 Edge。`service.synthesize(partners=...)` 實作，fallback hop 一樣記進指標；任何引擎回零長度或只有 WAV 檔頭（44 bytes）的音訊視為失敗（`EmptyAudioError`），擋 IndexTTS 停機時的 200 空檔。
+
+#### 6.3 第二台 IndexTTS（`indextts-nurse`）
+
+另一台跑同一套 index-tts-vllm 的節點，以獨立引擎 `indextts-nurse`（顯示名稱「IndexTTS（nurse24h）」）接入，與 `TTS_INDEXTTS_URL` 那台並存、互不影響。由 `TTS_INDEXTTS_NURSE_URL` 啟用，留空時引擎不出現在 `/api/v1/tts/providers`、不同步聲音、健康檢查回 `disabled`；`TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER`（預設 `hayley`，空字串也當 `hayley`）是沒指定聲音時用的角色。介面與主要那台相同：`GET /audio/voices` 列聲音（`{名稱: [參考音檔…]}`）、`POST /tts` 整段合成、`POST /tts_stream` 串流，皆送 `{text, character}`、回 16 kHz mono WAV；健康檢查打 `GET /health`（這台沒有 `/health/ready`），結果放在 `/health` 的 `index-tts-nurse`。這台不驗證，Backend 不對它送 `X-Internal-Token`。
+
+- 聲音 ID：兩台都有 `hayley` 這類同名聲音，資源表以 `resource_id` 為鍵，所以這台的聲音登錄成 `indextts-nurse:<名稱>`，metadata 帶 `provider: indextts-nurse` 與 `runtime_key: <名稱>`；選單、授權、專案清單都用加前綴的 ID，送上游前由 `resolve_tts_voice` 換回原名稱。顯示名稱照 `VOICE_SPEAKERS` 規則（`indextts-nurse:hayley` 顯示 `Hayley`）。
+- 只在被指名時使用：請求帶 `provider: indextts-nurse`、帳號或專案預設聲音是這台的聲音、或專案 `tts_engine_order` 明確列了它。它不在部署預設的備援鏈（`TTSRouterService.build_chain()` 不帶順位時排除 `OPT_IN_PROVIDERS`），也不在 `TTS_TAIWANESE_FALLBACK_ORDER` 的預設值裡；別的引擎失敗不會換到它。國語、英文的 IndexTTS 自動換台（VH-384）只換到主要那台，帳號預設已是這台的聲音時照用不換。
+- 失敗處理同其他指名的引擎：`/api/v1/tts/stream` 代理失敗時往下退 Edge 串流（專案允許時），`/v1/audio/speech` 失敗退 Edge 並標 `X-TTS-Fallback`。
+- 快取：`/v1/audio/speech` 的快取 key 含 provider，兩台同名聲音各存一份，不會互相命中。
 
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
@@ -345,6 +354,8 @@ LLM_STREAM=true              # 必須為 true
 # === TTS 設定 ===
 TTS_INDEXTTS_URL=http://shared-gpu-node:8011
 TTS_INDEXTTS_DEFAULT_CHARACTER=hayley
+TTS_INDEXTTS_NURSE_URL=http://nurse-tts.example:8001   # 選用：第二台 IndexTTS，選了才用
+TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER=hayley
 TTS_VOXCPM_URL=http://voxcpm-gateway:8800
 TTS_VOXCPM_API_KEY=***
 TTS_VOXCPM_DEFAULT_VOICE=voxcpm2-cosy-young-female-02

@@ -164,3 +164,17 @@ def test_direct_compose_routes_external_gpu_services_without_local_profiles():
     assert services["backend"]["environment"]["VISION_LLM_API_KEY"] == (
         "external-vlm-token"
     )
+
+
+def test_second_indextts_server_reaches_backend_and_gateway_worker():
+    services = compose_config({
+        "TTS_INDEXTTS_URL": "http://shared-gpu:8011",
+        "TTS_INDEXTTS_NURSE_URL": "http://nurse-tts:8001",
+    })["services"]
+
+    for service_name in ("backend", "gateway-worker"):
+        environment = services[service_name]["environment"]
+        assert environment["TTS_INDEXTTS_URL"] == "http://shared-gpu:8011"
+        assert environment["TTS_INDEXTTS_NURSE_URL"] == "http://nurse-tts:8001"
+        # 沒設時展開成 hayley，不能是空字串。
+        assert environment["TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER"] == "hayley"

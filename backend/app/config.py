@@ -65,6 +65,12 @@ class TTSRouterConfig(BaseSettings):
     # --- IndexTTS (primary, voice-cloning) ---
     tts_indextts_url: str = Field(default="", validation_alias="TTS_INDEXTTS_URL")
     tts_indextts_default_character: str = Field(default="", validation_alias="TTS_INDEXTTS_DEFAULT_CHARACTER")
+    # 第二台 IndexTTS（nurse24h，同一套 index-tts-vllm API）：獨立引擎 indextts-nurse，
+    # 帳號或專案選了才用，不排進部署的備援鏈。留空＝沒設定、不列出。
+    tts_indextts_nurse_url: str = Field(default="", validation_alias="TTS_INDEXTTS_NURSE_URL")
+    tts_indextts_nurse_default_character: str = Field(
+        default="hayley", validation_alias="TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER",
+    )
     # 台語那一輪的引擎順序（沒設專案順位時用）：第一個在跑的引擎先念，失敗照後面
     # 的順序換，聲音對應成同一個人；全部失敗才退 Edge。
     tts_taiwanese_fallback_order: str = Field(

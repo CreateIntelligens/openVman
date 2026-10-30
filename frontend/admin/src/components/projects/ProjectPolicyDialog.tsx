@@ -24,6 +24,7 @@ export const BATCH_ASR_ENGINES = new Set(["breeze", "r2t2", "r2t2-dev", "sensevo
 
 const TTS_ENGINE_LABELS: Record<string, string> = {
   indextts: "IndexTTS",
+  "indextts-nurse": "IndexTTS（nurse24h）",
   voxcpm: "VoxCPM",
   cosyvoice: "CosyVoice",
   "gemini-tts": "Gemini TTS",

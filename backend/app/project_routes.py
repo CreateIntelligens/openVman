@@ -328,7 +328,7 @@ class ProjectPolicyPayload(_StrictModel):
     default_mascot_id: str | None = None
     tts_engine_order: list[str] = Field(
         default_factory=list,
-        description="沒指定引擎與聲音時的 TTS 嘗試順序（indextts、voxcpm、cosyvoice、gemini-tts、gcp-tts、aws-polly、edge-tts）；空的用部署順序",
+        description="沒指定引擎與聲音時的 TTS 嘗試順序（indextts、indextts-nurse、voxcpm、cosyvoice、gemini-tts、gcp-tts、aws-polly、edge-tts）；空的用部署順序",
     )
     asr_engine_order: list[str] = Field(
         default_factory=list,

@@ -218,7 +218,8 @@ describe("ProjectPolicyDialog", () => {
     const asr = screen.getByRole("combobox", { name: "新增批次 ASR 引擎順位" }) as HTMLSelectElement;
     expect(Array.from(tts.options).map((option) => [option.value, option.textContent])).toEqual([
       ["", "選擇要新增的引擎…"],
-      ["indextts", "IndexTTS"], ["voxcpm", "VoxCPM"], ["cosyvoice", "CosyVoice"],
+      ["indextts", "IndexTTS"], ["indextts-nurse", "IndexTTS（nurse24h）"],
+      ["voxcpm", "VoxCPM"], ["cosyvoice", "CosyVoice"],
       ["gemini-tts", "Gemini TTS"], ["gcp-tts", "GCP TTS"], ["aws-polly", "AWS Polly"], ["edge-tts", "Edge TTS"],
     ]);
     expect(Array.from(asr.options).map((option) => [option.value, option.textContent])).toEqual([
