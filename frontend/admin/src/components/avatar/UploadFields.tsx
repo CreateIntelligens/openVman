@@ -155,6 +155,14 @@ function FilePreview({ file }: { file: File }) {
   );
 }
 
+/** 同一欄位可收影片或圖片時，選好檔案後圖示跟著實際類型走。 */
+function iconFor(file: File | null, fallback: string): string {
+  if (!file) return fallback;
+  if (isVideoFile(file) || file.type.startsWith("video/")) return "movie";
+  if (isImageFile(file) || file.type.startsWith("image/")) return "image";
+  return fallback;
+}
+
 export function FileDropField({
   label,
   inputLabel,
@@ -278,7 +286,7 @@ export function FileDropField({
             aria-hidden="true"
             className="material-symbols-outlined inline-flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden text-[1.25rem] leading-none text-content-subtle"
           >
-            {icon}
+            {iconFor(file, icon)}
           </span>
           {file ? (
             <span className="flex min-w-0 flex-1 flex-col">

@@ -73,6 +73,9 @@ describe("FileDropField", () => {
     const img = screen.getByRole("img", { name: "預覽 face.png" }) as HTMLImageElement;
     expect(img.getAttribute("src")).toBe("blob:preview");
     expect(screen.getByText("face.png")).toBeTruthy();
+    // 欄位預設是影片圖示，選了圖片要換成圖片圖示。
+    expect(zone.textContent).toContain("image");
+    expect(zone.textContent).not.toContain("movie");
   });
 
   it("previews a chosen video as a muted loop", () => {
@@ -84,6 +87,7 @@ describe("FileDropField", () => {
     expect(video.tagName).toBe("VIDEO");
     expect(video.muted).toBe(true);
     expect(video.loop).toBe(true);
+    expect(video.closest("label")!.textContent).toContain("movie");
   });
 
   it("rejects a wrong type or an oversized file before it reaches the form", () => {
