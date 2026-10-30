@@ -2,17 +2,58 @@
 
 import ast
 from dataclasses import dataclass, replace
+import hashlib
 import json
 from pathlib import Path
 import tempfile
+import threading
 import types
 import unittest
 from unittest.mock import patch
 
+import ablation_matrix as matrix
 import main_wiki_benchmark as benchmark
+import stage_profiler
 
 
 class MainWikiBenchmarkTests(unittest.TestCase):
+    def test_input_byte_changes_and_deleted_snapshot_are_not_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)/"sources.json"
+            source.write_bytes(b"old")
+            hashes = {str(source):hashlib.sha256(source.read_bytes()).hexdigest()}
+            self.assertTrue(benchmark.inputs_unchanged(hashes))
+            source.write_bytes(b"new")
+            self.assertFalse(benchmark.inputs_unchanged(hashes))
+            source.unlink()
+            self.assertFalse(benchmark.inputs_unchanged(hashes))
+
+    def test_worker_tool_stages_are_not_dropped_or_nested_into_the_main_thread(self):
+        tree = ast.parse(benchmark.SCRIPT)
+        nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef)
+                 and n.name in {"measure", "profile_report"}]
+        import time
+        start = time.perf_counter()
+        scope = {"profiler":stage_profiler.Profiler(request_started_at=start),
+                 "profile_thread":threading.get_ident(), "threading":threading,
+                 "worker_profiles":{}, "profile_lock":threading.Lock(),
+                 "stages":stage_profiler, "request_started":start}
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), "stages", "exec"), scope)
+        def worker():
+            with scope["measure"]("knowledge"):
+                with scope["measure"]("embedding"):
+                    pass
+        with scope["measure"]("caller"):
+            thread = threading.Thread(target=worker)
+            thread.start()
+            thread.join()
+        report = scope["profile_report"]()
+        self.assertEqual(set(report["summary"]), {"caller", "knowledge", "embedding"})
+        spans = {s["name"]:s for s in report["spans"]}
+        self.assertIsNone(spans["knowledge"]["parent"])
+        self.assertNotEqual(spans["knowledge"]["lane"], spans["caller"]["lane"])
+        self.assertEqual(report["spans"][spans["embedding"]["parent"]]["name"], "knowledge")
+
     def test_pairs_balance_both_orders_and_reverse_on_repeat(self):
         for index in range(8):
             self.assertEqual(
@@ -56,12 +97,23 @@ class MainWikiBenchmarkTests(unittest.TestCase):
         original = types.SimpleNamespace(handler=lambda args:calls.append(args) or {"original":True})
         scope = {"production_tool":original, "current_arm":"main",
                  "row_metrics":{"knowledge_ms":0, "knowledge_calls":0},
-                 "time":types.SimpleNamespace(perf_counter=lambda:1)}
+                 "time":types.SimpleNamespace(perf_counter=lambda:1),
+                 "p":{"ablation":False}, "measure":lambda _:__import__('contextlib').nullcontext()}
         exec(compile(ast.Module(body=nodes, type_ignores=[]), "handlers", "exec"), scope)
         arguments = {"queries":["fixture"], "top_k":7, "future_field":"keep"}
         self.assertEqual(scope["knowledge"](arguments), {"original":True})
         self.assertIs(calls[0], arguments)
         self.assertEqual(scope["row_metrics"]["knowledge_calls"], 1)
+
+    def test_ablation_rotates_each_arm_without_giving_one_all_the_warm_positions(self):
+        orders = [matrix.ordered_arms(i) for i in range(len(matrix.ARMS))]
+        self.assertEqual({order[0] for order in orders}, set(matrix.ARMS))
+        for order in orders:
+            self.assertEqual(set(order), set(matrix.ARMS))
+        self.assertFalse(matrix.recall_controls("main_fixes")["include_wiki"])
+        self.assertFalse(matrix.recall_controls("main_fixes")["rewrite"])
+        base = dict(matrix.ARMS["main_fixes_rewrite"])
+        self.assertEqual(matrix.ARMS["wiki"], {**base, "wiki":True})
 
     def test_slotted_production_tools_keep_their_original_schema(self):
         @dataclass(frozen=True, slots=True)

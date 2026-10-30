@@ -7,7 +7,7 @@ import tempfile
 import types
 from threading import RLock
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from focused_recall import (
     LexicalIndex,
@@ -316,6 +316,153 @@ class QueryVectorReuseTests(unittest.TestCase):
             self.np.asarray([0.6, 0.8], dtype=self.np.float32),
         )
         self.assertFalse(runtime.query_cache["actual query"].flags.writeable)
+
+
+class ControlledRecallTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = QueryVectorReuseTests()
+        self.fixture.setUp()
+        self.modules = self.fixture.modules
+
+    def runtime(self):
+        runtime = self.fixture.runtime()
+        runtime.root = Path("/unused-fixture-workspace")
+        runtime.personas_by_path, runtime.disabled = {}, []
+        runtime.lexical = LexicalIndex(runtime.units)
+        runtime._rewrite = Mock(return_value={"queries": [], "error": None})
+        runtime.gate.canonical_source = lambda path: path
+        runtime.gate.detect_instruction = lambda text: []
+        for unit in runtime.units:
+            unit.update(chunk_id=unit["id"], src="source_unit")
+        formal = runtime.formal
+
+        def with_results(*args, **kwargs):
+            formal(*args, **kwargs)
+            return {
+                "results": [{"chunk_id": "p" + str(i), "path": "knowledge/p.md",
+                             "text": "official " + str(i)}
+                            for i in range(kwargs["top_k"])],
+                "related": [],
+            }
+
+        runtime.formal = Mock(side_effect=with_results)
+        return runtime
+
+    def test_none_and_explicit_defaults_preserve_output_and_legacy_trace(self):
+        omitted, explicit, controlled = self.runtime(), self.runtime(), self.runtime()
+        with patch.dict("sys.modules", self.modules):
+            expected = omitted.search(["actual query"], profile="focused_v2")
+            self.assertEqual(
+                explicit.search(["actual query"], profile="focused_v2", controls=None),
+                expected,
+            )
+            self.assertEqual(explicit.trace, omitted.trace)
+            self.assertNotIn("controls", omitted.trace[-1])
+            self.assertEqual(
+                controlled.search(["actual query"], profile="focused_v2", controls={}),
+                expected,
+            )
+        trace = copy.deepcopy(controlled.trace[-1])
+        self.assertEqual(trace.pop("controls"), {
+            "formal_top_k": 5, "include_wiki": True,
+            "include_units": True, "rewrite": True,
+        })
+        self.assertEqual(trace, omitted.trace[-1])
+        self.assertEqual(expected["results"][:5], omitted._mark([
+            {"chunk_id": "p" + str(i), "path": "knowledge/p.md",
+             "text": "official " + str(i)} for i in range(5)
+        ]))
+        self.assertEqual(omitted.trace[-1]["selected_ids"],
+                         ["p0", "p1", "p2", "p3", "p4", "u2", "wiki:s2"])
+
+    def test_no_wiki_and_no_rewrite_skip_banks_and_model(self):
+        runtime = self.runtime()
+        runtime._hits = Mock(wraps=runtime._hits)
+        runtime._rewrite.side_effect = AssertionError("Must not invoke query model")
+        controls = {"formal_top_k": 3, "include_wiki": False, "rewrite": False}
+        with patch.dict("sys.modules", self.modules):
+            result = runtime.search(["actual query"], profile="focused_v2", controls=controls)
+        runtime._rewrite.assert_not_called()
+        self.assertTrue(runtime._hits.call_args_list)
+        self.assertTrue(all(call.args[1] != "wiki" for call in runtime._hits.call_args_list))
+        self.assertEqual(runtime.formal.call_args.kwargs["top_k"], 3)
+        self.assertEqual(result["queries"], ["actual query"])
+        self.assertFalse(any(row.get("src") == "wiki" for row in result["results"]))
+        self.assertFalse(any(str(value).startswith("wiki:")
+                             for value in runtime.trace[-1]["selected_ids"]))
+        self.assertIsNone(runtime.trace[-1]["rewrite"])
+        self.assertEqual(runtime.trace[-1]["controls"], {**controls, "include_units": True})
+        controls["include_wiki"] = True
+        self.assertFalse(runtime.trace[-1]["controls"]["include_wiki"])
+
+    def test_no_units_skips_dense_lexical_and_exact_document_recall(self):
+        runtime = self.runtime()
+        runtime._hits = Mock(wraps=runtime._hits)
+        runtime.lexical.hits = Mock(side_effect=AssertionError("Units disabled"))
+        with patch.dict("sys.modules", self.modules), patch("focused_recall.exact_documents") as exact:
+            result = runtime.search(["actual query"], profile="focused_v2",
+                                    controls={"include_units": False, "rewrite": False})
+        runtime.lexical.hits.assert_not_called()
+        exact.assert_not_called()
+        self.assertTrue(all(call.args[1] == "wiki" for call in runtime._hits.call_args_list))
+        self.assertFalse(any(row.get("src") in ("source_unit", "exact_document")
+                             for row in result["results"]))
+        self.assertEqual(runtime.trace[-1]["unit_candidates"], [])
+
+    def test_enabled_rewrite_expands_formal_queries_without_mutating_input(self):
+        runtime = self.runtime()
+        runtime._rewrite.return_value = {"queries": ["other query"], "error": None}
+        queries = ["actual query"]
+        with patch.dict("sys.modules", self.modules):
+            result = runtime.search(queries, profile="focused_v2", controls={"rewrite": True})
+        runtime._rewrite.assert_called_once_with(["actual query"])
+        self.assertEqual(queries, ["actual query"])
+        self.assertEqual(result["queries"], ["actual query", "other query"])
+        self.assertEqual(runtime.formal.call_args.kwargs["queries"], result["queries"])
+        self.assertEqual(runtime.trace[-1]["input_queries"], queries)
+
+    def test_controls_do_not_return_units_after_source_is_disabled(self):
+        runtime = self.runtime()
+        runtime._valid = lambda: ([], [{"id": "s1", "reason": "disabled_source"}])
+        with patch.dict("sys.modules", self.modules):
+            result = runtime.search(["actual query"], profile="focused_v2",
+                                    controls={"include_wiki": False, "rewrite": False})
+        self.assertTrue(all(row["src"] == "production" for row in result["results"]))
+        self.assertEqual(runtime.trace[-1]["unit_candidates"], [])
+        self.assertEqual(runtime.trace[-1]["valid_units"], 0)
+        self.assertEqual(runtime.trace[-1]["rejected_sections"][0]["reason"], "disabled_source")
+
+    def test_controls_keep_complete_records_rank_order_and_shared_budget(self):
+        runtime = self.runtime()
+        for unit in runtime.units:
+            unit["text"] *= 800
+        exact_row = {"chunk_id": "exact:fixture", "text": "exact source", "src": "exact_document"}
+        with patch.dict("sys.modules", self.modules), patch(
+            "focused_recall.exact_documents", return_value=[exact_row],
+        ):
+            result = runtime.search(["actual query"], profile="focused_v2",
+                                    controls={"rewrite": False})
+        self.assertEqual(result["results"][0], exact_row)
+        self.assertEqual([row["chunk_id"] for row in result["results"][1:6]],
+                         ["p0", "p1", "p2", "p3", "p4"])
+        self.assertLessEqual(sum(len(row["text"]) for row in result["results"] + result["related"]), 8000)
+        self.assertFalse(any(row.get("src") == "source_unit" for row in result["results"]))
+
+    def test_invalid_controls_are_rejected_before_retrieval(self):
+        cases = [[], "invalid", {"unknown": True}, {"formal_top_k": True},
+                 {"formal_top_k": 3.0}, {"formal_top_k": 4},
+                 {"include_units": 0}, {"include_wiki": "false"}, {"rewrite": None}]
+        with patch.dict("sys.modules", self.modules):
+            for controls in cases:
+                with self.subTest(controls=controls):
+                    runtime = self.runtime()
+                    with self.assertRaises(ValueError):
+                        runtime.search(["actual query"], profile="focused_v2", controls=controls)
+                    runtime.formal.assert_not_called()
+                    runtime._rewrite.assert_not_called()
+            for profile in ("safe_mixed", "safe_wide", "focused_v1"):
+                with self.subTest(profile=profile), self.assertRaises(ValueError):
+                    self.runtime().search(["actual query"], profile=profile, controls={})
 
 
 class LexicalLengthTests(unittest.TestCase):

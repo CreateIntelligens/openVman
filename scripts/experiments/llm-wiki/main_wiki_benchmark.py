@@ -14,6 +14,7 @@ from live_agent_stress import (
     output_path,
     validate_cases,
 )
+from ablation_matrix import ARMS
 
 
 MAIN_FILES = (
@@ -47,9 +48,17 @@ def main_sources(ref):
     return commit, hashes
 
 
-def validate_records(data, cases, reps):
+def inputs_unchanged(hashes):
+    try:
+        return all(hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest
+                   for path, digest in hashes.items())
+    except OSError:
+        return False
+
+
+def validate_records(data, cases, reps, arms=("main", "wiki")):
     expected = {(c["id"], rep, arm) for c in cases
-                for rep in range(reps) for arm in ("main", "wiki")}
+                for rep in range(reps) for arm in arms}
     records = data.get("records", [])
     actual = [(r["id"], r["rep"], r["variant"]) for r in records]
     if len(actual) != len(expected) or set(actual) != expected:
@@ -60,7 +69,7 @@ def validate_records(data, cases, reps):
 
 SCRIPT = r'''
 import copy
-from contextlib import ExitStack
+from contextlib import ExitStack, nullcontext
 from dataclasses import replace
 import hashlib
 import json
@@ -68,6 +77,7 @@ import logging
 from pathlib import Path
 import sys
 import time
+import threading
 import types
 from unittest.mock import patch
 
@@ -86,6 +96,11 @@ def module(name, source):
 
 runtime = module("readonly_runtime", p["runtime"])
 probe = module("latency_probe", p["probe"])
+stages = module("stage_profiler", p["stage_profiler"])
+matrix = module("ablation_matrix", p["ablation_matrix"])
+history = module("benchmark_history", p["history"])
+retention = module("benchmark_retention", p["retention"])
+answer_policy = module("benchmark_answer_policy", p["answer_policy"])
 dynamic_module = module("benchmark_dynamic_recall", p["dynamic"]["implementation"])
 gate = module("benchmark_source_gate", p["dynamic"]["gate_source"])
 gate.__file__ = "/app/benchmark_source_gate.py"
@@ -93,13 +108,14 @@ claims = module("benchmark_claim_gate", p["dynamic"]["grounded_source"])
 gate.detect_instruction = claims.detect_instruction
 
 from config import get_settings
-from core import agent_loop, llm_client, provider_router
+from core import agent_loop, llm_client, provider_router, prompt_builder, turn_reads
 from core.gemini_credentials import project_model_scope
 from core.prompt_builder import build_chat_messages
 from core.turn_decisions import TurnPolicy
 from infra import project_context, usage_ledger
 from knowledge.doc_meta import list_disabled_document_paths
 from memory import embedder
+from memory.auto_recall import strip_recall_noise
 from tools import tool_executor
 from tools.builtin.knowledge_tools import search_knowledge_tool
 from tools.builtin.product_tools import filter_products_tool
@@ -113,30 +129,76 @@ base_values = base.model_dump(mode="json")
 production_encode = embedder.encode_query_with_fallback
 production_tool = search_knowledge_tool()
 current_arm, row_metrics = None, None
+profiler = None
+profile_thread = threading.get_ident()
+worker_profiles = {}
+profile_lock = threading.Lock()
 usage, calls = [], []
 records, errors = [], []
+
+def measure(name):
+    if profiler is None:
+        return nullcontext()
+    if threading.get_ident() == profile_thread:
+        return profiler.measure(name)
+    with profile_lock:
+        worker = worker_profiles.setdefault(threading.get_ident(), stages.Profiler(request_started_at=request_started))
+    return worker.measure(name)
+
+def profile_report():
+    # Tool handlers run in workers; each lane has its own nesting stack.
+    # Inclusive totals across lanes may overlap and must not be summed as wall time.
+    result = {"summary":{}, "spans":[]}
+    for lane, item in enumerate([profiler, *worker_profiles.values()]):
+        report = item.report()
+        offset = len(result["spans"])
+        for span in report["spans"]:
+            result["spans"].append({**span, "lane":lane,
+                "parent":None if span["parent"] is None else offset + span["parent"]})
+        for name, values in report["summary"].items():
+            total = result["summary"].setdefault(name, {"count":0, "inclusive_ms":0, "self_ms":0})
+            for field in total:
+                total[field] += values[field]
+    return result
+
+def measured(name, original):
+    def run(*args, **kwargs):
+        with measure(name):
+            return original(*args, **kwargs)
+    return run
 
 def timed_tool(name, handler, arguments):
     start = time.perf_counter()
     try:
-        return handler(arguments)
+        with measure(name):
+            return handler(arguments)
     finally:
         row_metrics[name + "_ms"] += (time.perf_counter() - start) * 1000
         row_metrics[name + "_calls"] += 1
 
 def knowledge(arguments):
-    if current_arm == "main":
+    settings = matrix.ARMS[current_arm] if p["ablation"] else {}
+    if p["ablation"] and not settings.get("units"):
+        supplied = dict(arguments)
+        if settings.get("top_k"):
+            supplied["top_k"] = settings["top_k"]
+        return timed_tool("knowledge", production_tool.handler, supplied)
+    if not p["ablation"] and current_arm == "main":
         return timed_tool("knowledge", production_tool.handler, arguments)
     return timed_tool("knowledge", lambda args: wiki.search(
-        args.get("queries", []), profile=p["wiki_profile"]), arguments)
+        args.get("queries", []), profile=p["wiki_profile"],
+        **({"controls":matrix.recall_controls(current_arm)} if p["ablation"] else {})), arguments)
 
 def observed(name, original):
     def run(messages, **kwargs):
         start = time.perf_counter()
-        event = {"kind":name}
+        event = {"kind":name, "request_chars":sum(len(str(m.get("content", ""))) for m in messages),
+                 "tools_chars":len(json.dumps(kwargs.get("tools", []), ensure_ascii=False)),
+                 "started_ms":(start - request_started) * 1000 if profiler else None}
         calls.append(event)
         try:
-            reply = original(messages, **kwargs)
+            with measure("llm_" + name):
+                reply = original(messages, **kwargs)
             event["model"] = reply.model
             return reply
         except Exception as exc:
@@ -147,7 +209,7 @@ def observed(name, original):
     return run
 
 def collect_usage(**kwargs):
-    usage.append({k:kwargs.get(k) for k in ("provider", "model", "latency_ms")})
+    usage.append({k:kwargs.get(k) for k in ("provider", "model", "latency_ms", "raw")})
 
 with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as formal, project_model_scope(pid), ExitStack() as stack:
     # The grid-search helper memoizes embeddings; main must retain its real path.
@@ -166,8 +228,36 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
     stack.enter_context(patch.object(llm_client, "generate_chat_turn", generate))
     stack.enter_context(patch.object(agent_loop, "generate_chat_turn", generate))
     stack.enter_context(patch.object(agent_loop, "stream_chat_turn", stream))
+    for method, label in (("_rewrite", "query_rewrite"), ("_valid", "source_validation"),
+                          ("_vector", "query_vector"), ("_hits", "vector_rank")):
+        original = getattr(dynamic_module.SearchRuntime, method)
+        stack.enter_context(patch.object(dynamic_module.SearchRuntime, method, measured(label, original)))
+    stack.enter_context(patch.object(dynamic_module.LexicalIndex, "hits", measured("lexical_rank", dynamic_module.LexicalIndex.hits)))
+    stack.enter_context(patch.object(dynamic_module, "exact_documents", measured("exact_document", dynamic_module.exact_documents)))
+    stack.enter_context(patch.object(gate, "validate_sections", measured("validate_sections", gate.validate_sections)))
+    from tools.builtin import knowledge_tools
+    stack.enter_context(patch.object(knowledge_tools, "_search_one", measured("formal_single_query", knowledge_tools._search_one)))
+    stack.enter_context(patch.object(knowledge_tools, "_expand_via_graph", measured("graph_expand", knowledge_tools._expand_via_graph)))
+    stack.enter_context(patch.object(embedder, "encode_query_with_fallback", measured("embedding_query", production_encode)))
+    original_history = prompt_builder.select_recent_messages
+    original_queries = turn_reads.knowledge_queries
+    def history_enabled():
+        return p["ablation"] and matrix.ARMS[current_arm].get("history", False)
+    def retained_history(messages):
+        if not history_enabled():
+            return original_history(messages)
+        cfg = get_settings()
+        cleaned = [{**m, "content":strip_recall_noise(str(m.get("content", "")))} for m in messages]
+        return retention.select_recent_messages(cleaned, current_question=current_case["q"],
+            max_messages=max(cfg.short_term_memory_rounds * 2, 8),
+            history_budget=cfg.prompt_history_char_budget, retain_subject_declarations=True)
+    def retained_queries(current, previous):
+        queries = original_queries(current, previous)
+        return history.expand_history_queries(queries, current, previous, "subject_v3") if history_enabled() else queries
+    stack.enter_context(patch.object(prompt_builder, "select_recent_messages", retained_history))
+    stack.enter_context(patch.object(turn_reads, "knowledge_queries", retained_queries))
     started = time.perf_counter()
-    wiki = dynamic_module.SearchRuntime(p["dynamic"], formal, gate)
+    wiki = dynamic_module.SearchRuntime(p["dynamic"], measured("formal_search", formal), gate)
     wiki_startup_ms = round((time.perf_counter() - started) * 1000, 2)
     policy = TurnPolicy(needs_knowledge=True, needs_web=False, needs_memory=False, auto_recall=False)
     settings = {k:getattr(get_settings(), k) for k in (
@@ -175,9 +265,13 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
         "chat_prefetch_knowledge_always", "embedding_thresholds")}
     for rep in range(p["reps"]):
         for index, case in enumerate(p["cases"]):
-            order = ["main", "wiki"] if (rep + index) % 2 == 0 else ["wiki", "main"]
+            current_case = case
+            order = matrix.ordered_arms(index, rep) if p["ablation"] else (["main", "wiki"] if (rep + index) % 2 == 0 else ["wiki", "main"])
             for position, current_arm in enumerate(order):
                 usage.clear(); calls.clear()
+                if p["cold_queries"]:
+                    wiki.query_cache.clear()
+                    wiki.rewrite_cache.clear()
                 trace_start = len(wiki.trace)
                 row_metrics = {"knowledge_ms":0.0, "products_ms":0.0,
                                "knowledge_calls":0, "products_calls":0}
@@ -186,14 +280,20 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                        "answer":"", "tool_steps":[], "error":None,
                        "pair_position":position, "source_access_gate":True,
                        "unauthorized_sources":[]}
-                timer = probe.LatencyProbe()
+                request_started = time.perf_counter()
+                timer = probe.LatencyProbe(request_started_at=request_started)
+                profiler = stages.Profiler(request_started_at=request_started)
+                worker_profiles = {}
                 try:
-                    messages = build_chat_messages(
-                        case["q"], {"project_id":pid, "persona_id":persona,
-                                    "metadata":case.get("metadata", {})},
-                        case.get("history", []), allow_tools=True,
-                        turn_policy=policy, preferred_language=case.get("lang"),
-                    )
+                    with measure("prompt_build"):
+                        messages = build_chat_messages(
+                            case["q"], {"project_id":pid, "persona_id":persona,
+                                        "metadata":case.get("metadata", {})},
+                            case.get("history", []), allow_tools=True,
+                            turn_policy=policy, preferred_language=case.get("lang"),
+                        )
+                        if p["ablation"] and matrix.ARMS[current_arm].get("policy"):
+                            messages = answer_policy.apply_policy(messages, "evidence_v1", total_char_budget=get_settings().prompt_total_char_budget)
                     row["prompt_messages"] = copy.deepcopy(messages)
                     def capture(steps):
                         row["tool_steps"] = copy.deepcopy(steps)
@@ -213,6 +313,8 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                     row["error"] = {"type":type(exc).__name__, "message":"Benchmark execution failed; original partial steps retained"}
                     errors.append({"id":case["id"], "rep":rep, "variant":current_arm, **row["error"]})
                 row["latency"] = timer.finish(row["answer"])
+                row["stages"] = profile_report()
+                profiler = None
                 row["time_ms"] = row["latency"]["total_ms"]
                 row["read_timing"] = {k:round(v, 2) for k,v in row_metrics.items()}
                 row["llm_calls"] = copy.deepcopy(calls)
@@ -220,6 +322,9 @@ with runtime.readonly_search(pid, persona_id=persona, reply_mode=p["mode"]) as f
                 row["providers"] = sorted({u["provider"] for u in usage if u["provider"]})
                 row["models"] = sorted({c["model"] for c in calls if c.get("model")})
                 row["retrieval_trace"] = copy.deepcopy(wiki.trace[trace_start:])
+                row["evidence_chars"] = sum(len(item.get("text", "")) for step in row["tool_steps"]
+                    for field in ("results", "related")
+                    for item in json.loads(step["result"]).get("data", {}).get(field, []))
                 disabled = {v.removeprefix("knowledge/") for v in list_disabled_document_paths(pid)}
                 paths = {path for step in row["tool_steps"]
                          for field in ("results", "related")
@@ -240,8 +345,12 @@ print(json.dumps({"project_id":pid, "persona_id":persona, "records":records,
     "production_settings":settings, "wiki_profile":p["wiki_profile"],
     "reply_mode":p["mode"],
     "wiki_startup_ms":wiki_startup_ms, "answer_check_policy":"none",
-    "answer_policy":"production", "history_policy":"production",
-    "context_policy":"production", "experiment_embedding_cache":False,
+    "answer_policy":"per_arm" if p["ablation"] else "production",
+    "history_policy":"per_arm" if p["ablation"] else "production",
+    "context_policy":"per_arm" if p["ablation"] else "production",
+    "experiment_embedding_cache":False,
+    "ablation":p["ablation"], "arms":matrix.ARMS if p["ablation"] else {"main":{}, "wiki":{}},
+    "cold_queries":p["cold_queries"],
     "scope":"Isolated main knowledge/product read path, alternating paired order; no HTTP decisions, sessions, memory, web, media or TTS; no checker or repair",
 }, ensure_ascii=False))
 '''
@@ -258,7 +367,11 @@ def main():
     parser.add_argument("--mode", choices=("standard", "fast"), default="fast")
     parser.add_argument("--wiki-profile", choices=("focused_v1", "focused_v2"), default="focused_v2")
     parser.add_argument("--reps", type=int, default=2)
+    parser.add_argument("--ablation", action="store_true")
+    parser.add_argument("--cold-queries", action="store_true")
     args = parser.parse_args()
+    if args.ablation and args.wiki_profile != "focused_v2":
+        parser.error("Ablation requires focused_v2 controls")
     if args.reps < 1:
         parser.error("--reps must be positive")
     cases = json.loads(args.cases.read_text())
@@ -276,15 +389,24 @@ def main():
     commit, hashes = main_sources(args.main_ref)
     dynamic = dynamic_payload(args.snapshot, args.project, [args.wiki_profile])
     dynamic["persona_id"] = args.persona
+    generation = Path(dynamic["snapshot"])
+    inputs = [args.cases, *sorted(p for p in generation.rglob("*") if p.is_file())]
+    input_hashes = {str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}
     sources = {name:(HERE/name).read_text() for name in (
         "readonly_runtime.py", "latency_probe.py", "focused_recall.py",
         "repaired_retrieval.py", "grounded_claims.py",
+        "stage_profiler.py", "ablation_matrix.py", "history_query.py",
+        "context_retention.py", "answer_policy.py",
     )}
     payload = {"project_id":args.project, "persona_id":args.persona,
                "cases":answering_cases(cases), "dynamic":dynamic,
                "wiki_profile":args.wiki_profile, "reps":args.reps, "mode":args.mode,
                "main_commit":commit, "main_hashes":hashes,
-               "runtime":sources["readonly_runtime.py"], "probe":sources["latency_probe.py"]}
+               "runtime":sources["readonly_runtime.py"], "probe":sources["latency_probe.py"],
+               "stage_profiler":sources["stage_profiler.py"], "ablation_matrix":sources["ablation_matrix.py"],
+               "history":sources["history_query.py"], "retention":sources["context_retention.py"],
+               "answer_policy":sources["answer_policy.py"],
+               "ablation":args.ablation, "cold_queries":args.cold_queries}
     with checkpoint.open("x") as stream:
         process = subprocess.Popen(
             ["docker", "exec", "-i", "-w", "/app", args.container, "python", "-c", SCRIPT],
@@ -315,8 +437,11 @@ def main():
         target.with_suffix(".failure.json").write_text(json.dumps(failure))
         print(json.dumps(failure))
         raise SystemExit("Benchmark failed; checkpoint retained; no accepted batch")
-    validate_records(data, cases, args.reps)
-    data["inputs_sha256"] = {str(args.cases):hashlib.sha256(args.cases.read_bytes()).hexdigest()}
+    validate_records(data, cases, args.reps, ARMS if args.ablation else ("main", "wiki"))
+    if not inputs_unchanged(input_hashes):
+        raise SystemExit("Input snapshot changed; checkpoint retained, no accepted batch")
+    data["inputs_sha256"] = input_hashes
+    data["dynamic_snapshot"] = str(generation)
     data["runner_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     data["experiment_sources_sha256"] = {k:hashlib.sha256(v.encode()).hexdigest() for k,v in sources.items()}
     target.write_text(json.dumps(data, ensure_ascii=False, indent=1))

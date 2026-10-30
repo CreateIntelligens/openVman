@@ -339,19 +339,38 @@ class SearchRuntime:
                            "project_id": self.pid, "persona_id": self.persona})
         return marked
 
-    def search(self, queries, *, profile):
+    def search(self, queries, *, profile, controls=None):
         from tools.builtin import knowledge_tools
         from tools.search_helpers import merge_search_results, normalize_query_list
         from unittest.mock import patch
 
         if profile not in PROFILES:
             raise ValueError("Unknown recall profile")
+        options = {
+            "formal_top_k": 5, "include_wiki": True,
+            "include_units": True, "rewrite": True,
+        }
+        if controls is not None:
+            if profile != "focused_v2":
+                raise ValueError("Recall controls require focused_v2")
+            if not isinstance(controls, dict) or controls.keys() - options.keys():
+                raise ValueError("Invalid recall controls")
+            for name, value in controls.items():
+                if name == "formal_top_k":
+                    if type(value) is not int or value not in (3, 5):
+                        raise ValueError("formal_top_k must be 3 or 5")
+                elif type(value) is not bool:
+                    raise ValueError(name + " must be a boolean")
+            options.update(controls)
         queries = normalize_query_list({"queries": queries})
         if not queries:
             raise ValueError("Dynamic retrieval needs actual nonempty queries")
         with self.lock:
             input_queries = list(queries)
-            rewrite = self._rewrite(queries) if profile == "focused_v2" else None
+            rewrite = (
+                self._rewrite(queries)
+                if profile == "focused_v2" and options["rewrite"] else None
+            )
             if rewrite:
                 queries = list(dict.fromkeys(queries + rewrite["queries"]))
             captured = []
@@ -365,21 +384,27 @@ class SearchRuntime:
                 return records, version, vector
 
             with patch.object(knowledge_tools, "_search_one", capture):
-                formal = self.formal(queries[0], top_k=5, threshold=.68, queries=queries)
+                formal = self.formal(queries[0], top_k=options["formal_top_k"],
+                                     threshold=.68, queries=queries)
             valid, rejected = self._valid()
             valid_wiki = {s["id"] for s in valid}
             valid_units = {u["id"] for u in self.units if valid_wiki.intersection(u["parent_ids"])}
-            wiki_lists = [("wiki:" + q, self._hits(q, "wiki", valid_wiki, threshold=.68, limit=5))
-                          for q in queries]
+            wiki_lists = [
+                ("wiki:" + q, self._hits(q, "wiki", valid_wiki, threshold=.68, limit=5))
+                for q in queries
+            ] if options["include_wiki"] else []
             fusion = self.gate.merge_ranklists(captured + wiki_lists, merge_search_results, limit=100)
             if profile == "safe_mixed":
                 results = fusion[:5]
             elif profile == "safe_wide":
                 results = complete_records([fusion], limit=16)
             else:
-                unit_lists = [(bank + ":" + q, self._hits(q, bank, valid_units, threshold=.60, limit=8))
-                              for q in queries for bank in ("unit_full", "unit_question")]
-                if profile == "focused_v2":
+                unit_lists = [
+                    (bank + ":" + q,
+                     self._hits(q, bank, valid_units, threshold=.60, limit=8))
+                    for q in queries for bank in ("unit_full", "unit_question")
+                ] if options["include_units"] else []
+                if profile == "focused_v2" and options["include_units"]:
                     unit_lists.extend(("lexical:"+q,self.lexical.hits(q,valid_units)) for q in queries)
                 unit_fused = self.gate.merge_ranklists(unit_lists, merge_search_results, limit=100)
                 # Keep the official top-five set: a fourth-ranked exact answer
@@ -389,7 +414,7 @@ class SearchRuntime:
                 exact = exact_documents(
                     input_queries, self.personas_by_path, root=self.root, persona=self.persona,
                     project=self.pid, disabled=self.disabled, detector=self.gate.detect_instruction,
-                )
+                ) if options["include_units"] else []
                 unit_limit = 8 if profile == "focused_v2" else 3
                 results = complete_records([exact, primary[:5], unit_fused[:unit_limit], wiki_fused],
                                            limit=16 if profile == "focused_v2" else 10)
@@ -405,6 +430,8 @@ class SearchRuntime:
                 "related_chars": sum(len(r["text"]) for r in related),
                 "unit_candidates": [r["id"] for r in unit_fused[:12]] if profile.startswith("focused_") else [],
             })
+            if controls is not None:
+                self.trace[-1]["controls"] = copy.deepcopy(options)
             return {"table": "knowledge", "queries": queries, "embedding_versions": [],
                     "results": results, "related": related, "citations": [],
                     "recall_profile": profile, "source_access_gate": True}
