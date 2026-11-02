@@ -21,6 +21,27 @@ from focused_recall import (
 
 
 class FocusedRecallTests(unittest.TestCase):
+    def test_raw_only_validator_does_not_prepare_legacy_md_or_question_vectors(self):
+        encoder = Mock(side_effect=AssertionError("Legacy banks must not be embedded"))
+        config = types.ModuleType("config")
+        config.get_settings = lambda: types.SimpleNamespace(resolved_embedding_write_identity="synthetic")
+        project = types.ModuleType("infra.project_context")
+        project.resolve_project_context = lambda pid: types.SimpleNamespace(workspace_root=Path("/synthetic"))
+        embedder = types.ModuleType("memory.embedder")
+        embedder.get_embedder = lambda: types.SimpleNamespace(encode_with_metadata=encoder)
+        payload = {"project_id": "synthetic", "persona_id": "default", "raw_only": True,
+                   "sources": {}, "sections": [], "source_manifest": {},
+                   "profiles": ["focused_v2"]}
+        modules = {"config": config, "infra": types.ModuleType("infra"),
+                   "infra.project_context": project, "memory": types.ModuleType("memory"),
+                   "memory.embedder": embedder}
+        with (patch.dict("sys.modules", modules),
+              patch.object(SearchRuntime, "_valid", return_value=([], [])),
+              patch("focused_recall.unit_records", return_value=[])):
+            runtime = SearchRuntime(payload, Mock(), Mock())
+        self.assertEqual(runtime.vectors, {})
+        encoder.assert_not_called()
+
     def test_related_records_share_the_real_budget_and_are_never_cut(self):
         results = [{"text": "a" * 7508}]
         related = [{"text": "b" * 300}, {"text": "c" * 258}]

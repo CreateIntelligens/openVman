@@ -19,6 +19,14 @@ import repair_regression
 
 
 class PortableScriptTests(unittest.TestCase):
+    def test_all_experiment_scripts_avoid_private_project_and_home_defaults(self):
+        # Document CI does not scan scripts; this covers new runners as well.
+        for path in Path(__file__).parent.glob("*.py"):
+            with self.subTest(script=path.name):
+                source = path.read_text()
+                self.assertNotRegex(source, r"\b(?:proj|dev)-[a-f0-9]{10}\b")
+                self.assertNotRegex(source, r"/(?:home|Users)/[A-Za-z0-9_.-]+/")
+
     def test_real_project_scripts_require_explicit_project(self):
         for module in (regression, repair_regression):
             with self.subTest(module=module.__name__):

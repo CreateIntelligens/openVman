@@ -7,7 +7,7 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-from corpus_recall import PreparedIndex, merge_ranks, rank_hits
+from corpus_recall import PreparedIndex, build_corpora, merge_ranks, rank_hits
 from pipeline_runtime import Runtime
 
 
@@ -71,6 +71,22 @@ class PipelineRuntimeTests(unittest.TestCase):
         self.assertEqual(result["citations"], [])
         self.validator.formal.assert_not_called()
         self.validator.graph.assert_not_called()
+
+    def test_raw_only_preparation_needs_no_md_payload_or_md_embeddings(self):
+        encoder = Mock(return_value=([[1., 0.]], {"identity": "synthetic"}, {}))
+        embedder = types.ModuleType("memory.embedder")
+        embedder.get_embedder = lambda: types.SimpleNamespace(encode_with_metadata=encoder)
+        payload = {"raw_only": True, "sources": {"source-a": {
+            "text": "complete original unit", "topic": "synthetic topic",
+            "path": "knowledge/synthetic.md"}}}
+        helpers = types.SimpleNamespace(build_corpora=build_corpora, PreparedIndex=PreparedIndex)
+        with patch.dict("sys.modules", {"memory": types.ModuleType("memory"),
+                                        "memory.embedder": embedder}):
+            runtime = Runtime(payload, types.SimpleNamespace(identity="synthetic"), helpers)
+        self.assertEqual(set(runtime.records), {"raw"})
+        self.assertEqual(encoder.call_args.args[0], ["complete original unit"])
+        self.assertEqual(encoder.call_count, 1)
+        self.assertEqual(runtime.compiled, [])
 
     def test_invalid_controls_cannot_silently_enable_online_work(self):
         for controls in ({"banks":[]}, {"banks":["missing"]},

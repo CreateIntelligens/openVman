@@ -188,6 +188,8 @@ class SearchRuntime:
                 ["主題：" + s["title"] + "\n問題：" + s["question_text"]
                  if s["question_text"] else s["text"] for s in self.units],
             )
+        if payload.get("raw_only"):
+            banks = {}
         embedder = get_embedder()
         for name, (records, texts) in banks.items():
             vectors = []

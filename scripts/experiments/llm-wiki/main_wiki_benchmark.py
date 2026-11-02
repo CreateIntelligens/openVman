@@ -15,7 +15,7 @@ from live_agent_stress import (
     output_path,
     validate_cases,
 )
-from pipeline_matrix import selected_arms
+from pipeline_matrix import CLEAN_INDEX_ARMS, selected_arms
 
 
 MAIN_FILES = (
@@ -199,8 +199,11 @@ def timed_tool(name, handler, arguments):
 
 def knowledge(arguments):
     if p.get("pipelines"):
-        if current_arm == "main":
-            return timed_tool("knowledge", production_tool.handler, arguments)
+        if current_arm == "main" or pipeline_arms[current_arm].get("formal"):
+            supplied = dict(arguments)
+            if pipeline_arms[current_arm].get("top_k"):
+                supplied["top_k"] = pipeline_arms[current_arm]["top_k"]
+            return timed_tool("knowledge", production_tool.handler, supplied)
         return timed_tool("knowledge", lambda args:pipeline.search(
             args.get("queries", []), {k:v for k,v in pipeline_arms[current_arm].items()
                                       if k in ("banks", "multi", "rewrite")}), arguments)
@@ -485,17 +488,22 @@ def main():
     parser.add_argument("--ablation", action="store_true")
     parser.add_argument("--cold-queries", action="store_true")
     parser.add_argument("--pipelines", action="store_true")
+    parser.add_argument("--clean-index", action="store_true")
     parser.add_argument("--compiled-sections", type=Path)
     parser.add_argument("--followup", action="store_true")
     parser.add_argument("--pipeline-arms", nargs="+")
     args = parser.parse_args()
     if args.ablation and args.wiki_profile != "focused_v2":
         parser.error("Ablation requires focused_v2 controls")
-    if args.pipelines and (args.ablation or not args.compiled_sections):
+    if args.clean_index:
+        if args.ablation or args.followup or args.pipeline_arms or args.compiled_sections:
+            parser.error("Clean-index control excludes legacy matrices and compiled MD")
+        args.pipelines = True
+    if args.pipelines and (args.ablation or (not args.compiled_sections and not args.clean_index)):
         parser.error("Pipelines require compiled sections and cannot combine with ablation")
     if (args.followup or args.pipeline_arms) and not args.pipelines:
         parser.error("Follow-up controls require --pipelines")
-    arms = selected_arms(args.followup, args.pipeline_arms)
+    arms = dict(CLEAN_INDEX_ARMS) if args.clean_index else selected_arms(args.followup, args.pipeline_arms)
     if args.reps < 1:
         parser.error("--reps must be positive")
     cases = json.loads(args.cases.read_text())
@@ -513,11 +521,12 @@ def main():
     commit, hashes = main_sources(args.main_ref)
     dynamic = dynamic_payload(args.snapshot, args.project, [args.wiki_profile])
     dynamic["persona_id"] = args.persona
-    if args.pipelines:
+    dynamic["raw_only"] = args.clean_index
+    if args.compiled_sections:
         dynamic["compiled_sections"] = json.loads(args.compiled_sections.read_text())
     generation = Path(dynamic["snapshot"])
     inputs = [args.cases, *sorted(p for p in generation.rglob("*") if p.is_file())]
-    if args.pipelines:
+    if args.compiled_sections:
         inputs.append(args.compiled_sections)
     input_hashes = {str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}
     sources = {name:(HERE/name).read_text() for name in (
@@ -580,6 +589,12 @@ def main():
     if status or data is None or input_error:
         failure = {**classify_failure(stderr), "returncode":status,
                    "checkpoint_records":count}
+        if failure["category"] == "data_write_guard":
+            # Keep only guard diagnostics in the private output, never raw
+            # provider exceptions that may contain request or credential data.
+            failure["guard_diagnostics"] = [line.strip() for line in stderr.splitlines()
+                if line.startswith(("PermissionError: Blocked data mutation:",
+                                    "RuntimeError: Blocked data mutation:"))]
         if input_error:
             failure["input_error_type"] = input_error
         target.with_suffix(".failure.json").write_text(json.dumps(failure))

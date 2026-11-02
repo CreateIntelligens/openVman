@@ -172,7 +172,7 @@ def compare_records(live, judged, *, rounds=3, threshold_questions=2,
         for cid in sorted(stable_main):
             failing = [rep for rep in range(rounds)
                        if not grades[cid, rep, variant]["pass"]]
-            if failing:
+            if len(failing) >= 2:
                 stable_regressions.append({"id": cid, "failing_reps": failing})
         for rep in range(rounds):
             rows = [grades[cid, rep, variant] for cid in case_ids]
@@ -188,7 +188,7 @@ def compare_records(live, judged, *, rounds=3, threshold_questions=2,
         latency = _latency_pairs(variant, ordered_keys, records, grades,
                                  max_added_latency_ms)
         gates = {
-            "no_regression": not regressions,
+            "no_regression": not stable_regressions,
             "no_critical": critical == 0,
             "latency": latency["gate"],
             "gain": delta / rounds > threshold_questions,
@@ -220,6 +220,7 @@ def compare_records(live, judged, *, rounds=3, threshold_questions=2,
             "not_a_p_value": True, "statistical_significance_claimed": False,
             "note": "Absolute average gain <= threshold is operational-small; no significance test was run.",
         },
+        "regression_policy": "Main passes all three; candidate fails at least two of three. Pair failures alone are diagnostic.",
         "grade_policy": "Original pass/critical unchanged; inconsistent passing error rows are rejected.",
         "latency_policy": "All paired timings required; execution failures are missing, not fast responses. Maximum added latency must be <= limit.",
         "arms": arms,

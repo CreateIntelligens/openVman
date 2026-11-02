@@ -3,7 +3,9 @@
 from contextlib import nullcontext
 import json
 import logging
+import os
 from pathlib import Path
+import shutil
 import tempfile
 from types import ModuleType, SimpleNamespace
 import unittest
@@ -137,6 +139,49 @@ class ReadonlyTests(unittest.TestCase):
                 with self.assertRaises(PermissionError):
                     (self.root / "new-directory").mkdir(parents=True, exist_ok=True)
         self.assertFalse((self.root / "new-directory").exists())
+
+    def test_rmtree_relative_data_does_not_alias_production_data(self):
+        protected = self.root / "working" / "data"
+        protected.mkdir(parents=True)
+        shadow = self.root / "temporary-index"
+        (shadow / "data").mkdir(parents=True)
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(protected.parent)
+            with runtime._write_guard([protected]) as guard:
+                shutil.rmtree(shadow)
+                self.assertEqual(guard["violations"], [])
+            self.assertTrue(protected.is_dir())
+            self.assertFalse(shadow.exists())
+        finally:
+            os.chdir(original_cwd)
+
+    def test_dir_fd_delete_and_rename_still_protect_real_data(self):
+        protected = self.root / "protected"
+        protected.mkdir()
+        target = protected / "kept"
+        target.write_text("keep")
+        outside = self.root / "outside"
+        outside.mkdir()
+        source = outside / "source"
+        source.write_text("keep")
+        protected_fd = os.open(protected, os.O_RDONLY)
+        outside_fd = os.open(outside, os.O_RDONLY)
+        try:
+            with runtime._write_guard([protected]) as guard:
+                with self.assertRaises(PermissionError):
+                    os.remove("kept", dir_fd=protected_fd)
+                with self.assertRaises(PermissionError):
+                    os.rename("source", "moved", src_dir_fd=outside_fd,
+                              dst_dir_fd=protected_fd)
+                with self.assertRaises(PermissionError):
+                    os.mkdir("new", dir_fd=protected_fd)
+                self.assertEqual(len(guard["violations"]), 3)
+            self.assertTrue(target.exists())
+            self.assertTrue(source.exists())
+        finally:
+            os.close(outside_fd)
+            os.close(protected_fd)
 
     def test_query_routes_are_cached_and_copied(self):
         encoder = self.modules["memory.embedder"]

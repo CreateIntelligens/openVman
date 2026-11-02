@@ -17,10 +17,13 @@ class Runtime:
         self.validator = validator
         self.helper = helper
         self.trace = []
-        grouped = helper.build_corpora(payload["sources"], payload["sections"])
-        compiled = helper.build_corpora(payload["sources"], payload["compiled_sections"])
-        self.records = {"raw":grouped["raw"], "grouped":grouped["md"],
-                        "compiled":compiled["md"]}
+        if payload.get("raw_only"):
+            self.records = {"raw": helper.build_corpora(payload["sources"], [])["raw"]}
+        else:
+            grouped = helper.build_corpora(payload["sources"], payload["sections"])
+            compiled = helper.build_corpora(payload["sources"], payload["compiled_sections"])
+            self.records = {"raw":grouped["raw"], "grouped":grouped["md"],
+                            "compiled":compiled["md"]}
         for bank, records in self.records.items():
             for record in records:
                 record["src"] = bank
@@ -42,7 +45,7 @@ class Runtime:
             self.vectors[name] = vectors
             self.indexes[name] = helper.PreparedIndex(records, vectors)
         # Citation membership and file hashes establish provenance, not fidelity.
-        self.compiled = payload["compiled_sections"]
+        self.compiled = payload.get("compiled_sections", [])
 
     def search(self, supplied_queries, controls):
         from tools.search_helpers import normalize_query_list

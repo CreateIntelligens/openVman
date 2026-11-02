@@ -32,6 +32,13 @@ FOLLOWUP_ARMS.update({
 })
 
 
+CLEAN_INDEX_ARMS = {
+    "main": {},
+    "main_noise": {"formal": True, "products": True},
+    "raw_multi": {"banks": ["raw"], "multi": True, "products": True},
+}
+
+
 def selected_arms(followup=False, names=None):
     matrix = FOLLOWUP_ARMS if followup else ARMS
     if names is None:

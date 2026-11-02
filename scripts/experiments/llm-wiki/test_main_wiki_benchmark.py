@@ -19,6 +19,30 @@ import stage_profiler
 
 
 class MainWikiBenchmarkTests(unittest.TestCase):
+    def test_noise_control_uses_production_handler_and_identical_product_tools(self):
+        from unittest.mock import Mock
+
+        tree = ast.parse(benchmark.SCRIPT)
+        handler = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)
+                       and n.name == "knowledge")
+        production = Mock(return_value="production result")
+        raw = Mock(return_value="raw result")
+        scope = {"p": {"pipelines": True}, "pipeline_arms": pipeline_matrix.CLEAN_INDEX_ARMS,
+                 "production_tool": types.SimpleNamespace(handler=production),
+                 "pipeline": types.SimpleNamespace(search=raw),
+                 "timed_tool": lambda label, fn, args: fn(args)}
+        exec(compile(ast.Module(body=[handler], type_ignores=[]), "clean routing", "exec"), scope)
+        arguments = {"queries": ["synthetic"]}
+        for arm in ("main", "main_noise"):
+            scope["current_arm"] = arm
+            self.assertEqual(scope["knowledge"](arguments), "production result")
+        self.assertEqual(production.call_count, 2)
+        self.assertEqual(production.call_args.args[0], arguments)
+        raw.assert_not_called()
+        for arm, options in pipeline_matrix.CLEAN_INDEX_ARMS.items():
+            self.assertTrue(arm == "main" or options.get("products"))
+        self.assertEqual(pipeline_matrix.CLEAN_INDEX_ARMS['raw_multi']['banks'], ['raw'])
+
     def test_catalog_cache_never_changes_the_main_control_or_hides_invalidations(self):
         from unittest.mock import Mock
 

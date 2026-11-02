@@ -27,11 +27,23 @@ _PATH_EVENTS = {
     "os.utime": (0,), "os.setxattr": (0,), "os.removexattr": (0,),
 }
 
+_DIR_FD_POSITIONS = {
+    "os.remove": {0: 1}, "os.rmdir": {0: 1}, "os.mkdir": {0: 2},
+    "os.rename": {0: 2, 1: 3}, "os.link": {0: 2, 1: 3},
+    "os.symlink": {1: 2}, "os.chmod": {0: 2}, "os.chown": {0: 3},
+    "os.utime": {0: 3},
+}
 
-def _resolved(path):
+
+def _resolved(path, dir_fd=None):
     if isinstance(path, int):
         path = os.readlink(f"/proc/self/fd/{path}")
-    return Path(os.fsdecode(path)).resolve()
+    value = Path(os.fsdecode(path))
+    # rmtree uses paths relative to a directory descriptor. Resolving them from
+    # cwd mistakes a temporary LanceDB "data" child for production /app/data.
+    if not value.is_absolute() and isinstance(dir_fd, int) and dir_fd >= 0:
+        value = Path(os.readlink(f"/proc/self/fd/{dir_fd}")) / value
+    return value.resolve()
 
 
 def _audit(event, args):
@@ -48,7 +60,9 @@ def _audit(event, args):
         positions = _PATH_EVENTS.get(event, ())
     for position in positions:
         try:
-            path = _resolved(args[position])
+            fd_position = _DIR_FD_POSITIONS.get(event, {}).get(position)
+            dir_fd = args[fd_position] if fd_position is not None else None
+            path = _resolved(args[position], dir_fd)
         except (OSError, TypeError, ValueError):
             continue
         if any(path == root or root in path.parents for root in state["roots"]):

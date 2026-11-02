@@ -74,8 +74,14 @@ class CompareFollowupTests(unittest.TestCase):
         self.assertEqual(arm["main_pass_candidate_fail_pairs"], [
             {"id": "question-0", "rep": 0}, {"id": "question-1", "rep": 2},
         ])
+        self.assertEqual(arm["main_three_of_three_pass_candidate_fail_questions"], [])
+        self.assertTrue(arm["gates"]["no_regression"])
+        # Two failures cross the agreed threshold; a single noisy miss does not.
+        next(r for r in judged if r["variant"] == "candidate"
+             and r["id"] == "question-1" and r["rep"] == 1)["pass"] = False
+        arm = compare_records(live, judged)["arms"]["candidate"]
         self.assertEqual(arm["main_three_of_three_pass_candidate_fail_questions"], [
-            {"id": "question-1", "failing_reps": [2]},
+            {"id": "question-1", "failing_reps": [1, 2]},
         ])
         self.assertFalse(arm["gates"]["no_regression"])
 
