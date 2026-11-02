@@ -20,6 +20,8 @@ API 管理入口如下，皆需帳號登入 session（JWT Bearer 或同來源 Co
 
 代發另有權限上限：root 可替正式帳號發行；admin 替他人發行時，目標須為一般正式帳號，且發行當下的全部有效資源須在該 admin 的有效資源內。替其他 admin 發行需 root；admin 仍可依既有階層查看、撤銷其能管理的 admin key。發行後以所屬帳號權限為準，root 日後調整該帳號資源授權時，其所有 key 一起沿用新授權。
 
+撤銷超過 7 天的金鑰會在 backend 啟動時刪除，清單與 metadata 都不再出現；撤銷動作仍留在 auth audit。
+
 metadata 欄位為 `key_id`、`user_id`、`label`、`token_prefix`、`created_at`、`expires_at`、`revoked_at`、`last_used_at`、`request_count`。管理回應帶 `Cache-Control: no-store`。資料庫只保存高熵隨機 token 的 SHA-256；列表與 audit 不提供明文或雜湊。
 
 ## 呼叫 ASR 或其他應用 API

@@ -322,7 +322,7 @@ async def transcribe_for_account(
         # 呼叫端（例如經 proxy 的機台）常把回應裡的 provider 丟掉，只有這裡查得到實際走哪個引擎。
         _result_logger.info(json.dumps({
             "event": "asr_transcribed",
-            "username": account.user.username,
+            "username": getattr(account.user, "username", ""),
             "project_id": project_id,
             "requested_provider": requested,
             "provider": body["provider"],

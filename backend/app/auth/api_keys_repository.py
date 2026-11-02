@@ -7,7 +7,7 @@ import hmac
 import re
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from ._account_records import (
@@ -92,6 +92,10 @@ def _ensure_creation_ceiling(
         )
         if any(item.resource_id not in allowed for item in target_resources):
             raise AccountPolicyError("target resources exceed issuer access")
+
+
+# 撤銷的金鑰不能再用，留著只會把清單拉長；誰撤銷的仍記在 auth audit。
+REVOKED_KEY_RETENTION_DAYS = 7
 
 
 class ApiKeyRepository:
@@ -193,6 +197,20 @@ class ApiKeyRepository:
                 metadata={"key_id": key_id},
                 now=now,
             )
+
+    def purge_revoked(self, *, older_than_days: int = REVOKED_KEY_RETENTION_DAYS) -> int:
+        """Delete keys revoked long ago; who revoked what stays in the auth audit."""
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        ).isoformat()
+        with self.database.transaction(write=True) as connection:
+            return connection.execute(
+                """
+                DELETE FROM account_api_keys
+                WHERE revoked_at IS NOT NULL AND revoked_at < ?
+                """,
+                (cutoff,),
+            ).rowcount
 
     def authenticate(self, credential: str) -> tuple[UserRecord, ApiKeyRecord]:
         match = _KEY_PATTERN.fullmatch(credential)

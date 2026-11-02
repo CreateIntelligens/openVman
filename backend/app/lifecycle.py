@@ -72,6 +72,14 @@ def _warn_unreadable_model_keys(runtime: AuthRuntime) -> None:
         )
 
 
+def _purge_revoked_api_keys(runtime: AuthRuntime) -> None:
+    """清不掉只是清單長一點，不該擋住服務啟動。"""
+    try:
+        runtime.api_keys.purge_revoked()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("revoked API key purge failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     runtime = get_auth_runtime()
@@ -79,6 +87,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await _app.state.openapi_builder.build()
     sync_asr_engines(runtime)
     _warn_unreadable_model_keys(runtime)
+    _purge_revoked_api_keys(runtime)
     await sync_system_resources(runtime, get_tts_config())
     a2a_daemon = get_a2a_bridge_daemon() if get_tts_config().a2a_enabled else None
     if a2a_daemon:

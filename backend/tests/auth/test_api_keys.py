@@ -224,6 +224,27 @@ def test_invalid_credentials_fail_closed_without_counting(setup, failure):
         ).fetchone()[:] == (0, None)
 
 
+def test_purge_removes_only_keys_revoked_past_retention(setup):
+    runtime, _root, owner, _client = setup
+    old, _ = runtime.api_keys.create(actor_id=owner.id, user_id=owner.id, label="old")
+    recent, _ = runtime.api_keys.create(actor_id=owner.id, user_id=owner.id, label="recent")
+    runtime.api_keys.create(actor_id=owner.id, user_id=owner.id, label="active")
+    runtime.api_keys.revoke(actor_id=owner.id, key_id=old.key_id)
+    runtime.api_keys.revoke(actor_id=owner.id, key_id=recent.key_id)
+    stale = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+    with runtime.api_keys.database.transaction(write=True) as connection:
+        connection.execute(
+            "UPDATE account_api_keys SET revoked_at = ? WHERE key_id = ?",
+            (stale, old.key_id),
+        )
+
+    assert runtime.api_keys.purge_revoked() == 1
+    remaining = {
+        key.label for key in runtime.api_keys.list_for_user(actor_id=owner.id, user_id=owner.id)
+    }
+    assert {"recent", "active"} <= remaining and "old" not in remaining
+
+
 def test_password_reset_and_session_revocation_keep_keys_valid(setup):
     runtime, root, owner, client = setup
     _, secret = _issue(runtime, owner)
