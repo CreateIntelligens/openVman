@@ -3,6 +3,7 @@
 import asyncio
 import io
 import json
+import logging
 import wave
 from types import SimpleNamespace
 
@@ -286,6 +287,29 @@ def test_mixed_routes_still_run_the_language_check(setup, monkeypatch):
     assert checks == [1]
     assert response.json()["language"] is None
     assert response.json()["language_check"] == {"result": "zh", "ms": 7}
+
+
+def test_transcribe_logs_the_engine_that_actually_ran(setup, monkeypatch):
+    # 機台的 proxy 會丟掉回應裡的 provider，實際走哪個引擎只能從這行查。
+    app, _runtime, _root, owner, keys, _attempts = setup
+    lines = []
+
+    class Capture(logging.Handler):
+        def emit(self, record):
+            lines.append(json.loads(record.getMessage()))
+
+    handler = Capture()
+    logger = logging.getLogger("upstream_attempt")
+    logger.addHandler(handler)
+    try:
+        with TestClient(app) as client:
+            assert _upload(client, keys[0][1], "openai").status_code == 200
+    finally:
+        logger.removeHandler(handler)
+    entry = next(line for line in lines if line.get("event") == "asr_transcribed")
+    assert entry["username"] == owner.username
+    assert entry["requested_provider"] == "openai"
+    assert entry["provider"] == "openai"
 
 
 def test_project_authorization_error_keeps_404(setup, monkeypatch):

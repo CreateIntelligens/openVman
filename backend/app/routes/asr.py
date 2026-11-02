@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import math
 import os
@@ -27,7 +28,7 @@ from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.settings_repository import SERVER_ASR_PROVIDERS
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response, upload_rejected_response
-from app.upstream_guard import set_clip_seconds
+from app.upstream_guard import current_request_id, set_clip_seconds
 from app.usage_ledger_client import (
     UNIT_SECONDS,
     record_usage_event,
@@ -42,6 +43,8 @@ from app.utils.upload import (
 )
 
 logger = logging.getLogger("backend")
+# 用 upstream_attempt 的 logger：backend 的 root logger 沒有 handler，INFO 會被丟掉。
+_result_logger = logging.getLogger("upstream_attempt")
 router = APIRouter()
 
 
@@ -305,7 +308,7 @@ async def transcribe_for_account(
         # fallback must not expose other engines.
         providers = {requested} if requested else set(scope.allowed)
         tmp_path = await _persist_asr_clip(file, cfg)
-        return JSONResponse(content=await _transcribe_routed(
+        body = await _transcribe_routed(
             account, tmp_path,
             project_id=project_id,
             language_routes=language_routes,
@@ -315,7 +318,20 @@ async def transcribe_for_account(
             allowed_providers=providers,
             strict_provider=bool(requested),
             engine_order=tuple(policy.asr_engine_order) if policy is not None else (),
-        ))
+        )
+        # 呼叫端（例如經 proxy 的機台）常把回應裡的 provider 丟掉，只有這裡查得到實際走哪個引擎。
+        _result_logger.info(json.dumps({
+            "event": "asr_transcribed",
+            "username": account.user.username,
+            "project_id": project_id,
+            "requested_provider": requested,
+            "provider": body["provider"],
+            "language": body["language"],
+            "language_routes": body["language_routes"],
+            "elapsed_seconds": body["elapsed_seconds"],
+            "request_id": current_request_id(),
+        }, ensure_ascii=False))
+        return JSONResponse(content=body)
     except HTTPException:
         raise
     except UploadLimitError as exc:
