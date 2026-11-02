@@ -58,6 +58,22 @@ function formWith(grants: Partial<AccountAccessForm["access"]["grants"]>): Accou
   } as unknown as AccountAccessForm;
 }
 
+describe("AccountAccessFields 預設聲音", () => {
+  it("兩台 IndexTTS 都有 Hayley 時，預設下拉要標出是哪一台", () => {
+    const form = formWith({ custom_voices: ["hayley", "indextts-nurse:hayley"] });
+    form.options!.custom_voices.push({
+      id: "indextts-nurse:hayley", label: "Hayley", provider: "indextts-nurse",
+    });
+    render(<AccountAccessFields form={form} />);
+    const select = Array.from(document.querySelectorAll("select")).find((el) =>
+      Array.from(el.options).some((o) => o.value === "indextts-nurse:hayley"),
+    ) as HTMLSelectElement;
+    const labels = Array.from(select.options).map((o) => o.textContent?.trim());
+    expect(labels).toContain("Hayley（IndexTTS）");
+    expect(labels).toContain("Hayley（IndexTTS（nurse24h））");
+  });
+});
+
 describe("AccountAccessFields 分組", () => {
   it("人物依專案、聲音依引擎分成可收合區段，單一區段的類別不加標題", () => {
     render(<AccountAccessFields form={formWith({})} />);

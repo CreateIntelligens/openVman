@@ -8,7 +8,7 @@ import {
   type AccountAccessOptions,
   type AccountRole,
 } from "../../api/auth";
-import { groupAccessOptions, type GrantType } from "./accountAccessGroups";
+import { groupAccessOptions, providerLabel, type GrantType } from "./accountAccessGroups";
 import GroupedChecklist from "./GroupedChecklist";
 
 const PREFERRED_PROJECT = "proj-b85afb8bb6";
@@ -566,7 +566,12 @@ function AccessGroup({
               {typeOptions.length === 0 && <option value="">尚未選擇授權</option>}
               {optional && typeOptions.length > 0 && <option value="">不指定</option>}
               {typeOptions.map((option) => (
-                <option key={option.id} value={option.id}>{option.label}</option>
+                <option key={option.id} value={option.id}>
+                  {/* 兩台 IndexTTS 都有 Hayley，只寫名稱會選錯台。 */}
+                  {type === "custom_voices" && option.provider
+                    ? `${option.label}（${providerLabel(option.provider)}）`
+                    : option.label}
+                </option>
               ))}
             </select>
           </label>
