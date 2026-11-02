@@ -114,6 +114,19 @@ def test_load_core_workspace_context_overrides_soul_and_inherits_global_docs(
     assert context["memory"] == "global memory"
 
 
+def test_asr_glossary_is_not_indexed_as_knowledge(tmp_path):
+    from core.asr_glossary import GLOSSARY_FILENAME
+
+    workspace = _import("knowledge.workspace")
+    glossary = tmp_path / GLOSSARY_FILENAME
+    glossary.write_text("骨科\n", encoding="utf-8")
+    assert workspace.is_indexable_document(glossary, root=tmp_path) is False
+    knowledge = tmp_path / "knowledge" / "骨科.md"
+    knowledge.parent.mkdir()
+    knowledge.write_text("骨科\n", encoding="utf-8")
+    assert workspace.is_indexable_document(knowledge, root=tmp_path) is True
+
+
 def test_is_indexable_document_skips_persona_core_docs(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

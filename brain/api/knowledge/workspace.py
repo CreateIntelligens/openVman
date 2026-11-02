@@ -124,7 +124,8 @@ WORKSPACE_TEMPLATES = {
 - 每日對話整理後會寫在這裡，作為長期記憶治理的摘要輸出。
 """,
 }
-RESERVED_INDEX_PATHS = frozenset(WORKSPACE_TEMPLATES.keys())
+# ASR_PROMPT.md 是給辨識引擎的詞表，不是知識；進了索引會被當成回答的依據。
+RESERVED_INDEX_PATHS = frozenset(WORKSPACE_TEMPLATES.keys()) | {"ASR_PROMPT.md"}
 
 # Mapping from lowercase key to template path, derived from WORKSPACE_TEMPLATES.
 # e.g. "soul" -> "SOUL.md", "learnings" -> ".learnings/LEARNINGS.md"
