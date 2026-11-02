@@ -1,7 +1,6 @@
 """Successful ASR uploads meter media duration without breaking transcripts."""
 
 import io
-import subprocess
 import wave
 from types import SimpleNamespace
 
@@ -29,6 +28,14 @@ def _wav() -> bytes:
         audio.setframerate(16000)
         audio.writeframes(b"\x00\x00" * 8000)
     return buffer.getvalue()
+
+
+def _streamed_wav() -> bytes:
+    """A WAV as ffmpeg or a streaming TTS writes it: header says length unknown."""
+    data = bytearray(_wav())
+    data[4:8] = b"\xff\xff\xff\xff"
+    data[40:44] = b"\xff\xff\xff\xff"
+    return bytes(data)
 
 
 @pytest.fixture
@@ -90,7 +97,7 @@ def test_metering_failure_or_unknown_duration_preserves_transcript(
 ):
     client, usage = asr_client
     if failure == "probe":
-        monkeypatch.setattr(asr, "_audio_seconds", lambda *_: None)
+        monkeypatch.setattr(asr, "_check_asr_clip", lambda *_: None)
     elif failure == "ledger":
         def fail(**_kwargs):
             raise RuntimeError("ledger down")
@@ -110,25 +117,21 @@ def test_metering_failure_or_unknown_duration_preserves_transcript(
     assert usage == []
 
 
-def test_compressed_duration_uses_ffprobe_and_times_out_safely(tmp_path, monkeypatch):
-    path = tmp_path / "clip.webm"
-    path.write_bytes(b"not-wav")
-    seen = []
+def test_streamed_wav_meters_real_duration_not_header_length(asr_client):
+    client, usage = asr_client
+    response = client.post(
+        "/api/v1/asr/transcribe",
+        files={"file": ("clip.wav", _streamed_wav(), "audio/wav")},
+        data={"project_id": "p1"},
+    )
+    assert response.status_code == 200
+    assert usage[0]["units"] == pytest.approx(0.5)
 
-    def probe(args, **kwargs):
-        seen.append((args, kwargs))
-        return SimpleNamespace(stdout="2.75\n")
 
-    monkeypatch.setattr(asr.subprocess, "run", probe)
-    assert asr._audio_seconds(str(path)) == 2.75
-    assert seen[0][0][-1] == str(path)
-    assert seen[0][1]["timeout"] == 5
-
-    def timeout(*args, **kwargs):
-        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
-
-    monkeypatch.setattr(asr.subprocess, "run", timeout)
-    assert asr._audio_seconds(str(path)) is None
+def test_clip_length_for_timeouts_ignores_unknown_wav_header(tmp_path):
+    path = tmp_path / "clip.wav"
+    path.write_bytes(_streamed_wav())
+    assert ingestion_audio._clip_seconds(str(path)) == pytest.approx(0.5)
 
 
 def test_asr_openapi_exposes_transcript_fields(asr_client):

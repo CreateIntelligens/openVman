@@ -8,7 +8,6 @@ import re
 import subprocess
 import tempfile
 import time
-import wave
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -412,11 +411,6 @@ def _provider_host(cfg, name: str) -> str:
 
 def _clip_seconds(file_path: str) -> float | None:
     """Clip length for the timeout formula; ``None`` (= assume the longest) when unknown."""
-    try:
-        with wave.open(file_path, "rb") as audio:
-            return audio.getnframes() / audio.getframerate()
-    except (wave.Error, EOFError, OSError, ZeroDivisionError):
-        pass
     try:
         from app.utils.media import probe_media
 

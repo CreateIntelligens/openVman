@@ -5,10 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import math
 import os
-import subprocess
-import wave
 from time import monotonic
 from typing import Annotated, Any
 
@@ -28,7 +25,7 @@ from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.auth.settings_repository import SERVER_ASR_PROVIDERS
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response, upload_rejected_response
-from app.upstream_guard import current_request_id, set_clip_seconds
+from app.upstream_guard import clip_seconds, current_request_id, set_clip_seconds
 from app.usage_ledger_client import (
     UNIT_SECONDS,
     record_usage_event,
@@ -56,31 +53,6 @@ class AsrTranscription(BaseModel):
     language_check: dict[str, Any] | None
     language_routes: list[str]
     glossary: str
-
-
-def _audio_seconds(file_path: str) -> float | None:
-    """Measure media duration; compressed bytes are not a duration estimate."""
-    try:
-        with wave.open(file_path, "rb") as audio:
-            return audio.getnframes() / audio.getframerate()
-    except (wave.Error, EOFError, OSError):
-        pass
-    try:
-        probe = subprocess.run(
-            [
-                "ffprobe", "-v", "error", "-show_entries",
-                "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
-                file_path,
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=5,
-        )
-        seconds = float(probe.stdout.strip())
-        return seconds if math.isfinite(seconds) and seconds > 0 else None
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None
 
 
 def _check_asr_clip(file_path: str, max_seconds: float) -> float:
@@ -111,7 +83,6 @@ async def _persist_asr_clip(file: UploadFile, cfg: Any) -> str:
 
 async def _record_transcription_usage(
     account: CurrentAccount,
-    file_path: str,
     *,
     project_id: str,
     provider: str,
@@ -120,7 +91,9 @@ async def _record_transcription_usage(
     if not provider:
         return
     try:
-        seconds = await asyncio.to_thread(_audio_seconds, file_path)
+        # 用上傳時 ffprobe 量到的秒數，不看 WAV header：串流產生的 WAV 把長度填成
+        # 0xFFFFFFFF，照 header 算會記成 134217 秒。
+        seconds = clip_seconds()
         if seconds is None or seconds <= 0:
             logger.warning("ASR duration unavailable; usage event skipped")
             return
@@ -214,7 +187,7 @@ async def _transcribe_routed(
         raise HTTPException(status_code=502, detail="Requested ASR provider failed")
     elapsed_seconds = round(monotonic() - started, 2)
     await _record_transcription_usage(
-        account, tmp_path,
+        account,
         project_id=project_id,
         provider=result.provider or "",
         elapsed_seconds=elapsed_seconds,
