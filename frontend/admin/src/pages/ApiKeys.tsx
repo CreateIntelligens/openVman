@@ -42,6 +42,7 @@ export default function ApiKeys() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<AccountApiKey | null>(null);
+  const [showRevoked, setShowRevoked] = useState(false);
   const busyRef = useRef(false);
   const requestRef = useRef(0);
   const isFormal = account && (account.kind ?? account.account_type ?? "formal") === "formal";
@@ -143,6 +144,10 @@ export default function ApiKeys() {
   if (!isFormal) {
     return <p className="p-6 text-content-muted">臨時帳號不能建立 API 金鑰。</p>;
   }
+
+  // 撤銷過的金鑰不能再用，只留作稽核紀錄，平常收起來才看得出哪幾把還有效。
+  const revokedCount = keys.filter((key) => key.revoked_at).length;
+  const visibleKeys = showRevoked ? keys : keys.filter((key) => !key.revoked_at);
 
   return (
     <div className="page-scroll">
@@ -248,8 +253,12 @@ export default function ApiKeys() {
           ) : keys.length === 0 ? (
             <p className="text-sm text-content-muted">此帳號尚未建立 API 金鑰。</p>
           ) : (
+            <>
+            {visibleKeys.length === 0 ? (
+              <p className="text-sm text-content-muted">此帳號沒有未撤銷的 API 金鑰。</p>
+            ) : (
             <div className="divide-y divide-border rounded-xl border border-border bg-surface">
-              {keys.map((key) => {
+              {visibleKeys.map((key) => {
                 const expired = key.expires_at
                   && new Date(key.expires_at).getTime() <= Date.now();
                 const state = key.revoked_at ? "已撤銷" : expired ? "已到期" : "有效";
@@ -282,6 +291,18 @@ export default function ApiKeys() {
                 );
               })}
             </div>
+            )}
+            {revokedCount > 0 && (
+              <button
+                type="button"
+                className="btn btn-ghost mt-3 self-start text-xs"
+                aria-expanded={showRevoked}
+                onClick={() => setShowRevoked((value) => !value)}
+              >
+                {showRevoked ? "隱藏已撤銷" : `顯示已撤銷（${revokedCount}）`}
+              </button>
+            )}
+            </>
           )}
         </section>
       </div>

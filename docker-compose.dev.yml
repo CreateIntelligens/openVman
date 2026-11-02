@@ -37,6 +37,8 @@ services:
     # 跑 dev server。source 由下面的 bind mount 提供。
     build:
       target: builder
+    # 不換名的話 build 會把本機的正式 image tag 蓋成開發版。
+    image: openvman-dev-avatar
     command: ["corepack", "pnpm", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
     volumes: !override
       - ./frontend/app:/app

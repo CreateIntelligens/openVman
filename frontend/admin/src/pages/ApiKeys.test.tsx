@@ -133,9 +133,27 @@ describe("account API keys", () => {
     expect(mocks.revokeAccountApiKey).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "確認撤銷" }));
     await waitFor(() => expect(mocks.revokeAccountApiKey).toHaveBeenCalledWith("ak_1"));
+    fireEvent.click(await screen.findByRole("button", { name: "顯示已撤銷（1）" }));
     expect(await screen.findByText("已撤銷")).toBeTruthy();
     expect(screen.getByText("串接服務")).toBeTruthy();
     expect(screen.getByRole("button", { name: "撤銷 串接服務" })).toHaveProperty("disabled", true);
+  });
+
+  it("hides revoked keys until asked, and says so when none are left", async () => {
+    const revoked = { ...row, key_id: "ak_2", label: "舊金鑰", revoked_at: "2026-10-12T00:00:00Z" };
+    mocks.listAccountApiKeys.mockResolvedValue([row, revoked]);
+    const { unmount } = render(<ApiKeys />);
+    await screen.findByText("串接服務");
+    expect(screen.queryByText("舊金鑰")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "顯示已撤銷（1）" }));
+    expect(screen.getByText("舊金鑰")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "隱藏已撤銷" }));
+    expect(screen.queryByText("舊金鑰")).toBeNull();
+    unmount();
+
+    mocks.listAccountApiKeys.mockResolvedValue([revoked]);
+    render(<ApiKeys />);
+    expect(await screen.findByText("此帳號沒有未撤銷的 API 金鑰。")).toBeTruthy();
   });
 
   it("ordinary formal users only manage themselves without requesting account lists", async () => {
