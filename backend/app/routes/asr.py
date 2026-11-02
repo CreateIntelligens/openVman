@@ -170,6 +170,9 @@ async def _transcribe_routed(
     )
     if engine_order:
         scope["order"] = engine_order
+    # Gemini 用（找專案金鑰、逐詞詞表）；resolve_project 確保拿不到沒權限的專案金鑰。
+    scope["project_id"] = language_routes_mod.resolve_project(account, project_id) or ""
+    scope["vocabulary_loader"] = lambda: asr_glossary_mod.project_asr_vocabulary(account, project_id)
     # 只量轉寫本身，不含上傳與轉檔：比的是引擎誰快，網路時間算進去會讓同一個引擎在
     # 不同網路下看起來像兩回事。
     started = monotonic()
@@ -267,7 +270,7 @@ async def transcribe_for_account(
         str,
         Form(
             description=(
-                "指定批次引擎（breeze、r2t2、openai、sensevoice 等），須在帳號授權與專案清單內；"
+                "指定批次引擎（breeze、r2t2、openai、sensevoice、gemini-live-batch 等），須在帳號授權與專案清單內；"
                 "指定時只跑這個引擎、不備援，也不依台語分流換引擎。省略時依帳號偏好、專案預設、部署預設"
             ),
         ),
@@ -283,7 +286,7 @@ async def transcribe_for_account(
     cfg = get_tts_config()
     try:
         requested = provider.strip()
-        _project, policy = voice_policy.request_policy(runtime, account, project_id)
+        resolved_project, policy = voice_policy.request_policy(runtime, account, project_id)
         scope = voice_policy.batch_asr_scope(
             runtime, account.user, policy, embed=account.embed_key is not None,
         )
@@ -294,7 +297,7 @@ async def transcribe_for_account(
                 raise HTTPException(status_code=422, detail="Invalid batch ASR provider")
             if account.embed_key is not None or requested not in scope.explicit:
                 raise HTTPException(status_code=403, detail="ASR provider not allowed")
-            if requested not in configured_providers():
+            if requested not in configured_providers(resolved_project):
                 raise HTTPException(status_code=503, detail="ASR provider not configured")
         elif (
             policy is not None and policy.restricts_asr
@@ -379,7 +382,9 @@ async def list_asr_engines(
     from app.gateway.ingestion_audio import configured_providers
 
     return JSONResponse(content={
-        "engines": configured_providers(),
+        "engines": configured_providers(
+            language_routes_mod.resolve_project(admin, project_id),
+        ) if project_id else configured_providers(),
         "stream": configured_stream_engines(
             language_routes_mod.resolve_project(admin, project_id),
         ) if project_id else configured_stream_engines(),

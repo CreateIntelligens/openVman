@@ -10,7 +10,7 @@ from ._repository_base import now_iso
 from .database import AuthDatabase
 from .models import ProjectPolicyRecord, ResourceType
 from .repository_errors import InvalidProjectPolicyError
-from .settings_repository import SERVER_ASR_PROVIDERS
+from .settings_repository import SERVER_ASR_PROVIDERS, TAIWANESE_ASR_PROVIDERS
 
 #: 後端 TTS 備援鏈認得的引擎名（與 service._provider_routes 一致）。indextts-nurse
 #: 不在部署預設鏈裡，但專案順位明確列了就照用。
@@ -233,8 +233,8 @@ class ProjectPolicyRepository:
                 raise InvalidProjectPolicyError(
                     "resource is not registered: " + ", ".join(sorted(set(unknown)))
                 )
-            # 台語分流走批次辨識（串流引擎聽不懂台語），只能指定伺服器端的批次引擎。
-            if taiwanese and taiwanese not in SERVER_ASR_PROVIDERS:
+            # 台語分流走批次辨識（串流引擎聽不懂台語），只能指定聽得懂台語的批次引擎。
+            if taiwanese and taiwanese not in TAIWANESE_ASR_PROVIDERS:
                 raise InvalidProjectPolicyError(
                     "taiwanese_asr_engine must be a batch ASR engine"
                 )

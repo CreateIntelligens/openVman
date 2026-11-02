@@ -919,3 +919,13 @@ def test_speech_uses_the_same_taiwanese_partners_as_stream(env, tts_client, monk
         ("indextts", "hayley", ""),
     ]
     assert response.headers["X-TTS-Provider"] == "indextts"
+
+
+def test_gemini_live_batch_cannot_be_the_taiwanese_engine(env):
+    from app.auth.project_policy_repository import InvalidProjectPolicyError
+
+    env.runtime.resources.upsert_system_resource(
+        resource_type=ResourceType.ASR_ENGINE, resource_id="gemini-live-batch",
+    )
+    with pytest.raises(InvalidProjectPolicyError, match="taiwanese_asr_engine"):
+        _policy(env, taiwanese_asr_engine="gemini-live-batch")

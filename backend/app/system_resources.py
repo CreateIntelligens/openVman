@@ -50,6 +50,7 @@ ASR_ENGINE_LABELS = {
     "r2t2-dev": "Confucius4-R2T2 dev（.37）",
     "sensevoice": "SenseVoice-Small（臺語漢字）",
     "openai": "OpenAI Whisper（語音送往外部服務）",
+    "gemini-live-batch": "Gemini Live 批次（整檔上傳，語音送往 Google，選了才用）",
     "browser": "瀏覽器內建辨識（由瀏覽器廠商處理，不經本站伺服器）",
     "r2t2-live": "Confucius4-R2T2 串流辨識（.35，邊講邊出字，帶專案詞表）",
     "r2t2-dev-live": "Confucius4-R2T2 dev 串流辨識（.37）",

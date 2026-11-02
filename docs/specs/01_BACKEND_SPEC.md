@@ -272,7 +272,23 @@ ws.send(JSON.stringify(payload));
 
 `POST /api/v1/asr/transcribe` 的 multipart 欄位為必填 `file`、選填 `project_id`、`language_routes`、`provider`。明確指定非批次引擎回 422、未授權回 403、未設定回 503；指定時僅呼叫該引擎，台語分流不覆蓋選擇，失敗回 502，不暗中備援，不修改帳號偏好。`project_id` 保留原始 opaque ID，不接受以顯示 label 取代。
 
-省略或空白 `provider` 時，依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、r2t2、sensevoice、openai；r2t2-dev 只在被選或設成 `ASR_PROVIDER` 時排入），並限於帳號授權候選，保留原部署預設的相容例外；既有台語 Breeze 分流維持。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後立刻暫停、逾時或 5xx 連續兩次才暫停（預設 60 秒，`UPSTREAM_BREAKER_COOLDOWN_SECONDS`），背景健康探測判定掛掉的也跳過；時間到由下一個請求再試，成功就解除；4xx 代表機器還在回應，不暫停。每一站依音訊長度有自己的預算，整條鏈有期限（見 6.4）。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。此既有路徑全部失敗可能仍回 HTTP 200、空 `provider` 及「（音訊轉錄失敗）」；client 必須檢查結果。
+省略或空白 `provider` 時，依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、r2t2、sensevoice、openai；r2t2-dev 與 gemini-live-batch 只在被選或設成 `ASR_PROVIDER` 時排入），並限於帳號授權候選，保留原部署預設的相容例外；既有台語 Breeze 分流維持。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後立刻暫停、逾時或 5xx 連續兩次才暫停（預設 60 秒，`UPSTREAM_BREAKER_COOLDOWN_SECONDS`），背景健康探測判定掛掉的也跳過；時間到由下一個請求再試，成功就解除；4xx 代表機器還在回應，不暫停。每一站依音訊長度有自己的預算，整條鏈有期限（見 6.4）。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。此既有路徑全部失敗可能仍回 HTTP 200、空 `provider` 及「（音訊轉錄失敗）」；client 必須檢查結果。
+
+### 批次引擎 `gemini-live-batch`
+
+用 Gemini Live 辨識上傳的整檔，適合只能打 `POST /api/v1/asr/transcribe` 的呼叫端想用 Gemini 時。它是批次引擎：使用者講完才開始算，要邊講邊出字、或要即時回應的呼叫端應改用 WSS 串流 `gemini-live`（`/api/v1/asr/stream`）。
+
+| 項目 | 行為 |
+|---|---|
+| 選用方式 | 請求的 `provider`、帳號偏好、專案預設或 `ASR_PROVIDER`。不進預設鏈也不當備援，專案順位表裡有也要被選到才跑；授權方式與其他引擎相同。不能指定為專案的台語引擎（Gemini 聽不懂台語） |
+| 憑證 | `resolve_gemini_credential(專案)`：專案綁了金鑰用專案的，否則用部署預設。`project_id` 先經權限解析，拿不到沒權限專案的金鑰。讀不出金鑰視為未設定：明確指定回 503 |
+| 請求 | 每個請求一條新工作階段，模型為 `ASR_GEMINI_STREAM_MODEL`。ffmpeg 轉 16 kHz 單聲道 PCM，前面補 0.3 秒靜音，不照實際時間一次送完，`automaticActivityDetection.disabled` 並以 `activityStart`／`activityEnd` 框住。語言來自專案語言分流（沒有分流時用 `ASR_GEMINI_STREAM_LANGUAGES`），詞表逐詞放 `customVocabulary` |
+| 判定收完 | 收到 `generationComplete` 結束並合併所有 `inputTranscription`。靜音或雜訊只會收到 `voiceActivity: ACTIVITY_END`，再等 0.5 秒沒有定稿就回空字串。上游都不回算逾時，不當靜音 |
+| 逾時與斷路 | 與其他批次引擎相同：連線上限 `ASR_CONNECT_TIMEOUT_SECONDS`，牆鐘為單站預算（見 6.4），每站一行 `upstream_attempt`。關閉碼 1011／1012／1013 視同 5xx 累計斷路；1008 這類請求問題與專案金鑰讀取失敗不累計 |
+
+實測（2026-10-30～11-02，英文短句 1.7–5.3 秒，18 段合成音）：整檔含解碼中位約 1.4 秒、p90 約 1.7 秒，`openai` 中位 0.88 秒、p90 1.46 秒，兩者在這組音檔都全對；靜音約 1.4–1.8 秒回空字串。多的時間主要是伺服器處理音訊：連線與 setup 約 0.26 秒，其餘約為 0.19 秒＋補靜音後音訊長度的 0.23 倍。短音檔要快請用 `openai`，要即時請用 `gemini-live`。
+
+沒有連線池、也不沿用工作階段：可省的只有連線與 setup 約 0.26 秒，閒置工作階段 50–60 秒就被 Gemini 斷線（1008），每條待命連線每小時要重連約 80 次，不值得。
 
 ### 帳號能力探索（`GET /api/v1/me/capabilities`）
 

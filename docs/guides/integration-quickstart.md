@@ -109,7 +109,7 @@
 | 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `preferred_language`、`metadata.speech_language` | JSON `reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer` 等；通常會建立對話紀錄。要邊生成邊念改用 `POST /api/v1/chat/stream`（見「逐句串流」） |
 | 念回答 | `POST /api/v1/tts/stream`；JSON `text`，選填 `project_id`、`provider`、`voice`、`speech_language`、`format` | 音訊 bytes，以實際 `Content-Type` 判斷格式；`format=pcm16k` 時固定為 16 kHz raw PCM |
 
-選填 batch ASR `provider` 必須在已授權且已設定的 `asr.batch`。非批次引擎回 422、未授權回 403、未設定回 503；指定引擎失敗回 502，不備援、不讓台語分流改用其他辨識引擎。省略或空白時沿用帳號偏好、部署預設與既有備援，備援限授權候選及原部署預設相容例外。舊流程失敗可能仍回 HTTP 200，必須檢查非空 `provider`、有效 `text`，避免把「（音訊轉錄失敗）」當成問題送入 Chat。
+選填 batch ASR `provider` 必須在已授權且已設定的 `asr.batch`。`gemini-live-batch` 用 Gemini Live 辨識整檔，比 `openai` 慢（英文短句實測中位約 1.4 秒對 0.88 秒），只有選了才用、不當備援；要即時回應請改用 WSS 串流 `gemini-live`。非批次引擎回 422、未授權回 403、未設定回 503；指定引擎失敗回 502，不備援、不讓台語分流改用其他辨識引擎。省略或空白時沿用帳號偏好、部署預設與既有備援，備援限授權候選及原部署預設相容例外。舊流程失敗可能仍回 HTTP 200，必須檢查非空 `provider`、有效 `text`，避免把「（音訊轉錄失敗）」當成問題送入 Chat。
 
 一般帳號可選擇跨供應商的已授權聲音；TTS `provider` 與 `voice` 必須符合聲音資源 metadata。省略 provider 但提供 voice 時由 metadata 推導，舊 metadata 缺漏僅沿用管理員設定的預設 provider；省略 voice 時使用帳號預設，供應商不匹配仍拒絕。受限 admin 的 `/tts/providers` 與 capabilities 也僅列權限上限內的聲音。聲音 ID 的音質與可用性取決於部署及上游，不應把特定 ID 永久當成失效。Embed key 維持綁定聲音限制。
 

@@ -97,6 +97,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 |---|---|---|
 | 批次 ASR | Breeze-ASR（`breeze`）、Confucius4-R2T2（`r2t2`）、SenseVoice（`sensevoice`）、OpenAI Whisper（`openai`） | `ASR_BREEZE_URL`、`ASR_R2T2_URL`、`ASR_SENSEVOICE_URL`、`WHISPER_API_KEY` |
 | 串流 ASR | Confucius4-R2T2 串流（`r2t2-live`）、Gemini Live（`gemini-live`） | `ASR_R2T2_URL`、`ASR_R2T2_SECRET_KEY`、`GEMINI_API_KEY`；串流網址預設自動推導 |
+| 批次 ASR（選了才用，不進備援） | Gemini Live 批次（`gemini-live-batch`）；比串流與 OpenAI 慢，即時情境請用 `gemini-live` | `GEMINI_API_KEY` 或專案的 Gemini 金鑰；模型同 `ASR_GEMINI_STREAM_MODEL` |
 | 開發節點 | `r2t2-dev`、`r2t2-dev-live`（帳號選了才用，不進備援） | `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_SECRET_KEY`；串流網址預設自動推導 |
 | 瀏覽器 | 瀏覽器內建辨識（`browser`） | 無 |
 | TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語改用 CosyVoice，停用時 VoxCPM；國語、英文在沒指定聲音時用 IndexTTS） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |

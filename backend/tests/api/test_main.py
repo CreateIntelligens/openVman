@@ -1901,7 +1901,7 @@ def test_asr_preview_returns_the_transcript_and_the_engine_that_answered(monkeyp
     module, _ = _load_main(monkeypatch)
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
+    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None, **_):
         seen["trace_id"] = trace_id
         seen["preferred"] = preferred
         seen["routes"] = routes
@@ -1967,7 +1967,10 @@ def test_asr_engines_lists_only_configured_engines(monkeypatch):
     response = client.get("/api/v1/asr/engines")
 
     assert response.status_code == 200
-    assert response.json() == {"engines": ["breeze", "r2t2"], "stream": ["gemini-live", "r2t2-live"]}
+    assert response.json() == {
+        "engines": ["breeze", "r2t2", "gemini-live-batch"],
+        "stream": ["gemini-live", "r2t2-live"],
+    }
 
 
 def test_the_site_asr_default_endpoints_are_gone(monkeypatch):
@@ -1983,7 +1986,7 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
 
     async def _transcribe(
         path, trace_id, preferred=None, prompt="", routes=None,
-        *, allowed_providers=None,
+        *, allowed_providers=None, **_,
     ):
         assert allowed_providers == {"breeze"}
         return types.SimpleNamespace(
@@ -2039,7 +2042,7 @@ def _routed_asr_fixture(monkeypatch, module, routes):
 
     async def _transcribe(
         path, trace_id, preferred=None, prompt="", routes=None,
-        *, allowed_providers=None,
+        *, allowed_providers=None, **_,
     ):
         seen.update(preferred=preferred, prompt=prompt, trace_id=trace_id)
         return types.SimpleNamespace(
@@ -2244,7 +2247,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
 
     async def fake_transcribe(
         path, trace_id, preferred=None, prompt="", routes=None,
-        *, allowed_providers=None,
+        *, allowed_providers=None, **_,
     ):
         calls["preferred"] = preferred
         calls["prompt"] = prompt

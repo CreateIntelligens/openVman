@@ -419,3 +419,54 @@ def test_embed_cannot_override_and_admin_keeps_stream_preview(setup):
     )
     assert asr_stream._engine_for(embed, "gemini-live") == ""
     assert asr_stream._engine_for(admin, "gemini-live") == "gemini-live"
+
+
+def test_gemini_live_batch_is_explicit_and_gets_project_context(setup, monkeypatch):
+    app, runtime, root, owner, keys, attempts = setup
+    runtime.resources.upsert_system_resource(
+        resource_type=ResourceType.ASR_ENGINE, resource_id="gemini-live-batch",
+    )
+    seen = {}
+
+    async def run(file_path, trace_id, prompt="", **kwargs):
+        seen.update(kwargs)
+        seen["vocabulary"] = await kwargs["vocabulary_loader"]()
+        attempts.append("gemini-live-batch")
+        return "Where is the restroom?"
+
+    async def vocabulary(*args):
+        return ["PRP"]
+
+    monkeypatch.setitem(ingestion_audio._TRANSCRIBERS, "gemini-live-batch", run)
+    monkeypatch.setattr(asr.asr_glossary_mod, "project_asr_vocabulary", vocabulary)
+    monkeypatch.setattr(ingestion_audio, "_gemini_ready", lambda project_id: True)
+    monkeypatch.setattr(asr.language_routes_mod, "resolve_project", lambda current, supplied: "p1")
+
+    with TestClient(app) as client:
+        # 沒授權不能點名；授權後才跑。
+        assert _upload(client, keys[0][1], "gemini-live-batch").status_code == 403
+        runtime.account_access.replace(
+            user_id=owner.id, granted_by=root.id,
+            grants=_BASE_GRANTS + [
+                (ResourceType.ASR_ENGINE, engine)
+                for engine in ("breeze", "gemini-live-batch")
+            ],
+            defaults=_DEFAULTS,
+        )
+        response = _upload(client, keys[0][1], "gemini-live-batch")
+        assert response.status_code == 200
+        assert response.json()["provider"] == "gemini-live-batch"
+        assert seen["project_id"] == "p1"
+        assert seen["routes"] == ["zh"]
+        assert seen["vocabulary"] == ["PRP"]
+
+        # 被授權也不會自己跑：帳號偏好是 breeze，省略 provider 時不碰 Gemini。
+        attempts.clear()
+        assert _upload(client, keys[0][1]).json()["provider"] == "breeze"
+        assert attempts == ["breeze"]
+
+        # 金鑰拿不到：明確指定回 503，不暗中換別家。
+        monkeypatch.setattr(ingestion_audio, "_gemini_ready", lambda project_id: False)
+        attempts.clear()
+        assert _upload(client, keys[0][1], "gemini-live-batch").status_code == 503
+        assert attempts == []

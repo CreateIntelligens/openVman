@@ -35,7 +35,12 @@ STREAM_ASR_PROVIDERS = frozenset({
 })
 
 # 伺服器端引擎：音檔會送上來，走 transcribe() 與 fallback chain。
-SERVER_ASR_PROVIDERS = frozenset({"breeze", "r2t2", "r2t2-dev", "sensevoice", "openai"})
+SERVER_ASR_PROVIDERS = frozenset({
+    "breeze", "r2t2", "r2t2-dev", "sensevoice", "openai", "gemini-live-batch",
+})
+
+# 能指定給台語分流的批次引擎：Gemini 聽不懂台語。
+TAIWANESE_ASR_PROVIDERS = SERVER_ASR_PROVIDERS - {"gemini-live-batch"}
 
 # 使用者可以在聊天室選哪些引擎，由管理者決定（例如 openai 會把語音送到
 # 外部服務，不一定想開放給每個人）。空集合代表不開放使用者自選。
@@ -186,6 +191,7 @@ __all__ = [
     "ASR_USER_CHOICES_KEY",
     "BROWSER_ASR_PROVIDER",
     "SERVER_ASR_PROVIDERS",
+    "TAIWANESE_ASR_PROVIDERS",
     "STREAM_ASR_PROVIDERS",
     "InvalidSettingValueError",
     "SystemSettingsRepository",

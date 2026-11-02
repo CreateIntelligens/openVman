@@ -327,7 +327,7 @@ class TTSRouterConfig(BaseSettings):
     vision_clef_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
 
     # --- ASR ---
-    # "breeze" | "r2t2" | "r2t2-dev" | "sensevoice" | "openai"
+    # "breeze" | "r2t2" | "r2t2-dev" | "sensevoice" | "openai" | "gemini-live-batch"
     # 都是整檔上傳、無串流端點：使用者講完才開始辨識。我們要的是華語逐字稿：
     # breeze 把臺語轉寫成華語，sensevoice 則保留臺語漢字，所以它
     # 退居備援——全掛時臺語漢字仍比「音訊轉錄失敗」六個字進 prompt 好。

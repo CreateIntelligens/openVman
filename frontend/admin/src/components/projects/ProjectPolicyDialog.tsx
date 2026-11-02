@@ -19,7 +19,7 @@ import { groupAccessOptions, type GrantType } from "../accounts/accountAccessGro
 import GroupedChecklist from "../accounts/GroupedChecklist";
 import { useModalDismiss } from "../useModalDismiss";
 
-// 跟後端 SERVER_ASR_PROVIDERS 一致：台語分流走批次辨識，只能選這些。
+// 台語分流走批次辨識，只能選這些。後端 SERVER_ASR_PROVIDERS 還有 gemini-live-batch，但 Gemini 聽不懂台語。
 export const BATCH_ASR_ENGINES = new Set(["breeze", "r2t2", "r2t2-dev", "sensevoice", "openai"]);
 
 const TTS_ENGINE_LABELS: Record<string, string> = {
@@ -39,6 +39,7 @@ const ASR_ENGINE_LABELS: Record<string, string> = {
   "r2t2-dev": "R2T2 dev",
   sensevoice: "SenseVoice",
   openai: "OpenAI",
+  "gemini-live-batch": "Gemini Live 批次",
 };
 
 const EMPTY_POLICY: ProjectPolicyInput = {

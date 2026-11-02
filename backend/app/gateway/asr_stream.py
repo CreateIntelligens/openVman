@@ -25,7 +25,6 @@ Gemini 的專案詞表放 ``customVocabulary``；R2T2 帶專案詞表，
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import logging
 import os
@@ -56,6 +55,7 @@ from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import get_auth_runtime
 from app.config import TTSRouterConfig, get_tts_config
+from app.gateway import gemini_transcription as gemini
 from app.http_client import SharedAsyncClient
 from app.upstream_guard import OK, classify_outcome, emit_attempt, host_of
 from app.usage_ledger_client import (
@@ -76,19 +76,7 @@ _R2T2_STREAM_ENGINES = {R2T2_STREAM_ASR_ENGINE, R2T2_DEV_STREAM_ASR_ENGINE}
 _STREAM_ENGINES = {GEMINI_STREAM_ASR_ENGINE, *_R2T2_STREAM_ENGINES}
 _R2T2_CHUNK_BYTES = 5120
 _R2T2_EOS = "YOUDAO_ONETIME_ASR_STREAM_EOS"
-_GEMINI_LIVE_URL = (
-    "wss://generativelanguage.googleapis.com/ws/"
-    "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
-)
-_SAMPLE_RATE = 16000
-# 分流代碼 → Gemini languageCodes。台語分流時前台不走串流（Gemini 聽不懂），不必對應。
-_GEMINI_LANGUAGE_CODES = {
-    "zh": "zh-TW",
-    "en": "en-US",
-    "es": "es-ES",
-    "ja": "ja-JP",
-    "ko": "ko-KR",
-}
+_SAMPLE_RATE = gemini.SAMPLE_RATE
 # Brain 那邊 Jev 最多等 1 秒；這裡多留一點往返時間。使用者在等這句送出。
 _JUDGE_TIMEOUT_SECONDS = 1.5
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
@@ -107,21 +95,6 @@ def _append_judge_log(record: dict) -> None:
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:
         logger.warning("asr_final_judge_log_failed err=%s", exc)
-
-
-def _model() -> str:
-    return os.environ.get("ASR_GEMINI_STREAM_MODEL", "gemini-3.5-transcribe-live")
-
-
-def _languages() -> list[str]:
-    # 不指定時中文會出簡體；帶 zh-TW 出繁體，英西不受影響（2026-09-23 實測）。
-    raw = os.environ.get("ASR_GEMINI_STREAM_LANGUAGES", "zh-TW,en-US,es-ES")
-    return [code.strip() for code in raw.split(",") if code.strip()]
-
-
-def _gemini_languages(routes: list[str]) -> list[str]:
-    codes = [_GEMINI_LANGUAGE_CODES[route] for route in routes if route in _GEMINI_LANGUAGE_CODES]
-    return codes or _languages()
 
 
 async def _project_routes(current, project_id: str, requested: str | None) -> list[str]:
@@ -458,7 +431,7 @@ async def asr_stream(websocket: WebSocket) -> None:
     routes = await _project_routes(
         current, project_id, websocket.query_params.get("language_routes"),
     )
-    languages = _gemini_languages(routes)
+    languages = gemini.languages_for(routes)
     audio_bytes = 0
     started = time.monotonic()
     outcome, error = OK, ""
@@ -474,21 +447,18 @@ async def asr_stream(websocket: WebSocket) -> None:
             )
             await websocket.close()
             return
-        transcription: dict = {"languageCodes": languages}
         # 專案詞表逐詞給 Gemini：鶴記 160 句合成音，專有名詞命中率 31% → 87%、
         # 字錯率 0.39 → 0.19，定稿延遲不變（2026-10-06）。
-        if vocabulary := await project_asr_vocabulary(current, project_id):
-            transcription["customVocabulary"] = vocabulary
+        transcription = gemini.transcription_config(
+            languages, await project_asr_vocabulary(current, project_id),
+        )
         async with websockets.connect(
-            _GEMINI_LIVE_URL,
+            gemini.GEMINI_LIVE_URL,
             additional_headers={"x-goog-api-key": api_key},
             max_size=4 * 1024 * 1024,
             open_timeout=10,
         ) as upstream:
-            await upstream.send(json.dumps({"setup": {
-                "model": f"models/{_model()}",
-                "inputAudioTranscription": transcription,
-            }}))
+            await upstream.send(gemini.setup_message(transcription))
             first = json.loads(await asyncio.wait_for(upstream.recv(), 10))
             if "setupComplete" not in first:
                 raise RuntimeError(f"setup rejected: {str(first)[:120]}")
@@ -502,22 +472,19 @@ async def asr_stream(websocket: WebSocket) -> None:
                         return
                     if chunk := message.get("bytes"):
                         audio_bytes += len(chunk)
-                        await upstream.send(json.dumps({"realtimeInput": {"audio": {
-                            "mimeType": f"audio/pcm;rate={_SAMPLE_RATE}",
-                            "data": base64.b64encode(chunk).decode("ascii"),
-                        }}}))
+                        await upstream.send(gemini.audio_message(chunk))
                     elif (text := message.get("text")) and json.loads(text).get("type") == "end":
                         # 前台停止收音：讓 Gemini 把手上的句子定稿。
-                        await upstream.send(json.dumps({"realtimeInput": {"audioStreamEnd": True}}))
+                        await upstream.send(gemini.AUDIO_STREAM_END)
 
             async def gemini_to_client() -> None:
                 last_interim = ""
                 async for raw in upstream:
-                    content = json.loads(raw).get("serverContent") or {}
-                    if text := (content.get("interimInputTranscription") or {}).get("text"):
+                    event = gemini.parse_live_message(raw)
+                    if text := event.interim:
                         last_interim = text
                         await websocket.send_json({"type": "interim", "text": text})
-                    if text := (content.get("inputTranscription") or {}).get("text"):
+                    if text := event.final:
                         final = text.strip()
                         if last_interim.strip() and last_interim.strip() != final:
                             final = await _judge_final(project_id, routes, last_interim.strip(), final)
@@ -556,7 +523,7 @@ async def asr_stream(websocket: WebSocket) -> None:
     finally:
         emit_attempt(
             "asr_stream", engine, outcome, (time.monotonic() - started) * 1000,
-            host=host_of(endpoint[0]) if endpoint else host_of(_GEMINI_LIVE_URL),
+            host=host_of(endpoint[0]) if endpoint else host_of(gemini.GEMINI_LIVE_URL),
             error=error, audio_seconds=round(audio_bytes / (2 * _SAMPLE_RATE), 2),
         )
         seconds = audio_bytes / (2 * _SAMPLE_RATE)
@@ -568,7 +535,7 @@ async def asr_stream(websocket: WebSocket) -> None:
                 ),
                 model=(
                     "Confucius4-R2T2" if engine in _R2T2_STREAM_ENGINES
-                    else _model()
+                    else gemini.live_model()
                 ),
                 kind="asr",
                 unit_type=UNIT_SECONDS,

@@ -225,6 +225,7 @@ describe("ProjectPolicyDialog", () => {
     expect(Array.from(asr.options).map((option) => [option.value, option.textContent])).toEqual([
       ["", "選擇要新增的引擎…"],
       ["breeze", "Breeze"], ["r2t2", "R2T2"], ["r2t2-dev", "R2T2 dev"], ["sensevoice", "SenseVoice"], ["openai", "OpenAI"],
+      ["gemini-live-batch", "Gemini Live 批次"],
     ]);
     fireEvent.change(tts, { target: { value: "indextts" } });
     fireEvent.change(asr, { target: { value: "breeze" } });

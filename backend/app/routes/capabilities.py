@@ -215,7 +215,7 @@ async def get_capabilities(
         )
         if (policy is not None or project_id) else asr.effective
     )
-    batch_configured = set(configured_providers())
+    batch_configured = set(configured_providers(project_id) if project_id else configured_providers())
     stream_configured = set(
         configured_stream_engines(project_id)
         if project_id else configured_stream_engines()

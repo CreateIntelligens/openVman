@@ -158,6 +158,7 @@ async def process_media(ctx: dict[str, Any], data: dict[str, Any]) -> dict[str, 
         result = await dispatch(
             file_path, mime_type, trace_id, asr_provider,
             asr_allowed=asr_allowed,
+            asr_project_id=data.get("project_id") or "",
         )
 
         if result.get("type") == "processing_error":

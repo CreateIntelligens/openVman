@@ -14,7 +14,7 @@ export function isStreamAsrEngine(provider: string): boolean {
  * 在伺服器上跑、音檔要上傳的引擎（跟後端 SERVER_ASR_PROVIDERS 同一組）。沒選過
  * 引擎的人用部署設定的 ASR_PROVIDER，後台已經沒有「全站預設」可以改。
  */
-export const SERVER_ASR_ENGINES = ["breeze", "r2t2", "r2t2-dev", "sensevoice", "openai"] as const;
+export const SERVER_ASR_ENGINES = ["breeze", "r2t2", "r2t2-dev", "sensevoice", "openai", "gemini-live-batch"] as const;
 
 /** ASR 引擎的顯示名稱與說明。後台「語音」頁、前端設定與聊天室的引擎選單共用。 */
 export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> = {
@@ -37,6 +37,10 @@ export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> =
   openai: {
     label: "OpenAI Whisper",
     note: "需要 API 金鑰，語音會送出到外部服務。",
+  },
+  "gemini-live-batch": {
+    label: "Gemini Live 批次",
+    note: "整段上傳後才辨識，比 OpenAI 慢；要邊講邊出字請用 Gemini Live。語音送往 Google，只有選它才用，不當備援。",
   },
   browser: {
     label: "瀏覽器內建辨識",

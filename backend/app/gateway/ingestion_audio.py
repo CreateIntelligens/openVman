@@ -1,4 +1,4 @@
-"""Audio ingestion — Breeze-ASR, Confucius4-R2T2, SenseVoice, or the OpenAI Whisper API."""
+"""Audio ingestion — Breeze-ASR, Confucius4-R2T2, SenseVoice, the OpenAI Whisper API, or Gemini Live."""
 
 from __future__ import annotations
 
@@ -9,13 +9,18 @@ import subprocess
 import tempfile
 import time
 import wave
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import httpx
+from fastapi import HTTPException
 from openai import AsyncOpenAI
 
 from app import language_routes as language_routes_mod
+from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.config import get_tts_config
+from app.gateway import gemini_live_batch
+from app.gateway import gemini_transcription as gemini
 from app.gateway.ingestion import IngestionResult
 from app.http_client import SharedAsyncClient
 from app.upstream_guard import (
@@ -31,6 +36,7 @@ from app.upstream_guard import (
     clip_seconds,
     describe_error,
     emit_attempt,
+    exempt,
     ffmpeg_seconds,
     host_of,
     knob,
@@ -87,14 +93,17 @@ async def _transcribe_openai(file_path: str, trace_id: str, prompt: str = "") ->
             file=audio_file,
             **extra,
         )
-    text = response.text.strip()
+    return _traditional_unless_japanese(response.text.strip())
+
+
+_KANA = re.compile(r"[\u3040-\u30ff]")
+
+
+def _traditional_unless_japanese(text: str) -> str:
     # 中文會回簡體，要跟其他家一樣轉繁；有假名就是日文，轉了會把「学校」改成「學校」。
     if _KANA.search(text):
         return text
     return convert_to_traditional(text)
-
-
-_KANA = re.compile(r"[\u3040-\u30ff]")
 
 
 # 引擎能直接吃的容器格式。瀏覽器 MediaRecorder 錄出來的是 webm/opus，
@@ -279,6 +288,61 @@ async def _r2t2_request(
     return text
 
 
+def _decode_pcm16(file_path: str) -> bytes:
+    """Decode any input to raw 16 kHz mono PCM16; Live does not take a container."""
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", file_path,
+            "-ac", "1", "-ar", str(gemini.SAMPLE_RATE),
+            "-f", "s16le", "-acodec", "pcm_s16le", "-",
+        ],
+        capture_output=True,
+        timeout=ffmpeg_seconds(get_tts_config(), clip_seconds()),
+        check=False,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.decode(errors="replace")
+        raise RuntimeError(f"audio conversion failed: {stderr[:200]}")
+    return result.stdout
+
+
+async def _transcribe_gemini_live_batch(
+    file_path: str, trace_id: str, prompt: str = "", *,
+    routes: list[str] | None = None,
+    project_id: str = "",
+    vocabulary_loader: Callable[[], Awaitable[list[str]]] | None = None,
+) -> str:
+    """Whole-file transcription over a fresh Gemini Live session (``ASR_GEMINI_STREAM_MODEL``).
+
+    金鑰跟串流同一套：專案綁了就用專案的，否則用部署預設。``prompt`` 是整串詞表，Live 吃的是
+    逐詞的 customVocabulary，所以另外拿清單。靜音回空字串。
+    """
+    try:
+        credential = resolve_gemini_credential(project_id or None)
+    except HTTPException as exc:
+        # 這個專案的金鑰讀不出來不是 Gemini 掛了，不該讓其他專案跟著被跳過。
+        raise exempt(RuntimeError("project Gemini credential unavailable")) from exc
+    if not credential.api_key:
+        raise exempt(RuntimeError("Gemini API key is not configured"))
+    pcm = await asyncio.to_thread(_decode_pcm16, file_path)
+    vocabulary = await vocabulary_loader() if vocabulary_loader else None
+    result = await gemini_live_batch.transcribe_pcm(
+        pcm,
+        api_key=credential.api_key,
+        transcription=gemini.transcription_config(gemini.languages_for(routes or []), vocabulary),
+        connect_timeout=knob(get_tts_config(), "asr_connect_timeout_seconds"),
+    )
+    logger.info(
+        "gemini_live_batch trace_id=%s finals=%d completed_by=%s credential=%s",
+        trace_id, len(result.finals), result.completed_by, credential.source,
+    )
+    return _traditional_unless_japanese(result.text)
+
+
+GEMINI_LIVE_BATCH = "gemini-live-batch"
+
+
 # provider 名稱 → 轉寫函式。
 # 順序就是 fallback 順序（使用者選的、部署預設 ASR_PROVIDER 會被提到最前面）。預設把輸出華語的
 # 排在前面：使用者要的是華語逐字稿，臺語漢字只在全都掛掉時才聊勝於無。
@@ -288,16 +352,19 @@ _TRANSCRIBERS: dict[str, object] = {
     "r2t2-dev": _transcribe_r2t2_dev,
     "sensevoice": _transcribe_sensevoice,
     "openai": _transcribe_openai,
+    GEMINI_LIVE_BATCH: _transcribe_gemini_live_batch,
 }
 
 
-_OPT_IN_TRANSCRIBERS = frozenset({"r2t2-dev"})
+# 只有被選到（或設成部署預設）才用，不當別人的備援。
+_OPT_IN_TRANSCRIBERS = frozenset({"r2t2-dev", GEMINI_LIVE_BATCH})
 # 要照語言分流指定解碼語言的引擎；其他家自己判斷語言或只聽華語。
 _LANGUAGE_AWARE_TRANSCRIBERS = frozenset({"r2t2", "r2t2-dev"})
 
 
 def _resolve_chain(
     cfg, preferred: str | None = None, order: tuple[str, ...] | list[str] = (),
+    project_id: str = "",
 ) -> list[str]:
     """Ordered ASR providers to try: the preferred one, then the rest.
 
@@ -315,12 +382,12 @@ def _resolve_chain(
     configured = [
         name for name in (preferred, *rest)
         if name in _TRANSCRIBERS
-        # dev 機只在自己被選時用，不當別人的備援：它慢就讓這一句多等，不該拖累其他人。
+        # 選了才用，不當別人的備援：dev 機慢、Gemini 要送外部計費，不該拖累或牽連其他人。
         and (name not in _OPT_IN_TRANSCRIBERS or name in (preferred, cfg.asr_provider))
     ]
     ordered: list[str] = []
     for name in configured:
-        if name in ordered or not _provider_ready(cfg, name):
+        if name in ordered or not _provider_ready(cfg, name, project_id):
             continue
         ordered.append(name)
     return ordered
@@ -337,6 +404,8 @@ _unreachable_until: dict[str, float] = {}
 def _provider_host(cfg, name: str) -> str:
     if name == "openai":
         return host_of(getattr(cfg, "asr_openai_base_url", "") or "https://api.openai.com")
+    if name == GEMINI_LIVE_BATCH:
+        return host_of(gemini.GEMINI_LIVE_URL)
     url = getattr(cfg, f"asr_{name.replace('-', '_')}_url", "")
     return host_of(url) if isinstance(url, str) else ""
 
@@ -375,16 +444,26 @@ def _skip_unreachable(chain: list[str]) -> list[str]:
     return available or chain
 
 
-def configured_providers() -> list[str]:
+def configured_providers(project_id: str | None = None) -> list[str]:
     """Server-side engines whose URL or key is set, in fallback order.
 
     後台試辨識只列這些：沒設定的引擎選了也只會被備援接走，看起來像它辨識的。
+    ``project_id`` 只影響 Gemini：專案可以有自己的金鑰。
     """
     cfg = get_tts_config()
-    return [name for name in _TRANSCRIBERS if _provider_ready(cfg, name)]
+    return [name for name in _TRANSCRIBERS if _provider_ready(cfg, name, project_id or "")]
 
 
-def _provider_ready(cfg, name: str) -> bool:
+def _gemini_ready(project_id: str) -> bool:
+    try:
+        return resolve_gemini_credential(project_id or None).configured
+    except Exception:  # noqa: BLE001 - 金鑰讀不出來就是這家不能用，不擋其他引擎
+        return False
+
+
+def _provider_ready(cfg, name: str, project_id: str = "") -> bool:
+    if name == GEMINI_LIVE_BATCH:
+        return _gemini_ready(project_id)
     if name == "sensevoice":
         return bool(cfg.asr_sensevoice_url)
     if name == "breeze":
@@ -403,6 +482,8 @@ async def transcribe(
     allowed_providers: set[str] | None = None,
     order: tuple[str, ...] | list[str] = (),
     audio_seconds: float | None = None,
+    project_id: str = "",
+    vocabulary_loader: Callable[[], Awaitable[list[str]]] | None = None,
 ) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
 
@@ -413,10 +494,13 @@ async def transcribe(
     ``allowed_providers`` constrains every attempt, including fallback. Internal
     ingestion callers may omit it; account-facing routes supply their scope.
 
+    ``project_id`` 必須是呼叫端已驗證過權限的專案，Gemini 拿它找專案金鑰。
+    ``vocabulary_loader`` 取專案逐詞詞表，真的輪到 Gemini 才呼叫。
+
     Returns IngestionResult with content_type="audio_transcription".
     """
     cfg = get_tts_config()
-    configured = _resolve_chain(cfg, preferred, order)
+    configured = _resolve_chain(cfg, preferred, order, project_id)
     if allowed_providers is not None:
         configured = [name for name in configured if name in allowed_providers]
     chain = _skip_unreachable(configured)
@@ -446,6 +530,11 @@ async def transcribe(
     for name in chain:
         transcriber = _TRANSCRIBERS[name]
         extra = language if name in _LANGUAGE_AWARE_TRANSCRIBERS else {}
+        if name == GEMINI_LIVE_BATCH:
+            extra = {
+                "routes": routes, "project_id": project_id,
+                "vocabulary_loader": vocabulary_loader,
+            }
         host = _provider_host(cfg, name)
         seconds = deadline.hop_seconds(node_seconds)
         if name == "r2t2-dev":
