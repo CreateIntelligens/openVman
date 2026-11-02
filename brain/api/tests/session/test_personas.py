@@ -127,6 +127,13 @@ def test_asr_glossary_is_not_indexed_as_knowledge(tmp_path):
     assert workspace.is_indexable_document(knowledge, root=tmp_path) is True
 
 
+def test_dream_diary_is_not_indexed_as_knowledge(tmp_path):
+    workspace = _import("knowledge.workspace")
+    diary = tmp_path / "DREAMS.md"
+    diary.write_text("日記\n", encoding="utf-8")
+    assert workspace.is_indexable_document(diary, root=tmp_path) is False
+
+
 def test_is_indexable_document_skips_persona_core_docs(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
