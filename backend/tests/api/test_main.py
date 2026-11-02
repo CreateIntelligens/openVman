@@ -2294,6 +2294,55 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
     assert body["language_check"] == {"result": "nan", "ms": 1234}
 
 
+def test_taiwanese_only_route_uses_the_taiwanese_engine_without_a_check(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    calls = {}
+
+    import app.gateway.ingestion_audio as ingestion_audio
+    from app.auth.dependencies import AuthTransport, CurrentAccount
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
+    async def fake_transcribe(path, trace_id, preferred="", **kwargs):
+        calls["preferred"] = preferred
+        return types.SimpleNamespace(content="你好", provider="breeze")
+
+    async def fake_routes(current, project_id, requested):
+        return ["nan"]
+
+    async def fake_detect(path, *, project_id=""):
+        raise AssertionError("只有台語時不該判斷語言")
+
+    async def fake_prompt(current, project_id):
+        return ""
+
+    monkeypatch.setattr(ingestion_audio, "transcribe", fake_transcribe)
+    monkeypatch.setattr(module.asr_routes.language_routes_mod, "effective_routes", fake_routes)
+    monkeypatch.setattr(module.asr_routes.language_routes_mod, "detect_taiwanese", fake_detect)
+    monkeypatch.setattr(module.asr_routes.asr_glossary_mod, "project_asr_prompt", fake_prompt)
+
+    from starlette.datastructures import UploadFile
+
+    upload = UploadFile(filename="clip.wav", file=__import__("io").BytesIO(_silent_wav()))
+    runtime = get_auth_runtime()
+    user = runtime.users.create_root(username="ai360", password_hash="unused")
+    for engine in ("sensevoice", "breeze"):
+        runtime.resources.upsert_system_resource(
+            resource_type=ResourceType.ASR_ENGINE, resource_id=engine,
+        )
+    runtime.account_access.set_asr_provider(user.id, "sensevoice")
+    account = CurrentAccount(user=user, transport=AuthTransport.BEARER)
+    response = asyncio.run(module.asr_routes.transcribe_for_account(
+        account=account, file=upload, project_id="proj-hospital",
+        language_routes="nan", runtime=runtime,
+    ))
+
+    body = json.loads(response.body)
+    assert calls["preferred"] == "breeze"
+    assert body["language"] == "nan"
+    assert body["language_check"] is None
+
+
 def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
     """台語分流：原本是別家就改 VoxCPM，而且不能先被帳號的聲音授權擋掉。"""
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)

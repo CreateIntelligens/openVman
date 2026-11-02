@@ -247,6 +247,47 @@ def test_explicit_provider_is_not_overridden_by_taiwanese_route(setup, monkeypat
     assert attempts == ["openai"]
 
 
+def test_taiwanese_only_route_skips_the_language_check(setup, monkeypatch):
+    app, _runtime, _root, _owner, keys, attempts = setup
+
+    async def routes(*args):
+        return ["nan"]
+
+    async def heard(*args, **kwargs):
+        raise AssertionError("只有台語時不該判斷語言")
+
+    monkeypatch.setattr(asr.language_routes_mod, "effective_routes", routes)
+    monkeypatch.setattr(asr.language_routes_mod, "detect_taiwanese", heard)
+    with TestClient(app) as client:
+        response = _upload(client, keys[0][1], "openai")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["language"] == "nan"
+    assert body["language_check"] is None
+    assert body["language_routes"] == ["nan"]
+    assert attempts == ["openai"]
+
+
+def test_mixed_routes_still_run_the_language_check(setup, monkeypatch):
+    app, _runtime, _root, _owner, keys, _attempts = setup
+    checks = []
+
+    async def routes(*args):
+        return ["zh", "en", "nan"]
+
+    async def heard(*args, **kwargs):
+        checks.append(1)
+        return SimpleNamespace(language="zh", result="zh", ms=7)
+
+    monkeypatch.setattr(asr.language_routes_mod, "effective_routes", routes)
+    monkeypatch.setattr(asr.language_routes_mod, "detect_taiwanese", heard)
+    with TestClient(app) as client:
+        response = _upload(client, keys[0][1], "openai")
+    assert checks == [1]
+    assert response.json()["language"] is None
+    assert response.json()["language_check"] == {"result": "zh", "ms": 7}
+
+
 def test_project_authorization_error_keeps_404(setup, monkeypatch):
     app, _runtime, _root, _owner, keys, attempts = setup
 

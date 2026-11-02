@@ -172,7 +172,15 @@ async def _transcribe_routed(
     started = monotonic()
     speech_language: str | None = None
     language_check: dict | None = None
-    if language_routes_mod.TAIWANESE in routes:
+    if routes == [language_routes_mod.TAIWANESE]:
+        # 分流只剩台語，語言已經定了：再判斷只會多等 Flash-Lite，還可能把台語判成華語。
+        if taiwanese_engine:
+            preferred = taiwanese_engine
+        result = await transcribe(
+            tmp_path, trace_id, preferred, prompt=prompt, routes=routes, **scope,
+        )
+        speech_language = language_routes_mod.TAIWANESE
+    elif language_routes_mod.TAIWANESE in routes:
         # 台語分流：Breeze（或專案指定的台語引擎）把台語直接翻成華語（華語也準），同時
         # 請 Brain 聽是不是台語，轉錄出來的華語文字看不出原本講的是台語。後台試辨識與
         # 明確指定 provider 的請求傳 None，照選的引擎跑，才比得出各家聽台語的差別。
@@ -211,7 +219,7 @@ async def _transcribe_routed(
         "provider": result.provider or "",
         "elapsed_seconds": elapsed_seconds,
         "language": speech_language,
-        # 台語分流時才有：判斷結果（語言代碼、timeout、failed）與耗時。
+        # 有跑台語判斷才有（分流同時含台語與其他語言）：判斷結果（語言代碼、timeout、failed）與耗時。
         "language_check": language_check,
         "language_routes": routes,
         # 這次實際送給引擎的詞表（空字串：專案沒設、拿不到，或沒帶專案）。
@@ -247,8 +255,9 @@ async def transcribe_for_account(
         None,
         description=(
             "逗號分隔的語言代碼（zh、nan、en…），只能縮小專案在知識庫設定開的分流，不能多開。"
-            "分流含 nan 時改用專案的台語引擎（預設 breeze）並判斷是否為台語，"
-            "回應的 language 為 nan 代表這句是台語"
+            "分流含 nan 時改用專案的台語引擎（預設 breeze）；同時含其他語言時會判斷是否為台語，"
+            "只有 nan 時不判斷，直接當台語。回應的 language 為 nan 代表這句是台語。"
+            "前端已讓使用者選好語言時，請帶單一語言（zh 或 nan），可省掉語言判斷"
         ),
     ),
     provider: Annotated[

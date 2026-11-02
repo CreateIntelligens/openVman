@@ -366,7 +366,7 @@ Nginx：外圈 host vhost 與 admin 容器的 `/api/` 都是 `client_max_body_si
 
 ### 後台試辨識（`POST /api/v1/asr/preview`，管理員）
 
-multipart：`file`、`provider`（`SERVER_ASR_PROVIDERS` 之一，空白用部署預設）、選填 `project_id`、`language_routes`（逗號分隔）。帶了專案就跟 `/api/v1/asr/transcribe` 走同一個 `_transcribe_routed()`：套專案詞表、依分流在台語時同時跑台語判斷；差別是引擎照 `provider`，不換成 Breeze，才比得出各家聽台語的差別。回傳 `text`、`provider`（實際辨識的引擎）、`elapsed_seconds`、`language`、`language_check`、`language_routes`、`glossary`（實際送給引擎的詞表）。
+multipart：`file`、`provider`（`SERVER_ASR_PROVIDERS` 之一，空白用部署預設）、選填 `project_id`、`language_routes`（逗號分隔）。帶了專案就跟 `/api/v1/asr/transcribe` 走同一個 `_transcribe_routed()`：套專案詞表、分流同時含台語與其他語言時一併跑台語判斷（只有台語時不判斷，直接回 `language: "nan"`）；差別是引擎照 `provider`，不換成 Breeze，才比得出各家聽台語的差別。回傳 `text`、`provider`（實際辨識的引擎）、`elapsed_seconds`、`language`、`language_check`、`language_routes`、`glossary`（實際送給引擎的詞表）。
 
 ### 串流 ASR（`GET /api/v1/asr/stream`，WebSocket）
 

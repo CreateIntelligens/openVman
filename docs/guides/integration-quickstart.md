@@ -136,6 +136,8 @@
 
 `/api/v1/chat` 的回應沒有「回答語言」欄位；這一輪是不是台語，以 `/api/v1/asr/transcribe` 回應的 `language` 為準（`nan` 是台語）。ASR 要判斷台語，請求要帶 `project_id`，且該專案在知識庫設定開了台語分流；沒帶或沒權限時當成沒有專案，只辨識華語、不套詞表。
 
+前端已讓使用者選好語言時，請帶單一語言的 `language_routes`（`zh` 或 `nan`），可省掉語言判斷：只有 `nan` 時直接回 `language: "nan"`，只有 `zh` 時不判斷台語，兩者的 `language_check` 都是 `null`，回應通常快 1 秒以上。分流同時含台語與其他語言（例如 `zh,en,nan`）時才會判斷。
+
 Brain 對台語提問的回答一律寫成繁體中文文字（台語沒有通行的書寫）。`/api/v1/tts/stream` 依語言選引擎：語言取 `speech_language`（照抄 ASR 的 `language`），打字時用使用者選的 `language`。
 
 | 語言 | 引擎 | 條件 |
