@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import AppSidebar from "./components/app/AppSidebar";
+import ErrorBoundary from "./components/app/ErrorBoundary";
 import {
   AdminPortalDeniedState,
   AuthLoadingState,
@@ -266,24 +267,29 @@ function AppContent() {
 
           <div className="relative min-h-0 flex-1 overflow-hidden">
             <div key={projectId} className="h-full w-full">
-              <Suspense
-                fallback={
-                  <div
-                    className="flex h-full items-center justify-center text-sm text-content-muted"
-                    role="status"
-                  >
-                    載入中…
-                  </div>
-                }
+              <ErrorBoundary
+                variant="page"
+                resetKey={`${route.tab}/${route.subView ?? ""}`}
               >
-                {canLoadPage ? <ActiveComponent /> : (
-                  <div className="flex h-full items-center justify-center p-6 text-sm text-content-muted" role="alert">
-                    {projects.length
-                      ? "目前專案無法存取，請從上方選擇可用專案。"
-                      : "目前沒有可存取的專案，請聯絡管理員設定權限。"}
-                  </div>
-                )}
-              </Suspense>
+                <Suspense
+                  fallback={
+                    <div
+                      className="flex h-full items-center justify-center text-sm text-content-muted"
+                      role="status"
+                    >
+                      載入中…
+                    </div>
+                  }
+                >
+                  {canLoadPage ? <ActiveComponent /> : (
+                    <div className="flex h-full items-center justify-center p-6 text-sm text-content-muted" role="alert">
+                      {projects.length
+                        ? "目前專案無法存取，請從上方選擇可用專案。"
+                        : "目前沒有可存取的專案，請聯絡管理員設定權限。"}
+                    </div>
+                  )}
+                </Suspense>
+              </ErrorBoundary>
             </div>
           </div>
         </main>
@@ -363,8 +369,10 @@ function AuthGate() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthGate />
-    </AuthProvider>
+    <ErrorBoundary variant="screen">
+      <AuthProvider>
+        <AuthGate />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

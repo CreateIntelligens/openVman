@@ -58,8 +58,12 @@ vi.mock("./pages/AccessGraph", () => ({
 vi.mock("./pages/EmbedKeys", () => ({
   default: () => <div data-testid="tab-embed-keys">Embed keys tab</div>,
 }));
+const chatPage = vi.hoisted(() => ({ error: null as Error | null }));
 vi.mock("./pages/Chat", () => ({
-  default: () => <div data-testid="tab-chat">Chat tab</div>,
+  default: () => {
+    if (chatPage.error) throw chatPage.error;
+    return <div data-testid="tab-chat">Chat tab</div>;
+  },
 }));
 vi.mock("./pages/Health", () => ({
   default: () => <div data-testid="tab-health">Health tab</div>,
@@ -102,6 +106,7 @@ describe("App tab mounting", () => {
     window.localStorage.clear();
     window.history.replaceState(null, "", "/admin/");
     vi.clearAllMocks();
+    chatPage.error = null;
     vi.mocked(getCurrentAccount).mockResolvedValue({
       id: "admin-1",
       username: "admin",
@@ -293,6 +298,22 @@ describe("App tab mounting", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "System" })[0]);
     fireEvent.click(screen.getAllByRole("link", { name: /專案與權限/ })[0]);
     expect(await screen.findByTestId("tab-projects")).toBeTruthy();
+  });
+
+  it("keeps the shell usable when a page fails to render", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    chatPage.error = new Error("boom");
+    window.history.replaceState(null, "", "/admin/chat");
+
+    const { unmount } = render(<App />);
+
+    expect((await screen.findByRole("alert")).textContent).toContain("畫面無法顯示");
+    fireEvent.click(screen.getAllByRole("link", { name: /知識庫搜尋/ })[0]);
+    expect(await screen.findByTestId("tab-search")).toBeTruthy();
+    expect(screen.queryByText(/畫面無法顯示/)).toBeNull();
+
+    unmount();
+    consoleError.mockRestore();
   });
 
   it("mounts only the active tab content", async () => {

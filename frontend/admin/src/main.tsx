@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { installStaleChunkRecovery } from "@shared/staleChunkReload";
 import "./index.css";
 import App from "./App";
 
@@ -30,6 +31,7 @@ async function updateMaterialIconAvailability() {
 }
 
 void updateMaterialIconAvailability();
+installStaleChunkRecovery();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

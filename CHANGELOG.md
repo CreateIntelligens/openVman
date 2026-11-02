@@ -79,6 +79,8 @@
 
 ### Fixed
 
+- **[2026-11-02]** **部署後後台不再白屏或失去樣式**：每次部署都會換掉帶 hash 的 JS／CSS，閒置分頁或快取的舊 `index.html` 再去要就是 404，`React.lazy` 失敗後整個畫面被卸載。現在 `/admin/` 的 `index.html` 與 SPA 路由回 `Cache-Control: no-cache`，`/admin/assets/` 維持長期 immutable，缺檔仍回 404；後台與虛擬人前台遇到 `vite:preloadError` 或動態 import 失敗會自動重新載入一次（`sessionStorage` 記時間，5 分鐘內不重複、離線或無法寫入時不重載，避免服務真的掛掉時無限重載）；後台另加 `ErrorBoundary`，頁面區出錯保留側欄與頂列可切頁，其他錯誤也改顯示可重新載入的錯誤畫面，不再整頁空白。
+
 - **[2026-11-02]** **ASR 詞表不再進知識庫索引**：`ASR_PROMPT.md` 沒有排除在索引外，有詞表的專案都被嵌入 2 筆，回答時可能當成知識檢索到。現在列入保留路徑；既有的舊資料在下次重建知識索引時清除。
 
 - **[2026-10-30]** **帳號「登入後預設值」的聲音選單標出引擎**：兩台 IndexTTS（.35 與 nurse24h）都有 Hayley，選單原本只寫「Hayley」，分不出要設哪一台；現在寫成「Hayley（IndexTTS）」「Hayley（IndexTTS（nurse24h））」。

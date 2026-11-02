@@ -146,6 +146,12 @@ Watchtower 由同一份 compose 啟動，使用 Docker API `1.44`（相容 Docke
 舊檔案遮蔽。Admin image 使用 `runner` stage，由 HTTPS nginx edge 直接提供預先編譯
 的靜態 bundle，不啟動 Vite 或 React Refresh。
 
+前端靜態檔的快取規則要維持：`index.html` 與 SPA 路由回 `Cache-Control: no-cache`，
+帶 hash 的 `assets/` 長期 immutable，且缺檔必須是 404，不能落回 `index.html`
+（`frontend/admin/nginx/production.conf`、`frontend/app/nginx/default.conf`）。
+每次部署都會刪掉舊 chunk，還開著舊版的分頁在要不到檔案時會自動重新載入一次；同一分頁
+5 分鐘內再失敗就不再自動重載，後台改顯示錯誤畫面，避免服務異常時無限重載。
+
 ---
 
 ## 三、更新主機 nginx
