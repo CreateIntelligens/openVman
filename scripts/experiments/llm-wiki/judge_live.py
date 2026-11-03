@@ -18,7 +18,7 @@ def collect_tool_evidence(tool_steps):
         if evidence.get("status") != "ok":
             tool_errors.append(evidence.get("error"))
         data = evidence.get("data", {})
-        if step.get("name") == "search_knowledge":
+        if step.get("name") in {"search_knowledge", "read_wiki_page"}:
             context.extend(
                 r["text"]
                 for r in data.get("results", []) + data.get("related", [])
@@ -114,7 +114,7 @@ def collect_referenced_evidence(tool_steps, snapshot, row):
         if step.get("name") == "filter_products":
             structured, _ = collect_tool_evidence([step])
             context.extend(structured)
-        elif step.get("name") == "search_knowledge":
+        elif step.get("name") in {"search_knowledge", "read_wiki_page"}:
             for item in data.get("results", []) + data.get("related", []):
                 if "source_refs" not in item:
                     for key in ("project_id", "pid"):
