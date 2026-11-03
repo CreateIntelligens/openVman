@@ -151,7 +151,9 @@ async def probe_voxcpm_health(
         client,
         "voxcpm",
         cfg.tts_voxcpm_url or "",
-        "/api/v1/tts/health",
+        # /api/v1/tts/health 只代表 API 活著；推論 worker 被 OOM 殺掉時它照回 ok，
+        # 要看這個端點才會得到 503 worker_dead。
+        "/api/v1/health",
     )
 
 

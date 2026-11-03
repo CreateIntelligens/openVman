@@ -609,6 +609,27 @@ def test_probe_recovery_lifts_down_and_unreachable_but_not_timeout_trips():
         assert TTS_BREAKER.cooling("voxcpm") > 0
 
 
+def test_probe_marks_voxcpm_down_when_only_its_worker_died():
+    from app.upstream_probe import probe_once
+
+    # 實際觀察到的回應：API 活著、tts/health 回 ok，推論 worker 已死。
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v1/tts/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return httpx.Response(503, json={
+            "status": "worker_dead",
+            "worker": {"loaded": True, "alive": False, "model": "m"},
+        })
+
+    async def probe():
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await probe_once(client, _probe_cfg(TTS_VOXCPM_URL="http://voxcpm.test"))
+
+    assert asyncio.run(probe()) == {"tts:voxcpm": False}
+    assert TTS_BREAKER.cooling("voxcpm") > 0
+
+
 def test_probe_logs_only_state_transitions(monkeypatch):
     from app import upstream_probe
 

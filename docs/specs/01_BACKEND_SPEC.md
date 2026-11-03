@@ -150,7 +150,7 @@ async function synthesizeWithFallback(text, session) {
 
 #### 6.1 VoxCPM360 外部節點
 
-Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/tts/health` 探測狀態、`GET /api/v1/tts/voices` 同步可用聲線，並以 `POST /api/v1/tts/synthesize` 傳送 `text`、`voice_id` 與固定的 `format: "mp3"`。成功時上游回傳 `audio/mpeg`，並可用 `X-Request-ID` 標示請求。
+Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/health` 探測狀態（推論 worker 死掉時回 503 `worker_dead`；`/api/v1/tts/health` 此時仍回 ok，不能用來判斷）、`GET /api/v1/tts/voices` 同步可用聲線，並以 `POST /api/v1/tts/synthesize` 傳送 `text`、`voice_id` 與固定的 `format: "mp3"`。成功時上游回傳 `audio/mpeg`，並可用 `X-Request-ID` 標示請求。
 
 連線由 `TTS_VOXCPM_URL` 啟用；若上游設定 `TTS_API_KEY`，Backend 必須以 `TTS_VOXCPM_API_KEY` 傳送 Bearer token。`TTS_VOXCPM_DEFAULT_VOICE` 可覆寫預設聲線。金鑰不得放入 URL 或健康狀態回應；Backend 將 `400/422`、`401/403`、`429` 與 `5xx` 分別歸類為請求、驗證、限流與 provider 不可用，供有界 fallback 與監控使用。
 
