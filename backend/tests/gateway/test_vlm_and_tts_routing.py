@@ -132,12 +132,9 @@ async def test_indextts_routing_and_health_probing(monkeypatch):
     async def mock_get(self, url, headers=None, **kwargs):
         observed_headers.append(headers or {})
         req = httpx.Request("GET", url, headers=headers)
-        if "ready" in url:
-            return httpx.Response(
-                200,
-                json={"status": "ready", "model": "IndexTeam/IndexTTS-1.5", "revision": "1.0.0"},
-                request=req,
-            )
+        # 實際節點的回應：沒有 /health/ready。
+        if url.endswith("/health/ready"):
+            return httpx.Response(404, json={"detail": "Not Found"}, request=req)
         return httpx.Response(200, json={"status": "healthy"}, request=req)
 
     monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
@@ -158,7 +155,6 @@ async def test_indextts_routing_and_health_probing(monkeypatch):
         h_loc = await probe_indextts_health(client, cfg_local)
     assert h_loc["status"] == "ready"
     assert h_loc["route"] == "local"
-    assert h_loc["model"] == "IndexTeam/IndexTTS-1.5"
     assert observed_headers[-1] == {"X-Internal-Token": "shared-token"}
 
     # 3. External IndexTTS with sanitized URL

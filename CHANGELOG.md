@@ -81,6 +81,8 @@
 
 ### Fixed
 
+- **[2026-11-03]** **IndexTTS 不再被背景探測誤判成掛掉**：探測打 `/health/ready`，外部節點沒有這個端點（回 404），所以 `TTS_INDEXTTS_URL` 那台一直被標成掛掉：備援鏈跳過它，沒指定引擎的串流請求直接改走 Edge，聲音跟著換掉；只有明確指定 IndexTTS 的請求不受影響。現在改探 `/health`，與 `indextts-nurse` 相同。
+
 - **[2026-11-03]** **VoxCPM 背景探測抓得到推論 worker 死掉**：探測原本看 `/api/v1/tts/health`，worker 被 OOM 殺掉時它仍回 `ok`，健康狀態顯示正常、斷路器也不會標成掛掉。現在改看 `/api/v1/health`（worker 死掉回 503 `worker_dead`，與合成前的檢查相同），下一輪探測就會標成掛掉，備援鏈直接跳過；worker 恢復後自動解除。
 
 - **[2026-11-02]** **批次 ASR 用量不再被串流 WAV 灌成 134217 秒**：ffmpeg 管線或串流 TTS 產生的 WAV，header 把長度填成 `0xFFFFFFFF`，用量記錄直接照 header 算就記成 `2^31 / 16000` 秒。現在用量採用上傳時 ffprobe 量到的秒數，不再量第二次；聊天附件算 ASR／ffmpeg 逾時用的音訊長度同樣改用 ffprobe。既有的錯誤紀錄不會自動修正。

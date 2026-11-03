@@ -87,8 +87,9 @@ async def probe_indextts_health(
     if getattr(cfg, "gateway_internal_token", None):
         headers["X-Internal-Token"] = cfg.gateway_internal_token
 
-    ready_url = f"{tts_url.rstrip('/')}/health/ready"
-    res = await _probe_service(client, "index-tts", ready_url, headers=headers)
+    # 外部節點只有 /health；/health/ready 回 404 會被當成掛掉，斷路器就一直跳過這台。
+    health_url = f"{tts_url.rstrip('/')}/health"
+    res = await _probe_service(client, "index-tts", health_url, headers=headers)
     if res.get("status") in {"ready", "healthy"}:
         return {
             "status": "ready",

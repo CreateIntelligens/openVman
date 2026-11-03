@@ -630,6 +630,23 @@ def test_probe_marks_voxcpm_down_when_only_its_worker_died():
     assert TTS_BREAKER.cooling("voxcpm") > 0
 
 
+def test_probe_keeps_indextts_up_when_only_health_exists():
+    from app.upstream_probe import probe_once
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "healthy"})
+        return httpx.Response(404, json={"detail": "Not Found"})
+
+    async def probe():
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await probe_once(client, _probe_cfg(TTS_INDEXTTS_URL="http://indextts.test"))
+
+    assert asyncio.run(probe()) == {"tts:indextts": True}
+    assert TTS_BREAKER.cooling("indextts") == 0
+
+
 def test_probe_logs_only_state_transitions(monkeypatch):
     from app import upstream_probe
 
