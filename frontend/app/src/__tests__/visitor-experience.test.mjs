@@ -73,9 +73,9 @@ test("suggestions take one visible question per topic from the Chinese category"
 test("the chat panel shows suggestions before the first question and a live mic meter", () => {
   const panel = read("../components/chat/ChatPanel.vue");
   assert.match(panel, /v-if="!compact && messages\.length === 0 && suggestions\.length"/);
-  assert.match(panel, /emit\('suggest', item\.message, item\.sourcePath\)/);
+  assert.match(panel, /emit\('suggest', item\.message, item\.sourcePath, item\.label\)/);
   assert.match(panel, /<MicLevel v-if="asrListening"/);
-  assert.match(app, /@suggest="handleSend"/);
+  assert.match(app, /@suggest="handleSuggestion"/);
   assert.match(app, /useMicLevel\(computed\(\(\) => activeAsr\.value\.isListening\.value\)\)/);
 });
 

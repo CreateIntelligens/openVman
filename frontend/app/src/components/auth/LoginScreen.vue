@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { nextTick, ref } from "vue"
 
 import { useAuth } from "../../composables/useAuth"
 import { readPref, writePref, STORAGE_KEYS } from "../../utils/storageUtils"
@@ -11,10 +11,24 @@ const username = ref("")
 const password = ref("")
 const submitting = ref(false)
 const error = ref("")
+const usernameInput = ref<HTMLInputElement>()
+const passwordInput = ref<HTMLInputElement>()
+
+// 出錯後游標要回到該填的欄位，不必再點一次就能直接改。
+async function focusFieldToFix(): Promise<void> {
+  await nextTick()
+  if (mode.value === "formal" && !username.value.trim()) {
+    usernameInput.value?.focus()
+    return
+  }
+  passwordInput.value?.focus()
+  passwordInput.value?.select()
+}
 
 async function submit(): Promise<void> {
   if (!password.value || (mode.value === "formal" && !username.value.trim())) {
     error.value = mode.value === "formal" ? "請輸入帳號與密碼" : "請輸入臨時密碼"
+    await focusFieldToFix()
     return
   }
 
@@ -40,6 +54,7 @@ async function submit(): Promise<void> {
   } finally {
     submitting.value = false
   }
+  if (error.value) await focusFieldToFix()
 }
 
 function selectMode(nextMode: "formal" | "temporary"): void {
@@ -112,6 +127,7 @@ function selectMode(nextMode: "formal" | "temporary"): void {
           <label v-if="mode === 'formal'">
             <span>帳號</span>
             <input
+              ref="usernameInput"
               v-model="username"
               autocomplete="username"
               :disabled="submitting"
@@ -121,6 +137,7 @@ function selectMode(nextMode: "formal" | "temporary"): void {
           <label>
             <span>{{ mode === "formal" ? "密碼" : "臨時密碼" }}</span>
             <input
+              ref="passwordInput"
               v-model="password"
               :type="mode === 'formal' ? 'password' : 'text'"
               :autocomplete="mode === 'formal' ? 'current-password' : 'one-time-code'"

@@ -89,7 +89,7 @@
             :open="showQuickQa"
             :project-id="settings.projectId"
             @close="showQuickQa = false"
-            @select-question="handleSend"
+            @select-question="handleQuickQuestion"
           />
         </div>
       </section>
@@ -113,7 +113,7 @@
         :responding="avatarResponding"
         :mic-level="micLevel"
         :suggestions="suggestions"
-        @suggest="handleSend"
+        @suggest="handleSuggestion"
         @composing="composing = $event"
         @send="handleComposerSend"
         @asr-toggle="handleAsrToggle"
@@ -270,6 +270,15 @@ const conversation = useAvatarConversation({ settings, stage, languageRoutes,
 const { chat, canSend, isTyping, avatarResponding, handleStart, resetForNextVisitor, handleSend,
   handleComposerSend, handleStopResponse, handleSettingsApply,
   handleFatalRetry } = conversation;
+// 點選的題目送出時帶主題才查得準，但來賓看到的應該是他點的那句話。
+function handleSuggestion(message: string, sourcePath?: string, label?: string): void {
+  void handleSend(message, sourcePath, undefined, undefined, label);
+}
+function handleQuickQuestion(
+  message: string, sourcePath?: string, answerText?: string, question?: string,
+): void {
+  void handleSend(message, sourcePath, answerText, undefined, question);
+}
 function handleMotionGesture(state: "greeting" | "bye"): void {
   if (avatarResponding.value || rendererDisabled.value) return;
   void wasm.playMotionGesture(state).catch(() => {

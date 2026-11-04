@@ -358,6 +358,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     sourcePath?: string,
     referenceText?: string,
     speechLanguage?: string | null,
+    displayText?: string,
   ): Promise<ComposerSendResult> {
     turnTiming.begin(chat.mergesWithPending(sourcePath) ? "merged" : "superseded");
     if (
@@ -390,6 +391,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       sourcePath,
       referenceText,
       speechLanguage,
+      displayText,
     );
     return result.accepted
       ? { accepted: true }

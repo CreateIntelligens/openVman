@@ -15,7 +15,6 @@
             </svg>
             <span>{{ copy.back }}</span>
           </button>
-          <span v-else class="header-label">{{ copy.title }}</span>
         </div>
 
         <h4 id="quick-qa-title" class="panel-title">{{ currentTitle }}</h4>
@@ -107,7 +106,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  "select-question": [question: string, sourcePath?: string, answerText?: string];
+  "select-question": [message: string, sourcePath?: string, answerText?: string, question?: string];
 }>();
 
 const loading = ref(false);
@@ -176,7 +175,7 @@ function selectQuestion(question: string, sourcePath?: string): void {
   const topic = (currentNode.value?.label || currentNode.value?.node_id || "").trim();
   const message = topic ? `${topic} ${question}` : question;
 
-  emit("select-question", message, sourcePath, answerText);
+  emit("select-question", message, sourcePath, answerText, question);
   emit("close");
 }
 
@@ -312,12 +311,6 @@ onMounted(() => {
 .back-icon {
   width: 1rem;
   height: 1rem;
-}
-
-.header-label {
-  color: var(--text-soft);
-  font-weight: 700;
-  font-size: 0.95rem;
 }
 
 .panel-title {
@@ -491,10 +484,6 @@ onMounted(() => {
 
 .app-shell.immersive .panel-title {
   color: #fff;
-}
-
-.app-shell.immersive .header-label {
-  color: rgba(255, 255, 255, 0.6);
 }
 
 .app-shell.immersive .back-btn {

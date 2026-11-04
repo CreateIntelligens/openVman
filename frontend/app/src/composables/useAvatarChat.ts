@@ -343,6 +343,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
               sourcePathContent?: string,
               /** ASR 聽出的語言（例如台語 "nan"）；轉錄文字看不出來，要一起送給 Brain 記錄。 */
               speechLanguage?: string | null,
+              /** 對話紀錄顯示的文字：點選的題目送出時會帶主題，來賓只該看到題目本身。 */
+              displayText?: string,
        ): SendMessageResult {
               const trimmed = text.trim()
               if (!trimmed) return { accepted: false, reason: 'empty' }
@@ -364,12 +366,12 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             void textTurn.send(`${merge.text}\n${trimmed}`, speechLanguage, merge)
                             return { accepted: true, merged: true }
                      }
-                     void textTurn.send(trimmed, speechLanguage)
+                     void textTurn.send(trimmed, speechLanguage, undefined, displayText)
                      return { accepted: true }
               }
 
               liveSpeechLanguage = speechLanguage ?? null
-              messages.value.push({ role: 'user', text: trimmed, timestamp: Date.now() })
+              messages.value.push({ role: 'user', text: displayText ?? trimmed, timestamp: Date.now() })
               state.value = 'THINKING'
               pendingDecisionClientTurn = createClientId()
               sendEvent({

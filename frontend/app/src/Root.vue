@@ -310,8 +310,37 @@ onUnmounted(() => {
   margin-top: 1.5rem;
 }
 
+/* 單欄版面沒有空位給浮動的帳號列，會蓋住標題或輸入框：改排在舞台與對話下面。 */
+@media (max-width: 68.75rem) {
+  .app-shell:not(.immersive) ~ .session-toolbar {
+    position: static;
+    justify-content: space-between;
+    max-width: none;
+    margin: 0 1rem 1rem;
+  }
+}
+
+/* 這段寬度整頁不能捲，帳號列要留在畫面內，否則登出按不到；更窄的版面整頁可捲。 */
+@media (min-width: 48.0625rem) and (max-width: 68.75rem) {
+  .authenticated-app:has(> .app-shell:not(.immersive)) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  .authenticated-app > .app-shell:not(.immersive) {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+
+  .app-shell:not(.immersive) ~ .session-toolbar {
+    flex: none;
+  }
+}
+
 @media (max-width: 42rem) {
-  .session-toolbar {
+  .app-shell.immersive ~ .session-toolbar {
     top: auto;
     right: 0.75rem;
     bottom: 0.75rem;

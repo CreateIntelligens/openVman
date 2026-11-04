@@ -28,6 +28,14 @@ async function harness(t) {
   return { chat, requests, replies, errors, reply };
 }
 
+test("a picked question shows as picked while the request keeps its topic", async (t) => {
+  const { chat, requests } = await harness(t);
+  chat.sendMessage("型錄 Q&A 型號的 C 代表什麼？", "qa.csv", undefined, null, "型號的 C 代表什麼？");
+  await tick();
+  assert.equal(chat.messages.value[0].text, "型號的 C 代表什麼？");
+  assert.match(JSON.stringify(requests[0].body), /型錄 Q&A 型號的 C 代表什麼？/);
+});
+
 test("only the newest complete answer is acknowledged and played", async (t) => {
   const { chat, requests, replies, reply } = await harness(t);
   chat.sendMessage("第一句");

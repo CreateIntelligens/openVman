@@ -102,7 +102,7 @@
         type="button"
         class="suggestion-chip"
         :disabled="!canSend"
-        @click="emit('suggest', item.message, item.sourcePath)"
+        @click="emit('suggest', item.message, item.sourcePath, item.label)"
       >
         {{ item.label }}
       </button>
@@ -213,7 +213,7 @@ const emit = defineEmits<{
   send: [text: string, done: (result: ComposerSendResult) => void]
   'asr-toggle': []
   stop: []
-  suggest: [message: string, sourcePath?: string]
+  suggest: [message: string, sourcePath?: string, label?: string]
   /** 輸入框聚焦中：手機上外層會縮小舞台，讓出位置給鍵盤。 */
   composing: [active: boolean]
 }>()

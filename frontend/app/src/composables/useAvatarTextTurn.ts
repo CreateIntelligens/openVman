@@ -92,6 +92,8 @@ export function useAvatarTextTurn(context: TextTurnContext) {
               speechLanguage?: string | null,
               /** 合併重送時，改寫這一則使用者訊息而不是新增一則。 */
               mergedTurn?: PendingTurn,
+              /** 對話紀錄顯示的文字；沒給就顯示送出去的內容。 */
+              displayText?: string,
        ): Promise<void> {
               const requestId = ++textRequestId
               const abort = new AbortController()
@@ -108,7 +110,7 @@ export function useAvatarTextTurn(context: TextTurnContext) {
               if (replaced) {
                      replaced.text = text
               } else {
-                     messages.value.push({ role: 'user', text, timestamp: Date.now() })
+                     messages.value.push({ role: 'user', text: displayText ?? text, timestamp: Date.now() })
               }
               awaitingReply = {
                      text,
