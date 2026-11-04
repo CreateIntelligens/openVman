@@ -175,7 +175,7 @@ test("auth API uses cookie endpoints without storing the returned JWT", () => {
 
   assert.match(authApi, /"\/api\/v1\/auth\/login"/);
   assert.match(authApi, /"\/api\/v1\/auth\/logout"/);
-  assert.match(authApi, /"\/api\/v1\/auth\/me"/);
+  assert.match(authApi, /"\/api\/v1\/auth\/session"/);
   assert.doesNotMatch(`${authApi}\n${authStore}`, /localStorage|sessionStorage/);
   assert.match(authStore, /function expireSession\(\)/);
   assert.match(authStore, /publicAppPath\("\/login"\)/);

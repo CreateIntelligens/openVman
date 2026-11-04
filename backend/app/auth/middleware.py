@@ -17,6 +17,7 @@ from .runtime import AuthRuntime, get_auth_runtime
 _PUBLIC_EXACT_PATHS = frozenset(
     {
         "/api/v1/auth/login",
+        "/api/v1/auth/session",
         "/api/v1/auth/admin-login",
         "/api/v1/auth/admin-temporary-login",
         "/api/v1/auth/temporary-login",

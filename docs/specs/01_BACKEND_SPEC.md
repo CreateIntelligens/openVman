@@ -731,4 +731,5 @@ Brain Live 的內部 WebSocket 也沿用這些身分標頭及 `X-OpenVMan-User-I
 
 - `users.kiosk`（0／1，預設 0）。帳號 payload（`/api/v1/auth/me`、登入與臨時登入回應、`GET /api/v1/users`）帶 `kiosk`；前台據此一律進入訪客模式。
 - 設定：`PUT /api/v1/users/{id}/access`（`kiosk` 選填，省略不變）、`POST /api/v1/users` 與角色調整的 `access.kiosk`、`POST /api/v1/temporary-accounts/batches` 的 `kiosk`。權限沿用 `ensure_can_manage_account`；改 `kiosk` 不遞增 `token_version`，使用中的機台不會被登出。
+- `GET /api/v1/auth/session`：免驗證，前端開頁判斷登入狀態用。已登入回 `{"account": <帳號 payload>}`，沒登入或憑證失效回 200 `{"account": null}`。要明確驗證身分的 API 呼叫端仍用 `GET /api/v1/auth/me`（未登入回 401）。
 - `POST /api/v1/auth/verify-password`：body `{"password"}`，需登入（cookie 或 bearer）。核對目前帳號的 `password_hash`（臨時帳號即其臨時密碼）；符合回 204、不發 cookie、不換 session；不符回 400 `密碼不正確`（不用 401，前台會把 401 當 session 失效而登出）；embed key 身分 403。`FailedAttemptLimiter` 依帳號記在記憶體：5 分鐘內失敗 5 次後回 429 `嘗試太多次，請稍後再試` 並帶 `Retry-After`，成功歸零；重啟歸零、多副本各自計數。

@@ -65,10 +65,11 @@ export async function login(
   return accountFromResponse(payload)
 }
 
-export async function getCurrentAccount(): Promise<AccountProfile> {
-  return accountFromResponse(
-    await fetchJson<AccountResponse>("/api/v1/auth/me"),
+export async function getSessionAccount(): Promise<AccountProfile | null> {
+  const { account } = await fetchJson<{ account: AccountResponse | null }>(
+    "/api/v1/auth/session",
   )
+  return account ? accountFromResponse(account) : null
 }
 
 export async function logout(): Promise<void> {

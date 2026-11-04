@@ -81,8 +81,8 @@ async function openApp(storage, api = {}) {
     const url = String(input);
     const path = url.split("?")[0];
     if (api[path]) return api[path](url, init);
-    if (path.endsWith("/api/v1/auth/me")) {
-      return json({ id: ACCOUNT, role: "user", username: "u", defaults: DEFAULTS });
+    if (path.endsWith("/api/v1/auth/session")) {
+      return json({ account: { id: ACCOUNT, role: "user", username: "u", defaults: DEFAULTS } });
     }
     if (path.endsWith("/api/v1/projects")) {
       return json({ projects: [{ project_id: "proj-A" }, { project_id: "proj-B" }] });
@@ -384,12 +384,12 @@ test("four-level selection order for characters: project pref > project default 
   // 2. 專案預設優先於帳號預設
   const storage2 = savedStorage({ "avatar.project_id": "proj-A" });
   const app2 = await openApp(storage2, {
-    "/api/v1/auth/me": () => json({
+    "/api/v1/auth/session": () => json({ account: {
       id: ACCOUNT,
       role: "user",
       username: "u",
       defaults: { ...DEFAULTS, character_id: "c1" },
-    }),
+    } }),
     "/api/v1/projects/proj-A/resources": () => json({
       defaults: { avatar_character: "c2" },
       avatar_character: [
@@ -405,12 +405,12 @@ test("four-level selection order for characters: project pref > project default 
   // 3. 帳號預設優先於清單第一個
   const storage3 = savedStorage({ "avatar.project_id": "proj-A" });
   const app3 = await openApp(storage3, {
-    "/api/v1/auth/me": () => json({
+    "/api/v1/auth/session": () => json({ account: {
       id: ACCOUNT,
       role: "user",
       username: "u",
       defaults: { ...DEFAULTS, character_id: "c2" },
-    }),
+    } }),
     "/api/v1/projects/proj-A/resources": () => json({
       defaults: {},
       avatar_character: [
@@ -426,12 +426,12 @@ test("four-level selection order for characters: project pref > project default 
   // 4. 清單第一個 fallback
   const storage4 = savedStorage({ "avatar.project_id": "proj-A" });
   const app4 = await openApp(storage4, {
-    "/api/v1/auth/me": () => json({
+    "/api/v1/auth/session": () => json({ account: {
       id: ACCOUNT,
       role: "user",
       username: "u",
       defaults: { ...DEFAULTS, character_id: "" },
-    }),
+    } }),
     "/api/v1/projects/proj-A/resources": () => json({
       defaults: {},
       avatar_character: [
@@ -468,12 +468,12 @@ test("four-level selection order for backgrounds: project pref > project default
   // 2. 專案預設優先於帳號預設
   const storage2 = savedStorage({ "avatar.project_id": "proj-A" });
   const app2 = await openApp(storage2, {
-    "/api/v1/auth/me": () => json({
+    "/api/v1/auth/session": () => json({ account: {
       id: ACCOUNT,
       role: "user",
       username: "u",
       defaults: { ...DEFAULTS, background_id: "bg-A" },
-    }),
+    } }),
     "/api/v1/projects/proj-A/resources": () => json({
       defaults: { avatar_background: "bg-B" },
       avatar_background: [
@@ -490,12 +490,12 @@ test("four-level selection order for backgrounds: project pref > project default
   // 3. 帳號預設優先於清單第一個
   const storage3 = savedStorage({ "avatar.project_id": "proj-A" });
   const app3 = await openApp(storage3, {
-    "/api/v1/auth/me": () => json({
+    "/api/v1/auth/session": () => json({ account: {
       id: ACCOUNT,
       role: "user",
       username: "u",
       defaults: { ...DEFAULTS, background_id: "bg-B" },
-    }),
+    } }),
     "/api/v1/projects/proj-A/resources": () => json({
       defaults: {},
       avatar_background: [
@@ -512,12 +512,12 @@ test("four-level selection order for backgrounds: project pref > project default
   // 4. 清單第一個 fallback
   const storage4 = savedStorage({ "avatar.project_id": "proj-A" });
   const app4 = await openApp(storage4, {
-    "/api/v1/auth/me": () => json({
+    "/api/v1/auth/session": () => json({ account: {
       id: ACCOUNT,
       role: "user",
       username: "u",
       defaults: { ...DEFAULTS, background_id: "" },
-    }),
+    } }),
     "/api/v1/projects/proj-A/resources": () => json({
       defaults: {},
       avatar_background: [

@@ -7,7 +7,7 @@ import re
 from datetime import datetime, timezone
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_tts_config
@@ -559,6 +559,31 @@ def me(
         current.user,
         runtime=runtime,
         credential=current.temporary_credential,
+    )
+
+
+class SessionResponse(_StrictModel):
+    account: AccountProfile | None
+
+
+@auth_router.get("/session", response_model=SessionResponse)
+def session(
+    request: Request,
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> SessionResponse:
+    # 沒登入是開頁時的正常狀態，不是錯誤：回 200，瀏覽器才不會在 console 印紅字。
+    try:
+        current = get_current_account(request, runtime)
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_401_UNAUTHORIZED:
+            raise
+        return SessionResponse(account=None)
+    return SessionResponse(
+        account=AccountProfile.from_record(
+            current.user,
+            runtime=runtime,
+            credential=current.temporary_credential,
+        ),
     )
 
 

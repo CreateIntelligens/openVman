@@ -120,8 +120,8 @@ async function openApp(storage, { serverPrefs = {}, kiosk = false, runBootstrap 
     const url = String(input);
     const path = url.split("?")[0];
     const pid = new URL(url, "http://x").searchParams.get("project_id");
-    if (path.endsWith("/api/v1/auth/me")) {
-      return json({ id: ACCOUNT, role: "user", username: "u", kiosk, defaults: { project_id: "proj-A" } });
+    if (path.endsWith("/api/v1/auth/session")) {
+      return json({ account: { id: ACCOUNT, role: "user", username: "u", kiosk, defaults: { project_id: "proj-A" } } });
     }
     if (path.endsWith("/api/v1/settings/my-preferences")) {
       if (init.method === "PUT") {

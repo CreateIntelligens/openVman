@@ -67,6 +67,29 @@ def _origin_headers() -> dict[str, str]:
     return {"Origin": "http://testserver"}
 
 
+def test_session_reports_login_state_without_an_error(client, runtime):
+    admin = _bootstrap_admin(runtime)
+
+    anonymous = client.get("/api/v1/auth/session")
+    assert anonymous.status_code == 200
+    assert anonymous.json() == {"account": None}
+
+    client.cookies.set("openvman_session", "not-a-real-token")
+    expired = client.get("/api/v1/auth/session")
+    assert expired.status_code == 200
+    assert expired.json() == {"account": None}
+    client.cookies.clear()
+
+    login = _login(client, admin.username, _ADMIN_PASSWORD)
+    signed_in = client.get("/api/v1/auth/session")
+    assert signed_in.status_code == 200
+    assert signed_in.json() == {"account": login["account"]}
+
+    # /auth/me 的語意不變，既有的 API 呼叫端照舊拿到 401。
+    client.cookies.clear()
+    assert client.get("/api/v1/auth/me").status_code == 401
+
+
 def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
     admin = _bootstrap_admin(runtime)
 

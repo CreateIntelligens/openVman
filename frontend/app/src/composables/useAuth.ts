@@ -1,7 +1,7 @@
 import { readonly, ref } from "vue"
 
 import {
-  getCurrentAccount,
+  getSessionAccount,
   login as loginRequest,
   logout as logoutRequest,
   temporaryLogin as temporaryLoginRequest,
@@ -51,7 +51,12 @@ async function bootstrap(): Promise<void> {
   installHandlers()
   loading.value = true
   try {
-    account.value = await getCurrentAccount()
+    const current = await getSessionAccount()
+    if (!current) {
+      expireSession()
+      return
+    }
+    account.value = current
     forbidden.value = false
     if (window.location.pathname === publicAppPath("/login")) replacePath(publicAppPath("/"))
   } catch {
