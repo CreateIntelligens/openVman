@@ -310,18 +310,16 @@ onUnmounted(() => {
   margin-top: 1.5rem;
 }
 
-/* 單欄版面沒有空位給浮動的帳號列，會蓋住標題或輸入框：改排在舞台與對話下面。 */
-@media (max-width: 68.75rem) {
-  .app-shell:not(.immersive) ~ .session-toolbar {
-    position: static;
-    justify-content: space-between;
-    max-width: none;
-    margin: 0 1rem 1rem;
-  }
+/* 帳號列排在版面內：浮在畫面上不是蓋住輸入框、標題，就是蓋住人物。全螢幕沒有版面可排，才維持浮動。 */
+.app-shell:not(.immersive) ~ .session-toolbar {
+  position: static;
+  justify-content: space-between;
+  max-width: none;
+  margin: 0 1rem 1rem;
 }
 
-/* 這段寬度整頁不能捲，帳號列要留在畫面內，否則登出按不到；更窄的版面整頁可捲。 */
-@media (min-width: 48.0625rem) and (max-width: 68.75rem) {
+/* 這些寬度整頁不能捲，帳號列要留在畫面內，否則登出按不到；更窄的版面整頁可捲。 */
+@media (min-width: 48.0625rem) {
   .authenticated-app:has(> .app-shell:not(.immersive)) {
     display: flex;
     flex-direction: column;
@@ -336,6 +334,21 @@ onUnmounted(() => {
 
   .app-shell:not(.immersive) ~ .session-toolbar {
     flex: none;
+  }
+}
+
+/* 可捲的版面不必撐滿一屏，帳號列緊接在對話下面，不留一段空白。 */
+@media (max-width: 48rem) {
+  .authenticated-app > .app-shell:not(.immersive) {
+    min-height: 0;
+  }
+}
+
+/* 橫放時帳號列壓薄，把高度留給對話。 */
+@media (max-height: 30rem) {
+  .app-shell:not(.immersive) ~ .session-toolbar {
+    margin: 0 0.5rem 0.25rem;
+    padding-block: 0;
   }
 }
 

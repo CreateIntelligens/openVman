@@ -190,8 +190,8 @@ test("temporary login accepts only a password and exposes the expiry notice", ()
   assert.match(authApi, /"\/api\/v1\/auth\/temporary-login"/);
   assert.match(authApi, /JSON\.stringify\(\{ password \}\)/);
   assert.match(authStore, /loginTemporary/);
-  assert.match(loginScreen, /正式帳號/);
-  assert.match(loginScreen, /臨時密碼/);
+  assert.match(loginScreen, /我有帳號/);
+  assert.match(loginScreen, /我只有密碼/);
   assert.match(loginScreen, /v-if="mode === 'formal'"/);
   assert.match(root, /remaining_seconds/);
   assert.match(root, /expires_at/);

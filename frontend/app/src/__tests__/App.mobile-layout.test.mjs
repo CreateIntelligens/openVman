@@ -109,7 +109,7 @@ test("mobile layout preserves avatar stage height instead of compressing it afte
   assert.match(cssBlockAfter(phoneScopedMarker, ".stage-card"), /flex:\s*none;/);
   assert.match(
     cssBlockAfter(phoneScopedMarker, ".stage-card"),
-    /height:\s*clamp\(16rem,\s*48svh,\s*28rem\);/,
+    /height:\s*clamp\(11rem,\s*36svh,\s*24rem\);/,
   );
 });
 

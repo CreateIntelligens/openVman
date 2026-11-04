@@ -13,8 +13,8 @@ test("settings modal splits brain project selection from persona selection", () 
   assert.match(source, /currentProjectId:\s*string/);
   assert.match(source, /projectChange:\s*\[projectId:\s*string\]/);
   assert.match(source, /draftProjectId/);
-  assert.match(source, />大腦\/知識庫</);
-  assert.match(source, />人設</);
+  assert.match(source, />知識庫</);
+  assert.match(source, />個性</);
   assert.doesNotMatch(source, />大腦人設</);
 });
 
@@ -26,8 +26,8 @@ test("project selector is backed by project ids", () => {
 });
 
 test("brain project selector is shown before persona selector", () => {
-  const projectLabel = source.indexOf(">大腦/知識庫<");
-  const personaLabel = source.indexOf(">人設<");
+  const projectLabel = source.indexOf(">知識庫<");
+  const personaLabel = source.indexOf(">個性<");
 
   assert.notEqual(projectLabel, -1, "missing project label");
   assert.notEqual(personaLabel, -1, "missing persona label");

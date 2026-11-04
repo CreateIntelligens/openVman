@@ -83,7 +83,8 @@ describe("cookie auth API", () => {
     await getCurrentAccount();
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/auth/admin-temporary-login");
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/auth/admin-me");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/auth/session");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/v1/auth/admin-me");
   });
 
   it("updates Admin portal access for an existing temporary batch", async () => {

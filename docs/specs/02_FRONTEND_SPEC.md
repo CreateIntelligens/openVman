@@ -125,9 +125,20 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 `App.vue` 保留畫面組裝與事件綁定，不再內含語音計時與流程策略。`useAvatarConversation` 管理回答、打字機、TTS／播放、停止與錯誤協調；`useAvatarVoiceInput` 管理四種辨識、降級、閒置計時、回答時暫停與回答後恢復；`useAsrPreferences` 管理帳號引擎選單及偏好儲存。角色舞台、鏡頭、沉浸模式與設定切換分別由 `useAvatarStage`、`useAvatarCamera`、`useImmersiveView`、`useAvatarSettings` 管理。各自用 lifecycle hooks 清理持有資源；`App.vue` 組裝時以延遲 callback 銜接會話與計時上下文。原有路由、wire schema、台語分流、語音引擎、字幕與角色行為維持。後台入口、批次試辨識與外部 Avatar SDK 無需變更。
 
+### 5.1.1 登入與易用性（2026-11-04）
+
+前台的對象是一般訪客，文案用白話，操作說明要看得到，不靠 tooltip。
+
+* 開頁先打 `GET /api/v1/auth/session`：`{"account": null}` 就顯示登入畫面，不走 401。`/login` 由前台 nginx 回 `index.html`，重新整理或直接開不會 404；其他不存在的路徑仍回 404。
+* 登入畫面預設只有一個密碼欄（臨時密碼），「我有帳號」切到帳號密碼；窄畫面只顯示表單。出錯時游標回到要修正的欄位。
+* 麥克風按鈕直接寫出操作（按我說話、說完按這裡或按這裡停止），窄畫面（30rem 以下）獨立一排。上方按鈕在窄畫面保留文字。
+* 點推薦題或快速問題時，送出的內容帶主題以利檢索，對話紀錄只顯示題目本身（`sendMessage` 的 `displayText`）。參考資料的檔名與原文只顯示給 admin／root。
+* 設定視窗的基本區是知識庫、個性、人物、聲音、背景；語音引擎、語音辨識、語言、回答方式與展示機台收在「進階設定」。沒有改動時底部只有「關閉」。
+* 帳號列排在版面內；全螢幕模式沒有版面可排，才維持浮動。
+
 ### 5.2 訪客模式與迎賓（2026-10-06）
 
-訪客模式由 `useVisitorMode` 整頁共用，帳號的 `kiosk`（後台勾選，前台關不掉）或這台裝置的設定（設定視窗「切換成展示機台」、或網址 `?kiosk=1`／`?kiosk=0`，存在 localStorage）任一成立即生效：
+訪客模式由 `useVisitorMode` 整頁共用，帳號的 `kiosk`（後台勾選，前台關不掉）或這台裝置的設定（設定視窗「進階設定」的「切換成展示機台」、或網址 `?kiosk=1`／`?kiosk=0`，存在 localStorage）任一成立即生效：
 
 * 藏起設定鈕（`ControlBar`）與帳號列、登出（`Root.vue`）；長按標題 3 秒開 `UnlockDialog`，以 `POST /api/v1/auth/verify-password` 核對目前帳號密碼後暫時解鎖，重新整理後又藏起來。密碼錯回 400（401 會被 `apiFetch` 當成登入過期）。
 * `StartOverlay` 先要來賓點一下：`useAvatarConversation.handleStart` 解鎖 AudioContext、先連線，再開始收音。非訪客模式不顯示。

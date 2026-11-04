@@ -40,7 +40,7 @@ test("the mode is persisted and offered in settings", () => {
   assert.match(read("composables/useAvatarSettings.ts"), /saveSettings\(\{ replyMode: mode \}\)/);
 
   const modal = read("components/controls/SettingsModal.vue");
-  assert.match(modal, /回覆深度/);
+  assert.match(modal, /回答方式/);
   assert.match(modal, /v-for="option in REPLY_MODES"/);
 });
 

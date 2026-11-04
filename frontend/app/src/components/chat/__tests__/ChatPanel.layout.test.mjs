@@ -35,7 +35,7 @@ test("chat panel fills the console column while messages scroll internally", () 
 test("chat chrome does not shrink when messages grow", () => {
   assert.match(
     source,
-    /\.chat-panel__header,\s*\.chat-input-bar\s*{[\s\S]*flex-shrink:\s*0;/,
+    /\.chat-input-bar\s*{[\s\S]*flex-shrink:\s*0;/,
   );
 });
 
@@ -70,13 +70,13 @@ test("the composer says whether the microphone is live, and how to send", () => 
   // 使用者回報過「點了看不到反饋，不知道有沒有收音」。提示寫在輸入框裡，
   // 那是按下麥克風後眼睛會看的地方。
   assert.match(source, /:placeholder="composerPlaceholder"/);
-  assert.match(source, /收音中…講完請再按一次麥克風送出/);
-  assert.match(source, /收音中…請直接說話/);
+  assert.match(source, /請說話，說完按麥克風/);
+  assert.match(source, /請直接說話/);
   assert.match(source, /辨識中，請稍候…/);
   // 操作方式不同，提示要跟著走：push-to-talk 要提醒再按一次才會送。
   assert.match(source, /props\.asrInputMode === "push-to-talk"/);
   // VAD 偵測到講話時換一句，讓使用者知道聲音真的有進來。
-  assert.match(source, /props\.asrSpeaking \? "聆聽中…講完會自動送出"/);
+  assert.match(source, /props\.asrSpeaking \? "聽到了，說完會自動送出"/);
 });
 
 test("the listening status reaches assistive tech", () => {

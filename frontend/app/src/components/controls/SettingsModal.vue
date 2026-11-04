@@ -227,7 +227,10 @@ const projectOptions = computed(() =>
 )
 
 const personaOptions = computed(() =>
-  props.personas.map((p) => ({ value: p.persona_id, label: p.label }))
+  props.personas.map((p) => ({
+    value: p.persona_id,
+    label: p.label === 'default' ? '預設' : p.label,
+  }))
 )
 
 const characterOptions = computed(() =>
@@ -355,16 +358,16 @@ function handleDialogClick(event: MouseEvent): void {
         v-if="open"
         ref="dialogRef"
         class="modal-card"
-        aria-label="系統設定"
+        aria-label="設定"
         @cancel.prevent="close"
         @click="handleDialogClick"
       >
           <div class="modal-header">
-            <h3>系統設定</h3>
+            <h3>設定</h3>
             <button
               type="button"
               class="modal-close"
-              aria-label="關閉系統設定"
+              aria-label="關閉設定"
               @click="close"
             >
               ✕
@@ -376,7 +379,7 @@ function handleDialogClick(event: MouseEvent): void {
                  出關聯，也不必為了兩個下拉各佔掉一整行。 -->
             <div class="field-row">
               <div class="field-card">
-                <span class="field-card__label">大腦/知識庫</span>
+                <span class="field-card__label">知識庫</span>
                 <CustomSelect
                   v-model="draftProjectId"
                   :options="projectOptions"
@@ -386,7 +389,7 @@ function handleDialogClick(event: MouseEvent): void {
               </div>
 
               <div class="field-card">
-                <span class="field-card__label">人設</span>
+                <span class="field-card__label">個性</span>
                 <CustomSelect
                   v-model="draftPersonaId"
                   :options="personaOptions"
@@ -397,20 +400,10 @@ function handleDialogClick(event: MouseEvent): void {
 
             <div class="field-row">
               <div class="field-card">
-                <span class="field-card__label">角色配置</span>
+                <span class="field-card__label">人物</span>
                 <CustomSelect
                   v-model="draftCharacterValue"
                   :options="characterOptions"
-                />
-              </div>
-
-              <div class="field-card">
-                <span class="field-card__label">語音引擎</span>
-                <CustomSelect
-                  v-model="draftTtsProvider"
-                  :options="ttsProviderOptions"
-                  :disabled="disabled"
-                  @change="handleTtsProviderDraftChange"
                 />
               </div>
 
@@ -423,16 +416,6 @@ function handleDialogClick(event: MouseEvent): void {
                 />
               </div>
 
-              <!-- 沒有被授權任何引擎就不顯示：給一個只有「預設」的選單，
-                   看起來像壞掉。 -->
-              <div v-if="asrEngines.length" class="field-card">
-                <span class="field-card__label">語音辨識</span>
-                <CustomSelect
-                  v-model="draftAsrProvider"
-                  :options="asrProviderOptions"
-                  :disabled="disabled"
-                />
-              </div>
             </div>
 
             <div class="field-card field-card--full">
@@ -499,11 +482,38 @@ function handleDialogClick(event: MouseEvent): void {
               </div>
             </div>
 
+            <!-- 一般人只需要上面那幾項；引擎名稱這些工作人員才看得懂，收起來。 -->
+            <details class="settings-advanced">
+              <summary>進階設定</summary>
+              <div class="settings-advanced__body">
+                <div class="field-row">
+                <div class="field-card">
+                  <span class="field-card__label">語音引擎</span>
+                  <CustomSelect
+                    v-model="draftTtsProvider"
+                    :options="ttsProviderOptions"
+                    :disabled="disabled"
+                    @change="handleTtsProviderDraftChange"
+                  />
+                </div>
+
+                <!-- 沒有被授權任何引擎就不顯示：給一個只有「預設」的選單，
+                     看起來像壞掉。 -->
+                <div v-if="asrEngines.length" class="field-card">
+                  <span class="field-card__label">語音辨識</span>
+                  <CustomSelect
+                    v-model="draftAsrProvider"
+                    :options="asrProviderOptions"
+                    :disabled="disabled"
+                  />
+                </div>
+                </div>
+
             <div
               v-if="(languageRoutesAvailable?.length ?? 0) > 1"
               class="field-card field-card--full"
             >
-              <span class="field-card__label">語言分流</span>
+              <span class="field-card__label">可以使用的語言</span>
               <div class="route-toggles">
                 <label
                   v-for="route in languageRoutesAvailable"
@@ -520,7 +530,7 @@ function handleDialogClick(event: MouseEvent): void {
                 </label>
               </div>
               <small class="field-card__hint">
-                至少留一個；只能在後台開的語言裡切換，立即生效。
+                至少留一種語言，改了馬上生效。
               </small>
             </div>
 
@@ -571,7 +581,7 @@ function handleDialogClick(event: MouseEvent): void {
             </div>
 
             <div class="field-card field-card--full">
-              <span class="field-card__label">回覆深度</span>
+              <span class="field-card__label">回答方式</span>
               <div class="mode-toggle">
                 <label
                   v-for="option in REPLY_MODES"
@@ -592,20 +602,22 @@ function handleDialogClick(event: MouseEvent): void {
                 </label>
               </div>
             </div>
-          </div>
-
-          <div class="modal-footer">
             <!-- 展示機台開關：整台裝置切換，不必等「套用」。帳號固定的關不掉，只說明。 -->
             <p v-if="kioskSource === 'account'" class="kiosk-note">這個帳號固定是展示機台</p>
             <button
               v-else
               type="button"
-              class="btn-cancel btn-kiosk"
+              class="btn-cancel"
               @click="kioskSource === 'device' ? emit('leaveKiosk') : emit('enterKiosk')"
             >
               {{ kioskSource === 'device' ? '結束展示機台模式' : '切換成展示機台' }}
             </button>
-            <button type="button" class="btn-cancel" @click="close">取消</button>
+              </div>
+            </details>
+          </div>
+
+          <div class="modal-footer">
+            <button v-if="isDirty" type="button" class="btn-cancel" @click="close">取消</button>
             <button
               type="button"
               class="btn-apply"

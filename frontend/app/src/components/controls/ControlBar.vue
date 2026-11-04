@@ -333,24 +333,13 @@ function handleCameraPreviewScaleInput(event: Event): void {
     gap: 0.5rem;
   }
 
+  /* 手機也留文字：只有圖示的鏡頭和全螢幕，很多人看不出來是什麼。 */
   .control-btn {
-    min-width: 2.75rem;
-    padding-inline: 0.75rem;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+    padding-inline: 0.5rem;
+    font-size: 0.8rem;
   }
 }
-
-@media (max-width: 24rem) {
-  .control-button__label {
-    position: absolute;
-    width: 0.0625rem;
-    height: 0.0625rem;
-    padding: 0;
-    margin: -0.0625rem;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-}
-
 </style>

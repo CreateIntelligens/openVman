@@ -267,16 +267,25 @@ export async function logout(): Promise<void> {
   if (!res.ok) await parseJson<unknown>(res);
 }
 
+async function hasSession(): Promise<boolean> {
+  const response = await apiFetch(apiUrl("/auth/session"));
+  // 問不到就交給 admin-me 判斷，這裡只負責避開「沒登入」那一筆 401。
+  if (!response.ok) return true;
+  const payload = await parseJson<{ account: unknown }>(response);
+  return payload.account !== null;
+}
+
 export async function getCurrentAccount(): Promise<AccountProfile> {
-  let response: Response;
+  let response: Response | null = null;
   try {
-    response = await apiFetch(apiUrl("/auth/admin-me"));
+    if (await hasSession()) response = await apiFetch(apiUrl("/auth/admin-me"));
   } catch (error) {
     if (error instanceof DOMException) throw error;
     throw new AdminSessionUnavailableError(
       error instanceof Error ? error.message : "連不上伺服器，請稍後再試。",
     );
   }
+  if (!response) throw new Error("Not signed in");
   if (response.status === 403) {
     throw new AdminPortalAccessError("此帳號沒有進入管理後台的權限");
   }

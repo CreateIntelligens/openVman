@@ -1,15 +1,10 @@
 <template>
   <section class="chat-panel" :class="{ 'chat-panel--compact': compact }">
-    <header v-if="!compact" class="chat-panel__header">
-      <div>
-        <p class="chat-panel__eyebrow">訪客對話</p>
-        <h3>對話紀錄</h3>
-      </div>
-
-    </header>
-
     <div class="chat-messages" ref="messagesRef">
       <div ref="contentRef" class="chat-messages__content">
+        <p v-if="!compact && messages.length === 0 && !isThinking" class="chat-empty">
+          打字或按「按我說話」，都可以問我問題。
+        </p>
         <div
           v-for="(msg, i) in visibleMessages"
           :key="i"
@@ -17,7 +12,7 @@
           :class="msg.role"
         >
           <div class="chat-msg__meta">
-            <span class="chat-role">{{ msg.role === "user" ? "訪客" : "虛擬人" }}</span>
+            <span class="chat-role">{{ msg.role === "user" ? "你" : "虛擬人" }}</span>
             <span class="chat-time">{{ formatTime(msg.timestamp) }}</span>
           </div>
           <p v-if="msg.role === 'user'" class="chat-text">{{ msg.text }}</p>
@@ -45,7 +40,7 @@
               開啟相關連結
             </a>
           </div>
-          <div v-if="!compact && msg.sourcePath" class="chat-msg__reference-container">
+          <div v-if="!compact && showSources && msg.sourcePath" class="chat-msg__reference-container">
             <button
               type="button"
               class="chat-msg__ref-btn"
@@ -79,10 +74,9 @@
         <div v-if="isThinking" class="chat-msg ai thinking">
           <div class="chat-msg__meta">
             <span class="chat-role">虛擬人</span>
-            <span class="chat-time">即時生成</span>
           </div>
           <div class="thinking-row">
-            <span class="thinking-copy">正在整理回覆</span>
+            <span class="thinking-copy">正在想</span>
             <span class="dots"><span /><span /><span /></span>
           </div>
         </div>
@@ -96,6 +90,7 @@
       role="group"
       aria-label="推薦問題"
     >
+      <p class="suggestion-title">可以這樣問：</p>
       <button
         v-for="item in suggestions"
         :key="item.message"
@@ -114,6 +109,7 @@
         :is-transcribing="asrTranscribing"
         :disabled="!canSend || !asrSupported"
         :is-supported="asrSupported"
+        :label="asrButtonLabel"
         @toggle="emit('asr-toggle')"
       />
       <!-- 給螢幕閱讀器的收音狀態；看得到的人讀的是輸入框裡的提示。 -->
@@ -194,6 +190,8 @@ const props = withDefaults(defineProps<{
   /** 虛擬人正在想或在講；送出鈕換成停止。 */
   responding?: boolean
   compact?: boolean
+  /** 檔名和原文是給管理者查證用的；訪客看不懂，也不該看到。 */
+  showSources?: boolean
   /** 收音時的即時音量（0～1），讓使用者知道麥克風有收到聲音。 */
   micLevel?: number
   suggestions?: SuggestedQuestion[]
@@ -240,8 +238,15 @@ const asrStatusText = computed(() => {
   if (props.asrStarting) return "麥克風啟動中…"
   if (!props.asrListening) return ""
   if (props.asrInterim) return `辨識中：${props.asrInterim}`
-  if (props.asrInputMode === "push-to-talk") return "收音中…講完請再按一次麥克風送出"
-  return props.asrSpeaking ? "聆聽中…講完會自動送出" : "收音中…請直接說話"
+  if (props.asrInputMode === "push-to-talk") return "請說話，說完按麥克風"
+  return props.asrSpeaking ? "聽到了，說完會自動送出" : "請直接說話"
+})
+const asrButtonLabel = computed(() => {
+  if (props.asrSupported === false) return "不支援語音"
+  if (props.asrTranscribing) return "辨識中…"
+  if (props.asrStarting) return "請稍候…"
+  if (!props.asrListening) return "按我說話"
+  return props.asrInputMode === "push-to-talk" ? "說完按這裡" : "按這裡停止"
 })
 const composerPlaceholder = computed(() => props.asrInterim || asrStatusText.value || props.placeholder)
 const messagesRef = ref<HTMLDivElement>()
@@ -333,15 +338,6 @@ useStickToBottom(messagesRef, contentRef)
   overflow: hidden;
 }
 
-.chat-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: var(--hairline) solid var(--line);
-}
-
-.chat-panel__header,
 .chat-input-bar {
   flex-shrink: 0;
 }
@@ -376,32 +372,6 @@ useStickToBottom(messagesRef, contentRef)
 .suggestion-chip:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.chat-panel__eyebrow {
-  margin: 0 0 0.25rem;
-  color: var(--text-soft);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.chat-panel__header h3 {
-  margin: 0;
-  color: var(--text);
-  font-family: var(--ov-font-display);
-  font-size: 1.125rem;
-  font-weight: 700;
-}
-
-.chat-panel__counter {
-  border-radius: var(--radius-pill);
-  padding: 0.25rem 0.75rem;
-  background: var(--bg);
-  border: var(--hairline) solid var(--line);
-  color: var(--text-soft);
-  font-size: 0.75rem;
-  font-weight: 500;
 }
 
 .chat-messages {
@@ -660,7 +630,7 @@ useStickToBottom(messagesRef, contentRef)
 
 .chat-input-feedback {
   flex-basis: 100%;
-  margin: 0 0 0 3rem;
+  margin: 0;
   color: rgb(var(--ov-color-danger));
   font-size: 0.8rem;
 }
@@ -684,6 +654,20 @@ useStickToBottom(messagesRef, contentRef)
 
 .composer-shell--listening input {
   padding-right: 2.75rem;
+}
+
+.chat-empty {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.95rem;
+}
+
+.suggestion-title {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .composer-label {
@@ -818,9 +802,35 @@ useStickToBottom(messagesRef, contentRef)
   padding-inline: 0.875rem;
 }
 
+/* 高度不夠時先收提示，輸入框優先留在畫面內。 */
+@media (max-height: 36rem) {
+  .chat-empty,
+  .suggestion-chip:nth-of-type(n + 2) {
+    display: none;
+  }
+}
+
+@media (max-height: 30rem) {
+  .suggestion-row {
+    display: none;
+  }
+}
+
+/* 窄畫面把麥克風獨立成一整排：按鈕夠大也看得到字，輸入框不會被擠到打不下。 */
+@media (max-width: 30rem) {
+  .asr-btn {
+    flex-basis: 100%;
+  }
+
+  .chat-input-bar {
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+}
+
 @media (max-width: 48rem) {
   /* 手機一題常佔一整行，四題會把輸入框擠出第一屏，只留兩題。 */
-  .suggestion-chip:nth-child(n + 3) {
+  .suggestion-chip:nth-of-type(n + 3) {
     display: none;
   }
 

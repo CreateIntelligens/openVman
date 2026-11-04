@@ -275,7 +275,7 @@
 
   .stage-card {
     flex: none;
-    height: clamp(16rem, 48svh, 28rem);
+    height: clamp(11rem, 36svh, 24rem);
     padding: 0.625rem;
     border-radius: 0.75rem;
     transition: height 0.25s ease;
@@ -317,9 +317,39 @@
   }
 }
 
-@media (max-width: 48rem) and (max-height: 36rem) {
+/* 矮的手機（iPhone SE 這類）把舞台再縮小，輸入框才留得在第一屏。 */
+@media (max-width: 48rem) and (max-height: 44rem) {
   .stage-card {
-    height: clamp(14rem, 44svh, 22rem);
+    height: clamp(7rem, 22svh, 10rem);
+  }
+}
+
+/* 手機橫放高度不夠上下疊，舞台和對話改成左右並排。 */
+@media (min-width: 48.0625rem) and (max-width: 68.75rem) and (max-height: 30rem) {
+  .app-shell {
+    padding: 0.5rem;
+  }
+
+  .kiosk-layout {
+    flex-flow: row wrap;
+    gap: 0.5rem;
+  }
+
+  .control-area {
+    flex: 0 0 100%;
+  }
+
+  .stage-panel,
+  .chat-area {
+    height: calc(100% - var(--ov-touch-target) - 2.5rem);
+  }
+
+  .stage-panel {
+    flex: 0 0 36%;
+  }
+
+  .chat-area {
+    flex: 1 1 0;
   }
 }
 

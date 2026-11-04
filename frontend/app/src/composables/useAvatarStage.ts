@@ -49,7 +49,7 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     if (!settings.projectId) return "此帳號沒有可使用的知識庫專案";
     if (!wasm.isReady.value) return "正在準備...";
     if (wasm.isLoading.value) return "切換展示角色中...";
-    return "向數位虛擬人提問...";
+    return "輸入問題";
   });
   async function handleCharChange(charId: string): Promise<void> {
     if (!charId) return;

@@ -5,6 +5,8 @@ defineProps<{
   isTranscribing?: boolean
   disabled?: boolean
   isSupported?: boolean
+  /** 看得到的操作說明；手機碰不到 tooltip，只寫在 title 等於沒寫。 */
+  label?: string
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +20,7 @@ const emit = defineEmits<{
     :class="{
       'asr-btn--active': isListening,
       'asr-btn--transcribing': isTranscribing,
+      'asr-btn--labeled': label,
     }"
     :disabled="disabled || isTranscribing || isSupported === false"
     :aria-label="isSupported === false
@@ -41,6 +44,7 @@ const emit = defineEmits<{
         <line x1="12" x2="12" y1="19" y2="22" />
       </svg>
     </span>
+    <span v-if="label" class="asr-btn__label">{{ label }}</span>
     <span v-if="isListening" class="asr-btn__status" aria-hidden="true" />
   </button>
 </template>
@@ -65,6 +69,20 @@ const emit = defineEmits<{
     color var(--ov-dur-micro) var(--ov-ease-out),
     transform var(--ov-dur-micro) var(--ov-ease-out);
   flex-shrink: 0;
+}
+
+.asr-btn--labeled {
+  gap: 0.4rem;
+  width: auto;
+  padding-inline: 0.875rem;
+  border-radius: 999rem;
+}
+
+.asr-btn__label {
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 @media (hover: hover) {

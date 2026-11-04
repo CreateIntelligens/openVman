@@ -113,6 +113,7 @@
         :responding="avatarResponding"
         :mic-level="micLevel"
         :suggestions="suggestions"
+        :show-sources="canSeeDecisionDebug"
         @suggest="handleSuggestion"
         @composing="composing = $event"
         @send="handleComposerSend"
