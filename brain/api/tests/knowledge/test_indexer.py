@@ -781,3 +781,56 @@ def test_build_knowledge_records_encodes_embed_text(monkeypatch, tmp_path):
     assert encoded[0] == ["主題：t\n問題：q", "plain chunk"]
     assert records[0]["text"] == "full QA payload"
     assert records[1]["text"] == "plain chunk"
+
+
+def _stale_chunk_sink(monkeypatch, tmp_path):
+    indexer, *_ = _load_indexer(monkeypatch, tmp_path)
+    workspace = tmp_path / "stale-workspace"
+    workspace.mkdir()
+    table = MagicMock()
+    monkeypatch.setattr(indexer, "_ensure_knowledge_table", lambda *_: (table, False))
+    monkeypatch.setattr(indexer, "_open_knowledge_table", lambda *_: table)
+    monkeypatch.setattr(indexer, "_knowledge_table_exists", lambda *_: True)
+    return indexer._IndexSink("p", workspace, MagicMock()), table, workspace
+
+
+def test_shrinking_a_document_removes_its_old_tail_chunks(monkeypatch, tmp_path):
+    sink, table, _ = _stale_chunk_sink(monkeypatch, tmp_path)
+    sink.flush([
+        {"path": "qa.csv", "chunk_id": "qa.csv::0"},
+        {"path": "o'k.md", "chunk_id": "o'k.md::0"},
+    ])
+    assert [call.args[0] for call in table.delete.call_args_list] == [
+        "path = 'qa.csv' AND chunk_id NOT IN ('qa.csv::0')",
+        "path = 'o''k.md' AND chunk_id NOT IN ('o''k.md::0')",
+    ]
+
+
+def test_new_table_has_nothing_stale_to_remove(monkeypatch, tmp_path):
+    sink, table, _ = _stale_chunk_sink(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        sys.modules[sink.__class__.__module__],
+        "_ensure_knowledge_table",
+        lambda *_: (table, True),
+    )
+    sink.flush([{"path": "qa.csv", "chunk_id": "qa.csv::0"}])
+    table.delete.assert_not_called()
+
+
+def test_emptied_document_loses_all_its_chunks(monkeypatch, tmp_path):
+    sink, table, workspace = _stale_chunk_sink(monkeypatch, tmp_path)
+    emptied = workspace / "qa.csv"
+    emptied.write_text("", encoding="utf-8")
+    sink.flush([])
+    sink.commit_checkpoint([emptied])
+    table.delete.assert_called_once_with("path = 'qa.csv'")
+
+
+def test_document_with_chunks_is_not_wiped_at_checkpoint(monkeypatch, tmp_path):
+    sink, table, workspace = _stale_chunk_sink(monkeypatch, tmp_path)
+    doc = workspace / "qa.csv"
+    doc.write_text("x", encoding="utf-8")
+    sink.flush([{"path": "qa.csv", "chunk_id": "qa.csv::0"}])
+    table.delete.reset_mock()
+    sink.commit_checkpoint([doc])
+    table.delete.assert_not_called()

@@ -176,22 +176,30 @@ class _IndexSink:
         self._project_id = project_id
         self._workspace_root = workspace_root
         self._store = store
+        self._flushed_paths: set[str] = set()
 
     def flush(self, records: list[dict[str, Any]]) -> None:
+        self._flushed_paths = {record["path"] for record in records}
         if not records:
             return
         table, created = _ensure_knowledge_table(self._project_id, records)
         if created:
             return
         table.merge_insert("chunk_id").when_matched_update_all().when_not_matched_insert_all().execute(records)
+        # merge_insert 只新增或更新：文件變短時尾段的舊 chunk 會留著，刪掉的問答還查得到。
+        _delete_stale_chunks(table, records)
 
     def commit_checkpoint(self, paths: list[Path]) -> None:
         updates = {}
         for path in paths:
+            relative_path = path.relative_to(self._workspace_root).as_posix()
             try:
-                updates[path.relative_to(self._workspace_root).as_posix()] = _fingerprint_document(path)
+                updates[relative_path] = _fingerprint_document(path)
             except FileNotFoundError:
-                pass
+                continue
+            # 文件還在但切不出任何內容（例如被清空）：舊 chunk 全都過時了。
+            if relative_path not in self._flushed_paths:
+                _delete_records_where(self._project_id, "path", relative_path)
         self._store.commit(updates)
 
 
@@ -271,6 +279,16 @@ def _delete_records_where(project_id: str, field: str, value: str) -> None:
     if not _knowledge_table_exists(project_id):
         return
     _open_knowledge_table(project_id).delete(f"{field} = {_lance_string(value)}")
+
+
+def _delete_stale_chunks(table: Any, records: list[dict[str, Any]]) -> None:
+    """Drop chunks of the just-written documents that the new version no longer has."""
+    live_ids: dict[str, list[str]] = {}
+    for record in records:
+        live_ids.setdefault(record["path"], []).append(record["chunk_id"])
+    for path, chunk_ids in live_ids.items():
+        keep = ", ".join(_lance_string(chunk_id) for chunk_id in chunk_ids)
+        table.delete(f"path = {_lance_string(path)} AND chunk_id NOT IN ({keep})")
 
 
 def _delete_placeholder_record(project_id: str) -> None:
