@@ -768,7 +768,10 @@ def sync_entries_for_source(
                     elif not same_text[0].get("source_path"):
                         same_text[0].update(doc_entry)
                         kept.append(same_text[0])
-            kept.sort(key=lambda entry: doc_position[entry["question"]])
+            # 只有一個節點用這份文件時，在文件頁調整的順序要反映到選單；分給多個節點時，
+            # 每個節點各自排序，照檔案排會把別的節點拖過的順序打亂。新題放在最後。
+            if len(referencing) == 1:
+                kept.sort(key=lambda entry: doc_position[entry["question"]])
             node["qa_entries"] = _refill_source_slots(node["qa_entries"], source_path, kept)
             if not node["qa_entries"]:
                 emptied.append(node_id)

@@ -254,11 +254,15 @@ def _place_rows(
     updates: list[dict[str, Any]],
     removed: set[str],
     build_row: Any,
+    keep_positions: bool = False,
 ) -> list[Any]:
     """Put updated rows back into the slots they came from, leaving every other row alone.
 
     同題重複時對應最後一列，和合併檢視顯示的那列相同。多出來的新題接在這批題目最後一個
     位置之後，不接到檔尾，才不會跑到別的節點的題目後面。
+
+    ``keep_positions``：每列留在自己原本的位置，只換內容。檔案分給多個節點時要這樣，
+    同一題在兩個節點的順序可能不同，照這個節點的順序重排會改到另一個節點的選單。
     """
     last_position = {question_of(row): position for position, row in enumerate(rows)}
     sources = {
@@ -266,24 +270,30 @@ def _place_rows(
         for update in updates
         if update.get("match") in last_position
     }
-    slots = set(sources.values())
     built = [
-        build_row(update, rows[sources[update["match"]]] if update.get("match") in sources else None)
+        (
+            sources.get(update.get("match")),
+            build_row(update, rows[sources[update["match"]]] if update.get("match") in sources else None),
+        )
         for update in updates
     ]
-    placed = iter(built)
+    if keep_positions:
+        by_position = {position: row for position, row in built if position is not None}
+        fresh = [row for position, row in built if position is None]
+    else:
+        slots = sorted(sources.values())
+        by_position = dict(zip(slots, (row for _, row in built)))
+        fresh = [row for _, row in built][len(slots):]
     result: list[Any] = []
-    filled = 0
     last_slot = -1
     for position, row in enumerate(rows):
-        if position in slots:
-            result.append(next(placed))
-            filled += 1
+        if position in by_position:
+            result.append(by_position[position])
             last_slot = len(result)
         elif question_of(row) not in removed:
             result.append(row)
-    insert_at = last_slot if filled else len(result)
-    result[insert_at:insert_at] = built[filled:]
+    insert_at = last_slot if last_slot >= 0 else len(result)
+    result[insert_at:insert_at] = fresh
     return result
 
 
@@ -337,22 +347,17 @@ def rewrite_qa_csv(
 
     indexes: list[str] = []
     if has_other_rows:
-        # 別的節點的 index 不能動；這個節點只在自己原本的 index 之間換順序，新題排到最後。
-        own = sorted(
-            value
-            for value in (_index_sort_value(_cell(rows[p], "index")) for p in matched_positions)
-            if math.isfinite(value)
-        )
+        # 檔案分給多個節點：每列保留原本的 index，新題排在最大值之後。順序記在節點上。
         all_values = [
             value
             for value in (_index_sort_value(_cell(row, "index")) for row in rows)
             if math.isfinite(value)
         ]
         next_index = int(max(all_values, default=0)) + 1
-        for position in range(len(updates)):
-            if position < len(own):
-                value = own[position]
-                indexes.append(str(int(value)) if value == int(value) else str(value))
+        for update in updates:
+            position = last_position.get(update.get("match")) if update.get("match") else None
+            if position is not None:
+                indexes.append(_cell(rows[position], "index"))
             else:
                 indexes.append(str(next_index))
                 next_index += 1
@@ -386,7 +391,9 @@ def rewrite_qa_csv(
         _put("index", index_of[id(update)])
         return row
 
-    return _write_csv_table([header, *_place_rows(rows, _question_of, updates, removed, _build_row)])
+    return _write_csv_table(
+        [header, *_place_rows(rows, _question_of, updates, removed, _build_row, keep_positions=has_other_rows)]
+    )
 
 
 def qa_markdown_preamble(content: str) -> str:
@@ -439,7 +446,9 @@ def rewrite_qa_markdown(
         )
         return (update["q"], raw, update)
 
-    placed = _place_rows(blocks, lambda block: block[0], updates, removed, _build_block)
+    matched = {update.get("match") for update in updates if update.get("match")}
+    shared = any(block[0] not in matched and block[0] not in removed for block in blocks)
+    placed = _place_rows(blocks, lambda block: block[0], updates, removed, _build_block, keep_positions=shared)
     return "\n\n".join([preamble, *(block[1] for block in placed)] if preamble else [block[1] for block in placed])
 
 

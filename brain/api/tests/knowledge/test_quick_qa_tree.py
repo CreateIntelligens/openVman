@@ -135,18 +135,32 @@ def test_editing_keeps_custom_columns_on_every_row(client, shared):
     assert saved["丙題"]["備註"] == "丙的備註"
 
 
-def test_reordering_a_shared_file_stays_within_the_node_own_positions(client, shared):
+def test_reordering_a_shared_file_only_changes_this_node(client, shared):
     rows = list(reversed(_merged(client, "n1")))
-    for position, row in enumerate(rows, start=1):
-        row["index"] = str(position)
 
     assert _put_merged(client, "n1", rows).status_code == 200
 
     assert _questions("n1") == ["乙題", "甲題"]
     assert _questions("n2") == ["丙題", "丁題"]
-    saved = _rows(shared)
-    assert {saved[q]["index"] for q in ("甲題", "乙題")} == {"10", "20"}
-    assert saved["乙題"]["index"] == "10"
+    # 檔案分給多個節點時，順序記在節點上，檔案的列與 index 都不動。
+    assert shared.read_text(encoding="utf-8") == _SHARED_CONTENT
+
+
+def test_editing_a_question_on_two_nodes_does_not_reorder_the_other_node(client, shared):
+    """dev 實測：從第二個分類改答案，第一個分類的選單順序被檔案順序打亂。"""
+    from knowledge import qa_nodes
+
+    qa_nodes.add_qa_entry_to_node("n2", _entry("甲題"))
+    rows = _merged(client, "n2")
+    assert [row["q"] for row in rows] == ["丙題", "丁題", "甲題"]
+    rows[2]["a"] = "從 n2 改的答案"
+
+    assert _put_merged(client, "n2", rows).status_code == 200
+
+    assert _questions("n1") == ["甲題", "乙題"]
+    assert _questions("n2") == ["丙題", "丁題", "甲題"]
+    saved = shared.read_text(encoding="utf-8")
+    assert saved == _SHARED_CONTENT.replace("10,甲題,甲答,", "10,甲題,從 n2 改的答案,")
 
 
 def test_a_file_owned_by_one_node_still_takes_the_screen_order(client, workspace):
