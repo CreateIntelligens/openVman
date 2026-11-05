@@ -4,12 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fetchKnowledgeBaseDocumentsMock = vi.fn();
 const fetchKnowledgeDocumentMock = vi.fn();
 const reindexKnowledgeMock = vi.fn();
+const moveKnowledgeDocumentMock = vi.fn();
 let activeProjectId = "fishing";
 
 vi.mock("../api", () => ({
   fetchKnowledgeBaseDocuments: () => fetchKnowledgeBaseDocumentsMock(),
   fetchKnowledgeDocument: (path: string) => fetchKnowledgeDocumentMock(path),
   reindexKnowledge: () => reindexKnowledgeMock(),
+  moveKnowledgeDocument: (source: string, target: string) => moveKnowledgeDocumentMock(source, target),
 }));
 
 vi.mock("../context/ProjectContext", () => ({
@@ -312,6 +314,42 @@ describe("useKnowledgeBase document list", () => {
     expect(result.current.rightPane).toBe("folder");
     expect(result.current.selectedPath).toBe("knowledge/gear");
     expect(result.current.currentDir).toBe("knowledge/gear");
+  });
+
+  // 審查重現：從樹上「⋯ › 移動…」或拖到別的資料夾，會重新讀檔，把沒存的修改蓋回伺服器版。
+  it("keeps unsaved edits when the open document is moved to another folder", async () => {
+    let documents = [{ path: "knowledge/a/guide.md", enabled: true, is_indexed: true }];
+    fetchKnowledgeBaseDocumentsMock.mockImplementation(async () => ({
+      documents,
+      directories: ["knowledge/a", "knowledge/b"],
+    }));
+    fetchKnowledgeDocumentMock.mockImplementation(async (path: string) => ({
+      path,
+      enabled: true,
+      is_indexed: true,
+      content: "server copy",
+    }));
+    moveKnowledgeDocumentMock.mockImplementation(async (_source: string, target: string) => {
+      documents = [{ ...documents[0], path: target }];
+      return { status: "ok" };
+    });
+    const { result } = renderHook(() => useKnowledgeBase());
+    await waitFor(() => expect(result.current.documentsLoaded).toBe(true));
+    await act(async () => {
+      result.current.handleTreeSelect({ type: "file", path: "knowledge/a/guide.md" });
+    });
+    await waitFor(() => expect(result.current.openDocument?.path).toBe("knowledge/a/guide.md"));
+    act(() => result.current.updateEditContent("my unsaved edit"));
+
+    await act(async () => {
+      await result.current.handleMove("knowledge/a/guide.md", "knowledge/b");
+    });
+
+    expect(moveKnowledgeDocumentMock).toHaveBeenCalledWith("knowledge/a/guide.md", "knowledge/b/guide.md");
+    expect(result.current.openDocument?.path).toBe("knowledge/b/guide.md");
+    expect(result.current.selectedPath).toBe("knowledge/b/guide.md");
+    expect(result.current.editContent).toBe("my unsaved edit");
+    expect(result.current.editorDirty).toBe(true);
   });
 
   it("calls the index rebuild by its plain name in the result message", async () => {

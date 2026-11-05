@@ -556,6 +556,57 @@ describe("MergedCsvPane", () => {
       expect(screen.getByDisplayValue("問題1")).toBeTruthy();
     });
 
+    // 審查重現：分類的題目來自兩份檔案，刪光其中一份的題目後存檔，那份檔案會長回一個新分類。
+    it("refuses to save when every question from one of several files was deleted", async () => {
+      qaNodeMocks.fetchMergedQa.mockResolvedValue([
+        makeRow("甲", { source_file: "knowledge/qa/a.csv" }),
+        makeRow("乙", { source_file: "knowledge/qa/b.csv" }),
+        makeRow("丙", { source_file: "knowledge/qa/b.csv" }),
+      ]);
+      const { onStatus } = renderPane();
+
+      await screen.findByDisplayValue("甲");
+      fireEvent.click(screen.getByRole("button", { name: "刪除第 1 題" }));
+      fireEvent.click(saveButton());
+
+      expect(qaNodeMocks.saveMergedQa).not.toHaveBeenCalled();
+      expect(lastStatus(onStatus)).toEqual({
+        type: "error",
+        message: "「a.csv」的題目不能全部刪掉，至少留一題；要整份移除，請到左邊「文件」刪除那份檔案。想復原請按「取消變更」。",
+      });
+    });
+
+    it("does not name the generated file when every typed-in question was deleted", async () => {
+      qaNodeMocks.fetchMergedQa.mockResolvedValue([
+        makeRow("甲", { source_file: "knowledge/qa/a.csv" }),
+        makeRow("乙", { source_file: "knowledge/qa/manual_root.md" }),
+      ]);
+      const { onStatus } = renderPane();
+
+      await screen.findByDisplayValue("乙");
+      fireEvent.click(screen.getByRole("button", { name: "刪除第 2 題" }));
+      fireEvent.click(saveButton());
+
+      expect(qaNodeMocks.saveMergedQa).not.toHaveBeenCalled();
+      expect(lastStatus(onStatus).message).toBe("自己輸入的題目不能全部刪掉，至少留一題。想復原請按「取消變更」。");
+    });
+
+    it("still saves when some questions of each file are left", async () => {
+      qaNodeMocks.fetchMergedQa.mockResolvedValue([
+        makeRow("甲", { source_file: "knowledge/qa/a.csv" }),
+        makeRow("乙", { source_file: "knowledge/qa/b.csv" }),
+        makeRow("丙", { source_file: "knowledge/qa/b.csv" }),
+      ]);
+      renderPane();
+
+      await screen.findByDisplayValue("甲");
+      fireEvent.click(screen.getByRole("button", { name: "刪除第 2 題" }));
+      fireEvent.click(saveButton());
+
+      await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+      expect(savedPayload().map((item) => item.q)).toEqual(["甲", "丙"]);
+    });
+
     it("reuses the original file when questions are added back after deleting them all", async () => {
       qaNodeMocks.fetchMergedQa.mockResolvedValue([makeRow("舊題", { source_file: "knowledge/qa/a.csv" })]);
       renderPane();
@@ -994,11 +1045,11 @@ describe("MergedCsvPane", () => {
 
       await screen.findByDisplayValue("問題");
       expect(screen.getByText(/「已隱藏」的問題不會出現在訪客的選單，但 AI 回答時還是會用/)).toBeTruthy();
-      expect(within(article("問題")).getByText("顯示中")).toBeTruthy();
+      expect(within(article("問題")).getByText("隱藏這題")).toBeTruthy();
 
       fireEvent.click(screen.getByRole("button", { name: "第 1 題顯示中，按一下隱藏" }));
 
-      expect(within(article("問題")).getByText("已隱藏")).toBeTruthy();
+      expect(within(article("問題")).getByText("已隱藏 · 改回顯示")).toBeTruthy();
       expect(screen.getByRole("button", { name: "第 1 題已隱藏，按一下改成顯示" })).toBeTruthy();
       expect(screen.getByText("顯示中 0 題，隱藏 1 題")).toBeTruthy();
 

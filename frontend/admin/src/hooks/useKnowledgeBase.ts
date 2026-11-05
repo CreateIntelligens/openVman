@@ -501,6 +501,20 @@ export function useKnowledgeBase() {
     }
   }, [deleteTarget, loadDocuments, openDocument, selectedPath, setErrorStatus]);
 
+  // 搬移不改內容，所以只換路徑與文件資訊：重新讀檔會用伺服器版本蓋掉還沒存的修改。
+  const relocateOpenDocument = useCallback(async (targetPath: string) => {
+    const requestedProjectId = projectId;
+    setSelectedPath(targetPath);
+    setOpenDocument((current) => (current ? { ...current, path: targetPath } : current));
+    try {
+      const refreshed = await fetchKnowledgeDocument(targetPath);
+      if (activeProjectRef.current !== requestedProjectId) return;
+      setOpenDocument((current) => (current?.path === targetPath ? refreshed : current));
+    } catch {
+      // 路徑已經換好，文件資訊等下次列表更新。
+    }
+  }, [projectId]);
+
   const handleMove = useCallback(async (sourcePath: string, targetDir: string) => {
     const filename = sourcePath.split("/").pop() || "";
     const targetPath = targetDir ? `${targetDir}/${filename}` : filename;
@@ -515,13 +529,12 @@ export function useKnowledgeBase() {
       setMovingPath(null);
       await loadDocuments();
       if (openDocument?.path === sourcePath) {
-        await openFile(targetPath);
-        setSelectedPath(targetPath);
+        await relocateOpenDocument(targetPath);
       }
     } catch (error) {
       setErrorStatus(error);
     }
-  }, [loadDocuments, openDocument, openFile, setErrorStatus]);
+  }, [loadDocuments, openDocument, relocateOpenDocument, setErrorStatus]);
 
   const handleToggleEnabled = useCallback(async (document: KnowledgeDocumentSummary) => {
     setStatus(null);
@@ -682,6 +695,7 @@ export function useKnowledgeBase() {
     closeNormalizationPreview,
     closeFileView,
     updateEditContent,
+    relocateOpenDocument,
     loadDocuments,
   };
 }

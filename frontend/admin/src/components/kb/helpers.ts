@@ -1,5 +1,6 @@
 import type { KnowledgeDocumentSummary, KnowledgeLanguage } from "../../api";
 import type { QaNode } from "../../hooks/useQaNodes";
+import { isLanguageCategoryLabel } from "./qa/languageCategories";
 
 /* ── Types ── */
 
@@ -21,6 +22,8 @@ export interface TreeNode {
   qaEntryQuestion?: string;
   qaEntrySourcePath?: string;
   qaHidden?: boolean;
+  /** 第一層、名字是「中文」「English」這類的分類，改名會影響匯入與訪客選單。 */
+  qaLanguageCategory?: boolean;
   /** 這個分類自己的題數，不含子分類。 */
   qaQuestionCount?: number;
   doc?: KnowledgeDocumentSummary;
@@ -251,6 +254,7 @@ function qaNodeMatchesSearch(node: QaTreeNodeInput, normalizedSearch: string): b
 function qaNodeToTreeNode(
   node: QaTreeNodeInput,
   normalizedSearch: string,
+  topLevel = false,
 ): TreeNode | null {
   const childNodes = (node.children ?? [])
     .map((child) => qaNodeToTreeNode(child, normalizedSearch))
@@ -286,6 +290,7 @@ function qaNodeToTreeNode(
     virtual: true,
     qaNodeId: node.node_id,
     qaHidden: Boolean(node.hidden),
+    qaLanguageCategory: topLevel && isLanguageCategoryLabel(node.label),
     // 用未過濾的題數：搜尋時數字不跟著跳，看到的永遠是這個分類真正有幾題。
     qaQuestionCount: node.qa_entries?.length ?? 0,
     children: allChildren,
@@ -306,7 +311,7 @@ export function mergeQaNodesIntoTree(
     treeKind: "qa-root",
     virtual: true,
     children: qaNodes
-      .map((node) => qaNodeToTreeNode(node, normalizedSearch))
+      .map((node) => qaNodeToTreeNode(node, normalizedSearch, true))
       .filter((node): node is TreeNode => node !== null),
   };
   const documentsSection: TreeNode = {

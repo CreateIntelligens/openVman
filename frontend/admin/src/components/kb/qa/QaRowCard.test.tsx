@@ -154,11 +154,11 @@ describe("compact QA rows", () => {
     render(<QaDocEditor content={"## 問\n\n答\n"} onChange={onChange} />);
 
     expect(screen.getByText(/「已隱藏」的問題不會出現在訪客的選單，但 AI 回答時還是會用/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "第 1 題顯示中，按一下隱藏" }).textContent).toContain("顯示中");
+    expect(screen.getByRole("button", { name: "第 1 題顯示中，按一下隱藏" }).textContent).toContain("隱藏這題");
 
     fireEvent.click(screen.getByRole("button", { name: "第 1 題顯示中，按一下隱藏" }));
 
-    expect(screen.getByRole("button", { name: "第 1 題已隱藏，按一下改成顯示" }).textContent).toContain("已隱藏");
+    expect(screen.getByRole("button", { name: "第 1 題已隱藏，按一下改成顯示" }).textContent).toContain("已隱藏 · 改回顯示");
     expect(onChange.mock.lastCall?.[0]).toContain('"hidden":true');
   });
 

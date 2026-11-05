@@ -598,6 +598,32 @@ describe("TreeView", () => {
       expect(screen.getByText("0 題")).toBeTruthy();
     });
 
+    // 改掉「English」這種名字，匯入的英文問答表就不會再自動放進來，訪客選單也切不到英文。
+    it("marks top-level language categories, and not a same-named category deeper down", () => {
+      const qaNode = (node_id: string, label: string, children: unknown[] = []) => ({
+        node_id,
+        label,
+        parent_ids: [],
+        child_ids: [],
+        order: 1,
+        hidden: false,
+        qa_entries: [],
+        children,
+      });
+      const node = mergeQaNodesIntoTree(documentTree, [
+        qaNode("en", "English"),
+        qaNode("faq", "常見問題", [qaNode("faq-en", "中文")]),
+      ] as never);
+      renderTreeView({
+        node,
+        expandedDirs: new Set(["knowledge", QUICK_QA_TREE_PATH, qaTreeNodePath("faq")]),
+      });
+
+      expect(screen.getAllByText("語言")).toHaveLength(1);
+      expect(screen.getByRole("treeitem", { name: /^English，語言分類/ }).textContent).toContain("語言");
+      expect(screen.getByRole("treeitem", { name: /^中文/ }).getAttribute("aria-label")).not.toContain("語言分類");
+    });
+
     it("writes 已隱藏 on hidden categories and questions instead of only fading them", () => {
       const entry: TreeNode = {
         name: "可以退貨嗎？",

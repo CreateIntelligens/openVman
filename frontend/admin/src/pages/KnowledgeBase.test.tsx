@@ -29,6 +29,8 @@ const knowledgeBaseMocks = vi.hoisted(() => ({
   documentsLoaded: true,
   rightPane: "folder",
   openDocument: null as null | Record<string, unknown>,
+  editorDirty: false,
+  relocateOpenDocument: vi.fn(),
   search: "",
   hasActiveSearch: false,
   visibleExpandedDirs: new Set<string>(["knowledge", "knowledge/快速問答"]),
@@ -202,7 +204,7 @@ vi.mock("../hooks/useKnowledgeBase", () => ({
     editContent: "",
     editLoading: false,
     saving: false,
-    editorDirty: false,
+    editorDirty: knowledgeBaseMocks.editorDirty,
     deleteTarget: null,
     movingPath: null,
     showNewFolder: false,
@@ -245,6 +247,7 @@ vi.mock("../hooks/useKnowledgeBase", () => ({
     closeNormalizationPreview: vi.fn(),
     closeFileView: knowledgeBaseMocks.closeFileView,
     updateEditContent: vi.fn(),
+    relocateOpenDocument: knowledgeBaseMocks.relocateOpenDocument,
     loadDocuments: knowledgeBaseMocks.loadDocuments,
   }),
 }));
@@ -284,6 +287,7 @@ describe("KnowledgeBase merged tree", () => {
     knowledgeBaseMocks.documentsLoaded = true;
     knowledgeBaseMocks.rightPane = "folder";
     knowledgeBaseMocks.openDocument = null;
+    knowledgeBaseMocks.editorDirty = false;
     guardMocks.hasUnsavedChanges = false;
     importerMocks.value.items = [];
     importerMocks.value.progress = null;
@@ -643,6 +647,41 @@ describe("KnowledgeBase merged tree", () => {
       dropAt(row("快速問答"), MIDDLE);
 
       await waitFor(() => expect(qaNodeMocks.adoptSource).toHaveBeenCalledWith("knowledge/guide.md"));
+    });
+
+    // 審查重現：開著的文件改了沒存，拖進分類會被收成題目、刪掉來源，修改就沒了。
+    it("refuses to drag the open document with unsaved edits into quick QA, and says why", async () => {
+      knowledgeBaseMocks.openDocument = { ...guideDoc, content: "server copy" };
+      knowledgeBaseMocks.rightPane = "file";
+      knowledgeBaseMocks.editorDirty = true;
+      guardMocks.hasUnsavedChanges = true;
+      render(<KnowledgeBase />);
+
+      fireEvent.dragStart(row("guide.md"), { dataTransfer });
+      dropAt(row("乙"), MIDDLE);
+      fireEvent.dragStart(row("guide.md"), { dataTransfer });
+      dropAt(row("快速問答"), MIDDLE);
+
+      await act(async () => undefined);
+      expect(qaNodeMocks.adoptSource).not.toHaveBeenCalled();
+      expect(qaNodeMocks.ingestSource).not.toHaveBeenCalled();
+      expect(knowledgeBaseMocks.setStatus).toHaveBeenCalledWith({
+        type: "error",
+        message: "這份文件還有未儲存的修改。請先按「儲存」，再把它拖進快速問答。",
+      });
+    });
+
+    it("still lets another document go into quick QA while the open one has unsaved edits", async () => {
+      knowledgeBaseMocks.openDocument = { ...faqDoc, content: "server copy" };
+      knowledgeBaseMocks.rightPane = "file";
+      knowledgeBaseMocks.editorDirty = true;
+      guardMocks.hasUnsavedChanges = true;
+      render(<KnowledgeBase />);
+
+      fireEvent.dragStart(row("guide.md"), { dataTransfer });
+      dropAt(row("乙"), MIDDLE);
+
+      await waitFor(() => expect(qaNodeMocks.adoptSource).toHaveBeenCalledWith("knowledge/guide.md", "b"));
     });
 
     it("moves a nested document to the documents root from the zone under the tree", async () => {

@@ -1,6 +1,10 @@
 import type { QaNode } from "../../../hooks/useQaNodes";
 import PromptModal from "../../PromptModal";
 import ConfirmModal from "../../ConfirmModal";
+import {
+  isLanguageCategory,
+  LANGUAGE_CATEGORY_RENAME_WARNING,
+} from "./languageCategories";
 import MoveQaNodeModal from "./MoveQaNodeModal";
 
 export type QaNodeDialog =
@@ -47,7 +51,7 @@ export default function QaNodeModals({
             : "新增分類"
         }
         fields={[
-          { key: "label", label: "分類名稱", placeholder: "請輸入名稱", required: true },
+          { key: "label", label: "分類名稱", placeholder: "例如：停車與交通", required: true },
         ]}
         submitLabel="新增"
         onSubmit={onCreateSubmit}
@@ -63,6 +67,9 @@ export default function QaNodeModals({
             label: "分類名稱",
             initialValue: dialog?.type === "rename" ? dialog.node.label : "",
             required: true,
+            hint: dialog?.type === "rename" && isLanguageCategory(nodesTree, dialog.node.node_id)
+              ? LANGUAGE_CATEGORY_RENAME_WARNING
+              : undefined,
           },
         ]}
         submitLabel="儲存"

@@ -118,6 +118,19 @@ describe("KnowledgeHome", () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
+  it("opens the same file picker from 重新選檔案 on a refused file", () => {
+    const { importer } = renderHome(fakeImporter({
+      items: [{ ...waitingRow, state: "skipped", message: "讀不到文字內容" }],
+    }));
+    const input = screen.getByTestId("knowledge-upload-input") as HTMLInputElement;
+    const click = vi.spyOn(input, "click");
+
+    fireEvent.click(screen.getByRole("button", { name: "重新選檔案 a.md" }));
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(importer.retryItem).not.toHaveBeenCalled();
+  });
+
   it("makes the upload area the star when the knowledge base is empty", () => {
     renderHome(fakeImporter(), { documents: [], nodesTree: [] });
 

@@ -103,6 +103,20 @@ function findSaveProblem(
     };
   }
 
+  // 分類的題目來自好幾份檔案時也一樣：某份檔案的題目一題不剩，那份檔案不會被改寫，
+  // 之後會自己長成一個新分類，刪掉的題目又冒回來。
+  const remainingSources = new Set(rows.map((row) => row.source_file));
+  const emptiedSource = originalRows
+    .map((row) => row.source_file)
+    .find((source) => source && !remainingSources.has(source));
+  if (emptiedSource) {
+    return {
+      message: isManualSource(emptiedSource)
+        ? "自己輸入的題目不能全部刪掉，至少留一題。想復原請按「取消變更」。"
+        : `「${fileNameOf(emptiedSource)}」的題目不能全部刪掉，至少留一題；要整份移除，請到左邊「文件」刪除那份檔案。想復原請按「取消變更」。`,
+    };
+  }
+
   const incomplete = rows.flatMap((row, position) =>
     row.q.trim() && row.a.trim() ? [] : [position]);
   if (incomplete.length > 0) {

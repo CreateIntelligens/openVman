@@ -44,7 +44,8 @@ export interface ImportItem {
   state: ImportItemState;
   /** 相對 raw/ 的路徑，上傳完才有。 */
   rawPath?: string;
-  normalize: boolean;
+  /** 這批有沒有讓 AI 整理排版。接手別處開始的匯入時不知道，是 undefined。 */
+  normalize?: boolean;
   result?: KnowledgeCommitFileResult;
   /** skipped、failed 的白話原因。 */
   message?: string;
@@ -141,8 +142,9 @@ function withJobProgress(item: ImportItem, job: KnowledgeCommitJob): ImportItem 
   switch (job.files?.[item.rawPath]) {
     case "committed":
       return { ...item, state: "done" };
+    // 沒附原因的略過不是內容被拒絕，看不出要改什麼，所以當成沒完成、可以再試一次。
     case "skipped":
-      return { ...item, state: "skipped", message: REASON_NO_RESULT };
+      return { ...item, state: "failed", message: REASON_NO_RESULT };
     case "normalizing":
       return item.state === "processing" ? item : { ...item, state: "processing" };
     case "pending":
@@ -634,7 +636,8 @@ function createImportSession({
     enqueue({
       itemIds: new Set([itemId]),
       paths: [target.rawPath],
-      normalize: target.normalize,
+      // 不知道原本怎麼匯入的，就照原樣：不讓 AI 改到可能已經整理好的文件。
+      normalize: target.normalize ?? false,
     });
   };
 
@@ -671,7 +674,6 @@ function createImportSession({
           name: path,
           state: "waiting",
           rawPath: path,
-          normalize: false,
           run,
         },
         running,
@@ -806,12 +808,14 @@ export function useKnowledgeImport({
     setTargetChoice({ dir, currentDir });
   }, [currentDir]);
 
+  // 「照原樣放入」只用在這一批：下一批多半是另一種檔案，留著的話亂筆記就不會被整理。
   const startEntries = useCallback((entries: KnowledgeUploadEntry[]) => {
     void sessionRef.current?.uploadAndImport(entries, {
       targetDir,
       normalize: !skipNormalize,
       maxFileBytes,
     });
+    setSkipNormalize(false);
   }, [maxFileBytes, skipNormalize, targetDir]);
 
   const startFiles = useCallback((files: Iterable<File>) => {
@@ -821,6 +825,7 @@ export function useKnowledgeImport({
   const importPending = useCallback(() => {
     const session = sessionRef.current;
     session?.importExisting(session.getVisiblePending(), !skipNormalize);
+    setSkipNormalize(false);
   }, [skipNormalize]);
 
   const retryItem = useCallback((itemId: string) => {

@@ -12,6 +12,7 @@ original text so content is never lost.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import logging
 
 from core.llm_client import generate_chat_reply
@@ -63,40 +64,59 @@ def _passes_sanity_check(original: str, cleaned: str) -> bool:
     return 0.5 <= ratio <= 1.6
 
 
-def _normalize_segment(segment: str) -> str:
-    """Normalize one segment via the LLM, falling back to the original on error."""
+class NormalizationUnavailable(ValueError):
+    """AI 整理沒有產生可用的結果；訊息直接顯示給工作人員。"""
+
+
+_UNAVAILABLE = "AI 整理排版現在沒辦法使用，文件沒有任何改變。請稍後再試，一直不行請找管理員。"
+_UNUSABLE = "AI 整理出來的內容和原文差太多（語言或長度不對），沒有採用，文件沒有任何改變。"
+
+
+def _normalize_segment(segment: str, strict: bool = False) -> str:
+    """Normalize one segment via the LLM, falling back to the original on error.
+
+    *strict* raises :class:`NormalizationUnavailable` instead of falling back.
+    """
     prompt = NORMALIZE_PROMPT.format(text=segment)
     try:
         cleaned = generate_chat_reply(
             [{"role": "user", "content": prompt}],
         )
-        if not _passes_sanity_check(segment, cleaned):
-            logger.warning(
-                "normalizer: segment failed sanity check (len original: %d, len cleaned: %d); using original text",
-                len(segment),
-                len(cleaned),
-            )
-            return segment
-        return cleaned
-    except Exception:  # noqa: BLE001 - never drop content on LLM failure
+        passes = _passes_sanity_check(segment, cleaned)
+    except Exception as exc:  # noqa: BLE001 - never drop content on LLM failure
+        if strict:
+            raise NormalizationUnavailable(_UNAVAILABLE) from exc
         logger.warning(
             "normalizer: LLM call failed for a segment; using original text",
             exc_info=True,
         )
         return segment
+    if not passes:
+        if strict:
+            raise NormalizationUnavailable(_UNUSABLE)
+        logger.warning(
+            "normalizer: segment failed sanity check (len original: %d, len cleaned: %d); using original text",
+            len(segment),
+            len(cleaned),
+        )
+        return segment
+    return cleaned
 
 
-def normalize_to_markdown(text: str) -> str:
+def normalize_to_markdown(text: str, *, strict: bool = False) -> str:
     """Clean raw extracted text into tidy Obsidian-style Markdown via the LLM.
 
     Splits long input into segments, normalizes each concurrently, and rejoins.
     Returns the cleaned markdown. On LLM failure or sanity check failure for a
     segment, falls back to that segment's original text (never loses content).
+
+    *strict* raises :class:`NormalizationUnavailable` instead. 匯入時退回原文沒關係，
+    但後台按「AI 整理排版」時退回原文，預覽就是原文本身，工作人員會以為整理過了。
     """
     if not text.strip():
         return ""
     segments = _split_text(text, size=SEGMENT_SIZE)
     with ThreadPoolExecutor(max_workers=4) as executor:
-        cleaned = list(executor.map(_normalize_segment, segments))
+        cleaned = list(executor.map(partial(_normalize_segment, strict=strict), segments))
     return "\n\n".join(cleaned).strip()
 

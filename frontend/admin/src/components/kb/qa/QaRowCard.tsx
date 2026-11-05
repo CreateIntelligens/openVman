@@ -158,7 +158,8 @@ export default function QaRowCard({
             <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">
               {hidden ? "visibility_off" : "visibility"}
             </span>
-            {hidden ? "已隱藏" : "顯示中"}
+            {/* 寫成按了會發生什麼；只寫「顯示中」看起來像狀態，不像按鈕。 */}
+            {hidden ? "已隱藏 · 改回顯示" : "隱藏這題"}
           </button>
           <button
             type="button"

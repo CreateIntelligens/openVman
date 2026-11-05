@@ -20,6 +20,8 @@ interface ImportResultListProps {
   onViewQaNode: (nodeId: string) => void;
   onRenameQaNode: (nodeId: string) => void;
   onRetry: (itemId: string) => void;
+  /** 打開選檔視窗：內容被拒絕的檔案要先改過，再重新選一次。 */
+  onPickAgain?: () => void;
   onClear: () => void;
 }
 
@@ -44,6 +46,11 @@ function qaPlacement(result: KnowledgeCommitFileResult, nodesTree: QaNode[]) {
   const place = [parentLabel, label].filter(Boolean).join(" › ");
   const count = result.question_count === undefined ? "" : `（${result.question_count} 題）`;
   return { nodeId: node?.node_id, text: `${place}${count}` };
+}
+
+function normalizeNote(item: ImportItem): string {
+  if (item.normalize === undefined) return "";
+  return item.normalize ? "，AI 已整理排版" : "，照原樣放入";
 }
 
 function documentFolderNote(target: string): string {
@@ -71,6 +78,7 @@ function ImportResultRow({
   onViewQaNode,
   onRenameQaNode,
   onRetry,
+  onPickAgain,
 }: Omit<ImportResultListProps, "items" | "onClear"> & { item: ImportItem }) {
   const active = isImportItemActive(item);
   const result = item.state === "done" ? item.result : undefined;
@@ -100,7 +108,7 @@ function ImportResultRow({
     text = placement.text ? `${verb}：${placement.text}` : verb;
   } else {
     const verb = result?.updated ? "已更新既有文件" : "已加入知識庫";
-    text = `${verb}${result ? documentFolderNote(result.target) : ""}`;
+    text = `${verb}${result ? documentFolderNote(result.target) : ""}${normalizeNote(item)}`;
   }
 
   return (
@@ -159,7 +167,19 @@ function ImportResultRow({
               </button>
             </>
           )}
-          {item.state !== "done" && item.rawPath && (
+          {/* 被拒絕的是檔案內容，原檔再試一次結果一樣，要改好之後重新選；沒傳上去的也只能重新選。
+              檔案已經在伺服器上、只是處理或連線出錯，才值得再試一次。 */}
+          {(item.state === "skipped" || (item.state === "failed" && !item.rawPath)) && onPickAgain && (
+            <button
+              type="button"
+              className={ROW_BUTTON}
+              aria-label={`重新選檔案 ${item.name}`}
+              onClick={onPickAgain}
+            >
+              重新選檔案
+            </button>
+          )}
+          {item.state === "failed" && item.rawPath && (
             <button
               type="button"
               className={ROW_BUTTON}
@@ -195,6 +215,7 @@ export default function ImportResultList({
   onViewQaNode,
   onRenameQaNode,
   onRetry,
+  onPickAgain,
   onClear,
 }: ImportResultListProps) {
   if (items.length === 0) return null;
@@ -223,6 +244,7 @@ export default function ImportResultList({
             onViewQaNode={onViewQaNode}
             onRenameQaNode={onRenameQaNode}
             onRetry={onRetry}
+            onPickAgain={onPickAgain}
           />
         ))}
       </ul>

@@ -406,6 +406,7 @@ function TreeBranch({
   const statusLabel = node.doc && !node.virtual ? documentStatusLabel(node.doc) : null;
   const rowLabel = [
     node.name,
+    node.qaLanguageCategory ? "語言分類" : null,
     questionCount,
     node.qaHidden ? "已隱藏" : null,
     statusLabel === "可被搜尋" ? null : statusLabel,
@@ -700,6 +701,12 @@ function TreeBranch({
         </div>
 
         <RowName node={node} emphasized={isSection || isSelected} />
+
+        {node.qaLanguageCategory && (
+          <span aria-hidden="true" className="ml-1 shrink-0 whitespace-nowrap rounded bg-surface-sunken px-1 text-xs text-content-muted">
+            語言
+          </span>
+        )}
 
         {questionCount && (
           <span className="ml-1 shrink-0 whitespace-nowrap text-xs text-content-subtle">

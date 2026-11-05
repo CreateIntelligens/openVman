@@ -129,6 +129,7 @@ export default function KnowledgeHome({
   const { items, pendingFiles } = importer;
   const [discardTarget, setDiscardTarget] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // 正在匯入時才打開這個畫面（拖檔案進來、按頁首的「匯入中」），也算有新東西要看。
   const previousItemCount = useRef(items.some(isImportItemActive) ? 0 : items.length);
 
@@ -165,6 +166,7 @@ export default function KnowledgeHome({
           onTargetDirChange={importer.setTargetDir}
           skipNormalize={importer.skipNormalize}
           onSkipNormalizeChange={importer.setSkipNormalize}
+          fileInputRef={fileInputRef}
           crawlUrlValue={crawlUrlValue}
           setCrawlUrlValue={setCrawlUrlValue}
           crawling={crawling}
@@ -181,6 +183,7 @@ export default function KnowledgeHome({
             onViewQaNode={onViewQaNode}
             onRenameQaNode={onRenameQaNode}
             onRetry={importer.retryItem}
+            onPickAgain={() => fileInputRef.current?.click()}
             onClear={importer.clearResults}
           />
         </div>

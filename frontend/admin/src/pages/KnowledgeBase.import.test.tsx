@@ -223,7 +223,7 @@ describe("KnowledgeBase import, end to end", () => {
     pickFile("guide.docx");
     await advance();
 
-    expect(screen.getByText("已加入知識庫")).toBeTruthy();
+    expect(screen.getByText("已加入知識庫，AI 已整理排版")).toBeTruthy();
     expect(screen.getByText("1 份文件 · 1 份處理中")).toBeTruthy();
 
     server.documents = [makeDocument({ is_indexed: true })];

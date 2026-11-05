@@ -98,6 +98,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | 其他 `.md`、`.txt`、`.csv`、`.docx`、`.xlsx`、`.pdf` | 一般文件：轉成文字後由 LLM 整理（`knowledge/normalizer.py`），存成 `knowledge/<原路徑>.md`；`normalize: false` 時略過 LLM |
 
 - 語言：整理時不翻譯。每段輸出都和原文比對語言，並檢查中文字有沒有憑空出現或消失，不一致就保留那段原文。
+- LLM 呼叫失敗或輸出沒通過檢查時，匯入保留那段原文；後台的「AI 整理排版」（`POST /knowledge/renormalize/preview`、`/renormalize`）則回 400，`detail` 寫白話原因，文件不變。
 - 同一來源重傳：目標文件已被問答節點引用時，只更新該節點的題目，名稱、上層與隱藏狀態不動；`knowledge/qa/<檔名>.csv` 已掛在樹上時更新那份 CSV。一般文件同路徑時覆蓋，手動指定的語言保留。題目全部拿掉後分類還留著時，接回當初匯入建立的分類，不另開同名分類。
 - 問答表的內容：有一列只有答案沒有題目，或同一題有不同答案時，整份不匯入並寫明是哪一列；同一題答案相同只算一題。
 - 新問答的位置：第一層有符合語言的節點就放進去，沒有就放最上層，不自動建立語言分類。名稱對照是 `knowledge/qa_nodes.py` 的 `LANGUAGE_LABELS`，與前台 `quickQaText.ts` 相同，有測試鎖住兩邊一致。

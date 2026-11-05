@@ -16,6 +16,7 @@ import {
   parseQaNodeDragPath,
   qaNodeExpandPaths,
   qaTreeNodePath,
+  QUICK_QA_TREE_PATH,
 } from "../components/kb/helpers";
 import KnowledgeHeader from "../components/kb/KnowledgeHeader";
 import KnowledgeTreeSidebar from "../components/kb/KnowledgeTreeSidebar";
@@ -51,6 +52,16 @@ function dropReloadsCategory(
   if (draggedEntry) return draggedEntry.nodeId === nodeId;
   if (parseQaNodeDragPath(draggingPath)) return false;
   return targetPath === qaTreeNodePath(nodeId);
+}
+
+/** 文件拖進快速問答會變成題目，原本的文件就沒了，手上沒存的修改也跟著消失。 */
+function dropConsumesDocument(
+  draggingPath: string | null,
+  targetPath: string,
+  documentPath: string | undefined,
+): boolean {
+  if (!draggingPath || draggingPath !== documentPath) return false;
+  return targetPath === QUICK_QA_TREE_PATH || targetPath.startsWith(`${QUICK_QA_TREE_PATH}/`);
 }
 
 export default function KnowledgeBase() {
@@ -114,6 +125,7 @@ export default function KnowledgeBase() {
     closeNormalizationPreview,
     closeFileView,
     updateEditContent,
+    relocateOpenDocument,
     loadDocuments,
   } = useKnowledgeBase();
 
@@ -155,7 +167,7 @@ export default function KnowledgeBase() {
     openDocument,
     loadDocuments,
     closeFileView,
-    handleTreeSelect,
+    relocateOpenDocument,
     fetchQaTree,
   });
 
@@ -419,6 +431,14 @@ export default function KnowledgeBase() {
   // 重新載入會把沒存的修改洗掉，放下之前都還沒發生，所以直接擋下來，不必問要不要捨棄。
   const handleTreeDrop = useCallback(
     (targetPath: string, position?: QaDropPosition) => {
+      if (editorDirty && dropConsumesDocument(treeDrag.draggingPath, targetPath, openDocument?.path)) {
+        treeDrag.handleTreeDragEnd();
+        setStatus({
+          type: "error",
+          message: "這份文件還有未儲存的修改。請先按「儲存」，再把它拖進快速問答。",
+        });
+        return;
+      }
       if (
         hasUnsavedChanges
         && selectedQaNodeId
@@ -434,7 +454,15 @@ export default function KnowledgeBase() {
       }
       void treeDrag.handleTreeDrop(targetPath, position);
     },
-    [hasUnsavedChanges, selectedQaNodeId, setStatus, showNoteComposer, treeDrag],
+    [
+      editorDirty,
+      hasUnsavedChanges,
+      openDocument?.path,
+      selectedQaNodeId,
+      setStatus,
+      showNoteComposer,
+      treeDrag,
+    ],
   );
 
   // 刪除 QA 文件時後端會同步清掉問答樹節點, 前端也要跟著重抓樹

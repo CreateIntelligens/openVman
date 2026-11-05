@@ -1,4 +1,4 @@
-import { useId, useRef, type ChangeEvent } from "react";
+import { useId, useRef, type ChangeEvent, type RefObject } from "react";
 
 import type { KnowledgeNoteFormat } from "../../api";
 import {
@@ -17,6 +17,8 @@ interface SourcePanelProps {
   onTargetDirChange: (dir: string) => void;
   skipNormalize: boolean;
   onSkipNormalizeChange: (skip: boolean) => void;
+  /** 外面要能打開同一個選檔視窗，例如匯入結果的「重新選檔案」。 */
+  fileInputRef?: RefObject<HTMLInputElement>;
   crawlUrlValue: string;
   setCrawlUrlValue: (value: string) => void;
   crawling: boolean;
@@ -35,6 +37,7 @@ export default function SourcePanel({
   onTargetDirChange,
   skipNormalize,
   onSkipNormalizeChange,
+  fileInputRef,
   crawlUrlValue,
   setCrawlUrlValue,
   crawling,
@@ -42,8 +45,10 @@ export default function SourcePanel({
   onOpenComposer,
   prominent = false,
 }: SourcePanelProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const ownInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = fileInputRef ?? ownInputRef;
   const urlInputId = useId();
+  const normalizeName = useId();
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     onPickFiles(Array.from(event.target.files ?? []));
@@ -54,6 +59,34 @@ export default function SourcePanel({
   return (
     <div className="space-y-6">
       <section aria-label="上傳檔案" className="space-y-4">
+        {/* 選了檔案就開始上傳，所以要放在拖放區上面：由上往下操作的人先選好再放檔案。 */}
+        <fieldset className="space-y-2">
+          <legend className="mb-1 text-sm font-medium text-content">這批文件要怎麼放進去</legend>
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
+            <input
+              type="radio"
+              name={normalizeName}
+              className="mt-1 h-4 w-4 shrink-0 accent-primary"
+              checked={!skipNormalize}
+              onChange={() => onSkipNormalizeChange(false)}
+            />
+            讓 AI 整理排版（適合亂亂的筆記）
+          </label>
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
+            <input
+              type="radio"
+              name={normalizeName}
+              className="mt-1 h-4 w-4 shrink-0 accent-primary"
+              checked={skipNormalize}
+              onChange={() => onSkipNormalizeChange(true)}
+            />
+            照原樣放進去，不讓 AI 改（適合已經整理好的文件）
+          </label>
+          <p className="text-xs text-content-muted">
+            每次上傳開始後，會回到「讓 AI 整理排版」。問答表不看這個設定。
+          </p>
+        </fieldset>
+
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -82,19 +115,9 @@ export default function SourcePanel({
 
         <ul className="list-disc space-y-1 pl-5 text-sm text-content-muted">
           <li>有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。</li>
-          <li>其他文件由 AI 整理排版後加入知識庫，內容維持原本的語言，不會翻譯。</li>
+          <li>其他文件照上面的選擇加入知識庫。AI 整理時內容維持原本的語言，不會翻譯。</li>
           <li>可以上傳 {IMPORT_FORMATS_LABEL}，每個檔案 {maxUploadLabel} 以內。</li>
         </ul>
-
-        <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 shrink-0 accent-primary"
-            checked={skipNormalize}
-            onChange={(event) => onSkipNormalizeChange(event.target.checked)}
-          />
-          這批已經整理好了，不要讓 AI 修改內容
-        </label>
 
         <div className="space-y-1">
           <p className="text-sm font-medium text-content">放到哪個資料夾</p>

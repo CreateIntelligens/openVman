@@ -170,7 +170,7 @@ def preview_workspace_document_normalization(
         raise FileNotFoundError("找不到指定文件")
 
     original = path.read_text(encoding="utf-8-sig")
-    cleaned = normalize_to_markdown(original)
+    cleaned = normalize_to_markdown(original, strict=True)
     if not cleaned:
         raise ValueError("整理結果為空，已保留原文件")
 
@@ -231,7 +231,7 @@ def renormalize_workspace_document(relative_path: str, project_id: str = "defaul
         raise FileNotFoundError("找不到指定文件")
 
     original = path.read_text(encoding="utf-8-sig")
-    cleaned = normalize_to_markdown(original)
+    cleaned = normalize_to_markdown(original, strict=True)
     if not cleaned:
         raise ValueError("整理結果為空，已保留原文件")
 
@@ -719,8 +719,8 @@ def _render_qa_document(csv_bytes: bytes, target: Path) -> str:
         broken = next((e for e, a in zip(expected, actual) if e != a), expected[-1])
         question = " ".join(broken[0].split())[:40]
         raise _ImportRefused(
-            f"「{question}」這一題無法正確匯入：題目不能換行，答案裡不能有 ## 開頭的行或 ```。"
-            "請修改檔案後重新上傳"
+            f"「{question}」這題的答案裡有「##」或「```」符號，或題目有換行，"
+            "請在檔案裡刪掉這些符號或換行，存檔後重新上傳"
         )
     return markdown
 

@@ -794,8 +794,13 @@ def test_qa_table_markdown_cannot_hold_is_refused_not_split(workspace: Path, row
     result = commit_raw_documents("default")
 
     assert result["skipped"] == ["faq.csv"]
-    assert "Q2" in result["skip_reasons"]["faq.csv"]
-    assert "Q1" not in result["skip_reasons"]["faq.csv"]
+    reason = result["skip_reasons"]["faq.csv"]
+    assert "Q2" in reason
+    assert "Q1" not in reason
+    # 工作人員看得懂要改哪裡、改完怎麼做；不再說「無法正確匯入」又叫人「再試」。
+    assert "「##」或「```」符號，或題目有換行" in reason
+    assert reason.endswith("存檔後重新上傳")
+    assert "無法正確匯入" not in reason
     assert upload.exists()
     assert not (workspace / "knowledge" / "qa" / "faq.md").exists()
     assert _nodes() == {}

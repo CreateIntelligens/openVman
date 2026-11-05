@@ -52,6 +52,52 @@ describe("QaNodeModals wording", () => {
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
   });
 
+  it("starts a new category with an empty name and an example", () => {
+    renderDialog({ type: "add-root" });
+
+    const input = screen.getByLabelText(/分類名稱/) as HTMLInputElement;
+    expect(input.value).toBe("");
+    expect(input.placeholder).toBe("例如：停車與交通");
+  });
+
+  it("warns under the name when renaming a language category", () => {
+    const language = { ...node, node_id: "zh", label: "中文" };
+    render(
+      <QaNodeModals
+        dialog={{ type: "rename", node: language }}
+        nodesTree={[language, node]}
+        onClose={vi.fn()}
+        onCreateSubmit={vi.fn()}
+        onRenameSubmit={vi.fn()}
+        onMoveConfirm={vi.fn()}
+        onDeleteConfirm={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(
+      "這是語言分類：同語言的問答表會自動放進來，訪客選單也靠這個名字切換語言。改成別的名字後這兩件事都會失效。",
+    )).toBeTruthy();
+  });
+
+  it("does not warn when renaming an ordinary category, or a language name deeper down", () => {
+    const nested = { ...node, node_id: "en-sub", label: "English" };
+    const { rerender } = renderDialog({ type: "rename", node });
+    expect(screen.queryByText(/這是語言分類/)).toBeNull();
+
+    rerender(
+      <QaNodeModals
+        dialog={{ type: "rename", node: nested }}
+        nodesTree={[{ ...node, children: [nested] }]}
+        onClose={vi.fn()}
+        onCreateSubmit={vi.fn()}
+        onRenameSubmit={vi.fn()}
+        onMoveConfirm={vi.fn()}
+        onDeleteConfirm={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText(/這是語言分類/)).toBeNull();
+  });
+
   it("says what happens to the subcategories before deleting", () => {
     renderDialog({
       type: "delete",

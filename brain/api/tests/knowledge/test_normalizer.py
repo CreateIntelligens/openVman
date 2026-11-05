@@ -164,6 +164,28 @@ def test_sanity_check_falls_back_on_truncated_output(normalizer, monkeypatch):
     assert normalizer.normalize_to_markdown(original) == original
 
 
+def test_strict_raises_instead_of_falling_back_when_llm_fails(normalizer, monkeypatch):
+    """後台按「AI 整理排版」時退回原文，預覽就是原文，工作人員會以為整理過了。"""
+    def fake(messages):
+        raise RuntimeError("no LLM API key")
+
+    monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", fake)
+
+    with pytest.raises(normalizer.NormalizationUnavailable, match="沒辦法使用"):
+        normalizer.normalize_to_markdown("店內筆記\n老闆說冬天要多備貨。", strict=True)
+    # 匯入維持原本的行為：退回原文、不中斷。
+    assert normalizer.normalize_to_markdown("店內筆記\n老闆說冬天要多備貨。") == "店內筆記\n老闆說冬天要多備貨。"
+
+
+def test_strict_raises_when_output_fails_sanity_check(normalizer, monkeypatch):
+    monkeypatch.setattr(
+        "knowledge.normalizer.generate_chat_reply",
+        lambda messages: "太短",
+    )
+    with pytest.raises(normalizer.NormalizationUnavailable, match="差太多"):
+        normalizer.normalize_to_markdown("內" * 1000, strict=True)
+
+
 def test_sanity_check_falls_back_on_bloated_output(normalizer, monkeypatch):
     original = "內" * 1000
     monkeypatch.setattr(

@@ -766,6 +766,7 @@ describe("useKnowledgeImport", () => {
     });
     expect(result.current.items.map((item) => item.name)).toEqual(["old.md", "folder/old.csv"]);
     expect(result.current.pendingFiles).toEqual([]);
+    expect(result.current.skipNormalize).toBe(false);
   });
 
   it("lists a new copy of a file that was already imported", async () => {
@@ -836,6 +837,21 @@ describe("useKnowledgeImport", () => {
     expect(api.uploadRawKnowledgeDocuments.mock.calls[0][1]).toBe("raw/gear");
     expect(api.commitRawKnowledge).toHaveBeenCalledWith({ paths: ["gear/a.md"], normalize: false });
     expect(rowOf(result.current.items, "a.md").normalize).toBe(false);
+  });
+
+  // 實測：選了「照原樣」之後一直留著，下一批亂筆記也不會被整理。
+  it("goes back to letting the AI tidy up once a batch has started", async () => {
+    uploaded("raw/a.md");
+    started({ "a.md": "pending" });
+    const { result } = renderImport();
+    await flush();
+
+    act(() => result.current.setSkipNormalize(true));
+    act(() => result.current.startFiles([file("a.md")]));
+    await flush();
+
+    expect(api.commitRawKnowledge).toHaveBeenCalledWith({ paths: ["a.md"], normalize: false });
+    expect(result.current.skipNormalize).toBe(false);
   });
 
   it("offers the top level and real folders, never the folder QA tables live in", async () => {

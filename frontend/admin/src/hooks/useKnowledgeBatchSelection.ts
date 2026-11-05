@@ -8,7 +8,8 @@ interface UseKnowledgeBatchSelectionOptions {
   openDocument: KnowledgeDocument | null;
   loadDocuments: () => Promise<void>;
   closeFileView: () => void;
-  handleTreeSelect: (node: { type: string; path: string }) => void;
+  /** 開著的文件被搬走時跟著換路徑，不重新讀檔，還沒存的修改才不會被蓋掉。 */
+  relocateOpenDocument: (targetPath: string) => Promise<void> | void;
   fetchQaTree: () => Promise<unknown>;
 }
 
@@ -18,7 +19,7 @@ export function useKnowledgeBatchSelection({
   openDocument,
   loadDocuments,
   closeFileView,
-  handleTreeSelect,
+  relocateOpenDocument,
   fetchQaTree,
 }: UseKnowledgeBatchSelectionOptions) {
   const [multiSelect, setMultiSelect] = useState(false);
@@ -67,11 +68,12 @@ export function useKnowledgeBatchSelection({
     ) => {
       await loadDocuments();
       const openPath = openDocument?.path;
+      // 改語言不用碰開著的文件：上面重新載入列表時，語言就會帶到文件檢視。
       if (openPath && succeeded.includes(openPath)) {
         if (action === "delete") {
           closeFileView();
-        } else {
-          handleTreeSelect({ type: "file", path: targetPathOf(openPath) });
+        } else if (action === "move") {
+          await relocateOpenDocument(targetPathOf(openPath));
         }
       }
       // 搬移與刪除都可能改到 QA 文件，後端會同步改問答樹的來源。
@@ -79,7 +81,7 @@ export function useKnowledgeBatchSelection({
         await fetchQaTree().catch(() => undefined);
       }
     },
-    [closeFileView, fetchQaTree, handleTreeSelect, loadDocuments, openDocument],
+    [closeFileView, fetchQaTree, loadDocuments, openDocument, relocateOpenDocument],
   );
 
   return {

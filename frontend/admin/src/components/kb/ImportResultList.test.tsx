@@ -37,6 +37,7 @@ function renderList(items: ImportItem[], nodesTree: QaNode[] = []) {
     onViewQaNode: vi.fn(),
     onRenameQaNode: vi.fn(),
     onRetry: vi.fn(),
+    onPickAgain: vi.fn(),
     onClear: vi.fn(),
   };
   render(<ImportResultList items={items} nodesTree={nodesTree} {...handlers} />);
@@ -181,19 +182,32 @@ describe("ImportResultList", () => {
     expect(screen.queryByRole("button", { name: /^改名/ })).toBeNull();
   });
 
-  it("shows why a file was not imported and offers another try", () => {
-    const { onRetry } = renderList([
+  // 實測：內容被拒絕時寫「再試一次」，按了結果一樣，原因卻叫人改檔案。
+  it("shows why a file was not imported and offers picking the fixed file, not another try", () => {
+    const { onPickAgain, onRetry } = renderList([
       row({ state: "skipped", message: "讀不到文字內容，可能是掃描檔或檔案損毀" }),
     ]);
 
     expect(screen.getByText("沒有匯入：讀不到文字內容，可能是掃描檔或檔案損毀")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^查看/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^再試一次/ })).toBeNull();
 
+    fireEvent.click(screen.getByRole("button", { name: "重新選檔案 guide.docx" }));
+    expect(onPickAgain).toHaveBeenCalled();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("offers another try when the file is on the server but processing or the connection failed", () => {
+    const { onRetry } = renderList([
+      row({ state: "failed", message: "匯入中斷了，檔案還留著，可以再試一次" }),
+    ]);
+
+    expect(screen.queryByRole("button", { name: /^重新選檔案/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "再試一次 guide.docx" }));
     expect(onRetry).toHaveBeenCalledWith("row-1");
   });
 
-  it("does not offer another try for a file that never reached the server", () => {
+  it("asks for the file again when it never reached the server", () => {
     renderList([
       row({ state: "skipped", rawPath: undefined, message: "這個格式不能匯入" }),
       row({ id: "2", name: "b.md", state: "failed", rawPath: undefined, message: "連不上伺服器" }),
@@ -202,6 +216,26 @@ describe("ImportResultList", () => {
     expect(screen.getByText("沒有匯入：這個格式不能匯入")).toBeTruthy();
     expect(screen.getByText("沒有完成：連不上伺服器")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^再試一次/ })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^重新選檔案/ })).toHaveLength(2);
+  });
+
+  it("says whether the AI tidied a document or it went in as it was", () => {
+    renderList([
+      row({ id: "1", result: documentResult, normalize: true }),
+      row({ id: "2", name: "b.md", result: { ...documentResult, target: "knowledge/b.md" }, normalize: false }),
+    ]);
+
+    expect(screen.getByText(/^已加入知識庫，AI 已整理排版/)).toBeTruthy();
+    expect(screen.getByText(/^已加入知識庫，照原樣放入/)).toBeTruthy();
+  });
+
+  it("does not guess the choice for an import picked up from elsewhere, or for a QA table", () => {
+    renderList([
+      row({ id: "1", result: documentResult, normalize: undefined }),
+      row({ id: "2", name: "faq.csv", result: qaResult, normalize: false }),
+    ]);
+
+    expect(screen.queryByText(/AI 已整理排版|照原樣放入/)).toBeNull();
   });
 
   it("offers clearing once something has finished, and sums up the batch", () => {

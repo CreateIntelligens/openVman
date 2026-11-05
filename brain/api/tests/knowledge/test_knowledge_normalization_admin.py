@@ -52,7 +52,7 @@ def _stub_knowledge_admin_deps(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _stub_normalizer(monkeypatch: pytest.MonkeyPatch, cleaned: str) -> None:
     fake_normalizer = types.ModuleType("knowledge.normalizer")
-    fake_normalizer.normalize_to_markdown = lambda text: cleaned
+    fake_normalizer.normalize_to_markdown = lambda text, **_: cleaned
     monkeypatch.setitem(sys.modules, "knowledge.normalizer", fake_normalizer)
 
 
@@ -77,6 +77,44 @@ def test_preview_normalization_does_not_overwrite_document(
     assert preview["content"] == "# Clean\n\n整理後內容"
     assert preview["size"] == len("# Clean\n\n整理後內容".encode("utf-8"))
     assert doc.read_text(encoding="utf-8") == "# Original\n\n髒 OCR"
+
+
+@pytest.mark.parametrize("action", ["preview", "renormalize"])
+def test_requested_normalization_reports_ai_failure_instead_of_returning_original(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    action: str,
+):
+    """後台按「AI 整理排版」時沒有 LLM：要說整理不了，不能把原文當成整理結果。"""
+    root = _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+
+    def normalize(text: str, *, strict: bool = False) -> str:
+        if strict:
+            raise ValueError("AI 整理排版現在沒辦法使用，文件沒有任何改變。")
+        return text
+
+    fake_normalizer = types.ModuleType("knowledge.normalizer")
+    fake_normalizer.normalize_to_markdown = normalize
+    monkeypatch.setitem(sys.modules, "knowledge.normalizer", fake_normalizer)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    doc = root / "knowledge" / "ocr.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("# Original\n\n髒 OCR", encoding="utf-8")
+
+    run = (
+        knowledge_admin.preview_workspace_document_normalization
+        if action == "preview"
+        else knowledge_admin.renormalize_workspace_document
+    )
+    with pytest.raises(ValueError, match="沒辦法使用"):
+        run("knowledge/ocr.md")
+
+    assert doc.read_text(encoding="utf-8") == "# Original\n\n髒 OCR"
+    assert not list((root / ".normalization-backups").glob("**/*"))
 
 
 def test_renormalize_writes_recoverable_backup_before_overwrite(
