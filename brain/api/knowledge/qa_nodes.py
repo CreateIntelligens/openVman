@@ -476,8 +476,9 @@ def _build_entries_for_source(
 ) -> list[dict[str, Any]]:
     """Parse a QA markdown or CSV doc into node qa_entries (deduped by question)."""
     from knowledge.qa_csv import (
-        convert_csv_to_qa_markdown,
         extract_image_id,
+        normalize_qa_csv_rows,
+        parse_qa_csv,
         parse_qa_markdown,
     )
 
@@ -485,12 +486,12 @@ def _build_entries_for_source(
     if not doc_path.exists():
         return []
 
+    # CSV 直接解析：轉成 Markdown 再切的話，答案裡的 ## 行和多行題目會變成別的題目。
     if source_path.lower().endswith(".csv"):
-        content = convert_csv_to_qa_markdown(doc_path.read_bytes())
+        csv_bytes = doc_path.read_bytes()
+        parsed = parse_qa_csv(normalize_qa_csv_rows(csv_bytes) or csv_bytes)
     else:
-        content = doc_path.read_text(encoding="utf-8", errors="ignore")
-
-    parsed = parse_qa_markdown(content)
+        parsed = parse_qa_markdown(doc_path.read_text(encoding="utf-8", errors="ignore"))
 
     entries: list[dict[str, Any]] = []
     seen: set[str] = set()

@@ -7,6 +7,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 import re
 from typing import Any
 
@@ -148,6 +149,65 @@ def _rows_to_csv_bytes(fieldnames: list[str], rows: list[dict[str, str]]) -> byt
     writer.writeheader()
     writer.writerows(rows)
     return buffer.getvalue().encode("utf-8")
+
+
+def append_qa_csv_rows(file_bytes: bytes, entries: list[dict[str, Any]]) -> str:
+    """Append QA entries to a CSV, keeping its header, rows and extra columns.
+
+    不走 ``parse_qa_csv`` → ``serialize_qa_csv``：那條路會丟掉 index 與自訂欄位，
+    而拆成多檔的主題靠 index 記跨檔順序。新列的 index 接在現有最大值之後；
+    只有新列真的用到時才新增 img／url／display 欄。檔案必須是 UTF-8。
+    """
+    table = list(csv.reader(io.StringIO(file_bytes.decode("utf-8-sig"))))
+    if not table:
+        raise ValueError("CSV 沒有標題列")
+    header, rows = table[0], table[1:]
+    column_of: dict[str, int] = {}
+    for position, raw in enumerate(header):
+        column_of.setdefault(normalize_fieldname(raw), position)
+    if "q" not in column_of or "a" not in column_of:
+        raise ValueError("CSV 缺少問題或回答欄位")
+
+    def _add_column(canonical: str) -> None:
+        column_of[canonical] = len(header)
+        header.append(canonical)
+        for row in rows:
+            if row:
+                row.extend([""] * (len(header) - len(row)))
+
+    if "img" not in column_of and any(extract_image_id(e.get("img") or "") for e in entries):
+        _add_column("img")
+    if "url" not in column_of and any((e.get("url") or "").strip() for e in entries):
+        _add_column("url")
+    if "display" not in column_of and any(e.get("hidden") for e in entries):
+        _add_column("display")
+
+    next_index = 0
+    if "index" in column_of:
+        cells = (row[column_of["index"]] for row in rows if len(row) > column_of["index"])
+        numeric = [v for v in map(_index_sort_value, cells) if math.isfinite(v)]
+        next_index = int(max(numeric, default=len(rows))) + 1
+
+    for entry in entries:
+        values = {
+            "q": entry.get("q") or "",
+            "a": entry.get("a") or "",
+            "img": extract_image_id(entry.get("img") or ""),
+            "url": (entry.get("url") or "").strip(),
+            "display": "false" if entry.get("hidden") else "true",
+        }
+        if "index" in column_of:
+            values["index"] = str(next_index)
+            next_index += 1
+        row = [""] * len(header)
+        for canonical, value in values.items():
+            if canonical in column_of:
+                row[column_of[canonical]] = value
+        rows.append(row)
+
+    buffer = io.StringIO()
+    csv.writer(buffer, lineterminator="\n").writerows([header, *rows])
+    return buffer.getvalue()
 
 
 def _has_meaningful_qa_content(row: dict[str, str]) -> bool:

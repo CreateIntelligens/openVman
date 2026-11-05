@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict
 import logging
 import re
+import threading
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -23,7 +24,9 @@ from knowledge.knowledge_admin import (
 )
 from knowledge.upload_limits import read_upload_limited, validate_qa_image
 from knowledge.qa_csv import (
+    append_qa_csv_rows,
     extract_image_id,
+    is_qa_csv,
     parse_qa_csv,
     parse_qa_markdown,
     qa_markdown_block,
@@ -100,9 +103,62 @@ class MergedQaItem(BaseModel):
     hidden: bool | None = False
 
 
+_ingest_lock = threading.Lock()
+
+
 def parse_qa_markdown_with_metadata(content: str) -> list[dict[str, Any]]:
     """Parse qa markdown file into a list of dict containing q, a, img, url."""
     return parse_qa_markdown(content)
+
+
+def _parse_qa_bytes(suffix: str, content: bytes) -> list[dict[str, Any]] | None:
+    """Parse a QA document by format: ``[]`` when blank, ``None`` when not valid UTF-8 QA.
+
+    不猜編碼：猜錯的亂碼一旦併進 UTF-8 檔就救不回來，索引也只讀 UTF-8。
+    """
+    if not content.strip():
+        return []
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return None
+    if suffix.lower() == ".csv":
+        return parse_qa_csv(content) if is_qa_csv(content) else None
+    return parse_qa_markdown(text) or None
+
+
+def _qa_values(items: list[dict[str, Any]]) -> list[tuple[str, str, str, str, bool]]:
+    return [
+        (
+            item["q"].strip(),
+            item["a"].strip(),
+            extract_image_id(item.get("img") or ""),
+            (item.get("url") or "").strip(),
+            bool(item.get("hidden", False)),
+        )
+        for item in items
+    ]
+
+
+def _merged_target_content(target_file: Path, new_items: list[dict[str, Any]]) -> str:
+    """Target content with ``new_items`` added after everything it already has."""
+    existing = target_file.read_bytes() if target_file.exists() else b""
+    if target_file.suffix.lower() == ".csv":
+        if existing.strip():
+            return append_qa_csv_rows(existing, new_items)
+        return serialize_qa_csv(new_items)
+    blocks = [
+        qa_markdown_block(
+            item["q"],
+            item["a"],
+            item.get("img") or "",
+            item.get("url") or "",
+            bool(item.get("hidden", False)),
+        )
+        for item in new_items
+    ]
+    existing_text = existing.decode("utf-8-sig").rstrip()
+    return "\n\n".join([existing_text, *blocks] if existing_text else blocks)
 
 
 @router.get("/nodes")
@@ -135,9 +191,7 @@ async def adopt_source_route(
         if not doc_path.exists():
             raise HTTPException(status_code=404, detail="找不到指定文件")
 
-        content = doc_path.read_text(encoding="utf-8")
-        parsed = parse_qa_markdown(content)
-        if not parsed:
+        if not _parse_qa_bytes(doc_path.suffix, doc_path.read_bytes()):
             raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
 
         parent_ids = None
@@ -184,10 +238,17 @@ async def ingest_source_route(
         if not dragged_path.exists():
             raise HTTPException(status_code=404, detail="找不到指定文件")
 
-        dragged_content = dragged_path.read_text(encoding="utf-8")
-        dragged_items = parse_qa_markdown(dragged_content)
+        dragged_items = _parse_qa_bytes(dragged_path.suffix, dragged_path.read_bytes())
         if not dragged_items:
             raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
+
+        answers: dict[str, str] = {}
+        for item in dragged_items:
+            if answers.setdefault(item["q"].strip(), item["a"].strip()) != item["a"].strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"來源文件的同一題有不同答案，未做任何變更：{item['q'].strip()}",
+                )
 
         qa_entries = node.get("qa_entries", [])
         target_path = next((entry["source_path"] for entry in qa_entries if entry.get("source_path")), "")
@@ -195,65 +256,73 @@ async def ingest_source_route(
         if not target_path:
             target_path = f"knowledge/qa/{id}.md"
 
-        if path == target_path:
-            raise HTTPException(status_code=400, detail="此文件已是該節點的內容")
-
         try:
             target_file = resolve_workspace_document(target_path, project_id)
-            if target_file.exists():
-                target_content = target_file.read_text(encoding="utf-8")
-                target_items = parse_qa_markdown(target_content)
-            else:
-                target_items = []
-        except Exception:
-            target_items = []
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        target_qa_dict = {item["q"].strip(): item for item in target_items}
+        if target_file == dragged_path:
+            raise HTTPException(status_code=400, detail="此文件已是該節點的內容")
 
-        added_count = 0
+        # 讀不懂的目標不能當成空的：寫回去就把原內容整份蓋掉了。
+        target_items: list[dict[str, Any]] = []
+        if target_file.exists():
+            parsed_target = _parse_qa_bytes(target_file.suffix, target_file.read_bytes())
+            if parsed_target is None:
+                raise HTTPException(status_code=400, detail="目標 QA 文件格式無法解析，未做任何變更")
+            target_items = parsed_target
+
+        in_target = {item["q"].strip(): item for item in target_items}
+        node_questions = {
+            entry["question"] for entry in qa_entries if entry.get("source_path") == target_path
+        }
+        new_items: list[dict[str, Any]] = []
         new_qa_entries = list(qa_entries)
 
+        # 節點對照「還沒列入的題」而不是「這次新增的題」：上次寫完目標、更新節點失敗時，
+        # 重試才補得回節點。檔案已有的題以檔案的隱藏與圖片為準。
         for item in dragged_items:
             q = item["q"].strip()
-            if q in target_qa_dict:
-                continue
+            if q not in in_target:
+                in_target[q] = item
+                new_items.append(item)
+            if q not in node_questions:
+                node_questions.add(q)
+                kept = in_target[q]
+                new_qa_entries.append({
+                    "question": q,
+                    "source_path": target_path,
+                    "hidden": bool(kept.get("hidden", False)),
+                    "image_id": extract_image_id(kept.get("img") or "") or None,
+                })
 
-            target_items.append(item)
-            target_qa_dict[q] = item
-            added_count += 1
-
-            image_id = extract_image_id(item.get("img") or "")
-            new_qa_entries.append({
-                "question": q,
-                "source_path": target_path,
-                "hidden": bool(item.get("hidden", False)),
-                "image_id": image_id or None,
-            })
-
-        if added_count > 0:
-            blocks = []
-            for item in target_items:
-                blocks.append(
-                    qa_markdown_block(
-                        item["q"],
-                        item["a"],
-                        item.get("img") or "",
-                        item.get("url") or "",
-                        bool(item.get("hidden", False)),
-                    )
+        if new_items:
+            content = _merged_target_content(target_file, new_items)
+            # 寫入前先讀回比對：來源的 ## 行、多行題目、列長度不齊等，都可能讓內容讀出來
+            # 不一樣；這種情況不寫也不刪來源，才不會默默丟資料。
+            reread = _parse_qa_bytes(target_file.suffix, content.encode("utf-8"))
+            if _qa_values(reread or []) != _qa_values([*target_items, *new_items]):
+                raise HTTPException(
+                    status_code=400,
+                    detail="這份內容無法完整併入目標 QA 文件的格式，未做任何變更",
                 )
-            new_content = "\n\n".join(blocks)
-            save_workspace_document(target_path, new_content, project_id)
+            save_workspace_document(target_path, content, project_id)
             upsert_document_meta(target_path, project_id, source_type="qa")
 
+        if new_qa_entries != qa_entries:
             update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
 
         delete_workspace_document(path, project_id)
         # 被吸收的文件若原屬其他節點，清掉那些節點的懸空 entries
         sync_entries_for_source(path, project_id)
-        return {"added": added_count}
+        return {"added": len(new_items)}
 
-    result = await asyncio.to_thread(_ingest)
+    def _ingest_exclusively() -> dict[str, Any]:
+        # 從讀目標到刪來源要一起完成，否則同時兩次拖曳會有一邊的題目被蓋掉、來源卻已刪。
+        with _ingest_lock:
+            return _ingest()
+
+    result = await asyncio.to_thread(_ingest_exclusively)
     schedule_reindex(project_id)
     return result
 

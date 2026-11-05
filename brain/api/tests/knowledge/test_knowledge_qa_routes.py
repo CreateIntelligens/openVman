@@ -851,3 +851,458 @@ def test_ingest_source_removes_empty_ghost_node(client, tmp_path):
     assert response.status_code == 200
 
     assert qa_nodes.get_node("n_ghost") is None
+
+
+_CSV_WITH_INDEX_GAP = (
+    "index,q,a,img,url,display,備註\n"
+    '1,舊題一,"舊答一,含逗號",a.png,https://x.example/1,true,留著\n'
+    "2,舊題二,舊答二,,,false,\n"
+    "7,舊題三,舊答三,,,true,也留著\n"
+)
+_QA_MD = (
+    '## 舊題一\n\n重複的問題不該蓋掉原答案\n\n'
+    '## 新題\n\n新答\n<!-- qa_metadata: {"img": "b.png", "url": "https://x.example/2", "hidden": true} -->\n'
+)
+
+
+def _write_doc(root: Path, relative: str, content: str) -> Path:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def _csv_node(client, root: Path, content: str = _CSV_WITH_INDEX_GAP) -> Path:
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    target = _write_doc(root, "knowledge/qa/own.csv", content)
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/own.csv", "default", source_type="qa")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.update_node("n1", {"qa_entries": qa_nodes._build_entries_for_source("knowledge/qa/own.csv")})
+    return target
+
+
+def test_ingest_markdown_into_csv_node_keeps_existing_rows(client, tmp_path):
+    import csv
+    import io
+
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    target = _csv_node(client, root)
+    dragged = _write_doc(root, "knowledge/notes/dragged.md", _QA_MD)
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/notes/dragged.md"},
+    )
+    assert response.status_code == 200
+    assert response.json()["added"] == 1
+
+    rows = list(csv.DictReader(io.StringIO(target.read_text(encoding="utf-8"))))
+    assert [row["index"] for row in rows] == ["1", "2", "7", "8"]
+    assert rows[0] == {
+        "index": "1", "q": "舊題一", "a": "舊答一,含逗號", "img": "a.png",
+        "url": "https://x.example/1", "display": "true", "備註": "留著",
+    }
+    assert rows[1]["display"] == "false"
+    assert rows[2]["備註"] == "也留著"
+    assert rows[3] == {
+        "index": "8", "q": "新題", "a": "新答", "img": "b.png",
+        "url": "https://x.example/2", "display": "false", "備註": "",
+    }
+
+    entries = {e["question"]: e for e in qa_nodes.get_node("n1")["qa_entries"]}
+    assert set(entries) == {"舊題一", "舊題二", "舊題三", "新題"}
+    assert entries["新題"]["source_path"] == "knowledge/qa/own.csv"
+    assert entries["新題"]["hidden"] is True
+    assert not dragged.exists()
+
+
+def test_ingest_into_csv_keeps_alias_headers_and_adds_only_needed_columns(client, tmp_path):
+    root = tmp_path / "workspace"
+    target = _csv_node(client, root, "問題,回答\n舊題,舊答\n")
+    _write_doc(
+        root, "knowledge/notes/dragged.md",
+        '## 新題\n\n新答\n<!-- qa_metadata: {"img": "", "url": "", "hidden": true} -->\n',
+    )
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/notes/dragged.md"},
+    )
+    assert response.status_code == 200
+    assert target.read_text(encoding="utf-8") == "問題,回答,display\n舊題,舊答,\n新題,新答,false\n"
+
+
+def test_ingest_csv_source_into_markdown_node(client, tmp_path):
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    own = _write_doc(root, "knowledge/qa/own.md", '## Q1\n\nA1\n<!-- qa_metadata: {"img": "", "url": ""} -->\n')
+    dragged = _write_doc(root, "knowledge/notes/dragged.csv", "index,q,a,img,url,display\n1,Q2,A2,,,false\n")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q1", "source_path": "knowledge/qa/own.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/notes/dragged.csv"},
+    )
+    assert response.status_code == 200
+    assert response.json()["added"] == 1
+    assert "## Q1" in own.read_text(encoding="utf-8")
+    assert "## Q2" in own.read_text(encoding="utf-8")
+    assert not dragged.exists()
+
+
+@pytest.mark.parametrize("failing", ["routes.knowledge_qa.save_workspace_document", "os.replace"])
+def test_ingest_write_failure_keeps_source_target_and_node(client, tmp_path, monkeypatch, failing):
+    import importlib
+
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    target = _csv_node(client, root)
+    dragged = _write_doc(root, "knowledge/notes/dragged.md", _QA_MD)
+    entries_before = qa_nodes.get_node("n1")["qa_entries"]
+    target_dir_before = sorted(p.name for p in target.parent.iterdir())
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    module_name, attribute = failing.rsplit(".", 1)
+    safe_client = TestClient(client.app, raise_server_exceptions=False, headers=dict(client.headers))
+    with monkeypatch.context() as patch:
+        patch.setattr(importlib.import_module(module_name), attribute, boom)
+        response = safe_client.post(
+            "/brain/knowledge/qa/nodes/n1/ingest-source",
+            json={"path": "knowledge/notes/dragged.md"},
+        )
+
+    assert response.status_code == 500
+    assert dragged.read_text(encoding="utf-8") == _QA_MD
+    assert target.read_text(encoding="utf-8") == _CSV_WITH_INDEX_GAP
+    assert qa_nodes.get_node("n1")["qa_entries"] == entries_before
+    assert sorted(p.name for p in target.parent.iterdir()) == target_dir_before
+
+
+def test_ingest_retry_after_node_update_failure_completes(client, tmp_path, monkeypatch):
+    """寫完目標、更新節點失敗後重試：題目不重複，節點補齊，來源才刪。"""
+    import knowledge.qa_nodes as qa_nodes
+    import routes.knowledge_qa
+
+    root = tmp_path / "workspace"
+    target = _csv_node(client, root)
+    dragged = _write_doc(root, "knowledge/notes/dragged.md", _QA_MD)
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    safe_client = TestClient(client.app, raise_server_exceptions=False, headers=dict(client.headers))
+    with monkeypatch.context() as patch:
+        patch.setattr(routes.knowledge_qa, "update_node", boom)
+        failed = safe_client.post(
+            "/brain/knowledge/qa/nodes/n1/ingest-source",
+            json={"path": "knowledge/notes/dragged.md"},
+        )
+    assert failed.status_code == 500
+    assert dragged.exists()
+
+    retried = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/notes/dragged.md"},
+    )
+    assert retried.status_code == 200
+    assert retried.json()["added"] == 0
+    assert target.read_text(encoding="utf-8").count("新題") == 1
+    assert "新題" in {e["question"] for e in qa_nodes.get_node("n1")["qa_entries"]}
+    assert not dragged.exists()
+
+
+@pytest.mark.parametrize(
+    ("relative", "content"),
+    [
+        ("knowledge/qa/own.csv", "foo,bar\n1,2\n"),
+        ("knowledge/qa/own.md", "只是一段說明文字，不是問答。\n"),
+    ],
+)
+def test_ingest_refuses_to_overwrite_unreadable_target(client, tmp_path, relative, content):
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    target = _write_doc(root, relative, content)
+    dragged = _write_doc(root, "knowledge/notes/dragged.md", _QA_MD)
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q", "source_path": relative, "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/notes/dragged.md"},
+    )
+    assert response.status_code == 400
+    assert target.read_text(encoding="utf-8") == content
+    assert dragged.exists()
+
+
+@pytest.mark.parametrize("content", ["", "index,q,a,img,url,display\n"])
+def test_ingest_into_empty_csv_target(client, tmp_path, content):
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    target = _write_doc(root, "knowledge/qa/own.csv", content)
+    dragged = _write_doc(root, "knowledge/notes/dragged.md", "## 新題\n\n新答\n")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q", "source_path": "knowledge/qa/own.csv", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/notes/dragged.md"},
+    )
+    assert response.status_code == 200
+    assert "1,新題,新答" in target.read_text(encoding="utf-8")
+    assert not dragged.exists()
+
+
+def test_adopt_source_accepts_qa_csv(client, tmp_path):
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    target = _write_doc(root, "knowledge/uploads/faq.csv", _CSV_WITH_INDEX_GAP)
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/adopt-source",
+        json={"path": "knowledge/uploads/faq.csv"},
+    )
+    assert response.status_code == 200
+
+    entries = qa_nodes.get_node(response.json()["node_id"])["qa_entries"]
+    assert [e["question"] for e in entries] == ["舊題一", "舊題二", "舊題三"]
+    assert entries[1]["hidden"] is True
+    assert target.read_text(encoding="utf-8") == _CSV_WITH_INDEX_GAP
+    meta = knowledge.doc_meta.get_document_meta("knowledge/uploads/faq.csv", "default")
+    assert meta["source_type"] == "qa"
+
+
+def test_adopt_source_rejects_csv_without_qa_columns(client, tmp_path):
+    root = tmp_path / "workspace"
+    _write_doc(root, "knowledge/uploads/table.csv", "foo,bar\n1,2\n")
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/adopt-source",
+        json={"path": "knowledge/uploads/table.csv"},
+    )
+    assert response.status_code == 400
+
+
+def _ingest(client, source: str, node_id: str = "n1"):
+    return client.post(f"/brain/knowledge/qa/nodes/{node_id}/ingest-source", json={"path": source})
+
+
+def _node_with_source(client, root: Path, relative: str, content: "str | bytes") -> Path:
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    target = root / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content if isinstance(content, bytes) else content.encode("utf-8"))
+    knowledge.doc_meta.upsert_document_meta(relative, "default", source_type="qa")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.update_node("n1", {"qa_entries": [
+        {"question": "佔位", "source_path": relative, "hidden": False, "image_id": None},
+    ]})
+    return target
+
+
+@pytest.mark.parametrize("alias", ["./knowledge/qa/own.md", "knowledge/qa/../qa/own.md", "knowledge//qa/own.md"])
+def test_ingest_refuses_own_source_under_another_spelling(client, tmp_path, alias):
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, "knowledge/qa/own.md", _QA_MD)
+
+    assert _ingest(client, alias).status_code == 400
+    assert target.read_text(encoding="utf-8") == _QA_MD
+
+
+@pytest.mark.parametrize(
+    "source",
+    ["q,a\nQ,答一\nQ,答二\n", "q,a\n,無題答甲\n,無題答乙\n"],
+)
+def test_ingest_refuses_source_with_conflicting_duplicates(client, tmp_path, source):
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, "knowledge/qa/own.csv", "q,a\n舊,舊答\n")
+    dragged = _write_doc(root, "knowledge/notes/d.csv", source)
+
+    assert _ingest(client, "knowledge/notes/d.csv").status_code == 400
+    assert target.read_text(encoding="utf-8") == "q,a\n舊,舊答\n"
+    assert dragged.read_text(encoding="utf-8") == source
+
+
+@pytest.mark.parametrize(
+    "source",
+    ['q,a\nQ2,"前段\n## 注意事項\n後段"\n', 'q,a\n"第一行\n第二行",A2\n'],
+)
+def test_ingest_refuses_csv_content_markdown_cannot_hold(client, tmp_path, source):
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, "knowledge/qa/own.md", _QA_MD)
+    dragged = _write_doc(root, "knowledge/notes/d.csv", source)
+
+    assert _ingest(client, "knowledge/notes/d.csv").status_code == 400
+    assert target.read_text(encoding="utf-8") == _QA_MD
+    assert dragged.exists()
+
+
+def test_ingest_keeps_markdown_text_before_the_first_question(client, tmp_path):
+    root = tmp_path / "workspace"
+    original = "# 標題\n\n前言\n\n## Q1\n\nA1\n"
+    target = _node_with_source(client, root, "knowledge/qa/own.md", original)
+    _write_doc(root, "knowledge/notes/d.md", "## Q2\n\nA2\n")
+
+    assert _ingest(client, "knowledge/notes/d.md").status_code == 200
+    content = target.read_text(encoding="utf-8")
+    assert content.startswith(original.rstrip())
+    assert "## Q2" in content
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "q,a\n舊,答案前段,答案後段\n",  # 多出來的格會被新增的 img 欄當成圖片
+        "q,a,a\n舊,甲,乙\n",  # 重複欄位：新列寫前一欄，讀的卻是後一欄
+    ],
+)
+def test_ingest_refuses_csv_it_cannot_extend_faithfully(client, tmp_path, content):
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, "knowledge/qa/own.csv", content)
+    dragged = _write_doc(
+        root, "knowledge/notes/d.md",
+        '## 新\n\n新答\n<!-- qa_metadata: {"img": "b.png", "url": ""} -->\n',
+    )
+
+    assert _ingest(client, "knowledge/notes/d.md").status_code == 400
+    assert target.read_text(encoding="utf-8") == content
+    assert dragged.exists()
+
+
+def test_ingest_refuses_non_utf8_target_and_source(client, tmp_path):
+    root = tmp_path / "workspace"
+    gbk_target = "q,a\n旧题怎么办,旧答\n".encode("gbk")
+    target = _node_with_source(client, root, "knowledge/qa/own.csv", gbk_target)
+    dragged = _write_doc(root, "knowledge/notes/d.md", "## 新\n\n新答\n")
+    assert _ingest(client, "knowledge/notes/d.md").status_code == 400
+    assert target.read_bytes() == gbk_target
+    assert dragged.exists()
+
+    gbk_source = "q,a\n来源题怎么办,来源答\n".encode("gbk")
+    source = root / "knowledge" / "notes" / "s.csv"
+    source.write_bytes(gbk_source)
+    adopted = client.post("/brain/knowledge/qa/nodes/adopt-source", json={"path": "knowledge/notes/s.csv"})
+    assert adopted.status_code == 400
+    assert source.read_bytes() == gbk_source
+
+
+def test_ingest_uses_target_file_values_for_question_missing_from_node(client, tmp_path):
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    _node_with_source(client, root, "knowledge/qa/own.csv", "q,a,img,display\n舊,舊答,keep.png,false\n")
+    _write_doc(root, "knowledge/notes/d.md", '## 舊\n\n別的答案\n<!-- qa_metadata: {"img": "other.png", "url": ""} -->\n')
+
+    assert _ingest(client, "knowledge/notes/d.md").status_code == 200
+    entry = next(e for e in qa_nodes.get_node("n1")["qa_entries"] if e["question"] == "舊")
+    assert entry["hidden"] is True
+    assert entry["image_id"] == "keep.png"
+
+
+@pytest.mark.parametrize("index", ["NaN", "-inf", "1.5", "abc", ""])
+def test_ingest_into_csv_tolerates_unusual_index(client, tmp_path, index):
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, "knowledge/qa/own.csv", f"index,q,a\n{index},舊,舊答\n")
+    _write_doc(root, "knowledge/notes/d.md", "## 新\n\n新答\n")
+
+    assert _ingest(client, "knowledge/notes/d.md").status_code == 200
+    assert "舊,舊答" in target.read_text(encoding="utf-8")
+    assert "新,新答" in target.read_text(encoding="utf-8")
+
+
+def test_concurrent_ingests_keep_every_question(client, tmp_path, monkeypatch):
+    import threading
+
+    import knowledge.qa_nodes as qa_nodes
+    import routes.knowledge_qa
+
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, "knowledge/qa/own.csv", "q,a\n舊,舊答\n")
+    _write_doc(root, "knowledge/notes/a.md", "## 甲\n\n甲答\n")
+    _write_doc(root, "knowledge/notes/b.md", "## 乙\n\n乙答\n")
+
+    # 讓兩個請求都讀完目標才寫；有鎖時另一個等不到，逾時後照常往下。
+    barrier = threading.Barrier(2)
+    real_save = routes.knowledge_qa.save_workspace_document
+
+    def rendezvous_save(*args, **kwargs):
+        try:
+            barrier.wait(timeout=1)
+        except threading.BrokenBarrierError:
+            pass
+        return real_save(*args, **kwargs)
+
+    monkeypatch.setattr(routes.knowledge_qa, "save_workspace_document", rendezvous_save)
+    results: list[int] = []
+    threads = [
+        threading.Thread(target=lambda s=s: results.append(_ingest(client, s).status_code))
+        for s in ("knowledge/notes/a.md", "knowledge/notes/b.md")
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert results == [200, 200]
+    content = target.read_text(encoding="utf-8")
+    assert "甲,甲答" in content and "乙,乙答" in content
+    assert {"甲", "乙"} <= {e["question"] for e in qa_nodes.get_node("n1")["qa_entries"]}
+
+
+def test_adopted_csv_keeps_one_entry_per_row(client, tmp_path):
+    """答案裡的 ## 行與多行題目不能在建節點時變成別的題目。"""
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    _write_doc(
+        root, "knowledge/uploads/faq.csv",
+        'q,a\nQ1,"前段\n## 注意事項\n後段"\n"第一行\n第二行",A2\n',
+    )
+
+    response = client.post("/brain/knowledge/qa/nodes/adopt-source", json={"path": "knowledge/uploads/faq.csv"})
+    assert response.status_code == 200
+    node_id = response.json()["node_id"]
+    assert [e["question"] for e in qa_nodes.get_node(node_id)["qa_entries"]] == ["Q1", "第一行\n第二行"]
+
+    merged = client.get(f"/brain/knowledge/qa/nodes/{node_id}/merged").json()
+    assert merged[0]["a"] == "前段\n## 注意事項\n後段"
+    assert merged[1]["a"] == "A2"
+
+
+def test_saving_a_document_handles_long_names_and_keeps_mode(client, tmp_path):
+    import os
+
+    root = tmp_path / "workspace"
+    name = "長" * 80 + ".md"
+    assert len(name.encode()) > 240
+    relative = f"knowledge/{name}"
+    path = _write_doc(root, relative, "舊內容\n")
+    os.chmod(path, 0o640)
+
+    response = client.put("/brain/knowledge/document", json={"path": relative, "content": "新內容\n"})
+    assert response.status_code == 200
+
+    assert path.read_text(encoding="utf-8") == "新內容\n"
+    assert (path.stat().st_mode & 0o777) == 0o640
+    assert [p.name for p in path.parent.iterdir() if p.name.endswith(".tmp")] == []

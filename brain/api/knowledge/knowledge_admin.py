@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import tempfile
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timezone
 from pathlib import Path
@@ -115,9 +117,23 @@ def save_workspace_document(relative_path: str, content: str, project_id: str = 
     """Create or overwrite a text document in the workspace."""
     path = resolve_workspace_document(relative_path, project_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    _write_text_atomic(path, content)
     touch_document_meta(path.relative_to(ensure_workspace_scaffold(project_id)).as_posix(), project_id)
     return _build_document_summary(path, project_id)
+
+
+def _write_text_atomic(path: Path, content: str) -> None:
+    """Replace ``path`` in one step, so a failed write leaves the old file intact."""
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
+    fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=".write-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.chmod(temp_name, mode)
+        os.replace(temp_name, path)
+    except BaseException:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
 
 
 def _write_normalization_backup(
