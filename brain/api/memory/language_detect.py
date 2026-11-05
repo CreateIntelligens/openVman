@@ -125,6 +125,18 @@ def detect_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
     return "es" if es_hits > en_hits else "en"
 
 
+def detect_row_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
+    """Language of one QA row (question + answer), which may quote a Chinese name.
+
+    ``detect_language`` 判使用者的話：有中文就是中文。整題判斷時英文答案夾一個中文品牌名
+    不該算中文，所以拉丁字比漢字多時先拿掉漢字。
+    """
+    source = text or ""
+    if len(_LATIN_WORD.findall(source.lower())) > len(_HAN.findall(source)):
+        source = _HAN.sub("", source)
+    return detect_language(source, default)
+
+
 # 台羅的聲調符號：揚抑符、長音符與第八聲的 U+030D；西語只有尖音符，不會撞到。
 _TAILO_TONE = re.compile(r"[âêîôûāēīōūǹ]|\u030d")
 # 台語漢字常用、華語很少單獨出現的字；比例夠高才算，免得「給予」「欲望」誤判。

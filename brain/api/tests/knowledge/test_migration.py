@@ -113,10 +113,10 @@ def _write_json(path: Path, data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def test_migrate_downgrades_orphan_qa_docs_without_nodes_file(
+def test_migrate_keeps_unattached_qa_docs_without_nodes_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    """孤兒 QA 文件（無任何 node 引用、甚至沒有 .qa_nodes.json）應降級為 manual。"""
+    """刪節點不刪文件，沒掛節點的 QA 文件仍是 QA 文件，不能被降級。"""
     root = _setup_workspace(monkeypatch, tmp_path)
 
     orphan_path = root / "knowledge" / "orphan_faq.md"
@@ -133,13 +133,13 @@ def test_migrate_downgrades_orphan_qa_docs_without_nodes_file(
     assert orphan_path.exists()
     with open(doc_meta_path, encoding="utf-8") as f:
         updated = json.load(f)
-    assert updated["knowledge/orphan_faq.md"]["source_type"] == "manual"
+    assert updated["knowledge/orphan_faq.md"]["source_type"] == "qa"
 
 
 def test_migrate_handles_referenced_and_orphan_docs_together(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    """有引用的搬進 knowledge/qa/，無引用的降級 manual（含已在 qa/ 下的孤兒）。"""
+    """有引用的搬進 knowledge/qa/，無引用的留在原位、仍是 QA 文件。"""
     root = _setup_workspace(monkeypatch, tmp_path)
     knowledge_dir = root / "knowledge"
     knowledge_dir.mkdir(parents=True, exist_ok=True)
@@ -188,5 +188,5 @@ def test_migrate_handles_referenced_and_orphan_docs_together(
     with open(doc_meta_path, encoding="utf-8") as f:
         updated = json.load(f)
     assert updated["knowledge/qa/linked_faq.md"]["source_type"] == "qa"
-    assert updated["knowledge/orphan_faq.md"]["source_type"] == "manual"
-    assert updated["knowledge/qa/stale_faq.md"]["source_type"] == "manual"
+    assert updated["knowledge/orphan_faq.md"]["source_type"] == "qa"
+    assert updated["knowledge/qa/stale_faq.md"]["source_type"] == "qa"

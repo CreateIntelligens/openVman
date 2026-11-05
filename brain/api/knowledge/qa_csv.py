@@ -14,6 +14,7 @@ from typing import Any
 
 _QA_HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 _QA_METADATA_RE = re.compile(r"<!--\s*qa_metadata:\s*({.*?})\s*-->")
+_CSV_ENCODINGS = ("utf-8-sig", "utf-8", "cp950", "big5", "gbk")
 
 
 def _mask_code_block_headings(match: re.Match[str]) -> str:
@@ -76,6 +77,16 @@ _FIELD_ALIASES: dict[str, list[str]] = {
     "url": ["url", "link", "網址", "网址", "連結", "链接"],
     "index": ["index", "i", "順序"],
     "display": ["display", "d", "顯示"],
+    "language": ["language", "lang", "語言", "语言"],
+}
+
+_ROW_LANGUAGES: dict[str, str] = {
+    "zh": "zh", "zhtw": "zh", "zhhant": "zh", "中文": "zh", "華語": "zh", "繁體中文": "zh",
+    "en": "en", "english": "en", "英文": "en",
+    "es": "es", "español": "es", "espanol": "es", "spanish": "es", "西文": "es", "西班牙文": "es",
+    "ja": "ja", "日本語": "ja", "日文": "ja",
+    "ko": "ko", "한국어": "ko", "韓文": "ko",
+    "nan": "nan", "台語": "nan", "閩南語": "nan",
 }
 
 
@@ -101,17 +112,15 @@ def normalize_fieldname(raw: str) -> str:
 
 
 def _parse_csv_rows(file_bytes: bytes) -> tuple[list[str], list[dict[str, str]]] | None:
-    encodings = ["utf-8-sig", "utf-8", "cp950", "big5", "gbk"]
-
     first_decodable_parsed = None
 
-    for enc in encodings:
+    for enc in _CSV_ENCODINGS:
         try:
             text = file_bytes.decode(enc)
         except UnicodeDecodeError:
             continue
 
-        reader = csv.DictReader(io.StringIO(text))
+        reader = csv.DictReader(io.StringIO(text, newline=""))
         if reader.fieldnames is None:
             continue
 
@@ -158,7 +167,7 @@ def append_qa_csv_rows(file_bytes: bytes, entries: list[dict[str, Any]]) -> str:
     而拆成多檔的主題靠 index 記跨檔順序。新列的 index 接在現有最大值之後；
     只有新列真的用到時才新增 img／url／display 欄。檔案必須是 UTF-8。
     """
-    table = list(csv.reader(io.StringIO(file_bytes.decode("utf-8-sig"))))
+    table = list(csv.reader(io.StringIO(file_bytes.decode("utf-8-sig"), newline="")))
     if not table:
         raise ValueError("CSV 沒有標題列")
     header, rows = table[0], table[1:]
@@ -205,9 +214,272 @@ def append_qa_csv_rows(file_bytes: bytes, entries: list[dict[str, Any]]) -> str:
                 row[column_of[canonical]] = value
         rows.append(row)
 
-    buffer = io.StringIO()
-    csv.writer(buffer, lineterminator="\n").writerows([header, *rows])
+    return _write_csv_table([header, *rows])
+
+
+def _write_csv_table(rows: list[list[str]]) -> str:
+    """Serialize a raw CSV table.
+
+    Python 3.11 的 csv.writer 只替 lineterminator 裡的字元加引號，格子裡單獨的 \\r 會原樣
+    寫出，讀回來就斷成兩列，所以統一成 \\n。
+    """
+    buffer = io.StringIO(newline="")
+    csv.writer(buffer, lineterminator="\n").writerows(
+        [[cell.replace("\r\n", "\n").replace("\r", "\n") for cell in row] for row in rows]
+    )
     return buffer.getvalue()
+
+
+def _decode_qa_csv_table(file_bytes: bytes) -> list[list[str]]:
+    """Read a QA CSV as raw rows, in the encoding whose header has QA columns."""
+    for encoding in _CSV_ENCODINGS:
+        try:
+            text = file_bytes.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        table = list(csv.reader(io.StringIO(text, newline="")))
+        if table and {"q", "a"} <= {normalize_fieldname(raw) for raw in table[0]}:
+            return table
+    raise ValueError("CSV 缺少問題或回答欄位")
+
+
+def parse_csv_table(file_bytes: bytes) -> list[list[str]]:
+    """Raw rows of a QA CSV, header first."""
+    return _decode_qa_csv_table(file_bytes)
+
+
+def _place_rows(
+    rows: list[Any],
+    question_of: Any,
+    updates: list[dict[str, Any]],
+    removed: set[str],
+    build_row: Any,
+) -> list[Any]:
+    """Put updated rows back into the slots they came from, leaving every other row alone.
+
+    同題重複時對應最後一列，和合併檢視顯示的那列相同。多出來的新題接在這批題目最後一個
+    位置之後，不接到檔尾，才不會跑到別的節點的題目後面。
+    """
+    last_position = {question_of(row): position for position, row in enumerate(rows)}
+    sources = {
+        update["match"]: last_position[update["match"]]
+        for update in updates
+        if update.get("match") in last_position
+    }
+    slots = set(sources.values())
+    built = [
+        build_row(update, rows[sources[update["match"]]] if update.get("match") in sources else None)
+        for update in updates
+    ]
+    placed = iter(built)
+    result: list[Any] = []
+    filled = 0
+    last_slot = -1
+    for position, row in enumerate(rows):
+        if position in slots:
+            result.append(next(placed))
+            filled += 1
+            last_slot = len(result)
+        elif question_of(row) not in removed:
+            result.append(row)
+    insert_at = last_slot if filled else len(result)
+    result[insert_at:insert_at] = built[filled:]
+    return result
+
+
+def rewrite_qa_csv(
+    file_bytes: bytes,
+    updates: list[dict[str, Any]],
+    removed: set[str],
+) -> str:
+    """Apply one node's edits to a CSV without touching rows the node does not own.
+
+    ``updates`` is the node's rows in screen order; ``match`` names the question
+    a row replaces (absent for a new row). Only cells whose meaning changed are
+    rewritten, so extra columns and other nodes' rows stay byte-for-byte.
+    """
+    table = _decode_qa_csv_table(file_bytes)
+    header, rows = table[0], table[1:]
+    column_of: dict[str, int] = {}
+    for position, raw in enumerate(header):
+        column_of.setdefault(normalize_fieldname(raw), position)
+
+    def _add_column(canonical: str) -> None:
+        column_of[canonical] = len(header)
+        header.append(canonical)
+        for row in rows:
+            if row:
+                row.extend([""] * (len(header) - len(row)))
+
+    def _cell(row: list[str], canonical: str) -> str:
+        position = column_of.get(canonical)
+        return row[position] if position is not None and position < len(row) else ""
+
+    if "index" not in column_of:
+        _add_column("index")
+    if "img" not in column_of and any(extract_image_id(u.get("img") or "") for u in updates):
+        _add_column("img")
+    if "url" not in column_of and any((u.get("url") or "").strip() for u in updates):
+        _add_column("url")
+    if "display" not in column_of and any(u.get("hidden") for u in updates):
+        _add_column("display")
+
+    def _question_of(row: list[str]) -> str:
+        return _cell(row, "q").strip()
+
+    matched = {u["match"] for u in updates if u.get("match")}
+    last_position = {_question_of(row): position for position, row in enumerate(rows)}
+    matched_positions = {last_position[q] for q in matched if q in last_position}
+    has_other_rows = any(
+        position not in matched_positions and _question_of(row) not in removed and any(row)
+        for position, row in enumerate(rows)
+    )
+
+    indexes: list[str] = []
+    if has_other_rows:
+        # 別的節點的 index 不能動；這個節點只在自己原本的 index 之間換順序，新題排到最後。
+        own = sorted(
+            value
+            for value in (_index_sort_value(_cell(rows[p], "index")) for p in matched_positions)
+            if math.isfinite(value)
+        )
+        all_values = [
+            value
+            for value in (_index_sort_value(_cell(row, "index")) for row in rows)
+            if math.isfinite(value)
+        ]
+        next_index = int(max(all_values, default=0)) + 1
+        for position in range(len(updates)):
+            if position < len(own):
+                value = own[position]
+                indexes.append(str(int(value)) if value == int(value) else str(value))
+            else:
+                indexes.append(str(next_index))
+                next_index += 1
+    else:
+        # 用畫面上的位置，不信任 client 帶的 index：樹上拖題時送回來的還是舊值。
+        indexes = [str(u.get("position") or position) for position, u in enumerate(updates, start=1)]
+    index_of = {id(update): index for update, index in zip(updates, indexes)}
+
+    def _build_row(update: dict[str, Any], existing: list[str] | None) -> list[str]:
+        row = list(existing) if existing is not None else [""] * len(header)
+        row.extend([""] * (len(header) - len(row)))
+
+        def _put(canonical: str, value: str, unchanged: bool = False) -> None:
+            if canonical in column_of and not (existing is not None and unchanged):
+                row[column_of[canonical]] = value
+
+        q, a = update.get("q") or "", update.get("a") or ""
+        img = extract_image_id(update.get("img") or "")
+        url = (update.get("url") or "").strip()
+        hidden = bool(update.get("hidden"))
+        current_display = _cell(row, "display").strip().lower()
+        _put("q", q, _cell(row, "q").strip() == q)
+        _put("a", a, _cell(row, "a").strip() == a)
+        _put("img", img, extract_image_id(_cell(row, "img")) == img)
+        _put("url", url, _cell(row, "url").strip() == url)
+        _put(
+            "display",
+            "false" if hidden else "true",
+            (current_display in _HIDDEN_DISPLAY_VALUES) == hidden,
+        )
+        _put("index", index_of[id(update)])
+        return row
+
+    return _write_csv_table([header, *_place_rows(rows, _question_of, updates, removed, _build_row)])
+
+
+def qa_markdown_preamble(content: str) -> str:
+    """Text before the first question heading."""
+    masked = re.sub(r"```.*?```", _mask_code_block_headings, content, flags=re.DOTALL)
+    first = _QA_HEADING_RE.search(masked)
+    return (content[: first.start()] if first else content).strip()
+
+
+def rewrite_qa_markdown(
+    content: str,
+    updates: list[dict[str, Any]],
+    removed: set[str],
+) -> str:
+    """Markdown counterpart of ``rewrite_qa_csv``.
+
+    沒改到的段落照原文留著：重新組出來會把別的節點的自訂 metadata 與格式洗掉。
+    """
+    masked = re.sub(r"```.*?```", _mask_code_block_headings, content, flags=re.DOTALL)
+    headings = list(_QA_HEADING_RE.finditer(masked))
+    preamble = qa_markdown_preamble(content)
+    blocks: list[tuple[str, str, dict[str, Any]]] = []
+    for position, heading in enumerate(headings):
+        end = headings[position + 1].start() if position + 1 < len(headings) else len(content)
+        raw = content[heading.start():end].strip()
+        parsed = parse_qa_markdown(raw)
+        if parsed:
+            blocks.append((parsed[0]["q"].strip(), raw, parsed[0]))
+
+    def _values(entry: dict[str, Any]) -> tuple[str, str, str, str, bool]:
+        return (
+            entry["q"].strip(),
+            entry["a"].strip(),
+            extract_image_id(entry.get("img") or ""),
+            (entry.get("url") or "").strip(),
+            bool(entry.get("hidden", False)),
+        )
+
+    def _build_block(
+        update: dict[str, Any], existing: tuple[str, str, dict[str, Any]] | None,
+    ) -> tuple[str, str, dict[str, Any]]:
+        if existing is not None and _values(existing[2]) == _values(update):
+            return existing
+        raw = qa_markdown_block(
+            update["q"],
+            update["a"],
+            update.get("img") or "",
+            update.get("url") or "",
+            bool(update.get("hidden", False)),
+        )
+        return (update["q"], raw, update)
+
+    placed = _place_rows(blocks, lambda block: block[0], updates, removed, _build_block)
+    return "\n\n".join([preamble, *(block[1] for block in placed)] if preamble else [block[1] for block in placed])
+
+
+def normalize_row_language(raw: str) -> str | None:
+    """Language code for a CSV ``language`` cell; unknown values count as unlabelled."""
+    return _ROW_LANGUAGES.get(_clean_string(raw or ""))
+
+
+def label_qa_csv_languages(file_bytes: bytes, detect: Any) -> tuple[str, dict[str, int]]:
+    """Fill the ``language`` column of rows where it is blank.
+
+    Whatever a person wrote stays, even a value this code does not know, so a
+    correction survives a later run. ``detect`` gets the question and answer text
+    and returns a code.
+    """
+    table = _decode_qa_csv_table(file_bytes)
+    header, rows = table[0], table[1:]
+    column_of: dict[str, int] = {}
+    for position, raw in enumerate(header):
+        column_of.setdefault(normalize_fieldname(raw), position)
+    if "language" not in column_of:
+        # 列比標題長時，多出來的格子不能被新欄蓋掉。
+        width = max((len(row) for row in rows), default=len(header))
+        header.extend([""] * (width - len(header)))
+        column_of["language"] = len(header)
+        header.append("language")
+
+    counts: dict[str, int] = {}
+    position = column_of["language"]
+    for row in rows:
+        if not any(row):
+            continue
+        row.extend([""] * (len(header) - len(row)))
+        language = row[position].strip()
+        if not language:
+            language = detect(f"{row[column_of['q']]} {row[column_of['a']]}")
+            row[position] = language
+        counts[language] = counts.get(language, 0) + 1
+
+    return _write_csv_table([header, *rows]), counts
 
 
 def _has_meaningful_qa_content(row: dict[str, str]) -> bool:
@@ -315,6 +587,8 @@ def parse_qa_csv(file_bytes: bytes) -> list[dict[str, Any]]:
 def serialize_qa_csv(entries: list[dict[str, Any]]) -> str:
     """Serialize merged-editor QA entries without changing a CSV source to markdown."""
     fieldnames = ["index", "q", "a", "img", "url", "display"]
+    if any(entry.get("language") for entry in entries):
+        fieldnames.append("language")
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fieldnames, lineterminator="\n")
     writer.writeheader()
@@ -327,6 +601,7 @@ def serialize_qa_csv(entries: list[dict[str, Any]]) -> str:
                 "img": extract_image_id(entry.get("img") or ""),
                 "url": entry.get("url") or "",
                 "display": "false" if entry.get("hidden") else "true",
+                **({"language": entry.get("language") or ""} if "language" in fieldnames else {}),
             }
         )
     return buffer.getvalue()

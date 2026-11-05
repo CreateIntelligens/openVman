@@ -174,7 +174,10 @@ def test_qa_nodes_merged_and_update_route(client):
             "source_file": "knowledge/qa/manual_merged_node.md"
         }
     ]
-    response = client.put("/brain/knowledge/qa/nodes/merged_node/merged", json=updated_payload)
+    version = items[0]["base_version"]
+    response = client.put(
+        f"/brain/knowledge/qa/nodes/merged_node/merged?base_version={version}", json=updated_payload,
+    )
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
@@ -378,11 +381,14 @@ def test_merged_route_reads_and_preserves_csv_media(client):
     assert response.json()[0] == {
         "index": "1",
         "q": "怎麼加入",
+        "original_q": "怎麼加入",
         "a": "掃描 QR code",
         "img": "B1-4",
         "url": "https://example.com/line",
         "source_file": source_file,
         "hidden": False,
+        "base_version": response.json()[0]["base_version"],
+        "also_in": [],
     }
 
     payload = response.json()
@@ -448,8 +454,8 @@ def test_qa_note_creates_tree_node(client):
     assert node["qa_entries"][0]["source_path"] == "knowledge/qa/門市問答.md"
 
 
-def test_list_nodes_adopts_orphan_qa_sources(client, tmp_path):
-    """讀取問答樹時，未被任何節點引用的 QA 文件會自動補建節點。"""
+def test_list_nodes_leaves_unattached_qa_sources_alone(client, tmp_path):
+    """沒掛節點的 QA 文件不再自動建節點，否則刪掉的分類會自己長回來。"""
     import knowledge.doc_meta
 
     root = tmp_path / "workspace"
@@ -458,15 +464,13 @@ def test_list_nodes_adopts_orphan_qa_sources(client, tmp_path):
     orphan.write_text("## Q1\n\nA1\n", encoding="utf-8")
     knowledge.doc_meta.upsert_document_meta("knowledge/qa/orphan_faq.md", "default", source_type="qa")
 
-    tree = client.get("/brain/knowledge/qa/nodes").json()
-    assert len(tree) == 1
-    node = tree[0]
-    assert node["label"] == "orphan_faq"
-    assert node["qa_entries"][0]["source_path"] == "knowledge/qa/orphan_faq.md"
+    assert client.get("/brain/knowledge/qa/nodes").json() == []
+    assert orphan.exists()
 
-    # 再次讀取不會重複建節點
-    tree_again = client.get("/brain/knowledge/qa/nodes").json()
-    assert len(tree_again) == 1
+    # 要進選單是明確的動作
+    response = client.post("/brain/knowledge/qa/nodes/adopt-source", json={"path": "knowledge/qa/orphan_faq.md"})
+    assert response.status_code == 200
+    assert client.get("/brain/knowledge/qa/nodes").json()[0]["label"] == "orphan_faq"
 
 
 def test_documents_list_reports_qa_attached(client, tmp_path):
@@ -597,20 +601,21 @@ def test_ingest_source_clears_dangling_refs_in_other_nodes(client, tmp_path):
         "/brain/knowledge/qa/nodes/n1/ingest-source",
         json={"path": "knowledge/qa/moved.md"},
     )
-    assert response.status_code == 200
-    assert response.json()["added"] == 1
 
-    n1 = qa_nodes.get_node("n1")
-    assert {e["question"] for e in n1["qa_entries"]} == {"Q2"}
-    
-    # n2 should be deleted completely
+    # 還分給兩個以上的分類時不能併：刪來源會連帶清空它們。
+    assert response.status_code == 400
+    assert moved.exists()
+    assert qa_nodes.get_node("n2") is not None
+    assert {e["question"] for e in qa_nodes.get_node("n3")["qa_entries"]} == {"Q2"}
+
+    # 只剩文件自己那個分類時就是搬移，那個分類空了會一起拿掉。
+    qa_nodes.update_node("n3", {"qa_entries": []})
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/qa/moved.md"},
+    )
+    assert response.status_code == 200
     assert qa_nodes.get_node("n2") is None
-    
-    # n3 should still exist but have empty qa_entries since it has children
-    n3 = qa_nodes.get_node("n3")
-    assert n3 is not None
-    assert n3["qa_entries"] == []
-    
     assert not moved.exists()
 
 
@@ -689,8 +694,8 @@ def test_missing_category_is_reported_in_plain_words(client):
     assert "找不到這個分類" in response.json()["detail"]
 
 
-def test_delete_node_removes_owned_qa_doc(client, tmp_path):
-    """節點即內容：刪除節點時一併刪除其專屬 QA 文件；仍被其他節點引用者保留。"""
+def test_delete_node_keeps_every_qa_doc(client, tmp_path):
+    """刪節點只拿掉分類與掛載，文件都留著，仍可被檢索。"""
     import knowledge.doc_meta
     import knowledge.qa_nodes as qa_nodes
 
@@ -716,8 +721,8 @@ def test_delete_node_removes_owned_qa_doc(client, tmp_path):
     response = client.delete("/brain/knowledge/qa/nodes/n1")
     assert response.status_code == 200
 
-    assert not owned.exists()
-    assert "knowledge/qa/owned.md" not in knowledge.doc_meta.load_doc_meta("default")
+    assert owned.exists()
+    assert "knowledge/qa/owned.md" in knowledge.doc_meta.load_doc_meta("default")
     assert shared.exists()
     assert "knowledge/qa/shared.md" in knowledge.doc_meta.load_doc_meta("default")
 
@@ -1236,7 +1241,7 @@ def test_ingest_uses_target_file_values_for_question_missing_from_node(client, t
 
     root = tmp_path / "workspace"
     _node_with_source(client, root, "knowledge/qa/own.csv", "q,a,img,display\n舊,舊答,keep.png,false\n")
-    _write_doc(root, "knowledge/notes/d.md", '## 舊\n\n舊答\n<!-- qa_metadata: {"img": "other.png", "url": ""} -->\n')
+    _write_doc(root, "knowledge/notes/d.md", '## 舊\n\n舊答\n<!-- qa_metadata: {"img": "keep.png"} -->')
 
     assert _ingest(client, "knowledge/notes/d.md").status_code == 200
     entry = next(e for e in qa_nodes.get_node("n1")["qa_entries"] if e["question"] == "舊")

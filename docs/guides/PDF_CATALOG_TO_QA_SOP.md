@@ -81,6 +81,7 @@ index,q,a,img,url,display
 - `img`：關聯頁面或原圖檔名（如 `page_04.png`）
 - `url`：型錄來源 URL
 - `display`：`true`（預設前台顯示）
+- `language`（選填）：這一題的語言，例如 `zh`、`en`、`es`。一份 CSV 混多種語言時才需要，沒填就算文件的語言。上傳採納目前會轉成 Markdown 並丟掉這一欄，只對保持 CSV 的文件有效
 
 ### 2. 驗證代碼
 ```python

@@ -79,6 +79,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | `ASR_PROMPT.md` | 選填的語音專有名詞詞表，見「語言分流與回答長度」 |
 | `.kb_settings.json` | 語言分流與回答秒數 |
 | `.doc_meta.json` | 文件啟用狀態、來源與語言 |
+| `knowledge/.qa_nodes.json` | 快速問答樹：節點的名稱、上下層、排序、隱藏與掛載的題目。答案只在 QA 文件，規則見 `docs/specs/03_BRAIN_SPEC.md` 的 4.4 節 |
 | `knowledge/.qa_image_kinds.json` | QA 圖片是否為 QR code 的判斷結果，回應以 `image_kind` 帶出 |
 | `graphify-out/` | 知識圖譜產物 |
 
@@ -414,7 +415,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
 | 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
 | 知識設定 | `GET/PUT /knowledge/settings`（語言分流、`reply_seconds`，回應附 `speech_rates`） |
-| QA 知識 | `GET /knowledge/qa`，以及 `/knowledge/qa/nodes*`、`/knowledge/qa/images*` |
+| QA 知識 | `GET /knowledge/qa`，以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |
 | 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar` |
 | 工具與技能 | `GET /tools`、`POST /skills`、`PATCH /skills/{id}/toggle`、`GET/PUT /skills/{id}/files`、`DELETE /skills/{id}`、`POST /skills/reload` |

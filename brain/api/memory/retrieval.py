@@ -359,7 +359,9 @@ def _language_rank(
     order = {primary: 1, language: 0}
 
     def rank(record: dict[str, Any]) -> int:
-        return order.get(languages.get(path_of(record), DEFAULT_LANGUAGE), 2)
+        # 混語言的 CSV 每題有自己的語言，比文件的語言準；沒標才看文件。
+        row_language = parse_record_metadata(record).get("language")
+        return order.get(row_language or languages.get(path_of(record), DEFAULT_LANGUAGE), 2)
 
     return rank
 

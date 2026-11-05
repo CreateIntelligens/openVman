@@ -39,8 +39,18 @@ from knowledge.qa_images import (
     qa_image_kind,
     resolve_qa_image_path,
 )
+from knowledge.qa_merged import (
+    MergedSaveError,
+    canonical_knowledge_path,
+    conflict_detail,
+    ingest_loss,
+    merged_rows,
+    normalized_qa_source,
+    read_question,
+    save_merged_rows,
+)
 from knowledge.qa_nodes import (
-    adopt_orphan_qa_sources,
+    add_qa_entry_to_node,
     cleanup_unused_images,
     create_node,
     create_node_for_source,
@@ -48,7 +58,9 @@ from knowledge.qa_nodes import (
     get_node,
     get_node_tree,
     is_source_referenced,
+    list_nodes,
     move_node,
+    remove_qa_entry_from_node,
     reorder_node,
     sync_entries_for_source,
     update_node,
@@ -104,8 +116,19 @@ class MergedQaItem(BaseModel):
     a: str
     img: str | None = ""
     url: str | None = ""
+    # 空字串是選單專用題目，不寫進任何文件。維持必填：漏帶不能被當成選單專用題目。
     source_file: str
     hidden: bool | None = False
+    # 載入時的題目，用來認出改名；新列不帶。
+    original_q: str | None = None
+    # 載入時的版本，內容已被改過就拒絕存檔；新列不帶。
+    base_version: str | None = None
+
+
+class AddEntryRequest(BaseModel):
+    question: str
+    source_path: str = ""
+    hidden: bool = False
 
 
 def parse_qa_markdown_with_metadata(content: str) -> list[dict[str, Any]]:
@@ -143,10 +166,6 @@ def _conflicting_questions(
     ))
 
 
-def _conflict_detail(reason: str, questions: list[str]) -> str:
-    return "\n".join([f"{reason}（{len(questions)} 題），未做任何變更：", *questions])
-
-
 def _merged_target_content(target_file: Path, new_items: list[dict[str, Any]]) -> str:
     """Target content with ``new_items`` added after everything it already has."""
     existing = target_file.read_bytes() if target_file.exists() else b""
@@ -170,10 +189,6 @@ def _merged_target_content(target_file: Path, new_items: list[dict[str, Any]]) -
 
 @router.get("/nodes")
 def list_qa_nodes_route(project_id: str = "default") -> list[dict[str, Any]]:
-    # 無掛載模型的自癒遷移：未被任何節點引用的 QA 文件在讀取時補建節點。
-    adopted = adopt_orphan_qa_sources(project_id)
-    if adopted:
-        logger.info("adopted orphan qa sources into tree: %s", adopted)
     return get_node_tree(project_id)
 
 
@@ -187,13 +202,15 @@ async def adopt_source_route(
         if not path:
             raise HTTPException(status_code=400, detail="path 不可為空")
 
+        try:
+            path = canonical_knowledge_path(path, project_id)
+        except MergedSaveError as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
         if is_source_referenced(path, project_id):
             raise HTTPException(status_code=400, detail="這份文件已經在快速問答裡了")
 
-        try:
-            doc_path = resolve_workspace_document(path, project_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        doc_path = resolve_workspace_document(path, project_id)
 
         if not doc_path.exists():
             raise HTTPException(status_code=404, detail="找不到指定文件")
@@ -238,12 +255,26 @@ async def ingest_source_route(
             raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
 
         try:
-            dragged_path = resolve_workspace_document(path, project_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            path = canonical_knowledge_path(path, project_id)
+        except MergedSaveError as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+        dragged_path = resolve_workspace_document(path, project_id)
 
         if not dragged_path.exists():
             raise HTTPException(status_code=404, detail="找不到指定文件")
+
+        # 文件自己的那個節點併入別處是正常的搬移；還分給其他節點時，刪來源會連帶清空它們。
+        mounted_on = [
+            other_id
+            for other_id, other in list_nodes(project_id).items()
+            if other_id != id
+            and any(entry.get("source_path") == path for entry in other.get("qa_entries", []))
+        ]
+        if len(mounted_on) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="這份文件還分給其他分類，併入後那些分類的題目會消失，未做任何變更",
+            )
 
         dragged_items = _parse_qa_bytes(dragged_path.suffix, dragged_path.read_bytes())
         if not dragged_items:
@@ -252,7 +283,7 @@ async def ingest_source_route(
         if conflicts := _conflicting_questions(dragged_items, dragged_items):
             raise HTTPException(
                 status_code=400,
-                detail=_conflict_detail("來源文件的同一題有不同答案", conflicts),
+                detail=conflict_detail("來源文件的同一題有不同答案", conflicts),
             )
 
         qa_entries = node.get("qa_entries", [])
@@ -281,7 +312,18 @@ async def ingest_source_route(
         if conflicts := _conflicting_questions(dragged_items, target_items):
             raise HTTPException(
                 status_code=400,
-                detail=_conflict_detail("來源和目標的同一題答案不同", conflicts),
+                detail=conflict_detail("來源和目標的同一題答案不同", conflicts),
+            )
+        if loss := ingest_loss(path, target_items, dragged_items, project_id):
+            raise HTTPException(status_code=400, detail=f"{loss}，未做任何變更")
+        # 同一個分類不能有文字相同的題目；別的來源的同名題併不進來。
+        other_sources = {
+            entry["question"] for entry in qa_entries if (entry.get("source_path") or "") != target_path
+        }
+        if clashes := sorted(other_sources & {item["q"].strip() for item in dragged_items}):
+            raise HTTPException(
+                status_code=400,
+                detail=conflict_detail("這個分類已經有同名的題目", clashes),
             )
 
         in_target = {item["q"].strip(): item for item in target_items}
@@ -381,37 +423,11 @@ def patch_qa_node_route(
 
 
 @router.delete("/nodes/{id}")
-async def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str, Any]:
-    # 1 節點 = 1 來源：刪除節點時，其專屬 QA 文件一併刪除；
-    # 仍被其他節點引用（舊資料的多對多殘留）者保留。
-    def _delete() -> list[str]:
-        node = get_node(id, project_id=project_id)
-        if node is None:
-            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-        source_paths = {
-            entry["source_path"]
-            for entry in node.get("qa_entries", [])
-            if entry.get("source_path")
-        }
-
-        if not delete_node(id, project_id=project_id):
-            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-
-        removed: list[str] = []
-        for path in sorted(source_paths):
-            if is_source_referenced(path, project_id):
-                continue
-            try:
-                delete_workspace_document(path, project_id)
-                removed.append(path)
-            except FileNotFoundError:
-                pass
-        return removed
-
-    removed_docs = await asyncio.to_thread(_delete)
-    if removed_docs:
-        schedule_reindex(project_id)
-    return {"status": "ok", "removed_docs": removed_docs}
+def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str, str]:
+    # 只拿掉分類與掛載；文件要刪到文件樹刪，刪分類不該把知識一起刪掉。
+    if not delete_node(id, project_id=project_id):
+        raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
+    return {"status": "ok"}
 
 
 @router.post("/nodes/{id}/move")
@@ -453,47 +469,7 @@ def get_merged_qa_route(
     node = get_node(id, project_id=project_id)
     if not node:
         raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-
-    qa_entries = node.get("qa_entries", [])
-
-    by_path: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-    for entry in qa_entries:
-        by_path[entry["source_path"]].append(entry)
-
-    merged_items: list[dict[str, Any]] = []
-
-    for source_path, entries in by_path.items():
-        qa_dict = {}
-        try:
-            doc_path = resolve_workspace_document(source_path, project_id)
-            if doc_path.exists():
-                if doc_path.suffix.lower() == ".csv":
-                    parsed_qas = parse_qa_csv(doc_path.read_bytes())
-                else:
-                    content = doc_path.read_text(encoding="utf-8")
-                    parsed_qas = parse_qa_markdown_with_metadata(content)
-                qa_dict = {item["q"]: item for item in parsed_qas}
-        except Exception:
-            pass
-
-        for entry in entries:
-            q = entry["question"]
-            item_detail = qa_dict.get(q, {})
-            merged_items.append(
-                {
-                    "q": q,
-                    "a": item_detail.get("a", ""),
-                    "img": entry.get("image_id") or item_detail.get("img") or "",
-                    "url": item_detail.get("url") or "",
-                    "source_file": source_path,
-                    "hidden": entry.get("hidden", False),
-                }
-            )
-
-    for idx, item in enumerate(merged_items, start=1):
-        item["index"] = str(idx)
-
-    return merged_items
+    return merged_rows(id, node, project_id)
 
 
 @router.put("/nodes/{id}/merged")
@@ -501,62 +477,87 @@ async def put_merged_qa_route(
     id: str,
     payload: list[MergedQaItem],
     project_id: str = "default",
+    base_version: str | None = None,
 ) -> dict[str, str]:
     def _save() -> None:
-        node = get_node(id, project_id=project_id)
-        if not node:
-            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-
-        by_file: defaultdict[str, list[MergedQaItem]] = defaultdict(list)
-        for item in payload:
-            by_file[item.source_file].append(item)
-
-        new_qa_entries: list[dict[str, Any]] = []
-        existing_hidden = {e["question"]: e.get("hidden", False) for e in node.get("qa_entries", [])}
-
-        for source_file, items in by_file.items():
-            blocks: list[str] = []
-            csv_entries: list[dict[str, Any]] = []
-            for item in items:
-                q = item.q.strip()
-                a = item.a.strip()
-                img = item.img.strip() if item.img else ""
-                url = item.url.strip() if item.url else ""
-                img_val = extract_image_id(img)
-
-                hidden = item.hidden if item.hidden is not None else existing_hidden.get(q, False)
-                blocks.append(qa_markdown_block(q, a, img_val, url, hidden))
-                csv_entries.append(
-                    {
-                        "index": item.index,
-                        "q": q,
-                        "a": a,
-                        "img": img_val,
-                        "url": url,
-                        "hidden": hidden,
-                    }
+        with qa_document_lock:
+            try:
+                save_merged_rows(
+                    id, [item.model_dump() for item in payload], project_id, base_version,
                 )
-                new_qa_entries.append(
-                    {
-                        "question": q,
-                        "source_path": source_file,
-                        "hidden": hidden,
-                        "image_id": img_val if img_val else None,
-                    }
-                )
-
-            if Path(source_file).suffix.lower() == ".csv":
-                content = serialize_qa_csv(csv_entries)
-            else:
-                content = "\n\n".join(blocks)
-            save_workspace_document(source_file, content, project_id)
-            upsert_document_meta(source_file, project_id, source_type="qa")
-
-        update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
+            except MergedSaveError as exc:
+                raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
 
     await asyncio.to_thread(_save)
     schedule_reindex(project_id)
     return {"status": "ok"}
+
+
+@router.post("/nodes/{id}/entries")
+def add_qa_entry_route(
+    id: str,
+    payload: AddEntryRequest,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    """Mount a document's question on this node, or add a menu-only question."""
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="題目不可空白")
+
+    source_path = payload.source_path.strip()
+    with qa_document_lock:
+        node = get_node(id, project_id=project_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+        # 前後台都用「節點 + 題目文字」定位條目，同節點同文字會分不清。
+        if any(entry["question"] == question for entry in node.get("qa_entries", [])):
+            raise HTTPException(status_code=400, detail="這個分類已經有相同的題目")
+
+        hidden = payload.hidden
+        image_id = None
+        if source_path:
+            try:
+                source_path = normalized_qa_source(source_path, project_id)
+                found = read_question(source_path, question, project_id)
+            except MergedSaveError as exc:
+                raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+            hidden = bool(found.get("hidden", False))
+            image_id = extract_image_id(found.get("img") or "") or None
+
+        updated = add_qa_entry_to_node(
+            id,
+            {
+                "question": question,
+                "source_path": source_path,
+                "hidden": hidden,
+                "image_id": image_id,
+            },
+            project_id=project_id,
+        )
+    return updated or {}
+
+
+@router.delete("/nodes/{id}/entries")
+def remove_qa_entry_route(
+    id: str,
+    question: str,
+    source_path: str = "",
+    project_id: str = "default",
+) -> dict[str, Any]:
+    """Take a question off this node; the document keeps it and search still finds it."""
+    with qa_document_lock:
+        if not get_node(id, project_id=project_id):
+            raise HTTPException(status_code=404, detail="Node not found")
+        node = get_node(id, project_id=project_id)
+        if not any(
+            entry["question"] == question and (entry.get("source_path") or "") == source_path
+            for entry in node.get("qa_entries", [])
+        ):
+            raise HTTPException(status_code=404, detail="這個分類沒有這個題目")
+        updated = remove_qa_entry_from_node(
+            id, question, project_id=project_id, source_path=source_path
+        )
+    return updated or {}
 
 
 @router.post("/images")

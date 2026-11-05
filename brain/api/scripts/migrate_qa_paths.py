@@ -92,15 +92,9 @@ def _rewrite_node_references(
 def _update_doc_meta(
     workspace_root: Path,
     moved_mappings: dict[str, str],
-    referenced_paths: set[str],
     project_id: str,
 ) -> None:
-    """Rename moved doc-meta entries and downgrade orphan QA docs to manual.
-
-    A ``source_type == "qa"`` doc not referenced by any node is unreachable
-    from the QA tree while the documents-API ownership guard blocks edits and
-    deletion — downgrading to ``manual`` returns it to normal management.
-    """
+    """Rename moved doc-meta entries; a QA doc without a node stays a QA doc."""
     doc_meta_path = workspace_root / ".doc_meta.json"
     if not doc_meta_path.exists():
         return
@@ -116,13 +110,6 @@ def _update_doc_meta(
         if old_path in doc_meta:
             doc_meta[new_path] = doc_meta.pop(old_path)
             changed = True
-
-    referenced_after_move = {moved_mappings.get(path, path) for path in referenced_paths}
-    for path, meta in doc_meta.items():
-        if meta.get("source_type") == "qa" and path not in referenced_after_move:
-            meta["source_type"] = "manual"
-            changed = True
-            print(f"[{project_id}] Downgraded orphan QA doc to manual: {path}")
 
     if not changed:
         return
@@ -151,7 +138,7 @@ def migrate_project_qa_paths(project_id: str) -> None:
     ):
         return
 
-    _update_doc_meta(workspace_root, moved_mappings, referenced_paths, project_id)
+    _update_doc_meta(workspace_root, moved_mappings, project_id)
 
     if not moved_mappings:
         print(f"No QA files needed migration for project: {project_id}")

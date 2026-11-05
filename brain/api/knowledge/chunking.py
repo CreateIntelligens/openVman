@@ -19,7 +19,7 @@ from typing import Any
 
 from config import get_settings
 from knowledge.fingerprint import fingerprint_document
-from knowledge.qa_csv import extract_image_id
+from knowledge.qa_csv import extract_image_id, normalize_row_language
 from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
@@ -40,6 +40,7 @@ _CSV_FIELD_ALIASES: dict[str, list[str]] = {
     "img": ["img", "image", "圖片", "图片"],
     "url": ["url", "link", "網址", "网址", "連結", "链接"],
     "index": ["index", "i", "順序", "id"],
+    "language": ["language", "lang", "語言", "语言"],
 }
 
 _QUESTION_RE = re.compile(
@@ -680,6 +681,7 @@ def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[
         img_index = alias_map.get("img")
         url_index = alias_map.get("url")
         row_id_index = alias_map.get("index")
+        language_index = alias_map.get("language")
 
         def _cell(row: list[str], index: int | None) -> str:
             return row[index].strip() if index is not None and index < len(row) else ""
@@ -691,10 +693,12 @@ def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[
                 continue
 
             text = _format_qa_chunk(title, question or "未命名問題", [answer or ""])
+            language = normalize_row_language(_cell(row, language_index))
             chunks.append(
                 ChunkSpec(
                     text=text,
                     metadata={
+                        **({"language": language} if language else {}),
                         "path": relative_path,
                         "title": title,
                         "heading_path": [],
