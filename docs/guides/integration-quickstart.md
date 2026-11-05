@@ -173,7 +173,7 @@ ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流
 | 事件 | `data` | 說明 |
 |---|---|---|
 | `sentence` | `{"index": 0, "text": "營業時間是早上九點。"}` | 最終回答每完成一句就送一次，`index` 從 0 起算。查知識庫等工具輪的文字不會送出；另帶 `tts_text`（這一句念的版本，同 `/chat` 的欄位） |
-| `done` | 與 `/chat` 回應相同的 JSON（`reply`、`tts_text`、`citations`、`answer_source`、`knowledge_searched`、`no_answer`、`session_id`、`trace_id`、`history`、`pii_pending`、`image_id`／`url` 等） | 最後一個事件，之後串流結束 |
+| `done` | 與 `/chat` 回應相同的 JSON（`reply`、`tts_text`、`citations`、`answer_source`、`knowledge_searched`、`no_answer`、`session_id`、`trace_id`、`history`、`pii_pending`、`image_id`／`image_kind`／`url` 等） | 最後一個事件，之後串流結束。`image_kind` 只在回應帶圖時出現：`qr` 是整張以 QR code 為主，`image` 是一般圖片；判斷不了時不帶，照常顯示即可 |
 | `error` | `{"status": 502, "detail": ...}` | `status` 與 `detail` 就是 `/chat` 遇到同一個錯誤時的 HTTP 狀態碼與錯誤 `detail`（可能是字串，也可能是含 `error_code`、`retry_after_ms` 的物件）。之後串流結束，不會再有 `done` |
 
 句尾的判斷：中日文 `。！？；…`；英文 `. ! ?` 後面接空白或文字結束；換行。`3.5`、`HIPPO-50.html` 這類小數、型號與網址不會被切開，最後一段沒有句尾符號的文字在結束前補送。句子保留原文的空白與換行（換行後的那句以換行開頭），所有 `sentence.text` 依序接起來就等於 `done.reply`；送 TTS 前可以自己 trim。

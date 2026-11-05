@@ -4,7 +4,7 @@
 
 ### Added
 
-- **[2026-11-05]** **QA 圖片會標示是不是 QR code**：對話回應與歷史紀錄的 `image_id` 旁多帶 `image_kind`（`qr` 或 `image`；判斷不了時不出現），上傳 API 也會回傳。整張以 QR 為主且解得出內容才算 `qr`，海報角落的小 QR 仍是 `image`。每張圖只判斷一次，結果存在 `knowledge/.qa_image_kinds.json`，檔案換了才重判；既有圖片可跑 `python -m scripts.classify_qa_images`。虛擬人前台不變，照常顯示。Brain 新增相依 `opencv-python-headless`。
+- **[2026-11-05]** **QA 圖片會標示是不是 QR code**：對話回應與歷史紀錄的 `image_id` 旁多帶 `image_kind`（`qr` 或 `image`；判斷不了時不出現），上傳 API 也會回傳。整張以 QR 為主且解得出內容才算 `qr`，海報角落的小 QR 仍是 `image`。每張圖只判斷一次，結果存在 `knowledge/.qa_image_kinds.json`，檔案換了才重判；既有圖片可跑 `python -m scripts.classify_qa_images`。虛擬人前台不變，照常顯示。Brain 新增相依 `opencv-python-headless`。對接方式寫在 `docs/guides/integration-quickstart.md`。
 
 - **[2026-11-02]** **新增可選的批次 ASR 引擎 `gemini-live-batch`**：`POST /api/v1/asr/transcribe` 收整檔，每個請求開一條新的 Gemini Live 工作階段（`ASR_GEMINI_STREAM_MODEL`），關掉伺服器 VAD，以 `activityStart`／`activityEnd` 框住音訊並在前面補 0.3 秒靜音，收到 `generationComplete` 結束；靜音回空字串。憑證同串流：專案綁了 Gemini 金鑰就用專案的，否則用部署預設；帶專案語言分流與逐詞詞表（`customVocabulary`）。與其他批次引擎共用單站預算、斷路器與 `upstream_attempt` 紀錄。與 `r2t2-dev` 一樣只有被選到才用，不進預設鏈也不當備援，且不能指定為台語引擎；帳號／專案授權、後台標籤與試辨識都已列出。沒有新增環境變數。同 18 段英文短句（1.7–5.3 秒）實測，整檔含解碼中位約 1.4 秒、p90 約 1.7 秒，`openai` 為 0.88／1.46 秒；要即時回應的呼叫端應改用 WSS 串流 `gemini-live`。`gateway/asr_stream.py` 的 Live 訊息與語言對應抽到 `gateway/gemini_transcription.py` 共用，串流行為不變。比較腳本在 `scripts/experiments/gemini-asr/`。
 
