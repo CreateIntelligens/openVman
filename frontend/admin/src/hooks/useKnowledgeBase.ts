@@ -509,7 +509,10 @@ export function useKnowledgeBase() {
     try {
       const refreshed = await fetchKnowledgeDocument(targetPath);
       if (activeProjectRef.current !== requestedProjectId) return;
-      setOpenDocument((current) => (current?.path === targetPath ? refreshed : current));
+      // 編輯區沒換成新內容，版本也要留著舊的，否則存檔時就檢查不出別處改過。
+      setOpenDocument((current) => (
+        current?.path === targetPath ? { ...refreshed, content_hash: current.content_hash } : current
+      ));
     } catch {
       // 路徑已經換好，文件資訊等下次列表更新。
     }
@@ -564,7 +567,11 @@ export function useKnowledgeBase() {
       // 只換文件資訊：openFile 會用存檔內容蓋掉編輯區，還沒儲存的修改就沒了。
       if (openDocument?.path === document.path) {
         const refreshed = await fetchKnowledgeDocument(document.path);
-        if (activeProjectRef.current === projectId) setOpenDocument(refreshed);
+        if (activeProjectRef.current === projectId) {
+          setOpenDocument((current) => (
+            current ? { ...refreshed, content_hash: current.content_hash } : refreshed
+          ));
+        }
       }
       setStatus({ type: "success", message: `${document.title || fileNameOf(document.path)} 的語言已更新` });
     } catch (error) {

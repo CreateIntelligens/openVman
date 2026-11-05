@@ -301,6 +301,7 @@ def rewrite_qa_csv(
     file_bytes: bytes,
     updates: list[dict[str, Any]],
     removed: set[str],
+    shared: bool | None = None,
 ) -> str:
     """Apply one node's edits to a CSV without touching rows the node does not own.
 
@@ -340,7 +341,9 @@ def rewrite_qa_csv(
     matched = {u["match"] for u in updates if u.get("match")}
     last_position = {_question_of(row): position for position, row in enumerate(rows)}
     matched_positions = {last_position[q] for q in matched if q in last_position}
-    has_other_rows = any(
+    # 共用與否看別的節點有沒有掛這份檔案（呼叫端知道），不看檔案內容：拿下選單的列也是
+    # 「別的列」，但沒有別的節點在用，照畫面排序才不會被同步排回去。
+    has_other_rows = shared if shared is not None else any(
         position not in matched_positions and _question_of(row) not in removed and any(row)
         for position, row in enumerate(rows)
     )
@@ -407,6 +410,7 @@ def rewrite_qa_markdown(
     content: str,
     updates: list[dict[str, Any]],
     removed: set[str],
+    shared: bool | None = None,
 ) -> str:
     """Markdown counterpart of ``rewrite_qa_csv``.
 
@@ -447,7 +451,8 @@ def rewrite_qa_markdown(
         return (update["q"], raw, update)
 
     matched = {update.get("match") for update in updates if update.get("match")}
-    shared = any(block[0] not in matched and block[0] not in removed for block in blocks)
+    if shared is None:
+        shared = any(block[0] not in matched and block[0] not in removed for block in blocks)
     placed = _place_rows(blocks, lambda block: block[0], updates, removed, _build_block, keep_positions=shared)
     return "\n\n".join([preamble, *(block[1] for block in placed)] if preamble else [block[1] for block in placed])
 

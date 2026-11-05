@@ -908,3 +908,33 @@ def test_refilling_an_emptied_category_forgets_what_was_taken_off_the_menu(clien
         qa_nodes._source_node_id = monkey_label
 
     assert SHARED not in qa_nodes._load_nodes_data().get("detached", {})
+
+
+
+def test_reordering_a_file_with_a_question_taken_off_the_menu(client, workspace):
+    """審查重現：拿下選單的列讓檔案看起來像共用，存檔不重排，同步又照檔案排回去。"""
+    for source, content in (
+        ("knowledge/qa/own.csv", "index,q,a\n1,甲,甲答\n2,乙,乙答\n3,丙,丙答\n"),
+        ("knowledge/qa/own.md", "## 甲\n\n甲答\n\n## 乙\n\n乙答\n\n## 丙\n\n丙答\n"),
+    ):
+        write_doc(workspace, source, content)
+        node_id = source.rsplit(".", 1)[1]
+        make_node(client, node_id, [entry("甲", source), entry("乙", source), entry("丙", source)])
+        assert client.delete(f"{BASE}/nodes/{node_id}/entries", params={"question": "丙", "source_path": source}).status_code == 200
+
+        assert put(client, node_id, list(reversed(merged(client, node_id)))).status_code == 200
+
+        assert questions(node_id) == ["乙", "甲"]
+
+
+def test_renormalizing_through_a_path_alias_is_refused(client, workspace):
+    doc = write_doc(workspace, "knowledge/qa/q.md", "## 甲\n\n甲答\n")
+    make_node(client, "n", [entry("甲", "knowledge/qa/q.md")])
+
+    response = client.post(
+        "/brain/knowledge/renormalize/apply",
+        json={"path": "./knowledge/qa/q.md", "content": "garbage", "project_id": "default"},
+    )
+
+    assert response.status_code == 400
+    assert doc.read_text(encoding="utf-8") == "## 甲\n\n甲答\n"

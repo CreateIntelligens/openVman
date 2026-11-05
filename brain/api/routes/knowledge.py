@@ -144,8 +144,13 @@ async def list_knowledge_base_documents_route(project_id: str = "default"):
 
 
 def _assert_not_qa_document(path: str, project_id: str) -> None:
-    """Block LLM-renormalization on QA files to prevent corrupting their structure."""
-    if get_document_meta(path, project_id).get("source_type") == "qa":
+    """Block LLM-renormalization on QA files to prevent corrupting their structure.
+
+    路徑先統一寫法，./x 這類別名才擋得住；掛在問答樹上的文件就算沒標類型也是 QA 文件。
+    """
+    from knowledge.qa_nodes import is_qa_document
+
+    if is_qa_document(_document_path(path, project_id), project_id):
         raise HTTPException(status_code=400, detail="QA 知識文件不支援重新整理，以免破壞問答格式結構")
 
 
@@ -243,7 +248,7 @@ async def put_knowledge_settings_route(payload: KnowledgeSettingsPutRequest):
 async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatchRequest):
     try:
         document = update_workspace_document_meta(
-            payload.path,
+            _document_path(payload.path, payload.project_id),
             payload.project_id,
             enabled=payload.enabled,
             source_type=payload.source_type,

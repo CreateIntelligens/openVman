@@ -320,12 +320,12 @@ def _plan_file(
     try:
         if is_csv:
             content = (
-                rewrite_qa_csv(before_bytes, updates, removed)
+                rewrite_qa_csv(before_bytes, updates, removed, shared=bool(mounted_elsewhere))
                 if before_bytes.strip()
                 else serialize_qa_csv(updates)
             )
         else:
-            content = rewrite_qa_markdown(before_text, updates, removed)
+            content = rewrite_qa_markdown(before_text, updates, removed, shared=bool(mounted_elsewhere))
     except ValueError as exc:
         raise MergedSaveError(400, f"{source}：{exc}，未做任何變更") from exc
 
