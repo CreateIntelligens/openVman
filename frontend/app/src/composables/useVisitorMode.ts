@@ -10,7 +10,8 @@ import { useAuth } from "./useAuth";
  *   展示機台常整台重開，只記在分頁裡會掉。
  * - 網址帶 ?kiosk=1（?kiosk=0 取消），給自動化部署用，效果同上一條。
  *
- * 現場人員長按標題 3 秒、輸入這個帳號的密碼，可以暫時叫出設定與登出，重新整理又藏起來。
+ * 現場人員長按標題 3 秒、輸入這個帳號的密碼：裝置上開的訪客模式直接結束；
+ * 帳號固定的關不掉，只暫時叫出設定與登出，重新整理又藏起來。
  * 整頁共用一份狀態：設定鈕在 App、登出鈕在 Root，解鎖要兩邊一起生效。
  */
 
@@ -48,14 +49,19 @@ function createVisitorMode() {
   const kiosk = computed(() => accountKiosk.value || deviceKiosk.value);
   const unlocked = ref(false);
 
-  /** 設定視窗按鈕顯示哪一種：開啟、關閉，或帳號固定（不能從這台關）。 */
+  /** 設定視窗顯示哪一種：可以開啟，或帳號固定（不能從這台關）；解鎖對話框也靠它決定說明文字。 */
   const kioskSource = computed<"off" | "device" | "account">(() => {
     if (accountKiosk.value) return "account";
     return deviceKiosk.value ? "device" : "off";
   });
 
   function unlock(): void {
-    unlocked.value = true;
+    if (accountKiosk.value) {
+      unlocked.value = true;
+      return;
+    }
+    deviceKiosk.value = false;
+    rememberFlag(false);
   }
 
   function enterDeviceKiosk(): void {
@@ -64,14 +70,9 @@ function createVisitorMode() {
     unlocked.value = false;
   }
 
-  function leaveDeviceKiosk(): void {
-    deviceKiosk.value = false;
-    rememberFlag(false);
-  }
-
   const settingsVisible = computed(() => !kiosk.value || unlocked.value);
 
-  return { kiosk, kioskSource, settingsVisible, unlock, enterDeviceKiosk, leaveDeviceKiosk };
+  return { kiosk, kioskSource, settingsVisible, unlock, enterDeviceKiosk };
 }
 
 let shared: ReturnType<typeof createVisitorMode> | null = null;

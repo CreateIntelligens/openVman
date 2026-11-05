@@ -1,18 +1,22 @@
 <template>
   <div class="control-bar">
     <div class="control-bar__left">
-      <!-- 訪客模式下長按標題叫出解鎖，給現場人員用，所以不做成按鈕外觀。 -->
-      <h2
-        @pointerdown="startHold"
-        @pointerup="cancelHold"
-        @pointerleave="cancelHold"
-        @pointercancel="cancelHold"
-        @contextmenu.prevent
-      >{{ title || "openVman" }}</h2>
-      <span class="status-pill" :class="`status-pill--${status.tone}`" role="status">
-        <span class="status-pill__dot" aria-hidden="true" />
-        {{ status.label }}
-      </span>
+      <div class="control-bar__title">
+        <!-- 訪客模式下長按標題叫出解鎖，給現場人員用，所以不做成按鈕外觀。 -->
+        <h2
+          @pointerdown="startHold"
+          @pointerup="cancelHold"
+          @pointerleave="cancelHold"
+          @pointercancel="cancelHold"
+          @contextmenu.prevent
+        >{{ title || "openVman" }}</h2>
+        <span class="status-pill" :class="`status-pill--${status.tone}`" role="status">
+          <span class="status-pill__dot" aria-hidden="true" />
+          {{ status.label }}
+        </span>
+      </div>
+      <!-- 訪客模式不給來賓看到帳號、也不讓他按到登出；長按標題輸入密碼後會跟設定一起出現。 -->
+      <SessionLabel v-if="settingsVisible !== false" />
     </div>
 
     <div class="control-bar__right">
@@ -94,6 +98,16 @@
           {{ immersive ? '結束全螢幕' : '全螢幕' }}
         </span>
       </button>
+
+      <button
+        v-if="settingsVisible !== false"
+        class="control-btn control-btn--logout"
+        type="button"
+        :disabled="loggingOut"
+        @click="handleLogout"
+      >
+        {{ loggingOut ? "登出中…" : "登出" }}
+      </button>
     </div>
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
@@ -102,7 +116,9 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted } from "vue";
+import { useSessionLogout } from "../../composables/useSessionLogout";
 import { UNLOCK_HOLD_MS } from "../../composables/useVisitorMode";
+import SessionLabel from "../auth/SessionLabel.vue";
 
 import type { AvatarState } from "../../composables/useAvatarChat";
 
@@ -127,6 +143,8 @@ const props = defineProps<{
   immersive?: boolean
   cameraPreviewScale?: number
 }>()
+
+const { loggingOut, handleLogout } = useSessionLogout();
 
 const emit = defineEmits<{
   openSettings: []
@@ -189,12 +207,20 @@ function handleCameraPreviewScaleInput(event: Event): void {
   padding: 1rem 1.25rem;
 }
 
+/* 基準寬度留給標題：放不下時整條換行，而不是把標題擠到看不見（它也是長按解鎖的位置）。 */
 .control-bar__left {
-  flex: 1;
+  flex: 1 1 10rem;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.control-bar__title {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .status-pill {
@@ -318,28 +344,68 @@ function handleCameraPreviewScaleInput(event: Event): void {
   font-weight: 500;
 }
 
+/* 橫放時高度最缺：工具列壓成一行，把高度留給對話和輸入框。 */
+@media (max-height: 30rem) and (min-width: 30.0625rem) {
+  .control-bar {
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .control-bar__left {
+    flex-basis: 6rem;
+  }
+
+  .control-bar__right {
+    gap: 0.4rem;
+  }
+
+  .control-btn {
+    padding-inline: 0.5rem;
+  }
+}
+
+/* 手機兩行：標題和登出一行，其餘按鈕一行。按鈕容器攤平，才能把登出排到標題旁邊。 */
 @media (max-width: 30rem) {
   .control-bar {
+    gap: 0.5rem;
     padding: 0.75rem;
   }
 
-  .control-bar__left,
-  .control-bar__right {
+  .control-bar__left {
+    flex: 1 1 calc(100% - 6rem);
+  }
+
+  .control-bar:not(:has(.control-btn--logout)) .control-bar__left {
     flex-basis: 100%;
   }
 
   .control-bar__right {
-    justify-content: space-between;
-    gap: 0.5rem;
+    display: contents;
+  }
+
+  .camera-size-control {
+    order: 2;
+  }
+
+  .error-banner {
+    order: 3;
+    flex-basis: 100%;
   }
 
   /* 手機也留文字：只有圖示的鏡頭和全螢幕，很多人看不出來是什麼。 */
   .control-btn {
-    flex: 1;
+    order: 2;
+    flex: 1 1 28%;
     justify-content: center;
     min-width: 0;
     padding-inline: 0.5rem;
     font-size: 0.8rem;
+  }
+
+  .control-btn--logout {
+    order: 1;
+    flex: none;
+    padding-inline: 0.85rem;
   }
 }
 </style>

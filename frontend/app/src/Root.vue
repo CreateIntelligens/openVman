@@ -1,22 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import { computed, onMounted, watch } from "vue"
 
 import App from "./App.vue"
 import LoginScreen from "./components/auth/LoginScreen.vue"
 import { useAuth } from "./composables/useAuth"
-import { useVisitorMode } from "./composables/useVisitorMode"
-import {
-  cleanupLoggedOutSession,
-  leaveFullscreen,
-  runLogout,
-} from "./sessionCleanup"
+import { useSessionLogout } from "./composables/useSessionLogout"
+import { cleanupLoggedOutSession } from "./sessionCleanup"
 
 const auth = useAuth()
-const visitor = useVisitorMode()
-const now = ref(Date.now())
-const loggingOut = ref(false)
-const sessionStartedAt = Date.now()
-let clock: number | undefined
+const { loggingOut, handleLogout } = useSessionLogout()
 
 const isTemporary = computed(() => {
   const account = auth.account.value
@@ -24,49 +16,6 @@ const isTemporary = computed(() => {
     || account?.account_type === "temporary"
     || Boolean(account?.expires_at)
 })
-
-const remainingSeconds = computed(() => {
-  const account = auth.account.value
-  if (!account) return 0
-  if (account.expires_at) {
-    const expiresAt = new Date(account.expires_at).getTime()
-    return Number.isFinite(expiresAt)
-      ? Math.max(0, Math.floor((expiresAt - now.value) / 1000))
-      : Math.max(0, account.remaining_seconds ?? 0)
-  }
-  const elapsed = Math.floor((now.value - sessionStartedAt) / 1000)
-  return Math.max(0, (account.remaining_seconds ?? 0) - elapsed)
-})
-
-const remainingLabel = computed(() => {
-  const totalMinutes = Math.max(0, Math.ceil(remainingSeconds.value / 60))
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  return hours > 0 ? `${hours} 小時 ${minutes} 分` : `${minutes} 分`
-})
-
-const expiresLabel = computed(() => {
-  const value = auth.account.value?.expires_at
-  if (!value) return "到期時間待同步"
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? "到期時間待同步"
-    : new Intl.DateTimeFormat("zh-TW", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(date)
-})
-
-async function handleLogout(): Promise<void> {
-  await runLogout({
-    isLoggingOut: () => loggingOut.value,
-    setLoggingOut: (value) => {
-      loggingOut.value = value
-    },
-    cleanup: leaveFullscreen,
-    logout: auth.logout,
-  })
-}
 
 watch(
   () => [auth.loading.value, auth.account.value] as const,
@@ -77,13 +26,6 @@ watch(
 
 onMounted(() => {
   void auth.bootstrap()
-  clock = window.setInterval(() => {
-    now.value = Date.now()
-  }, 60_000)
-})
-
-onUnmounted(() => {
-  if (clock !== undefined) window.clearInterval(clock)
 })
 </script>
 
@@ -111,84 +53,10 @@ onUnmounted(() => {
       </div>
     </section>
   </main>
-  <div v-else class="authenticated-app">
-    <App />
-    <!-- 訪客模式不給來賓看到帳號、也不讓他按到登出；長按標題輸入密碼後會跟設定一起出現。 -->
-    <div v-if="visitor.settingsVisible.value" class="session-toolbar">
-      <span v-if="isTemporary" class="temporary-session">
-        <strong>臨時存取</strong>
-        <span>剩餘 {{ remainingLabel }}</span>
-        <span>{{ expiresLabel }} 到期</span>
-      </span>
-      <span v-else>{{ auth.account.value.username }}</span>
-      <button
-        class="session-logout"
-        type="button"
-        :disabled="loggingOut"
-        @click="handleLogout"
-      >
-        {{ loggingOut ? "登出中…" : "登出" }}
-      </button>
-    </div>
-  </div>
+  <App v-else />
 </template>
 
 <style scoped>
-.authenticated-app {
-  min-height: 100dvh;
-}
-
-.session-toolbar {
-  position: fixed;
-  top: 1.5rem;
-  left: 1.5rem;
-  z-index: var(--ov-z-sticky);
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  max-width: min(32rem, 90vw);
-  padding: 0.35rem 0.65rem 0.35rem 0.85rem;
-  border: var(--hairline) solid var(--line);
-  border-radius: 999rem;
-  background: color-mix(in srgb, var(--bg-soft) 88%, transparent);
-  backdrop-filter: blur(0.75rem);
-  -webkit-backdrop-filter: blur(0.75rem);
-  color: var(--text);
-  font-family: var(--ov-font-ui);
-  font-size: 0.75rem;
-  box-shadow: 0 0.125rem 0.5rem rgba(28, 26, 23, 0.06);
-}
-
-.session-toolbar span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.temporary-session {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.temporary-session strong {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999rem;
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 0.72rem;
-}
-
-.temporary-session span + span::before {
-  content: "·";
-  margin-right: 0.45rem;
-  color: var(--text-soft);
-}
-
 .forbidden-actions button {
   min-height: var(--ov-touch-target);
   padding: 0.4rem 0.75rem;
@@ -217,41 +85,6 @@ onUnmounted(() => {
 
 .forbidden-actions button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.session-logout {
-  min-height: var(--ov-touch-target);
-  padding: 0.4rem 0.2rem 0.4rem 0.7rem;
-  border: 0;
-  border-left: var(--hairline) solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-soft);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: opacity var(--ov-dur-micro) var(--ov-ease-out);
-}
-
-.session-logout:hover:not(:disabled) {
-  color: var(--text);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-.session-logout:focus-visible {
-  outline: var(--focus-ring-size) solid var(--primary);
-  outline-offset: var(--ov-focus-ring-offset);
-}
-
-.session-logout:active:not(:disabled) {
-  color: var(--primary-hover);
-}
-
-.session-logout:disabled {
-  cursor: wait;
   opacity: 0.55;
 }
 
@@ -308,62 +141,5 @@ onUnmounted(() => {
   justify-content: center;
   gap: 0.75rem;
   margin-top: 1.5rem;
-}
-
-/* 帳號列排在版面內：浮在畫面上不是蓋住輸入框、標題，就是蓋住人物。全螢幕沒有版面可排，才維持浮動。 */
-.app-shell:not(.immersive) ~ .session-toolbar {
-  position: static;
-  justify-content: space-between;
-  max-width: none;
-  margin: 0 1rem 1rem;
-}
-
-/* 這些寬度整頁不能捲，帳號列要留在畫面內，否則登出按不到；更窄的版面整頁可捲。 */
-@media (min-width: 48.0625rem) {
-  .authenticated-app:has(> .app-shell:not(.immersive)) {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-  }
-
-  .authenticated-app > .app-shell:not(.immersive) {
-    flex: 1;
-    height: auto;
-    min-height: 0;
-  }
-
-  .app-shell:not(.immersive) ~ .session-toolbar {
-    flex: none;
-  }
-}
-
-/* 可捲的版面不必撐滿一屏，帳號列緊接在對話下面，不留一段空白。 */
-@media (max-width: 48rem) {
-  .authenticated-app > .app-shell:not(.immersive) {
-    min-height: 0;
-  }
-}
-
-/* 橫放時帳號列壓薄，把高度留給對話。 */
-@media (max-height: 30rem) {
-  .app-shell:not(.immersive) ~ .session-toolbar {
-    margin: 0 0.5rem 0.25rem;
-    padding-block: 0;
-  }
-}
-
-@media (max-width: 42rem) {
-  .app-shell.immersive ~ .session-toolbar {
-    top: auto;
-    right: 0.75rem;
-    bottom: 0.75rem;
-    left: 0.75rem;
-    max-width: none;
-  }
-
-  .temporary-session {
-    flex: 1;
-    flex-wrap: wrap;
-  }
 }
 </style>

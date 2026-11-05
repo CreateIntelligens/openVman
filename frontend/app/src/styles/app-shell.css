@@ -167,13 +167,6 @@
   transform: none;
 }
 
-@media (max-width: 42rem) {
-  /* 登入工具列在窄畫面固定於底部，懸浮輸入區需留出它的觸控範圍。 */
-  .app-shell.immersive:has(~ .session-toolbar) .chat-area {
-    bottom: calc(var(--ov-touch-target) + 2.25rem + env(safe-area-inset-bottom));
-  }
-}
-
 .app-shell.immersive.camera-active .stage-frame :deep(.camera-preview) {
   right: clamp(1rem, 3vw, 2.5rem);
   bottom: clamp(1rem, 3dvh, 2.5rem);

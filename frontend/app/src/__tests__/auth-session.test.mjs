@@ -49,9 +49,9 @@ test("Avatar root bootstraps the cookie session before mounting the app", () => 
 
   assert.match(root, /auth\.bootstrap\(\)/);
   assert.match(root, /v-else-if="!auth\.account\.value"/);
-  assert.match(root, /<App\s*\/>/);
+  assert.match(root, /<App\s+v-else\s*\/>/);
   assert.match(root, /@click="handleLogout"/);
-  assert.match(root, /runLogout/);
+  assert.match(read("composables/useSessionLogout.ts"), /runLogout/);
   assert.match(root, /cleanupLoggedOutSession/);
   assert.match(main, /import Root from ['"]\.\/Root\.vue['"]/);
 });
@@ -185,7 +185,7 @@ test("temporary login accepts only a password and exposes the expiry notice", ()
   const authApi = read("api/auth.ts");
   const authStore = read("composables/useAuth.ts");
   const loginScreen = read("components/auth/LoginScreen.vue");
-  const root = read("Root.vue");
+  const label = read("components/auth/SessionLabel.vue");
 
   assert.match(authApi, /"\/api\/v1\/auth\/temporary-login"/);
   assert.match(authApi, /JSON\.stringify\(\{ password \}\)/);
@@ -193,9 +193,9 @@ test("temporary login accepts only a password and exposes the expiry notice", ()
   assert.match(loginScreen, /我有帳號/);
   assert.match(loginScreen, /我只有密碼/);
   assert.match(loginScreen, /v-if="mode === 'formal'"/);
-  assert.match(root, /remaining_seconds/);
-  assert.match(root, /expires_at/);
-  assert.match(root, /剩餘 \{\{ remainingLabel \}\}/);
+  assert.match(label, /remaining_seconds/);
+  assert.match(label, /expires_at/);
+  assert.match(label, /剩餘 \{\{ remainingLabel \}\}/);
 });
 
 test("resource defaults are resolved only against the authorized lists", () => {

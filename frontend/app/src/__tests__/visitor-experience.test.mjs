@@ -38,8 +38,11 @@ test("the start screen only appears in visitor mode and starts listening after t
   assert.match(app, /await handleStart\(\)/);
   assert.match(app, /handleAsrToggle\(\)/);
   assert.match(app, /:settings-visible="visitor\.settingsVisible\.value"/);
-  // 來賓不能按到登出：帳號列跟設定一起藏。
-  assert.match(read("../Root.vue"), /<div v-if="visitor\.settingsVisible\.value" class="session-toolbar">/);
+  // 來賓不能按到登出：帳號和登出跟設定鈕在同一個條件下。
+  assert.match(
+    read("../components/controls/ControlBar.vue"),
+    /v-if="settingsVisible !== false"\s+class="control-btn control-btn--logout"/,
+  );
 });
 
 const tree = [
@@ -145,7 +148,8 @@ test("kiosk mode comes from the account flag, the device setting, or the URL", (
 test("settings can switch this device into kiosk mode, and staff unlock with the account password", () => {
   const modal = read("../components/controls/SettingsModal.vue");
   assert.match(modal, /切換成展示機台/);
-  assert.match(modal, /結束展示機台模式/);
+  // 解鎖就直接結束，設定裡不再需要另一顆結束按鈕。
+  assert.doesNotMatch(modal, /結束展示機台模式/);
   assert.match(modal, /這個帳號固定是展示機台/);
   assert.match(app, /@enter-kiosk="handleEnterKiosk"/);
   assert.match(app, /visitor\.enterDeviceKiosk\(\);\s*started\.value = false;/);
@@ -155,4 +159,50 @@ test("settings can switch this device into kiosk mode, and staff unlock with the
   assert.match(dialog, /await verifyPassword\(password\.value\)/);
   // 密碼錯不能回 401：apiFetch 會把 401 當登入過期，機台就被登出了。
   assert.match(read("../api/auth.ts"), /\/api\/v1\/auth\/verify-password/);
+});
+
+
+async function visitorMode({ account = null, stored = "1", search = "" } = {}) {
+  const storage = new Map(stored ? [["openvman.kiosk", stored]] : []);
+  globalThis.localStorage = {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+    removeItem: (key) => storage.delete(key),
+  };
+  globalThis.window = { location: { search } };
+  const { useVisitorMode } = await load("../composables/useVisitorMode.ts", [
+    [/import \{ computed, ref \} from "vue";/, `${fakeVue}\n// ${Math.random()}`],
+    [/import \{ useAuth \} from "\.\/useAuth";/, `const useAuth = () => ({ account: { value: ${JSON.stringify(account)} } });`],
+  ]);
+  return { visitor: useVisitorMode(), storage };
+}
+
+test("unlocking a device kiosk ends kiosk mode for good", async () => {
+  const { visitor, storage } = await visitorMode();
+  assert.equal(visitor.kiosk.value, true);
+  assert.equal(visitor.settingsVisible.value, false);
+
+  visitor.unlock();
+
+  assert.equal(visitor.kiosk.value, false);
+  assert.equal(visitor.settingsVisible.value, true);
+  assert.equal(visitor.kioskSource.value, "off");
+  assert.equal(storage.has("openvman.kiosk"), false);
+});
+
+test("unlocking an account kiosk only reveals the controls until reload", async () => {
+  const { visitor } = await visitorMode({ account: { kiosk: true }, stored: null });
+
+  visitor.unlock();
+
+  assert.equal(visitor.kiosk.value, true);
+  assert.equal(visitor.settingsVisible.value, true);
+  assert.equal(visitor.kioskSource.value, "account");
+});
+
+test("the unlock dialog says what unlocking will do", () => {
+  const dialog = read("../components/controls/UnlockDialog.vue");
+  assert.match(dialog, /結束展示機台模式/);
+  assert.match(dialog, /暫時顯示設定與登出/);
+  assert.match(app, /:ends-kiosk="visitor\.kioskSource\.value !== 'account'"/);
 });

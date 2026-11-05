@@ -5,6 +5,7 @@ import { verifyPassword } from "../../api/auth";
 const props = defineProps<{
   open: boolean
   username: string
+  endsKiosk: boolean
 }>();
 
 const emit = defineEmits<{
@@ -55,7 +56,9 @@ async function submit(): Promise<void> {
       @keydown.esc="emit('close')"
     >
       <h2 id="unlock-title">現場人員解鎖</h2>
-      <p class="unlock-hint">輸入帳號 {{ username }} 的密碼，暫時顯示設定與登出；重新整理後會再藏起來。</p>
+      <p class="unlock-hint">
+        輸入帳號 {{ username }} 的密碼，{{ endsKiosk ? "結束展示機台模式。" : "暫時顯示設定與登出；重新整理後會再藏起來。" }}
+      </p>
       <input
         ref="inputRef"
         v-model="password"

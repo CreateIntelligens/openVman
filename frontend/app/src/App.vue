@@ -163,12 +163,12 @@
       @apply="handleSettingsApply"
       :kiosk-source="visitor.kioskSource.value"
       @enter-kiosk="handleEnterKiosk"
-      @leave-kiosk="visitor.leaveDeviceKiosk"
     />
 
     <UnlockDialog
       :open="showUnlock"
       :username="account?.username ?? ''"
+      :ends-kiosk="visitor.kioskSource.value !== 'account'"
       @close="showUnlock = false"
       @unlocked="visitor.unlock"
     />

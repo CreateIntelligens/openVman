@@ -98,7 +98,6 @@ const emit = defineEmits<{
   ]
   apply: []
   enterKiosk: []
-  leaveKiosk: []
 }>()
 
 const builtInBackgroundOptions: { id: BuiltInAvatarBackgroundId; label: string; url: string }[] = [
@@ -608,9 +607,9 @@ function handleDialogClick(event: MouseEvent): void {
               v-else
               type="button"
               class="btn-cancel"
-              @click="kioskSource === 'device' ? emit('leaveKiosk') : emit('enterKiosk')"
+              @click="emit('enterKiosk')"
             >
-              {{ kioskSource === 'device' ? '結束展示機台模式' : '切換成展示機台' }}
+              切換成展示機台
             </button>
               </div>
             </details>
