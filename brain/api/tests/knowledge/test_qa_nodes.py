@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -418,4 +419,59 @@ def test_move_node_cycle_prevented(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert node["parent_ids"] == ["node_a"]
 
 
+def test_find_language_category_matches_first_level_labels(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+    qa_nodes.create_node("zh", "繁體中文")
+    qa_nodes.create_node("en", "  ENGLISH ")
+    qa_nodes.create_node("es", "Espanol")
+    qa_nodes.create_node("other", "活動")
 
+    assert qa_nodes.find_language_category("zh") == "zh"
+    assert qa_nodes.find_language_category("en") == "en"
+    assert qa_nodes.find_language_category("es") == "es"
+    assert qa_nodes.find_language_category("ja") is None
+    assert qa_nodes.find_language_category("nan") is None
+
+
+def test_find_language_category_ignores_nested_nodes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+    qa_nodes.create_node("topic", "活動")
+    qa_nodes.create_node("nested", "English", parent_ids=["topic"])
+
+    assert qa_nodes.find_language_category("en") is None
+
+
+def test_find_language_category_prefers_visible_then_order(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+    qa_nodes.create_node("hidden_first", "中文", order=1.0, hidden=True)
+    qa_nodes.create_node("second", "華語", order=3.0)
+    qa_nodes.create_node("first", "繁體中文", order=2.0)
+
+    assert qa_nodes.find_language_category("zh") == "first"
+
+
+def test_language_labels_match_the_frontend_quick_qa_panel():
+    candidates = (
+        ancestor / "frontend/app/src/components/controls/quickQaText.ts"
+        for ancestor in Path(__file__).resolve().parents
+    )
+    source = next((path for path in candidates if path.is_file()), None)
+    if source is None:
+        pytest.skip("frontend source is not available (container mounts only brain/api)")
+
+    block = re.search(
+        r"LANGUAGE_LABELS[^=]*=\s*\{(.*?)\};", source.read_text(encoding="utf-8"), re.S
+    )
+    assert block is not None
+    frontend_labels = dict(re.findall(r'"([^"]+)"\s*:\s*"([^"]+)"', block.group(1)))
+
+    assert frontend_labels == _import("knowledge.qa_nodes").LANGUAGE_LABELS

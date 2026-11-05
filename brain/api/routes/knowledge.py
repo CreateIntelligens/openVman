@@ -35,14 +35,17 @@ from knowledge.knowledge_admin import (
     apply_workspace_document_normalization,
     commit_raw_documents,
     create_workspace_directory,
+    delete_raw_file,
     delete_workspace_directory,
     delete_workspace_document,
     list_knowledge_base_directories,
     list_knowledge_base_documents,
+    list_pending_raw_files,
     list_qa_entries,
     list_raw_files,
     list_workspace_documents,
     move_workspace_document,
+    normalize_raw_paths,
     preview_workspace_document_normalization,
     read_workspace_document,
     renormalize_workspace_document,
@@ -66,6 +69,7 @@ from protocol.schemas import (
     KnowledgeDocumentMoveRequest,
     KnowledgeDocumentPutRequest,
     KnowledgeNoteCreateRequest,
+    KnowledgeRawCommitRequest,
     KnowledgeSettingsPutRequest,
 )
 from safety.internal_auth import require_internal_token
@@ -394,45 +398,99 @@ async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionR
     }
 
 
-@router.post("/knowledge/raw/commit", summary="採納 raw 區檔案進知識庫（背景執行，逐檔進度可查詢）", status_code=202)
-async def commit_knowledge_raw_route(payload: AdminActionRequest, response: Response):
+@router.post("/knowledge/raw/commit", summary="匯入 raw 區檔案進知識庫（背景執行，逐檔進度可查詢）", status_code=202)
+async def commit_knowledge_raw_route(payload: KnowledgeRawCommitRequest, response: Response):
     """The 'commit' step: promote staged raw/ files into knowledge/ in the
     background (per-file LLM normalization is slow), then rebuild the vector
     index and concept graph. Progress is polled via /knowledge/raw/commit/status.
+
+    ``paths`` limits the job to those files, so older uploads still waiting in raw/
+    are not swept along; ``normalize=false`` skips the LLM step.
     """
     pid = payload.project_id
+    try:
+        requested = (
+            None
+            if payload.paths is None
+            else await asyncio.to_thread(normalize_raw_paths, payload.paths, pid)
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     pending = await asyncio.to_thread(list_raw_files, pid)
-    if not pending:
+    files = pending if requested is None else requested
+    if not set(files) & set(pending):
         response.status_code = 200
         return {"status": "nothing_to_commit", "project_id": pid, "committed": [], "skipped": []}
-    if not commit_jobs.start_job(pid, pending):
+    if not commit_jobs.start_job(pid, files):
         response.status_code = 200
         return {"status": "already_running", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
-    asyncio.create_task(_run_commit_job(pid))
+    # 一律帶明確清單：開工後才傳上來的檔案不算這一批。
+    asyncio.create_task(_run_commit_job(pid, files, payload.normalize))
     response.status_code = 202
     return {"status": "started", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
 
 
-async def _run_commit_job(project_id: str) -> None:
+async def _run_commit_job(project_id: str, files: list[str], normalize: bool = True) -> None:
     def _on_progress(path: str, state: str) -> None:
         commit_jobs.update_file(project_id, path, state)
 
+    def _on_result(path: str, result: dict[str, Any]) -> None:
+        commit_jobs.record_result(project_id, path, result)
+
+    def _on_skip(path: str, reason: str) -> None:
+        commit_jobs.record_skip(project_id, path, reason)
+
     try:
-        result = await asyncio.to_thread(commit_raw_documents, project_id, _on_progress)
+        result = await asyncio.to_thread(
+            commit_raw_documents,
+            project_id,
+            _on_progress,
+            paths=files,
+            normalize=normalize,
+            on_result=_on_result,
+            on_skip=_on_skip,
+        )
     except Exception as exc:
-        commit_jobs.fail_job(project_id, repr(exc))
+        commit_jobs.fail_job(project_id, "匯入中斷，還沒處理的檔案都留著，可以再試一次")
         log_exception("knowledge_commit_error", exc, project_id=project_id)
         return
     commit_jobs.finish_job(project_id, result["committed"], result["skipped"])
-    log_event("knowledge_commit", project_id=project_id, committed=len(result["committed"]))
+    log_event(
+        "knowledge_commit",
+        project_id=project_id,
+        committed=len(result["committed"]),
+        skipped=len(result["skipped"]),
+    )
     if result["committed"]:
         schedule_reindex(project_id)
 
 
-@router.get("/knowledge/raw/commit/status", summary="查詢採納進度")
+@router.get("/knowledge/raw/commit/status", summary="查詢匯入進度")
 async def commit_status_route(project_id: str = "default"):
     return commit_jobs.job_snapshot(project_id)
 
+
+@router.get("/knowledge/raw/pending", summary="列出等待匯入的檔案")
+async def list_raw_pending_route(project_id: str = "default"):
+    # 正在匯入的不算等待中。沒匯入成功的還在 raw/，要列出來才看得到、才移得掉。
+    active = commit_jobs.active_files(project_id)
+    files = await asyncio.to_thread(list_pending_raw_files, project_id)
+    return {"files": [item for item in files if item["path"] not in active]}
+
+
+@router.delete("/knowledge/raw/pending", summary="移除一個等待匯入的檔案")
+async def delete_raw_pending_route(path: str, project_id: str = "default"):
+    try:
+        relative = (await asyncio.to_thread(normalize_raw_paths, [path], project_id))[0]
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if relative in commit_jobs.active_files(project_id):
+        raise HTTPException(status_code=409, detail="這個檔案正在匯入，等匯入結束再移除")
+    try:
+        await asyncio.to_thread(delete_raw_file, relative, project_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"status": "ok"}
 
 
 @router.post("/knowledge/upload", summary="上傳實體檔案至知識庫")

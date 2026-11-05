@@ -4,7 +4,6 @@ import asyncio
 from collections import defaultdict
 import logging
 import re
-import threading
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -17,6 +16,7 @@ from config import get_settings
 from knowledge.doc_meta import upsert_document_meta
 from knowledge.knowledge_admin import (
     delete_workspace_document,
+    qa_document_lock,
     resolve_workspace_artifact,
     resolve_workspace_document,
     save_uploaded_artifact,
@@ -29,6 +29,7 @@ from knowledge.qa_csv import (
     is_qa_csv,
     parse_qa_csv,
     parse_qa_markdown,
+    qa_entry_values,
     qa_markdown_block,
     serialize_qa_csv,
 )
@@ -57,6 +58,10 @@ from routes.knowledge import schedule_reindex
 from safety.internal_auth import require_internal_token
 
 logger = logging.getLogger(__name__)
+
+# 這些訊息會直接顯示在後台，工作人員看到的是「分類」。
+_CATEGORY_NOT_FOUND = "找不到這個分類，可能已經被刪除，請重新整理頁面"
+_MOVE_REFUSED = "不能移到這裡，目標分類可能已經被刪除，或者就在這個分類底下"
 
 router = APIRouter(
     prefix="/brain/knowledge/qa",
@@ -103,9 +108,6 @@ class MergedQaItem(BaseModel):
     hidden: bool | None = False
 
 
-_ingest_lock = threading.Lock()
-
-
 def parse_qa_markdown_with_metadata(content: str) -> list[dict[str, Any]]:
     """Parse qa markdown file into a list of dict containing q, a, img, url."""
     return parse_qa_markdown(content)
@@ -125,19 +127,6 @@ def _parse_qa_bytes(suffix: str, content: bytes) -> list[dict[str, Any]] | None:
     if suffix.lower() == ".csv":
         return parse_qa_csv(content) if is_qa_csv(content) else None
     return parse_qa_markdown(text) or None
-
-
-def _qa_values(items: list[dict[str, Any]]) -> list[tuple[str, str, str, str, bool]]:
-    return [
-        (
-            item["q"].strip(),
-            item["a"].strip(),
-            extract_image_id(item.get("img") or ""),
-            (item.get("url") or "").strip(),
-            bool(item.get("hidden", False)),
-        )
-        for item in items
-    ]
 
 
 def _conflicting_questions(
@@ -199,7 +188,7 @@ async def adopt_source_route(
             raise HTTPException(status_code=400, detail="path 不可為空")
 
         if is_source_referenced(path, project_id):
-            raise HTTPException(status_code=400, detail="此 QA 文件已在問答樹中")
+            raise HTTPException(status_code=400, detail="這份文件已經在快速問答裡了")
 
         try:
             doc_path = resolve_workspace_document(path, project_id)
@@ -216,7 +205,7 @@ async def adopt_source_route(
         if payload.parent_id is not None:
             parent_node = get_node(payload.parent_id, project_id=project_id)
             if not parent_node:
-                raise HTTPException(status_code=400, detail="指定之父節點不存在")
+                raise HTTPException(status_code=400, detail="找不到指定的上層分類，可能已經被刪除")
             parent_ids = [payload.parent_id]
 
         label = doc_path.stem
@@ -246,7 +235,7 @@ async def ingest_source_route(
 
         node = get_node(id, project_id=project_id)
         if not node:
-            raise HTTPException(status_code=404, detail="找不到指定節點")
+            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
 
         try:
             dragged_path = resolve_workspace_document(path, project_id)
@@ -278,7 +267,7 @@ async def ingest_source_route(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         if target_file == dragged_path:
-            raise HTTPException(status_code=400, detail="此文件已是該節點的內容")
+            raise HTTPException(status_code=400, detail="這份文件已經在這個分類裡了")
 
         # 讀不懂的目標不能當成空的：寫回去就把原內容整份蓋掉了。
         target_items: list[dict[str, Any]] = []
@@ -324,7 +313,7 @@ async def ingest_source_route(
             # 寫入前先讀回比對：來源的 ## 行、多行題目、列長度不齊等，都可能讓內容讀出來
             # 不一樣；這種情況不寫也不刪來源，才不會默默丟資料。
             reread = _parse_qa_bytes(target_file.suffix, content.encode("utf-8"))
-            if _qa_values(reread or []) != _qa_values([*target_items, *new_items]):
+            if qa_entry_values(reread or []) != qa_entry_values([*target_items, *new_items]):
                 raise HTTPException(
                     status_code=400,
                     detail="這份內容無法完整併入目標 QA 文件的格式，未做任何變更",
@@ -342,7 +331,7 @@ async def ingest_source_route(
 
     def _ingest_exclusively() -> dict[str, Any]:
         # 從讀目標到刪來源要一起完成，否則同時兩次拖曳會有一邊的題目被蓋掉、來源卻已刪。
-        with _ingest_lock:
+        with qa_document_lock:
             return _ingest()
 
     result = await asyncio.to_thread(_ingest_exclusively)
@@ -385,7 +374,7 @@ def patch_qa_node_route(
     try:
         node = update_node(id, updates, project_id=project_id)
         if node is None:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
         return node
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -398,7 +387,7 @@ async def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str
     def _delete() -> list[str]:
         node = get_node(id, project_id=project_id)
         if node is None:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
         source_paths = {
             entry["source_path"]
             for entry in node.get("qa_entries", [])
@@ -406,7 +395,7 @@ async def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str
         }
 
         if not delete_node(id, project_id=project_id):
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
 
         removed: list[str] = []
         for path in sorted(source_paths):
@@ -434,10 +423,11 @@ def move_qa_node_route(
     try:
         node = move_node(id, payload.new_parent_ids, project_id=project_id)
         if node is None:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
         return node
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # move_node 的訊息帶內部編號，這句會直接顯示在「移到…」對話框。
+        raise HTTPException(status_code=400, detail=_MOVE_REFUSED) from exc
 
 
 @router.post("/nodes/{id}/reorder")
@@ -449,7 +439,7 @@ def reorder_qa_node_route(
     try:
         node = reorder_node(id, payload.sibling_ids_ordered, project_id=project_id)
         if node is None:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
         return node
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -462,7 +452,7 @@ def get_merged_qa_route(
 ) -> list[dict[str, Any]]:
     node = get_node(id, project_id=project_id)
     if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+        raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
 
     qa_entries = node.get("qa_entries", [])
 
@@ -515,7 +505,7 @@ async def put_merged_qa_route(
     def _save() -> None:
         node = get_node(id, project_id=project_id)
         if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
 
         by_file: defaultdict[str, list[MergedQaItem]] = defaultdict(list)
         for item in payload:

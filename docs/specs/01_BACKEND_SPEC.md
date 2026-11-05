@@ -613,6 +613,8 @@ process.on('SIGTERM', async () => {
 * `PUT /brain/knowledge/document`：儲存/更新 Markdown 檔案，儲存後應觸發自動重新索引。
 * `POST /brain/knowledge/upload`：上傳轉換後的 Markdown 文件並觸發知識重建。
 * `POST /brain/knowledge/raw/upload`：保存原始檔案（PDF/DOCX/PPTX/XLSX）到 `workspace/raw/`，不直接索引。
+* `POST /brain/knowledge/raw/commit`、`GET /brain/knowledge/raw/commit/status`：在背景把 `raw/` 的檔案匯入知識庫並查詢逐檔結果，`paths` 可限定這一批。
+* `GET`、`DELETE /brain/knowledge/raw/pending`：列出或移除等待匯入的檔案。
 * `DELETE /brain/knowledge/document`：刪除文件或資料夾。
 * `POST /brain/knowledge/move`：移動文件或資料夾，支援拖拽操作。
 

@@ -187,3 +187,93 @@ def test_qa_csv_conversion_metadata(tmp_path: Path):
     assert "## How to use?" in result
     assert "Run the tool." in result
     assert '<!-- qa_metadata: {"img": "img_url.png", "url": "https://example.com"} -->' in result
+
+
+def _workbook(path: Path, sheets: dict[str, list[list[object]]]) -> Path:
+    import openpyxl
+
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)
+    for title, rows in sheets.items():
+        sheet = workbook.create_sheet(title)
+        for row in rows:
+            sheet.append(row)
+    workbook.save(path)
+    return path
+
+
+def _qa_rows(path: Path) -> list[dict[str, object]]:
+    from knowledge.qa_csv import parse_qa_csv
+
+    csv_bytes = converters.qa_table_csv_bytes(path, path.read_bytes())
+    assert csv_bytes is not None
+    return parse_qa_csv(csv_bytes)
+
+
+def test_qa_workbook_keeps_image_link_and_display_columns(tmp_path: Path):
+    path = _workbook(tmp_path / "faq.xlsx", {
+        "FAQ": [
+            ["題目", "回答", "圖片", "連結", "顯示", "備註"],
+            ["Q1", "A1", "p.png", "https://example.com", False, "內部備註"],
+            ["Q2", "A2", None, None, None, None],
+        ],
+    })
+
+    assert _qa_rows(path) == [
+        {"q": "Q1", "a": "A1", "img": "p.png", "url": "https://example.com", "hidden": True},
+        {"q": "Q2", "a": "A2", "img": "", "url": "", "hidden": False},
+    ]
+
+
+def test_qa_workbook_joins_sheets_in_order_without_mixing_their_indexes(tmp_path: Path):
+    path = _workbook(tmp_path / "faq.xlsx", {
+        "第一張": [["index", "q", "a"], [2, "一之二", "A"], [1, "一之一", "A"]],
+        "第二張": [["index", "q", "a"], [1, "二之一", "A"], [2, "二之二", "A"]],
+    })
+
+    assert [row["q"] for row in _qa_rows(path)] == ["一之一", "一之二", "二之一", "二之二"]
+
+
+def test_qa_workbook_ignores_empty_sheets_and_blank_rows(tmp_path: Path):
+    path = _workbook(tmp_path / "faq.xlsx", {
+        "空的": [],
+        "只有空白": [[None, "  "]],
+        "FAQ": [[None, None], ["q", "a"], [None, None], ["Q1", 100]],
+    })
+
+    assert [(row["q"], row["a"]) for row in _qa_rows(path)] == [("Q1", "100")]
+
+
+def test_workbook_with_one_other_sheet_is_not_a_qa_table(tmp_path: Path):
+    path = _workbook(tmp_path / "book.xlsx", {
+        "FAQ": [["q", "a"], ["Q1", "A1"]],
+        "價目表": [["品項", "價格"], ["A", 100]],
+    })
+
+    assert converters.qa_table_csv_bytes(path, path.read_bytes()) is None
+
+
+def test_workbook_without_any_content_is_not_a_qa_table(tmp_path: Path):
+    path = _workbook(tmp_path / "book.xlsx", {"空的": []})
+
+    assert converters.qa_table_csv_bytes(path, path.read_bytes()) is None
+
+
+def test_corrupt_workbook_is_not_a_qa_table(tmp_path: Path):
+    path = tmp_path / "broken.xlsx"
+    path.write_bytes(b"this is not a workbook")
+
+    assert converters.qa_table_csv_bytes(path, path.read_bytes()) is None
+
+
+def test_qa_table_csv_bytes_for_csv_files(tmp_path: Path):
+    qa = tmp_path / "faq.csv"
+    qa.write_bytes("問題,答案\nQ1,A1\n".encode("utf-8"))
+    table = tmp_path / "table.csv"
+    table.write_bytes(b"name,age\nAlice,20\n")
+    text = tmp_path / "note.txt"
+    text.write_bytes("問題,答案\n".encode("utf-8"))
+
+    assert converters.qa_table_csv_bytes(qa, qa.read_bytes()) == qa.read_bytes()
+    assert converters.qa_table_csv_bytes(table, table.read_bytes()) is None
+    assert converters.qa_table_csv_bytes(text, text.read_bytes()) is None

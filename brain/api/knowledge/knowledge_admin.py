@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import os
-import tempfile
+import logging
+import threading
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,14 @@ from knowledge.doc_meta import (
     upsert_document_meta,
 )
 from knowledge.indexer import fingerprint_document, load_index_state
-from knowledge.qa_csv import parse_qa_markdown
+from knowledge.qa_csv import (
+    UNTITLED_QUESTION,
+    convert_csv_to_qa_markdown,
+    normalize_qa_csv_rows,
+    parse_qa_csv,
+    parse_qa_markdown,
+    qa_entry_values,
+)
 from knowledge.workspace import (
     ensure_workspace_scaffold,
     get_core_documents,
@@ -28,8 +36,15 @@ from knowledge.workspace import (
     iter_workspace_documents,
     resolve_workspace_artifact,
     resolve_workspace_document,
+    write_text_atomic,
 )
 from personas.personas import is_persona_core_relative_path
+
+logger = logging.getLogger("brain.knowledge.admin")
+
+# 問答文件會被整份改寫：拖曳併入（讀目標、寫入、更新節點、刪來源）和同名重傳（寫入、更新節點）。
+# 兩邊同時做的話，一邊的題目會被另一邊蓋掉，而來源檔已經刪掉或搬走。
+qa_document_lock = threading.Lock()
 
 
 def _sanitize_relative_subpath(raw: str) -> Path:
@@ -124,23 +139,9 @@ def save_workspace_document(relative_path: str, content: str, project_id: str = 
     """Create or overwrite a text document in the workspace."""
     path = resolve_workspace_document(relative_path, project_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    _write_text_atomic(path, content)
+    write_text_atomic(path, content)
     touch_document_meta(path.relative_to(ensure_workspace_scaffold(project_id)).as_posix(), project_id)
     return _build_document_summary(path, project_id)
-
-
-def _write_text_atomic(path: Path, content: str) -> None:
-    """Replace ``path`` in one step, so a failed write leaves the old file intact."""
-    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
-    fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=".write-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(content)
-        os.chmod(temp_name, mode)
-        os.replace(temp_name, path)
-    except BaseException:
-        Path(temp_name).unlink(missing_ok=True)
-        raise
 
 
 def _write_normalization_backup(
@@ -537,6 +538,9 @@ def _build_document_summary(
         "language": document_meta["language"],
         "language_source": document_meta["language_source"],
         "qa_attached": qa_attached,
+        # 刪除確認要照實說原檔還在不在：工作區頁上傳與舊文件沒有備份。
+        "has_original_backup": bool(document_meta["origin_path"])
+        and (root / document_meta["origin_path"]).is_file(),
     }
 
 
@@ -589,93 +593,330 @@ def list_raw_files(project_id: str = "default") -> list[str]:
     )
 
 
+def _raw_relative_path(path: str, raw_root: Path) -> str:
+    parts = path.split("/")
+    # 反斜線在這裡只是檔名的一部分，但沒有這個檔案時多半是 Windows 路徑，一樣拒絕。
+    # 真的有這個檔名時要放行，否則它移不掉，「全部匯入」也會整批失敗。
+    if any(part in ("", ".", "..") for part in parts) or (
+        "\\" in path and not (raw_root / path).is_file()
+    ):
+        raise ValueError("檔案路徑不正確")
+    # 上傳回應給 raw/a.csv，等待清單給 a.csv，兩種都收；raw/ 底下真的有 raw 資料夾時以實際檔案為準。
+    relative = path
+    if parts[0] == "raw" and len(parts) > 1 and not (raw_root / path).is_file():
+        relative = "/".join(parts[1:])
+    if not (raw_root / relative).resolve().is_relative_to(raw_root.resolve()):
+        raise ValueError("檔案路徑不正確")
+    return relative
+
+
+def normalize_raw_paths(paths: Iterable[str], project_id: str = "default") -> list[str]:
+    """Return client-supplied paths relative to raw/, deduplicated, rejecting traversal."""
+    raw_root = ensure_workspace_scaffold(project_id) / "raw"
+    return list(dict.fromkeys(_raw_relative_path(path, raw_root) for path in paths))
+
+
+def list_pending_raw_files(project_id: str = "default") -> list[dict[str, Any]]:
+    """Describe the files waiting under raw/, for the admin's pending list."""
+    raw_root = ensure_workspace_scaffold(project_id) / "raw"
+    files: list[dict[str, Any]] = []
+    for relative in list_raw_files(project_id):
+        try:
+            stat = (raw_root / relative).stat()
+        except FileNotFoundError:
+            continue
+        files.append({
+            "path": relative,
+            "size": stat.st_size,
+            "updated_at": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+        })
+    return files
+
+
+def delete_raw_file(relative_path: str, project_id: str = "default") -> None:
+    """Remove one waiting file; ``relative_path`` comes from :func:`normalize_raw_paths`."""
+    path = ensure_workspace_scaffold(project_id) / "raw" / relative_path
+    if not path.is_file():
+        raise FileNotFoundError("找不到指定檔案")
+    path.unlink()
+
+
+class _ImportRefused(Exception):
+    """This file cannot be imported; the message is shown to staff as written."""
+
+
+_REASON_MISSING = "找不到這個檔案，可能已經被移除"
+_REASON_NO_TEXT = "讀不到文字內容，可能是掃描檔或檔案損毀"
+_REASON_NO_QUESTIONS = "這份問答表沒有任何題目"
+_REASON_TARGET_IS_QA = "快速問答已經有同名的問答文件，請改檔名後再上傳"
+_REASON_NOT_UTF8 = "這個檔案不是 UTF-8 編碼，請另存成 UTF-8 後再上傳"
+_REASON_FAILED = "處理這個檔案時發生錯誤，可以再試一次；一直失敗請找管理員"
+_PLAIN_TEXT_SUFFIXES = frozenset({".md", ".txt", ".csv"})
+
+
+def _no_text_reason(src: Path, origin_bytes: bytes) -> str:
+    if src.suffix.lower() in _PLAIN_TEXT_SUFFIXES:
+        try:
+            origin_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return _REASON_NOT_UTF8
+    return _REASON_NO_TEXT
+
+
+def _qa_table_target(filename: str, project_id: str) -> Path:
+    """Where an imported QA table is stored: ``knowledge/qa/<name>.md``.
+
+    拖進樹的 CSV 文件不會轉成 .md；同名的已經掛在樹上時要更新它，不能另開一份多一個分類。
+    """
+    from knowledge.qa_nodes import is_source_referenced
+
+    markdown = (Path("knowledge/qa") / filename).with_suffix(".md")
+    existing_csv = markdown.with_suffix(".csv")
+    if not is_source_referenced(markdown.as_posix(), project_id) and is_source_referenced(
+        existing_csv.as_posix(), project_id
+    ):
+        return existing_csv
+    return markdown
+
+
+def _refuse_unclear_questions(entries: list[dict[str, Any]]) -> None:
+    """Refuse rows the quick Q&A cannot show correctly, instead of guessing.
+
+    編輯器一題只顯示一個答案，同一題有兩個答案時另一個會看不到，AI 卻兩個都查得到。
+    沒有題目的列在選單上只會是一顆「未命名問題」。
+    """
+    answers: dict[str, str] = {}
+    for entry in entries:
+        question, answer = entry["q"].strip(), entry["a"].strip()
+        if question == UNTITLED_QUESTION:
+            raise _ImportRefused(
+                f"有一列只有答案、沒有題目（「{' '.join(answer.split())[:20]}」），"
+                "請補上題目後重新上傳"
+            )
+        if answers.setdefault(question, answer) != answer:
+            short = " ".join(question.split())[:40]
+            raise _ImportRefused(f"「{short}」這一題在檔案裡有不同的答案，請只留一個後重新上傳")
+
+
+def _render_qa_document(csv_bytes: bytes, target: Path) -> str:
+    """Render a QA table in ``target``'s format, refusing what the format cannot hold.
+
+    轉成 Markdown 後，答案裡的 ## 行和多行題目會被切成別的題目。寫入前先讀回比對（和
+    ingest-source 同樣的做法），否則題目會默默拆壞，重傳時還會蓋掉原本正確的內容。
+    """
+    normalized = normalize_qa_csv_rows(csv_bytes)
+    entries = parse_qa_csv(normalized) if normalized is not None else []
+    if normalized is None or not entries:
+        raise _ImportRefused(_REASON_NO_QUESTIONS)
+    _refuse_unclear_questions(entries)
+    if target.suffix == ".csv":
+        return normalized.decode("utf-8")
+
+    markdown = convert_csv_to_qa_markdown(csv_bytes)
+    expected = qa_entry_values(entries)
+    actual = qa_entry_values(parse_qa_markdown(markdown))
+    if expected != actual:
+        broken = next((e for e, a in zip(expected, actual) if e != a), expected[-1])
+        question = " ".join(broken[0].split())[:40]
+        raise _ImportRefused(
+            f"「{question}」這一題無法正確匯入：題目不能換行，答案裡不能有 ## 開頭的行或 ```。"
+            "請修改檔案後重新上傳"
+        )
+    return markdown
+
+
+def _qa_node_summary(target: str, project_id: str) -> dict[str, Any]:
+    """The category holding ``target``, for the per-file result shown in the admin."""
+    from knowledge.qa_nodes import list_nodes
+
+    nodes = list_nodes(project_id)
+    for node_id, node in nodes.items():
+        question_count = sum(
+            entry.get("source_path") == target for entry in node.get("qa_entries", [])
+        )
+        if not question_count:
+            continue
+        summary = {
+            "qa_node_id": node_id,
+            "qa_node_label": node.get("label", ""),
+            "question_count": question_count,
+        }
+        parent = next((nodes[pid] for pid in node.get("parent_ids", []) if pid in nodes), None)
+        return {**summary, "qa_parent_label": parent.get("label", "")} if parent else summary
+    return {}
+
+
+def _commit_raw_file(
+    relative: str,
+    project_id: str,
+    *,
+    normalize: bool,
+    claimed_targets: dict[str, str],
+    report: Callable[[str], None],
+) -> dict[str, Any]:
+    """Import one raw/ file and describe the outcome.
+
+    Raises :class:`_ImportRefused` with the reason when the file cannot be imported.
+    """
+    from knowledge.converters import (
+        SUPPORTED_SUFFIXES,
+        convert_to_text,
+        qa_table_csv_bytes,
+    )
+    from knowledge.doc_meta import resolve_document_languages
+    from knowledge.normalizer import normalize_to_markdown
+    from knowledge.qa_nodes import (
+        create_node_for_source,
+        find_language_category,
+        is_source_referenced,
+        refill_emptied_node,
+        sync_entries_for_source,
+    )
+
+    root = ensure_workspace_scaffold(project_id)
+    src = root / "raw" / relative
+    if not src.is_file():
+        raise _ImportRefused(_REASON_MISSING)
+    if src.suffix.lower() not in SUPPORTED_SUFFIXES:
+        allowed = "、".join(sorted(SUPPORTED_SUFFIXES))
+        raise _ImportRefused(f"這個格式不支援，請改用 {allowed}")
+
+    report("normalizing")
+
+    origin_bytes = src.read_bytes()
+    qa_csv = qa_table_csv_bytes(src, origin_bytes)
+    is_qa = qa_csv is not None
+    target_rel = (
+        _qa_table_target(src.name, project_id)
+        if is_qa
+        else (Path("knowledge") / relative).with_suffix(".md")
+    )
+    target = target_rel.as_posix()
+    if target in claimed_targets:
+        # 同名不同副檔名（a.csv、a.xlsx）或不同資料夾的問答表會存成同一份，後面的會蓋掉前面的。
+        raise _ImportRefused(
+            f"和同一批的 {claimed_targets[target]} 會存成同一份文件，請改檔名後再上傳"
+        )
+
+    if is_qa:
+        content = _render_qa_document(qa_csv, target_rel)
+    else:
+        text = convert_to_text(src)
+        if not text:
+            raise _ImportRefused(_no_text_reason(src, origin_bytes))
+        content = normalize_to_markdown(text) if normalize else text
+        if not content.strip():
+            raise _ImportRefused(_REASON_NO_TEXT)
+
+    dest = resolve_workspace_document(target, project_id)
+    origin_hash = hashlib.sha256(origin_bytes).hexdigest()
+    # 節點寫在中繼資料之前：source_type 一標成 qa，輪詢問答樹時就會把還沒節點的文件自動收養，
+    # 接著這裡又建一次，就多出一個分類。原檔最後才搬走，中途失敗都還能重跑。
+    with qa_document_lock:
+        updated = dest.exists()
+        referenced = is_source_referenced(target, project_id)
+        if referenced and not is_qa:
+            raise _ImportRefused(_REASON_TARGET_IS_QA)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        write_text_atomic(dest, content)
+        touch_document_meta(target, project_id)
+        language = resolve_document_languages([target], project_id)[target]
+        if is_qa and referenced:
+            sync_entries_for_source(target, project_id)
+        elif is_qa and not refill_emptied_node(target, target_rel.stem, project_id):
+            category = find_language_category(language, project_id)
+            create_node_for_source(
+                target,
+                target_rel.stem,
+                project_id,
+                parent_ids=[category] if category else None,
+            )
+        upsert_document_meta(target, project_id, source_type="qa" if is_qa else "upload")
+        # AI 整理要幾分鐘，這段時間可能又傳了新版；留在 raw/ 等下一批，不能當成這一版搬走。
+        if hashlib.sha256(src.read_bytes()).hexdigest() == origin_hash:
+            archived_rel = _archive_original(src, Path(relative), root)
+            upsert_document_meta(
+                target, project_id, origin_path=archived_rel, origin_hash=origin_hash,
+            )
+
+    result = {
+        "target": target,
+        "kind": "qa" if is_qa else "document",
+        "language": language,
+        "updated": updated,
+    }
+    return {**result, **_qa_node_summary(target, project_id)} if is_qa else result
+
+
 @project_model_entry("knowledge")
 def commit_raw_documents(
     project_id: str = "default",
     on_progress: Callable[[str, str], None] | None = None,
+    *,
+    paths: Iterable[str] | None = None,
+    normalize: bool = True,
+    on_result: Callable[[str, dict[str, Any]], None] | None = None,
+    on_skip: Callable[[str, str], None] | None = None,
 ) -> dict[str, Any]:
     """Promote staged files from raw/ into knowledge/ (the 'commit' step).
 
-    raw/ is a staging area (uploads land there un-indexed). Committing now runs
-    each file through the *normalization pipeline*: convert any supported format
-    to text (docx/xlsx/pdf/csv/md/txt), then LLM-clean it into tidy Obsidian
-    Markdown, writing the result as a ``.md`` under knowledge/ preserving its
-    sub-path. The caller then triggers reindex + graph rebuild so the cleaned
-    docs enter RAG and the concept graph.
+    raw/ is a staging area (uploads land there un-indexed). Each file becomes a
+    ``.md`` under knowledge/ preserving its sub-path: QA tables (CSV, or Excel whose
+    every non-empty sheet has question and answer columns) become QA documents under
+    ``knowledge/qa/`` without any LLM step and join the quick Q&A tree; anything else
+    is converted to text and LLM-cleaned, unless ``normalize`` is false. A QA source
+    that already has a node updates that node's questions, keeping its name and place;
+    a new one goes under the first-level category of its language when there is one.
+    The caller then triggers reindex + graph rebuild.
 
-    Files whose format cannot be converted are left untouched in raw/ and
-    reported under ``skipped`` (the user can see they did not enter the base).
+    ``paths`` limits the run to those files (relative to raw/, see
+    :func:`normalize_raw_paths`); ``None`` means everything in raw/. One file failing
+    never stops the others: it stays in raw/ and its reason lands in ``skip_reasons``.
     """
-    from knowledge.converters import SUPPORTED_SUFFIXES, convert_to_text
-    from knowledge.normalizer import normalize_to_markdown
-    from knowledge.qa_csv import is_qa_csv
+    relative_paths = (
+        list_raw_files(project_id) if paths is None else normalize_raw_paths(paths, project_id)
+    )
 
-    root = ensure_workspace_scaffold(project_id)
-    raw_root = root / "raw"
-    if not raw_root.exists():
-        return {"committed": [], "skipped": []}
+    def _report(path: str, state: str) -> None:
+        if on_progress:
+            on_progress(path, state)
 
     committed: list[str] = []
     skipped: list[str] = []
-    for src in sorted(p for p in raw_root.rglob("*") if p.is_file()):
-        rel_in_raw = src.relative_to(raw_root)
-        rel_path_str = rel_in_raw.as_posix()
-
-        def _report(state: str) -> None:
-            if on_progress:
-                on_progress(rel_path_str, state)
-
-        if src.suffix.lower() not in SUPPORTED_SUFFIXES:
-            _report("skipped")
-            skipped.append(rel_path_str)
-            continue
-
-        _report("normalizing")
-
-        origin_bytes = src.read_bytes()
-        origin_hash = hashlib.sha256(origin_bytes).hexdigest()
-        is_qa = src.suffix.lower() == ".csv" and is_qa_csv(origin_bytes)
-
-        text = convert_to_text(src)
-        if not text:
-            # Unsupported in practice / extraction failed: leave it in raw/.
-            _report("skipped")
-            skipped.append(rel_path_str)
-            continue
-
-        if is_qa:
-            # QA CSV conversion already emits structured per-question markdown
-            # with qa_metadata comments; LLM cleaning would mangle them.
-            cleaned = text
+    results: dict[str, dict[str, Any]] = {}
+    skip_reasons: dict[str, str] = {}
+    claimed_targets: dict[str, str] = {}
+    for relative in relative_paths:
+        try:
+            result = _commit_raw_file(
+                relative,
+                project_id,
+                normalize=normalize,
+                claimed_targets=claimed_targets,
+                report=partial(_report, relative),
+            )
+        except _ImportRefused as refused:
+            reason = str(refused)
+        except Exception:  # noqa: BLE001 - one bad file must not stop the batch
+            logger.exception("raw commit failed project=%s path=%s", project_id, relative)
+            reason = _REASON_FAILED
         else:
-            cleaned = normalize_to_markdown(text)
-        if not cleaned:
-            _report("skipped")
-            skipped.append(rel_path_str)
+            claimed_targets[result["target"]] = relative
+            committed.append(result["target"])
+            results[relative] = result
+            if on_result:
+                on_result(relative, result)
+            _report(relative, "committed")
             continue
+        skipped.append(relative)
+        skip_reasons[relative] = reason
+        if on_skip:
+            on_skip(relative, reason)
+        _report(relative, "skipped")
 
-        # Output is always markdown regardless of the source format.
-        if is_qa:
-            target_rel = (Path("knowledge/qa") / rel_in_raw.name).with_suffix(".md")
-        else:
-            target_rel = (Path("knowledge") / rel_in_raw).with_suffix(".md")
-        dest = resolve_workspace_document(target_rel.as_posix(), project_id)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(cleaned, encoding="utf-8")
-        archived_rel = _archive_original(src, rel_in_raw, root)
-        upsert_document_meta(
-            target_rel.as_posix(),
-            project_id,
-            source_type="qa" if is_qa else "upload",
-            origin_path=archived_rel,
-            origin_hash=origin_hash,
-        )
-        touch_document_meta(target_rel.as_posix(), project_id)
-        if is_qa:
-            from knowledge.qa_nodes import create_node_for_source
-
-            create_node_for_source(target_rel.as_posix(), target_rel.stem, project_id)
-        committed.append(target_rel.as_posix())
-        _report("committed")
-
-    return {"committed": committed, "skipped": skipped}
+    return {
+        "committed": committed,
+        "skipped": skipped,
+        "results": results,
+        "skip_reasons": skip_reasons,
+    }

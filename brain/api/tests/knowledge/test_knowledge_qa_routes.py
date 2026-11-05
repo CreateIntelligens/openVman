@@ -665,6 +665,30 @@ def test_adopt_source_creates_node_from_dropped_doc(client, tmp_path):
     assert response.status_code == 400
 
 
+@pytest.mark.parametrize("new_parent_ids", [["no_such_category"], ["child_of_moved"]])
+def test_move_refusal_is_written_for_staff_without_internal_ids(client, new_parent_ids):
+    assert client.post("/brain/knowledge/qa/nodes", json={"node_id": "moved", "label": "A"}).status_code == 200
+    assert client.post(
+        "/brain/knowledge/qa/nodes",
+        json={"node_id": "child_of_moved", "label": "B", "parent_ids": ["moved"]},
+    ).status_code == 200
+
+    response = client.post("/brain/knowledge/qa/nodes/moved/move", json={"new_parent_ids": new_parent_ids})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "不能移到這裡" in detail
+    assert "no_such_category" not in detail
+    assert "node" not in detail
+
+
+def test_missing_category_is_reported_in_plain_words(client):
+    response = client.get("/brain/knowledge/qa/nodes/gone/merged")
+
+    assert response.status_code == 404
+    assert "找不到這個分類" in response.json()["detail"]
+
+
 def test_delete_node_removes_owned_qa_doc(client, tmp_path):
     """節點即內容：刪除節點時一併刪除其專屬 QA 文件；仍被其他節點引用者保留。"""
     import knowledge.doc_meta
@@ -780,7 +804,7 @@ def test_adopt_source_with_parent(client, tmp_path):
         json={"path": "knowledge/notes/child_note.md", "parent_id": "non_existent"},
     )
     assert response.status_code == 400
-    assert "父節點不存在" in response.json()["detail"]
+    assert "上層分類" in response.json()["detail"]
 
     # 2. Adopt with valid parent
     response = client.post(

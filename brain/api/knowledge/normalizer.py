@@ -3,10 +3,10 @@
 Knowledge documents are frequently OCR'd from PDFs and carry typos, missing
 characters, layout noise, and — most damaging for heading-based chunking — body
 text mis-detected as ``## headings``. This module asks the LLM to repair those
-issues without fabricating content. Long input is split into segments (reusing
-:func:`knowledge.graph_extractor._split_text`), each normalized via its own LLM
-call, then rejoined. A failed segment falls back to its original text so content
-is never lost.
+issues without fabricating content or changing the language. Long input is split
+into segments (reusing :func:`knowledge.graph_extractor._split_text`), each
+normalized via its own LLM call, then rejoined. A failed segment falls back to its
+original text so content is never lost.
 """
 
 from __future__ import annotations
@@ -17,12 +17,18 @@ import logging
 from core.llm_client import generate_chat_reply
 
 from knowledge.graph_extractor import _split_text
+from memory.language_detect import _HAN, detect_document_language
 
 logger = logging.getLogger("brain.knowledge.normalizer")
 
 SEGMENT_SIZE = 6000
 
-NORMALIZE_PROMPT = """你是知識庫文件整理助手。下面是一段從 PDF/掃描 OCR 轉出的中文文字，含有 OCR 錯字、缺字、排版雜訊，且標題層級被誤判（許多內文被當成 ## 標題）。
+NORMALIZE_PROMPT = """你是知識庫文件整理助手。下面是一段從 PDF、掃描 OCR 或其他檔案轉出的文字，可能是任何語言，可能含有 OCR 錯字、缺字、排版雜訊，標題層級也可能被誤判（內文被當成 ## 標題）。
+
+語言規則（最優先）：
+- 一律維持原文語言，不可翻譯。原文是西班牙文就輸出西班牙文，是英文就輸出英文。
+- 同一段文字混用多種語言時，每一段都維持它原本的語言。
+- Keep every passage in its original language. Never translate.
 
 請整理成乾淨的 Markdown：
 - 修正明顯的 OCR 錯字與缺字，但不可增刪或杜撰任何事實內容。
@@ -37,9 +43,19 @@ NORMALIZE_PROMPT = """你是知識庫文件整理助手。下面是一段從 PDF
 """
 
 
+def _keeps_language(original: str, cleaned: str) -> bool:
+    if detect_document_language(original) != detect_document_language(cleaned):
+        return False
+    # 判斷不出語言的短文一律歸中文：「Bloqueador solar」翻成「防曬乳」兩邊都是 zh，
+    # 所以另外看中文字有沒有憑空出現或消失。
+    return bool(_HAN.search(original)) == bool(_HAN.search(cleaned))
+
+
 def _passes_sanity_check(original: str, cleaned: str) -> bool:
-    """Check if the cleaned output passes length sanity check."""
+    """Check that the cleaned output is non-empty, same language, and of sane length."""
     if not cleaned.strip():
+        return False
+    if not _keeps_language(original, cleaned):
         return False
     if len(original) < 500:
         return True

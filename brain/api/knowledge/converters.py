@@ -16,7 +16,13 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from knowledge.qa_csv import convert_csv_to_qa_markdown, is_qa_csv, normalize_fieldname
+from knowledge.qa_csv import (
+    _rows_to_csv_bytes,
+    _sort_by_index,
+    convert_csv_to_qa_markdown,
+    is_qa_csv,
+    normalize_fieldname,
+)
 
 logger = logging.getLogger("brain.knowledge.converters")
 
@@ -24,6 +30,8 @@ logger = logging.getLogger("brain.knowledge.converters")
 # better for the predominantly Chinese-language knowledge base).
 _PAIR_SEP = " ｜ "
 _KV_SEP = ": "
+# 問答表帶進問答文件的欄位，順序就是輸出 CSV 的欄位順序；其他欄位（備註等）不帶。
+_QA_TABLE_FIELDS = ("q", "a", "img", "url", "display")
 
 
 def _cell_text(row: Sequence[object], index: int) -> str:
@@ -160,6 +168,83 @@ def _convert_xlsx(path: Path) -> str:
     finally:
         workbook.close()
     return "\n\n".join(sections)
+
+
+def _has_content(row: Sequence[object]) -> bool:
+    return any(cell is not None and str(cell).strip() for cell in row)
+
+
+def _qa_sheet_records(rows: Sequence[Sequence[object]]) -> list[dict[str, str]] | None:
+    """One sheet's rows keyed by canonical field, or None if it is not a QA table.
+
+    每張工作表各自依 index 排好再接起來：多張表的 index 常常都從 1 開始，
+    全部混在一起排的話，不同工作表的題目會交錯。
+    """
+    header = [_cell_text(rows[0], position) for position in range(len(rows[0]))]
+    if _qa_column_indices(header) is None:
+        return None
+    columns: dict[str, int] = {}
+    for position, name in enumerate(header):
+        columns.setdefault(normalize_fieldname(name), position)
+    records = [
+        {
+            field: _cell_text(row, columns[field])
+            for field in (*_QA_TABLE_FIELDS, "index")
+            if field in columns
+        }
+        for row in rows[1:]
+    ]
+    _sort_by_index(records)
+    return [
+        {field: value for field, value in record.items() if field != "index"}
+        for record in records
+    ]
+
+
+def _qa_workbook_csv_bytes(path: Path) -> bytes | None:
+    import openpyxl
+
+    workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    records: list[dict[str, str]] = []
+    has_qa_sheet = False
+    try:
+        for sheet in workbook.worksheets:
+            rows = [row for row in sheet.iter_rows(values_only=True) if _has_content(row)]
+            if not rows:
+                continue
+            sheet_records = _qa_sheet_records(rows)
+            if sheet_records is None:
+                return None
+            has_qa_sheet = True
+            records.extend(sheet_records)
+    finally:
+        workbook.close()
+    if not has_qa_sheet:
+        return None
+    fieldnames = [
+        field
+        for field in _QA_TABLE_FIELDS
+        if field in ("q", "a") or any(field in record for record in records)
+    ]
+    return _rows_to_csv_bytes(fieldnames, records)
+
+
+def qa_table_csv_bytes(path: Path, file_bytes: bytes) -> bytes | None:
+    """Return an upload as QA CSV bytes when it is a QA table, otherwise ``None``.
+
+    A CSV qualifies when it has question and answer columns. An Excel workbook
+    qualifies when every non-empty sheet does; one other sheet makes the whole book
+    an ordinary document. Never raises: an unreadable file is simply not a QA table.
+    """
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".csv":
+            return file_bytes if is_qa_csv(file_bytes) else None
+        if suffix == ".xlsx":
+            return _qa_workbook_csv_bytes(path)
+    except Exception:  # noqa: BLE001 — the ordinary conversion reports the failure
+        logger.warning("Failed to read %s as a QA table", path, exc_info=True)
+    return None
 
 
 def _convert_pdf(path: Path) -> str:

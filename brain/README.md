@@ -74,7 +74,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md` | 同樣放進 prompt；`ERRORS.md` 由 `infra/learnings.record_error_event` 寫入並輪替，`LEARNINGS.md` 由人工維護 |
 | `personas/<persona_id>/` | 人設覆寫：同名核心文件優先於 workspace 根目錄 |
 | `knowledge/` | 知識文件；`knowledge/products/` 是產品規格表 |
-| `raw/` | 上傳的原始檔，採納後轉成 Markdown 放進 `knowledge/` |
+| `raw/` | 等待匯入的原始檔；匯入後轉成 Markdown 放進 `knowledge/`，原檔搬到 `archive/originals/` |
 | `memory/<persona_id>/YYYY-MM-DD.md` | 每日對話日誌 |
 | `ASR_PROMPT.md` | 選填的語音專有名詞詞表，見「語言分流與回答長度」 |
 | `.kb_settings.json` | 語言分流與回答秒數 |
@@ -87,6 +87,45 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 可索引副檔名：`.md`、`.txt`、`.csv`，以及常見程式碼與設定檔（`.py`、`.ts`、`.yaml` 等，見 `knowledge/workspace.py`）。
 - 不進索引：核心文件與人設核心文件，以及 `memory/`、`.learnings/`、`.normalization-backups/`、`graphify-out/`、`dreaming/`、`raw/`、`archive/` 底下的檔案。
 - 在 `.doc_meta.json` 停用的文件不會出現在檢索結果。
+
+## 文件匯入
+
+上傳的檔案先存進 `raw/`，再由 `POST /knowledge/raw/commit` 在背景匯入。呼叫端帶 `paths` 就只處理這一批，`raw/` 裡以前留下的檔案不受影響。
+
+| 檔案 | 結果 |
+|---|---|
+| 有問題與答案欄的 CSV 或 Excel（Excel 要每個非空工作表都有這兩欄，有一張不是就整本當一般文件） | 問答表：存成 `knowledge/qa/<檔名>.md`，不經 LLM，圖片、連結、顯示欄照讀，並進快速問答 |
+| 其他 `.md`、`.txt`、`.csv`、`.docx`、`.xlsx`、`.pdf` | 一般文件：轉成文字後由 LLM 整理（`knowledge/normalizer.py`），存成 `knowledge/<原路徑>.md`；`normalize: false` 時略過 LLM |
+
+- 語言：整理時不翻譯。每段輸出都和原文比對語言，並檢查中文字有沒有憑空出現或消失，不一致就保留那段原文。
+- 同一來源重傳：目標文件已被問答節點引用時，只更新該節點的題目，名稱、上層與隱藏狀態不動；`knowledge/qa/<檔名>.csv` 已掛在樹上時更新那份 CSV。一般文件同路徑時覆蓋，手動指定的語言保留。題目全部拿掉後分類還留著時，接回當初匯入建立的分類，不另開同名分類。
+- 問答表的內容：有一列只有答案沒有題目，或同一題有不同答案時，整份不匯入並寫明是哪一列；同一題答案相同只算一題。
+- 新問答的位置：第一層有符合語言的節點就放進去，沒有就放最上層，不自動建立語言分類。名稱對照是 `knowledge/qa_nodes.py` 的 `LANGUAGE_LABELS`，與前台 `quickQaText.ts` 相同，有測試鎖住兩邊一致。
+- 寫入：目標文件原子寫入，並和拖曳併入（`ingest-source`）共用 `qa_document_lock`，兩者不會互相蓋掉。`.doc_meta.json` 同樣原子寫入，匯入與後台列文件同時進行也不會蓋掉彼此的欄位。問答表轉 Markdown 前先讀回比對，答案裡有 `##` 開頭的行或題目有換行時整份不匯入，原因會指出是哪一題。
+- 失敗：單一檔案失敗不影響其他檔案。沒匯入的留在 `raw/`，原因記在 `skip_reasons`；成功的原檔搬到 `archive/originals/`。匯入途中同一路徑又傳了新版時，新版留在 `raw/` 等下一批。
+
+### API
+
+`POST /knowledge/raw/commit`
+
+| 欄位 | 說明 |
+|---|---|
+| `project_id` | 專案 |
+| `paths` | 選填。只匯入這些檔案，路徑相對 `raw/`，帶 `raw/` 前綴也可以。不給就是全部，空陣列就是沒有要匯入的 |
+| `normalize` | 選填，預設 `true`；`false` 時略過 LLM 整理 |
+
+回應的 `status`：`started`（202，帶 `job`）、`already_running`（200，帶進行中的 `job`，這次的檔案沒有開始，等這批結束再送一次）、`nothing_to_commit`（200）。路徑超出 `raw/` 回 400。
+
+`GET /knowledge/raw/commit/status` 回傳 `state`（`idle`、`running`、`done`、`failed`）、`started_at`、`finished_at`、`files`（路徑對應 `pending`、`normalizing`、`committed`、`skipped`）、`committed`、`skipped`、`error`，以及逐檔處理完就更新的：
+
+- `results`：路徑對應 `{ target, kind, language, updated, qa_node_id?, qa_node_label?, qa_parent_label?, question_count? }`。`kind` 是 `qa` 或 `document`；`updated` 表示目標文件原本就存在；`qa_` 開頭的欄位與 `question_count` 只有問答表才有，沒有上層時不帶 `qa_parent_label`。
+- `skip_reasons`：路徑對應給工作人員看的原因。
+
+進度存在記憶體，服務重啟後回到 `idle`，`raw/` 裡的檔案不受影響。
+
+`GET /knowledge/raw/pending` 回傳 `{ files: [{ path, size, updated_at }] }`，`path` 相對 `raw/`。正在匯入的檔案不列；沒匯入成功的還在 `raw/`，會列出來，也會出現在 `skip_reasons`。
+
+`DELETE /knowledge/raw/pending?project_id=...&path=...` 移除一個檔案，回傳 `{ status: "ok" }`。路徑不合法回 400，檔案不存在回 404，檔案正在匯入回 409。
 
 ## 知識索引與檢索
 
@@ -372,7 +411,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | Session | `GET /sessions`、`GET /sessions/export`（皆可用 `language` 篩選）、`DELETE /sessions/{id}`、`POST /sessions/batch-delete`、`POST /sessions/{id}/recall-toggle` |
 | 檢索與記憶 | `POST /search`、`GET/POST/DELETE /memories`、`POST /memories/maintain` |
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
-| 原始檔採納 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`POST /knowledge/renormalize[/preview\|/apply]` |
+| 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
 | 知識設定 | `GET/PUT /knowledge/settings`（語言分流、`reply_seconds`，回應附 `speech_rates`） |
 | QA 知識 | `GET /knowledge/qa`，以及 `/knowledge/qa/nodes*`、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |

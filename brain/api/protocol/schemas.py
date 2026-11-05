@@ -243,6 +243,15 @@ class AdminActionRequest(BaseModel):
     project_id: str = "default"
 
 
+class KnowledgeRawCommitRequest(BaseModel):
+    project_id: str = "default"
+    paths: list[str] | None = Field(
+        None,
+        description="只匯入這些檔案（相對 raw/，可帶 raw/ 前綴）；不給就是全部，空陣列就是沒有要匯入的",
+    )
+    normalize: bool = Field(True, description="false 時略過 AI 整理；問答表本來就不經 AI")
+
+
 class SkillCreateRequest(BaseModel):
     skill_id: str = Field(..., min_length=1, description="Unique skill identifier")
     name: str = Field(..., min_length=1, description="Display name")

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 from pathlib import Path
 
 from infra.project_context import resolve_project_context
@@ -210,6 +212,20 @@ def resolve_workspace_document(relative_path: str, project_id: str = "default") 
         raise ValueError("path 超出 workspace 範圍")
 
     return resolved
+
+
+def write_text_atomic(path: Path, content: str) -> None:
+    """Replace ``path`` in one step, so a failed write leaves the old file intact."""
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
+    fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=".write-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.chmod(temp_name, mode)
+        os.replace(temp_name, path)
+    except BaseException:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
 
 
 def resolve_workspace_artifact(relative_path: str, project_id: str = "default") -> Path:

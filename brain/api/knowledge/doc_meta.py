@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
+from functools import wraps
 import json
 from pathlib import Path
+import threading
 from typing import Any, Iterable
 
-from knowledge.workspace import ensure_workspace_scaffold
+from knowledge.workspace import ensure_workspace_scaffold, write_text_atomic
 
 DOC_META_FILENAME = ".doc_meta.json"
 DEFAULT_SOURCE_TYPE = "upload"
@@ -17,6 +20,17 @@ LANGUAGE_SOURCE_AUTO = "auto"
 LANGUAGE_SOURCE_MANUAL = "manual"
 # 判斷語言只看開頭這麼多字；整份型錄讀進來沒有必要。
 _LANGUAGE_SAMPLE_CHARS = 20000
+# 匯入在背景執行緒寫中繼資料，同時後台在列文件也會寫。讀改寫沒有包起來的話，後寫的會蓋掉
+# 先寫的欄位；讀到寫一半的檔案則會當成沒有資料，整個專案的來源類型、停用與手動語言都被洗掉。
+_META_LOCK = threading.RLock()
+
+
+def _serialized(function: Callable) -> Callable:
+    @wraps(function)
+    def locked(*args: Any, **kwargs: Any) -> Any:
+        with _META_LOCK:
+            return function(*args, **kwargs)
+    return locked
 
 
 def get_doc_meta_path(project_id: str = "default") -> Path:
@@ -49,10 +63,7 @@ def save_doc_meta(metadata: dict[str, dict[str, Any]], project_id: str = "defaul
         for relative_path, value in sorted(metadata.items())
         if isinstance(relative_path, str) and isinstance(value, dict)
     }
-    path.write_text(
-        json.dumps(cleaned, ensure_ascii=False, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
+    write_text_atomic(path, json.dumps(cleaned, ensure_ascii=False, indent=2, sort_keys=True))
 
 
 def get_document_meta(relative_path: str, project_id: str = "default") -> dict[str, Any]:
@@ -61,6 +72,7 @@ def get_document_meta(relative_path: str, project_id: str = "default") -> dict[s
     return _resolved_entry(entry)
 
 
+@_serialized
 def upsert_document_meta(
     relative_path: str,
     project_id: str = "default",
@@ -134,6 +146,7 @@ def upsert_document_meta(
     return resolved
 
 
+@_serialized
 def touch_document_meta(relative_path: str, project_id: str = "default") -> dict[str, Any]:
     """Record that the document changed; drop an auto language so it is re-detected."""
     entry = load_doc_meta(project_id).get(relative_path, {})
@@ -155,13 +168,13 @@ def resolve_document_languages(
     metadata = load_doc_meta(project_id)
     root = get_workspace_root(project_id)
     languages: dict[str, str] = {}
-    changed = False
+    detected: dict[str, str] = {}
     for relative_path in set(relative_paths):
         if not relative_path:
             continue
-        entry = metadata.get(relative_path, {})
-        if entry.get("language"):
-            languages[relative_path] = entry["language"]
+        known = metadata.get(relative_path, {}).get("language")
+        if known:
+            languages[relative_path] = known
             continue
         path = root / relative_path
         try:
@@ -170,17 +183,24 @@ def resolve_document_languages(
         except OSError:
             languages[relative_path] = DEFAULT_LANGUAGE
             continue
-        language = detect_document_language(sample)
-        metadata[relative_path] = {
-            **entry, "language": language, "language_source": LANGUAGE_SOURCE_AUTO,
-        }
-        languages[relative_path] = language
-        changed = True
-    if changed:
-        save_doc_meta(metadata, project_id)
+        detected[relative_path] = detect_document_language(sample)
+    if detected:
+        # 讀檔判斷時不拿鎖，文件多的專案第一次列表會讀很久；寫回時併到最新內容上。
+        with _META_LOCK:
+            latest = load_doc_meta(project_id)
+            for relative_path, language in detected.items():
+                entry = latest.get(relative_path, {})
+                languages[relative_path] = entry.get("language") or language
+                latest[relative_path] = {
+                    **entry,
+                    "language": languages[relative_path],
+                    "language_source": entry.get("language_source") or LANGUAGE_SOURCE_AUTO,
+                }
+            save_doc_meta(latest, project_id)
     return languages
 
 
+@_serialized
 def delete_document_meta(relative_path: str, project_id: str = "default") -> None:
     metadata = load_doc_meta(project_id)
     if relative_path in metadata:
@@ -188,6 +208,7 @@ def delete_document_meta(relative_path: str, project_id: str = "default") -> Non
         save_doc_meta(metadata, project_id)
 
 
+@_serialized
 def move_document_meta(source_path: str, target_path: str, project_id: str = "default") -> None:
     metadata = load_doc_meta(project_id)
     if source_path not in metadata:

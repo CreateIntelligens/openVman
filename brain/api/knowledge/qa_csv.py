@@ -271,6 +271,8 @@ def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
 
 
 _HIDDEN_DISPLAY_VALUES = frozenset({"false", "0", "否", "n", "no"})
+# 只有答案、沒有題目的列，解析時用這個名字代替。
+UNTITLED_QUESTION = "未命名問題"
 
 
 def is_qa_csv(file_bytes: bytes) -> bool:
@@ -297,7 +299,7 @@ def parse_qa_csv(file_bytes: bytes) -> list[dict[str, Any]]:
             continue
         entries.append(
             {
-                "q": question or "未命名問題",
+                "q": question or UNTITLED_QUESTION,
                 "a": answer,
                 "img": extract_image_id(row.get("img") or ""),
                 "url": (row.get("url") or "").strip(),
@@ -328,6 +330,20 @@ def serialize_qa_csv(entries: list[dict[str, Any]]) -> str:
             }
         )
     return buffer.getvalue()
+
+
+def qa_entry_values(entries: list[dict[str, Any]]) -> list[tuple[str, str, str, str, bool]]:
+    """Comparable values of parsed QA entries, for checking content reads back unchanged."""
+    return [
+        (
+            entry["q"].strip(),
+            entry["a"].strip(),
+            extract_image_id(entry.get("img") or ""),
+            (entry.get("url") or "").strip(),
+            bool(entry.get("hidden", False)),
+        )
+        for entry in entries
+    ]
 
 
 def extract_image_id(raw: str) -> str:

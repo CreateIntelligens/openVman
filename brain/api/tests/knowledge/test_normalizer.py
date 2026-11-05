@@ -173,12 +173,70 @@ def test_sanity_check_falls_back_on_bloated_output(normalizer, monkeypatch):
     assert normalizer.normalize_to_markdown(original) == original
 
 
-def test_sanity_check_skips_short_segments(normalizer, monkeypatch):
+def test_short_segments_skip_the_length_check_only(normalizer, monkeypatch):
     monkeypatch.setattr(
         "knowledge.normalizer.generate_chat_reply",
-        lambda messages: "cleaned",
+        lambda messages: "這是一段變長了很多的短文，長度比例超出範圍也沒關係。",
     )
-    assert normalizer.normalize_to_markdown("短文") == "cleaned"
+    assert normalizer.normalize_to_markdown("短文") == "這是一段變長了很多的短文，長度比例超出範圍也沒關係。"
+
+
+_SPANISH_NOTE = (
+    "Esta nota explica cómo cuidar la piel después del tratamiento. "
+    "Por favor use protector solar todos los días y evite el sol por una semana."
+)
+_SPANISH_NOTE_IN_CHINESE = "這份筆記說明療程後如何照顧皮膚。請每天使用防曬，並避免日曬一週。"
+_ENGLISH_NOTE = (
+    "This note explains how to care for your skin after the treatment. "
+    "Please use sunscreen every day and avoid the sun for a week."
+)
+
+
+def test_prompt_does_not_assume_chinese_and_forbids_translation(normalizer):
+    prompt = normalizer.NORMALIZE_PROMPT
+    assert "中文文字" not in prompt
+    assert "不可翻譯" in prompt
+    assert "每一段都維持它原本的語言" in prompt
+
+
+@pytest.mark.parametrize("translated", [_SPANISH_NOTE_IN_CHINESE, _ENGLISH_NOTE])
+def test_short_spanish_note_keeps_original_when_llm_translates(normalizer, monkeypatch, translated):
+    assert len(_SPANISH_NOTE) < 500
+    monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", lambda messages: translated)
+    assert normalizer.normalize_to_markdown(_SPANISH_NOTE) == _SPANISH_NOTE
+
+
+def test_long_spanish_note_keeps_original_when_llm_translates(normalizer, monkeypatch):
+    original = "\n\n".join([_SPANISH_NOTE] * 8)
+    assert 500 < len(original) < normalizer.SEGMENT_SIZE
+    monkeypatch.setattr(
+        "knowledge.normalizer.generate_chat_reply",
+        lambda messages: "\n\n".join([_SPANISH_NOTE_IN_CHINESE * 3] * 8),
+    )
+    assert normalizer.normalize_to_markdown(original) == original
+
+
+def test_spanish_output_in_the_same_language_is_accepted(normalizer, monkeypatch):
+    tidied = f"# Cuidado de la piel\n\n{_SPANISH_NOTE}"
+    monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", lambda messages: tidied)
+    assert normalizer.normalize_to_markdown(_SPANISH_NOTE) == tidied
+
+
+def test_chinese_note_keeps_original_when_llm_translates(normalizer, monkeypatch):
+    monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", lambda messages: _SPANISH_NOTE)
+    assert normalizer.normalize_to_markdown(_SPANISH_NOTE_IN_CHINESE) == _SPANISH_NOTE_IN_CHINESE
+
+
+@pytest.mark.parametrize(
+    "original, translated",
+    [("Bloqueador solar", "防曬乳"), ("防曬乳", "Bloqueador solar")],
+)
+def test_translation_of_text_too_short_to_detect_is_still_caught(
+    normalizer, monkeypatch, original, translated,
+):
+    # 兩邊都判斷不出語言時都算中文，語言比對看不出差別。
+    monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", lambda messages: translated)
+    assert normalizer.normalize_to_markdown(original) == original
 
 
 def test_parallel_segments_preserve_order(normalizer, monkeypatch):

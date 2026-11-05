@@ -16,6 +16,17 @@ logger = logging.getLogger(__name__)
 
 _lock = threading.RLock()
 
+# 語言分類的名稱照該語言自己的寫法，比對時忽略大小寫與前後空白。和前台
+# frontend/app/src/components/controls/quickQaText.ts 的 LANGUAGE_LABELS 是同一份對照，
+# 有測試鎖住兩邊一致（test_qa_nodes.py）。
+LANGUAGE_LABELS: dict[str, str] = {
+    "中文": "zh", "華語": "zh", "繁體中文": "zh",
+    "english": "en",
+    "español": "es", "espanol": "es",
+    "日本語": "ja",
+    "한국어": "ko",
+}
+
 
 def _get_nodes_file_path(project_id: str = "default") -> Path:
     return ensure_workspace_scaffold(project_id) / "knowledge" / ".qa_nodes.json"
@@ -76,6 +87,21 @@ def get_node(node_id: str, project_id: str = "default") -> dict[str, Any] | None
     with _lock:
         data = _load_nodes_data(project_id)
         return data.get("nodes", {}).get(node_id)
+
+
+def find_language_category(language: str, project_id: str = "default") -> str | None:
+    """Return the id of the first-level node named after ``language``, if there is one.
+
+    同語言有多個分類時，取顯示中、排序最前面的。
+    """
+    nodes = list_nodes(project_id)
+    candidates = [
+        (bool(node.get("hidden", False)), node.get("order", 1.0), node_id)
+        for node_id, node in nodes.items()
+        if LANGUAGE_LABELS.get(str(node.get("label", "")).strip().lower()) == language
+        and not any(parent_id in nodes for parent_id in node.get("parent_ids", []))
+    ]
+    return min(candidates)[2] if candidates else None
 
 
 def _validate_string_list(value: object, field_name: str) -> None:
@@ -514,16 +540,40 @@ def _build_entries_for_source(
     return entries
 
 
-def _unique_node_id(existing: set[str], label: str) -> str:
+def _source_node_id(label: str) -> str:
     slug = "".join(ch if ch.isalnum() else "_" for ch in label.lower()).strip("_")
     slug = "_".join(part for part in slug.split("_") if part) or "node"
-    candidate = f"qa_{slug}"
+    return f"qa_{slug}"
+
+
+def _unique_node_id(existing: set[str], label: str) -> str:
+    candidate = _source_node_id(label)
     if candidate not in existing:
         return candidate
     suffix = 2
     while f"{candidate}_{suffix}" in existing:
         suffix += 1
     return f"{candidate}_{suffix}"
+
+
+def refill_emptied_node(
+    source_path: str, label: str, project_id: str = "default"
+) -> dict[str, Any] | None:
+    """Put a re-uploaded source back into the node it was first imported as.
+
+    題目全部拿掉後分類還留著，名稱與位置可能也改過；重傳時接回去，否則會多一個同名分類，
+    舊的一直空著。只認當初匯入建立的節點，其他空分類（例如拿來分組的）不動。
+    """
+    entries = _build_entries_for_source(source_path, project_id)
+    node_id = _source_node_id(label)
+    with _lock:
+        data = _load_nodes_data(project_id)
+        node = data["nodes"].get(node_id)
+        if node is None or node.get("qa_entries") or node.get("child_ids"):
+            return None
+        node["qa_entries"] = entries
+        _save_nodes_data(data, project_id)
+        return {**node, "node_id": node_id}
 
 
 def create_node_for_source(
