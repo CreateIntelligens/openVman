@@ -29,6 +29,12 @@ from knowledge.qa_csv import (
     qa_markdown_block,
     serialize_qa_csv,
 )
+from knowledge.qa_images import (
+    ALLOWED_QA_IMAGE_SUFFIXES,
+    QA_IMAGE_MEDIA_TYPES,
+    qa_image_kind,
+    resolve_qa_image_path,
+)
 from knowledge.qa_nodes import (
     adopt_orphan_qa_sources,
     cleanup_unused_images,
@@ -55,17 +61,6 @@ router = APIRouter(
     dependencies=[Depends(require_internal_token)],
 )
 
-_QA_IMAGE_MEDIA_TYPES = {
-    ".avif": "image/avif",
-    ".bmp": "image/bmp",
-    ".gif": "image/gif",
-    ".ico": "image/vnd.microsoft.icon",
-    ".jpeg": "image/jpeg",
-    ".jpg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-}
-_ALLOWED_QA_IMAGE_SUFFIXES = frozenset(_QA_IMAGE_MEDIA_TYPES)
 
 
 class CreateNodeRequest(BaseModel):
@@ -489,7 +484,7 @@ async def upload_image_route(
 ) -> dict[str, str]:
     settings = get_settings()
     ext = Path(file.filename or "").suffix.lower()
-    if ext not in _ALLOWED_QA_IMAGE_SUFFIXES:
+    if ext not in ALLOWED_QA_IMAGE_SUFFIXES:
         raise HTTPException(status_code=415, detail="不支援的圖片格式")
     file_bytes = await read_upload_limited(file, settings.qa_image_max_bytes)
     validate_qa_image(file_bytes, ext, settings.qa_image_max_side_px)
@@ -502,46 +497,26 @@ async def upload_image_route(
         target_dir="knowledge/.qa_images",
         project_id=project_id,
     )
+    # 上傳時就判斷好，回答用到這張圖時只要查表。
+    image_kind = await asyncio.to_thread(qa_image_kind, image_id, project_id)
 
-    return {"image_id": image_id}
+    # 判斷不了不影響上傳；欄位不出現，呼叫端當一般圖片處理。
+    return {"image_id": image_id, **({"image_kind": image_kind} if image_kind else {})}
 
 
 def _resolve_qa_image(id: str, project_id: str) -> Path:
-    safe_id = Path(id).name
-    if not safe_id or safe_id != id:
+    if not Path(id).name or Path(id).name != id:
         raise HTTPException(status_code=400, detail="Invalid image ID")
-
-    images_dir = resolve_workspace_artifact("knowledge/.qa_images", project_id)
-    exact_path = resolve_workspace_artifact(
-        f"knowledge/.qa_images/{safe_id}", project_id
-    )
-    if (
-        exact_path.is_file()
-        and exact_path.suffix.lower() in _ALLOWED_QA_IMAGE_SUFFIXES
-    ):
-        return exact_path
-
-    if Path(safe_id).suffix:
+    path = resolve_qa_image_path(id, project_id)
+    if path is None:
         raise HTTPException(status_code=404, detail="Image not found")
-
-    # 匯入來源的圖片名稱可能在括號前含空白（例如 PRP (1).jpg），
-    # 但 CSV 的圖片 ID 是 PRP(1)。比對時忽略空白，避免同一資產因命名格式而 404。
-    normalized_id = re.sub(r"\s+", "", safe_id).casefold()
-    candidates = sorted(images_dir.iterdir()) if images_dir.is_dir() else []
-    for candidate in candidates:
-        if (
-            candidate.is_file()
-            and re.sub(r"\s+", "", candidate.stem).casefold() == normalized_id
-            and candidate.suffix.lower() in _ALLOWED_QA_IMAGE_SUFFIXES
-        ):
-            return candidate
-    raise HTTPException(status_code=404, detail="Image not found")
+    return path
 
 
 @router.get("/images/{id}")
 def get_image_route(id: str, project_id: str = "default") -> FileResponse:
     path = _resolve_qa_image(id, project_id)
-    media_type = _QA_IMAGE_MEDIA_TYPES[path.suffix.lower()]
+    media_type = QA_IMAGE_MEDIA_TYPES[path.suffix.lower()]
     return FileResponse(path, media_type=media_type)
 
 

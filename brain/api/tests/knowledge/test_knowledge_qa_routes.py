@@ -200,6 +200,19 @@ _IMAGE_SAMPLES = {
 _IMAGE_SAMPLES["jpeg"] = _IMAGE_SAMPLES["jpg"]
 
 
+@pytest.mark.parametrize("kind, expected", [("qr", {"image_kind": "qr"}), (None, {})])
+def test_upload_reports_the_image_kind_only_when_known(client, monkeypatch, kind, expected):
+    monkeypatch.setattr("routes.knowledge_qa.qa_image_kind", lambda *_: kind)
+    response = client.post(
+        "/brain/knowledge/qa/images",
+        files={"file": ("test.png", _IMAGE_SAMPLES["png"], "image/png")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    data.pop("image_id")
+    assert data == expected
+
+
 def test_qa_images_routes(client):
     # 1. POST /brain/knowledge/qa/images (upload)
     img_data = _IMAGE_SAMPLES["png"]

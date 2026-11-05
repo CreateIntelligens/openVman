@@ -40,6 +40,10 @@ def serialize_history_messages(
             if isinstance(image_id, str) and image_id:
                 entry["image_id"] = image_id
 
+            image_kind = metadata.get("image_kind")
+            if isinstance(image_kind, str) and image_kind:
+                entry["image_kind"] = image_kind
+
             url = metadata.get("url")
             if isinstance(url, str) and url:
                 entry["url"] = url

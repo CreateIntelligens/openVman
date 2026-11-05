@@ -79,6 +79,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | `ASR_PROMPT.md` | 選填的語音專有名詞詞表，見「語言分流與回答長度」 |
 | `.kb_settings.json` | 語言分流與回答秒數 |
 | `.doc_meta.json` | 文件啟用狀態、來源與語言 |
+| `knowledge/.qa_image_kinds.json` | QA 圖片是否為 QR code 的判斷結果，回應以 `image_kind` 帶出 |
 | `graphify-out/` | 知識圖譜產物 |
 
 ### 索引規則

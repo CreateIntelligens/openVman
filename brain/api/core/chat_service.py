@@ -35,6 +35,7 @@ from core.turn_decisions import (
 from core.reference_media import ReplyMediaChoice, choose_reference_media, earlier_pictures
 from core.turn_reads import without_disabled_recall
 from infra.learnings import record_error_event
+from knowledge.qa_images import qa_image_kind
 from memory.memory import (
     append_session_message_with_id,
     archive_session_turn,
@@ -207,6 +208,8 @@ def _serialize_history_message(msg: dict[str, Any]) -> dict[str, Any]:
         entry["citations"] = citations
     if image_id := msg_meta.get("image_id"):
         entry["image_id"] = image_id
+    if image_kind := msg_meta.get("image_kind"):
+        entry["image_kind"] = image_kind
     if url := msg_meta.get("url"):
         entry["url"] = url
     return entry
@@ -478,6 +481,9 @@ def finalize_generation(
             for cite in citations
         ]
         primary_media = dict(media)
+    if image_id := primary_media.get("image_id"):
+        if image_kind := qa_image_kind(image_id, context.project_id):
+            primary_media["image_kind"] = image_kind
     meta: dict[str, Any] = {}
     if tool_steps:
         meta["tool_steps"] = tool_steps

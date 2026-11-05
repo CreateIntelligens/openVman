@@ -107,6 +107,9 @@ class ChatResponse(BaseModel):
         default_factory=dict, description="照抄請求帶入的 metadata 等脈絡",
     )
     image_id: str | None = Field(None, description="第一個引用附帶的圖片 ID（有才出現）")
+    image_kind: str | None = Field(
+        None, description="圖片類型：qr 是整張以 QR code 為主，image 是一般圖片；判斷不了時不出現",
+    )
     url: str | None = Field(None, description="第一個引用的來源網址（有才出現）")
     tool_steps: list[dict[str, Any]] = Field(default_factory=list, description="這一輪呼叫過的工具")
     response_time_s: float | None = Field(None, description="生成耗時（秒）")
