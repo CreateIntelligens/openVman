@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { QaNode } from "../../../hooks/useQaNodes";
 import { useModalDismiss } from "../useModalDismiss";
+import { moveToInsertion, useRowReorder } from "./rowReorder";
 import { errorMessage } from "../../../utils/errorMessage";
 
 type NodeUpdate = { label?: string; hidden?: boolean };
@@ -30,6 +31,9 @@ export default function VisibilityOrderModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dismiss = useModalDismiss(onClose);
+  const reorder = useRowReorder(localNodes.length, (from, insertAt) => {
+    setLocalNodes((prev) => moveToInsertion(prev, from, insertAt));
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -106,7 +110,7 @@ export default function VisibilityOrderModal({
       {...dismiss}
     >
       <div
-        className="bg-surface-raised border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col mx-4"
+        className="bg-surface-raised border border-border rounded-2xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -116,10 +120,10 @@ export default function VisibilityOrderModal({
             </span>
             <div>
               <span className="text-base font-semibold text-content ">
-                批次調整可見性與順序
+                調整順序與可見性
               </span>
               <p className="text-xs text-content-muted mt-0.5">
-                於父節點：{parentNode ? parentNode.label : "根節點目錄"}
+                {parentNode ? parentNode.label : "最上層"}：拖曳整列或用箭頭調整順序
               </p>
             </div>
           </div>
@@ -131,7 +135,7 @@ export default function VisibilityOrderModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm dark:bg-red-950/20 dark:border-red-900 dark:text-red-400">
               {error}
@@ -143,78 +147,76 @@ export default function VisibilityOrderModal({
               該層級下尚無任何子節點。
             </div>
           ) : (
-            <div className="border border-border rounded-xl overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-surface dark:bg-surface/50 border-b border-border text-xs font-semibold text-content-muted">
-                    <th className="py-3 px-4 text-center whitespace-nowrap">原始順序</th>
-                    <th className="py-3 px-4 whitespace-nowrap">識別 ID</th>
-                    <th className="py-3 px-4 whitespace-nowrap">節點名稱</th>
-                    <th className="py-3 px-4 text-center whitespace-nowrap">顯示狀態</th>
-                    <th className="py-3 px-4 text-center whitespace-nowrap">順序調整</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border text-sm">
-                  {localNodes.map((node, idx) => (
-                    <tr
-                      key={node.node_id}
-                      className="hover:bg-surface-sunken/50 text-content-muted transition-colors"
+            <ul className="divide-y divide-border rounded-xl border border-border">
+              {localNodes.map((node, idx) => {
+                const dropLine = reorder.dropLine(idx);
+                return (
+                  <li
+                    key={node.node_id}
+                    {...reorder.rowProps(idx)}
+                    {...reorder.handleProps(idx)}
+                    className={`relative flex cursor-grab items-center gap-2 px-3 py-2 transition-colors hover:bg-surface-sunken/50 active:cursor-grabbing ${
+                      reorder.isDragging(idx) ? "opacity-40" : ""
+                    }`}
+                  >
+                    {dropLine && (
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none absolute inset-x-0 h-0.5 bg-primary ${
+                          dropLine === "before" ? "top-0" : "bottom-0"
+                        }`}
+                      />
+                    )}
+                    <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[1.125rem] text-content-subtle">
+                      drag_indicator
+                    </span>
+                    <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-content-subtle">
+                      {idx + 1}
+                    </span>
+                    <div className={`min-w-0 flex-1 ${node.hidden ? "opacity-60" : ""}`}>
+                      <p className="truncate text-sm font-medium text-content" title={node.label}>{node.label}</p>
+                      <p className="truncate font-mono text-xs text-content-subtle" title={node.node_id}>{node.node_id}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleHidden(idx)}
+                      className={`flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
+                        node.hidden
+                          ? "bg-surface-sunken text-content-muted hover:bg-border"
+                          : "bg-success/10 text-success hover:bg-success/20 dark:bg-success/20"
+                      }`}
                     >
-                      <td className="py-3.5 px-4 text-center text-xs font-mono text-content-subtle">
-                        {idx + 1}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-xs">
-                        {node.node_id}
-                      </td>
-                      <td className="py-3.5 px-4 font-medium">
-                        {node.label}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex justify-center">
-                          <button
-                            onClick={() => handleToggleHidden(idx)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
-                              node.hidden
-                                ? "bg-surface-sunken hover:bg-border text-content-muted "
-                                : "bg-success/10 text-success hover:bg-success/20 dark:bg-success/20 dark:text-success"
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-[1rem]">
-                              {node.hidden ? "visibility_off" : "visibility"}
-                            </span>
-                            {node.hidden ? "已隱藏" : "顯示中"}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => handleMoveUp(idx)}
-                            disabled={idx === 0}
-                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg hover:bg-surface-sunken text-content-muted hover:text-content disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                            title="上移"
-                          >
-                            <span className="material-symbols-outlined text-[1.25rem]">
-                              arrow_upward
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => handleMoveDown(idx)}
-                            disabled={idx === localNodes.length - 1}
-                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg hover:bg-surface-sunken text-content-muted hover:text-content disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                            title="下移"
-                          >
-                            <span className="material-symbols-outlined text-[1.25rem]">
-                              arrow_downward
-                            </span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">
+                        {node.hidden ? "visibility_off" : "visibility"}
+                      </span>
+                      {node.hidden ? "已隱藏" : "顯示中"}
+                    </button>
+                    <div className="flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveUp(idx)}
+                        disabled={idx === 0}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content disabled:opacity-30"
+                        title="上移"
+                        aria-label={`上移 ${node.label}`}
+                      >
+                        <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">arrow_upward</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveDown(idx)}
+                        disabled={idx === localNodes.length - 1}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content disabled:opacity-30"
+                        title="下移"
+                        aria-label={`下移 ${node.label}`}
+                      >
+                        <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">arrow_downward</span>
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
 

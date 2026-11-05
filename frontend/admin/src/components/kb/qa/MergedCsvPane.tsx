@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 
 import { type MergedQaItem, useQaNodes } from "../../../hooks/useQaNodes";
 import ConfirmModal from "../../ConfirmModal";
-import QaImagePreview from "../QaImagePreview";
+import QaRowCard, { QaRowListHeader, type QaRowField } from "./QaRowCard";
+import { moveToInsertion, useRowReorder } from "./rowReorder";
 import { errorMessage } from "../../../utils/errorMessage";
 
 interface MergedCsvPaneProps {
@@ -17,6 +18,14 @@ interface LocalMergedQaItem extends MergedQaItem {
 }
 
 type EditableMergedQaField = "q" | "a" | "img" | "url" | "hidden";
+
+const CELL_FIELD: Record<QaRowField, EditableMergedQaField> = {
+  question: "q",
+  answer: "a",
+  img: "img",
+  url: "url",
+  hidden: "hidden",
+};
 
 function localRowId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -92,6 +101,11 @@ export default function MergedCsvPane({
     () => JSON.stringify(rows) !== JSON.stringify(originalRows),
     [rows, originalRows],
   );
+
+  const sourceFiles = useMemo(() => [...new Set(rows.map((row) => row.source_file))], [rows]);
+  const reorder = useRowReorder(rows.length, (from, insertAt) => {
+    setRows((prev) => moveToInsertion(prev, from, insertAt));
+  });
 
   if (!nodeId) {
     return (
@@ -200,8 +214,10 @@ export default function MergedCsvPane({
     setSaving(true);
     setStatusMsg(null);
     try {
-      const payload = rows.map(({ _localId, ...r }) => ({
+      // 號碼跟著畫面順序走：CSV 下次同步時依 index 排序，舊號碼會把順序排回去。
+      const payload = rows.map(({ _localId, ...r }, position) => ({
         ...r,
+        index: String(position + 1),
         q: r.q.trim(),
         a: r.a.trim(),
         img: r.img?.trim() || "",
@@ -231,6 +247,11 @@ export default function MergedCsvPane({
           {nodeLabel && (
             <p className="text-xs text-content-muted mt-0.5">
               目前節點：<span className="font-semibold text-content-muted">{nodeLabel}</span> ({nodeId})
+            </p>
+          )}
+          {sourceFiles.length === 1 && (
+            <p className="text-xs text-content-subtle" title={sourceFiles[0]}>
+              來源：{sourceFiles[0]}
             </p>
           )}
         </div>
@@ -280,7 +301,7 @@ export default function MergedCsvPane({
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-6 min-h-0">
+      <div className="flex-1 overflow-auto p-4 min-h-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full text-content-subtle py-12">
             <span className="material-symbols-outlined animate-spin text-[2rem] mb-2 text-primary">
@@ -297,109 +318,44 @@ export default function MergedCsvPane({
             <p className="text-xs">請點擊下方「新增一列」新增問答</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="divide-y divide-border rounded-xl border border-border bg-surface-raised">
+            <QaRowListHeader />
             {rows.map((row, idx) => (
-              <article
+              <QaRowCard
                 key={row._localId}
-                className={`rounded-xl border border-border bg-surface-raised p-4 shadow-sm transition-colors ${row.hidden ? "opacity-60" : ""}`}
-              >
-                <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-content-subtle">問答 {idx + 1}</p>
-                    <p className="break-all text-xs text-content-subtle" title={row.source_file}>
-                      來源：{row.source_file}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleCellChange(idx, "hidden", !row.hidden)}
-                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ${row.hidden ? "bg-surface-sunken text-content-subtle " : "bg-success/10 text-success"}`}
-                      title={row.hidden ? "目前已隱藏，點擊以顯示" : "目前顯示中，點擊以隱藏"}
+                index={idx}
+                question={row.q}
+                answer={row.a}
+                img={row.img || ""}
+                url={row.url || ""}
+                hidden={Boolean(row.hidden)}
+                sourceFile={sourceFiles.length > 1 ? row.source_file : undefined}
+                onChange={(field, value) => handleCellChange(idx, CELL_FIELD[field], value)}
+                onRemove={() => handleRemoveRow(idx)}
+                imageAction={(
+                  <button
+                    type="button"
+                    onClick={() => handlePickImage(idx)}
+                    disabled={uploadingImageRow !== null}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content disabled:opacity-50"
+                    title="上傳圖片並填入 ID"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`material-symbols-outlined text-[0.95rem] ${
+                        uploadingImageRow === idx ? "animate-spin" : ""
+                      }`}
                     >
-                      <span className="material-symbols-outlined text-base">{row.hidden ? "visibility_off" : "visibility"}</span>
-                      {row.hidden ? "已隱藏" : "顯示中"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRow(idx)}
-                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-content-subtle transition-colors hover:bg-danger/10 hover:text-danger"
-                      title="刪除此行"
-                    >
-                      <span className="material-symbols-outlined text-base">delete</span>
-                      刪除
-                    </button>
-                  </div>
-                </header>
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <label className="space-y-1.5 text-xs font-semibold text-content-subtle">
-                    <span>問題</span>
-                    <textarea
-                      value={row.q}
-                      onChange={(e) => handleCellChange(idx, "q", e.target.value)}
-                      placeholder="請輸入問題"
-                      rows={3}
-                      className="w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm font-normal leading-relaxed text-content outline-none transition-colors focus:border-primary focus:bg-white dark:bg-surface/40 dark:focus:bg-surface/70"
-                    />
-                  </label>
-                  <label className="space-y-1.5 text-xs font-semibold text-content-subtle">
-                    <span>答案</span>
-                    <textarea
-                      value={row.a}
-                      onChange={(e) => handleCellChange(idx, "a", e.target.value)}
-                      placeholder="請輸入答案"
-                      rows={5}
-                      className="w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm font-normal leading-relaxed text-content outline-none transition-colors focus:border-primary focus:bg-white dark:bg-surface/40 dark:focus:bg-surface/70"
-                    />
-                  </label>
-                </div>
-
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                  <div className="space-y-2">
-                    <span className="text-xs font-semibold text-content-subtle">圖片</span>
-                    <QaImagePreview
-                      imageId={row.img || ""}
-                      alt={`${row.q || `問答 ${idx + 1}`}的參考圖片`}
-                    />
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={row.img || ""}
-                        onChange={(e) => handleCellChange(idx, "img", e.target.value)}
-                        placeholder="圖片 ID"
-                        className="min-w-0 flex-1 rounded-lg border border-border bg-surface p-2.5 font-mono text-xs text-content-muted outline-none focus:border-primary dark:bg-surface/40 "
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handlePickImage(idx)}
-                        disabled={uploadingImageRow !== null}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-primary/20 px-2.5 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
-                        title="上傳圖片並填入 ID"
-                      >
-                        <span
-                          className={`material-symbols-outlined text-[1.125rem] ${
-                            uploadingImageRow === idx ? "animate-spin" : ""
-                          }`}
-                        >
-                          {uploadingImageRow === idx ? "sync" : "add_photo_alternate"}
-                        </span>
-                        上傳
-                      </button>
-                    </div>
-                  </div>
-                  <label className="space-y-2 text-xs font-semibold text-content-subtle">
-                    <span>外部連結</span>
-                    <input
-                      type="text"
-                      value={row.url || ""}
-                      onChange={(e) => handleCellChange(idx, "url", e.target.value)}
-                      placeholder="外部連結"
-                      className="w-full rounded-lg border border-border bg-surface p-2.5 text-xs font-normal text-content-muted outline-none focus:border-primary dark:bg-surface/40 "
-                    />
-                  </label>
-                </div>
-              </article>
+                      {uploadingImageRow === idx ? "sync" : "add_photo_alternate"}
+                    </span>
+                    上傳
+                  </button>
+                )}
+                rowProps={reorder.rowProps(idx)}
+                handleProps={reorder.handleProps(idx)}
+                dropLine={reorder.dropLine(idx)}
+                dragging={reorder.isDragging(idx)}
+              />
             ))}
           </div>
         )}

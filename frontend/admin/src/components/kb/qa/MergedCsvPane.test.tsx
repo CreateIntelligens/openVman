@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import MergedCsvPane from "./MergedCsvPane";
@@ -37,6 +37,7 @@ describe("MergedCsvPane", () => {
     const { container } = render(<MergedCsvPane nodeId="root" nodeLabel="Root" />);
 
     expect(await screen.findByDisplayValue("問題")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "圖片" }));
     fireEvent.click(screen.getByTitle("上傳圖片並填入 ID"));
 
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
@@ -88,5 +89,29 @@ describe("MergedCsvPane", () => {
     expect(image.getAttribute("src")).toBe(
       "/api/v1/knowledge/qa/images/PRP(1)?project_id=default",
     );
+  });
+
+  it("saves dragged rows in their new order with matching index values", async () => {
+    const row = (q: string, index: string) => ({
+      index, q, a: `${q}答`, img: "", url: "", source_file: "knowledge/qa/x.csv", hidden: false,
+    });
+    qaNodeMocks.fetchMergedQa.mockResolvedValue([row("甲", "1"), row("乙", "2"), row("丙", "3")]);
+    render(<MergedCsvPane nodeId="root" nodeLabel="Root" />);
+
+    const article = async (q: string) => (await screen.findByDisplayValue(q)).closest("article") as HTMLElement;
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+    const at = (event: Event) => {
+      Object.defineProperty(event, "clientY", { value: 1 });
+      return event;
+    };
+    const target = await article("丙");
+    fireEvent.dragStart((await article("甲")).querySelector("[draggable]") as HTMLElement, { dataTransfer });
+    fireEvent(target, at(createEvent.dragOver(target, { dataTransfer })));
+    fireEvent(target, at(createEvent.drop(target, { dataTransfer })));
+    fireEvent.click(screen.getByRole("button", { name: /儲存變更/ }));
+
+    await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+    const payload = qaNodeMocks.saveMergedQa.mock.lastCall?.[1] as { q: string; index: string }[];
+    expect(payload.map((item) => [item.index, item.q])).toEqual([["1", "乙"], ["2", "丙"], ["3", "甲"]]);
   });
 });
