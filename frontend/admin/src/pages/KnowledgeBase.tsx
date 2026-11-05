@@ -153,6 +153,7 @@ export default function KnowledgeBase() {
   } = useQaNodes(projectId);
 
   const [mergedRefreshKey, setMergedRefreshKey] = useState(0);
+  const bumpMergedRefresh = useCallback(() => setMergedRefreshKey((key) => key + 1), []);
   const [qaFocusRequest, setQaFocusRequest] = useState<QaFocusRequest | null>(null);
   const [noteComposerFormat, setNoteComposerFormat] = useState<KnowledgeNoteFormat>("text");
   const uploadLimits = useUploadLimits();
@@ -209,6 +210,7 @@ export default function KnowledgeBase() {
     loadDocuments,
     onQaNodeMoved: handleQaNodeMoved,
     onRevealQaNode: revealQaNode,
+    onQaNodeDeleted: bumpMergedRefresh,
   });
 
   const treeDrag = useKnowledgeTreeDragDrop({

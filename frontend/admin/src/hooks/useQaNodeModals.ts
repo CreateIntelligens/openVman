@@ -22,6 +22,8 @@ interface UseQaNodeModalsOptions extends QaNodeActions {
   onQaNodeMoved: (parentId: string | null) => void;
   /** 讓某個分類的內容在樹上看得到；null 代表快速問答最上層。 */
   onRevealQaNode: (nodeId: string | null) => void;
+  /** 分類刪掉後呼叫：開著的分類若有題目也放在被刪的分類，「也放在」要更新。 */
+  onQaNodeDeleted?: () => void;
 }
 
 export function useQaNodeModals({
@@ -35,6 +37,7 @@ export function useQaNodeModals({
   loadDocuments,
   onQaNodeMoved,
   onRevealQaNode,
+  onQaNodeDeleted,
 }: UseQaNodeModalsOptions) {
   const [qaNodeDialog, setQaNodeDialog] = useState<QaNodeDialog | null>(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
@@ -166,11 +169,12 @@ export function useQaNodeModals({
     async (id: string) => {
       const res = await deleteNode(id);
       setSelectedQaNodeId((current) => (current === id ? null : current));
-      // 後端會一併刪掉分類專屬的來源文件，文件那一段也要跟著更新。
+      // 文件不會被刪，但會變成沒掛分類，文件那一段的狀態要跟著更新。
       await loadDocuments();
+      onQaNodeDeleted?.();
       return res;
     },
-    [deleteNode, loadDocuments, setSelectedQaNodeId],
+    [deleteNode, loadDocuments, onQaNodeDeleted, setSelectedQaNodeId],
   );
 
   const handleDeleteQaNodeConfirm = useCallback(() => {
