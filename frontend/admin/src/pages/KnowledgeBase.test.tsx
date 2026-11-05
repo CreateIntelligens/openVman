@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -373,4 +375,12 @@ describe("KnowledgeBase route views", () => {
     fireEvent.click(screen.getByRole("tab", { name: "圖譜" }));
     expect(navigationMocks.navigateTo).toHaveBeenCalledWith("KnowledgeBase", "graph");
   });
+});
+
+it("shows status messages over the page instead of pushing it around", () => {
+  // 訊息出現、消失時版面一動，使用者正要點的東西就跑掉了（曾因此選錯文件語言）。
+  const kbSource = readFileSync("src/pages/KnowledgeBase.tsx", "utf8");
+  const wrapper = kbSource.match(/\{status && \(\s*<div className="([^"]*)"/)?.[1] ?? "";
+  expect(wrapper).toContain("fixed");
+  expect(wrapper).not.toContain("shrink-0");
 });

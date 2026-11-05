@@ -278,8 +278,9 @@ export default function KnowledgeBase() {
         projectId={projectId}
       />
 
+      {/* 浮在頁面上不佔版面：訊息出現或消失時，使用者正要點的東西不會跟著跑掉。 */}
       {status && (
-        <div className="px-4 pt-2 shrink-0">
+        <div className="fixed left-1/2 top-[4rem] z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl bg-surface-raised shadow-lg">
           <StatusAlert
             type={status.type}
             message={status.message}
