@@ -140,8 +140,18 @@ def list_session_messages(
     persona_id: str | None = None,
     project_id: str = "default",
 ) -> list[dict[str, Any]]:
-    """Return serialized session messages for APIs and prompt building."""
+    """Return the live session messages for prompt building."""
     messages = get_session_store(project_id).list_messages(session_id, persona_id)
+    return [dict(message) for message in messages]
+
+
+def list_conversation_messages(
+    session_id: str,
+    persona_id: str | None = None,
+    project_id: str = "default",
+) -> list[dict[str, Any]]:
+    """Return a conversation's full record for history views and exports."""
+    messages = get_session_store(project_id).list_conversation_messages(session_id, persona_id)
     return [dict(message) for message in messages]
 
 

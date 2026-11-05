@@ -257,6 +257,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 ## 記憶
 
 - 短期記憶：session 與訊息存在專案的 `sessions.db`。prompt 帶最近的對話並附上較早歷史的摘要（`SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`）；超過 `MAX_SESSION_TTL_MINUTES` 未更新的 session 與空 session 會被清理。
+- 對話紀錄：`conversations`、`conversation_messages` 與進行中的狀態分開，不會到期也沒有輪數上限，只有明確刪除才會消失。後台查詢、匯出與每日備份都讀這裡。
 - 每日日誌：每輪對話的摘要追加到 `memory/<persona_id>/YYYY-MM-DD.md`（以 fingerprint 去重），記憶維護再把每日摘要整理進 `memories` 表。
 - 長期記憶：`memories` 表。`save_memory` 只在使用者明確要求時執行，判斷走決策供應鏈；供應鏈失敗時改用關鍵字規則。文字對話與 Gemini Live 都會檢查。
 - 記憶治理（`memory/memory_governance.py`）：最多每 `MEMORY_MAINTENANCE_INTERVAL_SECONDS` 秒執行一次，負責每日摘要入庫、衰減、去重與相似記憶合併。

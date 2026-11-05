@@ -158,7 +158,7 @@ def export_sessions(
         for summary in summaries:
             summary_persona_id = str(summary["persona_id"])
             messages = serialize_history_messages(
-                store.list_messages(
+                store.list_conversation_messages(
                     str(summary["session_id"]),
                     persona_id=summary_persona_id,
                 )

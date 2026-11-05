@@ -15,10 +15,10 @@ from config import BrainSettings
 
 
 class TestEmbeddingSettings:
-    def test_session_ttl_defaults_to_the_admin_history_window(self):
+    def test_session_ttl_defaults_to_30_days(self):
         cfg = BrainSettings()
 
-        assert cfg.max_session_ttl_minutes == 184 * 24 * 60
+        assert cfg.max_session_ttl_minutes == 30 * 24 * 60
 
     def test_session_db_fallback_defaults_to_default_project_path(self):
         cfg = BrainSettings()

@@ -412,7 +412,9 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 * `GET /brain/sessions/export` 使用同一組篩選，日期區間限近三個月（未給起始日時從三個月前起算），並可用逗號分隔的 `session_ids` 限定單筆或多筆。回應包含 `exported_at`、`project_id`、`persona_id`、`sessions`（session 摘要連同依時間排序且移除內部 metadata 的訊息）、`total_messages` 與 `total_sessions`。帶 `simple=true` 時每則訊息只留 `role`、`content`、`created_at`。外部呼叫一律經 Backend `GET /api/v1/sessions/export` 代理，需要專案的 sessions 編輯權限。
 * `search` 以空白切成多個關鍵字，每個都要出現在該 session 的任一則訊息（不限同一則、不管順序）；比對前兩邊都經 OpenCC `t2s` 轉簡體並轉小寫（SQLite 自訂函式 `search_fold`），所以繁簡與「污／汙」「後台／後臺」這類異體字互通，`%`、`_` 當一般字元。
 * `DELETE /brain/sessions/{id}` 刪除單筆；`POST /brain/sessions/batch-delete` 帶 `{"session_ids": [...]}`（1–500 筆）一次刪除多筆，去重並略過空白，回應 `deleted` 與 `missing` 兩個清單，部分不存在不會讓整批失敗。經 Backend 代理時需要 sessions 的編輯權限。
-* 超過 `MAX_SESSION_TTL_MINUTES` 未更新的 session 與沒有訊息的空 session 會被清理。清理不是排程，而是任何請求建立或讀取該專案的 session 時順便執行，閒置專案的到期對話會在下一次存取時一次刪除。
+* 資料分兩層：`sessions`／`messages` 是進行中的狀態，給模型當上下文，超過 `MAX_SESSION_TTL_MINUTES` 未更新會清除，訊息數也有上限；`conversations`／`conversation_messages` 是對話紀錄，不會到期，只有 `DELETE` 明確刪除才會消失。列表、匯出、`GET /chat/history`、每日備份都讀對話紀錄。
+* 清理不是排程，而是請求建立或讀取該專案的進行中 session 時順便執行；只影響進行中的狀態。沒有訊息的空 session 也會清除。
+* 查詢區間限半年、下載限近三個月是操作範圍，不是資料保存期限。
 
 #### 13.2 訊息語言
 
@@ -504,7 +506,7 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 
 **16.4 對話限制**
 * 單 Session 最大對話輪次：`MAX_SESSION_ROUNDS`（預設 100），達上限回 400。
-* Session 存活時間：`MAX_SESSION_TTL_MINUTES`（預設 264960，即 184 天，涵蓋後台可查的 6 個月）未更新的 session 不再接受新訊息並會被清理。
+* Session 存活時間：`MAX_SESSION_TTL_MINUTES`（預設 43200，即 30 天）未更新的 session 不再接受新訊息並會被清理。
 
 ### 17. 環境變數 (Configuration)
 
@@ -564,7 +566,7 @@ KNOWLEDGE_GRAPH_TIMEOUT_SECONDS=1
 # === 記憶 ===
 SHORT_TERM_MEMORY_ROUNDS=20      # 短期記憶保留輪次
 MAX_SESSION_ROUNDS=100           # 單 Session 最大輪次
-MAX_SESSION_TTL_MINUTES=264960   # Session 最大存活時間（184 天，不可短於後台可查的 6 個月）
+MAX_SESSION_TTL_MINUTES=43200    # 進行中 session 的存活時間（30 天），對話紀錄不受影響
 MEMORY_MAINTENANCE_INTERVAL_SECONDS=300
 AUTO_RECALL_ENABLED=true
 DREAMING_ENABLED=false

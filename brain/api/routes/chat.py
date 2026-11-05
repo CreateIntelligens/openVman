@@ -479,8 +479,8 @@ async def chat_modes():
 
 @router.get("/chat/history", summary="對話歷史")
 async def chat_history(session_id: str, project_id: str = "default", persona_id: str = "default"):
-    from memory.memory import list_session_messages
+    from memory.memory import list_conversation_messages
 
-    messages = list_session_messages(session_id=session_id, persona_id=persona_id, project_id=project_id)
+    messages = list_conversation_messages(session_id=session_id, persona_id=persona_id, project_id=project_id)
     history = serialize_history_messages(messages)
     return {"session_id": session_id, "persona_id": persona_id, "history": history}

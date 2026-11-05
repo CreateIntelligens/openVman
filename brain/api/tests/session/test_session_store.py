@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -278,6 +278,112 @@ def test_list_sessions_filters_by_datetime_precision(store: SessionStore):
 
 
 # ------------------------------------------------------------------
+# Conversation record vs live state
+# ------------------------------------------------------------------
+
+
+def _age_session(store: SessionStore, session_id: str, days: int) -> None:
+    old = (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="seconds")
+    with store._connect() as conn:
+        conn.execute("UPDATE sessions SET updated_at = ? WHERE session_id = ?", (old, session_id))
+        conn.commit()
+
+
+def _talk(store: SessionStore, session_id: str = "s1") -> None:
+    store.get_or_create_session(session_id, "default")
+    store.append_message(session_id, "default", "user", "問題")
+    store.append_message(session_id, "default", "assistant", "回答")
+
+
+def test_expiry_clears_live_state_but_keeps_the_record(store: SessionStore):
+    _talk(store)
+    _age_session(store, "s1", 40)
+
+    assert store.list_messages("s1") == []  # 這次存取觸發清理
+    with store._connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    assert [m["content"] for m in store.list_conversation_messages("s1")] == ["問題", "回答"]
+    assert [s["session_id"] for s in store.list_sessions()] == ["s1"]
+    assert [len(s["messages"]) for s in store.snapshot_sessions()] == [2]
+
+
+def test_returning_after_expiry_continues_the_same_record(store: SessionStore):
+    _talk(store)
+    _age_session(store, "s1", 40)
+    store.list_messages("s1")
+
+    store.get_or_create_session("s1", "default")
+    store.append_message("s1", "default", "user", "我又來了")
+
+    assert [m["content"] for m in store.list_messages("s1")] == ["我又來了"]
+    assert [m["content"] for m in store.list_conversation_messages("s1")] == [
+        "問題", "回答", "我又來了",
+    ]
+    assert store.list_sessions()[0]["message_count"] == 3
+
+
+def test_the_round_cap_only_trims_live_context(tmp_path, monkeypatch):
+    import memory.session_store as module
+
+    monkeypatch.setattr(module, "get_settings", lambda: _fake_settings(max_session_rounds=1))
+    store = SessionStore(db_path=str(tmp_path / "cap.db"))
+    store.get_or_create_session("s1", "default")
+    for index in range(30):
+        store.append_message("s1", "default", "user", f"第{index}句")
+
+    assert len(store.list_messages("s1")) == 20
+    assert len(store.list_conversation_messages("s1")) == 30
+
+
+def test_delete_removes_the_record_too(store: SessionStore):
+    _talk(store)
+    _age_session(store, "s1", 40)
+    store.list_messages("s1")
+
+    assert store.delete_session("s1") is True
+    assert store.list_conversation_messages("s1") == []
+    assert store.list_sessions() == []
+    with store._connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM conversation_messages").fetchone()[0] == 0
+
+
+def test_language_and_metadata_updates_reach_both_copies(store: SessionStore):
+    _talk(store)
+    with store._connect() as conn:
+        message_id = conn.execute("SELECT MAX(id) FROM messages").fetchone()[0]
+    store.update_message_metadata(message_id, {"tool_steps": []})
+    store.update_message_language(message_id, "nan")
+
+    with store._connect() as conn:
+        for table in ("messages", "conversation_messages"):
+            metadata, language = conn.execute(
+                f"SELECT metadata, language FROM {table} WHERE id = ?", (message_id,),
+            ).fetchone()
+            assert "tool_steps" in metadata and language == "nan"
+
+
+def test_upgrade_copies_existing_rows_before_any_cleanup(tmp_path):
+    db_path = str(tmp_path / "old.db")
+    store = SessionStore(db_path=db_path)
+    _talk(store)
+    _age_session(store, "s1", 400)
+    # 回到升級前的樣子：還沒有對話紀錄的舊資料庫。
+    with store._connect() as conn:
+        conn.execute("DELETE FROM conversations")
+        conn.execute("PRAGMA user_version = 0")
+        conn.commit()
+
+    upgraded = SessionStore(db_path=db_path)
+
+    upgraded.list_messages("s1")  # 第一次存取就會清掉過期的進行中狀態
+    assert [m["content"] for m in upgraded.list_conversation_messages("s1")] == ["問題", "回答"]
+
+    # 再開一次不會把已刪除的紀錄補回來。
+    upgraded.delete_session("s1")
+    assert SessionStore(db_path=db_path).list_conversation_messages("s1") == []
+
+
+# ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
 
@@ -346,7 +452,7 @@ def test_lists_only_user_messages_missing_language(store: SessionStore, monkeypa
     _, first = store.append_message("s1", "default", "user", "hello there")
     store.append_message("s1", "default", "assistant", "hi")
     with store._connect() as conn:
-        conn.execute("UPDATE messages SET language = NULL WHERE id = ?", (first,))
+        conn.execute("UPDATE conversation_messages SET language = NULL WHERE id = ?", (first,))
         conn.commit()
 
     assert store.list_user_messages_without_language() == [(first, "hello there")]

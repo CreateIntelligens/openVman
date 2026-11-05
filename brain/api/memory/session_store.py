@@ -26,6 +26,9 @@ from personas.personas import normalize_persona_id
 _to_simplified: Any = None
 
 
+_SCHEMA_VERSION = 1
+
+
 def search_fold(text: str | None) -> str:
     """Normalize text for history search: Simplified Chinese, lower case."""
     global _to_simplified
@@ -134,13 +137,29 @@ def _insert_message_locked(
     conn: sqlite3.Connection, session_id: str, role: str, content: str,
     now: str, metadata: dict[str, Any] | None, language: str | None,
 ) -> int:
+    encoded = json.dumps(metadata, ensure_ascii=False) if metadata else None
     cursor = conn.execute(
         "INSERT INTO messages(session_id, role, content, created_at, metadata, language) "
         "VALUES (?, ?, ?, ?, ?, ?)",
-        (session_id, role, content, now,
-         json.dumps(metadata, ensure_ascii=False) if metadata else None, language),
+        (session_id, role, content, now, encoded, language),
     )
-    return int(cursor.lastrowid or 0)
+    message_id = int(cursor.lastrowid or 0)
+    conn.execute(
+        "INSERT OR IGNORE INTO conversations(session_id, persona_id, created_at, updated_at) "
+        "SELECT session_id, persona_id, created_at, updated_at FROM sessions WHERE session_id = ?",
+        (session_id,),
+    )
+    conn.execute(
+        "UPDATE conversations SET updated_at = ? WHERE session_id = ?", (now, session_id),
+    )
+    # 沿用 messages 的 id：之後更新語言或 metadata 才對得到同一則。
+    conn.execute(
+        "INSERT INTO conversation_messages"
+        "(id, session_id, role, content, created_at, metadata, language) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (message_id, session_id, role, content, now, encoded, language),
+    )
+    return message_id
 
 
 def _prune_messages_locked(conn: sqlite3.Connection, session_id: str) -> None:
@@ -151,6 +170,44 @@ def _prune_messages_locked(conn: sqlite3.Connection, session_id: str) -> None:
         "ORDER BY created_at DESC, id DESC LIMIT ?)",
         (session_id, session_id, max(get_settings().max_session_rounds * 2, 20)),
     )
+
+
+def _read_messages(
+    conn: sqlite3.Connection,
+    session_table: str,
+    message_table: str,
+    session_id: str,
+    persona_id: str | None,
+) -> list[dict[str, str]]:
+    # Validate session exists and persona matches, but don't create
+    row = conn.execute(
+        f"SELECT persona_id FROM {session_table} WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    if row is None:
+        return []
+    if persona_id is not None:
+        _validate_persona_match(row[0], persona_id)
+    rows = conn.execute(
+        f"""
+        SELECT role, content, created_at, metadata
+        FROM {message_table}
+        WHERE session_id = ?
+        ORDER BY created_at ASC, id ASC
+        """,
+        (session_id,),
+    ).fetchall()
+    return [
+        asdict(
+            SessionMessage(
+                role=row[0],
+                content=row[1],
+                created_at=normalize_iso_timestamp(row[2]),
+                metadata=_decode_metadata(row[3]),
+            )
+        )
+        for row in rows
+    ]
 
 
 class SessionStore:
@@ -236,7 +293,7 @@ class SessionStore:
                 return [
                     (int(row[0]), str(row[1]))
                     for row in conn.execute(
-                        "SELECT id, content FROM messages WHERE role = 'user' AND language IS NULL ORDER BY id",
+                        "SELECT id, content FROM conversation_messages WHERE role = 'user' AND language IS NULL ORDER BY id",
                     ).fetchall()
                 ]
 
@@ -360,10 +417,11 @@ class SessionStore:
     def update_message_language(self, message_id: int, language: str) -> None:
         with self._lock:
             with self._connect() as conn:
-                conn.execute(
-                    "UPDATE messages SET language = ? WHERE id = ?",
-                    (language, message_id),
-                )
+                for table in ("messages", "conversation_messages"):
+                    conn.execute(
+                        f"UPDATE {table} SET language = ? WHERE id = ?",
+                        (language, message_id),
+                    )
                 conn.commit()
 
     def update_message_metadata(
@@ -375,17 +433,19 @@ class SessionStore:
         with self._lock:
             with self._connect() as conn:
                 row = conn.execute(
-                    "SELECT metadata FROM messages WHERE id = ?",
+                    "SELECT metadata FROM conversation_messages WHERE id = ?",
                     (message_id,),
                 ).fetchone()
                 if row is None:
                     return
                 existing = json.loads(row[0]) if row[0] else {}
                 existing.update(metadata)
-                conn.execute(
-                    "UPDATE messages SET metadata = ? WHERE id = ?",
-                    (json.dumps(existing, ensure_ascii=False), message_id),
-                )
+                encoded = json.dumps(existing, ensure_ascii=False)
+                for table in ("messages", "conversation_messages"):
+                    conn.execute(
+                        f"UPDATE {table} SET metadata = ? WHERE id = ?",
+                        (encoded, message_id),
+                    )
                 conn.commit()
 
     def list_messages(
@@ -393,38 +453,23 @@ class SessionStore:
         session_id: str,
         persona_id: str | None = None,
     ) -> list[dict[str, str]]:
+        """Live context for prompts: pruned by age and capped by rounds."""
         with self._lock:
             self._prune_expired_sessions_locked()
             with self._connect() as conn:
-                # Validate session exists and persona matches, but don't create
-                row = conn.execute(
-                    "SELECT persona_id FROM sessions WHERE session_id = ?",
-                    (session_id,),
-                ).fetchone()
-                if row is None:
-                    return []
-                if persona_id is not None:
-                    _validate_persona_match(row[0], persona_id)
-                rows = conn.execute(
-                    """
-                    SELECT role, content, created_at, metadata
-                    FROM messages
-                    WHERE session_id = ?
-                    ORDER BY created_at ASC, id ASC
-                    """,
-                    (session_id,),
-                ).fetchall()
-                return [
-                    asdict(
-                        SessionMessage(
-                            role=row[0],
-                            content=row[1],
-                            created_at=normalize_iso_timestamp(row[2]),
-                            metadata=_decode_metadata(row[3]),
-                        )
-                    )
-                    for row in rows
-                ]
+                return _read_messages(conn, "sessions", "messages", session_id, persona_id)
+
+    def list_conversation_messages(
+        self,
+        session_id: str,
+        persona_id: str | None = None,
+    ) -> list[dict[str, str]]:
+        """The full record for history views and exports; never expires."""
+        with self._lock:
+            with self._connect() as conn:
+                return _read_messages(
+                    conn, "conversations", "conversation_messages", session_id, persona_id,
+                )
 
     def snapshot_sessions(self) -> list[dict[str, Any]]:
         """Read backup summaries and messages from one SQLite snapshot.
@@ -438,8 +483,8 @@ class SessionStore:
                     """
                     SELECT s.session_id, s.persona_id, s.created_at, s.updated_at,
                            m.role, m.content, m.created_at, m.metadata, m.language
-                    FROM sessions s
-                    JOIN messages m ON m.session_id = s.session_id
+                    FROM conversations s
+                    JOIN conversation_messages m ON m.session_id = s.session_id
                     ORDER BY s.updated_at DESC, s.session_id,
                              m.created_at ASC, m.id ASC
                     """
@@ -515,12 +560,12 @@ class SessionStore:
                         s.persona_id,
                         s.created_at,
                         s.updated_at,
-                        (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) AS message_count,
-                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_preview,
-                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_message,
-                        (SELECT m.language FROM messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_language
-                    FROM sessions s
-                    WHERE EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
+                        (SELECT COUNT(*) FROM conversation_messages m WHERE m.session_id = s.session_id) AS message_count,
+                        (SELECT m.content FROM conversation_messages m WHERE m.session_id = s.session_id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_preview,
+                        (SELECT m.content FROM conversation_messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_message,
+                        (SELECT m.language FROM conversation_messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_language
+                    FROM conversations s
+                    WHERE EXISTS (SELECT 1 FROM conversation_messages m WHERE m.session_id = s.session_id)
                 """
                 params: list[Any] = []
                 if persona_id:
@@ -539,7 +584,7 @@ class SessionStore:
                 # 兩邊都轉成簡體小寫再比，繁簡與「污／汙」「後台／後臺」這類異體字互通。
                 for term in search_text.split():
                     base_sql += """ AND EXISTS (
-                        SELECT 1 FROM messages m
+                        SELECT 1 FROM conversation_messages m
                         WHERE m.session_id = s.session_id
                           AND search_fold(m.content) LIKE ? ESCAPE '\\'
                     )"""
@@ -564,15 +609,17 @@ class SessionStore:
         return sessions
 
     def delete_session(self, session_id: str) -> bool:
-        """Delete a session and its messages (CASCADE)."""
+        """Delete a session everywhere: live state and the record (CASCADE)."""
         with self._lock:
             with self._connect() as conn:
-                cursor = conn.execute(
-                    "DELETE FROM sessions WHERE session_id = ?",
-                    (session_id,),
-                )
+                deleted = False
+                for table in ("sessions", "conversations"):
+                    cursor = conn.execute(
+                        f"DELETE FROM {table} WHERE session_id = ?",
+                        (session_id,),
+                    )
+                    deleted = cursor.rowcount > 0 or deleted
                 conn.commit()
-                deleted = cursor.rowcount > 0
         if deleted:
             self._cleanup_session_memory(session_id)
         return deleted
@@ -732,7 +779,58 @@ class SessionStore:
                 )
                 """
             )
+            # 對話紀錄與進行中的狀態分開：上面的表給模型當上下文，會到期、有輪數上限；
+            # 這兩張是後台查詢、匯出與備份的來源，只有明確刪除才會消失。
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversations (
+                    session_id TEXT PRIMARY KEY,
+                    persona_id TEXT NOT NULL DEFAULT 'default',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    id INTEGER PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    metadata TEXT,
+                    language TEXT,
+                    FOREIGN KEY(session_id) REFERENCES conversations(session_id)
+                        ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conversation_messages_session_created_at "
+                "ON conversation_messages(session_id, created_at, id)"
+            )
             conn.commit()
+            self._backfill_conversations_once(conn)
+
+    @staticmethod
+    def _backfill_conversations_once(conn: sqlite3.Connection) -> None:
+        """Copy existing rows into the record, before any cleanup can remove them."""
+        if conn.execute("PRAGMA user_version").fetchone()[0] >= _SCHEMA_VERSION:
+            return
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            "INSERT OR IGNORE INTO conversations(session_id, persona_id, created_at, updated_at) "
+            "SELECT session_id, persona_id, created_at, updated_at FROM sessions s "
+            "WHERE EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)"
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO conversation_messages"
+            "(id, session_id, role, content, created_at, metadata, language) "
+            "SELECT id, session_id, role, content, created_at, metadata, language FROM messages"
+        )
+        conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+        conn.commit()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
