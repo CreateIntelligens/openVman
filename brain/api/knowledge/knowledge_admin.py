@@ -49,13 +49,20 @@ def _sanitize_relative_subpath(raw: str) -> Path:
 
 
 def list_knowledge_base_directories(project_id: str = "default") -> list[str]:
-    """Return all subdirectory paths under knowledge/, relative to workspace root."""
+    """Return subdirectory paths under knowledge/ that hold documents.
+
+    系統自己用的資料夾不列：.qa_images 放問答圖片（圖片不是文件，樹上看起來是空的，
+    容易被當成沒用而刪掉），graphify-out 是舊版留下的圖譜快取。
+    """
     root = ensure_workspace_scaffold(project_id)
     knowledge_dir = root / "knowledge"
     return sorted(
         p.relative_to(root).as_posix()
         for p in knowledge_dir.rglob("*")
-        if p.is_dir()
+        if p.is_dir() and not any(
+            part == "graphify-out" or part.startswith(".")
+            for part in p.relative_to(knowledge_dir).parts
+        )
     )
 
 

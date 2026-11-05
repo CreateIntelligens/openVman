@@ -224,7 +224,7 @@ class _GraphItemSource:
     def pending(self) -> Iterator[Path]:
         if not self.knowledge_dir.exists():
             return
-        detection = detect(self.knowledge_dir)
+        detection = detect(self.knowledge_dir, cache_root=self.workspace_root)
         doc_paths = sorted([
             Path(f)
             for kind in ("document", "paper")
@@ -336,7 +336,8 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
     if not knowledge_dir.exists():
         raise FileNotFoundError(f"workspace knowledge/ 不存在: {knowledge_dir}")
 
-    detection = detect(knowledge_dir)
+    # cache_root 與 AST 快取同理：沒給的話 graphify 會在 knowledge/ 裡留一個 graphify-out/。
+    detection = detect(knowledge_dir, cache_root=workspace_root)
     code_paths = sorted([Path(f) for f in detection.get("files", {}).get("code", [])])
     doc_paths = sorted([
         Path(f)
