@@ -611,7 +611,7 @@ describe("KnowledgeBase merged tree", () => {
         type: "success",
         message: "已移到 乙",
       }));
-      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.at(-1)?.[0] as (
+      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.slice(-1)[0]?.[0] as (
         previous: Set<string>,
       ) => Set<string>;
       expect(update(new Set())).toEqual(new Set([QUICK_QA_TREE_PATH, qaTreeNodePath("b")]));
@@ -744,7 +744,7 @@ describe("KnowledgeBase merged tree", () => {
         type: "success",
         message: "已移到 乙",
       });
-      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.at(-1)?.[0] as (
+      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.slice(-1)[0]?.[0] as (
         previous: Set<string>,
       ) => Set<string>;
       expect(update(new Set(["knowledge"]))).toEqual(
@@ -796,7 +796,7 @@ describe("KnowledgeBase merged tree", () => {
         1,
         false,
       );
-      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.at(-1)?.[0] as (
+      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.slice(-1)[0]?.[0] as (
         previous: Set<string>,
       ) => Set<string>;
       expect(update(new Set())).toEqual(new Set([QUICK_QA_TREE_PATH, qaTreeNodePath("a")]));
@@ -810,7 +810,7 @@ describe("KnowledgeBase merged tree", () => {
       fireEvent.click(screen.getByRole("button", { name: "新增" }));
 
       expect(qaNodeMocks.createNode.mock.calls[0][2]).toEqual([]);
-      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.at(-1)?.[0] as (
+      const update = knowledgeBaseMocks.setExpandedDirs.mock.calls.slice(-1)[0]?.[0] as (
         previous: Set<string>,
       ) => Set<string>;
       expect(update(new Set())).toEqual(new Set([QUICK_QA_TREE_PATH]));
@@ -1248,7 +1248,7 @@ describe("KnowledgeBase merged tree", () => {
 
       expect(screen.getByTestId("merged-qa-pane")).toBeTruthy();
       expect(guardMocks.requestNavigation).not.toHaveBeenCalled();
-      expect(knowledgeBaseMocks.setStatus.mock.calls.at(-1)?.[0].message).toContain("已開始匯入");
+      expect(knowledgeBaseMocks.setStatus.mock.calls.slice(-1)[0]?.[0].message).toContain("已開始匯入");
     });
 
     it("says where a drop will go on the overlay", () => {
