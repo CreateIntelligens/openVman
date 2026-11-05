@@ -138,6 +138,8 @@ describe("FileView", () => {
 
     const trigger = screen.getByRole("combobox", { name: "文件語言" });
     expect(trigger.textContent).toContain("自動（English）");
+    // 下拉清單是絕對定位，外層一旦可捲動就會把選項裁掉、點不到。
+    expect(trigger.closest(".overflow-x-auto")).toBeNull();
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
     fireEvent.keyDown(trigger, { key: "End" });
     fireEvent.keyDown(trigger, { key: "Enter" });

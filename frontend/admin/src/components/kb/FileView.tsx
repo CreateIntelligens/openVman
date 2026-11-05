@@ -86,7 +86,7 @@ export default function FileView({
           <StatusDot doc={document} />
           {dirty && <span className="text-[0.625rem] text-amber-400 font-bold">● 未儲存</span>}
         </div>
-        <div className="flex w-full items-center justify-end gap-2 overflow-x-auto sm:w-auto">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
           <SourceBadge sourceType={document.source_type} />
           {onChangeLanguage && document.is_indexable && (
             <span title="使用者用哪種語言問，同語言的文件優先；不夠再用主要語言與其他語言的文件補。有台語文件的專案，Live 會另外聽使用者是不是講台語">
