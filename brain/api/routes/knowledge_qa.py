@@ -140,6 +140,24 @@ def _qa_values(items: list[dict[str, Any]]) -> list[tuple[str, str, str, str, bo
     ]
 
 
+def _conflicting_questions(
+    items: list[dict[str, Any]], against: list[dict[str, Any]],
+) -> list[str]:
+    """Questions in ``items`` whose answer differs from another answer in ``against``."""
+    answers: defaultdict[str, set[str]] = defaultdict(set)
+    for item in against:
+        answers[item["q"].strip()].add(item["a"].strip())
+    return list(dict.fromkeys(
+        item["q"].strip()
+        for item in items
+        if answers[item["q"].strip()] - {item["a"].strip()}
+    ))
+
+
+def _conflict_detail(reason: str, questions: list[str]) -> str:
+    return "\n".join([f"{reason}（{len(questions)} 題），未做任何變更：", *questions])
+
+
 def _merged_target_content(target_file: Path, new_items: list[dict[str, Any]]) -> str:
     """Target content with ``new_items`` added after everything it already has."""
     existing = target_file.read_bytes() if target_file.exists() else b""
@@ -242,13 +260,11 @@ async def ingest_source_route(
         if not dragged_items:
             raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
 
-        answers: dict[str, str] = {}
-        for item in dragged_items:
-            if answers.setdefault(item["q"].strip(), item["a"].strip()) != item["a"].strip():
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"來源文件的同一題有不同答案，未做任何變更：{item['q'].strip()}",
-                )
+        if conflicts := _conflicting_questions(dragged_items, dragged_items):
+            raise HTTPException(
+                status_code=400,
+                detail=_conflict_detail("來源文件的同一題有不同答案", conflicts),
+            )
 
         qa_entries = node.get("qa_entries", [])
         target_path = next((entry["source_path"] for entry in qa_entries if entry.get("source_path")), "")
@@ -271,6 +287,13 @@ async def ingest_source_route(
             if parsed_target is None:
                 raise HTTPException(status_code=400, detail="目標 QA 文件格式無法解析，未做任何變更")
             target_items = parsed_target
+
+        # 題目相同答案不同時要有人決定留哪個，不能跳過後把來源刪掉，那份答案就不見了。
+        if conflicts := _conflicting_questions(dragged_items, target_items):
+            raise HTTPException(
+                status_code=400,
+                detail=_conflict_detail("來源和目標的同一題答案不同", conflicts),
+            )
 
         in_target = {item["q"].strip(): item for item in target_items}
         node_questions = {

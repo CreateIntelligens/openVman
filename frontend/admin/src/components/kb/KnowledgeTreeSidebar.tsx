@@ -223,7 +223,8 @@ export default function KnowledgeTreeSidebar({
           {qaTreeError && (
             <div className="flex items-start gap-1.5 border-b border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
               <span className="material-symbols-outlined text-[1rem]">error</span>
-              <span className="min-w-0 flex-1 break-words">{qaTreeError}</span>
+              {/* 衝突訊息一題一行，可能很多題：限高捲動，下面的文件樹才不會被推出畫面。 */}
+              <span className="max-h-[40dvh] min-w-0 flex-1 overflow-y-auto whitespace-pre-line break-words">{qaTreeError}</span>
             </div>
           )}
 

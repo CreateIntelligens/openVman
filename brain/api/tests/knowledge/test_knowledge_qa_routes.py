@@ -509,7 +509,7 @@ def test_ingest_source_merges_rows_and_consumes_doc(client, tmp_path):
     dragged = root / "knowledge" / "notes" / "dragged.md"
     dragged.parent.mkdir(parents=True, exist_ok=True)
     dragged.write_text(
-        '## Q1\n\n重複的問題\n\n'
+        '## Q1\n\nA1\n\n'
         '## Q2\n\nA2\n<!-- qa_metadata: {"img": "", "url": "", "hidden": true} -->\n',
         encoding="utf-8",
     )
@@ -525,7 +525,7 @@ def test_ingest_source_merges_rows_and_consumes_doc(client, tmp_path):
         json={"path": "knowledge/notes/dragged.md"},
     )
     assert response.status_code == 200
-    assert response.json()["added"] == 1  # Q1 重複被跳過
+    assert response.json()["added"] == 1  # Q1 題目答案都相同，跳過
 
     node = qa_nodes.get_node("n1")
     entries = {e["question"]: e for e in node["qa_entries"]}
@@ -860,7 +860,7 @@ _CSV_WITH_INDEX_GAP = (
     "7,舊題三,舊答三,,,true,也留著\n"
 )
 _QA_MD = (
-    '## 舊題一\n\n重複的問題不該蓋掉原答案\n\n'
+    '## 舊題一\n\n舊答一,含逗號\n\n'
     '## 新題\n\n新答\n<!-- qa_metadata: {"img": "b.png", "url": "https://x.example/2", "hidden": true} -->\n'
 )
 
@@ -1212,7 +1212,7 @@ def test_ingest_uses_target_file_values_for_question_missing_from_node(client, t
 
     root = tmp_path / "workspace"
     _node_with_source(client, root, "knowledge/qa/own.csv", "q,a,img,display\n舊,舊答,keep.png,false\n")
-    _write_doc(root, "knowledge/notes/d.md", '## 舊\n\n別的答案\n<!-- qa_metadata: {"img": "other.png", "url": ""} -->\n')
+    _write_doc(root, "knowledge/notes/d.md", '## 舊\n\n舊答\n<!-- qa_metadata: {"img": "other.png", "url": ""} -->\n')
 
     assert _ingest(client, "knowledge/notes/d.md").status_code == 200
     entry = next(e for e in qa_nodes.get_node("n1")["qa_entries"] if e["question"] == "舊")
@@ -1306,3 +1306,55 @@ def test_saving_a_document_handles_long_names_and_keeps_mode(client, tmp_path):
     assert path.read_text(encoding="utf-8") == "新內容\n"
     assert (path.stat().st_mode & 0o777) == 0o640
     assert [p.name for p in path.parent.iterdir() if p.name.endswith(".tmp")] == []
+
+
+@pytest.mark.parametrize(
+    ("relative", "target_content"),
+    [
+        ("knowledge/qa/own.csv", "q,a\n甲,甲答\n乙,乙答\n丙,丙答\n"),
+        ("knowledge/qa/own.md", "## 甲\n\n甲答\n\n## 乙\n\n乙答\n\n## 丙\n\n丙答\n"),
+    ],
+)
+def test_ingest_reports_every_conflicting_answer_and_changes_nothing(client, tmp_path, relative, target_content):
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, relative, target_content)
+    source = "## 甲\n\n不同的甲答\n\n## 乙\n\n乙答\n\n## 丙\n\n不同的丙答\n\n## 丁\n\n丁答\n"
+    dragged = _write_doc(root, "knowledge/notes/d.md", source)
+    entries_before = qa_nodes.get_node("n1")["qa_entries"]
+
+    response = _ingest(client, "knowledge/notes/d.md")
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "甲" in detail and "丙" in detail
+    assert "乙" not in detail and "丁" not in detail  # 只列衝突的題目
+    assert target.read_text(encoding="utf-8") == target_content
+    assert dragged.read_text(encoding="utf-8") == source
+    assert qa_nodes.get_node("n1")["qa_entries"] == entries_before
+
+
+def test_ingest_ignores_surrounding_whitespace_when_comparing_answers(client, tmp_path):
+    root = tmp_path / "workspace"
+    target = _node_with_source(client, root, "knowledge/qa/own.csv", 'q,a\n舊, 舊答 \n')
+    dragged = _write_doc(root, "knowledge/notes/d.md", "##  舊 \n\n舊答\n\n## 新\n\n新答\n")
+
+    response = _ingest(client, "knowledge/notes/d.md")
+
+    assert response.status_code == 200
+    assert response.json()["added"] == 1
+    assert "新,新答" in target.read_text(encoding="utf-8")
+    assert not dragged.exists()
+
+
+def test_ingest_lists_every_conflict_inside_the_source(client, tmp_path):
+    root = tmp_path / "workspace"
+    _node_with_source(client, root, "knowledge/qa/own.csv", "q,a\n舊,舊答\n")
+    _write_doc(root, "knowledge/notes/d.csv", "q,a\n甲,一\n甲,二\n乙,三\n乙,四\n丙,五\n")
+
+    response = _ingest(client, "knowledge/notes/d.csv")
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "甲" in detail and "乙" in detail and "丙" not in detail
