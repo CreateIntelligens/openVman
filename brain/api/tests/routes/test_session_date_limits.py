@@ -110,4 +110,3 @@ def test_conversations_outlive_the_window_the_admin_promises():
     default = BrainSettings.model_fields["max_session_ttl_minutes"].default
     longest_window = timedelta(days=184)  # 6 個日曆月最長的情況（例如 7/1～12/31）
     assert timedelta(minutes=default) >= longest_window
-
