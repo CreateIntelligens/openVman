@@ -101,3 +101,13 @@ def test_malformed_dates_are_rejected_before_hitting_the_store(bad):
 
     assert caught.value.status_code == 400
     assert "YYYY-MM-DD" in caught.value.detail
+
+
+def test_conversations_outlive_the_window_the_admin_promises():
+    # 期限比查詢窗口短時，後台開放查半年，資料卻早被清掉；鶴記就這樣一次少了 307 個 session。
+    from config import BrainSettings
+
+    default = BrainSettings.model_fields["max_session_ttl_minutes"].default
+    longest_window = timedelta(days=184)  # 6 個日曆月最長的情況（例如 7/1～12/31）
+    assert timedelta(minutes=default) >= longest_window
+

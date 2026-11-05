@@ -132,7 +132,8 @@ class BrainSettings(BaseSettings):
     rag_query_expansion_max_terms: int = 3
     rag_query_expansion_model: str = ""
     max_session_rounds: int = 100
-    max_session_ttl_minutes: int = 30 * 24 * 60
+    # 要涵蓋後台「查得到半年」：6 個日曆月最長 184 天，短於這個就會查不到還在期限內的對話。
+    max_session_ttl_minutes: int = 184 * 24 * 60
     session_db_path: str = "/data/projects/default/sessions.db"
     memory_maintenance_interval_seconds: int = 300
     memory_decay_rate_per_day: float = 0.005
