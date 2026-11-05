@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from typing import Any
 
@@ -46,6 +47,7 @@ from knowledge.knowledge_admin import (
     list_workspace_documents,
     move_workspace_document,
     normalize_raw_paths,
+    qa_document_lock,
     preview_workspace_document_normalization,
     read_workspace_document,
     renormalize_workspace_document,
@@ -154,28 +156,60 @@ async def list_knowledge_qa_route(project_id: str = "default"):
     return {"entries": entries, "count": len(entries)}
 
 
+def _document_path(path: str, project_id: str) -> str:
+    """The one spelling of a workspace document, so ./x and x//y match the tree's paths."""
+    from knowledge.workspace import ensure_workspace_scaffold, resolve_workspace_document
+
+    try:
+        resolved = resolve_workspace_document(path, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return resolved.relative_to(ensure_workspace_scaffold(project_id).resolve()).as_posix()
+
+
+def _content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
 @router.get("/knowledge/document", summary="讀取單一知識文件")
 async def get_knowledge_document_route(path: str, project_id: str = "default"):
     try:
-        return read_workspace_document(path, project_id)
+        document = read_workspace_document(path, project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="找不到指定文件") from exc
+    return {**document, "content_hash": _content_hash(document.get("content", ""))}
 
 
 @router.put("/knowledge/document", summary="儲存知識文件")
 async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
-    try:
-        document = save_workspace_document(payload.path, payload.content, payload.project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    # QA 文件允許在文件頁編輯：儲存後把掛載中節點的條目同步成檔案現況，
-    # 取代先前直接 400 擋下的作法（移動/刪除仍受 guard 保護）。
-    if get_document_meta(payload.path, payload.project_id).get("source_type") == "qa":
-        from knowledge.qa_nodes import sync_entries_for_source
+    # 問答存檔會改同一份檔案，兩邊都進同一把鎖；帶了 base_hash 時，載入後被改過就拒絕，
+    # 否則開著的舊全文會蓋掉別處剛存的內容。
+    def _save() -> dict[str, Any]:
+        from knowledge.qa_nodes import is_qa_document, sync_entries_for_source
 
-        sync_entries_for_source(payload.path, payload.project_id)
+        with qa_document_lock:
+            path = _document_path(payload.path, payload.project_id)
+            if payload.base_hash:
+                try:
+                    current = read_workspace_document(path, payload.project_id).get("content", "")
+                except FileNotFoundError:
+                    current = None
+                if current is not None and _content_hash(current) != payload.base_hash:
+                    raise HTTPException(
+                        status_code=409, detail="這份文件在你編輯時被改過了，請重新載入後再存檔",
+                    )
+            try:
+                document = save_workspace_document(path, payload.content, payload.project_id)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            # QA 文件允許在文件頁編輯：儲存後把掛載中節點的條目同步成檔案現況。
+            if is_qa_document(path, payload.project_id):
+                sync_entries_for_source(path, payload.project_id)
+            return document
+
+    document = await asyncio.to_thread(_save)
     schedule_reindex(payload.project_id)
     return {"status": "ok", "document": document}
 
@@ -233,36 +267,46 @@ async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatc
 
 @router.delete("/knowledge/document", summary="刪除知識文件")
 async def delete_knowledge_document_route(path: str, project_id: str = "default"):
-    if get_document_meta(path, project_id).get("source_type") == "qa":
-        from knowledge.qa_nodes import remove_entries_for_source
-        remove_entries_for_source(path, project_id)
-    try:
-        delete_workspace_document(path, project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="找不到指定文件") from exc
+    def _delete() -> None:
+        from knowledge.qa_nodes import is_qa_document, remove_entries_for_source
+
+        with qa_document_lock:
+            relative = _document_path(path, project_id)
+            if is_qa_document(relative, project_id):
+                remove_entries_for_source(relative, project_id)
+            try:
+                delete_workspace_document(relative, project_id)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except FileNotFoundError as exc:
+                raise HTTPException(status_code=404, detail="找不到指定文件") from exc
+
+    await asyncio.to_thread(_delete)
     schedule_reindex(project_id)
     return {"status": "ok"}
 
 
 @router.post("/knowledge/move", summary="移動/重新命名知識文件")
 async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
-    is_qa = get_document_meta(payload.source_path, payload.project_id).get("source_type") == "qa"
-    try:
-        document = move_workspace_document(payload.source_path, payload.target_path, payload.project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    def _move() -> tuple[str, str, dict[str, Any]]:
+        from knowledge.qa_nodes import is_qa_document, rename_source_path_in_nodes
 
-    if is_qa:
-        from knowledge.qa_nodes import rename_source_path_in_nodes
-        rename_source_path_in_nodes(payload.source_path, payload.target_path, payload.project_id)
+        with qa_document_lock:
+            source = _document_path(payload.source_path, payload.project_id)
+            target = _document_path(payload.target_path, payload.project_id)
+            is_qa = is_qa_document(source, payload.project_id)
+            try:
+                document = move_workspace_document(source, target, payload.project_id)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except FileNotFoundError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            if is_qa:
+                rename_source_path_in_nodes(source, target, payload.project_id)
+            return source, target, document
 
-    asyncio.create_task(
-        _background_rename_document(payload.source_path, payload.target_path, payload.project_id)
-    )
+    source, target, document = await asyncio.to_thread(_move)
+    asyncio.create_task(_background_rename_document(source, target, payload.project_id))
     return {"status": "ok", "document": document}
 
 
@@ -504,19 +548,24 @@ async def upload_knowledge_documents_route(
 
     max_bytes = get_settings().knowledge_upload_max_bytes
     target_dir = require_target_under(target_dir, "knowledge")
-    uploaded: list[dict[str, object]] = []
-    try:
-        for index, upload in enumerate(files):
-            relative_path = relative_paths[index] if index < len(relative_paths) else ""
-            uploaded.append(
+    contents = [await read_upload_limited(upload, max_bytes) for upload in files]
+
+    def _save_all() -> list[dict[str, object]]:
+        # 覆蓋上傳可能蓋到問答存檔正在改的檔案，同一把鎖。
+        with qa_document_lock:
+            return [
                 save_uploaded_document(
                     upload.filename or "",
-                    await read_upload_limited(upload, max_bytes),
+                    content,
                     target_dir,
                     project_id,
-                    relative_path=relative_path,
+                    relative_path=relative_paths[index] if index < len(relative_paths) else "",
                 )
-            )
+                for index, (upload, content) in enumerate(zip(files, contents))
+            ]
+
+    try:
+        uploaded = await asyncio.to_thread(_save_all)
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=400, detail="檔案需為 UTF-8 編碼") from exc
     except ValueError as exc:
@@ -527,14 +576,19 @@ async def upload_knowledge_documents_route(
 
 @router.post("/knowledge/note", summary="建立知識筆記")
 async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
+    def _create() -> dict[str, Any]:
+        # 問答筆記會建節點，和問答存檔用同一把鎖。
+        with qa_document_lock:
+            return save_workspace_note(
+                payload.title,
+                payload.content,
+                payload.project_id,
+                payload.target_dir,
+                note_format=payload.note_format,
+            )
+
     try:
-        document = save_workspace_note(
-            payload.title,
-            payload.content,
-            payload.project_id,
-            payload.target_dir,
-            note_format=payload.note_format,
-        )
+        document = await asyncio.to_thread(_create)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     schedule_reindex(payload.project_id)

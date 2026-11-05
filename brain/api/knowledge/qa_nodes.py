@@ -502,6 +502,16 @@ def is_source_referenced(source_path: str, project_id: str = "default") -> bool:
     return source_path in referenced_source_paths(project_id)
 
 
+def is_qa_document(source_path: str, project_id: str = "default") -> bool:
+    """A document the QA subsystem owns: mounted on a node, or a QA document taken off the menu."""
+    from knowledge.doc_meta import get_document_meta
+
+    return (
+        is_source_referenced(source_path, project_id)
+        or get_document_meta(source_path, project_id).get("source_type") == "qa"
+    )
+
+
 def remove_qa_entry_from_node(
     node_id: str,
     question: str,
@@ -615,6 +625,8 @@ def refill_emptied_node(
         if node is None or node.get("qa_entries") or node.get("child_ids"):
             return None
         node["qa_entries"] = entries
+        # 整份接回去了，之前刻意拿下選單的記錄不再適用。
+        data.get("detached", {}).pop(source_path, None)
         _save_nodes_data(data, project_id)
         return {**node, "node_id": node_id}
 
@@ -709,6 +721,13 @@ def sync_entries_for_source(
         ]
         if not referencing:
             return 0
+        # 新題放進掛最多這份文件題目的節點；只多掛一題的節點不該變成新題的落點。
+        referencing.sort(
+            key=lambda node_id: -sum(
+                entry.get("source_path") == source_path
+                for entry in data["nodes"][node_id]["qa_entries"]
+            )
+        )
 
         mounted = {
             entry["question"]

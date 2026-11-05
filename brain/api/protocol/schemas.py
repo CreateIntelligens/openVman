@@ -181,6 +181,10 @@ class KnowledgeDocumentPutRequest(BaseModel):
     path: str = Field(..., description="Relative path in workspace")
     content: str = Field(..., description="Full text content")
     project_id: str = "default"
+    base_hash: str | None = Field(
+        None,
+        description="content_hash from GET /knowledge/document; a stale one gets 409",
+    )
 
 
 class KnowledgeDocumentMoveRequest(BaseModel):

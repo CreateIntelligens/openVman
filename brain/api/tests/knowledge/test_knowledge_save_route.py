@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import sys
+import threading
 import types
 import io
 from pathlib import Path
@@ -69,6 +70,7 @@ def _load_knowledge_routes_module():
         save_workspace_note=lambda *args, **kwargs: {},
         save_workspace_document=lambda *args, **kwargs: {},
         update_workspace_document_meta=lambda *args, **kwargs: {},
+        qa_document_lock=threading.Lock(),
     )
     _stub_module(
         "safety.observability",

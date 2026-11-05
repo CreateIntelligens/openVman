@@ -814,3 +814,97 @@ def test_deleting_every_row_needs_the_loaded_version(client, workspace):
     assert client.put(f"{BASE}/nodes/n/merged?base_version={version}", json=[]).status_code == 200
 
     assert table(doc) == []
+
+
+def test_a5b_document_delete_during_put_stays_deleted(client, workspace, monkeypatch):
+    doc = _shared_two_nodes(client, workspace)
+    loaded = _edit_first_answer(client)
+    state = during_write(monkeypatch, lambda: client.delete(
+        "/brain/knowledge/document", params={"path": SHARED},
+    ).status_code)
+    merged_status = put(client, "n1", loaded).status_code
+    state["thread"].join(10)
+    assert not doc.exists()
+
+
+def test_a5c_move_during_put_leaves_one_file_with_the_edit(client, workspace, monkeypatch):
+    doc = _shared_two_nodes(client, workspace)
+    target = workspace / "knowledge/moved/s.csv"
+    loaded = _edit_first_answer(client)
+    state = during_write(monkeypatch, lambda: client.post(
+        "/brain/knowledge/move",
+        json={"source_path": SHARED, "target_path": "knowledge/moved/s.csv", "project_id": "default"},
+    ).status_code)
+    merged_status = put(client, "n1", loaded).status_code
+    state["thread"].join(10)
+    from knowledge import qa_nodes
+
+    assert not doc.exists() and "merged 改的" in target.read_text(encoding="utf-8")
+
+
+def test_a6_reuploading_a_mounted_document_keeps_it_a_qa_document(client, workspace):
+    doc = _shared_two_nodes(client, workspace)
+    response = client.post(
+        "/brain/knowledge/upload",
+        data={"target_dir": "knowledge/qa", "project_id": "default"},
+        files=[("files", ("shared.csv", doc.read_bytes(), "text/csv"))],
+    )
+    assert response.status_code == 200, response.text
+    from knowledge.doc_meta import get_document_meta
+
+    tag = get_document_meta(SHARED, "default")["source_type"]
+    moved = client.post("/brain/knowledge/move", json={"source_path": SHARED, "target_path": "knowledge/qa/moved.csv", "project_id": "default"})
+    view = merged(client, "n1")
+    resave = put(client, "n1", pane(view))
+    assert [row["a"] for row in view] == ["甲答", "乙答"] and questions("n1") == ["甲", "乙"]
+
+
+def test_b1d_delete_with_an_alias_clears_mounts_and_meta(client, workspace):
+    from knowledge import qa_nodes
+    from knowledge.doc_meta import load_doc_meta
+
+    write_doc(workspace, SHARED, TWO_ROWS)
+    make_node(client, "n", [entry("甲"), entry("乙")])
+    response = client.delete("/brain/knowledge/document", params={"path": f"./{SHARED}"})
+    node = qa_nodes.get_node("n")
+    assert node is None and SHARED not in load_doc_meta("default")
+
+
+def test_a5a_document_page_with_a_stale_copy_is_refused(client, workspace, monkeypatch):
+    doc = _shared_two_nodes(client, workspace)
+    loaded = _edit_first_answer(client)
+    opened = client.get("/brain/knowledge/document", params={"path": SHARED}).json()
+    content = opened["content"] + "4,文件頁新題,文件頁答\n"
+    state = during_write(monkeypatch, lambda: client.put(
+        "/brain/knowledge/document",
+        json={"path": SHARED, "content": content, "project_id": "default", "base_hash": opened["content_hash"]},
+    ).status_code)
+
+    assert put(client, "n1", loaded).status_code == 200
+    state["thread"].join(10)
+
+    # 鎖讓文件頁等問答存完；它拿的是舊全文，所以被拒絕，問答剛存的內容留著。
+    assert state["status"] == 409
+    assert "merged 改的" in doc.read_text(encoding="utf-8")
+
+
+def test_refilling_an_emptied_category_forgets_what_was_taken_off_the_menu(client, workspace):
+    from knowledge import qa_nodes
+
+    write_doc(workspace, SHARED, TWO_ROWS)
+    make_node(client, "n", [entry("甲"), entry("乙")])
+    assert client.delete(f"{BASE}/nodes/n/entries", params={"question": "甲", "source_path": SHARED}).status_code == 200
+    assert "甲" in qa_nodes._load_nodes_data()["detached"][SHARED]
+
+    data = qa_nodes._load_nodes_data()
+    data["detached"][SHARED] = ["甲"]
+    qa_nodes._save_nodes_data(data)
+    qa_nodes.update_node("n", {"qa_entries": []})
+    monkey_label = qa_nodes._source_node_id
+    try:
+        qa_nodes._source_node_id = lambda label: "n"
+        assert qa_nodes.refill_emptied_node(SHARED, "shared") is not None
+    finally:
+        qa_nodes._source_node_id = monkey_label
+
+    assert SHARED not in qa_nodes._load_nodes_data().get("detached", {})

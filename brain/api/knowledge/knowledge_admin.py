@@ -259,12 +259,19 @@ def save_uploaded_document(
     base = Path(target_dir.strip()) if target_dir.strip() else Path()
     relative_path_obj = base / sub_path
     path = resolve_workspace_document(relative_path_obj.as_posix(), project_id)
+    relative = path.relative_to(ensure_workspace_scaffold(project_id).resolve()).as_posix()
     decoded = content.decode("utf-8-sig")
+    from knowledge.qa_nodes import is_qa_document, sync_entries_for_source
+
+    # 覆蓋上傳已經在問答樹上的文件仍是 QA 文件；標成 upload 的話搬移與刪除都不會跟著更新節點。
+    was_qa = path.exists() and is_qa_document(relative, project_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(decoded, encoding="utf-8")
-    upsert_document_meta(relative_path_obj.as_posix(), project_id, source_type="upload")
+    write_text_atomic(path, decoded)
+    upsert_document_meta(relative, project_id, source_type="qa" if was_qa else "upload")
     # 覆蓋上傳可能換了語言版本；清掉自動判斷的語言讓它重判。
-    touch_document_meta(relative_path_obj.as_posix(), project_id)
+    touch_document_meta(relative, project_id)
+    if was_qa:
+        sync_entries_for_source(relative, project_id)
     return _build_document_summary(path, project_id)
 
 
@@ -668,11 +675,11 @@ def _qa_table_target(filename: str, project_id: str) -> Path:
 
     拖進樹的 CSV 文件不會轉成 .md；同名的已經掛在樹上時要更新它，不能另開一份多一個分類。
     """
-    from knowledge.qa_nodes import is_source_referenced
+    from knowledge.qa_nodes import is_qa_document
 
     markdown = (Path("knowledge/qa") / filename).with_suffix(".md")
     existing_csv = markdown.with_suffix(".csv")
-    if not is_source_referenced(markdown.as_posix(), project_id) and is_source_referenced(
+    if not is_qa_document(markdown.as_posix(), project_id) and is_qa_document(
         existing_csv.as_posix(), project_id
     ):
         return existing_csv
@@ -730,20 +737,21 @@ def _qa_node_summary(target: str, project_id: str) -> dict[str, Any]:
     from knowledge.qa_nodes import list_nodes
 
     nodes = list_nodes(project_id)
-    for node_id, node in nodes.items():
-        question_count = sum(
-            entry.get("source_path") == target for entry in node.get("qa_entries", [])
-        )
-        if not question_count:
-            continue
-        summary = {
-            "qa_node_id": node_id,
-            "qa_node_label": node.get("label", ""),
-            "question_count": question_count,
-        }
-        parent = next((nodes[pid] for pid in node.get("parent_ids", []) if pid in nodes), None)
-        return {**summary, "qa_parent_label": parent.get("label", "")} if parent else summary
-    return {}
+    counts = {
+        node_id: sum(entry.get("source_path") == target for entry in node.get("qa_entries", []))
+        for node_id, node in nodes.items()
+    }
+    node_id = max(counts, key=counts.get, default=None)
+    if node_id is None or not counts[node_id]:
+        return {}
+    node = nodes[node_id]
+    summary = {
+        "qa_node_id": node_id,
+        "qa_node_label": node.get("label", ""),
+        "question_count": counts[node_id],
+    }
+    parent = next((nodes[pid] for pid in node.get("parent_ids", []) if pid in nodes), None)
+    return {**summary, "qa_parent_label": parent.get("label", "")} if parent else summary
 
 
 def _commit_raw_file(
@@ -768,6 +776,7 @@ def _commit_raw_file(
     from knowledge.qa_nodes import (
         create_node_for_source,
         find_language_category,
+        is_qa_document,
         is_source_referenced,
         refill_emptied_node,
         sync_entries_for_source,
@@ -815,7 +824,7 @@ def _commit_raw_file(
     with qa_document_lock:
         updated = dest.exists()
         referenced = is_source_referenced(target, project_id)
-        if referenced and not is_qa:
+        if not is_qa and is_qa_document(target, project_id):
             raise _ImportRefused(_REASON_TARGET_IS_QA)
         dest.parent.mkdir(parents=True, exist_ok=True)
         write_text_atomic(dest, content)

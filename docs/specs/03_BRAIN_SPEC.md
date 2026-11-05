@@ -174,6 +174,8 @@
 
 `source_file` 與 `source_path` 只接受 `knowledge/` 底下的文件，路徑含 `.` 開頭的資料夾（`.qa_images`）也不行，比對前先統一寫法。存回文件前一律讀回比對，讀出來的內容和預期不同（例如答案裡有 `## ` 開頭的行）就回 400，所有檔案與節點都不動；寫到一半失敗會還原檔案、節點與新檔的 meta。
 
+問答存檔、文件頁存檔、刪除、搬移、覆蓋上傳、建立筆記與匯入都進同一把鎖（`knowledge_admin.qa_document_lock`，不可重入），路徑先統一寫法。`GET /knowledge/document` 回 `content_hash`，`PUT` 帶回 `base_hash` 時，載入後被改過就回 409，避免開著的舊全文蓋掉問答剛存的內容；不帶就不檢查。覆蓋上傳已在問答樹上的文件時仍是 QA 文件，並同步節點。
+
 已知限制：共用文件在文件頁改題目文字時，系統分不出是改名還是刪舊加新，新題會放進第一個引用的節點。文件頁打錯引號讓 CSV 暫時少很多題時，改回來後拆分回不來，要重新掛。
 
 QA CSV 可以有 `language` 欄（別名 `lang`、`語言`；值接受 `zh`、`en`、`es`、`ja`、`ko` 與中文、English、Español 等名稱）。切段時寫進段落 `metadata.language`，檢索的語言排序先看它，沒標才看文件語言，所以一份 CSV 可以混多種語言。Markdown 文件仍是一份一種語言。上傳採納會把 CSV 轉成 Markdown，語言欄目前只對保持 CSV 的文件有效。既有 CSV 可用 `python -m scripts.label_qa_languages <project_id>` 預覽，加 `--write` 寫入；有值的列不會被改，判錯直接改檔案，人工指定語言的文件整份略過。
