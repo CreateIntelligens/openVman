@@ -117,3 +117,8 @@ test("mobile console uses content height instead of reserving an empty viewport"
   assert.match(cssBlockAfter(phoneScopedMarker, ".chat-area"), /flex:\s*none;/);
   assert.match(cssBlockAfter(phoneScopedMarker, ".chat-area"), /^\s*height:\s*auto;/m);
 });
+
+test("immersive keeps the quick questions button clear of the control bar", () => {
+  // 工具列橫跨整個上緣、高度又隨寬度變，按鈕放右上角就會被蓋住而按不到。
+  assert.match(cssBlock(".app-shell.immersive .quick-qa-toggle-btn"), /top:\s*calc\(50% - 2\.25rem\);/);
+});
