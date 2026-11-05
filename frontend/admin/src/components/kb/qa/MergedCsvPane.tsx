@@ -5,6 +5,7 @@ import { type MergedQaItem, useQaNodes } from "../../../hooks/useQaNodes";
 import type { Status } from "../../../hooks/useStatusState";
 import { errorMessage } from "../../../utils/errorMessage";
 import { fileNameOf, normalizeSearchTerm } from "../helpers";
+import MountQaEntryModal from "./MountQaEntryModal";
 import QaRowCard, { QA_HIDDEN_HINT, QaRowListHeader, type QaRowField } from "./QaRowCard";
 import { moveToInsertion, useRowReorder } from "./rowReorder";
 import { useQaImageUpload } from "./useQaImageUpload";
@@ -91,34 +92,10 @@ function listRowNumbers(positions: number[]): string {
     : `${listed} 題`;
 }
 
-function findSaveProblem(
-  rows: LocalMergedQaItem[],
-  originalRows: LocalMergedQaItem[],
-): SaveProblem | null {
-  // 後端不會重寫沒有題目的來源檔，下次讀取時那份檔案會被當成沒掛上去的文件，
-  // 長回一個新分類，刪掉的題目全部回來。真的不要了要刪分類，來源檔才會一起刪。
-  if (rows.length === 0 && originalRows.length > 0) {
-    return {
-      message: "分類裡至少要留一題。要整個刪掉這個分類，請到左邊分類的「⋯」選「刪除」；想復原請按「取消變更」。",
-    };
-  }
-
-  // 分類的題目來自好幾份檔案時也一樣：某份檔案的題目一題不剩，那份檔案不會被改寫，
-  // 之後會自己長成一個新分類，刪掉的題目又冒回來。
-  const remainingSources = new Set(rows.map((row) => row.source_file));
-  const emptiedSource = originalRows
-    .map((row) => row.source_file)
-    .find((source) => source && !remainingSources.has(source));
-  if (emptiedSource) {
-    return {
-      message: isManualSource(emptiedSource)
-        ? "自己輸入的題目不能全部刪掉，至少留一題。想復原請按「取消變更」。"
-        : `「${fileNameOf(emptiedSource)}」的題目不能全部刪掉，至少留一題；要整份移除，請到左邊「文件」刪除那份檔案。想復原請按「取消變更」。`,
-    };
-  }
-
+function findSaveProblem(rows: LocalMergedQaItem[]): SaveProblem | null {
+  // 選單專用題目（沒有來源檔）沒有答案，只要有題目。
   const incomplete = rows.flatMap((row, position) =>
-    row.q.trim() && row.a.trim() ? [] : [position]);
+    row.q.trim() && (row.a.trim() || !row.source_file) ? [] : [position]);
   if (incomplete.length > 0) {
     const first = rows[incomplete[0]];
     return {
@@ -168,7 +145,7 @@ function CategoryEditor({
   onSuccess,
   onStatus,
 }: EditorProps) {
-  const { fetchMergedQa, saveMergedQa } = useQaNodes();
+  const { fetchMergedQa, saveMergedQa, addQaEntry, nodesTree, fetchTree } = useQaNodes();
 
   const [rows, setRows] = useState<LocalMergedQaItem[]>([]);
   const [originalRows, setOriginalRows] = useState<LocalMergedQaItem[]>([]);
@@ -180,6 +157,9 @@ function CategoryEditor({
   const [search, setSearch] = useState("");
   // 搜尋中改過的列先留在畫面上：不然打到不符合搜尋字的瞬間，正在打字的那一列就不見了。
   const [keptRowIds, setKeptRowIds] = useState(NO_ROW_IDS);
+  const [mountRowId, setMountRowId] = useState<string | null>(null);
+  // 載入時的版本：題目都刪光或全換成新題時，列上就沒有版本可以送回去。
+  const baseVersionRef = useRef<string | undefined>(undefined);
 
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const loadSequenceRef = useRef(0);
@@ -211,6 +191,7 @@ function CategoryEditor({
         _localId: `loaded_${sequence}_${position}`,
       }));
       hasLoadedRef.current = true;
+      baseVersionRef.current = data[0]?.base_version;
       setRows(mapped);
       setOriginalRows(cloneRows(mapped));
       setKeptRowIds(NO_ROW_IDS);
@@ -277,7 +258,7 @@ function CategoryEditor({
   const hiddenCount = rows.filter((row) => row.hidden).length;
   const shownCount = rows.length - hiddenCount;
   const sourceFiles = useMemo(
-    () => [...new Set(rows.map((row) => row.source_file))],
+    () => [...new Set(rows.map((row) => row.source_file).filter(Boolean))],
     [rows],
   );
   const singleSource = sourceFiles.length === 1 ? sourceFiles[0] : null;
@@ -348,17 +329,17 @@ function CategoryEditor({
     }
   };
 
-  const handleAddRow = () => {
+  const handleAddRow = (menuOnly = false) => {
     // 同一份檔案的題目存檔後會排在一起，新題要留在尾端就得跟最後一題放同一份。
-    const lastRow = rows[rows.length - 1] ?? originalRows[originalRows.length - 1];
+    const lastSource = [...rows, ...originalRows].reverse().find((row) => row.source_file)?.source_file;
     const newRow: LocalMergedQaItem = {
       q: "",
       a: "",
       img: "",
       url: "",
-      source_file: lastRow?.source_file || manualSourcePath(nodeId),
+      source_file: menuOnly ? "" : lastSource || manualSourcePath(nodeId),
       hidden: false,
-      _localId: localRowId("new"),
+      _localId: localRowId(menuOnly ? "menu" : "new"),
     };
     setRows((prev) => [...prev, newRow]);
     clearSearch();
@@ -392,7 +373,7 @@ function CategoryEditor({
   };
 
   const handleSave = async () => {
-    const problem = findSaveProblem(rows, originalRows);
+    const problem = findSaveProblem(rows);
     if (problem) {
       setShowValidation(true);
       report({ type: "error", message: problem.message });
@@ -415,7 +396,7 @@ function CategoryEditor({
         img: row.img?.trim() || "",
         url: row.url?.trim() || "",
       }));
-      await saveMergedQa(nodeId, payload);
+      await saveMergedQa(nodeId, payload, baseVersionRef.current);
       setOriginalRows(cloneRows(rows));
       report({ type: "success", message: "已儲存，AI 和選單都會用新內容" });
       await load();
@@ -433,17 +414,42 @@ function CategoryEditor({
   const canEdit = loaded && !loadError;
   const showSearch = rows.length > SEARCH_MIN_ROWS || searching;
 
+  const mountRow = rows.find((row) => row._localId === mountRowId) ?? null;
+  const openMount = (rowId: string) => {
+    setMountRowId(rowId);
+    void fetchTree().catch(() => undefined);
+  };
+  const handleMount = async (targetNodeId: string) => {
+    if (!mountRow) return;
+    await addQaEntry(targetNodeId, mountRow.q, mountRow.source_file);
+    setMountRowId(null);
+    report({ type: "success", message: `已把「${mountRow.q}」也放到其他分類。` });
+    await load();
+    onSuccess?.();
+  };
+
   const addButton = (
-    <button
-      type="button"
-      ref={addButtonRef}
-      onClick={handleAddRow}
-      disabled={saving}
-      className="btn btn-ghost"
-    >
-      <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">add</span>
-      新增問題
-    </button>
+    <>
+      <button
+        type="button"
+        ref={addButtonRef}
+        onClick={() => handleAddRow()}
+        disabled={saving}
+        className="btn btn-ghost"
+      >
+        <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">add</span>
+        新增問題
+      </button>
+      <button
+        type="button"
+        onClick={() => handleAddRow(true)}
+        disabled={saving}
+        className="btn btn-ghost"
+      >
+        <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">add</span>
+        新增選單題目（不填答案）
+      </button>
+    </>
   );
 
   return (
@@ -553,7 +559,7 @@ function CategoryEditor({
               <>
                 <p className="text-sm font-medium text-content">題目都刪掉了，還沒有儲存</p>
                 <p className="text-sm text-content-muted">
-                  想復原請按「取消變更」。要整個刪掉這個分類，請到左邊分類的「⋯」選「刪除」。
+                  想復原請按「取消變更」。儲存後這個分類會是空的；要整個刪掉，請到左邊分類的「⋯」選「刪除」。
                 </p>
               </>
             ) : (
@@ -596,8 +602,14 @@ function CategoryEditor({
                   img={row.img || ""}
                   url={row.url || ""}
                   hidden={Boolean(row.hidden)}
-                  sourceLabel={hasManySources
+                  sourceLabel={hasManySources && row.source_file
                     ? (isManualSource(row.source_file) ? "自己輸入" : fileNameOf(row.source_file))
+                    : undefined}
+                  menuOnly={!row.source_file}
+                  alsoIn={row.also_in}
+                  // 存過的文件題目才能放到別處；有未儲存的修改時先存，免得放過去的是舊內容。
+                  onMount={row.source_file && row.original_q && !isDirty
+                    ? () => openMount(row._localId)
                     : undefined}
                   onChange={(field, value) => handleCellChange(row._localId, CELL_FIELD[field], value)}
                   onRemove={() => handleRemoveRow(row._localId, position)}
@@ -621,6 +633,16 @@ function CategoryEditor({
       </div>
 
       <input {...imageUpload.fileInputProps} />
+      {mountRow && (
+        <MountQaEntryModal
+          question={mountRow.q}
+          currentNodeId={nodeId}
+          alreadyIn={mountRow.also_in ?? []}
+          nodesTree={nodesTree}
+          onConfirm={handleMount}
+          onClose={() => setMountRowId(null)}
+        />
+      )}
     </section>
   );
 }

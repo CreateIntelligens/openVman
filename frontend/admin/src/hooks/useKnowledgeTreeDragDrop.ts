@@ -213,6 +213,7 @@ export function useKnowledgeTreeDragDrop({
               await saveMergedQa(
                 draggedQaEntry.nodeId,
                 reorderedRows.map((row, position) => ({ ...row, index: String(position + 1) })),
+                mergedRows[0]?.base_version,
               );
               if (selectedQaNodeId === draggedQaEntry.nodeId) {
                 setMergedRefreshKey((key) => key + 1);

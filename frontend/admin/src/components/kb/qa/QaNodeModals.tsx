@@ -29,7 +29,7 @@ function deleteMessage(node: QaNode): string {
   const childNote = childCount > 0
     ? `底下的 ${childCount} 個子分類不會被刪除，會移到最上層。`
     : "";
-  return `確定要刪除分類「${node.label}」嗎？這個分類的問題和答案會一起刪除，不能復原。${childNote}`;
+  return `確定要刪除分類「${node.label}」嗎？訪客的選單上不會再出現這個分類和它的問題。問題和答案會留在文件裡，AI 回答時還是會用；之後想放回選單，把文件拖進分類就好。${childNote}`;
 }
 
 export default function QaNodeModals({

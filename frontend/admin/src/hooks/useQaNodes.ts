@@ -31,12 +31,19 @@ export interface MergedQaItem {
   a: string;
   img?: string;
   url?: string;
+  /** 空字串是選單專用題目：沒有答案，訪客點了照一般方式問。 */
   source_file: string;
   hidden?: boolean;
+  /** 載入時的題目，存檔時原樣送回，後端用來認出改名。 */
+  original_q?: string;
+  /** 載入時的版本，存檔時原樣送回。 */
+  base_version?: string;
+  /** 這一題也掛在哪些分類。 */
+  also_in?: string[];
 }
 
-function qaProjectUrl(path: string, projectId: string): string {
-  return apiUrl(path, { project_id: projectId });
+function qaProjectUrl(path: string, projectId: string, extra: Record<string, string> = {}): string {
+  return apiUrl(path, { project_id: projectId, ...extra });
 }
 
 function nodePath(id: string, suffix = ""): string {
@@ -48,8 +55,9 @@ function qaJson<T>(
   path: string,
   method: string,
   body?: unknown,
+  query: Record<string, string> = {},
 ): Promise<T> {
-  return fetchJson<T>(qaProjectUrl(path, projectId), {
+  return fetchJson<T>(qaProjectUrl(path, projectId, query), {
     method,
     ...(body !== undefined && {
       headers: { "Content-Type": "application/json" },
@@ -211,15 +219,32 @@ export function useQaNodes(projectId = getActiveProjectId()) {
     [projectId, run],
   );
 
+  /** baseVersion 是載入時的版本：題目都刪光或全換新列時，列上就沒有版本可以送回。 */
   const saveMergedQa = useCallback(
-    (id: string, rows: MergedQaItem[]) => run(
+    (id: string, rows: MergedQaItem[], baseVersion?: string) => run(
       () => qaJson<{ status: string }>(
         projectId,
         nodePath(id, "/merged"),
         "PUT",
         rows,
+        baseVersion ? { base_version: baseVersion } : {},
       ),
       "Failed to save merged QA entries",
+      true,
+    ),
+    [projectId, run],
+  );
+
+  /** sourcePath 不給是新增選單專用題目；給了是把文件裡的這一題也放到這個分類。 */
+  const addQaEntry = useCallback(
+    (id: string, question: string, sourcePath = "") => run(
+      () => qaJson<QaNode>(
+        projectId,
+        nodePath(id, "/entries"),
+        "POST",
+        { question, source_path: sourcePath },
+      ),
+      "Failed to add QA entry",
       true,
     ),
     [projectId, run],
@@ -301,6 +326,7 @@ export function useQaNodes(projectId = getActiveProjectId()) {
     reorderNode,
     fetchMergedQa,
     saveMergedQa,
+    addQaEntry,
     uploadImage,
     deleteImage,
     cleanupImages,

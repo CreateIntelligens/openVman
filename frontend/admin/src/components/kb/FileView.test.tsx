@@ -96,7 +96,8 @@ describe("FileView", () => {
 
     openMoreMenu();
     expect(screen.getByRole("menuitem", { name: "移動…" })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: "AI 整理排版" })).toBeTruthy();
+    // AI 整理會破壞問答格式，後端一律拒絕 QA 文件，所以不顯示必失敗的選項。
+    expect(screen.queryByRole("menuitem", { name: "AI 整理排版" })).toBeNull();
     expect(screen.getByRole("menuitem", { name: "刪除" })).toBeTruthy();
   });
 

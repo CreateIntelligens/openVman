@@ -17,6 +17,12 @@ interface QaRowCardProps {
   hidden: boolean;
   /** 同一個清單來自多份檔案時才給，只有一份時放清單上方就好。 */
   sourceLabel?: string;
+  /** 選單專用題目：沒有答案、圖片與連結，訪客點了照一般方式問。 */
+  menuOnly?: boolean;
+  /** 這一題也放在哪些分類；改答案時那些分類會一起變。 */
+  alsoIn?: string[];
+  /** 有給才出現「也放到其他分類」。 */
+  onMount?: () => void;
   onChange: (field: QaRowField, value: string | boolean) => void;
   onRemove: () => void;
   /** 有給才出現「上傳圖片」。 */
@@ -57,6 +63,9 @@ export default function QaRowCard({
   url,
   hidden,
   sourceLabel,
+  menuOnly = false,
+  alsoIn = [],
+  onMount,
   onChange,
   onRemove,
   onPickImage,
@@ -125,9 +134,24 @@ export default function QaRowCard({
             來自：{sourceLabel}
           </span>
         )}
+        {menuOnly && (
+          <span className="rounded border border-border px-1.5 py-0.5 text-xs text-content-muted">
+            只在選單
+          </span>
+        )}
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
-          {!showImage && (
+          {onMount && (
+            <button
+              type="button"
+              className={ROW_BUTTON_CLASS}
+              onClick={onMount}
+              aria-label={`把第 ${number} 題也放到其他分類`}
+            >
+              也放到其他分類
+            </button>
+          )}
+          {!menuOnly && !showImage && (
             <button
               type="button"
               className={ROW_BUTTON_CLASS}
@@ -137,7 +161,7 @@ export default function QaRowCard({
               加圖片
             </button>
           )}
-          {!showUrl && (
+          {!menuOnly && !showUrl && (
             <button
               type="button"
               className={ROW_BUTTON_CLASS}
@@ -165,14 +189,20 @@ export default function QaRowCard({
             type="button"
             onClick={onRemove}
             className="btn btn-danger gap-1 px-2 py-1 text-xs"
-            aria-label={`刪除第 ${number} 題`}
+            aria-label={alsoIn.length > 0 ? `把第 ${number} 題從這個分類拿掉` : `刪除第 ${number} 題`}
           >
-            刪除
+            {/* 也放在別的分類時只是從這裡拿掉，題目和答案還在。 */}
+            {alsoIn.length > 0 ? "從這裡拿掉" : "刪除"}
           </button>
         </div>
       </div>
+      {alsoIn.length > 0 && (
+        <p className="mt-1 text-xs text-content-muted">
+          這題也放在：{alsoIn.join("、")}。改答案時那裡會一起改。
+        </p>
+      )}
 
-      <div className={`mt-1.5 grid gap-2 lg:grid-cols-[2fr_3fr] ${hidden ? "opacity-60" : ""}`}>
+      <div className={`mt-1.5 grid gap-2 ${menuOnly ? "" : "lg:grid-cols-[2fr_3fr]"} ${hidden ? "opacity-60" : ""}`}>
         {/* 寬版的欄名在清單頂端標一次就好，每列重複會很吵。 */}
         <div className="min-w-0">
           <span aria-hidden="true" className={`${FIELD_LABEL_CLASS} mb-0.5 lg:hidden`}>問題</span>
@@ -186,6 +216,11 @@ export default function QaRowCard({
             className={`${fieldClass(invalidFields?.question)} max-h-[30dvh] font-medium placeholder:text-content-subtle`}
           />
         </div>
+        {menuOnly ? (
+          <p className="text-xs text-content-muted">
+            這題只放在選單，沒有固定答案。訪客點了以後，AI 會照一般問題回答。
+          </p>
+        ) : (
         <div className="min-w-0">
           <span aria-hidden="true" className={`${FIELD_LABEL_CLASS} mb-0.5 lg:hidden`}>答案</span>
           <AutoTextarea
@@ -198,6 +233,7 @@ export default function QaRowCard({
             className={`${fieldClass(invalidFields?.answer)} max-h-[40dvh] placeholder:text-content-subtle`}
           />
         </div>
+        )}
       </div>
 
       {(showImage || showUrl) && (

@@ -158,7 +158,8 @@ export default function FileView({
               onSelect: () => onMove(document.path),
             }]
           : []),
-        ...(!isQaAttached && onRenormalize
+        // AI 整理會破壞問答格式，後端一律拒絕 QA 文件，沒掛分類的也一樣。
+        ...(!isQaDocument && onRenormalize
           ? [{
               id: "renormalize",
               label: "AI 整理排版",

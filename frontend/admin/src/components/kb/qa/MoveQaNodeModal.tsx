@@ -15,13 +15,13 @@ interface MoveQaNodeModalProps {
   onClose: () => void;
 }
 
-interface FlatCategory {
+export interface FlatCategory {
   node: QaNode;
   depth: number;
 }
 
 // 同一分類可能掛在多個上層，攤平時只留第一次出現的位置。
-function flattenCategories(
+export function flattenCategories(
   nodes: QaNode[],
   depth = 0,
   seen = new Set<string>(),

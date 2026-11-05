@@ -47,15 +47,21 @@ export function applyCorrection(
   now = Date.now(),
 ): MergedQaItem[] {
   const rows: MergedQaItem[] = existing.map(({ index: _index, ...item }) => item);
-  const matchIndex = rows.findIndex((row) => row.q.trim() === correction.q);
-  if (matchIndex >= 0) {
-    return rows.map((row, i) => (i === matchIndex ? { ...row, a: correction.a } : row));
-  }
   const manualPrefix = `knowledge/qa/manual_${nodeId}_`;
   const manualSource = [...rows]
     .reverse()
     .find((row) => row.source_file.startsWith(manualPrefix) && row.source_file.endsWith(".md"))
     ?.source_file;
+  const matchIndex = rows.findIndex((row) => row.q.trim() === correction.q);
+  if (matchIndex >= 0) {
+    // 選單專用題目沒有地方放答案：改成存進手動修正檔的題目，選單上的位置不變。
+    return rows.map((row, i) => {
+      if (i !== matchIndex) return row;
+      return row.source_file
+        ? { ...row, a: correction.a }
+        : { ...row, a: correction.a, original_q: undefined, source_file: manualSource ?? `${manualPrefix}${now}.md` };
+    });
+  }
   return [
     ...rows,
     {
@@ -115,7 +121,7 @@ export default function CorrectQaModal({ open, question, answer, onClose }: Corr
     try {
       const existing = await fetchMergedQa(nodeId);
       const rows = applyCorrection(existing, nodeId, { q: trimmedQ, a: trimmedA, hidden: !visible });
-      await saveMergedQa(nodeId, rows);
+      await saveMergedQa(nodeId, rows, existing[0]?.base_version);
       setSavedLabel(selectedLabel);
     } catch (err: unknown) {
       setError(errorMessage(err, "儲存問答失敗"));

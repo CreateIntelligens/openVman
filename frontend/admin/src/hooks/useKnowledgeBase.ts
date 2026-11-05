@@ -386,7 +386,7 @@ export function useKnowledgeBase() {
     if (!openDocument) return;
     setSaving(true);
     try {
-      await saveKnowledgeDocument(openDocument.path, editContent);
+      await saveKnowledgeDocument(openDocument.path, editContent, openDocument.content_hash);
       setStatus({ type: "success", message: `已儲存 ${fileNameOf(openDocument.path)}` });
       setEditorDirty(false);
       await loadDocuments();

@@ -41,6 +41,8 @@ export type KnowledgeLanguage = "zh" | "en" | "es" | "nan" | "ja" | "ko";
 
 export interface KnowledgeDocument extends KnowledgeDocumentSummary {
   content: string;
+  /** 存檔時送回；載入後檔案被改過，存檔會被拒絕，不會蓋掉別處剛存的內容。 */
+  content_hash?: string;
 }
 
 export interface KnowledgeDocumentsResponse {
@@ -114,10 +116,10 @@ export async function fetchKnowledgeDocument(path: string) {
   return get<KnowledgeDocument>(knowledgePath("/document"), { path });
 }
 
-export function saveKnowledgeDocument(path: string, content: string) {
+export function saveKnowledgeDocument(path: string, content: string, baseHash?: string) {
   return put<{ status: string; document: KnowledgeDocumentSummary }>(
     knowledgePath("/document"),
-    { path, content, project_id: getActiveProjectId() },
+    { path, content, project_id: getActiveProjectId(), ...(baseHash ? { base_hash: baseHash } : {}) },
   );
 }
 

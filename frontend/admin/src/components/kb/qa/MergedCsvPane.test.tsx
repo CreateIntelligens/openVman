@@ -535,60 +535,58 @@ describe("MergedCsvPane", () => {
       expect(scrolledTo).toHaveLength(0);
     });
 
-    // 實測後端：清空分類後來源檔沒有重寫，下次讀取會長回一個新分類，題目全部回來。
-    it("refuses to save an emptied category and points to deleting the category", async () => {
-      qaNodeMocks.fetchMergedQa.mockResolvedValue(makeRows(1));
-      const { onStatus } = renderPane();
+    // 後端已能處理刪光：檔案留著、節點清空。這時列上沒有版本可送，要用載入時記下的版本。
+    it("saves an emptied category with the version it loaded", async () => {
+      qaNodeMocks.fetchMergedQa.mockResolvedValue([makeRow("問題1", { base_version: "v1" })]);
+      renderPane();
 
       await screen.findByDisplayValue("問題1");
       fireEvent.click(screen.getByRole("button", { name: "刪除第 1 題" }));
       expect(await screen.findByText("題目都刪掉了，還沒有儲存")).toBeTruthy();
-      await waitFor(() => expect(document.activeElement).toBe(addButton()));
-
       fireEvent.click(saveButton());
 
-      expect(qaNodeMocks.saveMergedQa).not.toHaveBeenCalled();
-      expect(lastStatus(onStatus).type).toBe("error");
-      expect(lastStatus(onStatus).message).toContain("至少要留一題");
-      expect(lastStatus(onStatus).message).toContain("「刪除」");
-
-      fireEvent.click(cancelButton());
-      expect(screen.getByDisplayValue("問題1")).toBeTruthy();
+      await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+      expect(qaNodeMocks.saveMergedQa.mock.calls[0][1]).toEqual([]);
+      expect(qaNodeMocks.saveMergedQa.mock.calls[0][2]).toBe("v1");
     });
 
-    // 審查重現：分類的題目來自兩份檔案，刪光其中一份的題目後存檔，那份檔案會長回一個新分類。
-    it("refuses to save when every question from one of several files was deleted", async () => {
+    it("saves when every question from one of several files was deleted", async () => {
       qaNodeMocks.fetchMergedQa.mockResolvedValue([
         makeRow("甲", { source_file: "knowledge/qa/a.csv" }),
         makeRow("乙", { source_file: "knowledge/qa/b.csv" }),
-        makeRow("丙", { source_file: "knowledge/qa/b.csv" }),
       ]);
-      const { onStatus } = renderPane();
+      renderPane();
 
       await screen.findByDisplayValue("甲");
       fireEvent.click(screen.getByRole("button", { name: "刪除第 1 題" }));
       fireEvent.click(saveButton());
 
-      expect(qaNodeMocks.saveMergedQa).not.toHaveBeenCalled();
-      expect(lastStatus(onStatus)).toEqual({
-        type: "error",
-        message: "「a.csv」的題目不能全部刪掉，至少留一題；要整份移除，請到左邊「文件」刪除那份檔案。想復原請按「取消變更」。",
-      });
+      await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+      expect(savedPayload().map((item) => item.q)).toEqual(["乙"]);
     });
 
-    it("does not name the generated file when every typed-in question was deleted", async () => {
-      qaNodeMocks.fetchMergedQa.mockResolvedValue([
-        makeRow("甲", { source_file: "knowledge/qa/a.csv" }),
-        makeRow("乙", { source_file: "knowledge/qa/manual_root.md" }),
-      ]);
-      const { onStatus } = renderPane();
+    it("saves a menu-only question without an answer", async () => {
+      qaNodeMocks.fetchMergedQa.mockResolvedValue([makeRow("甲")]);
+      renderPane();
 
-      await screen.findByDisplayValue("乙");
-      fireEvent.click(screen.getByRole("button", { name: "刪除第 2 題" }));
+      await screen.findByDisplayValue("甲");
+      fireEvent.click(screen.getByRole("button", { name: "新增選單題目（不填答案）" }));
+      expect(screen.getAllByText("只在選單").length).toBe(1);
+      const questions = screen.getAllByPlaceholderText("請輸入問題");
+      fireEvent.change(questions[questions.length - 1], { target: { value: "今天有什麼活動" } });
       fireEvent.click(saveButton());
 
-      expect(qaNodeMocks.saveMergedQa).not.toHaveBeenCalled();
-      expect(lastStatus(onStatus).message).toBe("自己輸入的題目不能全部刪掉，至少留一題。想復原請按「取消變更」。");
+      await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+      expect(savedPayload()[1]).toMatchObject({ q: "今天有什麼活動", a: "", source_file: "" });
+    });
+
+    it("says where else a question is and that deleting only takes it off here", async () => {
+      qaNodeMocks.fetchMergedQa.mockResolvedValue([makeRow("甲", { also_in: ["產品"] })]);
+      renderPane();
+
+      await screen.findByDisplayValue("甲");
+      expect(screen.getByText("這題也放在：產品。改答案時那裡會一起改。")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "把第 1 題從這個分類拿掉" })).toBeTruthy();
     });
 
     it("still saves when some questions of each file are left", async () => {
