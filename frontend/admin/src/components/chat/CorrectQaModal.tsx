@@ -192,7 +192,7 @@ export default function CorrectQaModal({ open, question, answer, onClose }: Corr
                 />
               </label>
               <label className="block text-sm font-medium text-content">
-                存到問答節點
+                存到哪個分類
                 <select
                   value={nodeId}
                   onChange={(event) => setNodeId(event.target.value)}
@@ -206,7 +206,7 @@ export default function CorrectQaModal({ open, question, answer, onClose }: Corr
               </label>
               {!loading && !treeError && options.length === 0 && (
                 <p className="text-xs text-content-muted">
-                  這個專案還沒有問答節點，請先到知識庫的「快速問答」建立節點。
+                  這個專案的快速問答還沒有分類，請先到知識庫的「快速問答」新增分類。
                 </p>
               )}
               <label className="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs text-content-muted">

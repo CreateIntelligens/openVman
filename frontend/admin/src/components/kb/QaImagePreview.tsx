@@ -22,11 +22,17 @@ export default function QaImagePreview({
 
   useEffect(() => setVisible(Boolean(src)), [src]);
 
-  if (!src || !visible) return null;
+  if (!src) return null;
 
+  if (!visible) {
+    // 編號打錯時要講出來，不然看起來只是沒有縮圖，存了才發現訪客看不到圖。
+    return compact ? <span className="shrink-0 text-xs text-danger">找不到這張圖</span> : null;
+  }
+
+  // 白底是刻意的：去背的圖（QR code、型錄）放在深色底上會看不見。
   if (compact) {
     return (
-      <a href={src} target="_blank" rel="noopener noreferrer" className="shrink-0" title="開啟原圖">
+      <a href={src} target="_blank" rel="noopener noreferrer" className="shrink-0" aria-label="開啟原圖">
         <img
           src={src}
           alt={alt}

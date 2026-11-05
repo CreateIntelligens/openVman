@@ -237,6 +237,16 @@ describe("merged access and system status pages", () => {
       ["System", ["Access", "ModelProviders", "Usage", "SystemStatus"]],
     ]);
   });
+
+  it("shows Chinese group titles while the label stays the saved collapse key", () => {
+    // label 寫進使用者的 localStorage，換掉就會讓已存的收合狀態失效。
+    expect(tabGroups.map((group) => [group.label, group.title])).toEqual([
+      ["Workspace", "互動"],
+      ["Knowledge", "知識"],
+      ["Character", "角色"],
+      ["System", "系統"],
+    ]);
+  });
 });
 
 describe("sub view memory", () => {

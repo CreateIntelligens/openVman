@@ -12,7 +12,7 @@ import ConfirmModal from "../ConfirmModal";
 import {
   fileNameOf,
   formatBatchSummary,
-  isUploadDerivedKnowledgeFile,
+  hasOriginalBackup,
   KNOWLEDGE_LANGUAGE_LABELS,
   parentDirOf,
   runBatchSequentially,
@@ -168,7 +168,7 @@ export default function BatchActionBar({
       pending,
       async (path) => {
         if (documentsByPath.get(path)?.qa_attached) {
-          throw new Error("已掛在快速問答樹上，不能移動");
+          throw new Error("已放進快速問答，不能移動");
         }
         await moveKnowledgeDocument(path, targetPathOf(path));
       },
@@ -201,10 +201,10 @@ export default function BatchActionBar({
     ).length;
     const notes = [
       qaAttachedCount > 0
-        ? `其中 ${qaAttachedCount} 個掛在快速問答樹上，對應的節點與題目會一併移除。`
+        ? `其中 ${qaAttachedCount} 個掛在快速問答上，對應的分類與題目會一併移除。`
         : "",
-      selectedDocs.some(isUploadDerivedKnowledgeFile)
-        ? "上傳產生的檔案只會移除知識文件與索引，原始上傳檔仍保留在 raw/。"
+      selectedDocs.some(hasOriginalBackup)
+        ? "上傳的檔案只會把內容從知識庫移除，原始上傳檔還留在系統備份裡。"
         : "",
     ].filter(Boolean);
     return [

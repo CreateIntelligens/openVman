@@ -57,6 +57,7 @@
 - [語音對話不再一問一答：插話與連續追問](plans/full-duplex-voice.md)（進行中）：思考中補一句合併回答已上線；講話中插話待現場回音實測
 - [產品規格篩選工具](plans/product-spec-filter.md)（Draft）：Brain `filter_products` 依專案規格表回答選型問題，已部署，工業示範專案（開發） 經正式聊天路徑 20 題×3 次 45／11／4
 - [每輪回應延遲](plans/turn-latency.md)（Draft）：講完到聽到聲音 p50 約 7 秒的拆解與待做（回答與 TTS 重疊、先查再叫 LLM、提示快取、決策功能審查待辦）
+- [知識庫頁易用性改版](plans/knowledge-base-usability.md)（Draft）：上傳即匯入、兩段式文件樹、白話用詞，以及其他頁面的易用性待辦
 - [OpenSpec 變更提案（選用）](../openspec/changes/)
 - [Jev 決策層計畫](plans/jev-decision-layer.md)：意圖分流影子觀測 → RAG 證據判斷；SemIf 退場
 - [Jev API 分流／打斷評估](../scripts/experiments/jev/REPORT.md)：官方 Jev API 在 SemIf 同一份合成題庫上 96/96、零順序翻轉。

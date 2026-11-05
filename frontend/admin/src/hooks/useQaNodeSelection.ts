@@ -10,6 +10,8 @@ import {
   findQaNode,
   getFileParentPaths,
   getQaNodeAncestors,
+  QUICK_QA_TREE_PATH,
+  qaTreeNodePath,
 } from "../components/kb/helpers";
 import type { QaNode } from "./useQaNodes";
 import { readScoped, removeScoped } from "../utils/scopedStorage";
@@ -70,12 +72,8 @@ export function useQaNodeSelection({
     if (selectedQaNodeId && nodesTree.length > 0) {
       const ancestors = getQaNodeAncestors(nodesTree, selectedQaNodeId);
       if (ancestors) {
-        const pathsToExpand = ["quick_qa_tree_root"];
-        let currentPath = "quick_qa_tree_root";
-        for (const id of ancestors) {
-          currentPath = `${currentPath}/${encodeURIComponent(id)}`;
-          pathsToExpand.push(currentPath);
-        }
+        // 只展開上層讓它看得到；它自己要不要展開由使用者決定，樹一更新就會再跑一次這裡。
+        const pathsToExpand = [QUICK_QA_TREE_PATH, ...ancestors.map(qaTreeNodePath)];
         setExpandedDirs((prev) => {
           const next = new Set(prev);
           let changed = false;

@@ -6,7 +6,7 @@ import { useAdminSubView } from "../hooks/useAdminSubView";
 type Tab = "tts" | "asr";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "tts", label: "TTS 試聽" },
+  { id: "tts", label: "聲音試聽" },
   { id: "asr", label: "語音辨識" },
 ];
 

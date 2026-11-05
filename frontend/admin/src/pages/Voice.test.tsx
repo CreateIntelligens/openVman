@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe("語音頁分頁", () => {
-  it("預設顯示 TTS 試聽", () => {
+  it("預設顯示聲音試聽", () => {
     render(<RoutedVoice />);
 
     expect(screen.getByText("TTS 面板")).toBeTruthy();
@@ -63,7 +63,7 @@ describe("語音頁分頁", () => {
   it("只有選取中的分頁進入 Tab 鍵順序", () => {
     render(<RoutedVoice />);
 
-    expect(screen.getByRole("tab", { name: "TTS 試聽" }).getAttribute("tabindex")).toBe("0");
+    expect(screen.getByRole("tab", { name: "聲音試聽" }).getAttribute("tabindex")).toBe("0");
     expect(screen.getByRole("tab", { name: "語音辨識" }).getAttribute("tabindex")).toBe("-1");
   });
 

@@ -5,9 +5,10 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import type { TreeNode } from "../components/kb/helpers";
+import type { QaDropPosition, TreeNode } from "../components/kb/helpers";
 import {
   findQaNode,
+  getQaNodeParentId,
   isQaNodeDescendant,
   parseQaEntryDragPath,
   parseQaNodeDragPath,
@@ -34,6 +35,8 @@ interface UseKnowledgeTreeDragDropOptions extends QaTreeActions {
   loadDocuments: () => Promise<void>;
   handleMove: (sourcePath: string, targetDir: string) => Promise<void>;
   setMergedRefreshKey: Dispatch<SetStateAction<number>>;
+  /** 分類換了上層之後呼叫；parentId 是 null 代表移到最上層。 */
+  onQaNodeMoved?: (parentId: string | null) => void;
 }
 
 export function useKnowledgeTreeDragDrop({
@@ -49,23 +52,43 @@ export function useKnowledgeTreeDragDrop({
   loadDocuments,
   handleMove,
   setMergedRefreshKey,
+  onQaNodeMoved,
 }: UseKnowledgeTreeDragDropOptions) {
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<QaDropPosition | null>(null);
+
+  const setDropTarget = useCallback(
+    (path: string | null, position: QaDropPosition | null = null) => {
+      setDropTargetPath(path);
+      setDropPosition(position);
+    },
+    [],
+  );
 
   const canDropQaNode = useCallback(
-    (draggedPath: string, targetPath: string) => {
+    (draggedPath: string, targetPath: string, position?: QaDropPosition) => {
       const draggedNodeId = parseQaNodeDragPath(draggedPath);
+      if (!draggedNodeId) return false;
+      // 已經在最上層：放回「快速問答」沒有變化，不要顯示成可以放。
+      if (targetPath === QUICK_QA_TREE_PATH) {
+        return getQaNodeParentId(nodesTree, draggedNodeId) !== null;
+      }
       const targetNodeId = parseQaNodeDragPath(targetPath);
-      if (!draggedNodeId || !targetNodeId) return false;
+      if (!targetNodeId) return false;
       if (draggedNodeId === targetNodeId) return false;
 
       const draggedNode = findQaNode(nodesTree, draggedNodeId);
       const targetNode = findQaNode(nodesTree, targetNodeId);
       if (!draggedNode || !targetNode) return false;
 
-      // 同父層 = 排序; 跨父層 = 換父層(re-parent), 但不能移進自己的子孫
-      return !isQaNodeDescendant(draggedNode, targetNodeId);
+      // 三種放法都不能進自己的子孫：排在子孫旁邊等於放進子孫的上層。
+      if (isQaNodeDescendant(draggedNode, targetNodeId)) return false;
+      // 已經在這個分類底下：放進去沒有變化，不要顯示成可以放。
+      if (position === "into" && draggedNode.parent_ids?.includes(targetNodeId)) {
+        return false;
+      }
+      return true;
     },
     [nodesTree],
   );
@@ -105,13 +128,53 @@ export function useKnowledgeTreeDragDrop({
 
   const handleTreeDragEnd = useCallback(() => {
     setDraggingPath(null);
-    setDropTargetPath(null);
-  }, []);
+    setDropTarget(null);
+  }, [setDropTarget]);
+
+  const dropQaNodeOntoNode = useCallback(
+    async (draggedId: string, targetId: string, position: QaDropPosition) => {
+      const draggedNode = findQaNode(nodesTree, draggedId);
+      const targetNode = findQaNode(nodesTree, targetId);
+      if (!draggedNode || !targetNode) return;
+      if (draggedId === targetId || isQaNodeDescendant(draggedNode, targetId)) return;
+
+      if (position === "into") {
+        if (draggedNode.parent_ids?.includes(targetId)) return;
+        await moveNode(draggedId, [targetId]);
+        await fetchQaTree();
+        onQaNodeMoved?.(targetId);
+        return;
+      }
+
+      const targetParentId = getQaNodeParentId(nodesTree, targetId);
+      const isSameParent = getQaNodeParentId(nodesTree, draggedId) === targetParentId;
+      const siblings = targetParentId === null
+        ? nodesTree
+        : findQaNode(nodesTree, targetParentId)?.children ?? [];
+      const siblingIds = siblings.map((sibling) => sibling.node_id);
+      // 跨層時被拖的分類還不在對方的同層清單裡，所以一律先拿掉再插入。
+      const ordered = siblingIds.filter((id) => id !== draggedId);
+      ordered.splice(
+        ordered.indexOf(targetId) + (position === "after" ? 1 : 0),
+        0,
+        draggedId,
+      );
+      if (isSameParent && ordered.join("\0") === siblingIds.join("\0")) return;
+
+      if (!isSameParent) {
+        await moveNode(draggedId, targetParentId ? [targetParentId] : []);
+      }
+      await reorderNode(draggedId, ordered);
+      await fetchQaTree();
+      if (!isSameParent) onQaNodeMoved?.(targetParentId);
+    },
+    [fetchQaTree, moveNode, nodesTree, onQaNodeMoved, reorderNode],
+  );
 
   const handleTreeDrop = useCallback(
-    async (targetDir: string) => {
+    async (targetDir: string, position: QaDropPosition = "into") => {
       if (!draggingPath) return;
-      setDropTargetPath(targetDir);
+      setDropTarget(targetDir, position);
 
       const isQaRootDrop = targetDir === QUICK_QA_TREE_PATH;
       const isQaNodeDrop = targetDir.startsWith(`${QUICK_QA_TREE_PATH}/`);
@@ -122,7 +185,7 @@ export function useKnowledgeTreeDragDrop({
 
       const cleanup = () => {
         setDraggingPath(null);
-        setDropTargetPath(null);
+        setDropTarget(null);
       };
 
       try {
@@ -146,7 +209,11 @@ export function useKnowledgeTreeDragDrop({
                 (row) => row.q === targetQaEntry.question,
               );
               reorderedRows.splice(insertIdx, 0, draggedRow);
-              await saveMergedQa(draggedQaEntry.nodeId, reorderedRows);
+              // 號碼跟著新順序走：CSV 下次同步時依 index 排序，舊號碼會把順序排回去。
+              await saveMergedQa(
+                draggedQaEntry.nodeId,
+                reorderedRows.map((row, position) => ({ ...row, index: String(position + 1) })),
+              );
               if (selectedQaNodeId === draggedQaEntry.nodeId) {
                 setMergedRefreshKey((key) => key + 1);
               }
@@ -157,47 +224,17 @@ export function useKnowledgeTreeDragDrop({
         }
 
         if (draggedQaNodeId && isQaRootDrop) {
-          const draggedNode = findQaNode(nodesTree, draggedQaNodeId);
-          if (draggedNode && (draggedNode.parent_ids?.length ?? 0) > 0) {
+          if (getQaNodeParentId(nodesTree, draggedQaNodeId) !== null) {
             await moveNode(draggedQaNodeId, []);
             await fetchQaTree();
+            onQaNodeMoved?.(null);
           }
           cleanup();
           return;
         }
 
         if (draggedQaNodeId && targetQaNodeId) {
-          const draggedNodeId = draggedQaNodeId;
-          const targetNodeId = targetQaNodeId;
-          if (draggedNodeId !== targetNodeId) {
-            const draggedNode = findQaNode(nodesTree, draggedNodeId);
-            const targetNode = findQaNode(nodesTree, targetNodeId);
-            const draggingParentId = draggedNode?.parent_ids?.[0] || null;
-            const targetParentId = targetNode?.parent_ids?.[0] || null;
-
-            if (draggingParentId === targetParentId) {
-              const siblings =
-                draggingParentId === null
-                  ? nodesTree
-                  : findQaNode(nodesTree, draggingParentId)?.children || [];
-
-              const siblingIds = siblings.map((s) => s.node_id);
-              const dragIdx = siblingIds.indexOf(draggedNodeId);
-              const targetIdx = siblingIds.indexOf(targetNodeId);
-
-              if (dragIdx !== -1 && targetIdx !== -1) {
-                const newOrdered = [...siblingIds];
-                newOrdered.splice(dragIdx, 1);
-                const insertIdx = newOrdered.indexOf(targetNodeId);
-                newOrdered.splice(insertIdx, 0, draggedNodeId);
-                await reorderNode(draggedNodeId, newOrdered);
-                await fetchQaTree();
-              }
-            } else {
-              await moveNode(draggedNodeId, [targetNodeId]);
-              await fetchQaTree();
-            }
-          }
+          await dropQaNodeOntoNode(draggedQaNodeId, targetQaNodeId, position);
           cleanup();
           return;
         }
@@ -228,8 +265,6 @@ export function useKnowledgeTreeDragDrop({
             QUICK_QA_TREE_PATH.length + 1,
           );
           await attachSourceToNode(decodeURIComponent(encodedNodeId));
-        } else if (targetDir === "" && selectedQaNodeId) {
-          await attachSourceToNode(selectedQaNodeId);
         } else {
           await handleMove(draggingPath, targetDir);
         }
@@ -241,17 +276,19 @@ export function useKnowledgeTreeDragDrop({
     },
     [
       draggingPath,
+      dropQaNodeOntoNode,
       handleMove,
       adoptSource,
       ingestSource,
       loadDocuments,
       selectedQaNodeId,
       nodesTree,
-      reorderNode,
       fetchQaTree,
       fetchMergedQa,
       saveMergedQa,
       moveNode,
+      onQaNodeMoved,
+      setDropTarget,
       setMergedRefreshKey,
     ],
   );
@@ -259,7 +296,8 @@ export function useKnowledgeTreeDragDrop({
   return {
     draggingPath,
     dropTargetPath,
-    setDropTargetPath,
+    dropPosition,
+    setDropTarget,
     sourceDragDir,
     canDropQaNode,
     canDropQaEntry,

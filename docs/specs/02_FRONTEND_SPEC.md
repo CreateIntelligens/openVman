@@ -382,14 +382,15 @@ ws.onclose = () => { reconnect(); };
 #### 12.1 佈局設計 (Split-Pane Layout)
 * **左側面板 (Workspace Tree)**：遞迴顯示工作區目錄結構，支援資料夾建立、重新命名與刪除。標題列「多選」進入批次模式（2026-10-06）：檔案與資料夾出現勾選框（資料夾一次勾底下全部檔案），批次列可「移動到…」（沿用 `MoveModal`，保留檔名）、「設定語言」、「刪除」（`ConfirmModal` 列出數量與前 5 個檔名）。逐檔呼叫既有的 `moveKnowledgeDocument`、`updateKnowledgeDocumentMeta`、`deleteKnowledgeDocument`，執行中顯示進度、結束只重整一次；失敗（例如目標已有同名檔、文件掛在問答樹上不能移動）照樣繼續，摘要列出原因，失敗的保持勾選可重試。
 * **右側面板 (Main Content)**：
-    * **資料夾視角**：顯示檔案列表與大範圍的「拖拽上傳區 (Dropzone)」。
-    * **文件視角**：開啟全螢幕 Markdown 編輯器（左側原始碼，右側即時渲染）。
+    * **新增資料**：沒有選任何文件時的預設畫面，頁首「新增資料」也回到這裡。上傳區寫明規則，選檔或拖放後自動上傳並匯入，每個檔案一列結果，留到按「清除結果」。
+    * **文件視角**：文件編輯器，檢視切換為編輯、預覽、並排（手機沒有並排）；問答文件是問答表、原始文字。
+    * **快速問答分類**：標題是分類名稱與位置，超過 5 題有搜尋框，儲存與取消在標題列右側。
 
 #### 12.2 通用 Markdown 策略 (Universal Markdown Strategy)
 前端僅負責編輯 `.md` 文件。即使上傳的是 PDF、DOCX、PPTX 或 XLSX，後端也會先保留原始檔於 `workspace/raw/`；PDF 會先嘗試 pdf-inspector text-based fast path，其餘文件或 fallback 再透過 Docling / AnyDoc 轉換管線生成 Markdown 文件提供前端編輯，確保 AI 讀取的資料格式具備最高的一致性。
 
 #### 12.3 狀態反饋
-檔案右側會顯示「已索引 (Indexed)」或「處理中 (Processing)」的燈號，數據來源於 WebSocket 的 `gateway_status`。
+文件狀態是「可被搜尋」「處理中」「已停用」「不會被搜尋」，由文件清單的 `enabled`、`is_indexed`、`is_indexable` 算出（`documentStatusLabel`）。樹上只標需要留意的三種，正常的文件不顯示；文件檢視一律寫出來。有文件處理中時，前端定期重抓文件清單更新狀態，間隔從 3 秒逐步拉長到 15 秒，5 分鐘沒有變動就停。
 
 #### 12.4 知識圖譜視圖 (Graph View)
 知識庫頁面新增 **Graph** 分頁，呼叫 Brain `/graph` endpoint 取得由 `graphify` skill 產出的節點/關係資料，在 Admin UI 中以互動式圖形呈現實體與關聯。此視圖與檔案/紀錄分頁並列，作為非結構化知識的視覺化檢索入口。
@@ -402,12 +403,12 @@ ws.onclose = () => { reconnect(); };
 
 * **Slash Autocomplete (`/skill`)**：在輸入框輸入 `/` 時彈出 `SlashDropdown`，從 `skill_manager` 動態取得的技能清單即時過濾。支援 ↑/↓ 選擇、Enter / Tab 確認、Esc 關閉。選定技能後會被組裝為 forced tool call，Brain 端直接路由到該技能。
 * **Input History (↑/↓)**：以 `useInputHistory` 保存當前 session 的使用者訊息，當游標位於輸入起點或輸入框為空時，↑/↓ 循環帶入歷史訊息；輸入框仍有文字且 slash dropdown 顯示中時，歷史捕獲優先讓位給 slash autocomplete。
-* **修正成 QA**：文字模式的 AI 回答操作列有「修正成 QA」，`CorrectQaModal` 帶入該輪提問與回答，改好後選問答節點，以 `GET`／`PUT /knowledge/qa/nodes/{id}/merged` 寫回（同題只改答案，新題併入節點既有的 `knowledge/qa/manual_<節點>_*.md` 或新建），Brain 存檔後排程重建索引。預設 `hidden`，只進知識庫、不出現在前台快速問題按鈕。
+* **修正成 QA**：文字模式的 AI 回答操作列有「修正成 QA」，`CorrectQaModal` 帶入該輪提問與回答，改好後選快速問答分類，以 `GET`／`PUT /knowledge/qa/nodes/{id}/merged` 寫回（同題只改答案，新題併入節點既有的 `knowledge/qa/manual_<節點>_*.md` 或新建），Brain 存檔後排程重建索引。預設 `hidden`，只進知識庫、不出現在前台快速問題按鈕。
 * **錯誤訊息**：`api/common.ts` 的 `parseErrorMessage` 優先用後端說明；沒有說明、回應是 HTML 錯誤頁或欄位驗證錯誤時，依狀態碼（`statusMessage`）或欄位名稱講人話，連不上伺服器時說網路。
 * **Action Request Card**：當 Brain 回傳 `action_request` 事件時，前端以 `ActionRequestCard` 呈現工具調用提案（名稱、參數、說明）；操作者可逐案核可/拒絕，核可後才真正執行工具。
 * **TTS / ASR 控制集中化**：TTS provider / voice、ASR 開關、Live 麥克風鍵皆整併至輸入列，降低視覺雜訊。TTS fallback 會以 toast 提示。
 * **統一導覽 (`NavigationContext`)**：`AppSidebar`、`ChatSidebar`、各頁面共享單一導覽狀態，切換角色 (persona)、載入歷史 session、建立新對話都透過同一份 context 管理。
-* **可收合導覽群組**：`AppSidebar` 與手機 `MobileNavDrawer` 共用 `TabGroup`、`useNavigationGroups`，提供 Workspace／Knowledge／Character／System 個別收合。首次僅開啟目前群組，偏好以帳號範圍保存；載入與路由切換會展開目前頁面的群組。窄側欄保留 W／K／C／S 標題，群組按鈕具 `aria-expanded`／`aria-controls`，收合項目不進入鍵盤焦點順序。
+* **可收合導覽群組**：`AppSidebar` 與手機 `MobileNavDrawer` 共用 `TabGroup`、`useNavigationGroups`，提供互動／知識／角色／系統個別收合。畫面與無障礙名稱用 `tabGroups` 的 `title`；`label`（Workspace／Knowledge／Character／System）是收合狀態的儲存鍵，改掉會讓使用者存的狀態失效。首次僅開啟目前群組，偏好以帳號範圍保存；載入與路由切換會展開目前頁面的群組。窄側欄同樣顯示兩字標題，群組按鈕具 `aria-expanded`／`aria-controls`，收合項目不進入鍵盤焦點順序。
 * **合併分頁頁面**：「專案與權限」（`/admin/access`）與「系統狀態」（`/admin/system`）以 `PageTabsShell` 呈現第一層底線分頁，分頁狀態綁在網址子路徑；「帳號」分頁內的第二層（建立／編輯管理）改用分段控制，與第一層區隔。分頁可見性與直連擋法共用 `navigation.ts` 的 `requiredRouteAccess()`，路由表見 [Canonical Routes](../guides/admin-canonical-routes.md)。
 * **對話紀錄管理與匯出**：`Sessions` workspace 集中提供跨角色瀏覽、文字與秒級時間篩選、排序、批次選取、匯出及刪除。匯出由 Backend 驗證專案讀取權限後交由 Brain 組裝，不從前端逐筆抓取歷史；從紀錄列開啟 Chat 時，以一次性 URL deep link 還原角色與 session，消費後立即移除該參數。
 * **設計 Token (RGB channels)**：`tailwind.config.js` 與 `index.css` 將語意色 (`primary`、`surface`、`danger` 等) 以 `R G B` 三通道形式暴露，讓 Tailwind 透明度修飾符 (`bg-primary/20` 等) 能夠正確運算。

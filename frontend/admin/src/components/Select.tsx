@@ -28,6 +28,31 @@ interface SelectProps {
   label?: string;
 }
 
+const LIST_MAX_HEIGHT_REM = 12.5;
+// 空間再小也至少看得到幾個選項；清單本身可以捲動。
+const LIST_MIN_HEIGHT_REM = 6;
+const LIST_EDGE_GAP_REM = 0.5;
+const PREFER_BELOW_MIN_ROOM_REM = 13.75;
+
+/**
+ * 按鈕上下各有多少空間。不能只看視窗：清單會被外層的 overflow 裁掉，
+ * 例如手機上文件頁的語言選單，往上開就被頁首切掉，前兩個選項按不到。
+ */
+function roomAround(element: HTMLElement): { above: number; below: number } {
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    const { overflowY } = getComputedStyle(parent);
+    if (overflowY && overflowY !== "visible") {
+      const box = parent.getBoundingClientRect();
+      top = Math.max(top, box.top);
+      bottom = Math.min(bottom, box.bottom);
+    }
+  }
+  const rect = element.getBoundingClientRect();
+  return { above: rect.top - top, below: bottom - rect.bottom };
+}
+
 export default function Select({
   value,
   options,
@@ -50,6 +75,7 @@ export default function Select({
   };
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
+  const [listMaxHeightRem, setListMaxHeightRem] = useState(LIST_MAX_HEIGHT_REM);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -64,9 +90,12 @@ export default function Select({
     const idx = selectedOption ? options.indexOf(selectedOption) : 0;
     setFocusedIndex(idx >= 0 ? idx : 0);
     if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      setDropUp(spaceBelow < 220 && rect.top > spaceBelow);
+      const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const { above, below } = roomAround(containerRef.current);
+      const opensUp = below < PREFER_BELOW_MIN_ROOM_REM * rootFontSize && above > below;
+      setDropUp(opensUp);
+      const roomRem = (opensUp ? above : below) / rootFontSize - LIST_EDGE_GAP_REM;
+      setListMaxHeightRem(Math.max(LIST_MIN_HEIGHT_REM, Math.min(LIST_MAX_HEIGHT_REM, roomRem)));
     }
     setOpen(true);
   };
@@ -177,7 +206,8 @@ export default function Select({
           ref={listRef}
           role="listbox"
           aria-label={ariaLabel ?? title ?? placeholder ?? "選擇選項"}
-          className={`absolute z-50 w-full min-w-[7.5rem] bg-surface-raised border border-border rounded-xl shadow-xl dark:shadow-[0_0.5rem_1.875rem_rgba(0,0,0,0.5)] overflow-y-auto max-h-[12.5rem] py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
+          style={{ maxHeight: `${listMaxHeightRem}rem` }}
+          className={`absolute z-50 w-full min-w-[7.5rem] bg-surface-raised border border-border rounded-xl shadow-xl dark:shadow-[0_0.5rem_1.875rem_rgba(0,0,0,0.5)] overflow-y-auto py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           {label && (
             <div

@@ -85,7 +85,7 @@ describe("CorrectQaModal", () => {
   it("saves the edited answer into the chosen node through the merged QA API", async () => {
     renderModal();
 
-    fireEvent.change(screen.getByLabelText("存到問答節點"), { target: { value: "hours" } });
+    fireEvent.change(screen.getByLabelText("存到哪個分類"), { target: { value: "hours" } });
     fireEvent.change(screen.getByLabelText("正確答案"), { target: { value: " 早上八點半 " } });
     fireEvent.click(screen.getByRole("button", { name: /儲存/ }));
 

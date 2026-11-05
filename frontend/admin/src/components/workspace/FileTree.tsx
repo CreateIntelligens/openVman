@@ -24,8 +24,8 @@ function sortNodes(nodes: FileNode[]): FileNode[] {
 }
 
 const ICON_MAP: Record<string, { icon: string; color: string }> = {
-       ".md": { icon: "markdown", color: "text-sky-600 dark:text-sky-400" },
-       ".csv": { icon: "table_chart", color: "text-emerald-600 dark:text-emerald-400" },
+       ".md": { icon: "markdown", color: "text-info" },
+       ".csv": { icon: "table_chart", color: "text-success" },
        ".txt": { icon: "description", color: "text-content-muted" },
 };
 const DEFAULT_ICON = { icon: "draft", color: "text-content-subtle" };
@@ -155,13 +155,13 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                             {/* Badges / Labels */}
                             <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                    {doc?.is_core && (
-                                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-amber-500">
-                                                 core
+                                          <span className="rounded bg-warn/10 px-1.5 py-0.5 text-xs font-medium text-warn">
+                                                 核心
                                           </span>
                                    )}
                                    {!doc?.is_indexable && !doc?.is_core && (
-                                          <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-content-subtle">
-                                                 omit
+                                          <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-xs font-medium text-content-subtle">
+                                                 不會被搜尋
                                           </span>
                                    )}
                             </div>
@@ -172,7 +172,11 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
        const rootChildren = sortNodes(Object.values(tree.children));
 
        if (documents.length === 0) {
-              return <div className="text-sm text-content-subtle p-4">No documents found.</div>;
+              return <div className="text-sm text-content-subtle p-4">還沒有文件。</div>;
+       }
+
+       if (rootChildren.length === 0) {
+              return <div className="text-sm text-content-subtle p-4">找不到符合的文件。</div>;
        }
 
        return (

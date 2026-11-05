@@ -14,7 +14,7 @@ vi.mock("../../api", async () => {
 });
 
 // 依按鈕的可存取名稱找，手機只留圖示也找得到，不綁顯示文字的 DOM 結構。
-const routesButton = (summary: string) => new RegExp(`^語言分流：${summary}，`);
+const routesButton = (summary: string) => new RegExp(`^回答語言：${summary} · `);
 
 describe("LanguageRoutesButton", () => {
   beforeEach(() => {
@@ -75,13 +75,13 @@ describe("LanguageRoutesButton", () => {
     await waitFor(() =>
       expect(api.saveKnowledgeSettings).toHaveBeenLastCalledWith({ language_routes: ["zh", "en"], reply_seconds: 10 }),
     );
-    expect(await screen.findByRole("button", { name: "語言分流：中文、English，回答 10 秒" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "回答語言：中文、English · 10 秒" })).toBeTruthy();
   });
 
   it("zero means unlimited and toggling routes does not resend the seconds", async () => {
     api.fetchKnowledgeSettings.mockResolvedValue({ language_routes: ["zh"], reply_seconds: 0 });
     render(<LanguageRoutesButton projectId="esg" />);
-    expect(await screen.findByRole("button", { name: "語言分流：中文，回答 不限" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "回答語言：中文 · 長度不限" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: routesButton("中文") }));
     expect(screen.getByText("不限制長度")).toBeTruthy();
 
@@ -89,6 +89,53 @@ describe("LanguageRoutesButton", () => {
     await waitFor(() =>
       expect(api.saveKnowledgeSettings).toHaveBeenLastCalledWith({ language_routes: ["zh", "en"] }),
     );
+  });
+
+  it("closes with Escape and gives the focus back to the button", async () => {
+    render(<LanguageRoutesButton projectId="proj-hospital" />);
+    const button = await screen.findByRole("button", { name: routesButton("中文") });
+    fireEvent.click(button);
+    expect(screen.getByRole("dialog", { name: "回答語言設定" })).toBeTruthy();
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "回答語言設定" })).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("leaves room for the page header so the panel stays on a phone screen", async () => {
+    // 手機上面板接在整個頁首下面，375×667 時原本的 14rem 不夠，底部超出畫面 18px。
+    render(<LanguageRoutesButton projectId="proj-hospital" />);
+    fireEvent.click(await screen.findByRole("button", { name: routesButton("中文") }));
+
+    expect(screen.getByRole("dialog", { name: "回答語言設定" }).className).toContain(
+      "max-h-[calc(100dvh-17.5rem)]",
+    );
+  });
+
+  it("does not listen for Escape while closed", async () => {
+    render(<LanguageRoutesButton projectId="proj-hospital" />);
+    const button = await screen.findByRole("button", { name: routesButton("中文") });
+    (document.activeElement as HTMLElement | null)?.blur?.();
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+
+    expect(document.activeElement).not.toBe(button);
+  });
+
+  it("explains the setting in words on the panel, not in a tooltip", async () => {
+    render(<LanguageRoutesButton projectId="proj-hospital" />);
+    const button = await screen.findByRole("button", { name: routesButton("中文") });
+    expect(button.getAttribute("title")).toBeNull();
+
+    fireEvent.click(button);
+
+    const panel = screen.getByRole("dialog", { name: "回答語言設定" });
+    expect(panel.textContent).toContain("訪客用哪種語言問");
+    expect(panel.textContent).toContain("至少要勾一種語言");
+    expect(panel.textContent).toContain("填 0 就不限制");
+    expect(panel.textContent).not.toContain("分流");
+    expect(panel.textContent).not.toContain("模型");
   });
 
   it("rejects seconds out of range without saving", async () => {

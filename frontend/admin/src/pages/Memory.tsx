@@ -124,7 +124,7 @@ export default function Memory() {
     runMemoryMaintenance()
       .then((result) => {
         setMaintenanceResult(result);
-        setStatus({ type: "success", message: `記憶維護已完成（${result.status}）` });
+        setStatus({ type: "success", message: "記憶維護已完成。" });
         loadMemories(1);
       })
       .catch((e) => setStatus({ type: "error", message: String(e) }))

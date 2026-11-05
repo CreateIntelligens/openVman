@@ -411,9 +411,11 @@ dialog::backdrop {
   backdrop-filter: blur(0.1875rem);
 }
 
+/* 在頁面與手機導覽的遮罩（z-40）之上，但要低於對話框、選單與目錄抽屜（z-50）：
+   不然小助理開著時，對話框的按鈕會被蓋住。 */
 .mascot-trigger,
 .mascot-widget {
-  z-index: var(--ov-z-dropdown);
+  z-index: 45;
 }
 
 .material-icons-loading .material-symbols-outlined {

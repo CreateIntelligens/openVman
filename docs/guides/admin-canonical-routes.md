@@ -29,7 +29,7 @@
 
 | 頁面 | 預設子頁（省略子路徑） | 其他固定子路徑 |
 |------|------------------------|----------------|
-| 語音 | TTS 試聽：`/admin/voice` | ASR 試辨識：`/admin/voice/asr` |
+| 語音 | 聲音試聽：`/admin/voice` | ASR 試辨識：`/admin/voice/asr` |
 | 知識庫 | 文件：`/admin/knowledge` | 圖譜：`/admin/knowledge/graph` |
 | Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |

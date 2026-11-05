@@ -148,7 +148,7 @@ function RootCredentialDialog({ projectId, projectLabel, onClose }: ProjectGemin
           <form className="mt-5 space-y-4" onSubmit={submit}>
             <label className="block text-sm font-medium text-content">
               金鑰名稱
-              <input className="input mt-2" value={label} onChange={(event) => setLabel(event.target.value)} disabled={busy} required maxLength={128} autoComplete="off" placeholder="例：慧誠醫院 Google 專案" />
+              <input className="input mt-2" value={label} onChange={(event) => setLabel(event.target.value)} disabled={busy} required maxLength={128} autoComplete="off" placeholder="例：門市客服 Google 專案" />
             </label>
             <label className="block text-sm font-medium text-content">
               {credential.source === "project" ? "新的 Gemini API key" : "Gemini API key"}

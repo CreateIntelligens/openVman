@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
 import { NavigationGuardProvider } from "../context/NavigationGuardContext";
-import { fetchKnowledgeDocument } from "../api";
+import { fetchKnowledgeDocument, fetchKnowledgeDocuments, reindexKnowledge } from "../api";
 
 vi.mock("../context/ProjectContext", () => ({
   useProject: () => ({ projectId: "proj-test" }),
@@ -115,5 +115,70 @@ describe("Workspace unsaved changes", () => {
     expect(await screen.findByText("尚有未儲存的變更")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(textarea.value).toBe("還沒存的修改");
+  });
+});
+
+describe("Workspace wording", () => {
+  const renderWorkspace = () => render(
+    <NavigationGuardProvider>
+      <Workspace />
+    </NavigationGuardProvider>,
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("searches files in Chinese and says so when nothing matches", async () => {
+    renderWorkspace();
+    await screen.findByRole("button", { name: /文件乙/ });
+
+    const search = screen.getByRole("textbox", { name: "搜尋文件" }) as HTMLInputElement;
+    expect(search.placeholder).toBe("搜尋文件…");
+    expect(document.body.textContent).not.toMatch(/Search files|Loading/);
+
+    fireEvent.change(search, { target: { value: "不存在的文件" } });
+    expect(await screen.findByText("找不到符合的文件。")).toBeTruthy();
+  });
+
+  it("says there are no documents yet in Chinese", async () => {
+    vi.mocked(fetchKnowledgeDocuments).mockResolvedValueOnce({ documents: [] } as never);
+    renderWorkspace();
+
+    expect(await screen.findByText("還沒有文件。")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("No documents found");
+  });
+
+  it("labels special files without engineering words", async () => {
+    vi.mocked(fetchKnowledgeDocuments).mockResolvedValueOnce({
+      documents: [
+        { ...summary("main.md", "主要設定"), is_core: true },
+        { ...summary("notes.bin", "附件"), is_indexable: false },
+      ],
+    } as never);
+    renderWorkspace();
+
+    expect(await screen.findByText("核心")).toBeTruthy();
+    expect(screen.getByText("不會被搜尋")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/\bcore\b|\bomit\b/);
+  });
+
+  it("asks in Chinese before deleting a document", async () => {
+    renderWorkspace();
+    await editorWithDraft();
+
+    fireEvent.click(screen.getByRole("button", { name: "刪除" }));
+    const dialog = await screen.findByRole("dialog", { name: "刪除文件" });
+    expect(within(dialog).getByRole("button", { name: "刪除" })).toBeTruthy();
+    expect(dialog.textContent).not.toMatch(/Delete/);
+  });
+
+  it("reports a rebuild in plain words", async () => {
+    vi.mocked(reindexKnowledge).mockResolvedValueOnce({ document_count: 2, chunk_count: 7 } as never);
+    renderWorkspace();
+    await screen.findByRole("button", { name: /文件乙/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "重建搜尋資料" }));
+    expect(await screen.findByText("已重建搜尋資料：2 份文件，7 個段落。")).toBeTruthy();
   });
 });

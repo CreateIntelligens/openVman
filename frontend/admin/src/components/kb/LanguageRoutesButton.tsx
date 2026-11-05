@@ -30,7 +30,7 @@ export function lengthTable(seconds: number, rates: SpeechRates) {
   ];
 }
 
-/** 知識庫的語言分流與回答長度設定；分流由管理者勾選，不看有哪些文件。 */
+/** 回答語言與回答長度設定；語言由管理者勾選，不看有哪些文件。 */
 export default function LanguageRoutesButton({ projectId }: { projectId: string }) {
   const [routes, setRoutes] = useState<KnowledgeLanguage[]>(["zh"]);
   const [seconds, setSeconds] = useState(DEFAULT_SECONDS);
@@ -40,6 +40,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -54,8 +55,17 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
     const close = (event: MouseEvent) => {
       if (!panelRef.current?.contains(event.target as Node)) setOpen(false);
     };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
+    };
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
   }, [open]);
 
   function apply(settings: KnowledgeSettings) {
@@ -79,7 +89,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
     }
   }
 
-  // 只送分流：秒數不帶，Brain 會保留原本的設定。
+  // 只送語言：秒數不帶，Brain 會保留原本的設定。
   function save(next: KnowledgeLanguage[]) {
     return persist({ language_routes: next });
   }
@@ -121,29 +131,38 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
   ];
 
   const summary = routes.map(labelOf).join("、");
-  const limit = seconds > 0 ? `${seconds} 秒` : "不限";
+  const limit = seconds > 0 ? `${seconds} 秒` : "長度不限";
   const preview = Math.round(Number(secondsDraft));
   const showTable = Number.isFinite(preview) && preview > 0 && preview <= MAX_SECONDS;
 
   return (
-    <div className="relative" ref={panelRef}>
+    // 手機上不相對按鈕定位：按鈕在列的左半邊，面板會超出畫面，所以改貼著整個頁首。
+    <div className="sm:relative" ref={panelRef}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-content-muted hover:bg-surface-sunken transition-colors"
-        title="使用者用哪種語言問，就查那個語言的文件"
-        aria-label={`語言分流：${summary}，回答 ${limit}`}
+        aria-haspopup="dialog"
+        className="btn btn-ghost max-sm:px-2"
+        aria-label={`回答語言：${summary} · ${limit}`}
       >
-        <span className="material-symbols-outlined text-[1rem]" aria-hidden="true">translate</span>
-        {/* 手機只留圖示，頁首才不會被長標籤撐成好幾列。 */}
-        <span className="hidden sm:inline">分流：{summary}</span>
-        <span className="hidden text-content-subtle sm:inline">· 回答 {limit}</span>
+        <span aria-hidden="true" className="material-symbols-outlined hidden text-[1rem] sm:inline">translate</span>
+        {/* 手機只留短字，頁首才放得下一列。語言很多時只省略語言，秒數一定看得到。 */}
+        <span className="sm:hidden">語言</span>
+        <span className="hidden max-w-[16rem] truncate sm:inline">回答語言：{summary}</span>
+        <span className="hidden text-content-muted sm:inline">· {limit}</span>
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">
-          <p className="mb-2 text-xs text-content-muted">
-            至少勾一個；只勾一個就不分流。所有文件都查得到，使用者語言的文件優先。排第一的是主要語言：短句（如 hi）、判斷不出來時用它，同語言不夠時也先用它補。
+        <div
+          role="dialog"
+          aria-label="回答語言設定"
+          // 手機接在整個頁首下面：頂列加頁首約 15rem，副標題折行時再多一行。
+          className="absolute inset-x-4 top-full z-50 mt-1 max-h-[calc(100dvh-17.5rem)] overflow-y-auto rounded-lg border border-border bg-surface-raised p-4 shadow-lg sm:inset-x-auto sm:left-0 sm:max-h-[calc(100dvh-14rem)] sm:w-[22rem]"
+        >
+          <h2 className="text-sm font-semibold text-content">回答語言</h2>
+          <p className="mt-1 mb-3 text-xs text-content-muted">
+            訪客用哪種語言問，AI 就先查那個語言的文件，不夠再用其他語言補。
           </p>
           <ul className="flex flex-col gap-2">
             {ordered.map((value, index) => {
@@ -155,13 +174,13 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
                       type="checkbox"
                       className="h-4 w-4 accent-primary"
                       checked={checked}
-                      // 最後一個不能取消：至少要有一條分流。
+                      // 最後一個不能取消：至少要留一種語言。
                       disabled={saving || (routes.length === 1 && checked)}
                       onChange={() => toggle(value)}
                     />
                     {labelOf(value)}
                     {checked && index === 0 && (
-                      <span className="rounded px-1 text-[0.625rem] text-primary ring-1 ring-primary/40">主要</span>
+                      <span className="rounded px-1 text-xs text-primary ring-1 ring-primary/40">主要</span>
                     )}
                   </label>
                   {checked && index > 0 && (
@@ -169,16 +188,19 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
                       type="button"
                       onClick={() => moveUp(value)}
                       disabled={saving}
-                      className="rounded p-0.5 text-content-subtle hover:bg-surface-sunken hover:text-primary"
+                      className="btn btn-ghost px-2 py-0.5 text-xs"
                       aria-label={`${labelOf(value)} 往前移`}
-                      title="往前移"
                     >
-                      <span className="material-symbols-outlined text-[1rem]">arrow_upward</span>
+                      往前移
                     </button>
                   )}
                 </li>
               );
             })}
+          </ul>
+          <ul className="mt-3 list-disc space-y-1 pl-4 text-xs text-content-muted">
+            <li>至少要勾一種語言。</li>
+            <li>排第一的是主要語言：判斷不出訪客用什麼語言時（例如只打 hi）就用它。</li>
           </ul>
           <div className="mt-3 border-t border-border pt-3">
             <label className="flex items-center justify-between gap-2 text-sm">
@@ -190,7 +212,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
                   max={MAX_SECONDS}
                   inputMode="numeric"
                   aria-label="回答長度上限（秒）"
-                  className="w-16 rounded border border-border bg-surface px-1.5 py-0.5 text-right text-sm"
+                  className="input w-16 px-1.5 py-0.5 text-right"
                   value={secondsDraft}
                   disabled={saving}
                   onChange={(event) => setSecondsDraft(event.target.value)}
@@ -201,7 +223,10 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
               </span>
             </label>
             <p className="mt-1 text-xs text-content-muted">
-              回答會被念出來，模型會照這個秒數換算的字數回答；填 0 不限制（例如要照抄完整答案的知識庫）。
+              回答會被念出來，AI 會照這個秒數控制字數。
+            </p>
+            <p className="mt-1 text-xs text-content-muted">
+              填 0 就不限制，適合要照抄完整答案的知識庫。
             </p>
             {showTable ? (
               <table className="mt-2 w-full text-xs" aria-label="秒數換算">

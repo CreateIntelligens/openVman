@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   applyRenormalizedKnowledgeDocument,
+  commitRawKnowledge,
   createKnowledgeNote,
+  discardRawPending,
+  fetchRawPending,
   previewRenormalizedKnowledgeDocument,
   uploadRawKnowledgeDocuments,
   uploadKnowledgeDocuments,
@@ -42,6 +45,53 @@ describe("knowledge api", () => {
     expect(body).toBeInstanceOf(FormData);
     expect((body as FormData).get("target_dir")).toBe("raw/clinic");
     expect((body as FormData).get("project_id")).toBe("default");
+  });
+
+  // 實測：採納會連以前留在暫存區的檔案一起處理，所以這批要指名。
+  it("commits only the named files and can skip the AI step", async () => {
+    const f = mockFetch({ status: "started", project_id: "default" });
+
+    await commitRawKnowledge({ paths: ["a.csv", "clinic/b.docx"], normalize: false });
+
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("/api/v1/knowledge/raw/commit");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      project_id: "default",
+      paths: ["a.csv", "clinic/b.docx"],
+      normalize: false,
+    });
+  });
+
+  it("leaves paths and normalize to the server when they are not given", async () => {
+    const f = mockFetch({ status: "nothing_to_commit", project_id: "default" });
+
+    await commitRawKnowledge();
+
+    expect(JSON.parse((f.mock.calls[0][1] as RequestInit).body as string)).toEqual({
+      project_id: "default",
+    });
+  });
+
+  it("lists the files waiting to be imported", async () => {
+    const f = mockFetch({ files: [{ path: "a.csv", size: 3, updated_at: "2026-11-05T10:00:00" }] });
+
+    const response = await fetchRawPending();
+
+    expect(f.mock.calls[0][0]).toBe("/api/v1/knowledge/raw/pending?project_id=default");
+    expect(response.files[0].path).toBe("a.csv");
+  });
+
+  it("removes one waiting file by its path", async () => {
+    const f = mockFetch({ status: "ok" });
+
+    await discardRawPending("clinic/舊檔.csv");
+
+    const [url, init] = f.mock.calls[0];
+    expect((init as RequestInit).method).toBe("DELETE");
+    const query = new URL(url as string, "http://localhost").searchParams;
+    expect(query.get("path")).toBe("clinic/舊檔.csv");
+    expect(query.get("project_id")).toBe("default");
   });
 
   it("requests a normalization preview without overwriting the document", async () => {

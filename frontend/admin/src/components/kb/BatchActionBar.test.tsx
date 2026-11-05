@@ -101,6 +101,26 @@ describe("BatchActionBar", () => {
     expect(props.onSelectionChange).toHaveBeenCalledWith([]);
   });
 
+  it("tells where the uploaded originals went, not the old raw folder", () => {
+    render(
+      <BatchActionBar
+        selectedPaths={["knowledge/up.md"]}
+        documents={[makeDoc("knowledge/up.md", { source_type: "upload", has_original_backup: true })]}
+        serverDirs={[]}
+        onClearSelection={vi.fn()}
+        onSelectionChange={vi.fn()}
+        onFinished={vi.fn(async () => undefined)}
+        onStatus={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "刪除" }));
+
+    const message = screen.getByText(/確定要刪除 1 個檔案嗎？/).textContent;
+    expect(message).toContain("原始上傳檔還留在系統備份裡");
+    expect(message).not.toContain("raw/");
+  });
+
   it("does not delete when the confirmation is cancelled", () => {
     renderBar();
 

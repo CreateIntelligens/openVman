@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { useEffect } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +33,29 @@ describe("MascotWidget", () => {
     expect(src).not.toMatch(/engine=|vrm=|character=/);
     // 只有一個小助理，沒有切換選單。
     expect(screen.queryByText("Haru")).toBeNull();
+  });
+
+  it("stays below the save and search controls on a short window", () => {
+    // 1280×720 打開時原本從 y=224 開始，蓋住編輯器的儲存與文件的檢視切換。
+    window.localStorage.setItem("admin-mascot-open", "1");
+
+    render(
+      <MascotProvider>
+        <MascotWidget />
+      </MascotProvider>,
+    );
+
+    expect(screen.getByTitle("AI 虛擬人小助理").parentElement?.className).toContain(
+      "h-[max(12rem,min(30rem,calc(100dvh-21rem)))]",
+    );
+  });
+
+  it("stays under dialogs and menus so their buttons are never covered", () => {
+    // 對話框、選單和目錄抽屜都是 z-50。1024×768 小助理開著時蓋住過「新增分類」的確認鈕。
+    const css = readFileSync("src/index.css", "utf8");
+    const zIndex = css.match(/\.mascot-widget\s*\{\s*z-index:\s*(\d+)/)?.[1];
+    expect(Number(zIndex)).toBeGreaterThan(40);
+    expect(Number(zIndex)).toBeLessThan(50);
   });
 
   it("starts collapsed by default so the model is not downloaded eagerly", () => {

@@ -21,19 +21,20 @@ export default function WorkspaceTreePanel({
   return (
     <>
       <div className="px-4 mb-3 shrink-0 relative">
-        <span className="material-symbols-outlined absolute left-7 top-1/2 -translate-y-1/2 text-content-subtle text-[1rem]">search</span>
+        <span aria-hidden="true" className="material-symbols-outlined absolute left-7 top-1/2 -translate-y-1/2 text-content-subtle text-[1rem]">search</span>
         <input
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search files..."
-          className="w-full rounded-lg border border-border bg-surface-raised dark:bg-surface-sunken/50 pl-9 pr-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary/50 focus:outline-none focus:bg-white dark:focus:bg-surface-sunken transition-colors"
+          aria-label="搜尋文件"
+          placeholder="搜尋文件…"
+          className="w-full rounded-lg border border-border bg-surface-raised dark:bg-surface-sunken/50 pl-9 pr-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary/50 focus:outline-none focus:bg-surface-raised dark:focus:bg-surface-sunken transition-colors"
         />
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-4 select-none">
         {loading ? (
           <div className="flex items-center justify-center h-full text-content-subtle text-sm">
-            <span className="material-symbols-outlined animate-spin mr-2 text-[1.125rem]">refresh</span> Loading...
+            <span aria-hidden="true" className="material-symbols-outlined animate-spin mr-2 text-[1.125rem]">refresh</span> 載入中…
           </div>
         ) : (
           <FileTree

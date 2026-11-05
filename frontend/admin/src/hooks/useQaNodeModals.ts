@@ -10,12 +10,18 @@ import type { QaNode, useQaNodes } from "./useQaNodes";
 
 type QaNodeActions = Pick<
   ReturnType<typeof useQaNodes>,
-  "createNode" | "updateNode" | "deleteNode"
+  "createNode" | "updateNode" | "deleteNode" | "moveNode"
 >;
 
 interface UseQaNodeModalsOptions extends QaNodeActions {
   nodesTree: QaNode[];
   setSelectedQaNodeId: Dispatch<SetStateAction<string | null>>;
+  fetchQaTree: () => Promise<unknown>;
+  loadDocuments: () => Promise<void>;
+  /** 分類換了上層之後呼叫；parentId 是 null 代表移到最上層。 */
+  onQaNodeMoved: (parentId: string | null) => void;
+  /** 讓某個分類的內容在樹上看得到；null 代表快速問答最上層。 */
+  onRevealQaNode: (nodeId: string | null) => void;
 }
 
 export function useQaNodeModals({
@@ -23,7 +29,12 @@ export function useQaNodeModals({
   createNode,
   updateNode,
   deleteNode,
+  moveNode,
   setSelectedQaNodeId,
+  fetchQaTree,
+  loadDocuments,
+  onQaNodeMoved,
+  onRevealQaNode,
 }: UseQaNodeModalsOptions) {
   const [qaNodeDialog, setQaNodeDialog] = useState<QaNodeDialog | null>(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
@@ -87,19 +98,48 @@ export function useQaNodeModals({
     [nodesTree],
   );
 
+  const openMoveQaNodeDialog = useCallback(
+    (nodeId: string) => {
+      const node = findQaNode(nodesTree, nodeId);
+      if (!node) return;
+      setQaNodeDialog({ type: "move", node });
+    },
+    [nodesTree],
+  );
+
   const closeQaNodeDialog = useCallback(() => {
     setQaNodeDialog(null);
   }, []);
 
-  const handleCreateQaNodeSubmit = useCallback(
-    (values: Record<string, string>) => {
-      const parentIds =
-        qaNodeDialog?.type === "add-child" ? [qaNodeDialog.parentNodeId] : [];
-      const nodeId = values.node_id || `node_${Date.now()}`;
-      void createNode(nodeId, values.label, parentIds, [], 1.0, false);
+  // 失敗時讓錯誤往外丟：對話框留著並寫出原因，使用者不用重選一次。
+  const handleMoveQaNodeConfirm = useCallback(
+    async (parentId: string | null) => {
+      if (qaNodeDialog?.type !== "move") return;
+      await moveNode(qaNodeDialog.node.node_id, parentId ? [parentId] : []);
+      await fetchQaTree();
+      onQaNodeMoved(parentId);
       closeQaNodeDialog();
     },
-    [closeQaNodeDialog, createNode, qaNodeDialog],
+    [closeQaNodeDialog, fetchQaTree, moveNode, onQaNodeMoved, qaNodeDialog],
+  );
+
+  const handleCreateQaNodeSubmit = useCallback(
+    (values: Record<string, string>) => {
+      const parentId =
+        qaNodeDialog?.type === "add-child" ? qaNodeDialog.parentNodeId : null;
+      void createNode(
+        `node_${Date.now()}`,
+        values.label,
+        parentId ? [parentId] : [],
+        [],
+        1.0,
+        false,
+      );
+      // 上層收合著的話新分類看不到，使用者會以為沒有新增成功。
+      onRevealQaNode(parentId);
+      closeQaNodeDialog();
+    },
+    [closeQaNodeDialog, createNode, onRevealQaNode, qaNodeDialog],
   );
 
   const handleRenameQaNodeSubmit = useCallback(
@@ -126,9 +166,11 @@ export function useQaNodeModals({
     async (id: string) => {
       const res = await deleteNode(id);
       setSelectedQaNodeId((current) => (current === id ? null : current));
+      // 後端會一併刪掉分類專屬的來源文件，文件那一段也要跟著更新。
+      await loadDocuments();
       return res;
     },
-    [deleteNode],
+    [deleteNode, loadDocuments, setSelectedQaNodeId],
   );
 
   const handleDeleteQaNodeConfirm = useCallback(() => {
@@ -147,9 +189,11 @@ export function useQaNodeModals({
     openCreateQaNodeDialog,
     openRenameQaNodeDialog,
     openDeleteQaNodeDialog,
+    openMoveQaNodeDialog,
     closeQaNodeDialog,
     handleCreateQaNodeSubmit,
     handleRenameQaNodeSubmit,
+    handleMoveQaNodeConfirm,
     handleToggleQaNodeHidden,
     handleDeleteQaNodeConfirm,
   };

@@ -51,8 +51,8 @@ export default function WorkspaceDesktopSidebar({
             onClick={onSync}
             disabled={syncing}
             className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-            title="重建知識庫索引"
-            aria-label="重建知識庫索引"
+            title="重建搜尋資料"
+            aria-label="重建搜尋資料"
           >
             <span className={`material-symbols-outlined text-[1rem] ${syncing ? "animate-spin" : ""}`}>sync</span>
           </button>

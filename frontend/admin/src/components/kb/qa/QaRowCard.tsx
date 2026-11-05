@@ -1,43 +1,53 @@
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useId, useState, type DragEvent } from "react";
 
 import QaImagePreview from "../QaImagePreview";
 import AutoTextarea from "./AutoTextarea";
 
 export type QaRowField = "question" | "answer" | "img" | "url" | "hidden";
 
+export const QA_HIDDEN_HINT = "「已隱藏」的問題不會出現在訪客的選單，但 AI 回答時還是會用。";
+
 interface QaRowCardProps {
+  /** 在完整清單裡的位置，題號由它來：搜尋時清單變短，題號也不能跟著變。 */
   index: number;
   question: string;
   answer: string;
   img: string;
   url: string;
   hidden: boolean;
-  /** 同一列表來自多份檔案時才給，只有一份時放列表上方就好。 */
-  sourceFile?: string;
+  /** 同一個清單來自多份檔案時才給，只有一份時放清單上方就好。 */
+  sourceLabel?: string;
   onChange: (field: QaRowField, value: string | boolean) => void;
   onRemove: () => void;
-  /** 圖片欄旁的動作（上傳），打開圖片欄才出現。 */
-  imageAction?: ReactNode;
-  rowProps: {
+  /** 有給才出現「上傳圖片」。 */
+  onPickImage?: () => void;
+  uploadingImage?: boolean;
+  /** 別的列正在上傳時不能再選檔案。 */
+  uploadDisabled?: boolean;
+  rowRef?: (element: HTMLElement | null) => void;
+  highlighted?: boolean;
+  invalidFields?: { question?: boolean; answer?: boolean };
+  /** 排序用。沒給就沒有把手：搜尋時顯示的不是完整順序，不能拖。 */
+  rowProps?: {
     "data-reorder-row": boolean;
     onDragOver: (event: DragEvent<HTMLElement>) => void;
     onDrop: (event: DragEvent<HTMLElement>) => void;
   };
-  handleProps: {
+  handleProps?: {
     draggable: boolean;
     onDragStart: (event: DragEvent<HTMLElement>) => void;
     onDragEnd: () => void;
   };
-  dropLine: "before" | "after" | null;
-  dragging: boolean;
+  dropLine?: "before" | "after" | null;
+  dragging?: boolean;
 }
 
-const FIELD_CLASS =
-  "w-full rounded-lg border border-transparent bg-transparent px-2.5 py-1.5 text-sm leading-relaxed text-content placeholder:text-content-subtle hover:border-border focus:border-primary/50 focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/50 dark:focus:bg-surface/70";
-const EXTRA_INPUT_CLASS =
-  "min-w-0 flex-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-content-muted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50";
-const ICON_BUTTON_CLASS =
-  "inline-flex h-8 w-7 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content";
+const ROW_BUTTON_CLASS = "btn btn-ghost gap-1 px-2 py-1 text-xs";
+const FIELD_LABEL_CLASS = "block text-xs font-medium text-content-muted";
+
+function fieldClass(invalid: boolean | undefined): string {
+  return `input ${invalid ? "border-danger" : ""}`;
+}
 
 export default function QaRowCard({
   index,
@@ -46,26 +56,48 @@ export default function QaRowCard({
   img,
   url,
   hidden,
-  sourceFile,
+  sourceLabel,
   onChange,
   onRemove,
-  imageAction,
+  onPickImage,
+  uploadingImage = false,
+  uploadDisabled = false,
+  rowRef,
+  highlighted = false,
+  invalidFields,
   rowProps,
   handleProps,
-  dropLine,
-  dragging,
+  dropLine = null,
+  dragging = false,
 }: QaRowCardProps) {
-  const [imageOpen, setImageOpen] = useState(false);
-  const [urlOpen, setUrlOpen] = useState(false);
-  const showImage = Boolean(img) || imageOpen;
-  const showUrl = Boolean(url) || urlOpen;
+  const number = index + 1;
+  const fieldId = useId();
+  // 欄位一旦打開就留著：不然把舊編號刪光準備重打時，輸入框會當場消失。
+  const [imageOpen, setImageOpen] = useState(Boolean(img));
+  const [urlOpen, setUrlOpen] = useState(Boolean(url));
+  const showImage = imageOpen || Boolean(img);
+  const showUrl = urlOpen || Boolean(url);
+
+  const removeImage = () => {
+    onChange("img", "");
+    setImageOpen(false);
+  };
+
+  const removeUrl = () => {
+    onChange("url", "");
+    setUrlOpen(false);
+  };
 
   return (
     <article
       {...rowProps}
-      className={`group relative flex flex-wrap items-start gap-1 px-2 py-2 transition-colors hover:bg-surface-sunken/40 lg:flex-nowrap ${
-        dragging ? "opacity-40" : ""
-      }`}
+      ref={rowRef}
+      tabIndex={-1}
+      aria-label={`第 ${number} 題`}
+      data-highlighted={highlighted || undefined}
+      className={`relative scroll-mt-28 px-3 py-2.5 transition-colors lg:scroll-mt-12 ${
+        highlighted ? "bg-primary/10 ring-1 ring-inset ring-primary" : ""
+      } ${dragging ? "opacity-40" : ""}`}
     >
       {dropLine && (
         <span
@@ -76,125 +108,175 @@ export default function QaRowCard({
         />
       )}
 
-      <button
-        type="button"
-        {...handleProps}
-        aria-label={`拖曳調整問答 ${index + 1} 的順序`}
-        title="拖曳調整順序"
-        className="mt-1 flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded text-content-subtle hover:text-content active:cursor-grabbing"
-      >
-        <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">drag_indicator</span>
-      </button>
-      <span className="mt-2 w-6 shrink-0 text-right font-mono text-xs tabular-nums text-content-subtle">
-        {index + 1}
-      </span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {handleProps && (
+          <button
+            type="button"
+            {...handleProps}
+            aria-label={`拖曳調整第 ${number} 題的順序`}
+            className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded text-content-subtle hover:text-content active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50 [@media(pointer:coarse)]:hidden"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">drag_indicator</span>
+          </button>
+        )}
+        <span className="shrink-0 text-sm font-semibold text-content">第 {number} 題</span>
+        {sourceLabel && (
+          <span className="min-w-0 truncate text-xs text-content-subtle" title={sourceLabel}>
+            來自：{sourceLabel}
+          </span>
+        )}
 
-      {/* 窄版文字佔滿整行，把手和操作排在上面，不跟內容搶寬度。 */}
-      <div className={`order-last w-full min-w-0 lg:order-none lg:w-auto lg:flex-1 ${hidden ? "opacity-60" : ""}`}>
-        <div className="grid gap-0.5 lg:grid-cols-[2fr_3fr] lg:gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+          {!showImage && (
+            <button
+              type="button"
+              className={ROW_BUTTON_CLASS}
+              onClick={() => setImageOpen(true)}
+              aria-label={`第 ${number} 題加圖片`}
+            >
+              加圖片
+            </button>
+          )}
+          {!showUrl && (
+            <button
+              type="button"
+              className={ROW_BUTTON_CLASS}
+              onClick={() => setUrlOpen(true)}
+              aria-label={`第 ${number} 題加連結`}
+            >
+              加連結
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onChange("hidden", !hidden)}
+            className={`${ROW_BUTTON_CLASS} ${hidden ? "bg-surface-sunken" : ""}`}
+            aria-label={hidden
+              ? `第 ${number} 題已隱藏，按一下改成顯示`
+              : `第 ${number} 題顯示中，按一下隱藏`}
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">
+              {hidden ? "visibility_off" : "visibility"}
+            </span>
+            {hidden ? "已隱藏" : "顯示中"}
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="btn btn-danger gap-1 px-2 py-1 text-xs"
+            aria-label={`刪除第 ${number} 題`}
+          >
+            刪除
+          </button>
+        </div>
+      </div>
+
+      <div className={`mt-1.5 grid gap-2 lg:grid-cols-[2fr_3fr] ${hidden ? "opacity-60" : ""}`}>
+        {/* 寬版的欄名在清單頂端標一次就好，每列重複會很吵。 */}
+        <div className="min-w-0">
+          <span aria-hidden="true" className={`${FIELD_LABEL_CLASS} mb-0.5 lg:hidden`}>問題</span>
           <AutoTextarea
-            aria-label={`問答 ${index + 1} 的問題`}
+            data-qa-field="question"
+            aria-label={`第 ${number} 題的問題`}
+            aria-invalid={invalidFields?.question || undefined}
             value={question}
             onChange={(e) => onChange("question", e.target.value)}
             placeholder="請輸入問題"
-            className={`${FIELD_CLASS} max-h-[30dvh] font-medium`}
+            className={`${fieldClass(invalidFields?.question)} max-h-[30dvh] font-medium placeholder:text-content-subtle`}
           />
+        </div>
+        <div className="min-w-0">
+          <span aria-hidden="true" className={`${FIELD_LABEL_CLASS} mb-0.5 lg:hidden`}>答案</span>
           <AutoTextarea
-            aria-label={`問答 ${index + 1} 的答案`}
+            data-qa-field="answer"
+            aria-label={`第 ${number} 題的答案`}
+            aria-invalid={invalidFields?.answer || undefined}
             value={answer}
             onChange={(e) => onChange("answer", e.target.value)}
             placeholder="請輸入答案"
-            className={`${FIELD_CLASS} max-h-[40dvh]`}
+            className={`${fieldClass(invalidFields?.answer)} max-h-[40dvh] placeholder:text-content-subtle`}
           />
         </div>
+      </div>
 
-        {(showImage || showUrl || sourceFile) && (
-          <div className="flex flex-wrap items-center gap-2 px-2.5 pb-0.5 pt-1">
-            {showImage && (
-              <div className="flex min-w-[min(100%,16rem)] flex-1 items-center gap-2">
-                <QaImagePreview compact imageId={img} alt={`${question || `問答 ${index + 1}`}的參考圖片`} />
+      {(showImage || showUrl) && (
+        <div className={`mt-2 grid gap-2 lg:grid-cols-2 ${hidden ? "opacity-60" : ""}`}>
+          {showImage && (
+            <div className="min-w-0">
+              <label htmlFor={`${fieldId}-img`} className={FIELD_LABEL_CLASS}>
+                圖片編號（AI 用這題回答時會附上這張圖）
+              </label>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                <QaImagePreview compact imageId={img} alt={`${question || `第 ${number} 題`}的參考圖片`} />
                 <input
+                  id={`${fieldId}-img`}
                   type="text"
-                  aria-label={`問答 ${index + 1} 的圖片 ID`}
+                  aria-label={`第 ${number} 題的圖片編號`}
                   value={img}
                   onChange={(e) => onChange("img", e.target.value)}
-                  placeholder="圖片 ID"
-                  className={`${EXTRA_INPUT_CLASS} font-mono`}
+                  placeholder="圖片編號"
+                  className="input min-w-0 flex-1 basis-32 font-mono text-xs placeholder:text-content-subtle"
                 />
-                {imageAction}
+                {onPickImage && (
+                  <button
+                    type="button"
+                    onClick={onPickImage}
+                    disabled={uploadDisabled}
+                    className={ROW_BUTTON_CLASS}
+                    aria-label={`第 ${number} 題上傳圖片`}
+                  >
+                    {uploadingImage ? "上傳中…" : "上傳圖片"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className={ROW_BUTTON_CLASS}
+                  aria-label={`第 ${number} 題移除圖片`}
+                >
+                  移除
+                </button>
               </div>
-            )}
-            {showUrl && (
-              <input
-                type="text"
-                aria-label={`問答 ${index + 1} 的外部連結`}
-                value={url}
-                onChange={(e) => onChange("url", e.target.value)}
-                placeholder="外部連結"
-                className={`${EXTRA_INPUT_CLASS} min-w-[min(100%,16rem)]`}
-              />
-            )}
-            {sourceFile && (
-              <span className="ml-auto truncate text-xs text-content-subtle" title={sourceFile}>
-                {sourceFile.split("/").pop()}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="ml-auto mt-0.5 flex shrink-0 items-center">
-        {!showImage && (
-          <button type="button" className={ICON_BUTTON_CLASS} onClick={() => setImageOpen(true)} aria-label="圖片" title="加上圖片">
-            <span aria-hidden="true" className="material-symbols-outlined text-base">image</span>
-          </button>
-        )}
-        {!showUrl && (
-          <button type="button" className={ICON_BUTTON_CLASS} onClick={() => setUrlOpen(true)} aria-label="連結" title="加上外部連結">
-            <span aria-hidden="true" className="material-symbols-outlined text-base">link</span>
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => onChange("hidden", !hidden)}
-          className={`inline-flex h-8 min-w-7 items-center justify-center gap-1 rounded-lg px-1.5 text-xs font-medium transition-colors ${
-            hidden
-              ? "bg-surface-sunken text-content-muted hover:text-content"
-              : "text-content-subtle hover:bg-surface-sunken hover:text-content"
-          }`}
-          aria-label={hidden ? "目前已隱藏，點擊以顯示" : "目前顯示中，點擊以隱藏"}
-          title={hidden ? "目前已隱藏，點擊以顯示" : "目前顯示中，點擊以隱藏"}
-        >
-          <span aria-hidden="true" className="material-symbols-outlined text-base">
-            {hidden ? "visibility_off" : "visibility"}
-          </span>
-          {hidden && "已隱藏"}
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="inline-flex h-8 w-7 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-danger/10 hover:text-danger"
-          aria-label={`刪除問答 ${index + 1}`}
-          title="刪除此行"
-        >
-          <span aria-hidden="true" className="material-symbols-outlined text-base">delete</span>
-        </button>
-      </div>
+            </div>
+          )}
+          {showUrl && (
+            <div className="min-w-0">
+              <label htmlFor={`${fieldId}-url`} className={FIELD_LABEL_CLASS}>
+                相關連結網址（AI 用這題回答時會附上「開啟相關連結」）
+              </label>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                <input
+                  id={`${fieldId}-url`}
+                  type="url"
+                  aria-label={`第 ${number} 題的相關連結網址`}
+                  value={url}
+                  onChange={(e) => onChange("url", e.target.value)}
+                  placeholder="https://"
+                  className="input min-w-0 flex-1 basis-32 text-xs placeholder:text-content-subtle"
+                />
+                <button
+                  type="button"
+                  onClick={removeUrl}
+                  className={ROW_BUTTON_CLASS}
+                  aria-label={`第 ${number} 題移除連結`}
+                >
+                  移除
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </article>
   );
 }
 
-/** 問題／答案的欄名：每列重複標會很吵，寬版只在列表頂端標一次。 */
+/** 問題和答案的欄名：寬版兩欄並排時才需要，窄版每個欄位自己有標。 */
 export function QaRowListHeader() {
   return (
-    <div className="sticky top-0 z-20 hidden items-center gap-1 border-b border-border bg-surface-raised px-2 py-1.5 text-xs font-semibold text-content-subtle lg:flex">
-      <span className="w-5 shrink-0" />
-      <span className="w-6 shrink-0" />
-      <div className="grid min-w-0 flex-1 grid-cols-[2fr_3fr] gap-2 px-2.5">
-        <span>問題</span>
-        <span>答案</span>
-      </div>
-      <span className="w-[5.25rem] shrink-0" />
+    <div className="sticky top-0 z-20 hidden gap-2 border-b border-border bg-surface-raised px-3 py-1.5 text-xs font-semibold text-content-muted lg:grid lg:grid-cols-[2fr_3fr]">
+      <span>問題</span>
+      <span>答案</span>
     </div>
   );
 }

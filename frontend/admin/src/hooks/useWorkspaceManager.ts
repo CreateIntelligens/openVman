@@ -154,7 +154,7 @@ export function useWorkspaceManager() {
       const response = await reindexKnowledge();
       setStatus({
         type: "success",
-        message: `已重建 knowledge，文件 ${response.document_count} 份，chunk ${response.chunk_count} 筆。`,
+        message: `已重建搜尋資料：${response.document_count} 份文件，${response.chunk_count} 個段落。`,
       });
     } catch (error) {
       setErrorStatus(error);
@@ -178,7 +178,7 @@ export function useWorkspaceManager() {
       );
       setStatus({
         type: "success",
-        message: `已上傳 ${response.files.length} 個檔案到 workspace root。`,
+        message: `已上傳 ${response.files.length} 個檔案到工作區。`,
       });
       await loadDocuments(response.files[0]?.path);
     } catch (error) {

@@ -48,6 +48,7 @@ export default function TopBar({
   const activeProject = projects.find((p) => p.project_id === projectId);
   const displayLabel = activeProject?.label || projectId || "default";
   const activeTab = allTabs.find((t) => t.key === active);
+  const themeAction = theme === "dark" ? "切換淺色模式" : "切換深色模式";
 
   useEffect(() => {
     if (!open) return;
@@ -61,52 +62,42 @@ export default function TopBar({
   return (
     <header className="sticky top-0 z-30 flex h-14 min-w-0 shrink-0 items-center gap-2 md:gap-3 border-b border-border bg-surface/95 px-4 backdrop-blur">
       <button
+        type="button"
         onClick={onOpenMobileNav}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content md:hidden"
         aria-label="開啟導覽"
       >
-        <span className="material-symbols-outlined text-[1.25rem]">menu</span>
+        <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">menu</span>
       </button>
 
-      <div className="hidden items-center gap-2 border-l border-border pl-3 sm:flex">
-        <span className="max-w-[9rem] truncate text-sm text-content-muted">
-          {account.username}
-        </span>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex h-9 items-center gap-2 rounded-md px-3 text-sm text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
-          aria-label="登出"
-        >
-          <span className="material-symbols-outlined text-[1.125rem]">logout</span>
-          <span>登出</span>
-        </button>
-      </div>
-
       <div className="flex min-w-0 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium text-content md:hidden">
-        {activeTab && <span className="material-symbols-outlined text-[1rem] text-primary">{activeTab.icon}</span>}
+        {activeTab && <span aria-hidden="true" className="material-symbols-outlined text-[1rem] text-primary">{activeTab.icon}</span>}
         <span>{activeTab?.label}</span>
       </div>
 
-      <span className="hidden text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-content-subtle md:inline">
+      {/* 平板加固定側欄時寬度最緊，先讓位給專案名稱。 */}
+      <span className="hidden shrink-0 text-xs font-semibold text-content-subtle lg:inline">
         專案
       </span>
 
       <div ref={wrapRef} className="ml-auto min-w-0 flex-1 md:relative md:ml-0 md:mr-auto md:flex-initial">
         <button
+          type="button"
           onClick={() => setOpen((v) => !v)}
           disabled={loadingProjects && projects.length === 0}
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-controls="project-switcher-list"
           aria-label={`目前專案：${displayLabel}`}
+          title={displayLabel}
           className="btn btn-ghost h-9 w-full min-w-0 whitespace-nowrap bg-surface-raised px-3 hover:border-border-strong"
         >
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/15 text-[0.6875rem] font-bold text-primary">
+          {/* 320 寬只剩約 6rem，縮寫的兩個字會吃掉名稱的位置，窄畫面不放。 */}
+          <span aria-hidden="true" className="hidden h-6 w-6 shrink-0 items-center justify-center rounded bg-primary/15 text-xs font-bold text-primary sm:flex">
             {displayLabel.slice(0, 2).toUpperCase()}
           </span>
-          <span className="min-w-0 max-w-[8rem] truncate">{displayLabel}</span>
-          <span className="material-symbols-outlined shrink-0 text-[1rem] text-content-subtle">unfold_more</span>
+          <span className="min-w-0 max-w-[16rem] truncate">{displayLabel}</span>
+          <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[1rem] text-content-subtle">unfold_more</span>
         </button>
 
         {open && (
@@ -114,9 +105,9 @@ export default function TopBar({
             id="project-switcher-list"
             role="listbox"
             aria-label="切換專案"
-            className="absolute right-4 top-[calc(100%+0.375rem)] z-50 w-[calc(100%-2rem)] md:w-64 overflow-hidden rounded-lg border border-border-strong bg-surface-overlay shadow-lg md:left-0 md:right-auto"
+            className="absolute right-4 top-[calc(100%+0.375rem)] z-50 w-[calc(100%-2rem)] md:w-80 overflow-hidden rounded-lg border border-border-strong bg-surface-overlay shadow-lg md:left-0 md:right-auto"
           >
-            <div className="border-b border-border px-3 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-content-subtle">
+            <div className="border-b border-border px-3 py-2 text-xs font-semibold text-content-subtle">
               切換專案
             </div>
             <div className="max-h-[16rem] overflow-y-auto py-1">
@@ -127,9 +118,14 @@ export default function TopBar({
               )}
               {projects.map((project) => {
                 const isActive = project.project_id === projectId;
+                // 內部編號對工作人員沒有意義，只有同名專案要靠它分辨時才顯示。
+                const hasNamesake = Boolean(project.label) && projects.some(
+                  (other) => other !== project && other.label === project.label,
+                );
                 return (
                   <button
                     key={project.project_id}
+                    type="button"
                     role="option"
                     aria-selected={isActive}
                     onClick={() => {
@@ -143,7 +139,8 @@ export default function TopBar({
                     }`}
                   >
                     <span
-                      className={`flex h-6 w-6 items-center justify-center rounded text-[0.6875rem] font-bold ${
+                      aria-hidden="true"
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded text-xs font-bold ${
                         isActive
                           ? "bg-primary/20 text-primary"
                           : "bg-surface-sunken text-content-muted"
@@ -153,12 +150,14 @@ export default function TopBar({
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{project.label || project.project_id}</div>
-                      <div className="truncate font-mono text-[0.6875rem] text-content-subtle">
-                        {project.project_id}
-                      </div>
+                      {hasNamesake && (
+                        <div className="truncate font-mono text-xs text-content-subtle">
+                          {project.project_id}
+                        </div>
+                      )}
                     </div>
                     {isActive && (
-                      <span className="material-symbols-outlined text-[1rem] text-primary">check</span>
+                      <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[1rem] text-primary">check</span>
                     )}
                   </button>
                 );
@@ -184,18 +183,35 @@ export default function TopBar({
       </div>
 
       {(account.kind ?? account.account_type ?? "formal") === "formal" && (
-        <button type="button" onClick={onOpenApiKeys} className="btn btn-ghost hidden shrink-0 text-xs md:inline-flex" aria-label="管理帳號 API 金鑰">API 金鑰</button>
+        <button type="button" onClick={onOpenApiKeys} className="btn btn-ghost hidden h-9 shrink-0 px-3 md:inline-flex" aria-label="管理帳號 API 金鑰">API 金鑰</button>
       )}
 
+      {/* 手機的帳號名稱、API 金鑰與登出都在導覽抽屜的底部（MobileNavDrawer）。 */}
+      <div className="hidden shrink-0 items-center gap-2 border-l border-border pl-3 md:flex">
+        <span className="max-w-[5rem] truncate text-sm text-content-muted lg:max-w-[9rem]" title={account.username}>
+          {account.username}
+        </span>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="btn btn-ghost h-9 shrink-0 px-3"
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">logout</span>
+          <span>登出</span>
+        </button>
+      </div>
+
       <button
+        type="button"
         onClick={onToggleTheme}
-        title={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
-        aria-label={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
+        title={themeAction}
+        aria-label={themeAction}
+        className="flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-md text-sm text-content-muted transition-colors hover:bg-surface-sunken hover:text-content lg:w-auto lg:px-3"
       >
-        <span className="material-symbols-outlined text-[1.125rem]">
+        <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">
           {theme === "dark" ? "light_mode" : "dark_mode"}
         </span>
+        <span className="hidden whitespace-nowrap lg:inline">{theme === "dark" ? "切換淺色" : "切換深色"}</span>
       </button>
     </header>
   );
@@ -280,7 +296,7 @@ export function MobileNavDrawer({
         <div className="flex h-14 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary">
-              <span className="material-symbols-outlined text-[1.125rem]">neurology</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">neurology</span>
             </div>
             <span className="font-semibold">openVman</span>
           </div>
@@ -289,14 +305,14 @@ export function MobileNavDrawer({
             aria-label="關閉導覽"
             className="flex h-8 w-8 items-center justify-center rounded-md text-content-muted hover:bg-surface hover:text-content"
           >
-            <span className="material-symbols-outlined text-[1.125rem]">close</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">close</span>
           </button>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-2">
           {tabGroups.map((group) => (
             <TabGroup
               key={group.label}
-              label={group.label}
+              title={group.title}
               tabs={group.tabs.filter((tab) => isTabVisible(tab, access))}
               active={active}
               projectId={projectId}
@@ -326,7 +342,7 @@ export function MobileNavDrawer({
             onClick={onLogout}
             className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-content-muted hover:bg-surface hover:text-content"
           >
-            <span className="material-symbols-outlined text-[1.25rem]">logout</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">logout</span>
             登出
           </button>
         </div>

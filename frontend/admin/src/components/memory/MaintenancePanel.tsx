@@ -19,17 +19,17 @@ export default function MaintenancePanel({ maintaining, result, onRun }: Mainten
       <button
         onClick={onRun}
         disabled={maintaining}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold hover:bg-amber-500/20 transition-all disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-warn/10 border border-warn/30 text-content font-bold hover:bg-warn/20 transition-all disabled:opacity-50"
       >
         <span className="material-symbols-outlined text-sm">memory</span>
         {maintaining ? "執行中..." : "執行維護"}
       </button>
       {result && (
         <div className="mt-4 space-y-2 text-sm">
-          <StatRow label="Records before" value={result.records_before} />
-          <StatRow label="Records after" value={result.records_after} />
-          <StatRow label="Deduped" value={result.deduped || undefined} highlight />
-          <StatRow label="Summaries written" value={result.summaries_written} />
+          <StatRow label="維護前筆數" value={result.records_before} />
+          <StatRow label="維護後筆數" value={result.records_after} />
+          <StatRow label="移除重複" value={result.deduped || undefined} highlight />
+          <StatRow label="新增摘要" value={result.summaries_written} />
         </div>
       )}
     </div>
@@ -41,7 +41,7 @@ function StatRow({ label, value, highlight }: { label: string; value?: number | 
   return (
     <div className="flex justify-between text-content-muted">
       <span>{label}</span>
-      <span className={`font-mono ${highlight ? "text-emerald-400" : "text-content "}`}>{value}</span>
+      <span className={`font-mono text-content ${highlight ? "font-semibold" : ""}`}>{value}</span>
     </div>
   );
 }

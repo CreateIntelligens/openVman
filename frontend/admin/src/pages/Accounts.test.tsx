@@ -603,7 +603,7 @@ describe("Accounts", () => {
       expect(trigger.getAttribute("aria-expanded")).toBe("false");
 
       fireEvent.keyDown(trigger, { key: "ArrowDown" });
-      const menu = within(row as HTMLElement).getByRole("menu");
+      const menu = screen.getByRole("menu");
       const items = within(menu).getAllByRole("menuitem");
       expect(trigger.getAttribute("aria-expanded")).toBe("true");
       await waitFor(() => expect(document.activeElement).toBe(items[0]));
@@ -621,7 +621,7 @@ describe("Accounts", () => {
       expect(document.activeElement).toBe(items[0]);
 
       fireEvent.keyDown(menu, { key: "Escape" });
-      expect(within(row as HTMLElement).queryByRole("menu")).toBeNull();
+      expect(screen.queryByRole("menu")).toBeNull();
       expect(document.activeElement).toBe(trigger);
       expect(trigger.getAttribute("aria-expanded")).toBe("false");
     });
@@ -636,14 +636,14 @@ describe("Accounts", () => {
       const trigger = menuTrigger(row);
 
       fireEvent.keyDown(trigger, { key: "ArrowUp" });
-      const items = within(row as HTMLElement).getAllByRole("menuitem");
+      const items = screen.getAllByRole("menuitem");
       await waitFor(() => expect(document.activeElement).toBe(items[items.length - 1]));
 
       // 點選單裡面不會關。
-      fireEvent.pointerDown(within(row as HTMLElement).getByRole("menu"));
-      expect(within(row as HTMLElement).queryByRole("menu")).not.toBeNull();
+      fireEvent.pointerDown(screen.getByRole("menu"));
+      expect(screen.queryByRole("menu")).not.toBeNull();
       fireEvent.pointerDown(document.body);
-      expect(within(row as HTMLElement).queryByRole("menu")).toBeNull();
+      expect(screen.queryByRole("menu")).toBeNull();
     });
 
     it("still runs disable, revoke and delete from the menu", async () => {
@@ -661,7 +661,7 @@ describe("Accounts", () => {
 
       clickRowButton(activeRow, "停用");
       await waitFor(() => expect(setAccountDisabled).toHaveBeenCalledWith("user-b", true));
-      expect(within(activeRow as HTMLElement).queryByRole("menu")).toBeNull();
+      expect(screen.queryByRole("menu")).toBeNull();
       expect(document.activeElement).toBe(menuTrigger(activeRow));
 
       clickRowButton(activeRow, "登出所有裝置");
@@ -853,7 +853,7 @@ function menuTrigger(row: Element | null): HTMLButtonElement {
 
 function openRowMenu(row: Element | null): HTMLElement {
   fireEvent.click(menuTrigger(row));
-  return within(row as HTMLElement).getByRole("menu");
+  return screen.getByRole("menu");
 }
 
 /** 打開選單、讀出各組項目，再關掉，讓斷言不影響後續操作。 */

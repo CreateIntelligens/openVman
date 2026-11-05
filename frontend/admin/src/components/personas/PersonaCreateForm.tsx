@@ -40,7 +40,7 @@ export default function PersonaCreateForm({
         <input
           value={newPersonaLabel}
           onChange={(event) => onNewPersonaLabelChange(event.target.value)}
-          placeholder="名稱（例如 Support Bot）"
+          placeholder="名稱（例如 客服小幫手）"
           className="input dark:bg-surface-sunken/50 text-[0.8125rem] placeholder:text-content-subtle"
           title="顯示名稱（僅套用於空白範本）"
         />

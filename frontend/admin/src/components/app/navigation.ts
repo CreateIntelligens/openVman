@@ -32,11 +32,12 @@ export const systemTabs = [
   { key: "SystemStatus", label: "系統狀態", icon: "monitor_heart" },
 ] as const;
 
+// label 是收合狀態的儲存鍵（admin.navigation.collapsed.<label>），換掉會讓使用者存的狀態失效；畫面只顯示 title。
 export const tabGroups = [
-  { label: "Workspace", tabs: workspaceTabs },
-  { label: "Knowledge", tabs: knowledgeTabs },
-  { label: "Character", tabs: characterTabs },
-  { label: "System", tabs: systemTabs },
+  { label: "Workspace", title: "互動", tabs: workspaceTabs },
+  { label: "Knowledge", title: "知識", tabs: knowledgeTabs },
+  { label: "Character", title: "角色", tabs: characterTabs },
+  { label: "System", title: "系統", tabs: systemTabs },
 ] as const;
 
 export const allTabs = [

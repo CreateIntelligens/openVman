@@ -3,8 +3,7 @@ import type { QaNode } from "../../hooks/useQaNodes";
 
 /* ── Types ── */
 
-export type SourceMode = "upload" | "web" | "manual";
-export type SourceType = SourceMode | "qa";
+export type SourceType = "upload" | "web" | "manual" | "qa";
 export type DeleteTarget = { type: "file" | "dir"; value: string } | null;
 export type RightPane = "folder" | "file";
 
@@ -12,12 +11,18 @@ export interface TreeNode {
   name: string;
   path: string;
   type: "file" | "folder";
-  treeKind?: "qa-root" | "qa-node" | "qa-entry";
+  /**
+   * sections：不顯示的外層，子項就是兩個段落。
+   * qa-root、documents-root：段落列「快速問答」與「文件」。
+   */
+  treeKind?: "sections" | "qa-root" | "documents-root" | "qa-node" | "qa-entry";
   virtual?: boolean;
   qaNodeId?: string;
   qaEntryQuestion?: string;
   qaEntrySourcePath?: string;
   qaHidden?: boolean;
+  /** 這個分類自己的題數，不含子分類。 */
+  qaQuestionCount?: number;
   doc?: KnowledgeDocumentSummary;
   children: TreeNode[];
 }
@@ -39,14 +44,11 @@ export interface QaTreeNodeInput {
 
 /* ── Constants ── */
 
-export const SOURCE_MODES: SourceMode[] = ["upload", "web", "manual"];
 export const QUICK_QA_TREE_LABEL = "快速問答";
 export const QUICK_QA_TREE_PATH = `knowledge/${QUICK_QA_TREE_LABEL}`;
-export const SOURCE_MODE_COPY: Record<SourceMode, string> = {
-  upload: "上傳本地文件到目前資料夾。",
-  web: "貼網址後擷取頁面內容。",
-  manual: "手動建立筆記，支援純文字與 QA 問答格式。",
-};
+export const DOCUMENTS_SECTION_LABEL = "文件";
+export const DOCUMENTS_ROOT_PATH = "knowledge";
+const TREE_SECTIONS_PATH = "__tree_sections__";
 export const KNOWLEDGE_LANGUAGE_LABELS: Record<KnowledgeLanguage, string> = {
   zh: "中文",
   en: "English",
@@ -70,25 +72,36 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString("zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function isUploadDerivedKnowledgeFile(doc: { source_type: string; path: string }): boolean {
-  return doc.source_type === "upload" && doc.path.startsWith("knowledge/");
+export function hasOriginalBackup(doc: { has_original_backup?: boolean }): boolean {
+  return doc.has_original_backup === true;
 }
 
+/** 畫面上顯示的文件路徑：knowledge/ 是內部前綴，樹上也看不到這一層。 */
+export function displayDocumentPath(path: string): string {
+  return path.replace(/^knowledge(\/|$)/, "");
+}
+
+// 色相只放在底色與框線：淺色模式下 success、primary 當小字的對比不到 4.5:1，字一律用 content。
 export function getSourceMeta(sourceType: SourceType) {
   switch (sourceType) {
     case "web":
-      return { icon: "language", label: "網頁", chipClass: "border-sky-500/30 bg-sky-500/10 text-sky-300" };
+      return { icon: "language", label: "貼網址", chipClass: "border-info/30 bg-info/10 text-content" };
     case "manual":
-      return { icon: "edit_note", label: "手動", chipClass: "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300" };
+      return { icon: "edit_note", label: "自己輸入", chipClass: "border-primary/30 bg-primary/10 text-content" };
     case "qa":
-      return { icon: "quiz", label: "QA", chipClass: "border-amber-500/30 bg-amber-500/10 text-amber-300" };
+      return { icon: "quiz", label: "問答", chipClass: "border-warn/30 bg-warn/10 text-content" };
     default:
-      return { icon: "upload_file", label: "上傳", chipClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" };
+      return { icon: "upload_file", label: "上傳", chipClass: "border-success/30 bg-success/10 text-content" };
   }
 }
 
 export function normalizeSearchTerm(search: string): string {
   return search.trim().toLowerCase();
+}
+
+// knowledge/ 是內部前綴，畫面上看不到；留著的話搜「know」會把全部文件都搜出來。
+function searchablePath(path: string): string {
+  return displayDocumentPath(path).toLowerCase();
 }
 
 export function matchesKnowledgeDocumentSearch(document: KnowledgeDocumentSummary, search: string): boolean {
@@ -97,7 +110,7 @@ export function matchesKnowledgeDocumentSearch(document: KnowledgeDocumentSummar
     return true;
   }
 
-  return document.path.toLowerCase().includes(normalizedSearch) ||
+  return searchablePath(document.path).includes(normalizedSearch) ||
     document.title.toLowerCase().includes(normalizedSearch) ||
     document.preview.toLowerCase().includes(normalizedSearch) ||
     (document.source_url ?? "").toLowerCase().includes(normalizedSearch);
@@ -161,7 +174,7 @@ export function filterTree(node: TreeNode, normalizedSearch: string): TreeNode |
   const matchesSelf = node.doc
     ? matchesKnowledgeDocumentSearch(node.doc, normalizedSearch)
     : node.name.toLowerCase().includes(normalizedSearch) ||
-      node.path.toLowerCase().includes(normalizedSearch);
+      searchablePath(node.path).includes(normalizedSearch);
 
   if (node.type === "file") {
     return matchesSelf ? node : null;
@@ -179,11 +192,6 @@ export function filterTree(node: TreeNode, normalizedSearch: string): TreeNode |
     ...node,
     children,
   };
-}
-
-export function countFiles(node: TreeNode): number {
-  if (node.type === "file") return 1;
-  return node.children.reduce((sum, child) => sum + countFiles(child), 0);
 }
 
 export function collectFolderPaths(node: TreeNode): string[] {
@@ -235,9 +243,9 @@ export function parseQaEntryDragPath(path: string): { nodeId: string; question: 
   }
 }
 
+// 內部編號畫面上看不到，不拿來比對：搜「qa」不該跑出每個 qa_node_* 分類。
 function qaNodeMatchesSearch(node: QaTreeNodeInput, normalizedSearch: string): boolean {
-  return node.label.toLowerCase().includes(normalizedSearch) ||
-    node.node_id.toLowerCase().includes(normalizedSearch);
+  return node.label.toLowerCase().includes(normalizedSearch);
 }
 
 function qaNodeToTreeNode(
@@ -278,39 +286,104 @@ function qaNodeToTreeNode(
     virtual: true,
     qaNodeId: node.node_id,
     qaHidden: Boolean(node.hidden),
+    // 用未過濾的題數：搜尋時數字不跟著跳，看到的永遠是這個分類真正有幾題。
+    qaQuestionCount: node.qa_entries?.length ?? 0,
     children: allChildren,
   };
 }
 
+/** 樹的兩段：快速問答在前、文件在後，由不顯示的外層包住。 */
 export function mergeQaNodesIntoTree(
   documentTree: TreeNode,
   qaNodes: QaTreeNodeInput[],
   search = "",
 ): TreeNode {
   const normalizedSearch = normalizeSearchTerm(search);
-  const qaChildren = qaNodes
-    .map((node) => qaNodeToTreeNode(node, normalizedSearch))
-    .filter((node): node is TreeNode => node !== null);
-  const rootMatches = QUICK_QA_TREE_LABEL.toLowerCase().includes(normalizedSearch) ||
-    QUICK_QA_TREE_PATH.toLowerCase().includes(normalizedSearch);
-  const shouldShowQaRoot = !normalizedSearch || rootMatches || qaChildren.length > 0;
-  const children = [...documentTree.children];
-
-  if (shouldShowQaRoot) {
-    children.push({
-      name: QUICK_QA_TREE_LABEL,
-      path: QUICK_QA_TREE_PATH,
-      type: "folder",
-      treeKind: "qa-root",
-      virtual: true,
-      children: qaChildren,
-    });
-  }
+  const qaSection: TreeNode = {
+    name: QUICK_QA_TREE_LABEL,
+    path: QUICK_QA_TREE_PATH,
+    type: "folder",
+    treeKind: "qa-root",
+    virtual: true,
+    children: qaNodes
+      .map((node) => qaNodeToTreeNode(node, normalizedSearch))
+      .filter((node): node is TreeNode => node !== null),
+  };
+  const documentsSection: TreeNode = {
+    ...documentTree,
+    name: DOCUMENTS_SECTION_LABEL,
+    treeKind: "documents-root",
+  };
+  const sections = [qaSection, documentsSection];
 
   return {
-    ...documentTree,
-    children,
+    name: "",
+    path: TREE_SECTIONS_PATH,
+    type: "folder",
+    treeKind: "sections",
+    virtual: true,
+    // 搜尋時只留有結果的段落，外層 children 是空的就代表沒有東西可顯示。
+    children: normalizedSearch
+      ? sections.filter((section) => section.children.length > 0)
+      : sections,
   };
+}
+
+/** 搜尋結果的筆數：沒有下一層的列才算一筆，中間層只是帶路。 */
+export function countSearchResults(tree: TreeNode): number {
+  return tree.children.reduce(
+    (sum, child) => sum + (child.children.length > 0 ? countSearchResults(child) : 1),
+    0,
+  );
+}
+
+const FILE_NAME_TAIL_COLUMNS = 12;
+const FILE_NAME_MIN_HEAD_COLUMNS = 4;
+const WIDE_CHARACTER_START = 0x2e80;
+
+// 中日韓文字和 emoji 大約佔兩個英數字寬。照字數算的話，十幾個中文字的檔名明明放不下
+// 卻不會被切開，只差尾巴的兩份文件在樹上看起來一模一樣。
+function displayColumns(character: string): number {
+  return (character.codePointAt(0) ?? 0) >= WIDE_CHARACTER_START ? 2 : 1;
+}
+
+/**
+ * 把檔名切成會被省略的 head 與永遠顯示的 tail，CSS 就能省略中間、留住結尾，
+ * 長檔名才分得出「_IMG_PRP_1.csv」和「_IMG_PRP_2.csv」。短檔名不切。
+ */
+export function splitFileNameForDisplay(name: string): { head: string; tail: string } {
+  // 依碼位切，emoji 這類字元才不會被切成兩半。
+  const characters = Array.from(name);
+  const columns = characters.map(displayColumns);
+  const totalColumns = columns.reduce((sum, width) => sum + width, 0);
+  if (totalColumns <= FILE_NAME_TAIL_COLUMNS + FILE_NAME_MIN_HEAD_COLUMNS) {
+    return { head: name, tail: "" };
+  }
+  let tailStart = characters.length;
+  let tailColumns = 0;
+  while (tailColumns + columns[tailStart - 1] <= FILE_NAME_TAIL_COLUMNS) {
+    tailStart -= 1;
+    tailColumns += columns[tailStart];
+  }
+  return {
+    head: characters.slice(0, tailStart).join(""),
+    tail: characters.slice(tailStart).join(""),
+  };
+}
+
+export type QaDropPosition = "before" | "into" | "after";
+
+/** 拖曳分類時，游標在目標列的上下 25% 是排序，中間是放進去。 */
+export function qaDropPositionAt(
+  clientY: number,
+  rect: { top: number; height: number },
+): QaDropPosition {
+  // 量不到列高時當作放進去，寧可多一步也不要默默改順序。
+  if (rect.height <= 0) return "into";
+  const ratio = (clientY - rect.top) / rect.height;
+  if (ratio < 0.25) return "before";
+  if (ratio > 0.75) return "after";
+  return "into";
 }
 
 
@@ -366,6 +439,19 @@ export function getQaNodeAncestors(nodes: QaNode[], targetId: string, ancestors:
     }
   }
   return null;
+}
+
+/** 分類在樹上實際掛的上層；最上層或不在樹上時回 null。 */
+export function getQaNodeParentId(nodes: QaNode[], targetId: string): string | null {
+  const ancestors = getQaNodeAncestors(nodes, targetId);
+  return ancestors && ancestors.length > 0 ? ancestors[ancestors.length - 1] : null;
+}
+
+/** 要讓某個分類看得到內容所需展開的路徑；null 代表快速問答最上層。 */
+export function qaNodeExpandPaths(nodes: QaNode[], nodeId: string | null): string[] {
+  if (!nodeId) return [QUICK_QA_TREE_PATH];
+  const ancestors = getQaNodeAncestors(nodes, nodeId) ?? [];
+  return [QUICK_QA_TREE_PATH, ...ancestors.map(qaTreeNodePath), qaTreeNodePath(nodeId)];
 }
 
 /* ── 批次操作 ── */

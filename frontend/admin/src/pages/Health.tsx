@@ -20,10 +20,10 @@ export default function Health() {
       <header className="section-header">
         <div className="page-heading">
           <h2 className="page-section-title">系統健康</h2>
-          <p className="page-subtitle">Real-time status of your brain infrastructure</p>
+          <p className="page-subtitle">目前系統各部分是否正常運作。</p>
         </div>
         <div className="page-actions">
-          <span className="whitespace-nowrap text-xs text-content-subtle">auto-refresh in {countdown}s</span>
+          <span className="whitespace-nowrap text-xs text-content-subtle">{countdown} 秒後自動更新</span>
           <button
             type="button"
             onClick={load}
@@ -45,7 +45,7 @@ export default function Health() {
           <div className="flex items-center gap-4">
             <StatusPulse isOk={isOk} isKnown={Boolean(data)} />
             <div>
-              <p className="text-sm font-medium text-content-muted">System Status</p>
+              <p className="text-sm font-medium text-content-muted">系統狀態</p>
               <h3 className={`text-2xl font-bold uppercase tracking-wider ${getStatusHeadingClass(isOk, Boolean(data))}`}>
                 {data ? data.status : "—"}
               </h3>
@@ -53,7 +53,7 @@ export default function Health() {
           </div>
           {lastChecked && (
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-content-muted">Last Checked</p>
+              <p className="text-sm font-medium text-content-muted">上次檢查</p>
               <p className="text-sm font-bold">{lastChecked.toLocaleTimeString()}</p>
             </div>
           )}
@@ -168,11 +168,11 @@ export default function Health() {
 
 function getStatusHeadingClass(isOk: boolean, isKnown: boolean) {
   if (isOk) {
-    return "text-emerald-600 dark:text-emerald-400";
+    return "text-success";
   }
 
   if (isKnown) {
-    return "text-red-600 dark:text-red-400";
+    return "text-danger";
   }
 
   return "text-content-muted";
@@ -183,13 +183,12 @@ function StatusPulse({ isOk, isKnown }: { isOk: boolean; isKnown: boolean }) {
     return <span className="relative inline-flex h-4 w-4 rounded-full bg-content-subtle" />;
   }
 
-  const pulseColor = isOk ? "bg-emerald-400" : "bg-red-400";
-  const dotColor = isOk ? "bg-emerald-500" : "bg-red-500";
+  const color = isOk ? "bg-success" : "bg-danger";
 
   return (
     <div className="relative flex h-4 w-4">
-      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pulseColor}`} />
-      <span className={`relative inline-flex h-4 w-4 rounded-full ${dotColor}`} />
+      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${color}`} />
+      <span className={`relative inline-flex h-4 w-4 rounded-full ${color}`} />
     </div>
   );
 }
@@ -202,22 +201,22 @@ function InfoCard({ icon, label, value, detail, status = "ok" }: {
   status?: "ok" | "warn" | "error";
 }) {
   const badgeConfig = {
-    ok: { text: "Active", classes: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
-    warn: { text: "Warning", classes: "bg-amber-500/10 text-amber-500 border-amber-500/20" },
-    error: { text: "Error", classes: "bg-red-500/10 text-red-500 border-red-500/20" },
+    ok: { text: "Active", classes: "bg-success/10 text-content border-success/30" },
+    warn: { text: "Warning", classes: "bg-warn/10 text-content border-warn/30" },
+    error: { text: "Error", classes: "bg-danger/10 text-content border-danger/30" },
   }[status];
 
   return (
     <div className="bg-surface-raised dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-6 transition-transform hover:scale-[1.02]">
       <div className="flex justify-between items-start mb-4">
         <span className="material-symbols-outlined text-primary text-3xl">{icon}</span>
-        <span className={`px-2 py-1 text-[0.625rem] font-bold border rounded uppercase tracking-widest ${badgeConfig.classes}`}>
+        <span className={`px-2 py-1 text-xs font-bold border rounded uppercase tracking-widest ${badgeConfig.classes}`}>
           {badgeConfig.text}
         </span>
       </div>
       <h4 className="section-title mb-1">{label}</h4>
       <p className="text-xl font-bold truncate" title={value}>{value}</p>
-      {detail && <p className="mt-2 text-[0.625rem] text-content-subtle truncate" title={detail}>{detail}</p>}
+      {detail && <p className="mt-2 text-xs text-content-subtle truncate" title={detail}>{detail}</p>}
     </div>
   );
 }

@@ -1,99 +1,155 @@
-import type { RefObject } from "react";
-import { SOURCE_MODES, SOURCE_MODE_COPY, getSourceMeta, type SourceMode } from "./helpers";
+import { useId, useRef, type ChangeEvent } from "react";
 
+import type { KnowledgeNoteFormat } from "../../api";
+import {
+  IMPORT_ACCEPT,
+  IMPORT_FORMATS_LABEL,
+  type ImportTargetOption,
+} from "../../hooks/useKnowledgeImport";
+import Select from "../Select";
+
+interface SourcePanelProps {
+  onPickFiles: (files: File[]) => void;
+  /** 例如「100 MB」。 */
+  maxUploadLabel: string;
+  targetDir: string;
+  targetOptions: ImportTargetOption[];
+  onTargetDirChange: (dir: string) => void;
+  skipNormalize: boolean;
+  onSkipNormalizeChange: (skip: boolean) => void;
+  crawlUrlValue: string;
+  setCrawlUrlValue: (value: string) => void;
+  crawling: boolean;
+  onCrawl: () => void;
+  onOpenComposer: (format: KnowledgeNoteFormat) => void;
+  /** 知識庫還是空的：上傳區是畫面的主角。 */
+  prominent?: boolean;
+}
+
+/** 新增資料的所有入口。規則直接寫在畫面上，不靠滑過才出現的說明。 */
 export default function SourcePanel({
-  activeMode,
-  setActiveMode,
-  uploading,
-  uploadInputRef,
-  currentDir,
+  onPickFiles,
+  maxUploadLabel,
+  targetDir,
+  targetOptions,
+  onTargetDirChange,
+  skipNormalize,
+  onSkipNormalizeChange,
   crawlUrlValue,
   setCrawlUrlValue,
   crawling,
   onCrawl,
-  onShowNote,
-  uploadLimitHint,
-}: {
-  activeMode: SourceMode;
-  setActiveMode: (m: SourceMode) => void;
-  uploading: boolean;
-  uploadInputRef: RefObject<HTMLInputElement | null>;
-  currentDir: string;
-  crawlUrlValue: string;
-  setCrawlUrlValue: (v: string) => void;
-  crawling: boolean;
-  onCrawl: () => void;
-  onShowNote: () => void;
-  uploadLimitHint?: string;
-}) {
+  onOpenComposer,
+  prominent = false,
+}: SourcePanelProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const urlInputId = useId();
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onPickFiles(Array.from(event.target.files ?? []));
+    // 清空才選得了同一個檔案：改好之後重傳同名檔是常見操作。
+    event.target.value = "";
+  };
+
   return (
-    <div className="border-b border-border bg-surface-raised dark:bg-surface/30 px-4 py-3 space-y-3 shrink-0">
-      <div className="flex gap-2">
-        {SOURCE_MODES.map((mode) => {
-          const meta = getSourceMeta(mode);
-          return (
-            <button
-              key={mode}
-              onClick={() => {
-                setActiveMode(mode);
-                if (mode === "manual") {
-                  onShowNote();
-                }
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                activeMode === mode
-                  ? "bg-primary/15 text-primary border border-primary/30"
-                  : "text-content-muted hover:text-content hover:bg-surface-sunken border border-transparent"
-              }`}
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">{meta.icon}</span>
-              {meta.label}
-            </button>
-          );
-        })}
-        <span className="ml-2 text-xs text-content-subtle self-center">{SOURCE_MODE_COPY[activeMode]}</span>
-      </div>
+    <div className="space-y-6">
+      <section aria-label="上傳檔案" className="space-y-4">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface-raised px-4 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            prominent ? "py-16" : "py-8"
+          }`}
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[2rem] text-primary">
+            upload_file
+          </span>
+          <span className="text-base font-semibold text-content">
+            把檔案拖到這裡，或點這裡選擇檔案
+          </span>
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          data-testid="knowledge-upload-input"
+          className="hidden"
+          accept={IMPORT_ACCEPT}
+          multiple
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={handleInputChange}
+        />
 
-      <div className="h-14 flex items-stretch">
-        {activeMode === "upload" && (
-          <button
-            type="button"
-            onClick={() => uploadInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full rounded-lg border border-dashed border-border hover:border-primary/50 bg-surface dark:bg-surface-sunken/20 hover:bg-primary/5 transition-all py-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm text-content-muted"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">cloud_upload</span>
-            {uploading ? "上傳中..." : `選擇檔案上傳到 ${currentDir}`}
-            {uploadLimitHint && !uploading && (
-              <span className="text-xs text-content-subtle">（{uploadLimitHint}）</span>
-            )}
-          </button>
-        )}
+        <ul className="list-disc space-y-1 pl-5 text-sm text-content-muted">
+          <li>有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。</li>
+          <li>其他文件由 AI 整理排版後加入知識庫，內容維持原本的語言，不會翻譯。</li>
+          <li>可以上傳 {IMPORT_FORMATS_LABEL}，每個檔案 {maxUploadLabel} 以內。</li>
+        </ul>
 
-        {activeMode === "web" && (
-          <div className="flex gap-2 w-full items-center">
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 shrink-0 accent-primary"
+            checked={skipNormalize}
+            onChange={(event) => onSkipNormalizeChange(event.target.checked)}
+          />
+          這批已經整理好了，不要讓 AI 修改內容
+        </label>
+
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-content">放到哪個資料夾</p>
+          <Select
+            className="sm:max-w-[24rem]"
+            ariaLabel="放到哪個資料夾"
+            value={targetDir}
+            options={targetOptions}
+            onChange={onTargetDirChange}
+          />
+          <p className="text-xs text-content-muted">
+            問答表不看這個設定，一律放進快速問答。
+          </p>
+        </div>
+      </section>
+
+      <section aria-labelledby={`${urlInputId}-heading`} className="space-y-3">
+        <h3 id={`${urlInputId}-heading`} className="text-sm font-semibold text-content">其他方式</h3>
+        <div className="space-y-1">
+          <label htmlFor={urlInputId} className="block text-sm text-content-muted">
+            貼網址，把網頁內容加入知識庫
+          </label>
+          <div className="flex gap-2">
             <input
+              id={urlInputId}
               type="url"
-              className="flex-1 bg-surface-raised dark:bg-surface-sunken/60 border border-border rounded-lg px-4 py-2 text-sm text-content placeholder-content-subtle focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none"
+              inputMode="url"
+              className="input min-w-0 flex-1"
               placeholder="https://example.com/article"
               value={crawlUrlValue}
-              onChange={(e) => setCrawlUrlValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && onCrawl()}
+              onChange={(event) => setCrawlUrlValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !crawling) onCrawl();
+              }}
               disabled={crawling}
             />
             <button
+              type="button"
               onClick={onCrawl}
               disabled={crawling || !crawlUrlValue.trim()}
-              className="bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-all disabled:opacity-50"
+              className="btn btn-ghost shrink-0"
             >
-              <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">{crawling ? "hourglass_top" : "download"}</span>
-              {crawling ? "擷取中..." : "匯入"}
+              {crawling ? "匯入中…" : "匯入"}
             </button>
           </div>
-        )}
-
-        {activeMode === "manual" && <div className="flex-1" />}
-      </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn btn-ghost" onClick={() => onOpenComposer("text")}>
+            自己輸入一篇文件
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => onOpenComposer("qa")}>
+            自己輸入問答
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

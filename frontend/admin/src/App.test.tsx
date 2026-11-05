@@ -295,7 +295,7 @@ describe("App tab mounting", () => {
 
     expect(await screen.findByText("目前沒有可存取的專案，請聯絡管理員設定權限。")).toBeTruthy();
     expect(screen.queryByTestId("tab-chat")).toBeNull();
-    fireEvent.click(screen.getAllByRole("button", { name: "System" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "系統" })[0]);
     fireEvent.click(screen.getAllByRole("link", { name: /專案與權限/ })[0]);
     expect(await screen.findByTestId("tab-projects")).toBeTruthy();
   });
@@ -368,7 +368,7 @@ describe("App tab mounting", () => {
     render(<App />);
 
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "互動" }));
     fireEvent.click(screen.getAllByRole("link", { name: /對話$/ })[0]);
 
     expect(await screen.findByTestId("tab-chat")).toBeTruthy();
@@ -378,16 +378,16 @@ describe("App tab mounting", () => {
   it("shares group collapse state between the sidebar and mobile menu", async () => {
     render(<App />);
     await screen.findByTestId("tab-chat");
-    fireEvent.click(screen.getByRole("button", { name: "Knowledge" }));
+    fireEvent.click(screen.getByRole("button", { name: "知識" }));
     fireEvent.click(screen.getByRole("button", { name: "開啟導覽" }));
     const drawer = screen.getByRole("dialog", { name: "主要導覽" });
-    const knowledge = within(drawer).getByRole("button", { name: "Knowledge" });
+    const knowledge = within(drawer).getByRole("button", { name: "知識" });
     expect(knowledge.getAttribute("aria-expanded")).toBe("true");
     knowledge.focus();
     fireEvent.click(knowledge);
     expect(document.activeElement).toBe(knowledge);
-    expect(screen.getAllByRole("button", { name: "Knowledge" }).every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
-    fireEvent.click(within(drawer).getByRole("button", { name: "System" }));
+    expect(screen.getAllByRole("button", { name: "知識" }).every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
+    fireEvent.click(within(drawer).getByRole("button", { name: "系統" }));
     fireEvent.click(within(drawer).getByRole("link", { name: /系統狀態/ }));
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "主要導覽" })).toBeNull();

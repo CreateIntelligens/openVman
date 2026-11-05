@@ -1,54 +1,68 @@
-import { useId } from "react";
-import type { KeyboardEvent, MouseEvent } from "react";
+import { useId, useRef } from "react";
+import type { DragEvent, KeyboardEvent } from "react";
 
-import type { TreeNode } from "./helpers";
+import ActionMenu, { type ActionMenuGroup, type ActionMenuItem } from "../ActionMenu";
+import type { QaDropPosition, TreeNode } from "./helpers";
 import {
   collectBatchSelectableFiles,
+  DOCUMENTS_ROOT_PATH,
   isBatchSelectableFile,
   parseQaEntryDragPath,
   parseQaNodeDragPath,
+  qaDropPositionAt,
   qaEntryDragPath,
   qaNodeDragPath,
   qaTreeNodePath,
+  splitFileNameForDisplay,
 } from "./helpers";
-import StatusDot from "./StatusDot";
+import StatusDot, { documentStatusLabel } from "./StatusDot";
 
-// QA 節點的操作按鈕以覆蓋方式掛在列尾：absolute 不佔文流，名稱才有完整寬度；
-// 用 opacity 而非 display 隱藏，鍵盤 Tab 仍能聚焦並讓按鈕群顯示。
-const QA_ACTIONS_OVERLAY_CLASS =
-  "absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-inherit pl-1 opacity-0 pointer-events-none transition-opacity focus-within:opacity-100 focus-within:pointer-events-auto group-hover:opacity-100 group-hover:pointer-events-auto";
+// 操作按鈕佔自己的寬度，名稱不會被蓋住，也就不會按名稱卻按到按鈕。
+const TOUCH_TARGET_CLASS = "[@media(hover:none)]:p-1.5";
+const ROW_ACTION_CLASS = `flex items-center justify-center rounded-md p-0.5 transition-colors ${TOUCH_TARGET_CLASS}`;
+const MENU_TRIGGER_CLASS = `${ROW_ACTION_CLASS} text-content-subtle hover:bg-surface-sunken hover:text-content`;
+// 用 invisible 而不是透明：別的列的按鈕才不在 Tab 順序裡，整棵樹只佔一個 Tab 停留點。
+const REVEAL_WITH_ROW_CLASS =
+  "invisible group-hover:visible group-focus-within:visible aria-expanded:visible [@media(hover:none)]:visible";
 
-function TreeActionButton({
-  title,
-  icon,
-  variant = "default",
-  onClick,
-}: {
-  title: string;
-  icon: string;
-  variant?: "default" | "primary" | "danger";
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
-}) {
-  const variantClass = {
-    default: "hover:bg-surface-sunken hover:text-content ",
-    primary: "hover:bg-primary/10 hover:text-primary",
-    danger: "hover:bg-danger/10 hover:text-danger",
-  }[variant];
+// 非中文文件在樹狀清單上的語言徽章。
+const TREE_LANGUAGE_BADGES: Record<string, string> = { nan: "台", ja: "日", ko: "韓" };
 
-  return (
-    <button
-      type="button"
-      aria-label={title}
-      title={title}
-      className={`rounded-md p-1 text-content-subtle transition-colors ${variantClass}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick(event);
-      }}
-    >
-      <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">{icon}</span>
-    </button>
-  );
+interface TreeViewProps {
+  node: TreeNode;
+  selectedPath: string;
+  expandedDirs: Set<string>;
+  onSelect: (node: TreeNode) => void;
+  onToggle: (path: string) => void;
+  draggingPath: string | null;
+  sourceDragDir: string;
+  dropTargetPath: string | null;
+  dropPosition?: QaDropPosition | null;
+  onDragStart: (node: TreeNode) => void;
+  onDragEnd: () => void;
+  onDragTargetChange: (path: string | null, position?: QaDropPosition | null) => void;
+  onDropFile: (targetDir: string, position?: QaDropPosition) => void;
+  onDeleteFolder: (path: string) => void;
+  onMoveFile?: (path: string) => void;
+  onDeleteFile?: (path: string) => void;
+  onSelectQaNode?: (nodeId: string, question?: string) => void;
+  onCreateQaNode?: (parentNodeId: string | null) => void;
+  onRenameQaNode?: (nodeId: string) => void;
+  onMoveQaNode?: (nodeId: string) => void;
+  onToggleQaNodeHidden?: (nodeId: string, hidden: boolean) => void;
+  onDeleteQaNode?: (nodeId: string) => void;
+  onOrderQaNode?: (parentNodeId: string | null) => void;
+  canDropQaNode?: (draggedPath: string, targetPath: string, position?: QaDropPosition) => boolean;
+  canDropQaEntry?: (draggedPath: string, targetPath: string) => boolean;
+  multiSelect?: boolean;
+  checkedPaths?: ReadonlySet<string>;
+  onToggleChecked?: (paths: string[], checked: boolean) => void;
+}
+
+type SharedTreeProps = Omit<TreeViewProps, "node">;
+
+function isSectionRow(node: TreeNode): boolean {
+  return node.treeKind === "qa-root" || node.treeKind === "documents-root";
 }
 
 function hasVisibleSelectedNode(
@@ -56,7 +70,7 @@ function hasVisibleSelectedNode(
   selectedPath: string,
   expandedDirs: Set<string>,
 ): boolean {
-  if (node.path === selectedPath) {
+  if (!isSectionRow(node) && node.path === selectedPath) {
     return true;
   }
   if (node.type !== "folder" || !expandedDirs.has(node.path)) {
@@ -97,65 +111,223 @@ function finishKeyboardMove(treeItem: HTMLElement): void {
   }
 }
 
-// 非中文文件在樹狀清單上的語言徽章。
-const TREE_LANGUAGE_BADGES: Record<string, string> = { nan: "台", ja: "日", ko: "韓" };
+function compactItems(
+  items: Array<ActionMenuItem | false | undefined | null>,
+): ActionMenuItem[] {
+  return items.filter((item): item is ActionMenuItem => Boolean(item));
+}
 
-export default function TreeView({
+function buildRowMenu(node: TreeNode, actions: SharedTreeProps): ActionMenuGroup[] {
+  const {
+    onCreateQaNode,
+    onRenameQaNode,
+    onMoveQaNode,
+    onOrderQaNode,
+    onToggleQaNodeHidden,
+    onDeleteQaNode,
+    onDeleteFolder,
+    onMoveFile,
+    onDeleteFile,
+  } = actions;
+  const nodeId = node.qaNodeId;
+
+  if (node.treeKind === "qa-root") {
+    return [{
+      id: "section",
+      items: compactItems([
+        onCreateQaNode && {
+          id: "create",
+          label: "新增分類",
+          onSelect: () => onCreateQaNode(null),
+        },
+        onOrderQaNode && {
+          id: "order",
+          label: "調整順序",
+          onSelect: () => onOrderQaNode(null),
+        },
+      ]),
+    }];
+  }
+
+  if (node.treeKind === "qa-node" && nodeId) {
+    return [
+      {
+        id: "edit",
+        items: compactItems([
+          onCreateQaNode && {
+            id: "create",
+            label: "新增子分類",
+            onSelect: () => onCreateQaNode(nodeId),
+          },
+          onRenameQaNode && {
+            id: "rename",
+            label: "重新命名",
+            onSelect: () => onRenameQaNode(nodeId),
+          },
+          onMoveQaNode && {
+            id: "move",
+            label: "移到…",
+            onSelect: () => onMoveQaNode(nodeId),
+          },
+          onOrderQaNode && {
+            id: "order",
+            label: "調整子分類順序",
+            onSelect: () => onOrderQaNode(nodeId),
+          },
+          onToggleQaNodeHidden && {
+            id: "visibility",
+            label: node.qaHidden ? "顯示（訪客看得到）" : "隱藏（訪客看不到）",
+            onSelect: () => onToggleQaNodeHidden(nodeId, !node.qaHidden),
+          },
+        ]),
+      },
+      {
+        id: "danger",
+        items: compactItems([
+          onDeleteQaNode && {
+            id: "delete",
+            label: "刪除",
+            danger: true,
+            onSelect: () => onDeleteQaNode(nodeId),
+          },
+        ]),
+      },
+    ];
+  }
+
+  if (node.path === DOCUMENTS_ROOT_PATH || node.virtual) {
+    return [];
+  }
+
+  if (node.type === "folder") {
+    return [{
+      id: "danger",
+      items: [{
+        id: "delete-folder",
+        label: "刪除資料夾",
+        danger: true,
+        onSelect: () => onDeleteFolder(node.path),
+      }],
+    }];
+  }
+
+  // 核心文件不能移也不能刪。掛在快速問答上的文件要從分類處理，這裡只留刪除，
+  // 規則與文件檢視相同。
+  if (node.doc?.is_core) {
+    return [];
+  }
+  const isQaAttached = node.doc?.source_type === "qa" && node.doc.qa_attached === true;
+  return [
+    {
+      id: "edit",
+      items: compactItems([
+        onMoveFile && !isQaAttached && {
+          id: "move",
+          label: "移動…",
+          onSelect: () => onMoveFile(node.path),
+        },
+      ]),
+    },
+    {
+      id: "danger",
+      items: compactItems([
+        onDeleteFile && {
+          id: "delete",
+          label: "刪除",
+          danger: true,
+          onSelect: () => onDeleteFile(node.path),
+        },
+      ]),
+    },
+  ];
+}
+
+function rowIcon(node: TreeNode, isExpanded: boolean): { name: string; className: string } {
+  if (node.treeKind === "qa-root") {
+    return { name: "quiz", className: "text-primary" };
+  }
+  if (node.treeKind === "qa-entry") {
+    return { name: "help", className: "text-content-subtle" };
+  }
+  if (node.type === "folder") {
+    return { name: isExpanded ? "folder_open" : "folder", className: "text-primary/70" };
+  }
+  return node.name.endsWith(".md")
+    ? { name: "markdown", className: "text-info" }
+    : { name: "description", className: "text-content-subtle" };
+}
+
+function RowName({
   node,
-  depth,
-  selectedPath,
-  expandedDirs,
-  onSelect,
-  onToggle,
-  draggingPath,
-  sourceDragDir,
-  dropTargetPath,
-  onDragStart,
-  onDragEnd,
-  onDragTargetChange,
-  onDropFile,
-  onDeleteFolder,
-  onSelectQaNode,
-  onCreateQaNode,
-  onRenameQaNode,
-  onToggleQaNodeHidden,
-  onDeleteQaNode,
-  onOrderQaNode,
-  canDropQaNode,
-  canDropQaEntry,
-  multiSelect = false,
-  checkedPaths,
-  onToggleChecked,
+  emphasized,
 }: {
   node: TreeNode;
-  depth: number;
-  selectedPath: string;
-  expandedDirs: Set<string>;
-  onSelect: (node: TreeNode) => void;
-  onToggle: (path: string) => void;
-  draggingPath: string | null;
-  sourceDragDir: string;
-  dropTargetPath: string | null;
-  onDragStart: (node: TreeNode) => void;
-  onDragEnd: () => void;
-  onDragTargetChange: (path: string | null) => void;
-  onDropFile: (targetDir: string) => void;
-  onDeleteFolder: (path: string) => void;
-  onSelectQaNode?: (nodeId: string) => void;
-  onCreateQaNode?: (parentNodeId: string | null) => void;
-  onRenameQaNode?: (nodeId: string) => void;
-  onToggleQaNodeHidden?: (nodeId: string, hidden: boolean) => void;
-  onDeleteQaNode?: (nodeId: string) => void;
-  onOrderQaNode?: (parentNodeId: string | null) => void;
-  canDropQaNode?: (draggedPath: string, targetPath: string) => boolean;
-  canDropQaEntry?: (draggedPath: string, targetPath: string) => boolean;
-  multiSelect?: boolean;
-  checkedPaths?: ReadonlySet<string>;
-  onToggleChecked?: (paths: string[], checked: boolean) => void;
+  emphasized: boolean;
 }) {
-  const instructionsId = useId();
+  // 問題與分類名稱看開頭就認得出來；檔名常常只差結尾，所以只有檔案列留結尾。
+  const isFileRow = node.type === "file" && !node.virtual;
+  const { head, tail } = isFileRow
+    ? splitFileNameForDisplay(node.name)
+    : { head: node.name, tail: "" };
+
+  return (
+    <span
+      title={node.name}
+      className={`ml-1.5 flex min-w-0 flex-1 text-sm ${emphasized ? "font-semibold" : ""} ${
+        node.qaHidden ? "opacity-60" : ""
+      }`}
+    >
+      {/* 窄的樹上連結尾都放不下時，開頭先讓光，結尾再從左邊裁：副檔名和最後幾個字一定看得到。 */}
+      <span className={`truncate whitespace-pre ${tail ? "shrink-[1000]" : ""}`}>{head}</span>
+      {tail && <span className="flex min-w-0 justify-end overflow-hidden whitespace-pre">{tail}</span>}
+    </span>
+  );
+}
+
+function questionCountLabel(node: TreeNode): string | null {
+  if (node.treeKind !== "qa-node" || node.qaQuestionCount === undefined) return null;
+  // 只放子分類的上層沒有自己的題目，寫「0 題」會讓人以為底下是空的。
+  const hasChildCategories = node.children.some((child) => child.treeKind === "qa-node");
+  if (node.qaQuestionCount === 0 && hasChildCategories) return null;
+  return `${node.qaQuestionCount} 題`;
+}
+
+function TreeBranch({
+  node,
+  depth,
+  fallbackTabStopPath,
+  ...shared
+}: SharedTreeProps & {
+  node: TreeNode;
+  depth: number;
+  fallbackTabStopPath: string | null;
+}) {
+  const {
+    selectedPath,
+    expandedDirs,
+    onSelect,
+    onToggle,
+    draggingPath,
+    sourceDragDir,
+    dropTargetPath,
+    dropPosition = null,
+    onDragStart,
+    onDragEnd,
+    onDragTargetChange,
+    onDropFile,
+    onSelectQaNode,
+    onCreateQaNode,
+    canDropQaNode,
+    canDropQaEntry,
+    multiSelect = false,
+    checkedPaths,
+    onToggleChecked,
+  } = shared;
+  const rowRef = useRef<HTMLDivElement>(null);
   const isExpanded = expandedDirs.has(node.path);
-  const isSelected = selectedPath === node.path;
+  const isSection = isSectionRow(node);
+  // 段落列只是分段標題：預設的 selectedPath 就是 knowledge，不該一進來就亮著。
+  const isSelected = !isSection && selectedPath === node.path;
   const isQaRoot = node.treeKind === "qa-root";
   const isQaNode = node.treeKind === "qa-node";
   const isQaEntry = node.treeKind === "qa-entry";
@@ -173,7 +345,7 @@ export default function TreeView({
       ? qaEntryDragPath(qaNodeId, node.qaEntryQuestion ?? node.name)
       : node.path;
   const isDraggable = !multiSelect &&
-    ((node.type === "file" && !node.virtual) || isQaNode || isQaEntry);
+    ((node.type === "file" && !node.virtual && !node.doc?.is_core) || isQaNode || isQaEntry);
   const isCheckableFile = multiSelect && isBatchSelectableFile(node);
   const folderFiles = multiSelect && node.type === "folder" && !node.virtual
     ? collectBatchSelectableFiles(node)
@@ -205,15 +377,39 @@ export default function TreeView({
     !!draggingPath &&
     node.path !== draggingPath &&
     (draggingQaNodeId
-      ? (isQaRoot || (isQaNode && !!canDropQaNode && canDropQaNode(draggingPath, dropTargetKey)))
+      ? ((isQaRoot || isQaNode) && !!canDropQaNode && canDropQaNode(draggingPath, dropTargetKey))
       : draggingQaEntry
         ? (isQaEntry && !!canDropQaEntry && canDropQaEntry(draggingPath, dropTargetKey))
       : (isQaRoot || isQaNode || isQaEntry || (!node.virtual && effectiveDropDir !== sourceDragDir)));
   const isDropTarget = dropTargetPath === dropTargetKey && !!draggingPath;
-  const canDeleteFolder = !multiSelect &&
-    node.type === "folder" && node.path !== "knowledge" && !node.virtual;
-  const isTreeTabStop = isSelected ||
-    (depth === 0 && !hasVisibleSelectedNode(node, selectedPath, expandedDirs));
+  const showInsertLine = isDropTarget && !!draggingQaNodeId &&
+    (dropPosition === "before" || dropPosition === "after");
+  const isTreeTabStop = isSelected || node.path === fallbackTabStopPath;
+
+  // 先把焦點放回列上再開對話框：對話框關閉時會還原焦點，而「⋯」在列沒有焦點時
+  // 是隱藏的，還原到它會失敗，鍵盤使用者就找不到剛才的位置。
+  const menuGroups: ActionMenuGroup[] = multiSelect
+    ? []
+    : buildRowMenu(node, shared).map((group) => ({
+        ...group,
+        items: group.items.map((item) => ({
+          ...item,
+          onSelect: () => {
+            rowRef.current?.focus();
+            item.onSelect();
+          },
+        })),
+      }));
+  const hasMenu = menuGroups.some((group) => group.items.length > 0);
+  const showAddCategory = isQaRoot && !!onCreateQaNode && !multiSelect;
+  const questionCount = questionCountLabel(node);
+  const statusLabel = node.doc && !node.virtual ? documentStatusLabel(node.doc) : null;
+  const rowLabel = [
+    node.name,
+    questionCount,
+    node.qaHidden ? "已隱藏" : null,
+    statusLabel === "可被搜尋" ? null : statusLabel,
+  ].filter(Boolean).join("，");
 
   const handleSelect = (treeItem: HTMLElement) => {
     if (draggingPath && isKeyboardMoveActive(treeItem)) {
@@ -222,23 +418,38 @@ export default function TreeView({
         onDragEnd();
       } else if (canAcceptDrop) {
         finishKeyboardMove(treeItem);
-        onDragTargetChange(dropTargetKey);
-        onDropFile(dropTargetKey);
+        if (draggingQaNodeId) {
+          // 鍵盤沒有游標位置，分類一律當作放進去。
+          onDragTargetChange(dropTargetKey, "into");
+          onDropFile(dropTargetKey, "into");
+        } else {
+          onDragTargetChange(dropTargetKey);
+          onDropFile(dropTargetKey);
+        }
       }
+      return;
+    }
+    // 多選只作用在文件：點列只切換勾選或展開，不開檔，也不開快速問答，
+    // 手機版檔案樹也不會因此收起。
+    if (multiSelect) {
+      if (isCheckableFile) toggleChecked();
+      else if (node.type === "folder") onToggle(node.path);
       return;
     }
     if (isQaRoot) {
       onToggle(node.path);
       return;
     }
-    if ((isQaNode || isQaEntry) && qaNodeId && onSelectQaNode) {
-      onSelectQaNode(qaNodeId);
+    if (isQaEntry && qaNodeId && onSelectQaNode) {
+      onSelectQaNode(qaNodeId, node.qaEntryQuestion ?? node.name);
       return;
     }
-    // 多選模式下點列只切換勾選或展開，不開檔，也不觸發收起手機版檔案樹。
-    if (multiSelect) {
-      if (isCheckableFile) toggleChecked();
-      else if (node.type === "folder") onToggle(node.path);
+    if (isQaNode && qaNodeId && onSelectQaNode) {
+      onSelectQaNode(qaNodeId);
+      // 只放子分類的上層自己沒有題目，右邊是空的；不展開的話使用者會以為什麼都沒有。
+      if (!isExpanded && node.children.some((child) => child.treeKind === "qa-node")) {
+        onToggle(node.path);
+      }
       return;
     }
     onSelect(node);
@@ -319,37 +530,65 @@ export default function TreeView({
     }
   };
 
+  // 只有分類拖到分類才看游標位置；文件、問題不分區，拖回最上層一律是放進去。
+  const pointerDropPosition = (event: DragEvent<HTMLDivElement>): QaDropPosition | null => {
+    if (!draggingQaNodeId) return null;
+    if (!isQaNode) return "into";
+    return qaDropPositionAt(event.clientY, event.currentTarget.getBoundingClientRect());
+  };
+  const canDropAt = (position: QaDropPosition | null): boolean =>
+    position !== "into" ||
+    !isQaNode ||
+    !draggingPath ||
+    !canDropQaNode ||
+    canDropQaNode(draggingPath, dropTargetKey, "into");
+  const trackDropTarget = (event: DragEvent<HTMLDivElement>) => {
+    if (!canAcceptDrop) return;
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+    const position = pointerDropPosition(event);
+    if (canDropAt(position)) {
+      onDragTargetChange(dropTargetKey, position);
+    } else {
+      onDragTargetChange(null);
+    }
+  };
+
+  let rowStateClass: string;
+  if (isDropTarget && !showInsertLine) {
+    rowStateClass = "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20";
+  } else if (isSelected && !multiSelect) {
+    rowStateClass = "bg-primary/15 text-primary";
+  } else if (isCheckableFile && isChecked) {
+    rowStateClass = "bg-primary/10 text-content";
+  } else if (isSection) {
+    rowStateClass = "text-content hover:bg-surface-sunken";
+  } else {
+    rowStateClass = "hover:bg-surface-sunken text-content-muted hover:text-content";
+  }
+  const icon = rowIcon(node, isExpanded);
+  const rowIndentRem = depth * 0.875 + 0.5;
+
   return (
     <div
-      role={depth === 0 ? "tree" : "none"}
-      aria-label={depth === 0 ? "知識庫目錄" : undefined}
-      aria-describedby={depth === 0 ? instructionsId : undefined}
-      aria-multiselectable={depth === 0 && multiSelect ? true : undefined}
+      role="none"
+      className={node.treeKind === "documents-root" ? "mt-1 border-t border-border pt-1" : undefined}
     >
-      {depth === 0 && (
-        <span id={instructionsId} className="sr-only">
-          {multiSelect
-            ? "多選模式：使用方向鍵巡覽，Enter 或空白鍵選取或取消選取檔案。"
-            : "使用方向鍵巡覽，Enter 或空白鍵開啟。選擇「使用鍵盤移動」後，移至目標並按 Enter 或空白鍵放置，Escape 取消。"}
-        </span>
-      )}
       <div
+        ref={rowRef}
         role="treeitem"
         aria-expanded={node.type === "folder" ? isExpanded : undefined}
         aria-selected={isCheckableFile ? isChecked : isSelected}
         aria-level={depth + 1}
-        aria-label={node.name}
+        aria-label={rowLabel}
+        data-drop-position={isDropTarget ? dropPosition ?? "into" : undefined}
         tabIndex={isTreeTabStop ? 0 : -1}
-        className={`group relative flex cursor-pointer items-center px-2 py-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
-          isDropTarget
-            ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
-            : isSelected && !multiSelect
-              ? "bg-primary/15 text-primary"
-              : isCheckableFile && isChecked
-              ? "bg-primary/10 text-content"
-              : "hover:bg-surface-sunken text-content-muted hover:text-content "
-        } ${isDraggingThisNode ? "ring-1 ring-inset ring-primary/40" : ""}`}
-        style={{ paddingLeft: `${depth * 0.875 + 0.5}rem` }}
+        className={`group relative flex cursor-pointer items-center px-2 py-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [@media(hover:none)]:py-1.5 ${rowStateClass} ${
+          isDraggingThisNode ? "ring-1 ring-inset ring-primary/40" : ""
+        }`}
+        style={{ paddingLeft: `${rowIndentRem}rem` }}
         onClick={(event) => handleSelect(event.currentTarget)}
         onKeyDown={handleKeyDown}
         onFocus={(event) => {
@@ -358,7 +597,7 @@ export default function TreeView({
           }
           focusTreeItem(event.currentTarget);
           if (draggingPath && canAcceptDrop && isKeyboardMoveActive(event.currentTarget)) {
-            onDragTargetChange(dropTargetKey);
+            onDragTargetChange(dropTargetKey, draggingQaNodeId ? "into" : null);
           }
         }}
         draggable={isDraggable}
@@ -390,35 +629,49 @@ export default function TreeView({
           finishKeyboardMove(event.currentTarget);
           onDragEnd();
         }}
-        onDragOver={(event) => {
-          if (!canAcceptDrop) return;
-          event.preventDefault();
-          if (event.dataTransfer) {
-            event.dataTransfer.dropEffect = "move";
-          }
-          onDragTargetChange(dropTargetKey);
-        }}
-        onDragEnter={(event) => {
-          if (!canAcceptDrop) return;
-          event.preventDefault();
-          onDragTargetChange(dropTargetKey);
-        }}
-        onDragLeave={() => {
+        onDragOver={trackDropTarget}
+        onDragEnter={trackDropTarget}
+        onDragLeave={(event) => {
+          // 移到列內的子元素也會觸發 dragleave，不算離開。
+          if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
           if (isDropTarget) onDragTargetChange(null);
         }}
         onDrop={(event) => {
           if (!canAcceptDrop) return;
+          const position = pointerDropPosition(event);
+          if (!canDropAt(position)) return;
           event.preventDefault();
           event.stopPropagation();
-          onDropFile(dropTargetKey);
+          if (position) {
+            onDropFile(dropTargetKey, position);
+          } else {
+            onDropFile(dropTargetKey);
+          }
         }}
       >
-        {/* Expand arrow for folders */}
-        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+        {showInsertLine && (
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute right-1 z-[1] h-0.5 rounded-full bg-primary ${
+              dropPosition === "before" ? "top-0 -translate-y-1/2" : "bottom-0 translate-y-1/2"
+            }`}
+            style={{ left: `${rowIndentRem}rem` }}
+          />
+        )}
+
+        <div
+          className="flex h-4 w-4 shrink-0 items-center justify-center [@media(hover:none)]:h-7 [@media(hover:none)]:w-7"
+          onClick={node.type === "folder"
+            ? (event) => {
+                event.stopPropagation();
+                onToggle(node.path);
+              }
+            : undefined}
+        >
           {node.type === "folder" ? (
             <span
+              aria-hidden="true"
               className={`material-symbols-outlined text-[1rem] text-content-subtle transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
-              onClick={(e) => { e.stopPropagation(); onToggle(node.path); }}
             >
               chevron_right
             </span>
@@ -440,44 +693,30 @@ export default function TreeView({
           />
         )}
 
-        {/* Icon */}
-        <div className="w-5 h-5 flex items-center justify-center shrink-0 ml-0.5">
-          {isQaRoot ? (
-            <span className="material-symbols-outlined text-[1.125rem] text-primary/80">
-              quiz
-            </span>
-          ) : isQaEntry ? (
-            <span className="material-symbols-outlined text-[1.05rem] text-amber-500/80">
-              help
-            </span>
-          ) : node.type === "folder" ? (
-            <span className="material-symbols-outlined text-[1.125rem] text-amber-500/80">
-              {isExpanded ? "folder_open" : "folder"}
-            </span>
-          ) : (
-            <span className={`material-symbols-outlined text-[1.125rem] ${
-              node.name.endsWith(".md") ? "text-sky-400" : "text-content-subtle"
-            }`}>
-              {node.name.endsWith(".md") ? "markdown" : "description"}
-            </span>
-          )}
+        <div className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+          <span aria-hidden="true" className={`material-symbols-outlined text-[1.125rem] ${icon.className}`}>
+            {icon.name}
+          </span>
         </div>
 
-        {/* Name */}
-        <span
-          className={`ml-1.5 text-sm truncate flex-1 ${
-            isSelected ? "font-semibold" : ""
-          } ${node.qaHidden ? "opacity-40" : ""}`}
-        >
-          {node.name}
-        </span>
+        <RowName node={node} emphasized={isSection || isSelected} />
 
-        {/* Status indicator for files */}
+        {questionCount && (
+          <span className="ml-1 shrink-0 whitespace-nowrap text-xs text-content-subtle">
+            {questionCount}
+          </span>
+        )}
+        {node.qaHidden && (
+          <span className="ml-1 shrink-0 whitespace-nowrap rounded bg-surface-sunken px-1 text-xs text-content-muted">
+            已隱藏
+          </span>
+        )}
+
         {node.type === "file" && node.doc && !node.virtual && (
-          <div className="flex items-center gap-1 shrink-0 ml-1">
+          <div className="ml-1 flex shrink-0 items-center gap-1">
             {/* 中文是預設，只標出英西版本，免得整棵樹都是 ZH。 */}
             {node.doc.language && node.doc.language !== "zh" && (
-              <span className="rounded px-1 text-[0.625rem] font-semibold uppercase text-content-subtle ring-1 ring-border">
+              <span className="rounded px-1 text-xs font-semibold uppercase text-content-subtle ring-1 ring-border">
                 {TREE_LANGUAGE_BADGES[node.doc.language] ?? node.doc.language}
               </span>
             )}
@@ -485,71 +724,41 @@ export default function TreeView({
           </div>
         )}
 
-        {isQaRoot && onCreateQaNode && (
-          <div className={QA_ACTIONS_OVERLAY_CLASS}>
-            {onOrderQaNode && (
-              <TreeActionButton
-                title="調整順序與可見性"
-                icon="sort"
-                onClick={() => onOrderQaNode(null)}
-              />
+        {(showAddCategory || hasMenu) && (
+          // 選單用 portal 畫在 body，點選單項目的事件仍會沿 React 樹冒泡到這一列，
+          // 不擋的話選「刪除」也會同時選取這一列。
+          <div
+            className="ml-0.5 flex shrink-0 items-center gap-0.5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {showAddCategory && (
+              <button
+                type="button"
+                className={`${ROW_ACTION_CLASS} gap-0.5 whitespace-nowrap pr-1 text-xs font-medium text-content hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary`}
+                onClick={() => onCreateQaNode?.(null)}
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[1rem] leading-none text-primary">
+                  add
+                </span>
+                新增分類
+              </button>
             )}
-            <TreeActionButton
-              title="新增快速問答節點"
-              icon="add"
-              variant="primary"
-              onClick={() => onCreateQaNode(null)}
-            />
-          </div>
-        )}
-
-        {isQaNode && qaNodeId && (
-          <div className={QA_ACTIONS_OVERLAY_CLASS}>
-            {onToggleQaNodeHidden && (
-              <TreeActionButton
-                title={node.qaHidden ? "顯示節點" : "隱藏節點"}
-                icon={node.qaHidden ? "visibility_off" : "visibility"}
-                onClick={() => onToggleQaNodeHidden(qaNodeId, !node.qaHidden)}
-              />
-            )}
-            {onOrderQaNode && (
-              <TreeActionButton
-                title="調整子節點順序與可見性"
-                icon="sort"
-                onClick={() => onOrderQaNode(qaNodeId)}
-              />
-            )}
-            {onCreateQaNode && (
-              <TreeActionButton
-                title="新增子節點"
-                icon="add"
-                variant="primary"
-                onClick={() => onCreateQaNode(qaNodeId)}
-              />
-            )}
-            {onRenameQaNode && (
-              <TreeActionButton
-                title="修改名稱"
-                icon="edit"
-                onClick={() => onRenameQaNode(qaNodeId)}
-              />
-            )}
-            {onDeleteQaNode && (
-              <TreeActionButton
-                title="刪除節點"
-                icon="delete"
-                variant="danger"
-                onClick={() => onDeleteQaNode(qaNodeId)}
+            {hasMenu && (
+              <ActionMenu
+                label={node.name}
+                groups={menuGroups}
+                triggerClassName={`${MENU_TRIGGER_CLASS} ${isSelected ? "" : REVEAL_WITH_ROW_CLASS}`}
               />
             )}
           </div>
         )}
 
         {isDraggable && (
-          <TreeActionButton
-            title="使用鍵盤移動"
-            icon="drive_file_move"
+          <button
+            type="button"
+            className="invisible sr-only group-focus-within:visible focus:not-sr-only focus:ml-1 focus:shrink-0 focus:whitespace-nowrap focus:rounded-md focus:bg-surface-sunken focus:px-1.5 focus:py-0.5 focus:text-xs focus:text-content"
             onClick={(event) => {
+              event.stopPropagation();
               const tree = event.currentTarget.closest<HTMLElement>('[role="tree"]');
               if (tree) {
                 tree.dataset.keyboardMove = "true";
@@ -559,67 +768,74 @@ export default function TreeView({
               const treeItem = event.currentTarget.closest<HTMLElement>('[role="treeitem"]');
               focusTreeItem(treeItem ?? undefined);
             }}
-          />
-        )}
-
-        {canDeleteFolder && (
-          <button
-            type="button"
-            aria-label={`刪除資料夾 ${node.path}`}
-            className="ml-1 shrink-0 rounded-md p-1 text-content-subtle opacity-0 transition-colors hover:bg-red-500/10 hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDeleteFolder(node.path);
-            }}
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">delete</span>
+            使用鍵盤移動
           </button>
         )}
-
       </div>
 
-      {/* Children */}
+      {isSection && isExpanded && node.children.length === 0 && !multiSelect && (
+        <p
+          className="py-1.5 pr-2 text-xs text-content-subtle"
+          style={{ paddingLeft: `${rowIndentRem + 1.5}rem` }}
+        >
+          {isQaRoot ? "還沒有分類。按上面的「新增分類」開始。" : "還沒有文件。按頁首的「新增資料」加入。"}
+        </p>
+      )}
+
       {node.type === "folder" && isExpanded && node.children.length > 0 && (
         <div role="group">
           {node.children.map((child) => (
-            <TreeView
+            <TreeBranch
               key={child.path}
               node={child}
               depth={depth + 1}
-              selectedPath={selectedPath}
-              expandedDirs={expandedDirs}
-              onSelect={onSelect}
-              onToggle={onToggle}
-              draggingPath={draggingPath}
-              sourceDragDir={sourceDragDir}
-              dropTargetPath={dropTargetPath}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-              onDragTargetChange={onDragTargetChange}
-              onDropFile={onDropFile}
-              onDeleteFolder={onDeleteFolder}
-              onSelectQaNode={onSelectQaNode}
-              onCreateQaNode={onCreateQaNode}
-              onRenameQaNode={onRenameQaNode}
-              onToggleQaNodeHidden={onToggleQaNodeHidden}
-              onDeleteQaNode={onDeleteQaNode}
-              onOrderQaNode={onOrderQaNode}
-              canDropQaNode={canDropQaNode}
-              canDropQaEntry={canDropQaEntry}
-              multiSelect={multiSelect}
-              checkedPaths={checkedPaths}
-              onToggleChecked={onToggleChecked}
+              fallbackTabStopPath={fallbackTabStopPath}
+              {...shared}
             />
           ))}
         </div>
       )}
-      {depth === 0 && (
-        <span className="sr-only" role="status" aria-live="polite">
-          {draggingPath
-            ? "移動模式已啟用。請巡覽至有效目標，按 Enter 或空白鍵放置，按 Escape 取消。"
-            : ""}
-        </span>
-      )}
+    </div>
+  );
+}
+
+export default function TreeView({ node, ...shared }: TreeViewProps) {
+  const instructionsId = useId();
+  const { selectedPath, expandedDirs, draggingPath, multiSelect = false } = shared;
+  // 兩個段落共用一棵樹：只有一個 role="tree"，aria-level 從段落列算起。
+  const roots = node.treeKind === "sections" ? node.children : [node];
+  const hasVisibleSelection = roots.some((root) =>
+    hasVisibleSelectedNode(root, selectedPath, expandedDirs),
+  );
+  const fallbackTabStopPath = hasVisibleSelection ? null : roots[0]?.path ?? null;
+
+  return (
+    <div
+      role="tree"
+      aria-label="知識庫目錄"
+      aria-describedby={instructionsId}
+      aria-multiselectable={multiSelect ? true : undefined}
+    >
+      <span id={instructionsId} className="sr-only">
+        {multiSelect
+          ? "多選模式：使用方向鍵巡覽，Enter 或空白鍵選取或取消選取檔案。"
+          : "使用方向鍵巡覽，Enter 或空白鍵開啟。選擇「使用鍵盤移動」後，移至目標並按 Enter 或空白鍵放置，Escape 取消。"}
+      </span>
+      {roots.map((root) => (
+        <TreeBranch
+          key={root.path}
+          node={root}
+          depth={0}
+          fallbackTabStopPath={fallbackTabStopPath}
+          {...shared}
+        />
+      ))}
+      <span className="sr-only" role="status" aria-live="polite">
+        {draggingPath
+          ? "移動模式已啟用。請巡覽至有效目標，按 Enter 或空白鍵放置，按 Escape 取消。"
+          : ""}
+      </span>
     </div>
   );
 }

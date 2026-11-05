@@ -33,6 +33,7 @@ export interface KnowledgeDocumentSummary {
   language_source?: "auto" | "manual" | null;
   // source_type === "qa" 且被任一問答樹節點掛載時為 true
   qa_attached?: boolean;
+  has_original_backup?: boolean;
 }
 
 // nan＝台語；專案有台語文件才會在 Live 多聽一次判斷台語。
@@ -209,13 +210,28 @@ export type KnowledgeCommitFileState =
   | "committed"
   | "skipped";
 
+/** 一個檔案匯入後的結果。沒有上層的分類不會帶 qa_parent_label。 */
+export interface KnowledgeCommitFileResult {
+  target: string;
+  kind: "qa" | "document";
+  language?: KnowledgeLanguage | null;
+  updated: boolean;
+  qa_node_id?: string;
+  qa_node_label?: string;
+  qa_parent_label?: string;
+  question_count?: number;
+}
+
 export interface KnowledgeCommitJob {
   state: "idle" | "running" | "done" | "failed";
   started_at: string | null;
   finished_at: string | null;
+  // files、results、skip_reasons 的鍵都相對 raw/，不帶 raw/ 前綴。
   files: Record<string, KnowledgeCommitFileState>;
   committed: string[];
   skipped: string[];
+  results: Record<string, KnowledgeCommitFileResult>;
+  skip_reasons: Record<string, string>;
   error: string | null;
 }
 
@@ -227,10 +243,18 @@ export interface KnowledgeCommitResponse {
   job?: KnowledgeCommitJob;
 }
 
+export interface KnowledgeCommitOptions {
+  /** 只處理這些檔案（相對 raw/）；不給就是全部。 */
+  paths?: string[];
+  /** false 時略過 AI 整理；不給就是要整理。 */
+  normalize?: boolean;
+}
+
 /** Promote staged raw/ files into the knowledge base as a background job. */
-export function commitRawKnowledge() {
+export function commitRawKnowledge(options: KnowledgeCommitOptions = {}) {
   return post<KnowledgeCommitResponse>(knowledgePath("/raw/commit"), {
     project_id: getActiveProjectId(),
+    ...options,
   });
 }
 
@@ -239,6 +263,22 @@ export function getCommitStatus() {
   return get<KnowledgeCommitJob>(knowledgePath("/raw/commit/status"), {
     project_id: getActiveProjectId(),
   });
+}
+
+export interface KnowledgeRawPendingFile {
+  /** 相對 raw/，不帶 raw/ 前綴。 */
+  path: string;
+  size: number;
+  updated_at: string;
+}
+
+/** 之前上傳、還沒匯入的檔案；正在匯入的不算。 */
+export function fetchRawPending() {
+  return get<{ files: KnowledgeRawPendingFile[] }>(knowledgePath("/raw/pending"));
+}
+
+export function discardRawPending(path: string) {
+  return del<{ status: string }>(knowledgePath("/raw/pending"), { path });
 }
 
 export interface KnowledgeRenormalizeResponse {

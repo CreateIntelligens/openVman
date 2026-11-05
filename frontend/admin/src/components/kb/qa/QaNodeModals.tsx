@@ -1,26 +1,40 @@
 import type { QaNode } from "../../../hooks/useQaNodes";
 import PromptModal from "../../PromptModal";
 import ConfirmModal from "../../ConfirmModal";
+import MoveQaNodeModal from "./MoveQaNodeModal";
 
 export type QaNodeDialog =
   | { type: "add-root" }
   | { type: "add-child"; parentNodeId: string; parentLabel: string }
   | { type: "rename"; node: QaNode }
+  | { type: "move"; node: QaNode }
   | { type: "delete"; node: QaNode };
 
 interface QaNodeModalsProps {
   dialog: QaNodeDialog | null;
+  nodesTree: QaNode[];
   onClose: () => void;
   onCreateSubmit: (values: Record<string, string>) => void;
   onRenameSubmit: (values: Record<string, string>) => void;
+  onMoveConfirm: (parentId: string | null) => void | Promise<void>;
   onDeleteConfirm: () => void;
+}
+
+function deleteMessage(node: QaNode): string {
+  const childCount = node.children?.length ?? 0;
+  const childNote = childCount > 0
+    ? `底下的 ${childCount} 個子分類不會被刪除，會移到最上層。`
+    : "";
+  return `確定要刪除分類「${node.label}」嗎？這個分類的問題和答案會一起刪除，不能復原。${childNote}`;
 }
 
 export default function QaNodeModals({
   dialog,
+  nodesTree,
   onClose,
   onCreateSubmit,
   onRenameSubmit,
+  onMoveConfirm,
   onDeleteConfirm,
 }: QaNodeModalsProps) {
   return (
@@ -29,17 +43,11 @@ export default function QaNodeModals({
         open={dialog?.type === "add-root" || dialog?.type === "add-child"}
         title={
           dialog?.type === "add-child"
-            ? `在「${dialog.parentLabel}」下新增子節點`
-            : "新增快速問答節點"
+            ? `在「${dialog.parentLabel}」底下新增子分類`
+            : "新增分類"
         }
         fields={[
-          { key: "label", label: "節點名稱", placeholder: "請輸入名稱", required: true },
-          {
-            key: "node_id",
-            label: "唯一識別碼",
-            placeholder: "留空自動生成",
-            hint: "限英文/數字/底線；留空自動生成",
-          },
+          { key: "label", label: "分類名稱", placeholder: "請輸入名稱", required: true },
         ]}
         submitLabel="新增"
         onSubmit={onCreateSubmit}
@@ -48,11 +56,11 @@ export default function QaNodeModals({
 
       <PromptModal
         open={dialog?.type === "rename"}
-        title="修改快速問答節點名稱"
+        title="重新命名分類"
         fields={[
           {
             key: "label",
-            label: "節點名稱",
+            label: "分類名稱",
             initialValue: dialog?.type === "rename" ? dialog.node.label : "",
             required: true,
           },
@@ -62,14 +70,19 @@ export default function QaNodeModals({
         onCancel={onClose}
       />
 
+      {dialog?.type === "move" && (
+        <MoveQaNodeModal
+          node={dialog.node}
+          nodesTree={nodesTree}
+          onConfirm={onMoveConfirm}
+          onClose={onClose}
+        />
+      )}
+
       <ConfirmModal
         open={dialog?.type === "delete"}
-        title="刪除快速問答節點"
-        message={
-          dialog?.type === "delete"
-            ? `確定要刪除節點「${dialog.node.label}」嗎？節點的問答內容檔案將一併刪除。`
-            : ""
-        }
+        title="刪除分類"
+        message={dialog?.type === "delete" ? deleteMessage(dialog.node) : ""}
         confirmLabel="刪除"
         danger
         onConfirm={onDeleteConfirm}

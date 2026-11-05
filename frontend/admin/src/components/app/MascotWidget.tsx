@@ -201,10 +201,11 @@ export default function MascotWidget() {
   return (
     <>
       {isClosed && trigger}
+      {/* 高度留出視窗上方 20rem：頁首與編輯器的儲存、搜尋、檢視切換都在那裡，矮視窗（1280×720）也不能蓋到。 */}
       <div
         ref={widgetRef}
         hidden={isClosed}
-        className="mascot-widget fixed h-[min(30rem,70dvh)] w-[min(21.25rem,90vw)] overflow-hidden rounded-2xl shadow-lg group"
+        className="mascot-widget fixed h-[max(12rem,min(30rem,calc(100dvh-21rem)))] w-[min(21.25rem,90vw)] overflow-hidden rounded-2xl shadow-lg group"
         style={style}
       >
       <div

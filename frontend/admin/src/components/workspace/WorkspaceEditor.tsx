@@ -92,7 +92,7 @@ export default function WorkspaceEditor({
               className="min-w-0 flex-1 bg-transparent font-mono text-sm text-content placeholder:text-content-subtle focus:outline-none truncate"
             />
             {!selectedPath && draftPath && (
-              <span className="shrink-0 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-primary">
+              <span className="shrink-0 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
                 新檔
               </span>
             )}
@@ -131,7 +131,7 @@ export default function WorkspaceEditor({
               className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-content placeholder:text-content-subtle focus:outline-none font-mono resize-none overflow-y-auto ${
                 editorMode === "split" ? "border-r border-border " : ""
               }`}
-              placeholder={"# Markdown 內容\n\n…"}
+              placeholder="在這裡輸入文件內容，可以用 Markdown 語法…"
             />
           ) : null}
 

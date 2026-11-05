@@ -115,7 +115,95 @@ describe("VisibilityOrderModal", () => {
   it("keeps the up and down buttons for people who cannot drag", () => {
     renderSiblings();
 
-    fireEvent.click(row("甲").querySelector('button[title="下移"]') as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: "下移 甲" }));
     expect(labels()).toEqual(["乙", "甲", "丙"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "上移 丙" }));
+    expect(labels()).toEqual(["乙", "丙", "甲"]);
+  });
+
+  it("uses plain words: the new title, top level or the category name, and no internal ids", () => {
+    const { container, rerender } = render(
+      <VisibilityOrderModal
+        isOpen
+        onClose={vi.fn()}
+        parentNode={null}
+        nodesTree={siblings}
+        onUpdateNode={vi.fn()}
+        onReorderNode={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("dialog", { name: "調整順序與顯示" })).toBeTruthy();
+    expect(screen.getByText("最上層")).toBeTruthy();
+    expect(container.textContent).not.toContain("n0");
+    expect(container.textContent).not.toContain("節點");
+    expect(container.textContent).not.toContain("可見性");
+
+    rerender(
+      <VisibilityOrderModal
+        isOpen
+        onClose={vi.fn()}
+        parentNode={{ ...siblings[0], node_id: "parent", label: "中文", children: siblings }}
+        nodesTree={[]}
+        onUpdateNode={vi.fn()}
+        onReorderNode={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("中文")).toBeTruthy();
+    expect(screen.queryByText("最上層")).toBeNull();
+  });
+
+  it("says what hiding a category means", () => {
+    renderSiblings();
+
+    expect(screen.getByText(/「已隱藏」的分類訪客在選單看不到，但 AI 回答時還是會用/)).toBeTruthy();
+  });
+
+  it("saves hiding a category with words on the button", async () => {
+    const onUpdateNode = vi.fn().mockResolvedValue(undefined);
+    render(
+      <VisibilityOrderModal
+        isOpen
+        onClose={vi.fn()}
+        parentNode={null}
+        nodesTree={siblings}
+        onUpdateNode={onUpdateNode}
+        onReorderNode={vi.fn()}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: "甲顯示中，按一下隱藏" });
+    expect(toggle.textContent).toContain("顯示中");
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "甲已隱藏，按一下改成顯示" }).textContent).toContain("已隱藏");
+
+    fireEvent.click(screen.getByText("儲存變更"));
+    await waitFor(() => expect(onUpdateNode).toHaveBeenCalledWith("n0", { hidden: true }));
+  });
+
+  it("shows a failed save and stays open", async () => {
+    const onClose = vi.fn();
+    render(
+      <VisibilityOrderModal
+        isOpen
+        onClose={onClose}
+        parentNode={null}
+        nodesTree={siblings}
+        onUpdateNode={vi.fn()}
+        onReorderNode={vi.fn().mockRejectedValue(new Error("伺服器忙碌"))}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "下移 甲" }));
+    fireEvent.click(screen.getByText("儲存變更"));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("伺服器忙碌");
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

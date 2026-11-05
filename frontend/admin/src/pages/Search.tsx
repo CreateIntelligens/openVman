@@ -5,6 +5,14 @@ import { type SearchResult, useSemanticSearch } from "../hooks/useSemanticSearch
 
 const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
 
+// 後端的來源代碼對工作人員沒有意義；人工填的記憶來源不在表內，照原樣顯示。
+const SOURCE_LABELS = new Map([
+  ["workspace", "知識庫文件"],
+  ["system", "系統"],
+  ["user", "手動新增"],
+  ["memory_summary", "自動摘要"],
+]);
+
 function clampPercentage(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
@@ -18,7 +26,6 @@ interface SearchMetadata {
   path?: string;
   title?: string;
   heading_path?: string[];
-  chunk_id?: string;
   persona_id?: string;
 }
 
@@ -40,6 +47,12 @@ function getResultPercentage(item: SearchResult): number | null {
   return getSimilarityPercentage(item._distance);
 }
 
+// 不顯示內部路徑：去掉 knowledge/ 這一層；knowledge/qa/ 是系統自己產生的問答檔，檔名對人沒有意義。
+function getDisplayPath(path: string): string {
+  if (path.startsWith("knowledge/qa/")) return "";
+  return path.replace(/^knowledge\//, "");
+}
+
 function normalizeExactMatchText(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
@@ -56,10 +69,8 @@ function hasExactMatch(
     item.text,
     item.path ?? "",
     item.title ?? "",
-    item.chunk_id ?? "",
     metadata.path ?? "",
     metadata.title ?? "",
-    metadata.chunk_id ?? "",
     ...(metadata.heading_path ?? []),
   ];
   return haystacks.some((value) => normalizeExactMatchText(value).includes(needle));
@@ -89,7 +100,7 @@ export default function Search() {
     <div className="page-scroll">
       <PageHeader
         title="知識庫搜尋"
-        subtitle="顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。"
+        subtitle="輸入問題，看看 AI 回答時會參考知識庫的哪些段落。"
       />
 
       <div className="page-body max-w-5xl space-y-6">
@@ -109,27 +120,28 @@ export default function Search() {
               type="text"
               aria-label="搜尋內容"
               className="input pl-10"
-              placeholder="描述你要搜尋的內容..."
+              placeholder="輸入訪客可能會問的問題"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
           <Select
             ariaLabel="搜尋範圍"
+            label="搜尋範圍"
             value={table}
             onChange={setTable}
             options={[
-              { value: "memories", label: "個人記憶" },
               { value: "knowledge", label: "知識庫" },
+              { value: "memories", label: "個人記憶" },
             ]}
             className="text-sm"
           />
           <Select
-            ariaLabel="Top K"
-            label="Top K"
+            ariaLabel="找幾筆"
+            label="找幾筆"
             value={String(topK)}
             onChange={(v) => setTopK(Number(v))}
-            options={TOP_K_OPTIONS.map((k) => ({ value: String(k), label: String(k) }))}
+            options={TOP_K_OPTIONS.map((k) => ({ value: String(k), label: `${k} 筆` }))}
             className="text-sm"
           />
           <button
@@ -137,7 +149,7 @@ export default function Search() {
             disabled={!canSubmit}
             className="btn btn-primary ml-auto"
           >
-            {loading ? "搜尋中…" : "執行查詢"}
+            {loading ? "搜尋中…" : "搜尋"}
           </button>
         </form>
 
@@ -148,7 +160,7 @@ export default function Search() {
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-3">
               <h2 className="card-title">搜尋結果</h2>
               <span className="text-sm text-content-subtle">
-                找到 {response.results.length} 筆結果
+                找到 {response.results.length} {response.table === "memories" ? "筆記憶" : "個段落"}
               </span>
             </div>
 
@@ -156,9 +168,8 @@ export default function Search() {
               {response.results.map((item, i) => {
                 const metadata = parseMetadata(item.metadata);
                 const similarity = getResultPercentage(item);
-                const resultPath = item.path ?? metadata.path ?? "";
+                const resultPath = getDisplayPath(item.path ?? metadata.path ?? "");
                 const resultTitle = item.title ?? metadata.title ?? "";
-                const chunkId = item.chunk_id ?? metadata.chunk_id ?? "";
                 const headings = metadata.heading_path ?? [];
                 const exactMatch = hasExactMatch(query, item, metadata);
                 return (
@@ -167,13 +178,13 @@ export default function Search() {
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <span className="chip">{response.table === "memories" ? "個人記憶" : "知識庫"}</span>
                         {exactMatch && (
-                          <span className="chip border-success/30 bg-success/10 text-success">完全命中</span>
+                          <span className="chip border-success/30 bg-success/10 text-success">含有你輸入的文字</span>
                         )}
                         {response.table === "memories" && <PersonaBadge metadata={metadata} />}
-                        <span className="text-xs text-content-subtle">來源：{item.source}</span>
+                        <span className="text-xs text-content-subtle">來源：{SOURCE_LABELS.get(item.source) ?? item.source}</span>
                       </div>
-                      <div className="flex w-36 shrink-0 items-center gap-2" title="相關度">
-                        <span className="sr-only">相關度</span>
+                      <div className="flex w-44 shrink-0 items-center gap-2">
+                        <span className="shrink-0 text-xs text-content-subtle">相關度</span>
                         {similarity != null ? (
                           <>
                             <div aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
@@ -192,14 +203,13 @@ export default function Search() {
                       </div>
                     </div>
                     <p className="mb-3 leading-relaxed text-content-muted [overflow-wrap:anywhere]">{item.text}</p>
-                    {(resultTitle || resultPath || headings.length > 0 || chunkId) && (
+                    {(resultTitle || resultPath || headings.length > 0) && (
                       <div className="mb-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-content-muted [overflow-wrap:anywhere]">
                         {resultTitle && (
                           <span className="font-semibold text-content">{resultTitle}</span>
                         )}
                         {headings.length > 0 && <span>{headings.join(" / ")}</span>}
-                        {resultPath && <span className="font-mono">{resultPath}</span>}
-                        {chunkId && <span className="font-mono text-content-subtle">{chunkId}</span>}
+                        {resultPath && <span>{resultPath}</span>}
                       </div>
                     )}
                     <div className="flex items-center gap-2 border-t border-border pt-3 text-xs text-content-subtle">
@@ -212,7 +222,7 @@ export default function Search() {
             </ul>
 
             {response.results.length === 0 && (
-              <p className="py-8 text-center text-content-subtle">沒有找到結果。</p>
+              <p className="py-8 text-center text-content-subtle">沒有找到相關內容，可以換個說法再試一次。</p>
             )}
           </section>
         )}

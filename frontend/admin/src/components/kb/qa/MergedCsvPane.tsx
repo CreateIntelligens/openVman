@@ -1,20 +1,44 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useUnsavedChanges } from "../../../context/NavigationGuardContext";
 import { type MergedQaItem, useQaNodes } from "../../../hooks/useQaNodes";
-import ConfirmModal from "../../ConfirmModal";
-import QaRowCard, { QaRowListHeader, type QaRowField } from "./QaRowCard";
-import { moveToInsertion, useRowReorder } from "./rowReorder";
+import type { Status } from "../../../hooks/useStatusState";
 import { errorMessage } from "../../../utils/errorMessage";
+import { fileNameOf, normalizeSearchTerm } from "../helpers";
+import QaRowCard, { QA_HIDDEN_HINT, QaRowListHeader, type QaRowField } from "./QaRowCard";
+import { moveToInsertion, useRowReorder } from "./rowReorder";
+import { useQaImageUpload } from "./useQaImageUpload";
+import { type QaRowFocusTarget, useQaRowReveal } from "./useQaRowReveal";
+
+/** 樹上點了某一題。每次點都是新的物件，所以再點同一題也會捲回去。 */
+export interface QaFocusRequest {
+  question: string;
+}
 
 interface MergedCsvPaneProps {
   nodeId: string | null;
   nodeLabel?: string;
+  /** 上層分類的名稱，由最上層往下。 */
+  parentLabels?: string[];
+  /** 這個分類或它的上層被隱藏了：訪客根本走不到這裡。 */
+  nodeHidden?: boolean;
+  childCategoryCount?: number;
   refreshKey?: number;
+  focusQuestion?: QaFocusRequest | null;
   onSuccess?: () => void;
+  onStatus?: (status: Status) => void;
 }
+
+type EditorProps = Omit<MergedCsvPaneProps, "nodeId"> & { nodeId: string };
 
 interface LocalMergedQaItem extends MergedQaItem {
   _localId: string;
+}
+
+interface SaveProblem {
+  message: string;
+  rowId?: string;
+  focus?: QaRowFocusTarget;
 }
 
 type EditableMergedQaField = "q" | "a" | "img" | "url" | "hidden";
@@ -27,398 +51,562 @@ const CELL_FIELD: Record<QaRowField, EditableMergedQaField> = {
   hidden: "hidden",
 };
 
+const SEARCH_MIN_ROWS = 5;
+const LISTED_ROW_LIMIT = 5;
+const NO_ROW_IDS: ReadonlySet<string> = new Set();
+const MANUAL_SOURCE_NAME = /^manual_.*\.md$/;
+
 function localRowId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+}
+
+// 比對伺服器內容有沒有變：本機的列識別碼每次載入都不同，不能算進去。
+function contentKey(rows: MergedQaItem[]): string {
+  return JSON.stringify(rows.map(({ q, a, img, url, hidden, source_file }) => [
+    q, a, img || "", url || "", Boolean(hidden), source_file,
+  ]));
 }
 
 function cloneRows(rows: LocalMergedQaItem[]): LocalMergedQaItem[] {
   return rows.map((row) => ({ ...row }));
 }
 
-function createDraftMergedRow(nodeId: string): LocalMergedQaItem {
-  return {
-    q: "",
-    a: "",
-    img: "",
-    url: "",
-    source_file: `knowledge/qa/manual_${nodeId}.md`,
-    hidden: false,
-    _localId: localRowId("draft"),
-  };
+function manualSourcePath(nodeId: string): string {
+  return `knowledge/qa/manual_${nodeId}.md`;
 }
 
-export default function MergedCsvPane({
+/** 自己輸入的內容存在系統產生的檔案裡，檔名對使用者沒有意義。 */
+function isManualSource(path: string): boolean {
+  return MANUAL_SOURCE_NAME.test(fileNameOf(path));
+}
+
+function rowMatchesSearch(row: LocalMergedQaItem, term: string): boolean {
+  return row.q.toLowerCase().includes(term) || row.a.toLowerCase().includes(term);
+}
+
+function listRowNumbers(positions: number[]): string {
+  const listed = positions.slice(0, LISTED_ROW_LIMIT).map((position) => position + 1).join("、");
+  return positions.length > LISTED_ROW_LIMIT
+    ? `${listed} 等 ${positions.length} 題`
+    : `${listed} 題`;
+}
+
+function findSaveProblem(
+  rows: LocalMergedQaItem[],
+  originalRows: LocalMergedQaItem[],
+): SaveProblem | null {
+  // 後端不會重寫沒有題目的來源檔，下次讀取時那份檔案會被當成沒掛上去的文件，
+  // 長回一個新分類，刪掉的題目全部回來。真的不要了要刪分類，來源檔才會一起刪。
+  if (rows.length === 0 && originalRows.length > 0) {
+    return {
+      message: "分類裡至少要留一題。要整個刪掉這個分類，請到左邊分類的「⋯」選「刪除」；想復原請按「取消變更」。",
+    };
+  }
+
+  const incomplete = rows.flatMap((row, position) =>
+    row.q.trim() && row.a.trim() ? [] : [position]);
+  if (incomplete.length > 0) {
+    const first = rows[incomplete[0]];
+    return {
+      message: `第 ${listRowNumbers(incomplete)}：問題和答案都要填，填好再儲存。`,
+      rowId: first._localId,
+      focus: first.q.trim() ? "answer" : "question",
+    };
+  }
+
+  // 同一題存兩次，讀回來兩列都會變成後面那個答案，前面的答案就不見了。
+  const seen = new Map<string, number>();
+  for (let position = 0; position < rows.length; position += 1) {
+    const question = rows[position].q.trim();
+    const firstPosition = seen.get(question);
+    if (firstPosition !== undefined) {
+      return {
+        message: `第 ${firstPosition + 1} 題和第 ${position + 1} 題的問題一樣。同一個分類不能有相同的問題，請改掉或刪掉其中一題。`,
+        rowId: rows[position]._localId,
+        focus: "question",
+      };
+    }
+    seen.set(question, position);
+  }
+  return null;
+}
+
+export default function MergedCsvPane({ nodeId, ...editorProps }: MergedCsvPaneProps) {
+  if (!nodeId) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-8 text-content-muted">
+        <p className="text-sm font-medium">請從左邊選一個分類，就可以編輯裡面的問題</p>
+      </div>
+    );
+  }
+  // 換分類就整個重來：搜尋字、驗證狀態、還在跑的請求都屬於上一個分類。
+  return <CategoryEditor key={nodeId} nodeId={nodeId} {...editorProps} />;
+}
+
+function CategoryEditor({
   nodeId,
   nodeLabel = "",
+  parentLabels = [],
+  nodeHidden = false,
+  childCategoryCount = 0,
   refreshKey = 0,
+  focusQuestion = null,
   onSuccess,
-}: MergedCsvPaneProps) {
-  const { fetchMergedQa, saveMergedQa, uploadImage, cleanupImages } = useQaNodes();
+  onStatus,
+}: EditorProps) {
+  const { fetchMergedQa, saveMergedQa } = useQaNodes();
 
   const [rows, setRows] = useState<LocalMergedQaItem[]>([]);
   const [originalRows, setOriginalRows] = useState<LocalMergedQaItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [uploadingImageRow, setUploadingImageRow] = useState<number | null>(null);
-  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
-  const [cleaningImages, setCleaningImages] = useState(false);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const pendingImageRowRef = useRef<number | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
+  const [search, setSearch] = useState("");
+  // 搜尋中改過的列先留在畫面上：不然打到不符合搜尋字的瞬間，正在打字的那一列就不見了。
+  const [keptRowIds, setKeptRowIds] = useState(NO_ROW_IDS);
 
-  const loadMergedQa = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const loadSequenceRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+  const handledFocusRef = useRef<QaFocusRequest | null>(null);
+  const focusAddButtonRef = useRef(false);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const onStatusRef = useRef(onStatus);
+  onStatusRef.current = onStatus;
+  const report = useCallback((status: Status) => onStatusRef.current?.(status), []);
+
+  const { revealRow, registerRow, flashRowId } = useQaRowReveal();
+
+  const load = useCallback(async () => {
+    loadSequenceRef.current += 1;
+    const sequence = loadSequenceRef.current;
+    // 只有第一次顯示載入中：存檔後重新讀取時畫面不動，不會被捲回最上面。
+    const firstLoad = !hasLoadedRef.current;
+    if (firstLoad) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
-      const data = await fetchMergedQa(id);
-      const mapped = data.length > 0
-        ? data.map((item, idx) => ({
-          ...item,
-          _localId: item.index || localRowId(`init_${idx}`),
-        }))
-        : [createDraftMergedRow(id)];
+      const data = await fetchMergedQa(nodeId);
+      if (sequence !== loadSequenceRef.current) return;
+      const mapped = data.map((item, position) => ({
+        ...item,
+        _localId: `loaded_${sequence}_${position}`,
+      }));
+      hasLoadedRef.current = true;
       setRows(mapped);
       setOriginalRows(cloneRows(mapped));
+      setKeptRowIds(NO_ROW_IDS);
+      setLoaded(true);
     } catch (error: unknown) {
-      setError(errorMessage(error, "無法取得問答合併檢視資料"));
+      if (sequence !== loadSequenceRef.current) return;
+      const message = errorMessage(error, "讀不到這個分類的問題，請稍後再試。");
+      if (firstLoad) {
+        setLoadError(message);
+      } else {
+        report({ type: "error", message });
+      }
     } finally {
-      setLoading(false);
+      if (sequence === loadSequenceRef.current) setLoading(false);
     }
-  }, [fetchMergedQa]);
-
-  useEffect(() => {
-    if (nodeId) {
-      loadMergedQa(nodeId);
-      setStatusMsg(null);
-    } else {
-      setRows([]);
-      setOriginalRows([]);
-    }
-  }, [nodeId, refreshKey, loadMergedQa]);
+  }, [fetchMergedQa, nodeId, report]);
 
   const isDirty = useMemo(
     () => JSON.stringify(rows) !== JSON.stringify(originalRows),
     [rows, originalRows],
   );
+  const dirtyStateRef = useRef({ isDirty, originalRows });
+  dirtyStateRef.current = { isDirty, originalRows };
+  const outdatedRef = useRef(false);
 
-  const sourceFiles = useMemo(() => [...new Set(rows.map((row) => row.source_file))], [rows]);
+  const warnIfChangedElsewhere = useCallback(async () => {
+    const sequence = loadSequenceRef.current;
+    try {
+      const data = await fetchMergedQa(nodeId);
+      if (sequence !== loadSequenceRef.current) return;
+      if (contentKey(data) === contentKey(dirtyStateRef.current.originalRows)) return;
+      outdatedRef.current = true;
+      report({
+        type: "error",
+        message: "這個分類剛匯入了新內容。你還沒儲存的修改存下去會蓋掉它；要看新內容請按「取消變更」。",
+      });
+    } catch {
+      // 查不到就等於沒有新消息，存檔時後端還會再把關。
+    }
+  }, [fetchMergedQa, nodeId, report]);
+
+  useEffect(() => {
+    // 匯入途中可能有人正在改這個分類：直接重讀會把手上的修改洗掉。
+    if (dirtyStateRef.current.isDirty) {
+      void warnIfChangedElsewhere();
+    } else {
+      void load();
+    }
+    return () => {
+      loadSequenceRef.current += 1;
+    };
+  }, [load, refreshKey, warnIfChangedElsewhere]);
+  useUnsavedChanges("knowledge-qa-editor", isDirty, "快速問答");
+
+  const term = normalizeSearchTerm(search);
+  const searching = term !== "";
+  const visibleRows = useMemo(() => {
+    const positioned = rows.map((row, position) => ({ row, position }));
+    if (!searching) return positioned;
+    return positioned.filter(({ row }) =>
+      keptRowIds.has(row._localId) || rowMatchesSearch(row, term));
+  }, [rows, searching, term, keptRowIds]);
+
+  const hiddenCount = rows.filter((row) => row.hidden).length;
+  const shownCount = rows.length - hiddenCount;
+  const sourceFiles = useMemo(
+    () => [...new Set(rows.map((row) => row.source_file))],
+    [rows],
+  );
+  const singleSource = sourceFiles.length === 1 ? sourceFiles[0] : null;
+  const hasManySources = sourceFiles.length > 1;
+
   const reorder = useRowReorder(rows.length, (from, insertAt) => {
     setRows((prev) => moveToInsertion(prev, from, insertAt));
   });
 
-  if (!nodeId) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-content-subtle bg-surface-raised dark:bg-surface-sunken/30 rounded-xl border border-dashed border-border">
-        <span className="material-symbols-outlined text-[3rem] mb-3 text-border-strong">
-          drafts
-        </span>
-        <p className="text-sm font-medium">請從左側側邊欄選擇一個知識節點以檢視並編輯問答數據</p>
-      </div>
-    );
-  }
+  const imageUpload = useQaImageUpload({
+    onUploaded: (rowId, imageId) => {
+      if (!rowsRef.current.some((row) => row._localId === rowId)) return;
+      setRows((prev) => prev.map((row) => (
+        row._localId === rowId ? { ...row, img: imageId } : row
+      )));
+      report({ type: "success", message: "圖片已上傳，編號已經填好。按「儲存變更」才會生效。" });
+    },
+    onError: (message) => report({ type: "error", message }),
+  });
+  const uploading = imageUpload.uploadingRowId !== null;
+
+  const clearSearch = () => {
+    setSearch("");
+    setKeptRowIds(NO_ROW_IDS);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setKeptRowIds(NO_ROW_IDS);
+  };
+
+  const revealWithSearch = (
+    rowId: string,
+    options: { focus?: QaRowFocusTarget; flash?: boolean },
+  ) => {
+    // 要找的列被搜尋藏起來時，要先把搜尋清掉才捲得到。
+    if (!visibleRows.some(({ row }) => row._localId === rowId)) clearSearch();
+    revealRow({ rowId, ...options });
+  };
+
+  useEffect(() => {
+    if (!focusQuestion || !loaded || handledFocusRef.current === focusQuestion) return;
+    handledFocusRef.current = focusQuestion;
+    // 樹上的字是存檔時的內容，畫面上那一列可能已經改過，所以先對原本的內容。
+    const original = originalRows.find((row) => row.q === focusQuestion.question);
+    const target = rows.find((row) => row._localId === original?._localId)
+      ?? rows.find((row) => row.q === focusQuestion.question);
+    if (target) revealWithSearch(target._localId, { flash: true });
+  }, [focusQuestion, loaded, originalRows, rows]);
+
+  // 最後一列刪掉後按鈕會換到空白畫面裡，要等畫好才聚焦得到。
+  useEffect(() => {
+    if (!focusAddButtonRef.current) return;
+    focusAddButtonRef.current = false;
+    addButtonRef.current?.focus();
+  }, [rows.length]);
 
   const handleCellChange = (
-    index: number,
+    rowId: string,
     field: EditableMergedQaField,
     value: string | boolean,
   ) => {
-    const next = rows.map((row, i) => {
-      if (i === index) {
-        return { ...row, [field]: value };
-      }
-      return row;
-    });
-    setRows(next);
+    setRows((prev) => prev.map((row) => (
+      row._localId === rowId ? { ...row, [field]: value } : row
+    )));
+    if (searching) {
+      setKeptRowIds((prev) => (prev.has(rowId) ? prev : new Set([...prev, rowId])));
+    }
   };
 
   const handleAddRow = () => {
-    const defaultSourceFile =
-      rows.length > 0 && rows[0].source_file
-        ? rows[0].source_file
-        : `knowledge/qa/manual_${nodeId}.md`;
-
+    // 同一份檔案的題目存檔後會排在一起，新題要留在尾端就得跟最後一題放同一份。
+    const lastRow = rows[rows.length - 1] ?? originalRows[originalRows.length - 1];
     const newRow: LocalMergedQaItem = {
       q: "",
       a: "",
       img: "",
       url: "",
-      source_file: defaultSourceFile,
+      source_file: lastRow?.source_file || manualSourcePath(nodeId),
       hidden: false,
       _localId: localRowId("new"),
     };
-    setRows([...rows, newRow]);
+    setRows((prev) => [...prev, newRow]);
+    clearSearch();
+    revealRow({ rowId: newRow._localId, focus: "question", flash: true });
   };
 
-  const handleRemoveRow = (index: number) => {
-    const next = rows.filter((_, i) => i !== index);
-    setRows(next);
-  };
-
-  const handlePickImage = (index: number) => {
-    pendingImageRowRef.current = index;
-    imageInputRef.current?.click();
-  };
-
-  const handleImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    const rowIndex = pendingImageRowRef.current;
-    e.target.value = "";
-    pendingImageRowRef.current = null;
-    if (!file || rowIndex === null) return;
-
-    setUploadingImageRow(rowIndex);
-    setStatusMsg(null);
-    try {
-      const { image_id } = await uploadImage(file);
-      setRows((prev) => prev.map((row, i) => (i === rowIndex ? { ...row, img: image_id } : row)));
-      setStatusMsg({ type: "success", text: `圖片已上傳（ID：${image_id}），請記得儲存變更。` });
-    } catch (error: unknown) {
-      setStatusMsg({ type: "error", text: errorMessage(error, "圖片上傳失敗") });
-    } finally {
-      setUploadingImageRow(null);
-    }
-  };
-
-  const handleCleanupImages = async () => {
-    setCleanupConfirmOpen(false);
-    setCleaningImages(true);
-    setStatusMsg(null);
-    try {
-      const { deleted_files } = await cleanupImages();
-      setStatusMsg({
-        type: "success",
-        text: deleted_files.length > 0
-          ? `已清理 ${deleted_files.length} 個未使用圖片：${deleted_files.join("、")}`
-          : "沒有需要清理的未使用圖片。",
-      });
-    } catch (error: unknown) {
-      setStatusMsg({ type: "error", text: errorMessage(error, "清理未使用圖片失敗") });
-    } finally {
-      setCleaningImages(false);
+  const handleRemoveRow = (rowId: string, position: number) => {
+    const visibleIndex = visibleRows.findIndex(({ row }) => row._localId === rowId);
+    const neighbor = visibleRows[visibleIndex + 1] ?? visibleRows[visibleIndex - 1];
+    setRows((prev) => prev.filter((row) => row._localId !== rowId));
+    report({
+      type: "success",
+      message: `已刪除第 ${position + 1} 題。按「儲存變更」才會生效，想復原請按「取消變更」。`,
+    });
+    if (neighbor) {
+      revealRow({ rowId: neighbor.row._localId, focus: "row", scroll: false });
+    } else {
+      focusAddButtonRef.current = true;
     }
   };
 
   const handleCancel = () => {
     setRows(cloneRows(originalRows));
-    setStatusMsg(null);
+    setKeptRowIds(NO_ROW_IDS);
+    setShowValidation(false);
+    report(null);
+    if (outdatedRef.current) {
+      outdatedRef.current = false;
+      void load();
+    }
   };
 
   const handleSave = async () => {
-    const hasEmptyField = rows.some((row) => !row.q.trim() || !row.a.trim());
-    if (hasEmptyField) {
-      setStatusMsg({ type: "error", text: "儲存失敗：所有問答欄位皆必須填寫問題與答案" });
+    const problem = findSaveProblem(rows, originalRows);
+    if (problem) {
+      setShowValidation(true);
+      report({ type: "error", message: problem.message });
+      if (problem.rowId) {
+        revealWithSearch(problem.rowId, { focus: problem.focus, flash: true });
+      }
       return;
     }
 
     setSaving(true);
-    setStatusMsg(null);
+    setShowValidation(false);
+    report(null);
     try {
       // 號碼跟著畫面順序走：CSV 下次同步時依 index 排序，舊號碼會把順序排回去。
-      const payload = rows.map(({ _localId, ...r }, position) => ({
-        ...r,
+      const payload = rows.map(({ _localId, ...row }, position) => ({
+        ...row,
         index: String(position + 1),
-        q: r.q.trim(),
-        a: r.a.trim(),
-        img: r.img?.trim() || "",
-        url: r.url?.trim() || "",
+        q: row.q.trim(),
+        a: row.a.trim(),
+        img: row.img?.trim() || "",
+        url: row.url?.trim() || "",
       }));
       await saveMergedQa(nodeId, payload);
-      setStatusMsg({ type: "success", text: "問答變更已成功同步至伺服器並重新編製索引！" });
-      await loadMergedQa(nodeId);
+      setOriginalRows(cloneRows(rows));
+      report({ type: "success", message: "已儲存，AI 和選單都會用新內容" });
+      await load();
       onSuccess?.();
     } catch (error: unknown) {
-      setStatusMsg({ type: "error", text: errorMessage(error, "儲存合併問答失敗") });
+      report({
+        type: "error",
+        message: errorMessage(error, "儲存失敗，請再試一次。你改的內容還在畫面上。"),
+      });
     } finally {
       setSaving(false);
     }
   };
 
+  const canEdit = loaded && !loadError;
+  const showSearch = rows.length > SEARCH_MIN_ROWS || searching;
+
+  const addButton = (
+    <button
+      type="button"
+      ref={addButtonRef}
+      onClick={handleAddRow}
+      disabled={saving}
+      className="btn btn-ghost"
+    >
+      <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">add</span>
+      新增問題
+    </button>
+  );
+
   return (
-    <div className="flex flex-col h-full bg-surface-raised border border-border rounded-xl overflow-hidden shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border px-6 py-4 gap-3 bg-surface/50 dark:bg-surface/20 shrink-0">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[1.25rem] text-primary">view_list</span>
-            <span className="text-base font-bold text-content">
-              合併檢視編輯器
+    // 窄畫面整張一起捲，標題捲走、操作留在上面，清單才有足夠的高度；
+    // md 以上標題與操作固定，只捲清單。
+    <section
+      aria-label={`編輯分類：${nodeLabel || "未命名"}`}
+      className="flex min-h-full min-w-0 flex-col bg-surface-raised md:h-full md:min-h-0 md:overflow-hidden md:rounded-xl md:border md:border-border md:shadow-sm"
+    >
+      <div className="contents md:flex md:shrink-0 md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2 md:border-b md:border-border md:px-4 md:py-3">
+        <div className="min-w-[min(100%,16rem)] px-4 pt-3 md:flex-1 md:px-0 md:pt-0">
+          <h2 className="break-words text-base font-semibold text-content">
+            {parentLabels.length > 0 && (
+              <span className="font-normal text-content-muted">{parentLabels.join(" › ")} › </span>
+            )}
+            {nodeLabel || "這個分類"}
+          </h2>
+          <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-content-muted">
+            <span>
+              {nodeHidden
+                ? "這個分類目前隱藏中，訪客在選單看不到；AI 回答時還是會用這些內容"
+                : "訪客點到這個分類會看到這些問題"}
             </span>
-          </div>
-          {nodeLabel && (
-            <p className="text-xs text-content-muted mt-0.5">
-              目前節點：<span className="font-semibold text-content-muted">{nodeLabel}</span> ({nodeId})
-            </p>
-          )}
-          {sourceFiles.length === 1 && (
-            <p className="text-xs text-content-subtle" title={sourceFiles[0]}>
-              來源：{sourceFiles[0]}
+            {canEdit && rows.length > 0 && (
+              <span>
+                顯示中 {shownCount} 題{hiddenCount > 0 && `，隱藏 ${hiddenCount} 題`}
+              </span>
+            )}
+          </p>
+          {singleSource && !isManualSource(singleSource) && (
+            <p className="mt-0.5 truncate text-xs text-content-muted">
+              內容存放在：{fileNameOf(singleSource)}
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          {isDirty && (
-            <span className="px-2 py-0.5 text-xs font-bold text-warn bg-warn/10 border border-warn/25 rounded-md animate-pulse">
-              有未儲存變更
+        <div className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-surface-raised px-4 py-2 md:contents">
+          <div className="flex flex-wrap items-center justify-end gap-1.5 md:ml-auto">
+            {/* 位置先留好：不然打第一個字時按鈕被擠到下一行，正在打的那列也跟著跳。 */}
+            <span role="status" className="inline-flex min-w-[6.75rem] justify-end">
+              {isDirty && (
+                <span className="rounded-md border border-warn/30 bg-warn/10 px-2 py-1 text-xs font-medium text-content">
+                  有未儲存的變更
+                </span>
+              )}
             </span>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={!isDirty || saving}
+              className="btn btn-ghost px-3"
+            >
+              取消變更
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!isDirty || saving || uploading}
+              className="btn btn-primary px-3"
+            >
+              {saving && (
+                <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[1rem]">sync</span>
+              )}
+              {saving ? "儲存中…" : "儲存變更"}
+            </button>
+          </div>
+
+          {canEdit && rows.length > 0 && (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              {addButton}
+              {showSearch && (
+                <input
+                  type="search"
+                  aria-label="搜尋這個分類的問題和答案"
+                  placeholder="搜尋問題或答案"
+                  value={search}
+                  onChange={(event) => handleSearchChange(event.target.value)}
+                  className="input w-auto min-w-0 flex-1 basis-40 placeholder:text-content-subtle"
+                />
+              )}
+              {searching && (
+                <>
+                  <span role="status" className="text-xs text-content-muted">找到 {visibleRows.length} 題</span>
+                  <button type="button" onClick={clearSearch} className="btn btn-ghost">清除搜尋</button>
+                </>
+              )}
+            </div>
           )}
-          <button
-            type="button"
-            onClick={() => setCleanupConfirmOpen(true)}
-            disabled={cleaningImages}
-            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-content-muted transition-colors hover:text-content hover:bg-surface-sunken disabled:opacity-50"
-          >
-            <span className={`material-symbols-outlined text-[1rem] ${cleaningImages ? "animate-spin" : ""}`}>
-              {cleaningImages ? "sync" : "mop"}
-            </span>
-            {cleaningImages ? "清理中..." : "清理未使用圖片"}
-          </button>
         </div>
       </div>
 
-      {(error || statusMsg) && (
-        <div className="px-6 pt-4 shrink-0">
-          {error && (
-            <div className="flex items-start gap-2 rounded-lg bg-danger/5 text-danger p-3 text-xs border border-danger/20">
-              <span className="material-symbols-outlined text-[1.125rem] shrink-0 mt-0.5">error</span>
-              <div>{error}</div>
-            </div>
-          )}
-          {statusMsg && (
-            <div
-              className={`flex items-start gap-2.5 rounded-lg p-3 text-xs leading-relaxed ${
-                statusMsg.type === "success"
-                  ? "bg-success/5 text-success border border-success/20"
-                  : "bg-danger/5 text-danger border border-danger/20"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[1.125rem] shrink-0 mt-0.5">
-                {statusMsg.type === "success" ? "check_circle" : "error"}
-              </span>
-              <div>{statusMsg.text}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex-1 overflow-auto p-4 min-h-0">
+      {/* 底部留白：小助理固定在右下角，最後一列要捲得出來。 */}
+      <div className="min-w-0 flex-1 pb-24 md:min-h-0 md:overflow-auto">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-full text-content-subtle py-12">
-            <span className="material-symbols-outlined animate-spin text-[2rem] mb-2 text-primary">
-              sync
-            </span>
-            <p className="text-xs">正在載入合併問答數據...</p>
+          <div className="flex flex-col items-center justify-center py-12 text-content-muted">
+            <span aria-hidden="true" className="material-symbols-outlined mb-2 animate-spin text-[2rem]">sync</span>
+            <p className="text-sm">正在載入問題…</p>
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="flex flex-col items-center gap-3 px-4 py-12 text-center">
+            <p className="text-sm font-medium text-content">{loadError}</p>
+            <button type="button" onClick={() => void load()} className="btn btn-ghost">再試一次</button>
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-content-subtle py-12 space-y-2">
-            <span className="material-symbols-outlined text-[2.5rem]">
-              table_rows
-            </span>
-            <p className="text-sm font-medium">此節點尚無任何問答數據</p>
-            <p className="text-xs">請點擊下方「新增一列」新增問答</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border rounded-xl border border-border bg-surface-raised">
-            <QaRowListHeader />
-            {rows.map((row, idx) => (
-              <QaRowCard
-                key={row._localId}
-                index={idx}
-                question={row.q}
-                answer={row.a}
-                img={row.img || ""}
-                url={row.url || ""}
-                hidden={Boolean(row.hidden)}
-                sourceFile={sourceFiles.length > 1 ? row.source_file : undefined}
-                onChange={(field, value) => handleCellChange(idx, CELL_FIELD[field], value)}
-                onRemove={() => handleRemoveRow(idx)}
-                imageAction={(
-                  <button
-                    type="button"
-                    onClick={() => handlePickImage(idx)}
-                    disabled={uploadingImageRow !== null}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content disabled:opacity-50"
-                    title="上傳圖片並填入 ID"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`material-symbols-outlined text-[0.95rem] ${
-                        uploadingImageRow === idx ? "animate-spin" : ""
-                      }`}
-                    >
-                      {uploadingImageRow === idx ? "sync" : "add_photo_alternate"}
-                    </span>
-                    上傳
-                  </button>
-                )}
-                rowProps={reorder.rowProps(idx)}
-                handleProps={reorder.handleProps(idx)}
-                dropLine={reorder.dropLine(idx)}
-                dragging={reorder.isDragging(idx)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between border-t border-border px-6 py-4 bg-surface/50 dark:bg-surface/20 shrink-0">
-        <button
-          type="button"
-          onClick={handleAddRow}
-          disabled={loading || saving}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
-        >
-          <span className="material-symbols-outlined text-[1.1rem]">add</span>
-          新增一列
-        </button>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={loading || saving || !isDirty}
-            className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-content-muted hover:text-content dark:hover:bg-surface-overlay transition-colors disabled:opacity-45"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={loading || saving || !isDirty}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-45"
-          >
-            {saving ? (
+          <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
+            {originalRows.length > 0 ? (
               <>
-                <span className="material-symbols-outlined text-[1.1rem] animate-spin">sync</span>
-                儲存中...
+                <p className="text-sm font-medium text-content">題目都刪掉了，還沒有儲存</p>
+                <p className="text-sm text-content-muted">
+                  想復原請按「取消變更」。要整個刪掉這個分類，請到左邊分類的「⋯」選「刪除」。
+                </p>
               </>
             ) : (
               <>
-                <span className="material-symbols-outlined text-[1.1rem]">save</span>
-                儲存變更
+                <p className="text-sm font-medium text-content">這個分類還沒有問題</p>
+                <p className="text-sm text-content-muted">
+                  {childCategoryCount > 0
+                    ? `問題可以放在底下的 ${childCategoryCount} 個子分類，也可以直接加在這裡。`
+                    : "按「新增問題」開始輸入，存好之後訪客點到這個分類就會看到。"}
+                </p>
               </>
             )}
-          </button>
-        </div>
+            {addButton}
+          </div>
+        ) : visibleRows.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
+            <p className="text-sm font-medium text-content">找不到符合「{search.trim()}」的問題</p>
+            <button type="button" onClick={clearSearch} className="btn btn-ghost">清除搜尋</button>
+          </div>
+        ) : (
+          <>
+            <p className="px-3 pb-1 pt-2 text-xs text-content-muted">
+              {/* 手機沒辦法拖曳，把手和這句話都不顯示。 */}
+              <span className="[@media(pointer:coarse)]:hidden">
+                {searching
+                  ? "搜尋時不能調整順序，清除搜尋後才能拖曳。"
+                  : "按住題號左邊的把手可以拖曳排序。"}
+              </span>
+              {QA_HIDDEN_HINT}
+            </p>
+            <QaRowListHeader />
+            {/* 存檔中不能再改：存完會重新讀取，這段時間打的字會被蓋掉。 */}
+            <fieldset disabled={saving} className="min-w-0 divide-y divide-border">
+              {visibleRows.map(({ row, position }) => (
+                <QaRowCard
+                  key={row._localId}
+                  index={position}
+                  question={row.q}
+                  answer={row.a}
+                  img={row.img || ""}
+                  url={row.url || ""}
+                  hidden={Boolean(row.hidden)}
+                  sourceLabel={hasManySources
+                    ? (isManualSource(row.source_file) ? "自己輸入" : fileNameOf(row.source_file))
+                    : undefined}
+                  onChange={(field, value) => handleCellChange(row._localId, CELL_FIELD[field], value)}
+                  onRemove={() => handleRemoveRow(row._localId, position)}
+                  onPickImage={() => imageUpload.pickImage(row._localId)}
+                  uploadingImage={imageUpload.uploadingRowId === row._localId}
+                  uploadDisabled={uploading}
+                  rowRef={(element) => registerRow(row._localId, element)}
+                  highlighted={flashRowId === row._localId}
+                  invalidFields={showValidation
+                    ? { question: !row.q.trim(), answer: !row.a.trim() }
+                    : undefined}
+                  rowProps={searching ? undefined : reorder.rowProps(position)}
+                  handleProps={searching ? undefined : reorder.handleProps(position)}
+                  dropLine={searching ? null : reorder.dropLine(position)}
+                  dragging={!searching && reorder.isDragging(position)}
+                />
+              ))}
+            </fieldset>
+          </>
+        )}
       </div>
 
-      <input
-        type="file"
-        ref={imageInputRef}
-        onChange={handleImageFileChange}
-        accept="image/*"
-        className="hidden"
-      />
-
-      <ConfirmModal
-        open={cleanupConfirmOpen}
-        title="清理未使用圖片"
-        message="確定要清理所有未被任何問答引用的圖片嗎？此操作無法復原。"
-        confirmLabel="清理"
-        danger
-        onConfirm={handleCleanupImages}
-        onCancel={() => setCleanupConfirmOpen(false)}
-      />
-    </div>
+      <input {...imageUpload.fileInputProps} />
+    </section>
   );
 }

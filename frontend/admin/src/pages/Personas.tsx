@@ -70,7 +70,7 @@ export default function Personas() {
        const [deletePersonaTarget, setDeletePersonaTarget] = useState<PersonaSummary | null>(null);
 
        const hasUnsavedChanges = draftContent !== loadedContent;
-       useUnsavedChanges("persona-editor", hasUnsavedChanges, "Persona 文件");
+       useUnsavedChanges("persona-editor", hasUnsavedChanges, "角色文件");
        const { requestNavigation } = useNavigationGuard();
 
        // 重抓清單。keepId 的角色還在就只換成新資料、不重開文件：存檔、綁虛擬人、
@@ -163,7 +163,7 @@ export default function Personas() {
 
        const handleCreateOrClone = async () => {
               if (!newPersonaId.trim()) {
-                     setStatus({ type: "error", message: "請輸入要建立的 Persona ID (例如 `doctor`)。" });
+                     setStatus({ type: "error", message: "請輸入要建立的角色 ID（例如 doctor）。" });
                      return;
               }
 
@@ -176,7 +176,7 @@ export default function Personas() {
                             const response = await clonePersona(templateSourceId, newPersonaId.trim());
                             setStatus({
                                    type: "success",
-                                   message: `已從 ${response.source_persona_id} 複製 persona ${response.persona.persona_id}。`,
+                                   message: `已從 ${response.source_persona_id} 複製角色 ${response.persona.persona_id}。`,
                             });
                             setNewPersonaId("");
                             setNewPersonaLabel("");
@@ -194,7 +194,7 @@ export default function Personas() {
                             const response = await createPersona(newPersonaId.trim(), newPersonaLabel.trim());
                             setStatus({
                                    type: "success",
-                                   message: `已建立 persona ${response.persona.persona_id}，並生成 核心文件。`,
+                                   message: `已建立角色 ${response.persona.persona_id}，並產生核心文件。`,
                             });
                             setNewPersonaId("");
                             setNewPersonaLabel("");
@@ -218,7 +218,7 @@ export default function Personas() {
                      await deletePersona(persona.persona_id);
                      setStatus({
                             type: "success",
-                            message: `已刪除 persona ${persona.persona_id}。`,
+                            message: `已刪除角色 ${persona.persona_id}。`,
                      });
                      await loadPersonas(
                             selectedPersona?.persona_id === persona.persona_id

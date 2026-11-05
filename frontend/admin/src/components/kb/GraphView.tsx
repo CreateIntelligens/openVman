@@ -97,9 +97,9 @@ export default function GraphView(): ReactNode {
     const state = displayStatus?.state ?? "absent";
     const styles: Record<string, string> = {
       absent: "bg-border text-content-muted ",
-      building: "bg-amber-100 text-amber-800 dark:bg-amber-800/30 dark:text-amber-300",
-      ready: "bg-emerald-100 text-emerald-800 dark:bg-emerald-800/30 dark:text-emerald-300",
-      failed: "bg-rose-100 text-rose-800 dark:bg-rose-800/30 dark:text-rose-300",
+      building: "bg-warn/10 text-warn",
+      ready: "bg-success/10 text-success",
+      failed: "bg-danger/10 text-danger",
     };
     const labels: Record<string, string> = {
       absent: "尚未建立",
@@ -108,7 +108,7 @@ export default function GraphView(): ReactNode {
       failed: "失敗",
     };
     return (
-      <span className={`text-[0.6875rem] font-semibold px-2 py-1 rounded-md ${styles[state]}`}>
+      <span className={`text-xs font-semibold px-2 py-1 rounded-md ${styles[state]}`}>
         {labels[state]}
       </span>
     );
@@ -124,7 +124,7 @@ export default function GraphView(): ReactNode {
           <span className="text-sm font-bold text-content ">知識圖譜</span>
           {statusBadge}
           {displayStatus?.finished_at && (
-            <span className="text-[0.6875rem] text-content-subtle">
+            <span className="text-xs text-content-subtle">
               最後建置：{new Date(displayStatus.finished_at).toLocaleString()}
             </span>
           )}
@@ -142,25 +142,25 @@ export default function GraphView(): ReactNode {
       </div>
 
       {errorMsg && (
-        <div className="px-4 py-2 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 text-xs border-b border-rose-200 dark:border-rose-800/40 shrink-0">
+        <div className="px-4 py-2 bg-danger/5 text-danger text-xs border-b border-danger/20">
           {errorMsg}
         </div>
       )}
 
       {displayStatus?.state === "ready" && summary && (
         <div className="px-4 py-3 border-b border-border grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
-          <StatCard label="Nodes" value={summary.nodes} />
-          <StatCard label="Edges" value={summary.edges} />
-          <StatCard label="Communities" value={summary.communities} />
-          <StatCard label="Bridges" value={summary.surprising_bridges} />
+          <StatCard label="概念" value={summary.nodes} />
+          <StatCard label="關聯" value={summary.edges} />
+          <StatCard label="主題群" value={summary.communities} />
+          <StatCard label="跨主題連結" value={summary.surprising_bridges} />
           {summary.god_nodes.length > 0 && (
             <div className="col-span-2 md:col-span-4">
-              <div className="text-[0.625rem] uppercase tracking-widest text-content-subtle mb-1">Hubs</div>
+              <div className="text-xs text-content-subtle mb-1">連結最多的概念</div>
               <div className="flex flex-wrap gap-1.5">
                 {summary.god_nodes.slice(0, 10).map((n, i) => (
                   <span
                     key={`${n}-${i}`}
-                    className="text-[0.6875rem] px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20"
+                    className="text-xs px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20"
                   >
                     {n}
                   </span>
@@ -201,7 +201,7 @@ function GraphContent({ loadState, status, htmlKey }: GraphContentProps): ReactN
         <iframe
           key={htmlKey}
           src={graphHtmlUrl()}
-          title="knowledge-graph"
+          title="知識圖譜"
           sandbox="allow-scripts"
           className="w-full h-full border-0"
         />
@@ -219,7 +219,7 @@ interface StatCardProps {
 function StatCard({ label, value }: StatCardProps): ReactNode {
   return (
     <div className="rounded-lg border border-border bg-surface dark:bg-surface-sunken/40 px-3 py-2">
-      <div className="text-[0.625rem] uppercase tracking-widest text-content-subtle">{label}</div>
+      <div className="text-xs text-content-subtle">{label}</div>
       <div className="text-lg font-bold text-content ">{value.toLocaleString()}</div>
     </div>
   );

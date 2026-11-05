@@ -42,7 +42,7 @@ export default function Workspace() {
     uploading,
     uploadInputRef,
   } = useWorkspaceManager();
-  useUnsavedChanges("workspace-editor", hasUnsavedChanges, "Workspace 文件");
+  useUnsavedChanges("workspace-editor", hasUnsavedChanges, "工作區文件");
   const { requestNavigation } = useNavigationGuard();
 
   // 換文件、開新文件、重新整理都會蓋掉編輯區，有未存的修改先問。
@@ -120,9 +120,9 @@ export default function Workspace() {
 
       <ConfirmModal
         open={deleteTarget !== ""}
-        title="Delete Document"
+        title="刪除文件"
         message={`確定要刪除「${deleteTarget}」嗎？\n\n此操作無法復原。`}
-        confirmLabel="Delete"
+        confirmLabel="刪除"
         danger
         onConfirm={confirmDeleteDocument}
         onCancel={() => setDeleteTarget("")}

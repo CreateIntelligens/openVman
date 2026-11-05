@@ -45,7 +45,7 @@ export default function AppSidebar({
       <aside className="flex h-full w-full flex-col overflow-hidden border-r border-border bg-surface-sunken">
         <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary">
-            <span className="material-symbols-outlined text-[1.125rem]">neurology</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">neurology</span>
           </div>
           <span
             className={`truncate font-semibold text-content transition-opacity duration-200 ${
@@ -60,7 +60,7 @@ export default function AppSidebar({
           {tabGroups.map((group) => (
             <TabGroup
               key={group.label}
-              label={group.label}
+              title={group.title}
               tabs={group.tabs.filter((tab) => isTabVisible(tab, access))}
               active={active}
               projectId={projectId}
@@ -82,6 +82,7 @@ export default function AppSidebar({
             }`}
           >
             <span
+              aria-hidden="true"
               className={`material-symbols-outlined text-[1.125rem] transition-transform ${
                 isPinned ? "rotate-45" : ""
               }`}

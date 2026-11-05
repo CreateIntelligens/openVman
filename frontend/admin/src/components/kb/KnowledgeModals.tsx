@@ -6,7 +6,12 @@ import type {
 } from "../../api";
 import type { QaNode } from "../../hooks/useQaNodes";
 import ConfirmModal from "../ConfirmModal";
-import { isUploadDerivedKnowledgeFile, type DeleteTarget } from "./helpers";
+import {
+  displayDocumentPath,
+  fileNameOf,
+  hasOriginalBackup,
+  type DeleteTarget,
+} from "./helpers";
 import MoveModal from "./MoveModal";
 import NormalizationPreviewModal from "./NormalizationPreviewModal";
 import VisibilityOrderModal from "./qa/VisibilityOrderModal";
@@ -63,19 +68,20 @@ export default function KnowledgeModals({
         : null,
     [deleteTarget, documents],
   );
-  const isUploadDerived =
-    !!deleteTargetDocument && isUploadDerivedKnowledgeFile(deleteTargetDocument);
+  const keepsOriginal =
+    !!deleteTargetDocument && hasOriginalBackup(deleteTargetDocument);
   const isQaAttachedTarget =
     deleteTargetDocument?.source_type === "qa" &&
     deleteTargetDocument?.qa_attached === true;
+  const deleteFileName = deleteTarget ? fileNameOf(deleteTarget.value) : "";
   const deleteMessage =
     deleteTarget?.type === "dir"
-      ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？目錄內仍有檔案時不會刪除。`
+      ? `確定要刪除資料夾「${displayDocumentPath(deleteTarget.value)}」嗎？資料夾裡還有檔案時不會刪除。`
       : isQaAttachedTarget
-      ? `確定要刪除 ${deleteTarget?.value} 嗎？快速問答樹上對應的節點與題目會一併移除。`
-      : isUploadDerived
-      ? `確定要刪除 ${deleteTarget?.value} 嗎？這只會移除知識文件與索引；原始上傳檔仍保留在 raw/。`
-      : `確定要刪除 ${deleteTarget?.value} 嗎？`;
+      ? `確定要刪除「${deleteFileName}」嗎？快速問答裡對應的分類和題目也會一起刪除。`
+      : keepsOriginal
+      ? `確定要刪除「${deleteFileName}」嗎？這只會把內容從知識庫移除，原始上傳檔還留在系統備份裡。`
+      : `確定要刪除「${deleteFileName}」嗎？`;
 
   return (
     <>

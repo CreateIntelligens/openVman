@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Tab } from "../components/app/navigation";
-import { setStorageScope } from "../utils/scopedStorage";
+import { setStorageScope, writeScoped } from "../utils/scopedStorage";
 import { useNavigationGroups } from "./useNavigationGroups";
 
 beforeEach(() => {
@@ -42,6 +42,12 @@ describe("navigation group preferences", () => {
     setStorageScope("account-b");
     const other = renderHook(() => useNavigationGroups("Chat"));
     expect(other.result.current.collapsedGroups.Knowledge).toBe(true);
+  });
+
+  it("honours preferences users saved before the group titles became Chinese", () => {
+    writeScoped("admin.navigation.collapsed.Knowledge", "false");
+    const { result } = renderHook(() => useNavigationGroups("Chat"));
+    expect(result.current.collapsedGroups).toEqual({ Workspace: false, Knowledge: false, Character: true, System: true });
   });
 
   it("keeps toggles usable when browser storage is blocked", () => {

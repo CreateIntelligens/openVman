@@ -26,7 +26,7 @@ export default function MemoryAddForm({
         <textarea
           id="memory-content"
           className="w-full rounded-lg border-border bg-surface-raised text-content focus:ring-2 focus:ring-primary focus:border-primary placeholder:text-content-subtle transition-all p-4 text-base"
-          placeholder="描述 Brain 應保留的事實資料或背景脈絡..."
+          placeholder="描述 AI 應該記住的事實或背景…"
           rows={6}
           value={text}
           onChange={(e) => onTextChange(e.target.value)}

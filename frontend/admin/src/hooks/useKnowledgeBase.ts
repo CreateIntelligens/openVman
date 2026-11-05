@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   applyRenormalizedKnowledgeDocument,
   crawlUrl as apiCrawlUrl,
@@ -10,35 +10,32 @@ import {
   fetchKnowledgeDocument,
   moveKnowledgeDocument,
   reindexKnowledge,
-  commitRawKnowledge,
-  getCommitStatus,
   previewRenormalizedKnowledgeDocument,
   saveKnowledgeDocument,
   updateKnowledgeDocumentMeta,
-  uploadRawKnowledgeDocuments,
   type KnowledgeDocument,
+  type KnowledgeDocumentsResponse,
   type KnowledgeNormalizationPreviewResponse,
   type KnowledgeDocumentSummary,
   type KnowledgeLanguage,
   type KnowledgeNoteFormat,
 } from "../api";
 import {
-  SOURCE_MODES,
   buildTree,
   collectFolderPaths,
-  countFiles,
+  fileNameOf,
   filterTree,
   normalizeSearchTerm,
+  QUICK_QA_TREE_PATH,
   type DeleteTarget,
   type RightPane,
-  type SourceMode,
 } from "../components/kb/helpers";
+import { documentStatusLabel } from "../components/kb/StatusDot";
 import { useProject } from "../context/ProjectContext";
-import { useLocalStorageState } from "./useLocalStorageState";
 import { useStatusState } from "./useStatusState";
 import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
 
-type UploadEntry = { file: File; relativePath: string };
+const DEFAULT_EXPANDED_DIRS = ["knowledge", QUICK_QA_TREE_PATH];
 
 function selectedPathStorageKey(projectId: string): string {
   return `kb-selected-file-path:${projectId}`;
@@ -52,40 +49,37 @@ function selectedQaNodeStorageKey(projectId: string): string {
   return `kb-selected-qa-node-id:${projectId}`;
 }
 
-function rawUploadTargetFor(currentDir: string): string {
-  const relativeDir = currentDir.replace(/^knowledge(\/|$)/, "");
-  return relativeDir ? `raw/${relativeDir}` : "raw";
+// 索引在背景跑，文件處理完後端不會主動通知。
+const INDEX_POLL_FIRST_MS = 3000;
+const INDEX_POLL_GROWTH = 1.5;
+const INDEX_POLL_MAX_MS = 15_000;
+const INDEX_POLL_LIMIT_MS = 5 * 60 * 1000;
+
+function isDocumentProcessing(document: KnowledgeDocumentSummary): boolean {
+  return documentStatusLabel(document) === "處理中";
 }
 
-async function collectFileSystemEntries(roots: FileSystemEntry[]): Promise<UploadEntry[]> {
-  const out: UploadEntry[] = [];
-  const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
-    if (entry.isFile) {
-      const fileEntry = entry as FileSystemFileEntry;
-      const file: File = await new Promise((resolve, reject) => fileEntry.file(resolve, reject));
-      out.push({ file, relativePath: prefix ? `${prefix}/${file.name}` : file.name });
-      return;
-    }
-    if (entry.isDirectory) {
-      const dirEntry = entry as FileSystemDirectoryEntry;
-      const reader = dirEntry.createReader();
-      const next = prefix ? `${prefix}/${entry.name}` : entry.name;
-      // readEntries returns at most 100 per call; loop until empty.
-      while (true) {
-        const batch: FileSystemEntry[] = await new Promise((resolve, reject) =>
-          reader.readEntries(resolve, reject),
-        );
-        if (!batch.length) break;
-        for (const child of batch) {
-          await walk(child, next);
-        }
-      }
-    }
+function sameContent(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** 文件檢視顯示的狀態跟著列表走；內容不動，正在編輯的東西才不會被蓋掉。 */
+function withFreshStatus(
+  open: KnowledgeDocument | null,
+  documents: KnowledgeDocumentSummary[],
+): KnowledgeDocument | null {
+  const fresh = open && documents.find((document) => document.path === open.path);
+  if (!open || !fresh) return open;
+  const status = {
+    enabled: fresh.enabled,
+    is_indexed: fresh.is_indexed,
+    is_indexable: fresh.is_indexable,
+    language: fresh.language,
+    language_source: fresh.language_source,
   };
-  for (const root of roots) {
-    await walk(root, "");
-  }
-  return out;
+  const unchanged = (Object.keys(status) as (keyof typeof status)[])
+    .every((key) => open[key] === status[key]);
+  return unchanged ? open : { ...open, ...status };
 }
 
 export function useKnowledgeBase() {
@@ -94,11 +88,9 @@ export function useKnowledgeBase() {
   const [serverDirs, setServerDirs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
-  const [committing, setCommitting] = useState(false);
   const [renormalizing, setRenormalizing] = useState(false);
   const [previewingNormalization, setPreviewingNormalization] = useState(false);
   const [normalizationPreview, setNormalizationPreview] = useState<KnowledgeNormalizationPreviewResponse | null>(null);
-  const [uploading, setUploading] = useState(false);
   const { status, setStatus, setErrorStatus } = useStatusState();
   const [search, setSearch] = useState("");
   const [selectedPath, setSelectedPath] = useState<string>(() => {
@@ -116,7 +108,7 @@ export function useKnowledgeBase() {
     } catch (e) {
       // ignore
     }
-    return new Set(["knowledge"]);
+    return new Set(DEFAULT_EXPANDED_DIRS);
   });
   const [rightPane, setRightPane] = useState<RightPane>("folder");
   const [openDocument, setOpenDocument] = useState<KnowledgeDocument | null>(null);
@@ -128,53 +120,75 @@ export function useKnowledgeBase() {
   const [movingPath, setMovingPath] = useState<string | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [showSourcePanel, setShowSourcePanel] = useState(false);
-  const [activeSourceMode, setActiveSourceMode] = useLocalStorageState<SourceMode>(
-    "admin.knowledge.source_mode",
-    "upload",
-    SOURCE_MODES,
-  );
   const [crawlUrlValue, setCrawlUrlValue] = useState("");
   const [crawling, setCrawling] = useState(false);
   const [showNoteComposer, setShowNoteComposer] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
+  // 上次看的文件還原之前，右邊先不要閃出首頁。
+  const [contentReady, setContentReady] = useState(false);
+  const [indexPollEpoch, setIndexPollEpoch] = useState(0);
 
-  const dragCounterRef = useRef(0);
-  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const documentsRequestRef = useRef(0);
   const activeProjectRef = useRef(projectId);
   const restoredSelectionProjectRef = useRef<string | null>(null);
   const [selectionProjectId, setSelectionProjectId] = useState(projectId);
   const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
   activeProjectRef.current = projectId;
 
-  const isFileDragEvent = useCallback((event: DragEvent) => {
-    return event.dataTransfer?.types?.includes("Files") ?? false;
-  }, []);
-
   const closeNoteComposer = useCallback(() => {
     setShowNoteComposer(false);
   }, []);
 
+  // 內容沒變就不換陣列：樹不用重建，定期更新時才不會閃爍或跳掉捲動位置。
+  const applyDocuments = useCallback((response: KnowledgeDocumentsResponse) => {
+    const directories = response.directories ?? [];
+    setDocuments((current) => (sameContent(current, response.documents) ? current : response.documents));
+    setServerDirs((current) => (sameContent(current, directories) ? current : directories));
+    setOpenDocument((current) => withFreshStatus(current, response.documents));
+  }, []);
+
   const loadDocuments = useCallback(async () => {
     const requestedProjectId = projectId;
+    documentsRequestRef.current += 1;
+    const request = documentsRequestRef.current;
+    const isLatest = () =>
+      activeProjectRef.current === requestedProjectId && request === documentsRequestRef.current;
     setLoading(true);
     try {
       const response = await fetchKnowledgeBaseDocuments();
-      if (activeProjectRef.current !== requestedProjectId) return;
-      setDocuments(response.documents);
-      setServerDirs(response.directories ?? []);
+      if (!isLatest()) return;
+      applyDocuments(response);
       setLoadedProjectId(requestedProjectId);
+      setIndexPollEpoch((epoch) => epoch + 1);
     } catch (error) {
-      if (activeProjectRef.current === requestedProjectId) setErrorStatus(error);
+      if (isLatest()) {
+        setErrorStatus(error);
+        setContentReady(true);
+      }
     } finally {
-      if (activeProjectRef.current === requestedProjectId) setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [projectId, setErrorStatus]);
+  }, [applyDocuments, projectId, setErrorStatus]);
+
+  // 定期更新：不碰 loading、不報錯，下一輪再試就好。送出之後如果有新的 loadDocuments
+  // （刪除、移動之後都會呼叫），這份回應就是舊的，不能蓋上去。
+  const refreshDocumentsQuietly = useCallback(async () => {
+    const requestedProjectId = projectId;
+    const request = documentsRequestRef.current;
+    try {
+      const response = await fetchKnowledgeBaseDocuments();
+      if (activeProjectRef.current === requestedProjectId && request === documentsRequestRef.current) {
+        applyDocuments(response);
+      }
+    } catch {
+      // 下一輪再試。
+    }
+  }, [applyDocuments, projectId]);
 
   useEffect(() => {
     restoredSelectionProjectRef.current = null;
     setLoadedProjectId(null);
+    setContentReady(false);
     setSelectionProjectId(projectId);
     setDocuments([]);
     setServerDirs([]);
@@ -185,10 +199,10 @@ export function useKnowledgeBase() {
       const saved = readScoped(expandedDirsStorageKey(projectId));
       const parsed = saved ? JSON.parse(saved) : null;
       setExpandedDirs(
-        Array.isArray(parsed) ? new Set(parsed) : new Set(["knowledge"]),
+        Array.isArray(parsed) ? new Set(parsed) : new Set(DEFAULT_EXPANDED_DIRS),
       );
     } catch {
-      setExpandedDirs(new Set(["knowledge"]));
+      setExpandedDirs(new Set(DEFAULT_EXPANDED_DIRS));
     }
     setRightPane("folder");
     setOpenDocument(null);
@@ -229,15 +243,41 @@ export function useKnowledgeBase() {
     return path;
   }, [documents, openDocument, rightPane, selectedPath]);
 
-  const indexedCount = useMemo(
-    () => documents.filter((document) => document.is_indexed).length,
+  const processingDocuments = useMemo(
+    () => documents.filter(isDocumentProcessing),
     [documents],
   );
-
-  const matchingDocumentCount = useMemo(
-    () => (hasActiveSearch ? countFiles(filteredTree) : documents.length),
-    [documents.length, filteredTree, hasActiveSearch],
+  const processingKey = useMemo(
+    () => processingDocuments
+      .map((document) => `${document.path}@${document.updated_at}`)
+      .sort()
+      .join("\n"),
+    [processingDocuments],
   );
+
+  // 有文件處理中就定期更新。處理中的文件有變動（做完一份、又存了一份）或有人重新載入，
+  // 都從頭算；卡住不動才會拉長間隔，5 分鐘後停，下次有變動再開始。
+  useEffect(() => {
+    if (!processingKey) return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = INDEX_POLL_FIRST_MS;
+    const startedAt = Date.now();
+    const schedule = () => {
+      timer = setTimeout(() => {
+        void refreshDocumentsQuietly().then(() => {
+          if (disposed) return;
+          delay = Math.min(delay * INDEX_POLL_GROWTH, INDEX_POLL_MAX_MS);
+          if (Date.now() - startedAt + delay <= INDEX_POLL_LIMIT_MS) schedule();
+        });
+      }, delay);
+    };
+    schedule();
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+    };
+  }, [indexPollEpoch, processingKey, refreshDocumentsQuietly]);
 
   const resetNewFolderForm = useCallback(() => {
     setShowNewFolder(false);
@@ -287,6 +327,7 @@ export function useKnowledgeBase() {
     ) return;
 
     restoredSelectionProjectRef.current = projectId;
+    setContentReady(true);
     const hasQaNodeSelected = !!readScoped(
       selectedQaNodeStorageKey(projectId),
     );
@@ -331,22 +372,22 @@ export function useKnowledgeBase() {
   const handleTreeSelect = useCallback((node: { type: string; path: string }) => {
     if (node.type === "folder") {
       toggleExpand(node.path);
-      setSelectedPath(node.path);
-      setRightPane("folder");
-      setOpenDocument(null);
+      // 展開資料夾不該關掉正在看（可能還沒存）的文件；用 rightPane 判斷，
+      // 文件還在載入時 openDocument 仍是空的。
+      if (rightPane !== "file") setSelectedPath(node.path);
       return;
     }
 
     setSelectedPath(node.path);
     void openFile(node.path);
-  }, [openFile, toggleExpand]);
+  }, [openFile, rightPane, toggleExpand]);
 
   const handleSave = useCallback(async () => {
     if (!openDocument) return;
     setSaving(true);
     try {
       await saveKnowledgeDocument(openDocument.path, editContent);
-      setStatus({ type: "success", message: `已儲存 ${openDocument.path}` });
+      setStatus({ type: "success", message: `已儲存 ${fileNameOf(openDocument.path)}` });
       setEditorDirty(false);
       await loadDocuments();
       const document = await fetchKnowledgeDocument(openDocument.path);
@@ -358,38 +399,12 @@ export function useKnowledgeBase() {
     }
   }, [editContent, loadDocuments, openDocument, setErrorStatus]);
 
-  const uploadFiles = useCallback(async (entries: { file: File; relativePath: string }[]) => {
-    if (!entries.length) return;
-    setUploading(true);
-    setStatus(null);
-    try {
-      const response = await uploadRawKnowledgeDocuments(entries, rawUploadTargetFor(currentDir));
-      setStatus({
-        type: "success",
-        message: `已上傳 ${response.files.length} 個檔案至暫存區，點「採納上傳」納入知識庫。`,
-      });
-      await loadDocuments();
-    } catch (error) {
-      setErrorStatus(error);
-    } finally {
-      setUploading(false);
-    }
-  }, [currentDir, loadDocuments, setErrorStatus, setStatus]);
-
-  const handleFileUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-    await uploadFiles(files.map((file) => ({ file, relativePath: file.webkitRelativePath || file.name })));
-    if (uploadInputRef.current) {
-      uploadInputRef.current.value = "";
-    }
-  }, [uploadFiles]);
-
   const handleReindex = useCallback(async () => {
     setReindexing(true);
     setStatus(null);
     try {
       const response = await reindexKnowledge();
-      setStatus({ type: "success", message: `已重建知識庫，文件 ${response.document_count} 份，chunk ${response.chunk_count} 筆。` });
+      setStatus({ type: "success", message: `已重建搜尋資料：文件 ${response.document_count} 份，段落 ${response.chunk_count} 筆。` });
       await loadDocuments();
     } catch (error) {
       setErrorStatus(error);
@@ -397,41 +412,6 @@ export function useKnowledgeBase() {
       setReindexing(false);
     }
   }, [loadDocuments, setErrorStatus]);
-
-  const handleCommit = useCallback(async () => {
-    setCommitting(true);
-    setStatus(null);
-    try {
-      const response = await commitRawKnowledge();
-      if (response.status === "nothing_to_commit") {
-        setStatus({ type: "success", message: "raw 區沒有可採納的文件。" });
-        return;
-      }
-      let job = response.job ?? (await getCommitStatus());
-      while (job.state === "running") {
-        const total = Object.keys(job.files).length;
-        const processed = Object.values(job.files).filter(
-          (s) => s === "committed" || s === "skipped",
-        ).length;
-        setStatus({ type: "success", message: `採納處理中… ${processed}/${total} 份文件` });
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        job = await getCommitStatus();
-      }
-      if (job.state === "failed") {
-        setStatus({ type: "error", message: `採納失敗：${job.error ?? "未知錯誤"}` });
-        return;
-      }
-      setStatus({
-        type: "success",
-        message: `已採納 ${job.committed.length} 份文件，正在重建索引與圖譜。`,
-      });
-      await loadDocuments();
-    } catch (error) {
-      setErrorStatus(error);
-    } finally {
-      setCommitting(false);
-    }
-  }, [loadDocuments, setErrorStatus, setStatus]);
 
   const handleRenormalize = useCallback(async (path: string) => {
     setPreviewingNormalization(true);
@@ -461,7 +441,7 @@ export function useKnowledgeBase() {
       );
       setStatus({
         type: "success",
-        message: `已重新整理「${response.document.path}」，正在重建索引與圖譜。備份：${response.document.backup_path ?? "已建立"}`,
+        message: `已用 AI 整理排版「${fileNameOf(response.document.path)}」，舊版已備份。`,
       });
       setNormalizationPreview(null);
       await loadDocuments();
@@ -500,7 +480,7 @@ export function useKnowledgeBase() {
     try {
       if (type === "file") {
         await deleteKnowledgeDocument(value);
-        setStatus({ type: "success", message: `已刪除 ${value}` });
+        setStatus({ type: "success", message: `已刪除 ${fileNameOf(value)}` });
         if (openDocument?.path === value) {
           setRightPane("folder");
           setOpenDocument(null);
@@ -510,7 +490,7 @@ export function useKnowledgeBase() {
         }
       } else {
         await deleteKnowledgeDirectory(value);
-        setStatus({ type: "success", message: `已刪除資料夾 ${value}` });
+        setStatus({ type: "success", message: `已刪除資料夾 ${fileNameOf(value)}` });
         if (selectedPath === value || selectedPath.startsWith(value + "/")) {
           setSelectedPath(value.split("/").slice(0, -1).join("/") || "knowledge");
         }
@@ -528,7 +508,10 @@ export function useKnowledgeBase() {
     setStatus(null);
     try {
       await moveKnowledgeDocument(sourcePath, targetPath);
-      setStatus({ type: "success", message: `已移動到 ${targetPath}` });
+      setStatus({
+        type: "success",
+        message: targetDir === "knowledge" ? "已移到文件最上層" : `已移到 ${fileNameOf(targetDir)}`,
+      });
       setMovingPath(null);
       await loadDocuments();
       if (openDocument?.path === sourcePath) {
@@ -550,7 +533,7 @@ export function useKnowledgeBase() {
       setOpenDocument((current) =>
         current && current.path === document.path ? { ...current, enabled: result.enabled } : current,
       );
-      setStatus({ type: "success", message: `${document.title || document.path} 已${result.enabled ? "啟用" : "停用"}` });
+      setStatus({ type: "success", message: `${document.title || fileNameOf(document.path)} 已${result.enabled ? "啟用" : "停用"}` });
     } catch (error) {
       setErrorStatus(error);
     }
@@ -565,12 +548,16 @@ export function useKnowledgeBase() {
       await updateKnowledgeDocumentMeta(document.path, { language });
       // auto 要等下次列表才重判，重新載入拿判斷結果。
       await loadDocuments();
-      if (openDocument?.path === document.path) await openFile(document.path);
-      setStatus({ type: "success", message: `${document.title || document.path} 的語言已更新` });
+      // 只換文件資訊：openFile 會用存檔內容蓋掉編輯區，還沒儲存的修改就沒了。
+      if (openDocument?.path === document.path) {
+        const refreshed = await fetchKnowledgeDocument(document.path);
+        if (activeProjectRef.current === projectId) setOpenDocument(refreshed);
+      }
+      setStatus({ type: "success", message: `${document.title || fileNameOf(document.path)} 的語言已更新` });
     } catch (error) {
       setErrorStatus(error);
     }
-  }, [loadDocuments, openDocument, openFile, setErrorStatus]);
+  }, [loadDocuments, openDocument, projectId, setErrorStatus]);
 
   const handleCreateNote = useCallback(async (
     title: string,
@@ -582,7 +569,7 @@ export function useKnowledgeBase() {
     setStatus(null);
     try {
       const result = await createKnowledgeNote(title, content, "", noteFormat);
-      setStatus({ type: "success", message: `已建立筆記「${result.document.title}」` });
+      setStatus({ type: "success", message: `已建立「${result.document.title}」` });
       closeNoteComposer();
       await loadDocuments();
       setSelectedPath(result.path);
@@ -619,51 +606,20 @@ export function useKnowledgeBase() {
   const cancelCreateFolder = resetNewFolderForm;
 
   const closeFileView = useCallback(() => {
+    // 沒開文件時 selectedPath 是使用者選的資料夾，不能往上跳，匯入的預設資料夾跟著它。
+    if (rightPane === "file") {
+      setSelectedPath(selectedPath.split("/").slice(0, -1).join("/") || "knowledge");
+    }
     setRightPane("folder");
     setOpenDocument(null);
-    const parentDir = selectedPath.split("/").slice(0, -1).join("/") || "knowledge";
-    setSelectedPath(parentDir);
-  }, [selectedPath]);
+    // 文件關了，沒存的內容也就沒了，不能留著讓之後每次離開都再問一次。
+    setEditorDirty(false);
+  }, [rightPane, selectedPath]);
 
   const updateEditContent = useCallback((content: string) => {
     setEditContent(content);
     setEditorDirty(true);
   }, []);
-
-  const handleDragEnter = useCallback((event: DragEvent) => {
-    if (!isFileDragEvent(event)) return;
-    event.preventDefault();
-    dragCounterRef.current += 1;
-    if (dragCounterRef.current === 1) setDragOver(true);
-  }, [isFileDragEvent]);
-
-  const handleDragLeave = useCallback((event: DragEvent) => {
-    if (!isFileDragEvent(event)) return;
-    event.preventDefault();
-    dragCounterRef.current -= 1;
-    if (dragCounterRef.current === 0) setDragOver(false);
-  }, [isFileDragEvent]);
-
-  const handleDrop = useCallback(async (event: DragEvent) => {
-    if (!isFileDragEvent(event)) return;
-    event.preventDefault();
-    dragCounterRef.current = 0;
-    setDragOver(false);
-    const items = event.dataTransfer.items;
-    let entries: { file: File; relativePath: string }[] = [];
-    if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
-      const fsEntries = Array.from(items)
-        .map((item) => item.webkitGetAsEntry())
-        .filter((entry): entry is FileSystemEntry => entry !== null);
-      entries = await collectFileSystemEntries(fsEntries);
-    } else {
-      entries = Array.from(event.dataTransfer.files).map((file) => ({
-        file,
-        relativePath: file.webkitRelativePath || file.name,
-      }));
-    }
-    await uploadFiles(entries);
-  }, [isFileDragEvent, uploadFiles]);
 
   return {
     projectId,
@@ -671,10 +627,8 @@ export function useKnowledgeBase() {
     serverDirs,
     loading,
     reindexing,
-    committing,
     renormalizing,
     previewingNormalization,
-    uploading,
     status,
     search,
     selectedPath,
@@ -688,39 +642,32 @@ export function useKnowledgeBase() {
     movingPath,
     showNewFolder,
     newFolderName,
-    showSourcePanel,
-    activeSourceMode,
     crawlUrlValue,
     crawling,
     showNoteComposer,
     creatingNote,
-    dragOver,
+    contentReady,
+    documentsLoaded: loadedProjectId === projectId,
     normalizationPreview,
-    uploadInputRef,
     filteredTree,
     visibleExpandedDirs,
     qaDirectoryOptions,
     hasActiveSearch,
     currentDir,
-    indexedCount,
-    matchingDocumentCount,
+    processingCount: processingDocuments.length,
     setStatus,
     setSearch,
     setDeleteTarget,
     setMovingPath,
     setShowNewFolder,
     setNewFolderName,
-    setShowSourcePanel,
-    setActiveSourceMode,
     setCrawlUrlValue,
     setShowNoteComposer,
     toggleExpand,
     setExpandedDirs,
     handleTreeSelect,
     handleSave,
-    handleFileUpload,
     handleReindex,
-    handleCommit,
     handleRenormalize,
     handleApplyNormalizationPreview,
     handleCrawl,
@@ -735,9 +682,6 @@ export function useKnowledgeBase() {
     closeNormalizationPreview,
     closeFileView,
     updateEditContent,
-    handleDragEnter,
-    handleDragLeave,
-    handleDrop,
     loadDocuments,
   };
 }

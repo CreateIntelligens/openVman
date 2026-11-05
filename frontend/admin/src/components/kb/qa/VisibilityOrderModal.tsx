@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import type { QaNode } from "../../../hooks/useQaNodes";
 import { useModalDismiss } from "../useModalDismiss";
@@ -18,6 +18,9 @@ interface VisibilityOrderModalProps {
   onRefresh: () => NodeAction;
 }
 
+const MOVE_BUTTON_CLASS =
+  "flex h-8 w-8 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content disabled:cursor-not-allowed disabled:opacity-30";
+
 export default function VisibilityOrderModal({
   isOpen,
   onClose,
@@ -30,6 +33,7 @@ export default function VisibilityOrderModal({
   const [localNodes, setLocalNodes] = useState<QaNode[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const titleId = useId();
   const dismiss = useModalDismiss(onClose);
   const reorder = useRowReorder(localNodes.length, (from, insertAt) => {
     setLocalNodes((prev) => moveToInsertion(prev, from, insertAt));
@@ -98,7 +102,7 @@ export default function VisibilityOrderModal({
       await onRefresh();
       onClose();
     } catch (error: unknown) {
-      setError(errorMessage(error, "儲存變更失敗，請重試。"));
+      setError(errorMessage(error, "儲存失敗，請再試一次。"));
     } finally {
       setSaving(false);
     }
@@ -110,41 +114,42 @@ export default function VisibilityOrderModal({
       {...dismiss}
     >
       <div
-        className="bg-surface-raised border border-border rounded-2xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col mx-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="mx-4 flex max-h-[80dvh] w-full max-w-xl flex-col rounded-2xl border border-border bg-surface-raised shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[1.5rem]">
-              sort
-            </span>
-            <div>
-              <span className="text-base font-semibold text-content ">
-                調整順序與可見性
-              </span>
-              <p className="text-xs text-content-muted mt-0.5">
-                {parentNode ? parentNode.label : "最上層"}：拖曳整列或用箭頭調整順序
-              </p>
-            </div>
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3 sm:px-6 sm:py-4">
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-base font-semibold text-content">調整順序與顯示</h2>
+            <p className="mt-0.5 break-words text-sm font-medium text-content-muted">
+              {parentNode ? parentNode.label : "最上層"}
+            </p>
+            <p className="mt-1 text-xs text-content-muted">
+              拖曳整列或按上下箭頭調整順序。「已隱藏」的分類訪客在選單看不到，但 AI 回答時還是會用。
+            </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-content-muted hover:text-content hover:bg-surface-sunken transition-colors"
+            aria-label="關閉"
+            className="shrink-0 rounded-lg p-1.5 text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
           >
-            <span className="material-symbols-outlined text-[1.25rem]">close</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">close</span>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm dark:bg-red-950/20 dark:border-red-900 dark:text-red-400">
+            <div role="alert" className="mb-3 rounded-lg border border-danger/20 bg-danger/5 p-3 text-sm text-danger">
               {error}
             </div>
           )}
 
           {localNodes.length === 0 ? (
-            <div className="text-center py-12 text-content-subtle">
-              該層級下尚無任何子節點。
+            <div className="py-12 text-center text-sm text-content-muted">
+              這一層還沒有子分類。
             </div>
           ) : (
             <ul className="divide-y divide-border rounded-xl border border-border">
@@ -155,7 +160,7 @@ export default function VisibilityOrderModal({
                     key={node.node_id}
                     {...reorder.rowProps(idx)}
                     {...reorder.handleProps(idx)}
-                    className={`relative flex cursor-grab items-center gap-2 px-3 py-2 transition-colors hover:bg-surface-sunken/50 active:cursor-grabbing ${
+                    className={`relative flex cursor-grab flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 transition-colors hover:bg-surface-sunken/50 active:cursor-grabbing ${
                       reorder.isDragging(idx) ? "opacity-40" : ""
                     }`}
                   >
@@ -170,34 +175,30 @@ export default function VisibilityOrderModal({
                     <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[1.125rem] text-content-subtle">
                       drag_indicator
                     </span>
-                    <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-content-subtle">
+                    <span className="w-5 shrink-0 text-right text-xs tabular-nums text-content-muted">
                       {idx + 1}
                     </span>
-                    <div className={`min-w-0 flex-1 ${node.hidden ? "opacity-60" : ""}`}>
-                      <p className="truncate text-sm font-medium text-content" title={node.label}>{node.label}</p>
-                      <p className="truncate font-mono text-xs text-content-subtle" title={node.node_id}>{node.node_id}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleHidden(idx)}
-                      className={`flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
-                        node.hidden
-                          ? "bg-surface-sunken text-content-muted hover:bg-border"
-                          : "bg-success/10 text-success hover:bg-success/20 dark:bg-success/20"
-                      }`}
-                    >
-                      <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">
-                        {node.hidden ? "visibility_off" : "visibility"}
-                      </span>
-                      {node.hidden ? "已隱藏" : "顯示中"}
-                    </button>
-                    <div className="flex shrink-0 items-center">
+                    {/* 窄畫面名稱佔滿一行，按鈕換到下一行，不跟名稱搶寬度。 */}
+                    <p className={`min-w-0 flex-1 basis-[calc(100%-3.5rem)] break-words text-sm font-medium text-content sm:basis-0 ${node.hidden ? "opacity-60" : ""}`}>
+                      {node.label}
+                    </p>
+                    <div className="ml-auto flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleHidden(idx)}
+                        aria-label={node.hidden ? `${node.label}已隱藏，按一下改成顯示` : `${node.label}顯示中，按一下隱藏`}
+                        className={`btn btn-ghost gap-1 px-2 py-1 text-xs ${node.hidden ? "bg-surface-sunken" : ""}`}
+                      >
+                        <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">
+                          {node.hidden ? "visibility_off" : "visibility"}
+                        </span>
+                        {node.hidden ? "已隱藏" : "顯示中"}
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleMoveUp(idx)}
                         disabled={idx === 0}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content disabled:opacity-30"
-                        title="上移"
+                        className={MOVE_BUTTON_CLASS}
                         aria-label={`上移 ${node.label}`}
                       >
                         <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">arrow_upward</span>
@@ -206,8 +207,7 @@ export default function VisibilityOrderModal({
                         type="button"
                         onClick={() => handleMoveDown(idx)}
                         disabled={idx === localNodes.length - 1}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content disabled:opacity-30"
-                        title="下移"
+                        className={MOVE_BUTTON_CLASS}
                         aria-label={`下移 ${node.label}`}
                       >
                         <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">arrow_downward</span>
@@ -220,32 +220,20 @@ export default function VisibilityOrderModal({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-content-muted hover:text-content hover:bg-surface-sunken transition-colors"
-            disabled={saving}
-          >
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-6 sm:py-4">
+          <button type="button" onClick={onClose} disabled={saving} className="btn btn-ghost">
             取消
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving || localNodes.length === 0}
-            className="px-5 py-2 rounded-xl bg-primary text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-md shadow-primary/10"
+            className="btn btn-primary"
           >
-            {saving ? (
-              <>
-                <span className="material-symbols-outlined text-[1.1rem] animate-spin">
-                  sync
-                </span>
-                儲存中...
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-[1.1rem]">save</span>
-                儲存變更
-              </>
+            {saving && (
+              <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[1rem]">sync</span>
             )}
+            {saving ? "儲存中…" : "儲存變更"}
           </button>
         </div>
       </div>

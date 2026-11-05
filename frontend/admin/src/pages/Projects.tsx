@@ -39,11 +39,11 @@ export default function Projects() {
         <div className="page-heading">
           <h2 className="page-section-title">專案管理</h2>
           <p className="page-subtitle">
-            管理多專案隔離，每個專案有獨立的 knowledge、persona、memory 空間。
+            每個專案有各自的知識庫、角色和記憶，互不影響。
           </p>
         </div>
         <div className="whitespace-nowrap text-xs text-content-subtle">
-          {projects.length} project{projects.length !== 1 ? "s" : ""}
+          {projects.length} 個專案
         </div>
       </header>
 
@@ -63,7 +63,7 @@ export default function Projects() {
                   type="text"
                   value={newProjectLabel}
                   onChange={(e) => setNewProjectLabel(e.target.value)}
-                  placeholder="例：My Project 或 慧誠醫院"
+                  placeholder="例：門市客服"
                   className="w-full rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-content placeholder:text-content-subtle focus:border-primary/40 focus:outline-none shadow-sm dark:shadow-none transition-all"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -126,7 +126,7 @@ export default function Projects() {
                     </p>
                   </div>
                   {project.project_id === "default" && (
-                    <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-primary">
+                    <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-xs font-bold text-primary">
                       預設
                     </span>
                   )}
@@ -134,11 +134,11 @@ export default function Projects() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-border bg-surface dark:bg-surface-sunken/60 px-3 py-2">
-                    <p className="text-[0.625rem] uppercase tracking-[0.2em] text-content-subtle">Docs</p>
+                    <p className="text-xs text-content-subtle">文件</p>
                     <p className="mt-1 text-lg font-bold text-content ">{project.document_count}</p>
                   </div>
                   <div className="rounded-xl border border-border bg-surface dark:bg-surface-sunken/60 px-3 py-2">
-                    <p className="text-[0.625rem] uppercase tracking-[0.2em] text-content-subtle">Personas</p>
+                    <p className="text-xs text-content-subtle">角色</p>
                     <p className="mt-1 text-lg font-bold text-content ">{project.persona_count}</p>
                   </div>
                 </div>
@@ -165,7 +165,7 @@ export default function Projects() {
                       <button
                         onClick={() => setDeleteTargetId(project.project_id)}
                         disabled={!!deletingId}
-                        className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-colors disabled:opacity-50"
+                        className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-2 text-xs font-medium text-danger hover:bg-danger/10 hover:border-danger/30 transition-colors disabled:opacity-50"
                       >
                         {deletingId === project.project_id ? "刪除中…" : "刪除專案"}
                       </button>
