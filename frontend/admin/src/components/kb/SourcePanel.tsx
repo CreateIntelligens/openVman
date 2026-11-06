@@ -29,6 +29,16 @@ interface SourcePanelProps {
 }
 
 /** 新增資料的所有入口。規則直接寫在畫面上，不靠滑過才出現的說明。 */
+// 與 vite.config 的 base 一致；public/ 底下的檔案跟打包後的資源走同一個前綴。
+const TEMPLATE_BASE = "/admin/templates/";
+
+// 範例檔放在 public/templates，內容是虛構的服務中心，不含任何客戶資料。
+export const IMPORT_TEMPLATES = [
+  { file: "範例_常見問題.xlsx", label: "問答表（Excel）" },
+  { file: "範例_常見問題.csv", label: "問答表（CSV）" },
+  { file: "範例_整理好的文件.md", label: "整理好的文件（Markdown）" },
+] as const;
+
 export default function SourcePanel({
   onPickFiles,
   maxUploadLabel,
@@ -118,6 +128,23 @@ export default function SourcePanel({
           <li>其他文件照上面的選擇加入知識庫。AI 整理時內容維持原本的語言，不會翻譯。</li>
           <li>可以上傳 {IMPORT_FORMATS_LABEL}，每個檔案 {maxUploadLabel} 以內。</li>
         </ul>
+
+        <div className="space-y-1 text-sm">
+          <p className="font-medium text-content">不知道怎麼排？下載範例照著填：</p>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            {IMPORT_TEMPLATES.map((template) => (
+              <li key={template.file}>
+                <a
+                  className="text-primary underline underline-offset-2 hover:text-primary-600"
+                  href={`${TEMPLATE_BASE}${encodeURIComponent(template.file)}`}
+                  download={template.file}
+                >
+                  {template.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <div className="space-y-1">
           <p className="text-sm font-medium text-content">放到哪個資料夾</p>

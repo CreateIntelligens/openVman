@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-11-06]** **新增資料畫面提供範例檔下載**：問答表（Excel、CSV）與整理好的文件（Markdown）各一份，內容是虛構的服務中心，不含任何客戶資料，工作人員可以照著填。檔案放在 `frontend/admin/public/templates/`。
+
 - **[2026-11-05]** **QA CSV 每題可以標語言**：CSV 新增選填的 `language` 欄（別名 `lang`、`語言`），檢索的語言排序先看每題的語言，沒標才看文件語言，一份 CSV 可以混多種語言。既有 CSV 可用 `python -m scripts.label_qa_languages <project_id>` 依規則打標，預設只預覽，加 `--write` 才寫入，有值的列不會被改，人工指定語言的文件略過。不需要遷移資料表，語言存在段落的 `metadata`。上傳採納目前會把 CSV 轉成 Markdown，這一欄只對保持 CSV 的文件有效。
 
 - **[2026-11-05]** **QA 圖片會標示是不是 QR code**：對話回應與歷史紀錄的 `image_id` 旁多帶 `image_kind`（`qr` 或 `image`；判斷不了時不出現），上傳 API 也會回傳。整張以 QR 為主且解得出內容才算 `qr`，海報角落的小 QR 仍是 `image`。每張圖只判斷一次，結果存在 `knowledge/.qa_image_kinds.json`，檔案換了才重判；既有圖片可跑 `python -m scripts.classify_qa_images`。虛擬人前台不變，照常顯示。Brain 新增相依 `opencv-python-headless`。對接方式寫在 `docs/guides/integration-quickstart.md`。

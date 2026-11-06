@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import SourcePanel from "./SourcePanel";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+import SourcePanel, { IMPORT_TEMPLATES } from "./SourcePanel";
 
 function renderPanel(overrides: Partial<Parameters<typeof SourcePanel>[0]> = {}) {
   const props = {
@@ -151,4 +154,18 @@ describe("SourcePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "自己輸入問答" }));
     expect(onOpenComposer).toHaveBeenLastCalledWith("qa");
   });
+
+  it("offers example files that exist in public/templates", () => {
+    renderPanel();
+
+    const links = IMPORT_TEMPLATES.map((template) =>
+      screen.getByRole("link", { name: template.label }));
+    links.forEach((link, position) => {
+      const file = IMPORT_TEMPLATES[position].file;
+      expect(link.getAttribute("download")).toBe(file);
+      expect(decodeURIComponent(link.getAttribute("href") ?? "")).toBe(`/admin/templates/${file}`);
+      expect(existsSync(resolve(__dirname, "../../../public/templates", file))).toBe(true);
+    });
+  });
 });
+
