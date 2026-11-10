@@ -130,6 +130,27 @@ def test_short_or_unclear_text_falls_to_primary_language(text, default, expected
     assert detect_language(text, default) == expected
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Do you have a menu in Español?", "en"),
+        ("Is this pump made in La Cañada?", "en"),
+        ("Which of these is the El Niño model?", "en"),
+        # 西語句子裡夾一個英文字，仍是西語。
+        ("¿Tienen la bomba for sale en la tienda?", "es"),
+        ("¿Dónde está el baño?", "es"),
+        ("Español", "es"),
+    ],
+)
+def test_spanish_marks_yield_to_clearly_english_sentences(text, expected):
+    assert detect_language(text) == expected
+
+
+def test_english_row_mentioning_spanish_name_is_english():
+    row = "What languages do you support? We support English and Español."
+    assert language_detect.detect_row_language(row) == "en"
+
+
 def test_short_text_is_never_sent_to_jev(jev, monkeypatch):
     def boom(*_a, **_kw):
         raise AssertionError("short text should not reach Jev")

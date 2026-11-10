@@ -487,7 +487,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 #### 14.2 語言判斷
 
-* **使用者訊息**（`memory/language_detect.detect_language`）：有中文字就是中文；日文、韓文靠假名、諺文判斷（實測見 `scripts/experiments/ja-ko/`）；一兩個拉丁字的短句（ok、型號）與判斷不出來的歸主要語言；但有 ¿¡ñ 的再短也是西語（「¿Quién eres?」），用到只有一種語言會用的招呼或客套話（hi、hello、thanks／hola、gracias、buenos días）的照該語言。
+* **使用者訊息**（`memory/language_detect.detect_language`）：有中文字就是中文；日文、韓文靠假名、諺文判斷（實測見 `scripts/experiments/ja-ko/`）；一兩個拉丁字的短句（ok、型號）與判斷不出來的歸主要語言；但有 ¿¡ñ 的再短也是西語（「¿Quién eres?」），除非英文功能字比西語多（英文句子提到 Español、El Niño）；用到只有一種語言會用的招呼或客套話（hi、hello、thanks／hola、gracias、buenos días）的照該語言。
 * **文件語言**存在 `.doc_meta.json` 的 `language`／`language_source`：`auto` 由文件開頭 2 萬字以規則判斷，第一次被列表或查詢用到時判斷並存下，內容儲存後清掉重判；`manual` 是後台指定，永不覆蓋。`PATCH /brain/knowledge/document/meta` 帶 `language=zh|en|es|nan|ja|ko` 指定、`auto` 取消指定；文件列表回傳 `language` 與 `language_source`。
 * 文件自動判斷也認台語：有台羅聲調符號，或台語特有漢字與詞的密度達 3%（先排除「給予」「欲望」等華語詞）。後台可手動標「台語」。實驗見 `scripts/experiments/taigi/`。
 

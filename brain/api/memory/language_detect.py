@@ -114,12 +114,14 @@ def detect_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
     han = len(_HAN.findall(text or ""))
     if han and (han > len(words) or len(text or "") < 200):
         return "zh"
-    if _SPANISH_MARKS.search(lowered):
+    en_hits = sum(word in _EN_WORDS for word in words)
+    es_hits = sum(word in _ES_WORDS for word in words)
+    # ¿¡ñ 再短也看得出是西語，但英文句子也會提到 Español、El Niño 這類專名：
+    # 英文功能字比較多就還是英文。
+    if _SPANISH_MARKS.search(lowered) and en_hits <= es_hits:
         return "es"
     if len(words) <= _SHORT_TEXT_WORDS:
         return _greeting_language(words) or default
-    en_hits = sum(word in _EN_WORDS for word in words)
-    es_hits = sum(word in _ES_WORDS for word in words)
     if en_hits == es_hits:
         return default
     return "es" if es_hits > en_hits else "en"
