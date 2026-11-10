@@ -1,5 +1,6 @@
 import type { ChangeEvent, RefObject } from "react";
 import type { KnowledgeDocumentSummary } from "../../api";
+import WorkspaceActions from "./WorkspaceActions";
 import WorkspaceTreePanel from "./WorkspaceTreePanel";
 
 interface WorkspaceDesktopSidebarProps {
@@ -47,49 +48,28 @@ export default function WorkspaceDesktopSidebar({
           >
             <span className="material-symbols-outlined text-[1rem]">refresh</span>
           </button>
-          <button
-            onClick={onSync}
-            disabled={syncing}
-            className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-            title="重建搜尋資料"
-            aria-label="重建搜尋資料"
-          >
-            <span className={`material-symbols-outlined text-[1rem] ${syncing ? "animate-spin" : ""}`}>sync</span>
-          </button>
         </div>
       </div>
 
-      <div className="px-4 mt-5 mb-3 flex items-center justify-between shrink-0">
+      <div className="px-4 mt-5 mb-3 flex flex-col gap-2 shrink-0">
         <div className="flex items-center gap-2 text-xs font-bold text-content-subtle">
-          <span className="material-symbols-outlined text-[0.875rem]">folder_open</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">folder_open</span>
           <span>{documents.length} 份文件</span>
         </div>
-        <div className="flex items-center gap-1">
-          <input
-            type="file"
-            ref={uploadInputRef}
-            onChange={onFileUpload}
-            className="hidden"
-            multiple
-          />
-          <button
-            onClick={() => uploadInputRef.current?.click()}
-            disabled={uploading}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-50"
-            title="上傳檔案"
-            aria-label="上傳檔案"
-          >
-            <span className="material-symbols-outlined text-[1rem]">upload_file</span>
-          </button>
-          <button
-            onClick={onCreate}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
-            title="新文件"
-            aria-label="新文件"
-          >
-            <span className="material-symbols-outlined text-[1rem]">add</span>
-          </button>
-        </div>
+        <input
+          type="file"
+          ref={uploadInputRef}
+          onChange={onFileUpload}
+          className="hidden"
+          multiple
+        />
+        <WorkspaceActions
+          uploading={uploading}
+          syncing={syncing}
+          onUpload={() => uploadInputRef.current?.click()}
+          onSync={onSync}
+          onCreate={onCreate}
+        />
       </div>
 
       <WorkspaceTreePanel

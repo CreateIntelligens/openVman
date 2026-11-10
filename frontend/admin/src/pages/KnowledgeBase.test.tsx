@@ -271,7 +271,6 @@ vi.mock("../components/kb/qa/MergedCsvPane", () => ({
   },
 }));
 
-vi.mock("../components/kb/qa/ManualQaModal", () => ({ default: () => null }));
 
 describe("KnowledgeBase merged tree", () => {
   beforeEach(() => {

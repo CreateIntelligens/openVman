@@ -6,6 +6,7 @@ import {
   submitAvatarCharacterJob,
   type AvatarJob,
 } from "../../api";
+import { generateAssetId } from "../../utils/generateAssetId";
 import StatusAlert from "../StatusAlert";
 import { FileDropField, ScopeField, TextField } from "./UploadFields";
 import {
@@ -127,8 +128,8 @@ export default function CharacterJobsPanel({
   }, [hasActive, refresh]);
 
   async function handleSubmit(): Promise<void> {
-    if (!charId.trim() || !label.trim() || !source) {
-      setStatus({ type: "error", message: "請填人物 ID、顯示名稱，並選好影片或圖片" });
+    if (!label.trim() || !source) {
+      setStatus({ type: "error", message: "請填顯示名稱，並選好影片或圖片" });
       return;
     }
     const problem = checkFile(source, SOURCE_KINDS);
@@ -140,7 +141,7 @@ export default function CharacterJobsPanel({
     setStatus(null);
     try {
       await submitAvatarCharacterJob({
-        charId: charId.trim(),
+        charId: charId.trim() || generateAssetId("char"),
         label: label.trim(),
         video: source,
         projectId: projectId || undefined,
@@ -210,10 +211,10 @@ export default function CharacterJobsPanel({
 
         <div className={uploadFieldsClassName}>
           <TextField
-            label="人物 ID"
+            label="人物代號"
             value={charId}
             onChange={setCharId}
-            hint="英數字與 . _ -，最多 64 字，建立後不能改。"
+            hint="選填，不填會自動產生。只能用英數字與 . _ -，建立後不能改。"
             disabled={submitting}
             mono
           />

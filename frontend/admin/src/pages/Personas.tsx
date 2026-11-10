@@ -23,6 +23,7 @@ import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuar
 import { useProject } from "../context/ProjectContext";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
+import { generateAssetId } from "../utils/generateAssetId";
 
 type EditorMode = "edit" | "preview" | "split";
 const EDITOR_MODES: readonly EditorMode[] = ["edit", "split", "preview"];
@@ -30,6 +31,18 @@ type Status = { type: "success" | "error"; message: string } | null;
 type AvatarBindingOption = Pick<AvatarCharacter, "char_id" | "label">;
 
 // 前台舞台只有 2D 影片人物，虛擬人只能綁人物；小助理不是舞台上的角色。
+const PERSONA_DOC_LABELS: Record<string, string> = {
+       "SOUL.md": "個性與說話方式",
+       "AGENTS.md": "工作規則",
+       "TOOLS.md": "工具使用說明",
+       "MEMORY.md": "長期記憶",
+};
+
+function personaDocLabel(path: string): string {
+       const fileName = path.split("/").pop() ?? path;
+       return PERSONA_DOC_LABELS[fileName] ?? fileName;
+}
+
 function buildAvatarBindingOptions(
        characters: AvatarCharacter[],
 ): AvatarBindingOption[] {
@@ -145,7 +158,7 @@ export default function Personas() {
 
               try {
                      await saveKnowledgeDocument(selectedPath, draftContent);
-                     setStatus({ type: "success", message: `已儲存 ${selectedPath}` });
+                     setStatus({ type: "success", message: `已儲存「${personaDocLabel(selectedPath)}」` });
                      setLoadedContent(draftContent);
                      await loadPersonas(selectedPersona?.persona_id);
               } catch (error) {
@@ -162,10 +175,16 @@ export default function Personas() {
        };
 
        const handleCreateOrClone = async () => {
-              if (!newPersonaId.trim()) {
-                     setStatus({ type: "error", message: "請輸入要建立的角色 ID（例如 doctor）。" });
+              const typedId = newPersonaId.trim();
+              if (typedId && !/^[A-Za-z0-9._-]{1,64}$/.test(typedId)) {
+                     setStatus({ type: "error", message: "代號只能用英文、數字和 . _ -，或是留空讓系統產生。" });
                      return;
               }
+              if (!typedId && !templateSourceId && !newPersonaLabel.trim()) {
+                     setStatus({ type: "error", message: "請輸入角色名稱。" });
+                     return;
+              }
+              const personaId = typedId || generateAssetId("persona");
 
               setStatus(null);
 
@@ -173,10 +192,10 @@ export default function Personas() {
               if (templateSourceId) {
                      setCloningPersona(true);
                      try {
-                            const response = await clonePersona(templateSourceId, newPersonaId.trim());
+                            const response = await clonePersona(templateSourceId, personaId);
                             setStatus({
                                    type: "success",
-                                   message: `已從 ${response.source_persona_id} 複製角色 ${response.persona.persona_id}。`,
+                                   message: `已複製成新角色「${response.persona.label || response.persona.persona_id}」。`,
                             });
                             setNewPersonaId("");
                             setNewPersonaLabel("");
@@ -191,10 +210,10 @@ export default function Personas() {
                      // Otherwise, create from the default blank template
                      setCreatingPersona(true);
                      try {
-                            const response = await createPersona(newPersonaId.trim(), newPersonaLabel.trim());
+                            const response = await createPersona(personaId, newPersonaLabel.trim());
                             setStatus({
                                    type: "success",
-                                   message: `已建立角色 ${response.persona.persona_id}，並產生核心文件。`,
+                                   message: `已建立角色「${response.persona.label || response.persona.persona_id}」。`,
                             });
                             setNewPersonaId("");
                             setNewPersonaLabel("");
@@ -218,7 +237,7 @@ export default function Personas() {
                      await deletePersona(persona.persona_id);
                      setStatus({
                             type: "success",
-                            message: `已刪除角色 ${persona.persona_id}。`,
+                            message: `已刪除角色「${persona.label || persona.persona_id}」。`,
                      });
                      await loadPersonas(
                             selectedPersona?.persona_id === persona.persona_id
@@ -262,10 +281,10 @@ export default function Personas() {
        const docPrefix = selectedPersona?.is_default ? "" : `personas/${selectedPersona?.persona_id}/`;
        const coreDocs = selectedPersona
               ? [
-                     { path: selectedPersona.path, label: "SOUL.md", icon: "psychology" },
-                     { path: `${docPrefix}AGENTS.md`, label: "AGENTS.md", icon: "group_work" },
-                     { path: `${docPrefix}TOOLS.md`, label: "TOOLS.md", icon: "build" },
-                     { path: `${docPrefix}MEMORY.md`, label: "MEMORY.md", icon: "memory" },
+                     { path: selectedPersona.path, label: personaDocLabel("SOUL.md"), icon: "psychology" },
+                     { path: `${docPrefix}AGENTS.md`, label: personaDocLabel("AGENTS.md"), icon: "group_work" },
+                     { path: `${docPrefix}TOOLS.md`, label: personaDocLabel("TOOLS.md"), icon: "build" },
+                     { path: `${docPrefix}MEMORY.md`, label: personaDocLabel("MEMORY.md"), icon: "memory" },
               ]
               : [];
 
@@ -424,7 +443,7 @@ export default function Personas() {
                      <ConfirmModal
                             open={deletePersonaTarget !== null}
                             title="刪除角色"
-                            message={`確定要刪除角色「${deletePersonaTarget?.persona_id}」嗎？此操作無法復原。`}
+                            message={`確定要刪除角色「${deletePersonaTarget?.label || deletePersonaTarget?.persona_id}」嗎？此操作無法復原。`}
                             confirmLabel="刪除"
                             danger
                             onConfirm={confirmDeletePersona}
@@ -457,9 +476,9 @@ function PersonaAvatarSelector({
 
        return (
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface-raised dark:bg-surface-sunken/10">
-                     <span className="text-sm text-content-muted font-medium">虛擬人模型：</span>
+                     <span className="text-sm text-content-muted font-medium">虛擬人：</span>
                      <Select
-                            ariaLabel="虛擬人模型"
+                            ariaLabel="虛擬人"
                             value={persona.avatar_char_id ?? ""}
                             options={options}
                             onChange={(value) => onBind(persona.persona_id, value || null)}

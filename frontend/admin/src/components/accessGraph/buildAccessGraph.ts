@@ -386,13 +386,13 @@ export const KIND_LABELS: Record<NodeKind, string> = {
 };
 
 export const ROLE_LABELS: Record<Account["role"], string> = {
-  root: "ROOT",
+  root: "最高管理員",
   admin: "管理員",
   user: "一般帳號",
 };
 
 export const ACCESS_MODE_LABELS: Record<AccessMode, string> = {
-  root: "ROOT：全部",
+  root: "最高管理員：全部",
   "admin-unscoped": "管理員：不受限",
   "admin-scoped": "管理員：依管理範圍",
   "admin-unknown": "管理範圍無法讀取",
@@ -424,7 +424,7 @@ export function languageName(route: KnowledgeLanguage): string {
 }
 
 export function languageRoutesText(routes: LanguageRoutesResult): string {
-  if (routes === "error") return "語言分流：讀不到";
-  if (routes.every((route) => route === "zh")) return "語言分流：只有中文（不分流）";
-  return `語言分流：${routes.map(languageName).join("、")}`;
+  if (routes === "error") return "回答語言：讀不到";
+  if (routes.every((route) => route === "zh")) return "回答語言：只有中文";
+  return `回答語言：${routes.map(languageName).join("、")}`;
 }

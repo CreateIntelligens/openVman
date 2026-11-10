@@ -72,7 +72,7 @@ export default function SessionBackupPanel() {
           <h2 className="text-sm font-semibold">對話備份</h2>
           <p className="mt-1 text-xs leading-5 text-content-muted">
             每天 03:00 自動把所有專案的對話依語言分檔備份，保留最近 30 份。
-            備份存在伺服器的資料目錄，只有 ROOT 看得到這一區。
+            備份存在伺服器的資料目錄，只有最高管理員看得到這一區。
           </p>
         </div>
         <div className="flex shrink-0 gap-2">

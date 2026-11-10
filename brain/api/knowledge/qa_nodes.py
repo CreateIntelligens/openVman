@@ -166,12 +166,21 @@ def _upsert_qa_entry(
     )
 
 
+def _next_sibling_order(nodes: dict[str, dict[str, Any]], parent_ids: list[str]) -> float:
+    if parent_ids:
+        sibling_ids = {cid for pid in parent_ids for cid in nodes[pid].get("child_ids", [])}
+    else:
+        sibling_ids = {nid for nid, node in nodes.items() if not node.get("parent_ids")}
+    orders = [float(nodes[nid].get("order", 1.0)) for nid in sibling_ids if nid in nodes]
+    return max(orders, default=0.0) + 1.0
+
+
 def create_node(
     node_id: str,
     label: str,
     parent_ids: list[str] | None = None,
     child_ids: list[str] | None = None,
-    order: float = 1.0,
+    order: float | None = None,
     hidden: bool = False,
     qa_entries: list[dict[str, Any]] | None = None,
     project_id: str = "default",
@@ -182,7 +191,7 @@ def create_node(
         raise ValueError("label must be a string.")
     _validate_string_list(parent_ids, "parent_ids")
     _validate_string_list(child_ids, "child_ids")
-    if not isinstance(order, (int, float)):
+    if order is not None and not isinstance(order, (int, float)):
         raise ValueError("order must be a float or integer.")
     if not isinstance(hidden, bool):
         raise ValueError("hidden must be a boolean.")
@@ -199,6 +208,10 @@ def create_node(
         for cid in child_ids or []:
             if cid not in data["nodes"]:
                 raise ValueError(f"Child node '{cid}' does not exist in the database.")
+
+        # 沒指定就排在同層最後；固定給 1.0 會跟排序後的第一項同分，新分類掉到第二個。
+        if order is None:
+            order = _next_sibling_order(data["nodes"], parent_ids or [])
 
         node = {
             "label": label,

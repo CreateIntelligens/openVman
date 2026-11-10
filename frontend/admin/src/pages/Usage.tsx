@@ -34,8 +34,8 @@ const GROUP_BY_OPTIONS: Array<{ value: UsageGroupBy | ""; label: string }> = [
   { value: "project", label: "專案" },
   { value: "model", label: "模型" },
   { value: "kind", label: "類型" },
-  { value: "principal", label: "呼叫主體" },
-  { value: "session", label: "工作階段" },
+  { value: "principal", label: "使用者或金鑰" },
+  { value: "session", label: "單次對話" },
 ];
 
 const BUCKET_OPTIONS: Array<{ value: UsageBucket; label: string }> = [
@@ -52,6 +52,22 @@ const RANGE_OPTIONS: Array<{ value: string; label: string; days?: number }> = [
   { value: "90", label: "最近 90 天", days: 89 },
   { value: "custom", label: "自訂區間" },
 ];
+
+/** 事件類型的白話名稱；沒列到的新類型照原文顯示，至少不會整列看不到。 */
+const USAGE_KIND_LABELS: Record<string, string> = {
+  chat: "對話",
+  embed: "建立搜尋資料",
+  asr: "語音辨識",
+  tts: "語音合成",
+  tts_stream: "語音合成",
+  live: "即時語音",
+  audio_language: "語言判斷",
+  query_expansion: "搜尋改寫",
+};
+
+function usageKindLabel(kind: string): string {
+  return USAGE_KIND_LABELS[kind] ?? kind;
+}
 
 /** 分組維度 -> 該維度在彙總列裡的欄位名，用來取標籤。 */
 const GROUP_LABEL_KEYS: Record<string, Array<keyof UsageSummaryGroup>> = {
@@ -304,7 +320,7 @@ function BreakdownTable({
               <tr>
                 <th scope="col" className={headCell}>{columnLabel}</th>
                 <th scope="col" className={headNumericCell}>呼叫數</th>
-                <th scope="col" className={headNumericCell}>Tokens</th>
+                <th scope="col" className={headNumericCell}>文字用量</th>
                 <th scope="col" className={headNumericCell}>其他用量</th>
                 <th scope="col" className={headNumericCell}>占比</th>
                 <th scope="col" className={headNumericCell}>平均延遲</th>
@@ -508,7 +524,7 @@ export default function Usage() {
     <div className="page-scroll">
       <PageHeader
         title="用量"
-        subtitle="查看 LLM 與語音的呼叫次數、Token 消耗與延遲，並追溯每個對話回合的成本。"
+        subtitle="查看 AI 與語音用了多少、回應多快，也能查每一輪對話的用量。"
         actions={(
           <button
             type="button"
@@ -586,8 +602,8 @@ export default function Usage() {
             />
 
             <Select
-              ariaLabel="主體類型"
-              label="主體"
+              ariaLabel="使用者類型"
+              label="誰在用"
               value={principalType}
               onChange={(value) => {
                 setPrincipalType(value as PrincipalTypeFilter);
@@ -600,7 +616,7 @@ export default function Usage() {
 
             {principalType === "embed_key" && embedKeys.length > 0 ? (
               <Select
-                ariaLabel="主體 ID"
+                ariaLabel="帳號或金鑰編號"
                 label="金鑰"
                 value={principalId}
                 onChange={setPrincipalId}
@@ -610,11 +626,11 @@ export default function Usage() {
             ) : (
               <input
                 type="text"
-                aria-label="主體 ID"
+                aria-label="帳號或金鑰編號"
                 className="input"
                 value={principalId}
                 onChange={(event) => setPrincipalId(event.target.value)}
-                placeholder="主體 ID（選填）"
+                placeholder="帳號或金鑰編號（選填）"
               />
             )}
           </div>
@@ -636,43 +652,43 @@ export default function Usage() {
               <h2 className="section-title mb-3">總覽</h2>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 <Tile
-                  label="LLM 呼叫數"
+                  label="AI 呼叫次數"
                   value={formatNumber(totals?.calls ?? 0)}
-                  hint="符合篩選條件的全部事件"
+                  hint="符合篩選條件的全部紀錄"
                 />
                 <Tile
-                  label="Token 總量"
+                  label="文字用量（Token）"
                   value={formatNumber(totals?.total_tokens ?? 0)}
                   hint={`輸入 ${formatNumber(totals?.input_tokens ?? 0)} / 輸出 ${formatNumber(totals?.output_tokens ?? 0)}`}
                 />
                 <Tile
-                  label="平均每次呼叫 Tokens"
+                  label="平均每次的文字用量"
                   value={formatDecimal(avgTokensPerCall, 0)}
-                  hint="Token 總量 ÷ 呼叫數"
+                  hint="文字用量 ÷ 呼叫次數"
                 />
                 <Tile
-                  label="平均延遲"
+                  label="平均回應時間"
                   value={`${formatDecimal(avgLatency, 0)} ms`}
-                  hint={`取自最近 ${events.length} 筆事件`}
+                  hint={`取自最近 ${events.length} 筆紀錄`}
                 />
                 <Tile
-                  label="平均每個對話回合的 LLM 呼叫數"
+                  label="每輪對話平均呼叫 AI 幾次"
                   value={formatDecimal(callsPerTurn, 2)}
-                  hint={`由最近 ${events.length} 筆事件視窗計算：呼叫數 ÷ 不重複 (session_id, trace_id) 回合數`}
+                  hint={`由最近 ${events.length} 筆紀錄計算`}
                 />
                 {/* TTS 與 Live 不按 token 計價，沒有用量時不佔版面。 */}
                 {Boolean(totals?.chars) && (
                   <Tile
-                    label="TTS 合成字元"
+                    label="語音合成字數"
                     value={formatNumber(totals?.chars ?? 0)}
-                    hint="送去語音合成的字元數；TTS 按字元計價，不是 token"
+                    hint="語音合成是按字數計費"
                   />
                 )}
                 {Boolean(totals?.seconds) && (
                   <Tile
-                    label="Live 音訊"
+                    label="即時語音"
                     value={formatDuration(totals?.seconds ?? 0)}
-                    hint="Gemini Live 的音訊秒數，輸入與輸出加總"
+                    hint="即時語音對話的時間，聽和說加總"
                   />
                 )}
               </div>
@@ -683,7 +699,7 @@ export default function Usage() {
                 <div>
                   <h2 className="card-title">用量趨勢</h2>
                   <p className="mt-1 text-sm text-content-muted">
-                    每個時間區間的 token 總量；分組後以堆疊呈現，只顯示用量前
+                    每段時間的文字用量；分組後疊在一起顯示，只顯示用量前
                     8 名，其餘併為「其他」。
                   </p>
                 </div>
@@ -696,8 +712,8 @@ export default function Usage() {
                     options={GROUP_BY_OPTIONS}
                   />
                   <Select
-                    ariaLabel="粒度"
-                    label="粒度"
+                    ariaLabel="時間單位"
+                    label="時間單位"
                     value={bucket}
                     onChange={(value) => setBucket(value as UsageBucket)}
                     options={BUCKET_OPTIONS}
@@ -726,8 +742,8 @@ export default function Usage() {
 
             <div className="grid gap-6 xl:grid-cols-2">
               <BreakdownTable
-                title="依 Provider"
-                columnLabel="Provider"
+                title="依供應商"
+                columnLabel="供應商"
                 rows={providerBreakdown}
                 totalTokens={totals?.total_tokens ?? 0}
               />
@@ -758,10 +774,10 @@ export default function Usage() {
                       <tr>
                         <th scope="col" className={headCell}>時間</th>
                         <th scope="col" className={headCell}>類型</th>
-                        <th scope="col" className={headCell}>Provider / 模型</th>
-                        <th scope="col" className={headCell}>主體</th>
+                        <th scope="col" className={headCell}>供應商 / 模型</th>
+                        <th scope="col" className={headCell}>誰在用</th>
                         <th scope="col" className={headCell}>專案</th>
-                        <th scope="col" className={headNumericCell}>Tokens</th>
+                        <th scope="col" className={headNumericCell}>文字用量</th>
                         <th scope="col" className={headNumericCell}>延遲</th>
                       </tr>
                     </thead>
@@ -785,7 +801,7 @@ export default function Usage() {
                               {formatUsageTime(event.created_at)}
                             </td>
                             <td className="px-5 py-3">
-                              <span className="chip">{event.kind}</span>
+                              <span className="chip">{usageKindLabel(event.kind)}</span>
                             </td>
                             <td className="px-5 py-3 text-content">
                               {event.provider || "—"}

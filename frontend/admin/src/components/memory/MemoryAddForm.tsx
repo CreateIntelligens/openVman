@@ -47,7 +47,7 @@ export default function MemoryAddForm({
             className="w-full pl-10 rounded-lg border-border bg-surface-raised text-content focus:ring-2 focus:ring-primary focus:border-primary transition-all h-11"
             value={source}
             onChange={(e) => onSourceChange(e.target.value)}
-            placeholder="來源識別標識"
+            placeholder="這筆資訊是誰說的，例如 客服主管"
           />
         </div>
       </div>

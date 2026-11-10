@@ -370,7 +370,7 @@ describe("Accounts", () => {
     expect(screen.getByRole("option", { name: "管理員" })).toBeTruthy();
     switchToManageTab();
 
-    expect(await screen.findByText("ROOT")).toBeTruthy();
+    expect(await screen.findByText("最高管理員")).toBeTruthy();
 
     const rootRow = screen.getByText("ai360").closest("article");
     const adminRow = screen.getByText("operator").closest("article");
@@ -401,7 +401,7 @@ describe("Accounts", () => {
     render(<Accounts />);
     switchToManageTab();
 
-    await screen.findByText("ROOT");
+    await screen.findByText("最高管理員");
     // 子樹裡看得到，但不是自己建立的就動不了。
     expect(rowButtonLabels(rowByUsername("ai360"))).toEqual([]);
     expect(rowButtonLabels(rowByUsername("admin"))).toEqual([]);

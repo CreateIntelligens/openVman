@@ -4,7 +4,7 @@ export const defaultPersona: PersonaSummary = {
   persona_id: "default",
   label: "核心人格設定 (SOUL)",
   path: "SOUL.md",
-  preview: "使用 workspace root 的全域人格設定。",
+  preview: "使用預設的角色設定。",
   is_default: true,
 };
 

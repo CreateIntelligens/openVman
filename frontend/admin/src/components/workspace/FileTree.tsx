@@ -153,7 +153,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                             </div>
 
                             {/* Badges / Labels */}
-                            <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1.5 shrink-0">
                                    {doc?.is_core && (
                                           <span className="rounded bg-warn/10 px-1.5 py-0.5 text-xs font-medium text-warn">
                                                  核心

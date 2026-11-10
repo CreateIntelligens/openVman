@@ -17,7 +17,7 @@ export function ResourceSourceBadge({
   if (source === "assigned") {
     return (
       <span className="inline-flex items-center rounded bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success">
-        ROOT 指派
+        最高管理員指派
       </span>
     );
   }

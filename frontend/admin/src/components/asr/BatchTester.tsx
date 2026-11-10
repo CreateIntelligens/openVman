@@ -257,16 +257,15 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
   return (
     <section className="flex flex-col gap-4" aria-labelledby="asr-batch-title">
       <div className="flex flex-col gap-1">
-        <h2 id="asr-batch-title" className="text-sm font-semibold">試辨識</h2>
+        <h2 id="asr-batch-title" className="text-sm font-semibold">比較辨識結果</h2>
         <p className="text-xs leading-5 text-content-muted">
-          勾幾個引擎，按「開始講話」直接講，每講完一句會自動送出，同一句同時給每一家辨識、結果並排比較；也可以上傳音檔。之後再勾的引擎會直接拿下面的音檔去跑；改了分流或詞表按「重跑」。串流引擎的秒數是講完到定稿：麥克風講的照真實速度送，上傳的檔案用 4 倍速送（文字一樣，不用乾等整段，但秒數比實際慢一點）；瀏覽器內建辨識只在「開始講話」時一起聽。
-          跟正式對話一樣套專案詞表與語言分流；開台語分流時另外聽是不是台語，但引擎照勾的跑（正式對話會換成 Breeze）。
+          勾幾個引擎，按「開始講話」直接講，每講完一句會自動送出，同一句給每個引擎辨識，結果並排比較；也可以上傳音檔。之後再勾的引擎會直接拿下面的音檔去跑；改了語言或詞表按「重跑」。秒數是講完到文字出來要多久，上傳的音檔測出來只能當參考；瀏覽器內建辨識只在「開始講話」時一起聽。
           只影響這一次，不會改任何人的設定。
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="試辨識的引擎">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="要比較的引擎">
           {offered.map((id) => {
             const on = engines.includes(id);
             return (
@@ -293,7 +292,7 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
       </div>
 
       <label className="flex flex-col gap-1 text-xs text-content-muted">
-        參考文字（選填：填了就算錯字率，跟 voice_e2e 同一個算法）
+        參考文字（選填：填了會算錯字率）
         <input
           className="input"
           value={reference}
@@ -385,7 +384,7 @@ function ClipResult({ clip, rows, reference, onRerun }: {
       </div>
       {first && (
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="chip">分流：{(first.preview.language_routes ?? []).join("、") || "—"}</span>
+          <span className="chip">語言：{(first.preview.language_routes ?? []).join("、") || "—"}</span>
           <span className="chip">{first.preview.glossary ? "有套用專案詞表" : "沒有套用詞表"}</span>
           {check && (
             <span className="chip">

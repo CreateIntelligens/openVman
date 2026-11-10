@@ -1,4 +1,5 @@
 import type { KnowledgeDocumentSummary } from "../../api";
+import WorkspaceActions from "./WorkspaceActions";
 import WorkspaceTreePanel from "./WorkspaceTreePanel";
 
 interface WorkspaceMobileSidebarProps {
@@ -7,6 +8,10 @@ interface WorkspaceMobileSidebarProps {
   selectedPath: string;
   loadingList: boolean;
   docSearch: string;
+  uploading: boolean;
+  syncing: boolean;
+  onUpload: () => void;
+  onSync: () => void;
   onClose: () => void;
   onCreate: () => void;
   onSearchChange: (value: string) => void;
@@ -19,6 +24,10 @@ export default function WorkspaceMobileSidebar({
   selectedPath,
   loadingList,
   docSearch,
+  uploading,
+  syncing,
+  onUpload,
+  onSync,
   onClose,
   onCreate,
   onSearchChange,
@@ -45,21 +54,18 @@ export default function WorkspaceMobileSidebar({
             <span className="material-symbols-outlined text-[1.125rem]">close</span>
           </button>
         </div>
-        <div className="px-4 mt-5 mb-3 flex items-center justify-between shrink-0">
+        <div className="px-4 mt-5 mb-3 flex flex-col gap-2 shrink-0">
           <div className="flex items-center gap-2 text-xs font-bold text-content-subtle">
-            <span className="material-symbols-outlined text-[0.875rem]">folder_open</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">folder_open</span>
             <span>{documents.length} 份文件</span>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onCreate}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
-              title="新文件"
-              aria-label="新文件"
-            >
-              <span className="material-symbols-outlined text-[1rem]">add</span>
-            </button>
-          </div>
+          <WorkspaceActions
+            uploading={uploading}
+            syncing={syncing}
+            onUpload={onUpload}
+            onSync={onSync}
+            onCreate={onCreate}
+          />
         </div>
 
         <WorkspaceTreePanel

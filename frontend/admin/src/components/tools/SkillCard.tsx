@@ -101,10 +101,10 @@ export default function SkillCard({
             type="button"
             onClick={() => onDelete(skill)}
             className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-content-muted hover:text-danger border border-border hover:border-danger/30 rounded-lg transition-colors"
-            title="刪除"
             aria-label={`刪除 ${skill.name}`}
           >
             <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">delete</span>
+            刪除
           </button>
         </div>
       </div>

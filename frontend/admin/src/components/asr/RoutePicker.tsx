@@ -22,7 +22,7 @@ interface RoutePickerProps {
 export default function RoutePicker({ available, selected, onChange, disabled }: RoutePickerProps) {
   if (!available.length) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="語言分流">
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="辨識語言">
       {available.map((route) => {
         const on = selected.includes(route);
         const last = on && selected.length === 1;
@@ -32,7 +32,7 @@ export default function RoutePicker({ available, selected, onChange, disabled }:
             type="button"
             aria-pressed={on}
             disabled={disabled || last}
-            title={last ? "至少要留一個分流" : undefined}
+            title={last ? "至少要留一種語言" : undefined}
             onClick={() => onChange(on ? selected.filter((r) => r !== route) : [...selected, route])}
             className={`btn px-3 py-1 text-xs ${on ? "btn-primary" : "btn-ghost"}`}
           >

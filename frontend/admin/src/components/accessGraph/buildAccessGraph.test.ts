@@ -367,9 +367,9 @@ describe("language routes", () => {
     expect(languageBadge("error")).toBeNull();
     expect(languageBadge(undefined)).toBeNull();
     expect(languageBadge(["zh", "nan", "en"])).toBe("中·台·EN");
-    expect(languageRoutesText(["zh"])).toBe("語言分流：只有中文（不分流）");
-    expect(languageRoutesText(["zh", "nan"])).toBe("語言分流：中文、台語");
-    expect(languageRoutesText("error")).toBe("語言分流：讀不到");
+    expect(languageRoutesText(["zh"])).toBe("回答語言：只有中文");
+    expect(languageRoutesText(["zh", "nan"])).toBe("回答語言：中文、台語");
+    expect(languageRoutesText("error")).toBe("回答語言：讀不到");
   });
 });
 

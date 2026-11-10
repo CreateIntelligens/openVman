@@ -404,7 +404,7 @@ export default function AccountAccessFields({
           role="note"
         >
           <span className="block text-sm font-semibold text-content">
-            {role === "root" ? "ROOT" : "管理員"}不受這份清單限制
+            {role === "root" ? "最高管理員" : "管理員"}不受這份清單限制
           </span>
           這個帳號看得到、用得到全部資源，本來就能進管理後台。下方的勾選只決定登入後的預設值，
           以及他替別人授權時能分配哪些專案專屬資源；要縮小他能動的範圍，請用「資源上限」。

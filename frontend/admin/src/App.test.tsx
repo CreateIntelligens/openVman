@@ -201,9 +201,9 @@ describe("App tab mounting", () => {
       "帳號",
       "API 金鑰",
       "權限圖譜",
-      "Embed 金鑰",
+      "網站嵌入金鑰",
     ]);
-    fireEvent.click(tabs.getByRole("tab", { name: "Embed 金鑰" }));
+    fireEvent.click(tabs.getByRole("tab", { name: "網站嵌入金鑰" }));
     expect(await screen.findByTestId("tab-embed-keys")).toBeTruthy();
     expect(window.location.pathname).toBe("/admin/access/embed-keys");
     fireEvent.click(tabs.getByRole("tab", { name: "權限圖譜" }));

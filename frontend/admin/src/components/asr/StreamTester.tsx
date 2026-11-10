@@ -78,17 +78,16 @@ export default function StreamTester({ projectId, routes }: StreamTesterProps) {
   return (
     <section className="flex flex-col gap-4" aria-labelledby="asr-stream-title">
       <div className="flex flex-col gap-1">
-        <h2 id="asr-stream-title" className="text-sm font-semibold">串流試聽</h2>
+        <h2 id="asr-stream-title" className="text-sm font-semibold">邊講邊聽寫</h2>
         <p className="text-xs leading-5 text-content-muted">
-          邊講邊出字，走正式對話的同一條串流路徑，可以連續講好幾句。套用上面勾的語言分流與專案詞表。
-          只有一種語言時 R2T2 用那個語言解碼；多種語言時交給它自己判斷：.35 分得出中英西，.37 一律當中文。
+          對著麥克風講話，字會邊講邊出來，跟正式對話一樣。可以連續講好幾句，會套用上面勾的語言與專案詞表。
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Select
           value={engine}
           disabled={listening}
-          ariaLabel="串流試聽的引擎"
+          ariaLabel="邊講邊聽寫的引擎"
           options={STREAM_ASR_ENGINES.map((id) => ({ value: id, label: describe(id).label }))}
           onChange={setEngine}
         />

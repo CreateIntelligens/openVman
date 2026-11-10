@@ -90,7 +90,7 @@ export default function AccessGraphFilterBar({
         {search}
         <FocusPicker
           label="專案"
-          description="只看能存取所選專案的帳號（選多個時任一個即可）。ROOT 與不受限管理員能存取全部，一律保留。"
+          description="只看能存取所選專案的帳號（選多個時任一個即可）。最高管理員與不受限管理員能存取全部，一律保留。"
           groups={projectGroups}
           selected={filters.projects}
           onChange={(projects) => set({ projects })}

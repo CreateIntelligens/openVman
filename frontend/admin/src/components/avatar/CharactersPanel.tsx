@@ -80,7 +80,7 @@ export default function CharactersPanel({
             </span>
             <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
               <span className="font-medium text-content">上傳現成素材包</span>
-              <span>已有 01.webm 與資料檔時用，不經過轉換</span>
+              <span>只有手上已經是處理好的人物檔案時才用；一般請用上面的製作</span>
             </span>
           </summary>
           <div className="flex min-w-0 flex-col gap-4 border-t border-border px-4 pb-4 pt-4">
@@ -112,10 +112,10 @@ export default function CharactersPanel({
               </div>
               <div className="flex min-w-0 flex-col gap-3">
                 <TextField
-                  label="人物 ID"
+                  label="人物代號"
                   value={uploadId}
                   onChange={onUploadIdChange}
-                  hint="英數字與 . _ -，最多 64 字，建立後不能改。"
+                  hint="選填，不填會自動產生。只能用英數字與 . _ -，建立後不能改。"
                   disabled={uploading}
                   mono
                 />

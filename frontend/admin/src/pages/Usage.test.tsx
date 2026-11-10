@@ -220,7 +220,7 @@ describe("Usage page", () => {
   it("renders the summary tiles from the mocked responses", async () => {
     render(<Usage />);
 
-    await screen.findByText("LLM 呼叫數");
+    await screen.findByText("AI 呼叫次數");
     const overview = within(screen.getByRole("region", { name: "用量總覽" }));
 
     expect(overview.getByText("4")).toBeTruthy();
@@ -230,14 +230,14 @@ describe("Usage page", () => {
     expect(overview.getByText("150")).toBeTruthy();
     expect(overview.getByText("400 ms")).toBeTruthy();
     expect(overview.getByText("2.00")).toBeTruthy();
-    expect(overview.getByText("平均每個對話回合的 LLM 呼叫數")).toBeTruthy();
+    expect(overview.getByText("每輪對話平均呼叫 AI 幾次")).toBeTruthy();
   });
 
   it("folds the model groups into a provider breakdown and keeps the model table", async () => {
     render(<Usage />);
 
     const providerTable = within(
-      await screen.findByRole("table", { name: "依 Provider" }),
+      await screen.findByRole("table", { name: "依供應商" }),
     );
     expect(providerTable.getByText("openai")).toBeTruthy();
     expect(providerTable.getByText("groq")).toBeTruthy();
@@ -282,7 +282,7 @@ describe("Usage page", () => {
 
     await waitFor(() => expect(fetchUsageEvents).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText("主體 ID"), {
+    fireEvent.change(screen.getByLabelText("帳號或金鑰編號"), {
       target: { value: "key-abc" },
     });
 
@@ -299,12 +299,12 @@ describe("Usage page", () => {
     });
     render(<Usage />);
     await screen.findByText("api_key:key-a");
-    fireEvent.click(screen.getByRole("combobox", { name: "主體類型" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "使用者類型" }));
     fireEvent.mouseDown(await screen.findByRole("option", { name: "API 金鑰" }));
     await waitFor(() => expect(fetchUsageEvents).toHaveBeenLastCalledWith(
       100, expect.objectContaining({ principalType: "api_key", principalId: "" }),
     ));
-    fireEvent.change(screen.getByLabelText("主體 ID"), {
+    fireEvent.change(screen.getByLabelText("帳號或金鑰編號"), {
       target: { value: "key-a" },
     });
     await waitFor(() => expect(fetchUsageEvents).toHaveBeenLastCalledWith(
@@ -367,21 +367,21 @@ describe("Usage page", () => {
     render(<Usage />);
     await waitFor(() => expect(listEmbedKeys).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole("combobox", { name: "主體類型" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "使用者類型" }));
     fireEvent.mouseDown(await screen.findByRole("option", { name: "Embed 金鑰" }));
 
     // 未選專案時兩把金鑰都在。
-    fireEvent.click(screen.getByRole("combobox", { name: "主體 ID" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "帳號或金鑰編號" }));
     expect(await screen.findByRole("option", { name: "金鑰 A" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "金鑰 B" })).toBeTruthy();
-    fireEvent.keyDown(screen.getByRole("combobox", { name: "主體 ID" }), {
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "帳號或金鑰編號" }), {
       key: "Escape",
     });
 
     fireEvent.click(screen.getByRole("combobox", { name: "專案" }));
     fireEvent.mouseDown(await screen.findByRole("option", { name: "專案一" }));
 
-    fireEvent.click(screen.getByRole("combobox", { name: "主體 ID" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "帳號或金鑰編號" }));
     expect(await screen.findByRole("option", { name: "金鑰 A" })).toBeTruthy();
     expect(screen.queryByRole("option", { name: "金鑰 B" })).toBeNull();
   });
@@ -392,7 +392,7 @@ describe("Usage page", () => {
     await waitFor(() => expect(fetchUsageTimeseries).toHaveBeenCalledTimes(1));
     expect(vi.mocked(fetchUsageTimeseries).mock.calls[0][0]).toBe("day");
 
-    fireEvent.click(screen.getByRole("combobox", { name: "粒度" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "時間單位" }));
     fireEvent.mouseDown(await screen.findByRole("option", { name: "每小時" }));
 
     await waitFor(() => expect(fetchUsageTimeseries).toHaveBeenCalledTimes(2));
@@ -478,9 +478,9 @@ describe("Usage page non-token units", () => {
   it("hides the TTS and Live tiles when there is no such usage", async () => {
     vi.mocked(fetchUsageSummary).mockResolvedValue(SUMMARY);
     render(<Usage />);
-    await screen.findByText("LLM 呼叫數");
-    expect(screen.queryByText("TTS 合成字元")).toBeNull();
-    expect(screen.queryByText("Live 音訊")).toBeNull();
+    await screen.findByText("AI 呼叫次數");
+    expect(screen.queryByText("語音合成字數")).toBeNull();
+    expect(screen.queryByText("即時語音")).toBeNull();
   });
 
   it("shows characters and audio duration once those units appear", async () => {
@@ -493,9 +493,9 @@ describe("Usage page non-token units", () => {
     const overview = within(
       await screen.findByRole("region", { name: "用量總覽" }),
     );
-    expect(overview.getByText("TTS 合成字元")).toBeTruthy();
+    expect(overview.getByText("語音合成字數")).toBeTruthy();
     expect(overview.getByText("1,920")).toBeTruthy();
-    expect(overview.getByText("Live 音訊")).toBeTruthy();
+    expect(overview.getByText("即時語音")).toBeTruthy();
     // 秒數要轉成看得懂的長度，不是丟一個 92.4 出來。
     expect(overview.getByText("1 分 32 秒")).toBeTruthy();
   });

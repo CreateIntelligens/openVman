@@ -37,8 +37,8 @@ export default function Health() {
       </header>
 
       <div className="page-body space-y-6">
-        {healthError && <StatusAlert type="error" message={`Health: ${healthError}`} />}
-        {metricsError && <StatusAlert type="error" message={`Metrics: ${metricsError}`} />}
+        {healthError && <StatusAlert type="error" message={`健康檢查失敗：${healthError}`} />}
+        {metricsError && <StatusAlert type="error" message={`統計資料載入失敗：${metricsError}`} />}
 
         {/* Status Card */}
         <div className="bg-surface-raised dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-6 flex items-center justify-between">
@@ -46,8 +46,8 @@ export default function Health() {
             <StatusPulse isOk={isOk} isKnown={Boolean(data)} />
             <div>
               <p className="text-sm font-medium text-content-muted">系統狀態</p>
-              <h3 className={`text-2xl font-bold uppercase tracking-wider ${getStatusHeadingClass(isOk, Boolean(data))}`}>
-                {data ? data.status : "—"}
+              <h3 className={`text-2xl font-bold ${getStatusHeadingClass(isOk, Boolean(data))}`}>
+                {data ? (isOk ? "正常" : "異常") : "—"}
               </h3>
             </div>
           </div>
@@ -65,26 +65,26 @@ export default function Health() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <InfoCard
                 icon="database"
-                label="Database Tables"
+                label="資料表"
                 value={data.tables.length.toString()}
                 detail={data.tables.join(", ")}
                 status="ok"
               />
               <InfoCard
                 icon="folder"
-                label="Workspace Docs"
+                label="工作區文件"
                 value={data.workspace_documents.toString()}
                 status="ok"
               />
               <InfoCard
                 icon="chat"
-                label="Chat"
-                value={data.chat_enabled ? "Enabled" : "Disabled"}
+                label="對話功能"
+                value={data.chat_enabled ? "開啟" : "關閉"}
                 status={data.chat_enabled ? "ok" : "warn"}
               />
               <InfoCard
                 icon="view_in_ar"
-                label="Embedding Model"
+                label="搜尋用模型"
                 value={data.embedding_model}
                 status={data.embedding_model ? "ok" : "error"}
               />
@@ -93,13 +93,13 @@ export default function Health() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <InfoCard
                 icon="cloud"
-                label="LLM Provider"
+                label="AI 供應商"
                 value={data.llm_provider}
                 status={data.llm_provider ? "ok" : "error"}
               />
               <InfoCard
                 icon="smart_toy"
-                label="LLM Model"
+                label="AI 模型"
                 value={data.llm_model}
                 status={data.llm_model ? "ok" : "error"}
               />
@@ -111,12 +111,12 @@ export default function Health() {
         {metrics && (metrics.counter_count > 0 || metrics.timing_count > 0) && (
           <div className="space-y-4">
             <h3 className="section-title px-1">
-              Runtime Metrics
+              執行統計
             </h3>
 
             {metrics.counter_count > 0 && (
               <div className="bg-surface-raised dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-6">
-                <h4 className="section-title mb-4">Counters</h4>
+                <h4 className="section-title mb-4">累計次數</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Object.entries(metrics.counters)
                     .sort(([, a], [, b]) => b - a)
@@ -132,15 +132,15 @@ export default function Health() {
 
             {metrics.timing_count > 0 && (
               <div className="bg-surface-raised dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-6">
-                <h4 className="section-title mb-4">Timings</h4>
+                <h4 className="section-title mb-4">花費時間</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs uppercase tracking-widest text-content-subtle">
-                        <th className="pb-3 pr-4">Name</th>
-                        <th className="pb-3 pr-4 text-right">Count</th>
-                        <th className="pb-3 pr-4 text-right">Avg (ms)</th>
-                        <th className="pb-3 text-right">Max (ms)</th>
+                      <tr className="text-left text-xs text-content-subtle">
+                        <th className="pb-3 pr-4">項目</th>
+                        <th className="pb-3 pr-4 text-right">次數</th>
+                        <th className="pb-3 pr-4 text-right">平均（毫秒）</th>
+                        <th className="pb-3 text-right">最長（毫秒）</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border ">
@@ -201,16 +201,16 @@ function InfoCard({ icon, label, value, detail, status = "ok" }: {
   status?: "ok" | "warn" | "error";
 }) {
   const badgeConfig = {
-    ok: { text: "Active", classes: "bg-success/10 text-content border-success/30" },
-    warn: { text: "Warning", classes: "bg-warn/10 text-content border-warn/30" },
-    error: { text: "Error", classes: "bg-danger/10 text-content border-danger/30" },
+    ok: { text: "正常", classes: "bg-success/10 text-content border-success/30" },
+    warn: { text: "注意", classes: "bg-warn/10 text-content border-warn/30" },
+    error: { text: "異常", classes: "bg-danger/10 text-content border-danger/30" },
   }[status];
 
   return (
     <div className="bg-surface-raised dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-6 transition-transform hover:scale-[1.02]">
       <div className="flex justify-between items-start mb-4">
         <span className="material-symbols-outlined text-primary text-3xl">{icon}</span>
-        <span className={`px-2 py-1 text-xs font-bold border rounded uppercase tracking-widest ${badgeConfig.classes}`}>
+        <span className={`px-2 py-1 text-xs font-bold border rounded ${badgeConfig.classes}`}>
           {badgeConfig.text}
         </span>
       </div>

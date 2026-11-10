@@ -15,8 +15,8 @@ export default function ToolTable({ tools, resolveSkillName }: ToolTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-widest text-content-subtle border-b border-border">
-              <th className="px-6 py-3">名稱</th>
-              <th className="px-6 py-3">說明</th>
+              <th className="px-6 py-3">用途</th>
+              <th className="px-6 py-3">程式名稱</th>
               {showSkillColumn && <th className="px-6 py-3">技能</th>}
             </tr>
           </thead>
@@ -27,10 +27,8 @@ export default function ToolTable({ tools, resolveSkillName }: ToolTableProps) {
 
               return (
                 <tr key={tool.name} className="text-content-muted hover:bg-surface-sunken transition-colors">
-                  <td className="px-6 py-3 font-mono text-xs whitespace-nowrap">{tool.name}</td>
-                  <td className="px-6 py-3 text-xs text-content-muted max-w-md truncate" title={tool.description}>
-                    {tool.description}
-                  </td>
+                  <td className="px-6 py-3 text-sm text-content min-w-[16rem]">{tool.description}</td>
+                  <td className="px-6 py-3 font-mono text-xs text-content-subtle whitespace-nowrap">{tool.name}</td>
                   {showSkillColumn && (
                     <td className="px-6 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.625rem] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">

@@ -154,7 +154,7 @@ export default function ApiKeys() {
       <header className="section-header">
         <div className="page-heading">
           <h2 className="page-section-title">帳號 API 金鑰</h2>
-          <p className="page-subtitle">供服務串接使用，權限隨所屬帳號的角色與資源授權變動。</p>
+          <p className="page-subtitle">給程式串接用，不要放在網頁上。能做的事跟著所屬帳號的權限走。</p>
         </div>
       </header>
       <div className="page-body space-y-6">

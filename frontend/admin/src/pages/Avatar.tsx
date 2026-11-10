@@ -31,6 +31,7 @@ import {
   checkBundleTotal,
   checkFile,
 } from "../components/avatar/uploadRules";
+import { generateAssetId } from "../utils/generateAssetId";
 
 type Status = { type: "success" | "error"; message: string } | null;
 type RenameTarget =
@@ -178,14 +179,14 @@ export default function Avatar() {
   }
 
   async function handleUpload(): Promise<void> {
-    const charId = uploadCharId.trim();
+    const charId = uploadCharId.trim() || generateAssetId("char");
     const label = uploadLabel.trim();
     const videoFile = uploadVideoFile;
     const dataFile = uploadDataFile;
     if (!charId || !label || !videoFile || !dataFile) {
       setStatus({
         type: "error",
-        message: "請填寫所有欄位，並選好兩個檔案",
+        message: "請填寫顯示名稱，並選好兩個檔案",
       });
       return;
     }
@@ -223,20 +224,21 @@ export default function Avatar() {
     try {
       await deleteAvatarCharacter(charId);
       setCharacters((prev) => prev.filter((c) => c.char_id !== charId));
-      setStatus({ type: "success", message: `已刪除 ${charId}` });
+      const removed = characters.find((c) => c.char_id === charId)?.label || charId;
+      setStatus({ type: "success", message: `已刪除 ${removed}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
   }
 
   async function handleBackgroundUpload(): Promise<void> {
-    const backgroundId = uploadBackgroundId.trim();
+    const backgroundId = uploadBackgroundId.trim() || generateAssetId("bg");
     const label = uploadBackgroundLabel.trim();
     const image = uploadImageFile;
     if (!backgroundId || !label || !image) {
       setStatus({
         type: "error",
-        message: "請填寫所有欄位，並選好圖片",
+        message: "請填寫顯示名稱，並選好圖片",
       });
       return;
     }
@@ -269,7 +271,8 @@ export default function Avatar() {
     try {
       await deleteAvatarBackground(backgroundId);
       setBackgrounds((prev) => prev.filter((bg) => bg.background_id !== backgroundId));
-      setStatus({ type: "success", message: `已刪除 ${backgroundId}` });
+      const removed = backgrounds.find((bg) => bg.background_id === backgroundId)?.label || backgroundId;
+      setStatus({ type: "success", message: `已刪除 ${removed}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
@@ -359,7 +362,7 @@ export default function Avatar() {
       className="flex h-full min-h-0 min-w-0 flex-col bg-surface dark:bg-background-dark"
     >
       <PageHeader
-        title="Avatar"
+        title="虛擬人"
         sticky={false}
         tabs={(
           <PageTabs

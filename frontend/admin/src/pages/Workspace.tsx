@@ -72,6 +72,10 @@ export default function Workspace() {
         selectedPath={selectedPath}
         loadingList={loadingList}
         docSearch={docSearch}
+        uploading={uploading}
+        syncing={syncing}
+        onUpload={() => uploadInputRef.current?.click()}
+        onSync={() => void syncDocuments()}
         onClose={() => setMobileSidebarOpen(false)}
         onCreate={startNewDocument}
         onSearchChange={setDocSearch}

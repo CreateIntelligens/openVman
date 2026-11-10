@@ -87,10 +87,10 @@ export default function BackgroundsPanel({
             />
             <div className={uploadFieldsClassName}>
               <TextField
-                label="背景 ID"
+                label="背景代號"
                 value={uploadId}
                 onChange={onUploadIdChange}
-                hint="英數字與 . _ -，最多 64 字，建立後不能改。"
+                hint="選填，不填會自動產生。只能用英數字與 . _ -，建立後不能改。"
                 disabled={uploading}
                 mono
               />

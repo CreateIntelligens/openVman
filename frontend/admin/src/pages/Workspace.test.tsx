@@ -98,6 +98,20 @@ describe("Workspace unsaved changes", () => {
     expect(screen.queryByRole("button", { name: "關閉文件清單" })).toBeNull();
   });
 
+  it("offers upload and rebuild with visible words in the phone file list", async () => {
+    render(
+      <NavigationGuardProvider>
+        <Workspace />
+      </NavigationGuardProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "開啟文件清單" }));
+    const list = screen.getByRole("button", { name: "關閉文件清單" }).closest("aside") as HTMLElement;
+
+    expect(within(list).getByRole("button", { name: "上傳檔案" })).toBeTruthy();
+    expect(within(list).getByRole("button", { name: "重建搜尋資料" })).toBeTruthy();
+    expect(within(list).getByRole("button", { name: "新文件" })).toBeTruthy();
+  });
+
   it("asks before starting a new document or reloading the list over unsaved edits", async () => {
     render(
       <NavigationGuardProvider>

@@ -178,7 +178,7 @@ export default function Tools() {
     <div className="page-scroll">
       <PageHeader
         title="工具與技能"
-        subtitle="管理技能插件及查看已註冊工具"
+        subtitle="AI 回答時能用的技能，以及系統內建的工具。"
         actions={(
           <button
             type="button"

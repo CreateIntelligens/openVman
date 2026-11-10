@@ -36,7 +36,7 @@ export default function AsrProviderPanel() {
       })
       .catch(() => {
         // 讀不到分流照樣能試辨識，後端會用專案設定；只是這裡沒得挑。
-        if (!cancelled) setRoutesError("讀不到這個專案的語言分流，試辨識會直接用專案設定。");
+        if (!cancelled) setRoutesError("讀不到這個專案的語言，測試會直接用專案設定。");
       });
     return () => {
       cancelled = true;
@@ -48,9 +48,9 @@ export default function AsrProviderPanel() {
       <GlossaryEditor projectId={projectId} />
 
       <div className="flex flex-col gap-2 border-t border-border pt-6">
-        <h2 className="text-sm font-semibold">語言分流</h2>
+        <h2 className="text-sm font-semibold">辨識語言</h2>
         <p className="text-xs leading-5 text-content-muted">
-          跟前台一樣，只能在專案開的分流裡取消或勾回；下面的試辨識與串流試聽都套用這裡的選擇。勾了台語會另外聽是不是台語。
+          語音辨識要聽哪些語言。只能在專案開放的語言裡取消或勾回，下面的測試都照這裡的選擇。勾了台語會另外判斷是不是台語。
         </p>
         <RoutePicker available={available} selected={routes} onChange={setRoutes} />
         {routesError && <p className="text-xs text-content-muted">{routesError}</p>}

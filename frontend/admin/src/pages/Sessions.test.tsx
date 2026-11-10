@@ -172,7 +172,7 @@ describe("Sessions", () => {
 
   it("toggles the simple export format", () => {
     render(<Sessions />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /簡化格式/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /只留誰說的/ }));
     expect(browserState.setSimpleExport).toHaveBeenCalledWith(true);
   });
 

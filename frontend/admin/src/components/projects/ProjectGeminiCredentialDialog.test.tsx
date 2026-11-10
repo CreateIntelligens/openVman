@@ -23,7 +23,7 @@ function renderDialog() {
 }
 
 function inputKey(value = "test-private-key") {
-  const input = screen.getByLabelText(/Gemini API key/) as HTMLInputElement;
+  const input = screen.getByLabelText(/Gemini API 金鑰/) as HTMLInputElement;
   fireEvent.change(input, { target: { value } });
   return input;
 }
@@ -47,7 +47,7 @@ describe("ProjectGeminiCredentialDialog", () => {
   it("shows shared state and keeps the key input empty and masked", async () => {
     renderDialog();
     expect(await screen.findByText("目前使用：共用金鑰")).toBeTruthy();
-    const input = screen.getByLabelText("Gemini API key") as HTMLInputElement;
+    const input = screen.getByLabelText("Gemini API 金鑰") as HTMLInputElement;
     expect(input.type).toBe("password");
     expect(input.value).toBe("");
     expect(screen.queryByRole("button", { name: "改用共用金鑰" })).toBeNull();
@@ -60,7 +60,7 @@ describe("ProjectGeminiCredentialDialog", () => {
     expect(await screen.findByText("目前使用：專案專屬金鑰")).toBeTruthy();
     expect(screen.getByText("••••abcd")).toBeTruthy();
     expect((screen.getByLabelText("金鑰名稱") as HTMLInputElement).value).toBe("醫院專案");
-    expect((screen.getByLabelText("新的 Gemini API key") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("新的 Gemini API 金鑰") as HTMLInputElement).value).toBe("");
   });
 
   it("rejects whitespace-only keys even when the form is submitted directly", async () => {

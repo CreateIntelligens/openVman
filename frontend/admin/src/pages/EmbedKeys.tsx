@@ -86,7 +86,7 @@ export default function EmbedKeys() {
     } catch (error) {
       setStatus({
         type: "error",
-        message: errorMessage(error, "無法取得 Embed 金鑰列表"),
+        message: errorMessage(error, "無法取得 網站嵌入金鑰列表"),
       });
     } finally {
       setLoading(false);
@@ -173,7 +173,7 @@ export default function EmbedKeys() {
       } else {
         await createEmbedKey({ ...shared, project_id: form.projectId });
       }
-    }, editingKeyId ? "更新 Embed 金鑰失敗" : "建立 Embed 金鑰失敗");
+    }, editingKeyId ? "更新 網站嵌入金鑰失敗" : "建立 網站嵌入金鑰失敗");
 
     setSubmitting(false);
     if (succeeded) {
@@ -181,7 +181,7 @@ export default function EmbedKeys() {
       setEditingKeyId(null);
       setStatus({
         type: "success",
-        message: editingKeyId ? "已更新 Embed 金鑰。" : "已建立 Embed 金鑰。",
+        message: editingKeyId ? "已更新 網站嵌入金鑰。" : "已建立 網站嵌入金鑰。",
       });
     }
   }
@@ -200,9 +200,9 @@ export default function EmbedKeys() {
     <div className="page-scroll">
       <header className="section-header">
         <div className="page-heading">
-          <h2 className="page-section-title">Embed 金鑰</h2>
+          <h2 className="page-section-title">網站嵌入金鑰</h2>
           <p className="page-subtitle">
-            管理外部網站嵌入用的金鑰：綁定專案、限制來源網域與每日用量。
+            放在外部網站上，讓訪客直接使用虛擬人，不用登入。每把金鑰綁一個專案，可以限制網域與每日用量。
           </p>
         </div>
         <button
@@ -228,7 +228,7 @@ export default function EmbedKeys() {
         )}
         {!loading && keys.length === 0 && (
           <p className="text-sm text-content-muted">
-            尚未建立任何 Embed 金鑰。
+            尚未建立任何 網站嵌入金鑰。
           </p>
         )}
         {!loading && keys.length > 0 && (
@@ -327,11 +327,11 @@ export default function EmbedKeys() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <form
             onSubmit={handleSubmit}
-            aria-label={editingKeyId ? "編輯 Embed 金鑰" : "建立 Embed 金鑰"}
+            aria-label={editingKeyId ? "編輯 網站嵌入金鑰" : "建立 網站嵌入金鑰"}
             className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-border bg-surface p-6 shadow-lg dark:bg-surface-sunken"
           >
             <h3 className="card-title">
-              {editingKeyId ? "編輯 Embed 金鑰" : "建立 Embed 金鑰"}
+              {editingKeyId ? "編輯 網站嵌入金鑰" : "建立 網站嵌入金鑰"}
             </h3>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -513,7 +513,7 @@ export default function EmbedKeys() {
 
       <ConfirmModal
         open={deleteTarget !== null}
-        title="刪除 Embed 金鑰"
+        title="刪除 網站嵌入金鑰"
         message={
           deleteTarget
             ? `刪除後使用 ${deleteTarget.key_id} 的網站會立即失效，且無法復原。`
@@ -528,7 +528,7 @@ export default function EmbedKeys() {
           if (target) {
             void runAction(
               () => deleteEmbedKey(target.key_id),
-              "刪除 Embed 金鑰失敗",
+              "刪除 網站嵌入金鑰失敗",
             );
           }
         }}

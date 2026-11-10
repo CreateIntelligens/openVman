@@ -322,11 +322,11 @@ describe("ProjectPolicyDialog", () => {
     });
 
     renderDialog();
-    expect(await screen.findByText("唯讀（僅 ROOT 可編輯）")).toBeTruthy();
+    expect(await screen.findByText("唯讀（只有最高管理員能改）")).toBeTruthy();
     // 指派區與允許清單（清單列現在顯示 id）都會出現這個 id。
     expect(screen.getAllByText("c-assigned-1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("特派角色 1").length).toBeGreaterThan(0);
-    expect(screen.getByText("ROOT 指派")).toBeTruthy();
+    expect(screen.getByText("最高管理員指派")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "解除指派" })).toBeNull();
     expect(screen.queryByRole("button", { name: "指派至專案" })).toBeNull();
     expect(screen.queryByLabelText("指派類型")).toBeNull();
@@ -346,8 +346,8 @@ describe("ProjectPolicyDialog", () => {
     });
 
     renderDialog();
-    expect(await screen.findByText("ROOT 資源指派（將全域資源指派給此專案）")).toBeTruthy();
-    expect(screen.queryByText("唯讀（僅 ROOT 可編輯）")).toBeNull();
+    expect(await screen.findByText("最高管理員指派的資源（把共用資源指派給這個專案）")).toBeTruthy();
+    expect(screen.queryByText("唯讀（只有最高管理員能改）")).toBeNull();
 
     // 驗證類型選項符合後端定義
     const typeSelect = screen.getByLabelText("指派類型") as HTMLSelectElement;

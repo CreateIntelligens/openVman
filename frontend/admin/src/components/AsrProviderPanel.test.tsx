@@ -54,7 +54,7 @@ function upload(name = "clip.wav") {
 }
 
 function engineButton(label: RegExp) {
-  return within(screen.getByRole("group", { name: "試辨識的引擎" })).getByRole("button", { name: label });
+  return within(screen.getByRole("group", { name: "要比較的引擎" })).getByRole("button", { name: label });
 }
 
 describe("AsrProviderPanel", () => {
@@ -64,7 +64,7 @@ describe("AsrProviderPanel", () => {
 
     // 詞表與串流試聽照常出現；引擎清單一回 403 就會讓整個後台變成「權限不足」。
     await waitFor(() => expect(fetchKnowledgeDocument).toHaveBeenCalled());
-    expect(screen.queryByRole("heading", { name: "試辨識" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "比較辨識結果" })).toBeNull();
     expect(fetchAsrEngines).not.toHaveBeenCalled();
   });
 
@@ -156,7 +156,7 @@ describe("AsrProviderPanel", () => {
   it("取消分流會送出剩下的分流，最後一個不能取消", async () => {
     vi.mocked(previewAsr).mockResolvedValue({ text: "hi", provider: "breeze" });
     render(<AsrProviderPanel />);
-    const routes = within(await screen.findByRole("group", { name: "語言分流" }));
+    const routes = within(await screen.findByRole("group", { name: "辨識語言" }));
     await routes.findByRole("button", { name: "台語" });
     fireEvent.click(routes.getByRole("button", { name: "台語" }));
     fireEvent.click(routes.getByRole("button", { name: "English" }));
@@ -179,7 +179,7 @@ describe("AsrProviderPanel", () => {
     vi.mocked(fetchAsrEngines).mockResolvedValue({ engines: ["breeze", "r2t2"], stream: ["r2t2-live"] });
     render(<AsrProviderPanel />);
     await waitFor(() => expect(screen.queryByRole("button", { name: /^SenseVoice-Small$/ })).toBeNull());
-    const group = within(screen.getByRole("group", { name: "試辨識的引擎" }));
+    const group = within(screen.getByRole("group", { name: "要比較的引擎" }));
     expect(group.getAllByRole("button").map((button) => button.textContent)).toEqual([
       "Breeze-ASR-26", "Confucius4-R2T2", "Confucius4-R2T2 串流",
     ]);

@@ -14,7 +14,7 @@ export default function MaintenancePanel({ maintaining, result, onRun }: Mainten
         記憶維護
       </h3>
       <p className="text-sm text-content-muted mb-4">
-        執行衰減、去重複與重要性評分。系統會自動排程，也可手動觸發。
+        整理記憶：合併重複的內容，讓很久沒用到的慢慢淡出。系統會定期自動整理，也可以現在手動做。
       </p>
       <button
         onClick={onRun}

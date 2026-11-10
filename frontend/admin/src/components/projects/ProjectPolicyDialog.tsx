@@ -544,7 +544,7 @@ export default function ProjectPolicyDialog({
           </h2>
           <p className="mt-2 text-sm leading-6 text-content-muted">
             限制這個專案能用的人物、背景、小助理、語音辨識引擎與聲音。實際能用的是帳號授權與這裡的交集；
-            清單留空代表不限制。專案專屬資源與 ROOT 指派資源不受帳號授權限制。
+            清單留空代表不限制。專案專屬資源與最高管理員指派的資源不受帳號授權限制。
           </p>
         </header>
 
@@ -723,7 +723,7 @@ export default function ProjectPolicyDialog({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-content">
-                      ROOT 資源指派（將全域資源指派給此專案）
+                      最高管理員指派的資源（把共用資源指派給這個專案）
                     </h3>
                     <p className="text-xs text-content-muted">
                       指派給專案的資源，任何可存取此專案的使用者均可使用，不受個人帳號授權限制。
@@ -731,7 +731,7 @@ export default function ProjectPolicyDialog({
                   </div>
                   {!isRoot && (
                     <span className="rounded bg-surface-overlay border border-border px-2 py-0.5 text-xs text-content-muted">
-                      唯讀（僅 ROOT 可編輯）
+                      唯讀（只有最高管理員能改）
                     </span>
                   )}
                 </div>
@@ -748,7 +748,7 @@ export default function ProjectPolicyDialog({
                             {item.typeLabel}
                           </span>
                           <span className="rounded bg-success/10 text-success px-1.5 py-0.5 text-xs font-medium">
-                            ROOT 指派
+                            最高管理員指派
                           </span>
                           <span className="font-medium">{item.label}</span>
                           <span className="text-xs text-content-subtle font-mono">{item.id}</span>

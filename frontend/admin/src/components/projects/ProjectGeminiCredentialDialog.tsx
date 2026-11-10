@@ -70,7 +70,7 @@ function RootCredentialDialog({ projectId, projectLabel, onClose }: ProjectGemin
     if (saving || loading || !credential) return;
     const apiKey = keyRef.current?.value.trim() ?? "";
     if (!label.trim() || !apiKey || apiKey.length > 4096) {
-      setError("請輸入金鑰名稱及有效的 Gemini API key。");
+      setError("請輸入金鑰名稱及有效的 Gemini API 金鑰。");
       return;
     }
     setSaving(true);
@@ -124,7 +124,7 @@ function RootCredentialDialog({ projectId, projectLabel, onClose }: ProjectGemin
       >
         <h2 id="project-gemini-title" className="card-title">Gemini 金鑰：{projectLabel}</h2>
         <p className="mt-2 text-sm leading-6 text-content-muted">
-          僅 ROOT 可管理。綁定專屬金鑰可由此專案自己的 Google 專案分帳；未綁定時使用共用金鑰。
+          只有最高管理員能管理。綁定專屬金鑰可由此專案自己的 Google 專案分帳；未綁定時使用共用金鑰。
           專屬金鑰失效時會回報錯誤，不會自動改用共用金鑰。
         </p>
 
@@ -151,7 +151,7 @@ function RootCredentialDialog({ projectId, projectLabel, onClose }: ProjectGemin
               <input className="input mt-2" value={label} onChange={(event) => setLabel(event.target.value)} disabled={busy} required maxLength={128} autoComplete="off" placeholder="例：門市客服 Google 專案" />
             </label>
             <label className="block text-sm font-medium text-content">
-              {credential.source === "project" ? "新的 Gemini API key" : "Gemini API key"}
+              {credential.source === "project" ? "新的 Gemini API 金鑰" : "Gemini API 金鑰"}
               <input
                 ref={keyRef}
                 className="input mt-2"

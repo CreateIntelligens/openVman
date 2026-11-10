@@ -322,7 +322,7 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("tab", { name: "背景" }));
-    fireEvent.change(await screen.findByLabelText("背景 ID"), {
+    fireEvent.change(await screen.findByLabelText("背景代號"), {
       target: { value: "clinic" },
     });
     fireEvent.change(screen.getByLabelText("顯示名稱"), {
@@ -399,7 +399,7 @@ describe("Avatar page", () => {
     });
     expect(screen.getByRole("alert").textContent).toContain("「bg.gif」不是支援的格式");
 
-    fireEvent.change(screen.getByLabelText("背景 ID"), { target: { value: "clinic" } });
+    fireEvent.change(screen.getByLabelText("背景代號"), { target: { value: "clinic" } });
     fireEvent.change(screen.getByLabelText("顯示名稱"), { target: { value: "診間背景" } });
     fireEvent.change(picker, {
       target: { files: [new File(["png"], "bg.png", { type: "image/png" })] },
@@ -421,7 +421,7 @@ describe("Avatar page", () => {
     Object.defineProperty(video, "size", { value: 80 * 1024 * 1024 });
     const data = new File(["d"], "combined_data.json.gz", { type: "application/gzip" });
     Object.defineProperty(data, "size", { value: 30 * 1024 * 1024 });
-    fireEvent.change(within(bundle).getByLabelText("人物 ID"), { target: { value: "big" } });
+    fireEvent.change(within(bundle).getByLabelText("人物代號"), { target: { value: "big" } });
     fireEvent.change(within(bundle).getByLabelText("顯示名稱"), { target: { value: "大檔" } });
     fireEvent.change(within(bundle).getByLabelText("影片"), { target: { files: [video] } });
     fireEvent.change(within(bundle).getByLabelText("資料檔"), { target: { files: [data] } });

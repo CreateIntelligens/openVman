@@ -43,7 +43,7 @@ export const RELATION_LABELS: Record<RelationKind, string> = {
   grant: "授權",
   default: "預設",
   scope: "管理範圍",
-  assigned: "ROOT 指派",
+  assigned: "最高管理員指派",
 };
 
 export const DEFAULT_FILTERS: AccessGraphFilters = {

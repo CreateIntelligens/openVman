@@ -47,6 +47,14 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { useNavigationGroups } from "./hooks/useNavigationGroups";
 import { readScoped, removeScoped, writeScoped } from "./utils/scopedStorage";
 
+/** 寬螢幕預設展開側欄，要滑過才看得到字的話，第一次來的人不知道每顆圖示是什麼。 */
+function initialSidebarPinned(): boolean {
+  const saved = readScoped("brain-sidebar-pinned");
+  if (saved !== null) return saved === "true";
+  return typeof window.matchMedia === "function"
+    && window.matchMedia("(min-width: 80rem)").matches;
+}
+
 function initialRoute(): AdminRoute {
   const route = parseAdminRoute(window.location.pathname, window.location.search);
   if (route) {
@@ -68,9 +76,7 @@ function AppContent() {
   const { account, logout } = useAuth();
   const [route, setRoute] = useState<AdminRoute>(initialRoute);
   const { collapsedGroups, toggleGroup } = useNavigationGroups(route.tab);
-  const [isPinned, setIsPinned] = useState(
-    () => readScoped("brain-sidebar-pinned") === "true",
-  );
+  const [isPinned, setIsPinned] = useState(initialSidebarPinned);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const {

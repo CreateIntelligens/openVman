@@ -190,7 +190,7 @@ describe("AccessGraph page", () => {
     renderPage();
 
     expect(await screen.findByRole("button", { name: /帳號 clerk/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /帳號 ai360，ROOT，ROOT：全部/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /帳號 ai360，最高管理員，最高管理員：全部/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /專案 鶴記/ })).toBeTruthy();
     expect(screen.getByText("4 個帳號 · 2 個專案 · 3 條專案連線")).toBeTruthy();
     expect(fetchAdminScope).toHaveBeenCalledWith("admin-1");
@@ -305,13 +305,13 @@ describe("AccessGraph page", () => {
 
     fireEvent.keyDown(screen.getByRole("button", { name: /專案 鶴記/ }), { key: "Enter" });
     let panel = screen.getByRole("complementary", { name: "節點細節" });
-    expect(within(panel).getByText("語言分流")).toBeTruthy();
+    expect(within(panel).getByText("回答語言")).toBeTruthy();
     expect(within(panel).getByText("台語")).toBeTruthy();
     expect(within(panel).getByText("中文")).toBeTruthy();
 
     fireEvent.keyDown(screen.getByRole("button", { name: /專案 展示/ }), { key: "Enter" });
     panel = screen.getByRole("complementary", { name: "節點細節" });
-    expect(within(panel).getByText("讀不到這個專案的語言分流。")).toBeTruthy();
+    expect(within(panel).getByText("讀不到這個專案的回答語言。")).toBeTruthy();
   });
 
   it("focuses on a project picked from the project menu and clears it from the chip", async () => {
@@ -345,7 +345,7 @@ describe("AccessGraph page", () => {
     await screen.findByRole("button", { name: /帳號 clerk/ });
 
     const accountGroup = screen.getByRole("group", { name: "帳號" });
-    fireEvent.click(within(accountGroup).getByRole("button", { name: /^ROOT/ }));
+    fireEvent.click(within(accountGroup).getByRole("button", { name: /^最高管理員/ }));
     fireEvent.click(within(accountGroup).getByRole("button", { name: /^管理員/ }));
     expect(screen.queryByRole("button", { name: /帳號 ai360/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /帳號 pm-admin/ })).toBeNull();
@@ -371,7 +371,7 @@ describe("AccessGraph page", () => {
     const relations = screen.getByRole("group", { name: "連線" });
     fireEvent.click(within(relations).getByRole("button", { name: /^授權/ }));
     fireEvent.click(within(relations).getByRole("button", { name: /^管理範圍/ }));
-    fireEvent.click(within(relations).getByRole("button", { name: /^ROOT 指派/ }));
+    fireEvent.click(within(relations).getByRole("button", { name: /^最高管理員指派/ }));
 
     expect(document.querySelectorAll('[data-edge-kind="scope"]').length).toBe(0);
     expect(document.querySelectorAll('[data-edge-kind="grant"]').length).toBe(0);

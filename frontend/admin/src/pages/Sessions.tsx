@@ -40,6 +40,10 @@ function getExportButtonLabel(
   return "匯出篩選結果";
 }
 
+function sessionTitle(session: { session_id: string; last_message_preview: string }): string {
+  return session.last_message_preview || `對話 ${session.session_id.slice(0, 8)}`;
+}
+
 function formatAbsolute(iso: string | undefined): string {
   if (!iso) return "—";
   const date = new Date(iso);
@@ -114,17 +118,14 @@ export default function Sessions() {
         subtitle="瀏覽、篩選並匯出歷史對話。時間區間可精確到秒。"
         actions={(
           <>
-            <label
-              className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-content-muted"
-              title="每則訊息只留角色、內容與時間"
-            >
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-content-muted">
               <input
                 type="checkbox"
                 checked={simpleExport}
                 onChange={(event) => setSimpleExport(event.target.checked)}
                 className="h-4 w-4 accent-primary"
               />
-              簡化格式
+              匯出時只留誰說的、內容與時間
             </label>
             <button
               type="button"
@@ -173,11 +174,11 @@ export default function Sessions() {
                   type="text"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="多個關鍵字用空白分開，繁簡通用"
-                  title="每個關鍵字都要出現在同一段對話裡，不管順序；繁體、簡體與異體字（污／汙）都找得到"
+                  placeholder="多個關鍵字用空白分開"
                   className="input pl-10"
                 />
               </div>
+              <span className="text-xs text-content-subtle">同一段對話要包含全部關鍵字，順序不拘，繁簡都找得到。</span>
             </label>
 
             <label className="flex flex-col gap-1.5">
@@ -238,10 +239,7 @@ export default function Sessions() {
                 className="input"
               />
             </label>
-            <label
-              className="flex flex-col gap-1.5"
-              title="依最後一則使用者訊息判斷"
-            >
+            <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
                 語言
               </span>
@@ -251,6 +249,7 @@ export default function Sessions() {
                 options={LANGUAGE_OPTIONS}
                 className="w-full"
               />
+              <span className="text-xs text-content-subtle">看使用者最後一句話是哪種語言。</span>
             </label>
             {hasActiveFilters && (
               <button type="button" onClick={resetFilters} className="btn btn-ghost justify-self-start">
@@ -352,7 +351,7 @@ export default function Sessions() {
                 return (
                   <li
                     key={session.session_id}
-                    className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-4 border-b border-border px-5 py-4 transition-colors last:border-b-0 ${
+                    className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-2 border-b sm:grid-cols-[auto_minmax(0,1fr)_auto] border-border px-5 py-4 transition-colors last:border-b-0 ${
                       isSelected ? "bg-primary/5" : "hover:bg-surface-sunken"
                     }`}
                   >
@@ -361,14 +360,15 @@ export default function Sessions() {
                       checked={isSelected}
                       onChange={() => toggleSessionSelection(session.session_id)}
                       className="mt-1 h-4 w-4 accent-primary"
-                      aria-label={`選取對話 ${session.session_id.slice(0, 8)}`}
+                      aria-label={`選取對話：${sessionTitle(session)}`}
                     />
 
                     <div className="flex min-w-0 flex-col gap-1.5">
+                      {/* 用最後一句話當標題：工作人員認得內容，認不得編號。 */}
+                      <p className="line-clamp-2 text-sm font-medium text-content">
+                        {sessionTitle(session)}
+                      </p>
                       <div className="flex flex-wrap items-center gap-2">
-                        <code className="font-mono text-sm text-content">
-                          {session.session_id.slice(0, 8)}
-                        </code>
                         <span className="chip">{session.persona_id}</span>
                         <span className="chip">
                           {session.message_count} 則
@@ -379,11 +379,6 @@ export default function Sessions() {
                           </span>
                         )}
                       </div>
-                      {session.last_message_preview && (
-                        <p className="line-clamp-2 text-sm text-content-muted">
-                          {session.last_message_preview}
-                        </p>
-                      )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-content-subtle">
                         <span title={formatAbsolute(session.updated_at)}>
                           更新於 {session.updated_at
@@ -391,10 +386,11 @@ export default function Sessions() {
                             : "—"}
                         </span>
                         <span>建立於 {formatAbsolute(session.created_at)}</span>
+                        <span>編號 <span className="font-mono">{session.session_id.slice(0, 8)}</span></span>
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="col-start-2 flex flex-wrap items-center gap-1 sm:col-start-auto sm:flex-nowrap">
                       <a
                         href={buildAdminPath("Chat", projectId, undefined, {
                           sessionId: session.session_id,
@@ -413,23 +409,23 @@ export default function Sessions() {
                           void exportSessionHistory([session.session_id])
                         }
                         disabled={exportingSessions}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-content-subtle transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
-                        title="匯出這筆對話"
+                        className="btn btn-ghost px-2.5 py-1.5 text-xs"
                         aria-label="匯出這筆對話"
                       >
-                        <span className="material-symbols-outlined text-[1.125rem]">
+                        <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">
                           download
                         </span>
+                        匯出
                       </button>
                       <button
                         onClick={() => setDeleteTarget(session)}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-content-subtle transition-colors hover:bg-danger/10 hover:text-danger"
-                        title="刪除對話"
+                        className="btn btn-ghost px-2.5 py-1.5 text-xs hover:text-danger"
                         aria-label="刪除對話"
                       >
-                        <span className="material-symbols-outlined text-[1.125rem]">
+                        <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">
                           delete
                         </span>
+                        刪除
                       </button>
                     </div>
                   </li>
@@ -476,7 +472,7 @@ export default function Sessions() {
         title="刪除對話"
         message={
           deleteTarget
-            ? `確定要刪除對話 ${deleteTarget.session_id.slice(0, 8)}？共 ${deleteTarget.message_count} 則訊息，此操作無法復原。`
+            ? `確定要刪除「${sessionTitle(deleteTarget)}」這段對話？共 ${deleteTarget.message_count} 則訊息，此操作無法復原。`
             : ""
         }
         confirmLabel="刪除"

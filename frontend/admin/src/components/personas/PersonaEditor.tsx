@@ -50,9 +50,6 @@ export default function PersonaEditor({
               <h3 className="card-title leading-tight tracking-tight mb-0.5">
                 {title}
               </h3>
-              <div className="flex items-center gap-2">
-                <span className="break-all text-[0.6875rem] font-mono text-content-subtle">{selectedPath}</span>
-              </div>
             </div>
           </div>
           <EditorModeSwitch mode={editorMode} onChange={onEditorModeChange} />

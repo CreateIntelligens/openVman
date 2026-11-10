@@ -21,7 +21,7 @@ export const knowledgeTabs = [
 
 export const characterTabs = [
   { key: "Personas", label: "角色管理", icon: "groups" },
-  { key: "Avatar", label: "Avatar", icon: "face" },
+  { key: "Avatar", label: "虛擬人", icon: "face" },
   { key: "Tools", label: "工具與技能", icon: "build" },
 ] as const;
 
@@ -175,7 +175,7 @@ export const accessSections: readonly {
   { id: "accounts", label: "帳號", access: "admin" },
   { id: "api-keys", label: "API 金鑰", access: "user" },
   { id: "graph", label: "權限圖譜", access: "admin" },
-  { id: "embed-keys", label: "Embed 金鑰", access: "admin" },
+  { id: "embed-keys", label: "網站嵌入金鑰", access: "admin" },
 ];
 
 export function accessSectionOf(subView?: string): AccessSection {

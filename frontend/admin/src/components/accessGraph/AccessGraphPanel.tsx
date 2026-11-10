@@ -110,7 +110,7 @@ function AccountDetails({
       <Section title="存取方式">
         <p className="text-sm text-content">{ACCESS_MODE_LABELS[node.accessMode ?? "none"]}</p>
         {node.accessMode === "admin-scoped" && (
-          <p className="mt-1 text-xs text-content-muted">管理員不看授權清單，可存取的範圍由 ROOT 設定的管理範圍決定（圖上以虛線表示）。</p>
+          <p className="mt-1 text-xs text-content-muted">管理員不看授權清單，可存取的範圍由最高管理員設定的管理範圍決定（圖上以虛線表示）。</p>
         )}
         {node.accessMode === "admin-unknown" && (
           <p className="mt-1 text-xs text-content-muted">讀不到這個管理員的管理範圍，圖上不畫他的連線。</p>
@@ -286,11 +286,11 @@ function TemporaryBatchDetails({
 function LanguageRoutesSection({ node }: { node: GraphNode }) {
   const routes = node.languageRoutes;
   return (
-    <Section title="語言分流">
+    <Section title="回答語言">
       {routes === undefined ? (
         <p className="text-sm text-content-muted">讀取中…</p>
       ) : routes === "error" ? (
-        <p className="text-sm text-content-muted">讀不到這個專案的語言分流。</p>
+        <p className="text-sm text-content-muted">讀不到這個專案的回答語言。</p>
       ) : (
         <>
           <div className="flex flex-wrap gap-1.5">
@@ -358,7 +358,7 @@ function ProjectResourcesSection({ projectId }: { projectId: string }) {
       case "project":
         return <span className="rounded bg-info/10 text-info px-1.5 py-0.5 text-xs font-medium">專案專屬</span>;
       case "assigned":
-        return <span className="rounded bg-success/10 text-success px-1.5 py-0.5 text-xs font-medium">ROOT 指派</span>;
+        return <span className="rounded bg-success/10 text-success px-1.5 py-0.5 text-xs font-medium">最高管理員指派</span>;
       case "grant":
         return <span className="rounded bg-surface-sunken text-content-muted px-1.5 py-0.5 text-xs font-medium">帳號授權</span>;
       default:
@@ -398,7 +398,7 @@ const EDGE_GROUPS: Array<{ title: string; match: (edge: GraphEdge) => boolean }>
   { title: "依授權清單", match: (edge) => edge.kind === "grant" },
   { title: "依管理範圍", match: (edge) => edge.kind === "scope" },
   { title: "全權限帳號的預設", match: (edge) => edge.kind === "full" },
-  { title: "ROOT 指派至專案", match: (edge) => edge.kind === "assigned" },
+  { title: "最高管理員指派至專案", match: (edge) => edge.kind === "assigned" },
 ];
 
 function ResourceDetails({
@@ -427,8 +427,8 @@ function ResourceDetails({
             來源：
             <span className="ml-1 inline-flex items-center rounded bg-surface-sunken px-1.5 py-0.5 text-xs font-medium">
               {node.resourceSource === "project" && `專案專屬${node.ownerProjectId ? `（${node.ownerProjectId}）` : ""}`}
-              {node.resourceSource === "assigned" && "ROOT 指派"}
-              {node.resourceSource === "orphan" && "孤兒資源"}
+              {node.resourceSource === "assigned" && "最高管理員指派"}
+              {node.resourceSource === "orphan" && "沒有歸屬專案"}
               {node.resourceSource === "grant" && "帳號授權"}
             </span>
           </p>

@@ -186,7 +186,8 @@ export default function QaRowCard({
           )}
         </div>
 
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+        {/* 靠左放並另起一行：小助理固定在右下角，靠右或排太長的按鈕每一列都會被蓋到。 */}
+        <div className="flex w-full flex-wrap items-center gap-1 min-[112rem]:w-auto">
           {onMount && (
             <button
               type="button"

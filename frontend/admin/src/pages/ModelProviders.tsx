@@ -17,12 +17,12 @@ import {
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   decision: "本地規則無法判斷時，依序詢問的決策供應商。每個有效答案會立即返回；連線、逾時、驗證或回應錯誤時才換下一個。",
-  chat_llm: "產生回答的主對話模型。依序嘗試啟用的供應商；模型名稱留空時沿用部署設定的 LLM_FALLBACK_CHAIN。",
+  chat_llm: "產生回答的主對話模型。依序嘗試啟用的供應商；模型名稱留空時用伺服器預設的模型。",
 };
 
 // 遮罩長得一樣（都是 ••••末四碼），要一眼看出這把 key 是 .env 的還是後台加密存的。
 const SOURCE_BADGES: Record<ProviderCredential["source"], { label: string; className: string }> = {
-  environment: { label: "來自 .env", className: "rounded bg-surface-sunken px-2 py-0.5 text-xs text-content-muted" },
+  environment: { label: "伺服器設定", className: "rounded bg-surface-sunken px-2 py-0.5 text-xs text-content-muted" },
   admin: { label: "後台已存（加密）", className: "rounded bg-primary/10 px-2 py-0.5 text-xs text-primary" },
   unreadable: { label: "無法解密", className: "rounded bg-danger/10 px-2 py-0.5 text-xs text-danger" },
   none: { label: "未設定", className: "rounded bg-surface-sunken px-2 py-0.5 text-xs text-content-subtle" },
@@ -234,7 +234,7 @@ export default function ModelProviders() {
   function credentialStatus(credential: ProviderCredential): string {
     if (clearKeys.has(credential.id)) return "將清除目前金鑰";
     if (useEnvironmentKeys.has(credential.id)) {
-      return `儲存後刪除後台金鑰，改用伺服器的 ${credential.environment_variable}`;
+      return "儲存後刪除後台金鑰，改用伺服器設定";
     }
     if (credential.source === "unreadable") {
       return credential.configured
@@ -287,7 +287,7 @@ export default function ModelProviders() {
     <div className="page-scroll">
       <PageHeader
         title="模型供應商"
-        subtitle="全站各類模型使用哪幾家、優先順序與 API 金鑰。只有 ROOT 能修改。"
+        subtitle="全站各類模型使用哪幾家、優先順序與 API 金鑰。只有最高管理員能修改。"
         actions={(
           <button
             type="button"
@@ -501,14 +501,14 @@ export default function ModelProviders() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <label htmlFor={`provider-key-${credential.id}`} className="text-sm font-medium text-content">
-                          {credential.label} API key
+                          {credential.label} API 金鑰
                         </label>
                         <span className={SOURCE_BADGES[credential.source].className}>
                           {SOURCE_BADGES[credential.source].label}
                         </span>
                       </div>
                       <p className="mt-1 text-xs leading-5 text-content-subtle">
-                        用於{credential.used_by.join("、")}；未填時沿用部署環境的 {credential.environment_variable}。
+                        用於{credential.used_by.join("、")}；未填時用伺服器設定。
                       </p>
                     </div>
                     <div className="min-w-0">
@@ -532,7 +532,7 @@ export default function ModelProviders() {
                             return next;
                           });
                         }}
-                        placeholder={credential.configured ? credential.masked : "輸入 API key"}
+                        placeholder={credential.configured ? credential.masked : "輸入 API 金鑰"}
                         disabled={busy}
                         className={textInput}
                       />
@@ -554,10 +554,9 @@ export default function ModelProviders() {
                           type="button"
                           onClick={() => setCredentialAction(credential.id, "environment")}
                           disabled={busy}
-                          title={`儲存後刪除後台加密存的這把金鑰，改用伺服器部署設定的 ${credential.environment_variable}`}
                           className={quietButton}
                         >
-                          移除後台金鑰，改用 .env
+                          移除後台金鑰，改用伺服器設定
                         </button>
                       )}
                     </div>

@@ -5,7 +5,7 @@ import { LineSymbol, NodeSymbol, type SymbolKey } from "./graphSymbols";
 
 const ITEMS: Array<{ key: SymbolKey; label: string }> = [
   { key: "project", label: "專案" },
-  { key: "root", label: "ROOT" },
+  { key: "root", label: "最高管理員" },
   { key: "admin", label: "管理員" },
   { key: "user", label: "一般帳號" },
   { key: "temporary", label: "臨時帳號（一批）" },
@@ -75,7 +75,7 @@ export default function AccessGraphLegend({ muted = new Set() }: AccessGraphLege
           </li>
           <li className="flex items-center gap-1.5 whitespace-nowrap">
             <span className="font-medium text-info">中·台</span>
-            專案的語言分流（只有中文不標）
+            專案的回答語言（只有中文不標）
           </li>
         </ul>
         <p className="mt-1">內圈專案・中圈帳號・外圈人物／聲音／辨識引擎</p>

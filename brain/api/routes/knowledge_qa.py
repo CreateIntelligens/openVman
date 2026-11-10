@@ -88,7 +88,7 @@ class CreateNodeRequest(BaseModel):
     label: str
     parent_ids: list[str] | None = None
     child_ids: list[str] | None = None
-    order: float | None = 1.0
+    order: float | None = None
     hidden: bool | None = False
 
 

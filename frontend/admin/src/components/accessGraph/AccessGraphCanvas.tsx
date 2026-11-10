@@ -239,7 +239,7 @@ function badgeFor(node: GraphNode): string | null {
     return temporaryStateLabel(node.batch.state);
   }
   if (node.kind !== "account") return null;
-  if (node.accessMode === "root") return "ROOT：全部";
+  if (node.accessMode === "root") return "最高管理員：全部";
   if (node.accessMode === "admin-unscoped") return "不受限";
   if (node.account?.disabled) return "停用";
   return null;

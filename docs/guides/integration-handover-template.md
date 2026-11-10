@@ -24,7 +24,7 @@
 Authorization: Bearer ovk_<key_id>.<secret>
 ```
 
-key 沿用帳號當下的權限；帳號停用或改角色時 key 失效，重設密碼不影響 key。不要把 key 放進網址、程式碼、版本庫或瀏覽器前端；給網頁用的是 Embed key（後台「Embed 金鑰」）。
+key 沿用帳號當下的權限；帳號停用或改角色時 key 失效，重設密碼不影響 key。不要把 key 放進網址、程式碼、版本庫或瀏覽器前端；給網頁用的是 Embed key（後台「網站嵌入金鑰」）。
 
 ## 可用專案
 

@@ -74,7 +74,7 @@ describe("Personas page", () => {
     render(<Personas />);
 
     const trigger = await screen.findByRole("combobox", {
-      name: "虛擬人模型",
+      name: "虛擬人",
     });
     expect(trigger.textContent).toContain("未綁定");
 

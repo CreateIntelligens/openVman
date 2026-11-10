@@ -130,7 +130,7 @@ describe("ModelProviders", () => {
     fireEvent.click(within(openAiRow).getByLabelText("啟用 主對話模型 OpenAI"));
     expect(screen.getByRole("tab", { name: /主對話模型/ }).querySelector("[aria-label='有未儲存的修改']")).toBeTruthy();
     await openTab("API 金鑰");
-    fireEvent.change(screen.getByLabelText("OpenAI API key"), { target: { value: "new-openai-key" } });
+    fireEvent.change(screen.getByLabelText("OpenAI API 金鑰"), { target: { value: "new-openai-key" } });
     await openTab("主對話模型");
     expect((within(screen.getByTestId("provider-chat_llm-openai")).getByLabelText("啟用 主對話模型 OpenAI") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "儲存設定" }));
@@ -152,7 +152,7 @@ describe("ModelProviders", () => {
       target: { value: "gpt-4.1" },
     });
     await openTab("API 金鑰");
-    fireEvent.change(screen.getByLabelText("OpenAI API key"), { target: { value: "new-openai-key" } });
+    fireEvent.change(screen.getByLabelText("OpenAI API 金鑰"), { target: { value: "new-openai-key" } });
     fireEvent.click(screen.getByRole("button", { name: "儲存設定" }));
 
     await waitFor(() => expect(saveModelProviderSettings).toHaveBeenCalled());
@@ -213,7 +213,7 @@ describe("ModelProviders", () => {
     await openTab("API 金鑰");
     const openai = await screen.findByTestId("credential-openai");
     expect(within(openai).getByText(/無法解密，暫用環境變數/)).toBeTruthy();
-    expect(within(openai).getByRole("button", { name: "移除後台金鑰，改用 .env" })).toBeTruthy();
+    expect(within(openai).getByRole("button", { name: "移除後台金鑰，改用伺服器設定" })).toBeTruthy();
   });
 
   it("shows which hops Brain is skipping and why", async () => {
@@ -262,7 +262,7 @@ describe("ModelProviders", () => {
     render(<ModelProviders />);
 
     await openTab("API 金鑰");
-    expect(within(await screen.findByTestId("credential-jev")).getByText("來自 .env")).toBeTruthy();
+    expect(within(await screen.findByTestId("credential-jev")).getByText("伺服器設定")).toBeTruthy();
     expect(within(screen.getByTestId("credential-openai")).getByText("後台已存（加密）")).toBeTruthy();
   });
 

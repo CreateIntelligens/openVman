@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Personas from "./Personas";
 import { NavigationGuardProvider } from "../context/NavigationGuardContext";
-import { deletePersona, fetchKnowledgeDocument, saveKnowledgeDocument } from "../api";
+import { createPersona, deletePersona, fetchKnowledgeDocument, saveKnowledgeDocument } from "../api";
 
 // 未存提醒用真的 NavigationGuardProvider 與編輯器，只把 API 換掉。
 
@@ -45,6 +45,25 @@ describe("Personas unsaved changes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it("creates a persona from its name alone and names documents in plain words", async () => {
+    vi.mocked(createPersona).mockResolvedValue({
+      status: "ok",
+      persona: { persona_id: "persona-x", label: "客服小幫手", path: "personas/persona-x/SOUL.md", preview: "", is_default: false, avatar_char_id: null },
+    } as Awaited<ReturnType<typeof createPersona>>);
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: /個性與說話方式/ })).toBeTruthy();
+    expect(screen.queryByText("SOUL.md")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("角色名稱"), { target: { value: "客服小幫手" } });
+    fireEvent.click(screen.getByRole("button", { name: "建立角色" }));
+
+    await waitFor(() => expect(createPersona).toHaveBeenCalledOnce());
+    const [personaId, label] = vi.mocked(createPersona).mock.calls[0];
+    expect(personaId).toMatch(/^persona-[a-z0-9]+$/);
+    expect(label).toBe("客服小幫手");
   });
 
   it("asks before switching persona and keeps the draft when the user stays", async () => {
@@ -94,7 +113,7 @@ describe("Personas unsaved changes", () => {
     await waitFor(() => expect(draft.value).toBe("內容：SOUL.md"));
     fireEvent.change(draft, { target: { value: "還沒存的修改" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /AGENTS\.md/ }));
+    fireEvent.click(screen.getByRole("button", { name: /工作規則/ }));
     expect(await screen.findByText("尚有未儲存的變更")).toBeTruthy();
     expect(opened()).not.toContain("AGENTS.md");
   });
@@ -102,14 +121,14 @@ describe("Personas unsaved changes", () => {
   it("stays on AGENTS.md after saving it instead of jumping back to SOUL.md", async () => {
     renderPage();
     await waitFor(() => expect(opened()).toEqual(["SOUL.md"]));
-    fireEvent.click(screen.getByRole("button", { name: /AGENTS\.md/ }));
+    fireEvent.click(screen.getByRole("button", { name: /工作規則/ }));
     const draft = await editor("預設");
     await waitFor(() => expect(draft.value).toBe("內容：AGENTS.md"));
 
     fireEvent.change(draft, { target: { value: "新的 AGENTS" } });
     fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
     await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalledWith("AGENTS.md", "新的 AGENTS"));
-    await waitFor(() => expect(screen.getByText("已儲存 AGENTS.md")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("已儲存「工作規則」")).toBeTruthy());
     expect((await editor("預設")).value).toBe("新的 AGENTS");
     expect(opened()).toEqual(["SOUL.md", "AGENTS.md"]);
   });

@@ -486,7 +486,7 @@ export default function Accounts() {
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">{account.username}</span>
                             <span className="chip">
-                              {account.role === "root" ? "ROOT" : account.role}
+                              {account.role === "root" ? "最高管理員" : account.role}
                             </span>
                             {isSelf && (
                               <span className="chip border-primary/30 text-primary">

@@ -73,6 +73,21 @@ def test_qa_nodes_crud(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     assert len(qa_nodes.list_nodes()) == 0
 
 
+def test_new_nodes_without_an_order_go_last_among_their_siblings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    assert qa_nodes.create_node("root_a", "A")["order"] == 1.0
+    assert qa_nodes.create_node("root_b", "B")["order"] == 2.0
+
+    # 同層已經排過序（從 1 開始）時，新分類不能跟第一項同分而插到前面。
+    assert qa_nodes.create_node("child_1", "1", parent_ids=["root_a"], order=1.0)["order"] == 1.0
+    assert qa_nodes.create_node("child_2", "2", parent_ids=["root_a"])["order"] == 2.0
+    assert qa_nodes.create_node("other", "x", parent_ids=["root_b"])["order"] == 1.0
+
+
 def test_qa_nodes_move_and_reorder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     _configure_workspace(monkeypatch, tmp_path)
     qa_nodes = _import("knowledge.qa_nodes")

@@ -25,7 +25,7 @@ export default function MemoryFilters({
         <input
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="篩選記憶..."
+          placeholder="在這一頁裡找..."
           className="w-full pl-9 rounded-xl border border-border bg-surface-raised dark:bg-surface/60 px-4 py-2.5 text-sm text-content placeholder:text-content-subtle focus:border-primary/50 focus:outline-none"
         />
       </div>

@@ -158,7 +158,7 @@ export function useQaNodes(projectId = getActiveProjectId()) {
         label,
         parent_ids: parentIds ?? [],
         child_ids: childIds ?? [],
-        order: order ?? 1.0,
+        ...(order === undefined ? {} : { order }),
         hidden: Boolean(hidden),
       }),
       "Failed to create QA node",

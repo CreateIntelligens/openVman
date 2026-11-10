@@ -25,7 +25,7 @@ describe("CharacterJobsPanel", () => {
     });
     render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
 
-    fireEvent.change(screen.getByLabelText("人物 ID"), { target: { value: "hero" } });
+    fireEvent.change(screen.getByLabelText("人物代號"), { target: { value: "hero" } });
     fireEvent.change(screen.getByLabelText("顯示名稱"), { target: { value: "主角" } });
     const file = new File([new Uint8Array([0, 0, 0, 24])], "clip.mp4", { type: "video/mp4" });
     fireEvent.change(screen.getByLabelText("來源影片或圖片"), { target: { files: [file] } });
@@ -38,12 +38,29 @@ describe("CharacterJobsPanel", () => {
     expect(screen.getByText("已排入轉換佇列")).toBeTruthy();
   });
 
+  it("makes up the character code when the field is left empty", async () => {
+    vi.spyOn(api, "fetchAvatarCharacterJobs").mockResolvedValue({ jobs: [] });
+    const submit = vi.spyOn(api, "submitAvatarCharacterJob").mockResolvedValue({
+      status: "queued",
+      job: job({}),
+    });
+    render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText("顯示名稱"), { target: { value: "主角" } });
+    const file = new File([new Uint8Array([0, 0, 0, 24])], "clip.mp4", { type: "video/mp4" });
+    fireEvent.change(screen.getByLabelText("來源影片或圖片"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "產生人物" }));
+
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0][0].charId).toMatch(/^char-[a-z0-9]+$/);
+  });
+
   it("refuses to submit without a video", async () => {
     vi.spyOn(api, "fetchAvatarCharacterJobs").mockResolvedValue({ jobs: [] });
     const submit = vi.spyOn(api, "submitAvatarCharacterJob");
     render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "產生人物" }));
-    expect((await screen.findByRole("alert")).textContent).toContain("請填人物 ID、顯示名稱，並選好影片或圖片");
+    expect((await screen.findByRole("alert")).textContent).toContain("請填顯示名稱，並選好影片或圖片");
     expect(submit).not.toHaveBeenCalled();
   });
 
@@ -60,7 +77,7 @@ describe("CharacterJobsPanel", () => {
     expect(screen.getByText("選擇影片或圖片")).toBeTruthy();
     expect(screen.getByText(/圖片會做成 10 秒的循環片段/)).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("人物 ID"), { target: { value: "face" } });
+    fireEvent.change(screen.getByLabelText("人物代號"), { target: { value: "face" } });
     fireEvent.change(screen.getByLabelText("顯示名稱"), { target: { value: "正面照" } });
     const image = new File(["png"], "face.png", { type: "image/png" });
     fireEvent.drop(input.closest("label")!, { dataTransfer: { files: [image] } });
@@ -82,7 +99,7 @@ describe("CharacterJobsPanel", () => {
     fireEvent.change(screen.getByLabelText("來源影片或圖片"), { target: { files: [big] } });
 
     expect(screen.getByRole("alert").textContent).toBe("「long.mp4」有 250.0 MB，影片上限是 200 MB。");
-    fireEvent.change(screen.getByLabelText("人物 ID"), { target: { value: "hero" } });
+    fireEvent.change(screen.getByLabelText("人物代號"), { target: { value: "hero" } });
     fireEvent.change(screen.getByLabelText("顯示名稱"), { target: { value: "主角" } });
     fireEvent.click(screen.getByRole("button", { name: "產生人物" }));
     expect(submit).not.toHaveBeenCalled();
@@ -93,7 +110,7 @@ describe("CharacterJobsPanel", () => {
     vi.spyOn(api, "submitAvatarCharacterJob").mockRejectedValue(new Error("影片超過長度上限（60 秒）"));
     render(<CharacterJobsPanel onCharacterCreated={() => {}} />);
 
-    fireEvent.change(screen.getByLabelText("人物 ID"), { target: { value: "hero" } });
+    fireEvent.change(screen.getByLabelText("人物代號"), { target: { value: "hero" } });
     fireEvent.change(screen.getByLabelText("顯示名稱"), { target: { value: "主角" } });
     fireEvent.change(screen.getByLabelText("來源影片或圖片"), {
       target: { files: [new File(["x"], "clip.webm", { type: "video/webm" })] },
