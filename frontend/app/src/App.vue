@@ -1,7 +1,7 @@
 <template>
   <div
     class="app-shell"
-    :class="{ immersive, 'camera-active': webcam.active.value, composing }"
+    :class="{ immersive, 'controls-hidden': controlsHidden, 'camera-active': webcam.active.value, composing }"
     :style="cameraPreviewStyle"
   >
     <p v-if="selectionNotices.length > 0" class="authorization-notice" role="status">
@@ -25,6 +25,16 @@
         @toggle-camera="handleToggleCamera"
         @toggle-immersive="handleToggleImmersive"
         @camera-preview-scale-change="handleCameraPreviewScaleChange"
+        @pointerdown="revealControls"
+        @input="revealControls"
+        @focusin="revealControls"
+      />
+      <button
+        v-if="controlsHidden"
+        class="controls-reveal"
+        type="button"
+        aria-label="顯示工具列"
+        @click="revealControls"
       />
 
       <section class="stage-panel">
@@ -293,9 +303,10 @@ const { activeAsr, serverAsr, vadAsr, streamAsr, asrSpeaking,
 const camera = useAvatarCamera(settings, conversation, showMessage);
 const { webcam, visionAvailable, cameraPreviewStyle,
   handleCameraPreviewScaleChange, handleToggleCamera } = camera;
-const { immersive, handleToggleImmersive } = useImmersiveView(
+const { immersive, controlsRevealed, revealControls, handleToggleImmersive } = useImmersiveView(
   showSettings, showQuickQa, avatarResponding, handleStopResponse,
 );
+const controlsHidden = computed(() => immersive.value && !controlsRevealed.value && !rendererErrorMessage.value);
 const visitor = useVisitorMode();
 const { account } = useAuth();
 // 判讀面板會顯示「模型判定你：挫折 97%」與模型名稱，展場訪客用的一般／臨時帳號不該看到。

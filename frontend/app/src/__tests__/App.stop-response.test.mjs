@@ -30,6 +30,6 @@ test("standard mode still counts as answering while audio plays", () => {
 
 test("Escape stops the answer before leaving immersive mode", () => {
   const stop = app.indexOf("} else if (avatarResponding.value) {");
-  const immersive = app.indexOf("} else if (immersive.value || document.fullscreenElement) {");
+  const immersive = app.indexOf("} else if (immersive.value || currentFullscreenElement()) {");
   assert.ok(stop > 0 && immersive > stop);
 });

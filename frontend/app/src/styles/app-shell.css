@@ -151,6 +151,49 @@
   -webkit-backdrop-filter: blur(0.5rem);
 }
 
+/* 全螢幕預設收起工具列，點上緣叫出；錯誤訊息在工具列裡，有錯時不收（見 controlsHidden）。 */
+.app-shell.immersive .control-area {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.app-shell.immersive.controls-hidden .control-area {
+  transform: translateY(calc(-100% - 1rem));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controls-reveal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rem;
+  z-index: 3;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* 收起後留一條小把手，不然沒人知道上面點得出東西。 */
+.controls-reveal::after {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: 0.125rem;
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateX(-50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.immersive .control-area {
+    transition: none;
+  }
+}
+
 .app-shell.immersive .chat-area {
   position: absolute;
   left: 50%;

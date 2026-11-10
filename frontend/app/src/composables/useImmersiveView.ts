@@ -1,7 +1,38 @@
-import { ref, onMounted, onUnmounted, type Ref } from "vue";
-import { leaveFullscreen, unlockKeyboard } from "../sessionCleanup";
+import { ref, onMounted, onUnmounted, watch, type Ref } from "vue";
+import {
+  currentFullscreenElement,
+  enterFullscreen,
+  exitFullscreen,
+  fullscreenChangeEvent,
+  leaveFullscreen,
+  unlockKeyboard,
+} from "../sessionCleanup";
+import { installImmersiveGuards } from "../utils/immersiveGuards";
+// 工具列露出的時間；剛進全螢幕也先亮這麼久，讓人知道它在上面。
+const CONTROLS_VISIBLE_MS = 4000;
+
 export function useImmersiveView(showSettings: Ref<boolean>, showQuickQa: Ref<boolean>, avatarResponding: Ref<boolean>, handleStopResponse: () => void) {
   const immersive = ref(false);
+  const controlsRevealed = ref(true);
+  let hideControlsTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearHideControlsTimer(): void {
+    if (hideControlsTimer !== null) clearTimeout(hideControlsTimer);
+    hideControlsTimer = null;
+  }
+
+  function revealControls(): void {
+    controlsRevealed.value = true;
+    clearHideControlsTimer();
+    if (!immersive.value) return;
+    hideControlsTimer = setTimeout(() => {
+      hideControlsTimer = null;
+      controlsRevealed.value = false;
+    }, CONTROLS_VISIBLE_MS);
+  }
+
+  watch(immersive, () => revealControls());
+
   function tryLockEscapeKeys(): void {
     const nav = navigator as Record<string, any>;
     if ("keyboard" in nav && typeof nav.keyboard?.lock === "function") {
@@ -21,7 +52,7 @@ export function useImmersiveView(showSettings: Ref<boolean>, showQuickQa: Ref<bo
     }
     immersive.value = true;
     try {
-      await document.documentElement.requestFullscreen();
+      await enterFullscreen();
       tryLockEscapeKeys();
     } catch (e) {
       console.warn("[App] requestFullscreen failed:", e);
@@ -29,14 +60,14 @@ export function useImmersiveView(showSettings: Ref<boolean>, showQuickQa: Ref<bo
   }
 
   function handleFullscreenChange(): void {
-    if (!document.fullscreenElement) {
+    if (!currentFullscreenElement()) {
       if (showSettings.value || showQuickQa.value) {
         // Browser exited fullscreen on ESC while a modal was open.
         // Sequential exit priority: close the open modal first and preserve fullscreen.
         showSettings.value = false;
         showQuickQa.value = false;
         if (immersive.value) {
-          void document.documentElement.requestFullscreen().then(() => {
+          void enterFullscreen().then(() => {
             tryLockEscapeKeys();
           }).catch(() => {
             immersive.value = false;
@@ -62,11 +93,11 @@ export function useImmersiveView(showSettings: Ref<boolean>, showQuickQa: Ref<bo
         event.preventDefault();
         event.stopPropagation();
         handleStopResponse();
-      } else if (immersive.value || document.fullscreenElement) {
+      } else if (immersive.value || currentFullscreenElement()) {
         event.preventDefault();
         event.stopPropagation();
-        if (document.fullscreenElement) {
-          void document.exitFullscreen().catch(() => {});
+        if (currentFullscreenElement()) {
+          void exitFullscreen().catch(() => {});
         }
         immersive.value = false;
         tryUnlockKeyboard();
@@ -74,14 +105,19 @@ export function useImmersiveView(showSettings: Ref<boolean>, showQuickQa: Ref<bo
     }
   }
 
+  let removeGuards = (): void => {};
+
   onMounted(() => {
     window.addEventListener("keydown", handleKeydown, true);
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener(fullscreenChangeEvent(), handleFullscreenChange);
+    removeGuards = installImmersiveGuards(() => immersive.value);
   });
   onUnmounted(() => {
     window.removeEventListener("keydown", handleKeydown, true);
-    document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    document.removeEventListener(fullscreenChangeEvent(), handleFullscreenChange);
+    removeGuards();
+    clearHideControlsTimer();
   });
 
-  return { immersive, handleToggleImmersive };
+  return { immersive, controlsRevealed, revealControls, handleToggleImmersive };
 }

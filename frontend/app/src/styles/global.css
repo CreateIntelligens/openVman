@@ -70,3 +70,26 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 全螢幕時長按、拖曳不跳系統選單，也不把畫面拉走；輸入框要留著，否則 iOS 打不了字。 */
+html:has(.app-shell.immersive) {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html:has(.app-shell.immersive),
+html:has(.app-shell.immersive) :is(body, #app) {
+  overscroll-behavior: none;
+}
+
+html:has(.app-shell.immersive) :is(img, video, canvas, a) {
+  -webkit-user-drag: none;
+}
+
+html:has(.app-shell.immersive) :is(input, textarea, [contenteditable]) {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
