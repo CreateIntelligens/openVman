@@ -153,7 +153,7 @@ describe("KnowledgeBase import, end to end", () => {
     expect(server.commitBodies).toEqual([{
       project_id: "default",
       paths: ["booth_faq_en.csv"],
-      normalize: true,
+      normalize: false,
     }]);
     expect(screen.getByRole("button", { name: "匯入中 0/1" })).toBeTruthy();
     expect(screen.getByText("排隊中")).toBeTruthy();
@@ -223,7 +223,7 @@ describe("KnowledgeBase import, end to end", () => {
     pickFile("guide.docx");
     await advance();
 
-    expect(screen.getByText("已加入知識庫，AI 已整理排版")).toBeTruthy();
+    expect(screen.getByText("已加入知識庫，內容未經 AI 修改")).toBeTruthy();
     expect(screen.getByText("1 份文件 · 1 份處理中")).toBeTruthy();
 
     server.documents = [makeDocument({ is_indexed: true })];

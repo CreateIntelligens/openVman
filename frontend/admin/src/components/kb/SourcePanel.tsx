@@ -77,23 +77,23 @@ export default function SourcePanel({
               type="radio"
               name={normalizeName}
               className="mt-1 h-4 w-4 shrink-0 accent-primary"
-              checked={!skipNormalize}
-              onChange={() => onSkipNormalizeChange(false)}
+              checked={skipNormalize}
+              onChange={() => onSkipNormalizeChange(true)}
             />
-            讓 AI 整理排版（適合亂亂的筆記）
+            直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）
           </label>
           <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
             <input
               type="radio"
               name={normalizeName}
               className="mt-1 h-4 w-4 shrink-0 accent-primary"
-              checked={skipNormalize}
-              onChange={() => onSkipNormalizeChange(true)}
+              checked={!skipNormalize}
+              onChange={() => onSkipNormalizeChange(false)}
             />
-            照原樣放進去，不讓 AI 改（適合已經整理好的文件）
+            先讓 AI 整理排版再放進去（適合掃描錯字多、排版很亂的檔案）
           </label>
           <p className="text-xs text-content-muted">
-            每次上傳開始後，會回到「讓 AI 整理排版」。問答表不看這個設定。
+            每次上傳開始後，會回到「直接放進知識庫」。問答表不看這個設定。
           </p>
         </fieldset>
 
@@ -127,7 +127,7 @@ export default function SourcePanel({
           <li>有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。</li>
           <li>同名的問答表再傳一次是加上新題目，原本的題目都留著。答案和現有的不同時不會匯入，畫面會列出是哪幾題。</li>
           <li>想指定放在哪個分類，加一欄「分類」，用斜線分層，例如「中文/產品/EUS」。沒填就放在以檔名命名的分類。</li>
-          <li>其他文件照上面的選擇加入知識庫。AI 整理時內容維持原本的語言，不會翻譯。</li>
+          <li>其他文件會切成段落加入知識庫，AI 回答時查得到，不會變成問答。選 AI 整理時，內容維持原本的語言，不會翻譯。</li>
           <li>可以上傳 {IMPORT_FORMATS_LABEL}，每個檔案 {maxUploadLabel} 以內。</li>
         </ul>
 

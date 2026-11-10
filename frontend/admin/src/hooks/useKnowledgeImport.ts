@@ -756,7 +756,8 @@ export function useKnowledgeImport({
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 }: UseKnowledgeImportOptions) {
   const [view, setView] = useState<ImportView>({ projectId, items: [], pending: [] });
-  const [skipNormalize, setSkipNormalize] = useState(false);
+  // 預設直接切段放進知識庫；AI 整理是使用者要求才做，整理本身會改動內容。
+  const [skipNormalize, setSkipNormalize] = useState(true);
   const [targetChoice, setTargetChoice] = useState<{ dir: string; currentDir: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const dragCounterRef = useRef(0);
@@ -775,7 +776,7 @@ export function useKnowledgeImport({
         Promise.allSettled([latest.current.loadDocuments(), latest.current.fetchQaTree()]),
     });
     sessionRef.current = session;
-    setSkipNormalize(false);
+    setSkipNormalize(true);
     setTargetChoice(null);
     session.start();
     return () => {
@@ -808,14 +809,14 @@ export function useKnowledgeImport({
     setTargetChoice({ dir, currentDir });
   }, [currentDir]);
 
-  // 「照原樣放入」只用在這一批：下一批多半是另一種檔案，留著的話亂筆記就不會被整理。
+  // AI 整理只用在選了它的這一批：下一批多半是另一種檔案，留著的話內容會被改動。
   const startEntries = useCallback((entries: KnowledgeUploadEntry[]) => {
     void sessionRef.current?.uploadAndImport(entries, {
       targetDir,
       normalize: !skipNormalize,
       maxFileBytes,
     });
-    setSkipNormalize(false);
+    setSkipNormalize(true);
   }, [maxFileBytes, skipNormalize, targetDir]);
 
   const startFiles = useCallback((files: Iterable<File>) => {
@@ -825,7 +826,7 @@ export function useKnowledgeImport({
   const importPending = useCallback(() => {
     const session = sessionRef.current;
     session?.importExisting(session.getVisiblePending(), !skipNormalize);
-    setSkipNormalize(false);
+    setSkipNormalize(true);
   }, [skipNormalize]);
 
   const retryItem = useCallback((itemId: string) => {

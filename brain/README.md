@@ -114,7 +114,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 |---|---|
 | `project_id` | 專案 |
 | `paths` | 選填。只匯入這些檔案，路徑相對 `raw/`，帶 `raw/` 前綴也可以。不給就是全部，空陣列就是沒有要匯入的 |
-| `normalize` | 選填，預設 `true`；`false` 時略過 LLM 整理 |
+| `normalize` | 選填，預設 `true`；`false` 時略過 LLM 整理。後台「新增資料」畫面預設送 `false`，使用者選了 AI 整理才送 `true` |
 
 回應的 `status`：`started`（202，帶 `job`）、`already_running`（200，帶進行中的 `job`，這次的檔案沒有開始，等這批結束再送一次）、`nothing_to_commit`（200）。路徑超出 `raw/` 回 400。
 

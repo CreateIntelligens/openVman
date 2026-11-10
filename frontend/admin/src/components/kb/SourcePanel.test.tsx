@@ -16,7 +16,7 @@ function renderPanel(overrides: Partial<Parameters<typeof SourcePanel>[0]> = {})
       { value: "knowledge/gear", label: "gear" },
     ],
     onTargetDirChange: vi.fn(),
-    skipNormalize: false,
+    skipNormalize: true,
     onSkipNormalizeChange: vi.fn(),
     crawlUrlValue: "",
     setCrawlUrlValue: vi.fn(),
@@ -35,7 +35,7 @@ describe("SourcePanel", () => {
 
     expect(screen.getByRole("button", { name: "把檔案拖到這裡，或點這裡選擇檔案" })).toBeTruthy();
     expect(screen.getByText("有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。")).toBeTruthy();
-    expect(screen.getByText("其他文件照上面的選擇加入知識庫。AI 整理時內容維持原本的語言，不會翻譯。")).toBeTruthy();
+    expect(screen.getByText("其他文件會切成段落加入知識庫，AI 回答時查得到，不會變成問答。選 AI 整理時，內容維持原本的語言，不會翻譯。")).toBeTruthy();
     expect(screen.getByText(/每個檔案 100 MB 以內/)).toBeTruthy();
     expect(screen.getByText(/Excel（\.xlsx）/)).toBeTruthy();
     expect(screen.queryByText(/暫存區|採納|raw/)).toBeNull();
@@ -71,41 +71,45 @@ describe("SourcePanel", () => {
     expect(input.value).toBe("");
   });
 
-  const TIDY = "讓 AI 整理排版（適合亂亂的筆記）";
-  const AS_IS = "照原樣放進去，不讓 AI 改（適合已經整理好的文件）";
+  const DIRECT = "直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）";
+  const TIDY = "先讓 AI 整理排版再放進去（適合掃描錯字多、排版很亂的檔案）";
 
   // 實測：勾選框在拖放區下面，選了檔案就開始上傳，由上往下操作的人來不及勾。
   it("asks how to bring the batch in above the drop zone, before any file is picked", () => {
     renderPanel();
 
-    const choice = screen.getByRole("radio", { name: TIDY });
+    const direct = screen.getByRole("radio", { name: DIRECT });
+    const tidy = screen.getByRole("radio", { name: TIDY });
     const dropZone = screen.getByRole("button", { name: "把檔案拖到這裡，或點這裡選擇檔案" });
-    expect(choice.compareDocumentPosition(dropZone) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(direct.compareDocumentPosition(tidy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tidy.compareDocumentPosition(dropZone) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
-  it("lets the AI tidy up by default, and switches to as-is", () => {
+  it("puts files in directly by default, and switches to letting the AI tidy up", () => {
     const { onSkipNormalizeChange } = renderPanel();
 
-    expect((screen.getByRole("radio", { name: TIDY }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("radio", { name: AS_IS }) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("radio", { name: DIRECT }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: TIDY }) as HTMLInputElement).checked).toBe(false);
 
-    fireEvent.click(screen.getByRole("radio", { name: AS_IS }));
-    expect(onSkipNormalizeChange).toHaveBeenCalledWith(true);
-  });
-
-  it("shows the as-is choice as it is, and can go back to tidying", () => {
-    const { onSkipNormalizeChange } = renderPanel({ skipNormalize: true });
-
-    expect((screen.getByRole("radio", { name: AS_IS }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: TIDY }));
     expect(onSkipNormalizeChange).toHaveBeenCalledWith(false);
+  });
+
+  it("shows the AI tidy choice once picked, and can go back to putting files in directly", () => {
+    const { onSkipNormalizeChange } = renderPanel({ skipNormalize: false });
+
+    expect((screen.getByRole("radio", { name: TIDY }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: DIRECT }) as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(screen.getByRole("radio", { name: DIRECT }));
+    expect(onSkipNormalizeChange).toHaveBeenCalledWith(true);
   });
 
   it("says the choice goes back to the default after each upload", () => {
     renderPanel();
 
-    expect(screen.getByText("每次上傳開始後，會回到「讓 AI 整理排版」。問答表不看這個設定。")).toBeTruthy();
+    expect(screen.getByText("每次上傳開始後，會回到「直接放進知識庫」。問答表不看這個設定。")).toBeTruthy();
   });
 
   it("picks the target folder from the real folders", () => {

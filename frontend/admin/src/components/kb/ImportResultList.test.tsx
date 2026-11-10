@@ -283,7 +283,7 @@ describe("ImportResultList", () => {
     ]);
 
     expect(screen.getByText(/^已加入知識庫，AI 已整理排版/)).toBeTruthy();
-    expect(screen.getByText(/^已加入知識庫，照原樣放入/)).toBeTruthy();
+    expect(screen.getByText(/^已加入知識庫，內容未經 AI 修改/)).toBeTruthy();
   });
 
   it("does not guess the choice for an import picked up from elsewhere, or for a QA table", () => {
@@ -292,7 +292,7 @@ describe("ImportResultList", () => {
       row({ id: "2", name: "faq.csv", result: qaResult, normalize: false }),
     ]);
 
-    expect(screen.queryByText(/AI 已整理排版|照原樣放入/)).toBeNull();
+    expect(screen.queryByText(/AI 已整理排版|內容未經 AI 修改/)).toBeNull();
   });
 
   it("offers clearing once something has finished, and sums up the batch", () => {

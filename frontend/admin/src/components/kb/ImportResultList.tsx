@@ -51,7 +51,7 @@ function qaPlacement(result: KnowledgeCommitFileResult, nodesTree: QaNode[]) {
 
 function normalizeNote(item: ImportItem): string {
   if (item.normalize === undefined) return "";
-  return item.normalize ? "，AI 已整理排版" : "，照原樣放入";
+  return item.normalize ? "，AI 已整理排版" : "，內容未經 AI 修改";
 }
 
 function documentFolderNote(target: string): string {

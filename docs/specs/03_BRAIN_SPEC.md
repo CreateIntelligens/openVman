@@ -125,7 +125,7 @@
 * **Gateway 上傳**（Backend `POST /api/v1/knowledge/upload`）：`.md`、`.txt`、`.csv` 直接轉發給 Brain `POST /brain/knowledge/upload`。其他格式先把原始檔存到 `workspace/raw/`（`POST /brain/knowledge/raw/upload`），再由 Gateway 轉成 Markdown：PDF 先嘗試 **pdf-inspector** text-based fast path，不適合的 PDF 與 Office 文件用 **Docling**，Docling 失敗且 fallback 啟用時改用 **AnyDoc**；轉出的 Markdown 存到 `knowledge/`（未指定資料夾時為 `knowledge/ingested/`）。細節見 `04_GATEWAY_SPEC.md`。
 * **原始檔匯入**（`POST /brain/knowledge/raw/upload` → `POST /brain/knowledge/raw/commit`）：Brain 在背景處理 `raw/` 的檔案，`paths` 可限定這一批，以前留下的檔案不受影響。
   * **問答表**：有問題與答案欄的 CSV，或每個非空工作表都有這兩欄的 Excel。轉成 `knowledge/qa/` 的問答文件，不經 LLM，圖片、連結、顯示欄照讀，並進快速問答。同一來源已有節點時只更新題目，名稱與上層不動；新的放進同語言的第一層分類，沒有就放最上層，不自動建立語言分類。
-  * **一般文件**：轉成文字（`knowledge/converters.py`：`.md`、`.txt`、`.csv`、`.docx`、`.xlsx`、`.pdf`），再逐段以 LLM 整理成乾淨的 Markdown（`knowledge/normalizer.py`；修正 OCR 錯字與誤判的標題，不新增內容，不翻譯；輸出語言和原文不同或失敗的段落保留原文），寫入 `knowledge/`。`normalize: false` 時略過 LLM。
+  * **一般文件**：轉成文字（`knowledge/converters.py`：`.md`、`.txt`、`.csv`、`.docx`、`.xlsx`、`.pdf`），再逐段以 LLM 整理成乾淨的 Markdown（`knowledge/normalizer.py`；修正 OCR 錯字與誤判的標題，不新增內容，不翻譯；輸出語言和原文不同或失敗的段落保留原文），寫入 `knowledge/`。`normalize: false` 時略過 LLM；API 不帶時預設 `true`，後台匯入畫面預設送 `false`，使用者選了 AI 整理才送 `true`。
   * **進度與結果**：`GET /brain/knowledge/raw/commit/status` 回傳逐檔狀態、`results`（目標文件、種類、語言、是否更新既有文件、所屬分類與題數）與 `skip_reasons`（沒匯入的原因）。單一檔案失敗不影響其他檔案，沒匯入的留在 `raw/`，可用 `GET`、`DELETE /brain/knowledge/raw/pending` 查看或移除。欄位定義見 `brain/README.md`。
 * **既有文件重新整理**：`POST /brain/knowledge/renormalize[/preview|/apply]`，整理前的版本存到 `.normalization-backups/`。
 * 文件新增、儲存、搬移或刪除後都會排程重建：同一專案的請求以 2 秒 debounce 合併、不會同時跑兩個，索引重建完成後接著重建知識圖譜。也可呼叫 `POST /brain/knowledge/reindex` 手動重建。

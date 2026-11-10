@@ -138,7 +138,7 @@ describe("useKnowledgeImport", () => {
     // 只送這批上傳的檔案，舊檔不會被順手帶入；帶不帶 raw/ 由後端的鍵決定。
     expect(api.commitRawKnowledge).toHaveBeenCalledWith({
       paths: ["guide.md", "faq.csv"],
-      normalize: true,
+      normalize: false,
     });
     expect(rowOf(result.current.items, "guide.md").state).toBe("waiting");
 
@@ -268,7 +268,7 @@ describe("useKnowledgeImport", () => {
     started({ "a.md": "pending" });
     await nextPoll();
     expect(api.commitRawKnowledge).toHaveBeenCalledTimes(2);
-    expect(api.commitRawKnowledge.mock.calls[1][0]).toEqual({ paths: ["a.md"], normalize: true });
+    expect(api.commitRawKnowledge.mock.calls[1][0]).toEqual({ paths: ["a.md"], normalize: false });
 
     api.getCommitStatus.mockResolvedValueOnce(job({
       state: "done",
@@ -755,18 +755,18 @@ describe("useKnowledgeImport", () => {
 
     api.fetchRawPending.mockResolvedValue({ files: [] });
     started({ "old.md": "pending", "folder/old.csv": "pending" });
-    act(() => result.current.setSkipNormalize(true));
+    act(() => result.current.setSkipNormalize(false));
     act(() => result.current.importPending());
     await flush();
 
     expect(api.uploadRawKnowledgeDocuments).not.toHaveBeenCalled();
     expect(api.commitRawKnowledge).toHaveBeenCalledWith({
       paths: ["old.md", "folder/old.csv"],
-      normalize: false,
+      normalize: true,
     });
     expect(result.current.items.map((item) => item.name)).toEqual(["old.md", "folder/old.csv"]);
     expect(result.current.pendingFiles).toEqual([]);
-    expect(result.current.skipNormalize).toBe(false);
+    expect(result.current.skipNormalize).toBe(true);
   });
 
   it("lists a new copy of a file that was already imported", async () => {
@@ -829,29 +829,29 @@ describe("useKnowledgeImport", () => {
     const { result } = renderImport({ directories: ["knowledge/gear"] });
     await flush();
 
-    act(() => result.current.setSkipNormalize(true));
+    act(() => result.current.setSkipNormalize(false));
     act(() => result.current.setTargetDir("knowledge/gear"));
     act(() => result.current.startFiles([file("a.md")]));
     await flush();
 
     expect(api.uploadRawKnowledgeDocuments.mock.calls[0][1]).toBe("raw/gear");
-    expect(api.commitRawKnowledge).toHaveBeenCalledWith({ paths: ["gear/a.md"], normalize: false });
-    expect(rowOf(result.current.items, "a.md").normalize).toBe(false);
+    expect(api.commitRawKnowledge).toHaveBeenCalledWith({ paths: ["gear/a.md"], normalize: true });
+    expect(rowOf(result.current.items, "a.md").normalize).toBe(true);
   });
 
-  // 實測：選了「照原樣」之後一直留著，下一批亂筆記也不會被整理。
-  it("goes back to letting the AI tidy up once a batch has started", async () => {
+  // AI 整理會改動內容：選了之後一直留著的話，下一批文件也會被改。
+  it("goes back to putting files in directly once a batch has started", async () => {
     uploaded("raw/a.md");
     started({ "a.md": "pending" });
     const { result } = renderImport();
     await flush();
 
-    act(() => result.current.setSkipNormalize(true));
+    act(() => result.current.setSkipNormalize(false));
     act(() => result.current.startFiles([file("a.md")]));
     await flush();
 
-    expect(api.commitRawKnowledge).toHaveBeenCalledWith({ paths: ["a.md"], normalize: false });
-    expect(result.current.skipNormalize).toBe(false);
+    expect(api.commitRawKnowledge).toHaveBeenCalledWith({ paths: ["a.md"], normalize: true });
+    expect(result.current.skipNormalize).toBe(true);
   });
 
   it("offers the top level and real folders, never the folder QA tables live in", async () => {
