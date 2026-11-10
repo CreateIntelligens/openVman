@@ -18,6 +18,10 @@ test("/login, a client-side route, survives a reload", () => {
   assert.match(block("= /login"), /no-cache/);
 });
 
+test("the web app manifest is served with its own content type", () => {
+  assert.match(block("= /manifest.webmanifest"), /default_type application\/manifest\+json;/);
+});
+
 test("other missing paths stay 404 so stale chunks can trigger a reload", () => {
   assert.match(block("/"), /try_files \$uri \$uri\/ =404;/);
 });
