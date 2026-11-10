@@ -9,6 +9,7 @@ import SegmentedControl from "../SegmentedControl";
 import Select from "../Select";
 import {
   displayDocumentPath,
+  isManagedQaDocument,
   fileNameOf,
   formatDate,
   formatSize,
@@ -136,7 +137,7 @@ export default function FileView({
   };
 
   const displayName = document.title || fileNameOf(document.path);
-  const displayPath = displayDocumentPath(document.path);
+  const displayPath = isManagedQaDocument(document) ? displayName : displayDocumentPath(document.path);
   const statusLabel = documentStatusLabel(document);
   const isQaDocument = document.source_type === "qa";
   const isQaAttached = isQaDocument && document.qa_attached === true;

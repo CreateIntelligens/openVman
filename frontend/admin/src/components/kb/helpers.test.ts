@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildTree,
   collectFolderPaths,
   countSearchResults,
   displayDocumentPath,
@@ -22,6 +23,7 @@ import {
   splitFileNameForDisplay,
   type TreeNode,
 } from "./helpers";
+import type { KnowledgeDocumentSummary } from "../../api";
 
 describe("knowledge source modes", () => {
   it("still renders QA as a document source type", () => {
@@ -47,6 +49,32 @@ describe("knowledge source modes", () => {
       expect(chipClass).not.toMatch(/\b(?:sky|fuchsia|amber|emerald)-\d/);
     },
   );
+});
+
+describe("buildTree", () => {
+  const doc = (path: string, extra: Partial<KnowledgeDocumentSummary> = {}) =>
+    ({ path, title: path, source_type: "qa", qa_attached: true, ...extra }) as KnowledgeDocumentSummary;
+  const folders = (tree: TreeNode) => tree.children.filter((c) => c.type === "folder").map((c) => c.name);
+
+  it("leaves questions on the quick QA menu out of the documents section", () => {
+    const tree = buildTree([doc("knowledge/qa/manual_1.md")], ["knowledge/qa", "knowledge/qa/old"]);
+    expect(tree.children).toEqual([]);
+  });
+
+  it("keeps a QA document that is not on the menu, or nobody could find or delete it", () => {
+    const tree = buildTree([doc("knowledge/qa/spare.md", { qa_attached: false })], ["knowledge/qa"]);
+    expect(folders(tree)).toEqual(["qa"]);
+    expect(tree.children[0].children.map((c) => c.name)).toEqual(["spare.md"]);
+  });
+
+  it("only hides the QA storage folder", () => {
+    const tree = buildTree(
+      [doc("knowledge/faq.csv"), doc("knowledge/qa-notes/a.md", { source_type: "upload", qa_attached: undefined })],
+      ["knowledge/qa-notes"],
+    );
+    expect(folders(tree)).toEqual(["qa-notes"]);
+    expect(tree.children.some((c) => c.name === "faq.csv")).toBe(true);
+  });
 });
 
 describe("displayDocumentPath", () => {

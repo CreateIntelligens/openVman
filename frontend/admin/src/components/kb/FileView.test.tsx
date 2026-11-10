@@ -79,6 +79,12 @@ function isShowingPreview() {
 }
 
 describe("FileView", () => {
+  it("names a quick QA document by its title instead of its storage path", () => {
+    const document = { ...baseDocument, path: "knowledge/qa/manual_1.md", title: "營業時間", qa_attached: true };
+    renderFileView({ document });
+    expect(screen.queryByText("qa/manual_1.md")).toBeNull();
+  });
+
   beforeEach(() => {
     window.localStorage.clear();
   });

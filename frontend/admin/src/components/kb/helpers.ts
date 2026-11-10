@@ -121,6 +121,17 @@ export function matchesKnowledgeDocumentSearch(document: KnowledgeDocumentSummar
 
 /* ── Tree Builder ── */
 
+const QA_STORAGE_DIR = "knowledge/qa";
+
+function isInQaStorage(path: string): boolean {
+  return path === QA_STORAGE_DIR || path.startsWith(`${QA_STORAGE_DIR}/`);
+}
+
+/** 掛在快速問答的問答文件，由上面的「快速問答」段落管理，文件段落不再列出。 */
+export function isManagedQaDocument(document: KnowledgeDocumentSummary): boolean {
+  return document.source_type === "qa" && document.qa_attached === true && isInQaStorage(document.path);
+}
+
 export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: string[]): TreeNode {
   const root: TreeNode = { name: "knowledge", path: "knowledge", type: "folder", children: [] };
 
@@ -141,10 +152,12 @@ export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: str
   }
 
   for (const dir of serverDirs) {
-    if (dir.startsWith("knowledge")) ensureFolder(dir);
+    // 資料夾跟著裡面看得到的文件才出現：沒掛上快速問答的問答文件要留著，否則找不到也刪不掉。
+    if (dir.startsWith("knowledge") && !isInQaStorage(dir)) ensureFolder(dir);
   }
 
   for (const doc of documents) {
+    if (isManagedQaDocument(doc)) continue;
     const parts = doc.path.split("/");
     const parentPath = parts.slice(0, -1).join("/");
     const parent = parentPath ? ensureFolder(parentPath) : root;
