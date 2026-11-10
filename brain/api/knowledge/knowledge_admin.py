@@ -670,17 +670,18 @@ def _no_text_reason(src: Path, origin_bytes: bytes) -> str:
     return _REASON_NO_TEXT
 
 
-def _qa_table_target(filename: str, project_id: str) -> Path:
+def _qa_table_target(filename: str, project_id: str, keep_csv: bool = False) -> Path:
     """Where an imported QA table is stored: ``knowledge/qa/<name>.md``.
 
     拖進樹的 CSV 文件不會轉成 .md；同名的已經掛在樹上時要更新它，不能另開一份多一個分類。
+    每題標了語言的表（``keep_csv``）也留 CSV，Markdown 放不下語言欄。
     """
     from knowledge.qa_nodes import is_qa_document
 
     markdown = (Path("knowledge/qa") / filename).with_suffix(".md")
     existing_csv = markdown.with_suffix(".csv")
-    if not is_qa_document(markdown.as_posix(), project_id) and is_qa_document(
-        existing_csv.as_posix(), project_id
+    if not is_qa_document(markdown.as_posix(), project_id) and (
+        keep_csv or is_qa_document(existing_csv.as_posix(), project_id)
     ):
         return existing_csv
     return markdown
@@ -778,9 +779,12 @@ def _commit_raw_file(
         find_language_category,
         is_qa_document,
         is_source_referenced,
+        place_questions_by_path,
         refill_emptied_node,
         sync_entries_for_source,
     )
+    from knowledge.qa_csv import qa_csv_row_extras
+    from knowledge.qa_merged import MergedSaveError, merge_reupload
 
     root = ensure_workspace_scaffold(project_id)
     src = root / "raw" / relative
@@ -795,8 +799,11 @@ def _commit_raw_file(
     origin_bytes = src.read_bytes()
     qa_csv = qa_table_csv_bytes(src, origin_bytes)
     is_qa = qa_csv is not None
+    extras = qa_csv_row_extras(qa_csv) if is_qa else {}
     target_rel = (
-        _qa_table_target(src.name, project_id)
+        _qa_table_target(
+            src.name, project_id, keep_csv=any(row["language"] for row in extras.values()),
+        )
         if is_qa
         else (Path("knowledge") / relative).with_suffix(".md")
     )
@@ -826,20 +833,43 @@ def _commit_raw_file(
         referenced = is_source_referenced(target, project_id)
         if not is_qa and is_qa_document(target, project_id):
             raise _ImportRefused(_REASON_TARGET_IS_QA)
+        # 同名的問答文件已經存在時是合併，不是取代：後台新增的題目和掛在別的分類的題目都不能消失。
+        merge_counts: dict[str, int] = {}
+        existing_qa = is_qa and updated and is_qa_document(target, project_id)
+        if existing_qa:
+            try:
+                merged = merge_reupload(target, parse_qa_csv(normalize_qa_csv_rows(qa_csv)), extras, project_id)
+            except MergedSaveError as exc:
+                raise _ImportRefused(exc.detail) from exc
+            content = merged.content
+            merge_counts = {"added": merged.added, "kept": merged.kept}
         dest.parent.mkdir(parents=True, exist_ok=True)
-        write_text_atomic(dest, content)
-        touch_document_meta(target, project_id)
+        if content is not None:
+            write_text_atomic(dest, content)
+            touch_document_meta(target, project_id)
         language = resolve_document_languages([target], project_id)[target]
-        if is_qa and referenced:
-            sync_entries_for_source(target, project_id)
-        elif is_qa and not refill_emptied_node(target, target_rel.stem, project_id):
-            category = find_language_category(language, project_id)
-            create_node_for_source(
-                target,
-                target_rel.stem,
-                project_id,
-                parent_ids=[category] if category else None,
-            )
+        if is_qa:
+            paths = {question: row["path"] for question, row in extras.items() if row["path"]}
+            if paths:
+                place_questions_by_path(target, paths, project_id)
+            if referenced:
+                sync_entries_for_source(target, project_id)
+            elif paths and existing_qa:
+                pass
+            elif not paths and refill_emptied_node(target, target_rel.stem, project_id):
+                pass
+            elif not existing_qa:
+                # 分類刪掉後重傳同名文件走不到這裡：只更新內容，不回選單。
+                unplaced = set(extras) - set(paths)
+                if unplaced:
+                    category = find_language_category(language, project_id)
+                    create_node_for_source(
+                        target,
+                        target_rel.stem,
+                        project_id,
+                        parent_ids=[category] if category else None,
+                        only_questions=unplaced if paths else None,
+                    )
         upsert_document_meta(target, project_id, source_type="qa" if is_qa else "upload")
         # AI 整理要幾分鐘，這段時間可能又傳了新版；留在 raw/ 等下一批，不能當成這一版搬走。
         if hashlib.sha256(src.read_bytes()).hexdigest() == origin_hash:
@@ -853,6 +883,7 @@ def _commit_raw_file(
         "kind": "qa" if is_qa else "document",
         "language": language,
         "updated": updated,
+        **merge_counts,
     }
     return {**result, **_qa_node_summary(target, project_id)} if is_qa else result
 

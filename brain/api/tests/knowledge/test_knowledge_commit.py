@@ -345,7 +345,7 @@ def test_spanish_note_is_not_translated_when_the_llm_answers_in_chinese(workspac
 # --- re-uploading the same source -----------------------------------------------
 
 
-def test_reupload_updates_the_existing_category_instead_of_adding_one(workspace: Path):
+def test_reupload_merges_into_the_existing_category(workspace: Path):
     import knowledge.qa_nodes as qa_nodes
 
     _raw(workspace, "faq.csv", "問題,答案,display\nQ1,舊答案一,\nQ2,舊答案二,false\n")
@@ -358,7 +358,7 @@ def test_reupload_updates_the_existing_category_instead_of_adding_one(workspace:
     qa_nodes.move_node(node_id, ["parent"], "default")
     qa_nodes.update_node(node_id, {"label": "常見問題", "hidden": True}, "default")
 
-    _raw(workspace, "faq.csv", "問題,答案\nQ2,新答案二\nQ3,新答案三\n")
+    _raw(workspace, "faq.csv", "問題,答案\nQ2,舊答案二\nQ3,新答案三\n")
     second = commit_raw_documents("default")
 
     nodes = _nodes()
@@ -367,21 +367,196 @@ def test_reupload_updates_the_existing_category_instead_of_adding_one(workspace:
     assert node["label"] == "常見問題"
     assert node["parent_ids"] == ["parent"]
     assert node["hidden"] is True
-    assert [entry["question"] for entry in node["qa_entries"]] == ["Q2", "Q3"]
-    assert all(entry["source_path"] == "knowledge/qa/faq.md" for entry in node["qa_entries"])
-
+    # 新檔沒有的 Q1 留著；Q2 在舊檔是隱藏的，重傳不會改回顯示。
+    assert [entry["question"] for entry in node["qa_entries"]] == ["Q1", "Q2", "Q3"]
+    assert next(e for e in node["qa_entries"] if e["question"] == "Q2")["hidden"] is True
     content = (workspace / "knowledge" / "qa" / "faq.md").read_text(encoding="utf-8")
-    assert "Q1" not in content and "新答案二" in content
+    assert "Q1" in content and "新答案三" in content
     assert second["results"]["faq.csv"] == {
         "target": "knowledge/qa/faq.md",
         "kind": "qa",
         "language": "zh",
         "updated": True,
+        "added": 1,
+        "kept": 1,
         "qa_node_id": node_id,
         "qa_node_label": "常見問題",
         "qa_parent_label": "活動",
-        "question_count": 2,
+        "question_count": 3,
     }
+
+
+def test_reupload_with_a_changed_answer_imports_nothing_and_names_it(workspace: Path):
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\nQ2,A2\n")
+    commit_raw_documents("default")
+    target = workspace / "knowledge" / "qa" / "faq.md"
+    before = target.read_text(encoding="utf-8")
+
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\nQ2,不一樣的答案\nQ3,A3\n")
+    result = commit_raw_documents("default")
+
+    assert result["skipped"] == ["faq.csv"]
+    assert "「Q2」" in result["skip_reasons"]["faq.csv"]
+    assert target.read_text(encoding="utf-8") == before
+    assert (workspace / "raw" / "faq.csv").exists()
+    assert [e["question"] for e in next(iter(_nodes().values()))["qa_entries"]] == ["Q1", "Q2"]
+
+
+def test_reupload_with_nothing_new_leaves_the_file_alone(workspace: Path):
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\n")
+    commit_raw_documents("default")
+    target = workspace / "knowledge" / "qa" / "faq.md"
+    before = target.read_bytes()
+
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\n")
+    result = commit_raw_documents("default")
+
+    assert target.read_bytes() == before
+    assert result["results"]["faq.csv"]["added"] == 0
+    assert result["results"]["faq.csv"]["kept"] == 1
+
+
+def test_reupload_fills_a_missing_image_but_refuses_a_different_one(workspace: Path):
+    _raw(workspace, "faq.csv", "問題,答案,圖片\nQ1,A1,\nQ2,A2,old.png\n")
+    commit_raw_documents("default")
+    target = workspace / "knowledge" / "qa" / "faq.md"
+
+    _raw(workspace, "faq.csv", "問題,答案,圖片\nQ1,A1,new.png\n")
+    assert commit_raw_documents("default")["committed"] == ["knowledge/qa/faq.md"]
+    assert "new.png" in target.read_text(encoding="utf-8")
+
+    _raw(workspace, "faq.csv", "問題,答案,圖片\nQ2,A2,other.png\n")
+    result = commit_raw_documents("default")
+    assert "「Q2」" in result["skip_reasons"]["faq.csv"]
+
+
+def test_reupload_keeps_questions_on_other_categories(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\nQ2,A2\n")
+    first = commit_raw_documents("default")
+    source = "knowledge/qa/faq.md"
+    node_id = first["results"]["faq.csv"]["qa_node_id"]
+    qa_nodes.create_node("other", "別的分類")
+    qa_nodes.add_qa_entry_to_node("other", {"question": "Q2", "source_path": source, "hidden": False, "image_id": None})
+
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\nQ3,A3\n")
+    commit_raw_documents("default")
+
+    nodes = _nodes()
+    assert [e["question"] for e in nodes["other"]["qa_entries"]] == ["Q2"]
+    assert [e["question"] for e in nodes[node_id]["qa_entries"]] == ["Q1", "Q2", "Q3"]
+
+
+def test_reupload_after_the_category_was_deleted_stays_off_the_menu(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\n")
+    first = commit_raw_documents("default")
+    qa_nodes.delete_node(first["results"]["faq.csv"]["qa_node_id"], "default")
+
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\nQ2,A2\n")
+    second = commit_raw_documents("default")
+
+    assert _nodes() == {}
+    content = (workspace / "knowledge" / "qa" / "faq.md").read_text(encoding="utf-8")
+    assert "A2" in content
+    assert second["results"]["faq.csv"]["updated"] is True
+    assert "qa_node_id" not in second["results"]["faq.csv"]
+
+
+def test_path_column_places_each_question(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    qa_nodes.create_node("zh", "中文")
+    _raw(
+        workspace,
+        "faq.csv",
+        "問題,答案,display,path\nQ1,A1,,中文/產品/EUS\nQ2,A2,false,中文/產品/EUS\nQ3,A3,,中文/售後\nQ4,A4,,\n",
+    )
+
+    result = commit_raw_documents("default")
+
+    nodes = _nodes()
+    by_label = {n["label"]: (nid, n) for nid, n in nodes.items()}
+    assert by_label["中文"][0] == "zh"
+    assert by_label["產品"][1]["parent_ids"] == ["zh"]
+    assert by_label["EUS"][1]["parent_ids"] == [by_label["產品"][0]]
+    entries = {e["question"]: e for e in by_label["EUS"][1]["qa_entries"]}
+    assert list(entries) == ["Q1", "Q2"]
+    assert entries["Q2"]["hidden"] is True
+    assert [e["question"] for e in by_label["售後"][1]["qa_entries"]] == ["Q3"]
+    # 沒填路徑的題目照舊放到以檔名命名的分類，放在同語言的分類底下。
+    assert [e["question"] for e in by_label["faq"][1]["qa_entries"]] == ["Q4"]
+    assert by_label["faq"][1]["parent_ids"] == ["zh"]
+    assert result["committed"] == ["knowledge/qa/faq.md"]
+
+
+def test_path_matches_existing_categories_regardless_of_case(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    qa_nodes.create_node("en", "English")
+    _raw(workspace, "faq.csv", "q,a,path\nHello,World,english\n")
+
+    commit_raw_documents("default")
+
+    assert sorted(_nodes()) == ["en"]
+    assert [e["question"] for e in _nodes()["en"]["qa_entries"]] == ["Hello"]
+
+
+def test_reupload_does_not_move_a_question_someone_placed(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,甲\n")
+    commit_raw_documents("default")
+    ids = {n["label"]: nid for nid, n in _nodes().items()}
+    source = "knowledge/qa/faq.md"
+    qa_nodes.create_node("other", "乙")
+    qa_nodes.add_qa_entry_to_node("other", {"question": "Q1", "source_path": source, "hidden": False, "image_id": None})
+    qa_nodes.remove_qa_entry_from_node(ids["甲"], "Q1", "default", source_path=source)
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,甲\n")
+    commit_raw_documents("default")
+
+    assert [e["question"] for e in _nodes()["other"]["qa_entries"]] == ["Q1"]
+    assert _nodes()[ids["甲"]]["qa_entries"] == []
+
+
+def test_reupload_keeps_questions_taken_off_the_menu_off_it(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,甲\nQ2,A2,甲\n")
+    commit_raw_documents("default")
+    node_id = next(iter(_nodes()))
+    qa_nodes.remove_qa_entry_from_node(node_id, "Q1", "default", source_path="knowledge/qa/faq.md")
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,甲\nQ2,A2,甲\n")
+    commit_raw_documents("default")
+
+    assert [e["question"] for e in _nodes()[node_id]["qa_entries"]] == ["Q2"]
+
+
+def test_table_with_row_languages_stays_a_csv(workspace: Path):
+    _raw(workspace, "mixed.csv", "q,a,language\n營業時間,九點開門,zh\nHours,Open at nine,en\n")
+
+    result = commit_raw_documents("default")
+
+    assert result["committed"] == ["knowledge/qa/mixed.csv"]
+    assert "language" in (workspace / "knowledge" / "qa" / "mixed.csv").read_text(encoding="utf-8")
+
+    _raw(workspace, "mixed.csv", "q,a,language\nParking,In the basement,en\n")
+    commit_raw_documents("default")
+    rows = (workspace / "knowledge" / "qa" / "mixed.csv").read_text(encoding="utf-8").splitlines()
+    assert any(row.startswith(("Parking", "3,Parking")) and row.endswith(",en") for row in rows)
+
+
+def test_excel_carries_path_and_language(workspace: Path):
+    _workbook(workspace / "raw" / "faq.xlsx", {"FAQ": [["q", "a", "path", "language"], ["Q1", "A1", "甲/乙", "zh"]]})
+
+    result = commit_raw_documents("default")
+
+    assert result["committed"] == ["knowledge/qa/faq.csv"]
+    assert {n["label"] for n in _nodes().values()} == {"甲", "乙"}
 
 
 def test_documents_report_whether_the_original_upload_is_kept(workspace: Path):
@@ -412,7 +587,7 @@ def test_reupload_refills_a_category_emptied_in_the_admin(workspace: Path):
     node_id = first["results"]["faq.csv"]["qa_node_id"]
     qa_nodes.update_node(node_id, {"label": "常見問題", "qa_entries": []}, "default")
 
-    _raw(workspace, "faq.csv", "問題,答案\nQ1,新答案\nQ2,A2\n")
+    _raw(workspace, "faq.csv", "問題,答案\nQ1,A1\nQ2,A2\n")
     second = commit_raw_documents("default")
 
     nodes = _nodes()
@@ -487,8 +662,8 @@ def test_reupload_onto_a_csv_source_updates_that_file(workspace: Path):
     assert result["results"]["own.csv"]["updated"] is True
     assert not (workspace / "knowledge" / "qa" / "own.md").exists()
     assert list(_nodes()) == [node["node_id"]]
-    assert [e["question"] for e in _nodes()[node["node_id"]]["qa_entries"]] == ["新題"]
-    assert "舊題" not in target.read_text(encoding="utf-8")
+    assert [e["question"] for e in _nodes()[node["node_id"]]["qa_entries"]] == ["舊題", "新題"]
+    assert "舊題" in target.read_text(encoding="utf-8")
 
 
 def test_document_reupload_reports_updated(workspace: Path):
@@ -584,7 +759,7 @@ def test_reuploaded_excel_updates_the_same_category(workspace: Path):
 
     assert len(_nodes()) == 1
     assert result["results"]["faq.xlsx"]["updated"] is True
-    assert [e["question"] for e in next(iter(_nodes().values()))["qa_entries"]] == ["Q2"]
+    assert [e["question"] for e in next(iter(_nodes().values()))["qa_entries"]] == ["Q1", "Q2"]
 
 
 # --- language categories --------------------------------------------------------

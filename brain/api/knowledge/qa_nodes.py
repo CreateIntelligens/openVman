@@ -636,12 +636,16 @@ def create_node_for_source(
     label: str,
     project_id: str = "default",
     parent_ids: list[str] | None = None,
+    only_questions: set[str] | None = None,
 ) -> dict[str, Any]:
-    """Create a tree node holding every question of ``source_path``.
+    """Create a tree node holding the questions of ``source_path``.
 
+    ``only_questions`` limits it to those; the rest are placed elsewhere.
     Returns the created node dict augmented with its ``node_id``.
     """
     entries = _build_entries_for_source(source_path, project_id)
+    if only_questions is not None:
+        entries = [entry for entry in entries if entry["question"] in only_questions]
     with _lock:
         data = _load_nodes_data(project_id)
         node_id = _unique_node_id(set(data["nodes"]), label)
@@ -652,11 +656,68 @@ def create_node_for_source(
         qa_entries=entries,
         project_id=project_id,
     )
+    if only_questions is None:
+        with _lock:
+            data = _load_nodes_data(project_id)
+            if data.get("detached", {}).pop(source_path, None) is not None:
+                _save_nodes_data(data, project_id)
+    return {**node, "node_id": node_id}
+
+
+def _ensure_path(data: dict[str, Any], parts: list[str]) -> str:
+    """The node at ``parts`` (labels from the top), creating what is missing."""
+    nodes = data["nodes"]
+    parent_id: str | None = None
+    for part in parts:
+        siblings = (
+            [nid for nid, n in nodes.items() if not any(p in nodes for p in n.get("parent_ids", []))]
+            if parent_id is None
+            else [nid for nid in nodes[parent_id].get("child_ids", []) if nid in nodes]
+        )
+        wanted = part.strip().casefold()
+        found = next(
+            (nid for nid in siblings if str(nodes[nid].get("label", "")).strip().casefold() == wanted),
+            None,
+        )
+        if found is None:
+            found = _unique_node_id(set(nodes), part)
+            nodes[found] = {
+                "label": part,
+                "parent_ids": [parent_id] if parent_id else [],
+                "child_ids": [],
+                "order": max((float(nodes[nid].get("order", 1.0)) for nid in siblings), default=0.0) + 1.0,
+                "hidden": False,
+                "qa_entries": [],
+            }
+            if parent_id:
+                nodes[parent_id].setdefault("child_ids", []).append(found)
+        parent_id = found
+    return str(parent_id)
+
+
+def place_questions_by_path(
+    source_path: str, paths: dict[str, list[str]], project_id: str = "default",
+) -> int:
+    """Mount each question on the node its ``path`` names, creating nodes as needed.
+
+    已經掛在某處的題目不搬：工作人員可能拖過。刻意拿下選單的也不放回去。回傳實際放了幾題。
+    """
+    by_question = {entry["question"]: entry for entry in _build_entries_for_source(source_path, project_id)}
+    placed = 0
     with _lock:
         data = _load_nodes_data(project_id)
-        if data.get("detached", {}).pop(source_path, None) is not None:
-            _save_nodes_data(data, project_id)
-    return {**node, "node_id": node_id}
+        detached = set(data.get("detached", {}).get(source_path, []))
+        for question, parts in paths.items():
+            entry = by_question.get(question)
+            if not entry or not parts or question in detached or _is_mounted(data, source_path, question):
+                continue
+            node = data["nodes"][_ensure_path(data, parts)]
+            if any(existing["question"] == question for existing in node.get("qa_entries", [])):
+                continue
+            node.setdefault("qa_entries", []).append(dict(entry))
+            placed += 1
+        _save_nodes_data(data, project_id)
+    return placed
 
 
 def _refill_source_slots(

@@ -166,6 +166,39 @@ describe("ImportResultList", () => {
     expect(screen.getByText("已更新快速問答：English › booth_faq_en（2 題）")).toBeTruthy();
   });
 
+  it("says how many questions a re-upload added", () => {
+    renderList([row({
+      name: "faq.csv",
+      result: {
+        target: "knowledge/qa/faq.md", kind: "qa", updated: true, added: 3, kept: 90,
+        qa_node_label: "常見問題", question_count: 93,
+      },
+    })]);
+
+    expect(screen.getByText("已更新快速問答：常見問題（93 題），新增 3 題")).toBeTruthy();
+  });
+
+  it("says when a re-upload brought nothing new", () => {
+    renderList([row({
+      name: "faq.csv",
+      result: {
+        target: "knowledge/qa/faq.md", kind: "qa", updated: true, added: 0, kept: 2,
+        qa_node_label: "常見問題", question_count: 2,
+      },
+    })]);
+
+    expect(screen.getByText("已更新快速問答：常見問題（2 題），沒有新題目")).toBeTruthy();
+  });
+
+  it("says a document whose category was deleted is not back on the menu", () => {
+    renderList([row({
+      name: "faq.csv",
+      result: { target: "knowledge/qa/faq.md", kind: "qa", updated: true, added: 1, kept: 1 },
+    })]);
+
+    expect(screen.getByText("已更新文件內容。這份文件不在選單上，要放回選單請把文件拖進分類。")).toBeTruthy();
+  });
+
   it("follows a rename or a move made after the import", () => {
     renderList([
       row({ name: "faq.csv", result: qaResult }),

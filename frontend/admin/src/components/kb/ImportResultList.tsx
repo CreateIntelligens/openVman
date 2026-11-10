@@ -103,9 +103,15 @@ function ImportResultRow({
     icon = "error";
     iconClass = "text-danger";
     text = `沒有完成：${item.message ?? ""}`;
+  } else if (placement && !placement.text) {
+    // 分類刪掉後重傳同名文件：只更新內容，不會自己回到選單。
+    text = "已更新文件內容。這份文件不在選單上，要放回選單請把文件拖進分類。";
   } else if (placement) {
     const verb = result?.updated ? "已更新快速問答" : "已放進快速問答";
-    text = placement.text ? `${verb}：${placement.text}` : verb;
+    const merged = result?.added === undefined
+      ? ""
+      : result.added > 0 ? `，新增 ${result.added} 題` : "，沒有新題目";
+    text = `${verb}：${placement.text}${merged}`;
   } else {
     const verb = result?.updated ? "已更新既有文件" : "已加入知識庫";
     text = `${verb}${result ? documentFolderNote(result.target) : ""}${normalizeNote(item)}`;

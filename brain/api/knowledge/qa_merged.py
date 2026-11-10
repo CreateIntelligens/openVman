@@ -234,6 +234,114 @@ def merged_rows(node_id: str, node: dict[str, Any], project_id: str) -> list[dic
     ]
 
 
+def _verify_rewrite(
+    source: str,
+    before_items: list[dict[str, Any]],
+    updates: list[dict[str, Any]],
+    removed: set[str],
+    after_items: list[dict[str, Any]],
+) -> None:
+    """Refuse a rewrite that does not read back as intended.
+
+    答案裡的 ## 行等內容讀回來會變成別的題目，這種情況不能寫。
+    """
+    consumed = {update["match"] for update in updates if update.get("match")}
+    last_seen = {item["q"].strip(): position for position, item in enumerate(before_items)}
+    untouched = [
+        item
+        for position, item in enumerate(before_items)
+        if item["q"].strip() not in removed
+        and not (item["q"].strip() in consumed and last_seen[item["q"].strip()] == position)
+    ]
+    if sorted(qa_entry_values(after_items)) != sorted(qa_entry_values(untouched) + qa_entry_values(updates)):
+        raise MergedSaveError(400, f"{source} 的內容無法照原格式存回，未做任何變更")
+
+
+@dataclass
+class ReuploadMerge:
+    # None 表示新檔沒有帶來任何變更，不用寫。
+    content: str | None
+    added: int
+    kept: int
+
+
+def _quoted_list(questions: list[str], limit: int = 5) -> str:
+    shown = "、".join(f"「{' '.join(q.split())[:30]}」" for q in questions[:limit])
+    return f"{shown} 等 {len(questions)} 題" if len(questions) > limit else shown
+
+
+def merge_reupload(
+    source: str,
+    entries: list[dict[str, Any]],
+    extras: dict[str, dict[str, Any]],
+    project_id: str,
+) -> ReuploadMerge:
+    """Merge a re-uploaded QA table into the document it would replace.
+
+    新題加進去，檔案裡已有、新檔沒有的題目留著（要刪到編輯畫面刪）。同一題內容不同時整份拒絕：
+    哪一版才對要有人決定，直接蓋掉就是默默丟資料。同一題只差舊檔沒填的圖片或連結時補上。
+    """
+    doc_path = resolve_workspace_document(source, project_id)
+    is_csv = doc_path.suffix.lower() == ".csv"
+    before_bytes = doc_path.read_bytes()
+    try:
+        before_text = "" if is_csv else before_bytes.decode("utf-8-sig")
+        before_items = parse_qa_csv(before_bytes) if is_csv else parse_qa_markdown(before_text)
+    except (UnicodeDecodeError, csv.Error) as exc:
+        raise MergedSaveError(400, "現有的文件讀不懂，請先到文件頁修好再上傳") from exc
+    in_file = {item["q"].strip(): item for item in before_items}
+
+    def _differs(new: dict[str, Any], old: dict[str, Any], key: str) -> bool:
+        return bool(new.get(key)) and bool(old.get(key)) and new[key] != old[key]
+
+    updates: list[dict[str, Any]] = []
+    conflicts: list[str] = []
+    fresh: list[dict[str, Any]] = []
+    kept = 0
+    for entry in entries:
+        q = entry["q"].strip()
+        values = {
+            "q": q,
+            "a": entry["a"].strip(),
+            "img": extract_image_id(entry.get("img") or ""),
+            "url": (entry.get("url") or "").strip(),
+            "hidden": bool(entry.get("hidden")),
+        }
+        old = in_file.get(q)
+        if old is None:
+            fresh.append({"match": None, **values, "language": extras.get(q, {}).get("language", "")})
+            continue
+        old_values = {
+            "img": extract_image_id(old.get("img") or ""),
+            "url": (old.get("url") or "").strip(),
+        }
+        if old["a"].strip() != values["a"] or any(_differs(values, old_values, key) for key in ("img", "url")):
+            conflicts.append(q)
+            continue
+        kept += 1
+        filled = {key: values[key] or old_values[key] for key in ("img", "url")}
+        if filled != old_values:
+            # 隱藏狀態留舊的：工作人員可能在後台隱藏過。
+            updates.append({"match": q, **values, **filled, "hidden": bool(old.get("hidden"))})
+    if conflicts:
+        raise MergedSaveError(
+            400,
+            f"{_quoted_list(conflicts)} 的內容和現有的不同，這份檔案沒有匯入。"
+            "請改成一樣，或先到分類編輯改掉舊答案，再重新上傳。",
+        )
+    updates.extend(fresh)
+    if not updates:
+        return ReuploadMerge(None, 0, kept)
+
+    if is_csv:
+        content = rewrite_qa_csv(before_bytes, updates, set(), shared=True)
+    else:
+        content = rewrite_qa_markdown(before_text, updates, set(), shared=True)
+    after_items = parse_qa_csv(content.encode("utf-8")) if is_csv else parse_qa_markdown(content)
+    _verify_rewrite(source, before_items, updates, set(), after_items)
+    return ReuploadMerge(content, len(fresh), kept)
+
+
 def _hidden_of(item: dict[str, Any], in_file: dict[str, Any] | None) -> bool:
     if item.get("hidden") is None:
         return bool(in_file and in_file.get("hidden"))
@@ -329,18 +437,8 @@ def _plan_file(
     except ValueError as exc:
         raise MergedSaveError(400, f"{source}：{exc}，未做任何變更") from exc
 
-    # 寫入前先讀回比對：答案裡的 ## 行等內容讀回來會變成別的題目，這種情況不能寫。
     after_items = parse_qa_csv(content.encode("utf-8")) if is_csv else parse_qa_markdown(content)
-    consumed = {update["match"] for update in updates if update["match"]}
-    last_seen = {item["q"].strip(): position for position, item in enumerate(before_items)}
-    untouched = [
-        item
-        for position, item in enumerate(before_items)
-        if item["q"].strip() not in removed
-        and not (item["q"].strip() in consumed and last_seen[item["q"].strip()] == position)
-    ]
-    if sorted(qa_entry_values(after_items)) != sorted(qa_entry_values(untouched) + qa_entry_values(updates)):
-        raise MergedSaveError(400, f"{source} 的內容無法照原格式存回，未做任何變更")
+    _verify_rewrite(source, before_items, updates, removed, after_items)
 
     # 同題重複的列看不出使用者改的是哪一列，有變動就交給人到文件頁處理；沒變動就不寫。
     duplicated = repeated & own

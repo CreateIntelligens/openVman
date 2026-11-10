@@ -78,6 +78,7 @@ _FIELD_ALIASES: dict[str, list[str]] = {
     "index": ["index", "i", "順序"],
     "display": ["display", "d", "顯示"],
     "language": ["language", "lang", "語言", "语言"],
+    "path": ["path", "路徑", "路径", "分類", "分类"],
 }
 
 _ROW_LANGUAGES: dict[str, str] = {
@@ -326,7 +327,8 @@ def rewrite_qa_csv(
         position = column_of.get(canonical)
         return row[position] if position is not None and position < len(row) else ""
 
-    if "index" not in column_of:
+    # 共用檔案不排序，用不到 index；補一欄只有新列有值，排序時新列反而會跑到舊列前面。
+    if "index" not in column_of and shared is not True:
         _add_column("index")
     if "img" not in column_of and any(extract_image_id(u.get("img") or "") for u in updates):
         _add_column("img")
@@ -334,6 +336,8 @@ def rewrite_qa_csv(
         _add_column("url")
     if "display" not in column_of and any(u.get("hidden") for u in updates):
         _add_column("display")
+    if "language" not in column_of and any(u.get("language") for u in updates):
+        _add_column("language")
 
     def _question_of(row: list[str]) -> str:
         return _cell(row, "q").strip()
@@ -392,6 +396,8 @@ def rewrite_qa_csv(
             (current_display in _HIDDEN_DISPLAY_VALUES) == hidden,
         )
         _put("index", index_of[id(update)])
+        if existing is None and update.get("language"):
+            _put("language", update["language"])
         return row
 
     return _write_csv_table(
@@ -455,6 +461,22 @@ def rewrite_qa_markdown(
         shared = any(block[0] not in matched and block[0] not in removed for block in blocks)
     placed = _place_rows(blocks, lambda block: block[0], updates, removed, _build_block, keep_positions=shared)
     return "\n\n".join([preamble, *(block[1] for block in placed)] if preamble else [block[1] for block in placed])
+
+
+def qa_csv_row_extras(file_bytes: bytes) -> dict[str, dict[str, Any]]:
+    """Each question's ``path`` parts and ``language`` label from an uploaded table."""
+    parsed = _parse_csv_rows(file_bytes)
+    if parsed is None:
+        return {}
+    extras: dict[str, dict[str, Any]] = {}
+    for row in parsed[1]:
+        question = (row.get("q") or "").strip()
+        if question:
+            extras[question] = {
+                "path": [part.strip() for part in (row.get("path") or "").split("/") if part.strip()],
+                "language": (row.get("language") or "").strip(),
+            }
+    return extras
 
 
 def normalize_row_language(raw: str) -> str | None:

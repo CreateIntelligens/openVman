@@ -218,6 +218,9 @@ export interface KnowledgeCommitFileResult {
   kind: "qa" | "document";
   language?: KnowledgeLanguage | null;
   updated: boolean;
+  /** 重傳同名問答表時才有：這次新增幾題、幾題和現有內容相同。 */
+  added?: number;
+  kept?: number;
   qa_node_id?: string;
   qa_node_label?: string;
   qa_parent_label?: string;
