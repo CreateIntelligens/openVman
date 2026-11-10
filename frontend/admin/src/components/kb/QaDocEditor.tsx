@@ -9,7 +9,8 @@ import {
   type QaRow,
 } from "./qaMarkdown";
 import QaRowCard, { QA_HIDDEN_HINT, QaRowListHeader } from "./qa/QaRowCard";
-import { moveToInsertion, useRowReorder } from "./qa/rowReorder";
+import QaMoveToModal from "./qa/QaMoveToModal";
+import { insertionForPosition, moveToInsertion, useRowReorder } from "./qa/rowReorder";
 import { useQaImageUpload } from "./qa/useQaImageUpload";
 import { useQaRowReveal } from "./qa/useQaRowReveal";
 
@@ -52,6 +53,7 @@ function editableRowsFromContent(content: string, format: "markdown" | "csv"): E
 
 export default function QaDocEditor({ content, onChange, format = "markdown" }: QaDocEditorProps) {
   const [rows, setRows] = useState<EditorRow[]>(() => editableRowsFromContent(content, format));
+  const [moveToRowId, setMoveToRowId] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<{ error: boolean; text: string } | null>(null);
   const csvHeadersRef = useRef(format === "csv" ? parseQaCsv(content).headers : []);
   // Blank draft rows serialize to nothing, so re-parse only on external
@@ -114,6 +116,13 @@ export default function QaDocEditor({ content, onChange, format = "markdown" }: 
     emit(rowsRef.current.filter((row) => row.localId !== rowId));
   };
 
+  const moveRowTo = (rowId: string, position: number) => {
+    const from = rowsRef.current.findIndex((row) => row.localId === rowId);
+    if (from < 0) return;
+    emit(reassignCsvIndexes(moveToInsertion(rowsRef.current, from, insertionForPosition(from, position))));
+    revealRow({ rowId, flash: true });
+  };
+
   const reorder = useRowReorder(rows.length, (from, insertAt) => {
     emit(reassignCsvIndexes(moveToInsertion(rowsRef.current, from, insertAt)));
   });
@@ -156,6 +165,11 @@ export default function QaDocEditor({ content, onChange, format = "markdown" }: 
                   img={row.img}
                   url={row.url}
                   hidden={row.hidden}
+                  onMoveUp={() => moveRowTo(row.localId, idx)}
+                  onMoveDown={() => moveRowTo(row.localId, idx + 2)}
+                  onMoveTo={rows.length > 1 ? () => setMoveToRowId(row.localId) : undefined}
+                  isFirst={idx === 0}
+                  isLast={idx === rows.length - 1}
                   onChange={(field, value) => handleCellChange(row.localId, field, value)}
                   onRemove={() => handleRemoveRow(row.localId)}
                   onPickImage={() => handlePickImage(row.localId)}
@@ -175,6 +189,17 @@ export default function QaDocEditor({ content, onChange, format = "markdown" }: 
       </div>
 
       <input {...imageUpload.fileInputProps} />
+      {moveToRowId !== null && rows.some((row) => row.localId === moveToRowId) && (
+        <QaMoveToModal
+          rowNumber={rows.findIndex((row) => row.localId === moveToRowId) + 1}
+          total={rows.length}
+          onMove={(position) => {
+            moveRowTo(moveToRowId, position);
+            setMoveToRowId(null);
+          }}
+          onClose={() => setMoveToRowId(null)}
+        />
+      )}
     </div>
   );
 }

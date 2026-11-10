@@ -8,6 +8,19 @@ export function moveToInsertion<T>(list: T[], from: number, insertAt: number): T
   return next;
 }
 
+/** ``moveToInsertion`` 要的插入位置：讓第 ``from`` 列（從 0 算）最後落在第 ``position`` 題（從 1 算）。 */
+export function insertionForPosition(from: number, position: number): number {
+  return position - 1 > from ? position : position - 1;
+}
+
+/** 使用者輸入的題號；中文輸入法常打出全形數字，一併接受。範圍外或不是整數回 null。 */
+export function parseRowPosition(raw: string, total: number): number | null {
+  const text = raw.normalize("NFKC").trim();
+  if (!/^\d+$/.test(text)) return null;
+  const position = Number(text);
+  return position >= 1 && position <= total ? position : null;
+}
+
 function pointerInsertion(event: DragEvent<HTMLElement>, index: number): number {
   const rect = event.currentTarget.getBoundingClientRect();
   return event.clientY > rect.top + rect.height / 2 ? index + 1 : index;

@@ -6,8 +6,9 @@ import type { Status } from "../../../hooks/useStatusState";
 import { errorMessage } from "../../../utils/errorMessage";
 import { fileNameOf, normalizeSearchTerm } from "../helpers";
 import MountQaEntryModal from "./MountQaEntryModal";
+import QaMoveToModal from "./QaMoveToModal";
 import QaRowCard, { QA_HIDDEN_HINT, QaRowListHeader, type QaRowField } from "./QaRowCard";
-import { moveToInsertion, useRowReorder } from "./rowReorder";
+import { insertionForPosition, moveToInsertion, useRowReorder } from "./rowReorder";
 import { useQaImageUpload } from "./useQaImageUpload";
 import { type QaRowFocusTarget, useQaRowReveal } from "./useQaRowReveal";
 
@@ -173,6 +174,7 @@ function CategoryEditor({
   const report = useCallback((status: Status) => onStatusRef.current?.(status), []);
 
   const { revealRow, registerRow, flashRowId } = useQaRowReveal();
+  const [moveToRowId, setMoveToRowId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     loadSequenceRef.current += 1;
@@ -263,6 +265,14 @@ function CategoryEditor({
   );
   const singleSource = sourceFiles.length === 1 ? sourceFiles[0] : null;
   const hasManySources = sourceFiles.length > 1;
+
+  const moveRowTo = (rowId: string, position: number) => {
+    setRows((prev) => {
+      const from = prev.findIndex((row) => row._localId === rowId);
+      return from < 0 ? prev : moveToInsertion(prev, from, insertionForPosition(from, position));
+    });
+    revealRow({ rowId, flash: true });
+  };
 
   const reorder = useRowReorder(rows.length, (from, insertAt) => {
     setRows((prev) => moveToInsertion(prev, from, insertAt));
@@ -585,8 +595,8 @@ function CategoryEditor({
               {/* 手機沒辦法拖曳，把手和這句話都不顯示。 */}
               <span className="[@media(pointer:coarse)]:hidden">
                 {searching
-                  ? "搜尋時不能調整順序，清除搜尋後才能拖曳。"
-                  : "按住題號左邊的把手可以拖曳排序。"}
+                  ? "搜尋時不能拖曳排序，可以用「移到第幾題」。"
+                  : "按住題號左邊的把手可以拖曳排序，也可以用上移、下移。"}
               </span>
               {QA_HIDDEN_HINT}
             </p>
@@ -611,6 +621,11 @@ function CategoryEditor({
                   onMount={row.source_file && row.original_q && !isDirty
                     ? () => openMount(row._localId)
                     : undefined}
+                  onMoveUp={searching ? undefined : () => moveRowTo(row._localId, position)}
+                  onMoveDown={searching ? undefined : () => moveRowTo(row._localId, position + 2)}
+                  onMoveTo={rows.length > 1 ? () => setMoveToRowId(row._localId) : undefined}
+                  isFirst={position === 0}
+                  isLast={position === rows.length - 1}
                   onChange={(field, value) => handleCellChange(row._localId, CELL_FIELD[field], value)}
                   onRemove={() => handleRemoveRow(row._localId, position)}
                   onPickImage={() => imageUpload.pickImage(row._localId)}
@@ -633,6 +648,17 @@ function CategoryEditor({
       </div>
 
       <input {...imageUpload.fileInputProps} />
+      {moveToRowId !== null && rows.some((row) => row._localId === moveToRowId) && (
+        <QaMoveToModal
+          rowNumber={rows.findIndex((row) => row._localId === moveToRowId) + 1}
+          total={rows.length}
+          onMove={(position) => {
+            moveRowTo(moveToRowId, position);
+            setMoveToRowId(null);
+          }}
+          onClose={() => setMoveToRowId(null)}
+        />
+      )}
       {mountRow && (
         <MountQaEntryModal
           question={mountRow.q}

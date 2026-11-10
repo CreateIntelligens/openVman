@@ -726,7 +726,7 @@ describe("MergedCsvPane", () => {
 
       expect(articles()).toHaveLength(6);
       expect(container.querySelectorAll("[draggable]")).toHaveLength(0);
-      expect(screen.getByText("搜尋時不能調整順序，清除搜尋後才能拖曳。")).toBeTruthy();
+      expect(screen.getByText("搜尋時不能拖曳排序，可以用「移到第幾題」。")).toBeTruthy();
 
       fireEvent.click(screen.getByRole("button", { name: "清除搜尋" }));
       expect(container.querySelectorAll("[draggable]")).toHaveLength(6);
@@ -1185,5 +1185,83 @@ describe("MergedCsvPane when an import updates the open category", () => {
 
     expect(onStatus).not.toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
     expect(screen.getByDisplayValue("我正在改")).toBeTruthy();
+  });
+});
+
+describe("MergedCsvPane moving questions without dragging", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+    qaNodeMocks.saveMergedQa.mockResolvedValue({ status: "ok" });
+    qaNodeMocks.fetchMergedQa.mockResolvedValue(makeRows(4));
+  });
+
+  it("moves a question up and down and saves the on-screen order", async () => {
+    render(pane());
+    await screen.findByDisplayValue("問題1");
+
+    fireEvent.click(screen.getByRole("button", { name: "第 3 題上移" }));
+    expect(questionValues()).toEqual(["問題1", "問題3", "問題2", "問題4"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "第 1 題下移" }));
+    expect(questionValues()).toEqual(["問題3", "問題1", "問題2", "問題4"]);
+
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+    const payload = qaNodeMocks.saveMergedQa.mock.lastCall?.[1] as Array<MergedQaItem>;
+    expect(payload.map((row) => [row.q, row.index])).toEqual([
+      ["問題3", "1"], ["問題1", "2"], ["問題2", "3"], ["問題4", "4"],
+    ]);
+  });
+
+  it("cannot move the first question up or the last one down", async () => {
+    render(pane());
+    await screen.findByDisplayValue("問題1");
+
+    expect((screen.getByRole("button", { name: "第 1 題上移" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "第 4 題下移" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it.each([
+    ["3", ["問題2", "問題3", "問題1", "問題4"]],
+    ["４", ["問題2", "問題3", "問題4", "問題1"]],
+  ])("jumps to the typed position %s", async (typed, expected) => {
+    render(pane());
+    await screen.findByDisplayValue("問題1");
+
+    fireEvent.click(screen.getByRole("button", { name: "把第 1 題移到第幾題" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /移到第幾題/ }), { target: { value: typed } });
+    fireEvent.click(screen.getByRole("button", { name: "移動" }));
+
+    expect(questionValues()).toEqual(expected);
+    expect(screen.queryByRole("textbox", { name: /移到第幾題/ })).toBeNull();
+  });
+
+  it("keeps the dialog open and explains when the number is out of range", async () => {
+    render(pane());
+    await screen.findByDisplayValue("問題1");
+
+    fireEvent.click(screen.getByRole("button", { name: "把第 2 題移到第幾題" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /移到第幾題/ }), { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: "移動" }));
+
+    expect(screen.getByText("請輸入 1 到 4 的數字。")).toBeTruthy();
+    expect(questionValues()).toEqual(["問題1", "問題2", "問題3", "問題4"]);
+  });
+
+  it("offers only the jump while searching, by the question's position in the full list", async () => {
+    qaNodeMocks.fetchMergedQa.mockResolvedValue(makeRows(6));
+    render(pane());
+    await screen.findByDisplayValue("問題1");
+
+    fireEvent.change(screen.getByPlaceholderText(/搜尋/), { target: { value: "問題5" } });
+
+    expect(screen.queryByRole("button", { name: "第 5 題上移" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "把第 5 題移到第幾題" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /移到第幾題/ }), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "移動" }));
+    fireEvent.change(screen.getByPlaceholderText(/搜尋/), { target: { value: "" } });
+
+    expect(questionValues()).toEqual(["問題5", "問題1", "問題2", "問題3", "問題4", "問題6"]);
   });
 });

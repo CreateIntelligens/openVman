@@ -33,6 +33,12 @@ interface QaRowCardProps {
   rowRef?: (element: HTMLElement | null) => void;
   highlighted?: boolean;
   invalidFields?: { question?: boolean; answer?: boolean };
+  /** 不用拖曳的排序方式，手機也能用。沒給就不顯示；搜尋時顯示的不是完整順序，只留「移到第幾題」。 */
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onMoveTo?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
   /** 排序用。沒給就沒有把手：搜尋時顯示的不是完整順序，不能拖。 */
   rowProps?: {
     "data-reorder-row": boolean;
@@ -66,6 +72,11 @@ export default function QaRowCard({
   menuOnly = false,
   alsoIn = [],
   onMount,
+  onMoveUp,
+  onMoveDown,
+  onMoveTo,
+  isFirst = false,
+  isLast = false,
   onChange,
   onRemove,
   onPickImage,
@@ -139,6 +150,41 @@ export default function QaRowCard({
             只在選單
           </span>
         )}
+
+        <div className="flex flex-wrap items-center gap-1">
+          {onMoveUp && (
+            <button
+              type="button"
+              className={ROW_BUTTON_CLASS}
+              onClick={onMoveUp}
+              disabled={isFirst}
+              aria-label={`第 ${number} 題上移`}
+            >
+              上移
+            </button>
+          )}
+          {onMoveDown && (
+            <button
+              type="button"
+              className={ROW_BUTTON_CLASS}
+              onClick={onMoveDown}
+              disabled={isLast}
+              aria-label={`第 ${number} 題下移`}
+            >
+              下移
+            </button>
+          )}
+          {onMoveTo && (
+            <button
+              type="button"
+              className={ROW_BUTTON_CLASS}
+              onClick={onMoveTo}
+              aria-label={`把第 ${number} 題移到第幾題`}
+            >
+              移到第幾題
+            </button>
+          )}
+        </div>
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
           {onMount && (
