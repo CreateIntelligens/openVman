@@ -199,6 +199,30 @@ describe("ImportResultList", () => {
     expect(screen.getByText("已更新文件內容。這份文件不在選單上，要放回選單請把文件拖進分類。")).toBeTruthy();
   });
 
+  it("says when a table was split across categories", () => {
+    renderList([row({
+      name: "faq.csv",
+      result: {
+        target: "knowledge/qa/faq.md", kind: "qa", updated: false,
+        qa_node_label: "產品", question_count: 4, qa_category_count: 3,
+      },
+    })]);
+
+    expect(screen.getByText("已放進快速問答：產品 等 3 個分類（4 題）")).toBeTruthy();
+  });
+
+  it("names questions that could not go on the menu", () => {
+    renderList([row({
+      name: "faq.csv",
+      result: {
+        target: "knowledge/qa/faq.md", kind: "qa", updated: false,
+        qa_node_label: "產品", question_count: 1, name_clashes: ["保固多久"],
+      },
+    })]);
+
+    expect(screen.getByText("已放進快速問答：產品（1 題）。有 1 題沒放進選單，分類裡已有同名題目：保固多久")).toBeTruthy();
+  });
+
   it("follows a rename or a move made after the import", () => {
     renderList([
       row({ name: "faq.csv", result: qaResult }),

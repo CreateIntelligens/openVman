@@ -37,6 +37,7 @@ from knowledge.qa_csv import (
     rewrite_qa_csv,
     rewrite_qa_markdown,
     serialize_qa_csv,
+    unify_newlines,
 )
 from knowledge.qa_nodes import (
     get_node,
@@ -297,16 +298,23 @@ def merge_reupload(
     updates: list[dict[str, Any]] = []
     conflicts: list[str] = []
     fresh: list[dict[str, Any]] = []
+    seen: dict[str, dict[str, Any]] = {}
     kept = 0
     for entry in entries:
         q = entry["q"].strip()
         values = {
             "q": q,
-            "a": entry["a"].strip(),
+            "a": unify_newlines(entry["a"]).strip(),
             "img": extract_image_id(entry.get("img") or ""),
             "url": (entry.get("url") or "").strip(),
             "hidden": bool(entry.get("hidden")),
         }
+        # 同一份檔案裡重複的列：一樣就算一題，不一樣（例如圖片不同）要有人決定。
+        if q in seen:
+            if seen[q] != values:
+                conflicts.append(q)
+            continue
+        seen[q] = values
         old = in_file.get(q)
         if old is None:
             fresh.append({"match": None, **values, "language": extras.get(q, {}).get("language", "")})
@@ -315,7 +323,7 @@ def merge_reupload(
             "img": extract_image_id(old.get("img") or ""),
             "url": (old.get("url") or "").strip(),
         }
-        if old["a"].strip() != values["a"] or any(_differs(values, old_values, key) for key in ("img", "url")):
+        if unify_newlines(old["a"]).strip() != values["a"] or any(_differs(values, old_values, key) for key in ("img", "url")):
             conflicts.append(q)
             continue
         kept += 1
@@ -326,7 +334,7 @@ def merge_reupload(
     if conflicts:
         raise MergedSaveError(
             400,
-            f"{_quoted_list(conflicts)} 的內容和現有的不同，這份檔案沒有匯入。"
+            f"{_quoted_list(list(dict.fromkeys(conflicts)))} 的內容和現有的不同，這份檔案沒有匯入。"
             "請改成一樣，或先到分類編輯改掉舊答案，再重新上傳。",
         )
     updates.extend(fresh)

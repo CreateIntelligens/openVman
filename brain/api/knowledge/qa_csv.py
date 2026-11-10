@@ -14,6 +14,8 @@ from typing import Any
 
 _QA_HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 _QA_METADATA_RE = re.compile(r"<!--\s*qa_metadata:\s*({.*?})\s*-->")
+# 全形斜線和反斜線也算分層：寫錯時變成一個名字裡有斜線的分類，看不出哪裡錯。
+_PATH_SEPARATORS = re.compile(r"[/／\\]")
 _CSV_ENCODINGS = ("utf-8-sig", "utf-8", "cp950", "big5", "gbk")
 
 
@@ -293,7 +295,8 @@ def _place_rows(
             last_slot = len(result)
         elif question_of(row) not in removed:
             result.append(row)
-    insert_at = last_slot if last_slot >= 0 else len(result)
+    # 共用檔案的順序記在節點上，新列放檔尾；否則放在這批題目後面，不要跑到別的題目之後。
+    insert_at = last_slot if last_slot >= 0 and not keep_positions else len(result)
     result[insert_at:insert_at] = fresh
     return result
 
@@ -473,7 +476,11 @@ def qa_csv_row_extras(file_bytes: bytes) -> dict[str, dict[str, Any]]:
         question = (row.get("q") or "").strip()
         if question:
             extras[question] = {
-                "path": [part.strip() for part in (row.get("path") or "").split("/") if part.strip()],
+                "path": [
+                    part.strip()
+                    for part in _PATH_SEPARATORS.split(row.get("path") or "")
+                    if part.strip()
+                ],
                 "language": (row.get("language") or "").strip(),
             }
     return extras
@@ -643,12 +650,17 @@ def serialize_qa_csv(entries: list[dict[str, Any]]) -> str:
     return buffer.getvalue()
 
 
+def unify_newlines(text: str) -> str:
+    """One newline style: Windows line breaks are not a different answer."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def qa_entry_values(entries: list[dict[str, Any]]) -> list[tuple[str, str, str, str, bool]]:
     """Comparable values of parsed QA entries, for checking content reads back unchanged."""
     return [
         (
-            entry["q"].strip(),
-            entry["a"].strip(),
+            unify_newlines(entry["q"]).strip(),
+            unify_newlines(entry["a"]).strip(),
             extract_image_id(entry.get("img") or ""),
             (entry.get("url") or "").strip(),
             bool(entry.get("hidden", False)),

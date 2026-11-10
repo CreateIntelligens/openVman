@@ -536,6 +536,136 @@ def test_reupload_keeps_questions_taken_off_the_menu_off_it(workspace: Path):
     assert [e["question"] for e in _nodes()[node_id]["qa_entries"]] == ["Q2"]
 
 
+def test_a_blank_path_on_a_reupload_goes_to_the_file_category(workspace: Path):
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,X\n")
+    commit_raw_documents("default")
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,X\nQ2,A2,\n")
+    commit_raw_documents("default")
+
+    by_label = {n["label"]: n for n in _nodes().values()}
+    assert [e["question"] for e in by_label["X"]["qa_entries"]] == ["Q1"]
+    assert [e["question"] for e in by_label["faq"]["qa_entries"]] == ["Q2"]
+
+
+def test_a_deleted_category_stays_off_the_menu_even_with_a_path(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,X\n")
+    commit_raw_documents("default")
+    qa_nodes.delete_node(next(iter(_nodes())), "default")
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,X\nQ2,A2,Y\n")
+    result = commit_raw_documents("default")
+
+    assert _nodes() == {}
+    assert "A2" in (workspace / "knowledge" / "qa" / "faq.md").read_text(encoding="utf-8")
+    assert result["results"]["faq.csv"]["added"] == 1
+
+
+def test_an_emptied_category_gets_its_questions_back_even_with_a_path(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    _raw(workspace, "faq.csv", "q,a\nQ1,A1\n")
+    node_id = commit_raw_documents("default")["results"]["faq.csv"]["qa_node_id"]
+    qa_nodes.update_node(node_id, {"qa_entries": []}, "default")
+
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,\nQ2,A2,X/Y\n")
+    commit_raw_documents("default")
+
+    assert {e["question"] for e in _nodes()[node_id]["qa_entries"]} == {"Q1", "Q2"}
+
+
+def test_windows_line_breaks_are_not_a_different_answer(workspace: Path):
+    target = workspace / "knowledge" / "qa" / "own.csv"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes('q,a\nQ1,"第一行\r\n第二行"\n'.encode("utf-8"))
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/own.csv", "default", source_type="qa")
+    qa_nodes.create_node_for_source("knowledge/qa/own.csv", "own", "default")
+
+    _raw(workspace, "own.csv", 'q,a\nQ1,"第一行\n第二行"\nQ2,A2\n')
+    result = commit_raw_documents("default")
+
+    assert result["committed"] == ["knowledge/qa/own.csv"]
+    assert result["results"]["own.csv"]["added"] == 1
+
+
+def test_path_prefers_a_visible_category_over_a_hidden_one(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    qa_nodes.create_node("hidden_one", "EUS", hidden=True)
+    qa_nodes.create_node("shown_one", "eus", order=2.0)
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,EUS\n")
+
+    commit_raw_documents("default")
+
+    assert [e["question"] for e in _nodes()["shown_one"]["qa_entries"]] == ["Q1"]
+    assert _nodes()["hidden_one"]["qa_entries"] == []
+
+
+@pytest.mark.parametrize("path", ["中文／產品", "中文\\產品", "中文/產品"])
+def test_path_separators_all_split_levels(workspace: Path, path: str):
+    _raw(workspace, "faq.csv", f"q,a,path\nQ1,A1,{path}\n")
+
+    commit_raw_documents("default")
+
+    assert sorted(n["label"] for n in _nodes().values()) == ["中文", "產品"]
+
+
+def test_full_width_letters_match_the_same_category(workspace: Path):
+    import knowledge.qa_nodes as qa_nodes
+
+    qa_nodes.create_node("eus", "eus")
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,ＥＵＳ\n")
+
+    commit_raw_documents("default")
+
+    assert sorted(_nodes()) == ["eus"]
+
+
+def test_a_question_that_clashes_with_the_category_is_reported(workspace: Path):
+    _raw(workspace, "a.csv", "q,a,path\nQ1,A1,X\n")
+    commit_raw_documents("default")
+
+    _raw(workspace, "b.csv", "q,a,path\nQ1,A1,X\n")
+    result = commit_raw_documents("default")
+
+    assert result["results"]["b.csv"]["name_clashes"] == ["Q1"]
+
+
+def test_new_questions_go_to_the_end_even_when_an_image_is_filled_in(workspace: Path):
+    _raw(workspace, "faq.csv", "q,a,img\nQ1,A1,\nQ2,A2,\nQ3,A3,\n")
+    commit_raw_documents("default")
+
+    _raw(workspace, "faq.csv", "q,a,img\nQ1,A1,new.png\nQ4,A4,\n")
+    commit_raw_documents("default")
+
+    assert [e["question"] for e in next(iter(_nodes().values()))["qa_entries"]] == ["Q1", "Q2", "Q3", "Q4"]
+
+
+def test_a_repeated_new_row_counts_once(workspace: Path):
+    _raw(workspace, "faq.csv", "q,a\nQ1,A1\n")
+    commit_raw_documents("default")
+
+    _raw(workspace, "faq.csv", "q,a\nQ1,A1\nQ2,A2\nQ2,A2\n")
+    result = commit_raw_documents("default")
+
+    assert result["results"]["faq.csv"]["added"] == 1
+    assert (workspace / "knowledge" / "qa" / "faq.md").read_text(encoding="utf-8").count("## Q2") == 1
+
+
+def test_a_split_table_reports_every_category(workspace: Path):
+    _raw(workspace, "faq.csv", "q,a,path\nQ1,A1,X\nQ2,A2,X\nQ3,A3,Y\n")
+
+    summary = commit_raw_documents("default")["results"]["faq.csv"]
+
+    assert summary["question_count"] == 3
+    assert summary["qa_category_count"] == 2
+
+
 def test_table_with_row_languages_stays_a_csv(workspace: Path):
     _raw(workspace, "mixed.csv", "q,a,language\n營業時間,九點開門,zh\nHours,Open at nine,en\n")
 

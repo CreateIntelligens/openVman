@@ -221,10 +221,14 @@ export interface KnowledgeCommitFileResult {
   /** 重傳同名問答表時才有：這次新增幾題、幾題和現有內容相同。 */
   added?: number;
   kept?: number;
+  /** 分類裡已有同名題目、沒能放進選單的題目。 */
+  name_clashes?: string[];
   qa_node_id?: string;
   qa_node_label?: string;
   qa_parent_label?: string;
   question_count?: number;
+  /** 題目分到不只一個分類時才有。 */
+  qa_category_count?: number;
 }
 
 export interface KnowledgeCommitJob {

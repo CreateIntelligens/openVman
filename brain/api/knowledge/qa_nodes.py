@@ -6,6 +6,7 @@ import os
 import tempfile
 import threading
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -636,16 +637,12 @@ def create_node_for_source(
     label: str,
     project_id: str = "default",
     parent_ids: list[str] | None = None,
-    only_questions: set[str] | None = None,
 ) -> dict[str, Any]:
-    """Create a tree node holding the questions of ``source_path``.
+    """Create a tree node holding every question of ``source_path``.
 
-    ``only_questions`` limits it to those; the rest are placed elsewhere.
     Returns the created node dict augmented with its ``node_id``.
     """
     entries = _build_entries_for_source(source_path, project_id)
-    if only_questions is not None:
-        entries = [entry for entry in entries if entry["question"] in only_questions]
     with _lock:
         data = _load_nodes_data(project_id)
         node_id = _unique_node_id(set(data["nodes"]), label)
@@ -656,12 +653,19 @@ def create_node_for_source(
         qa_entries=entries,
         project_id=project_id,
     )
-    if only_questions is None:
-        with _lock:
-            data = _load_nodes_data(project_id)
-            if data.get("detached", {}).pop(source_path, None) is not None:
-                _save_nodes_data(data, project_id)
+    with _lock:
+        data = _load_nodes_data(project_id)
+        if data.get("detached", {}).pop(source_path, None) is not None:
+            _save_nodes_data(data, project_id)
     return {**node, "node_id": node_id}
+
+
+def node_label(node_id: str, project_id: str = "default") -> str:
+    return str((get_node(node_id, project_id) or {}).get("label", ""))
+
+
+def _label_key(label: str) -> str:
+    return unicodedata.normalize("NFKC", label).strip().casefold()
 
 
 def _ensure_path(data: dict[str, Any], parts: list[str]) -> str:
@@ -674,11 +678,13 @@ def _ensure_path(data: dict[str, Any], parts: list[str]) -> str:
             if parent_id is None
             else [nid for nid in nodes[parent_id].get("child_ids", []) if nid in nodes]
         )
-        wanted = part.strip().casefold()
-        found = next(
-            (nid for nid in siblings if str(nodes[nid].get("label", "")).strip().casefold() == wanted),
-            None,
+        wanted = _label_key(part)
+        # 同名的分類有隱藏也有顯示時放顯示中的：放到隱藏的，訪客看不到。
+        matches = sorted(
+            (nid for nid in siblings if _label_key(str(nodes[nid].get("label", ""))) == wanted),
+            key=lambda nid: bool(nodes[nid].get("hidden", False)),
         )
+        found = matches[0] if matches else None
         if found is None:
             found = _unique_node_id(set(nodes), part)
             nodes[found] = {
@@ -697,13 +703,14 @@ def _ensure_path(data: dict[str, Any], parts: list[str]) -> str:
 
 def place_questions_by_path(
     source_path: str, paths: dict[str, list[str]], project_id: str = "default",
-) -> int:
+) -> list[str]:
     """Mount each question on the node its ``path`` names, creating nodes as needed.
 
-    已經掛在某處的題目不搬：工作人員可能拖過。刻意拿下選單的也不放回去。回傳實際放了幾題。
+    已經掛在某處的題目不搬：工作人員可能拖過。刻意拿下選單的也不放回去。
+    回傳因為分類裡已有同名題目而放不進去的題目，呼叫端要告訴使用者。
     """
     by_question = {entry["question"]: entry for entry in _build_entries_for_source(source_path, project_id)}
-    placed = 0
+    clashes: list[str] = []
     with _lock:
         data = _load_nodes_data(project_id)
         detached = set(data.get("detached", {}).get(source_path, []))
@@ -713,11 +720,11 @@ def place_questions_by_path(
                 continue
             node = data["nodes"][_ensure_path(data, parts)]
             if any(existing["question"] == question for existing in node.get("qa_entries", [])):
+                clashes.append(question)
                 continue
             node.setdefault("qa_entries", []).append(dict(entry))
-            placed += 1
         _save_nodes_data(data, project_id)
-    return placed
+    return clashes
 
 
 def _refill_source_slots(

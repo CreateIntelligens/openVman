@@ -44,7 +44,8 @@ function qaPlacement(result: KnowledgeCommitFileResult, nodesTree: QaNode[]) {
   const parentLabel = node ? liveParentLabel : result.qa_parent_label;
   const label = node?.label ?? result.qa_node_label;
   const place = [parentLabel, label].filter(Boolean).join(" › ");
-  const count = result.question_count === undefined ? "" : `（${result.question_count} 題）`;
+  const others = result.qa_category_count ? ` 等 ${result.qa_category_count} 個分類` : "";
+  const count = result.question_count === undefined ? "" : `${others}（${result.question_count} 題）`;
   return { nodeId: node?.node_id, text: `${place}${count}` };
 }
 
@@ -105,13 +106,19 @@ function ImportResultRow({
     text = `沒有完成：${item.message ?? ""}`;
   } else if (placement && !placement.text) {
     // 分類刪掉後重傳同名文件：只更新內容，不會自己回到選單。
-    text = "已更新文件內容。這份文件不在選單上，要放回選單請把文件拖進分類。";
+    const changed = result?.updated
+      ? (result.added === 0 ? "內容沒有變動" : "已更新文件內容")
+      : "已加入知識庫";
+    text = `${changed}。這份文件不在選單上，要放回選單請把文件拖進分類。`;
   } else if (placement) {
     const verb = result?.updated ? "已更新快速問答" : "已放進快速問答";
     const merged = result?.added === undefined
       ? ""
       : result.added > 0 ? `，新增 ${result.added} 題` : "，沒有新題目";
-    text = `${verb}：${placement.text}${merged}`;
+    const clashes = result?.name_clashes?.length
+      ? `。有 ${result.name_clashes.length} 題沒放進選單，分類裡已有同名題目：${result.name_clashes.slice(0, 3).join("、")}`
+      : "";
+    text = `${verb}：${placement.text}${merged}${clashes}`;
   } else {
     const verb = result?.updated ? "已更新既有文件" : "已加入知識庫";
     text = `${verb}${result ? documentFolderNote(result.target) : ""}${normalizeNote(item)}`;

@@ -746,10 +746,12 @@ def _qa_node_summary(target: str, project_id: str) -> dict[str, Any]:
     if node_id is None or not counts[node_id]:
         return {}
     node = nodes[node_id]
+    category_count = sum(1 for count in counts.values() if count)
     summary = {
         "qa_node_id": node_id,
         "qa_node_label": node.get("label", ""),
-        "question_count": counts[node_id],
+        "question_count": sum(counts.values()),
+        **({"qa_category_count": category_count} if category_count > 1 else {}),
     }
     parent = next((nodes[pid] for pid in node.get("parent_ids", []) if pid in nodes), None)
     return {**summary, "qa_parent_label": parent.get("label", "")} if parent else summary
@@ -779,6 +781,7 @@ def _commit_raw_file(
         find_language_category,
         is_qa_document,
         is_source_referenced,
+        node_label,
         place_questions_by_path,
         refill_emptied_node,
         sync_entries_for_source,
@@ -848,28 +851,31 @@ def _commit_raw_file(
             write_text_atomic(dest, content)
             touch_document_meta(target, project_id)
         language = resolve_document_languages([target], project_id)[target]
-        if is_qa:
-            paths = {question: row["path"] for question, row in extras.items() if row["path"]}
-            if paths:
-                place_questions_by_path(target, paths, project_id)
-            if referenced:
+        name_clashes: list[str] = []
+        if is_qa and existing_qa and not referenced:
+            # 分類刪掉的文件只更新內容，不回選單，表裡有 path 也一樣；分類還在但題目都拿掉了才接回去。
+            refill_emptied_node(target, target_rel.stem, project_id)
+        elif is_qa:
+            category = find_language_category(language, project_id)
+            if any(row["path"] for row in extras.values()):
+                # 同一份表裡沒填 path 的題目，不論第一次匯入或重傳，都放以檔名命名的分類。
+                parents = [node_label(category, project_id)] if category else []
+                name_clashes = place_questions_by_path(
+                    target,
+                    {q: row["path"] or [*parents, target_rel.stem] for q, row in extras.items()},
+                    project_id,
+                )
+                if referenced:
+                    sync_entries_for_source(target, project_id)
+            elif referenced:
                 sync_entries_for_source(target, project_id)
-            elif paths and existing_qa:
-                pass
-            elif not paths and refill_emptied_node(target, target_rel.stem, project_id):
-                pass
-            elif not existing_qa:
-                # 分類刪掉後重傳同名文件走不到這裡：只更新內容，不回選單。
-                unplaced = set(extras) - set(paths)
-                if unplaced:
-                    category = find_language_category(language, project_id)
-                    create_node_for_source(
-                        target,
-                        target_rel.stem,
-                        project_id,
-                        parent_ids=[category] if category else None,
-                        only_questions=unplaced if paths else None,
-                    )
+            elif not refill_emptied_node(target, target_rel.stem, project_id):
+                create_node_for_source(
+                    target,
+                    target_rel.stem,
+                    project_id,
+                    parent_ids=[category] if category else None,
+                )
         upsert_document_meta(target, project_id, source_type="qa" if is_qa else "upload")
         # AI 整理要幾分鐘，這段時間可能又傳了新版；留在 raw/ 等下一批，不能當成這一版搬走。
         if hashlib.sha256(src.read_bytes()).hexdigest() == origin_hash:
@@ -884,6 +890,7 @@ def _commit_raw_file(
         "language": language,
         "updated": updated,
         **merge_counts,
+        **({"name_clashes": name_clashes} if name_clashes else {}),
     }
     return {**result, **_qa_node_summary(target, project_id)} if is_qa else result
 
