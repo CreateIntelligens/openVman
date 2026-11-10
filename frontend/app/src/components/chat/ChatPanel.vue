@@ -106,6 +106,7 @@
     <div class="chat-input-bar">
       <AsrButton
         :is-listening="asrListening"
+        :is-paused="asrPaused"
         :is-transcribing="asrTranscribing"
         :disabled="!canSend || !asrSupported"
         :is-supported="asrSupported"
@@ -116,7 +117,7 @@
       <span class="composer-status" role="status" aria-live="polite">{{ asrStatusText }}</span>
       <label class="composer-shell" :class="{ 'composer-shell--listening': asrStatusText }">
         <span class="composer-label">輸入問題</span>
-        <MicLevel v-if="asrListening" class="composer-mic-level" :level="micLevel" />
+        <MicLevel v-if="asrListening && !asrPaused" class="composer-mic-level" :level="micLevel" />
         <input
           ref="inputRef"
           v-model="inputText"
@@ -175,6 +176,8 @@ const props = withDefaults(defineProps<{
   isThinking?: boolean
   isTyping?: boolean
   asrListening?: boolean
+  /** 語音對話開著，但虛擬人出聲中，麥克風暫時關閉。 */
+  asrPaused?: boolean
   asrSupported?: boolean
   /** 伺服器引擎是整段上傳：停止收音到出字之間有幾秒空窗，要讓使用者看得到。 */
   asrTranscribing?: boolean
@@ -233,19 +236,19 @@ const feedbackMessage = computed({
 // 收音狀態直接寫在輸入框裡：那是使用者按下麥克風後眼睛會看的地方。只靠按鈕
 // 變色的話，使用者回報過「點了看不到反饋，不知道有沒有收音」。
 const asrStatusText = computed(() => {
-  if (props.asrTranscribing) return "辨識中，請稍候…"
+  if (props.asrPaused) return "虛擬人講完會繼續聽"
   // 載模型、要麥克風那一兩秒說的話收不到，照實講，不能假裝已經在聽。
   if (props.asrStarting) return "麥克風啟動中…"
-  if (!props.asrListening) return ""
+  // 收音中上一句還在辨識時不叫人等：使用者可以接著講。
+  if (!props.asrListening) return props.asrTranscribing ? "辨識中，請稍候…" : ""
   if (props.asrInterim) return `辨識中：${props.asrInterim}`
   if (props.asrInputMode === "push-to-talk") return "請說話，說完按麥克風"
   return props.asrSpeaking ? "聽到了，說完會自動送出" : "請直接說話"
 })
 const asrButtonLabel = computed(() => {
   if (props.asrSupported === false) return "不支援語音"
-  if (props.asrTranscribing) return "辨識中…"
   if (props.asrStarting) return "請稍候…"
-  if (!props.asrListening) return "按我說話"
+  if (!props.asrListening) return props.asrTranscribing ? "辨識中…" : "按我說話"
   return props.asrInputMode === "push-to-talk" ? "說完按這裡" : "按這裡停止"
 })
 const composerPlaceholder = computed(() => props.asrInterim || asrStatusText.value || props.placeholder)

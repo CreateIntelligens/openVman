@@ -21,7 +21,7 @@ test("listening resumes after the reply with a shorter idle window", () => {
   const resume = app.match(/watch\(avatarResponding, \(responding\) => \{([\s\S]*?)\n\s*\}\);/);
   assert.ok(resume, "resume watcher missing");
   assert.match(resume[1], /if \(responding\) return;/);
-  assert.match(resume[1], /if \(!resumeAsrAfterReply\) \{/);
+  assert.match(resume[1], /if \(!resumeAsrAfterReply\.value\) \{/);
   assert.match(resume[1], /active\.resume\(\)/);
   assert.match(resume[1], /void active\.start\(\)/);
   assert.match(resume[1], /scheduleAsrIdleTimer\(ASR_RESUME_IDLE_TIMEOUT_MS\)/);
@@ -41,7 +41,7 @@ test("the gap while TTS synthesises still counts as answering", () => {
 
 test("turning the microphone off by hand is not undone after the reply", () => {
   const toggle = app.match(/function handleAsrToggle\(\): void \{([\s\S]*?)\n\s*\}/);
-  assert.match(toggle[1], /resumeAsrAfterReply = false;\s*active\.stop\(\);/);
+  assert.match(toggle[1], /resumeAsrAfterReply\.value = false;\s*if \(active\.isListening\.value \|\| asrStarting\.value\) active\.stop\(\);/);
 });
 
 for (const streaming of [true, false]) {
@@ -51,7 +51,7 @@ for (const streaming of [true, false]) {
       isListening: ref(true),
       isStarting: ref(false),
       stop() { calls.push('stop'); this.isListening.value = false; },
-      pause() { calls.push('pause'); },
+      pause() { calls.push('pause'); this.isListening.value = false; },
       resume() { calls.push('resume'); },
       start() { calls.push('start'); this.isListening.value = true; },
     };
@@ -67,7 +67,7 @@ for (const streaming of [true, false]) {
     const install = new Function(
       'watch', 'chat', 'activeAsr', 'streamAsr', 'avatarSpeaking', 'avatarResponding',
       'asrStarting', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
-      `let resumeAsrAfterReply = false; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000; const INTERRUPT_WHILE_SPEAKING = false;\n${voice.slice(start, end)}`,
+      `const resumeAsrAfterReply = { value: false }; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000; const INTERRUPT_WHILE_SPEAKING = false;\n${voice.slice(start, end)}`,
     );
     const scope = effectScope();
     try {
@@ -80,7 +80,7 @@ for (const streaming of [true, false]) {
       ttsPending.value = true; chat.state.value = 'IDLE'; await nextTick();
       assert.deepEqual(calls.slice(1), ['clear', streaming ? 'stop' : 'pause']);
       ttsPending.value = false; await nextTick();
-      assert.deepEqual(calls.slice(3), [streaming ? 'start' : 'resume', 6000]);
+      assert.deepEqual(calls.slice(3), ['start', 6000]);
       await nextTick();
       assert.equal(calls.length, 5);
     } finally {
@@ -101,7 +101,7 @@ test("a reply that never speaks starts the idle countdown on the open microphone
   const install = new Function(
     'watch', 'chat', 'activeAsr', 'streamAsr', 'avatarSpeaking', 'avatarResponding',
     'asrStarting', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
-    `let resumeAsrAfterReply = false; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000; const INTERRUPT_WHILE_SPEAKING = false;\n${voice.slice(start, end)}`,
+    `const resumeAsrAfterReply = { value: false }; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000; const INTERRUPT_WHILE_SPEAKING = false;\n${voice.slice(start, end)}`,
   );
   const scope = effectScope();
   try {
@@ -117,7 +117,7 @@ test("a reply that never speaks starts the idle countdown on the open microphone
 });
 
 // 2026-10-13 現場回報：虛擬人講話時按麥克風沒反應（開麥立刻被「出聲時關麥」關掉，排到講完才開）。
-function runToggle({ listening = false, starting = false, speaking = false } = {}) {
+function runToggle({ listening = false, starting = false, speaking = false, resumePending = false } = {}) {
   const calls = [];
   const active = {
     isListening: ref(listening),
@@ -127,23 +127,29 @@ function runToggle({ listening = false, starting = false, speaking = false } = {
   const voice = readAppModule('useAvatarVoiceInput');
   const body = voice.match(/function handleAsrToggle\(\): void \{([\s\S]*?)\n  \}\n/);
   assert.ok(body, 'handleAsrToggle missing');
-  const state = { resumeAsrAfterReply: true };
+  const state = { resumeAsrAfterReply: { value: resumePending } };
   const run = new Function(
     'activeAsr', 'asrStarting', 'avatarSpeaking', 'conversation', 'asrError', 'asrInterim',
     'clearAsrIdleTimer', 'scheduleAsrIdleTimer', 'state',
-    `let interruptionRevision = 0; let resumeAsrAfterReply = state.resumeAsrAfterReply;
-     (() => {${body[1]}})();
-     state.resumeAsrAfterReply = resumeAsrAfterReply;`,
+    `let interruptionRevision = 0; const resumeAsrAfterReply = state.resumeAsrAfterReply;
+     const voiceSessionOn = { value: activeAsr.value.isListening.value || asrStarting.value || resumeAsrAfterReply.value };
+     (() => {${body[1]}})();`,
   );
   run({ value: active }, ref(starting), ref(speaking),
     { handleStopResponse: () => calls.push('interrupt') }, ref(''), ref(''),
     () => calls.push('clear'), () => calls.push('schedule'), state);
-  return { calls, resume: state.resumeAsrAfterReply };
+  return { calls, resume: state.resumeAsrAfterReply.value };
 }
 
 test("tapping the microphone while the avatar speaks interrupts and listens", () => {
   const { calls, resume } = runToggle({ speaking: true });
   assert.deepEqual(calls, ['interrupt', 'schedule', 'start']);
+  assert.equal(resume, false);
+});
+
+test("tapping during a reply in a running voice session only cancels the reopening", () => {
+  const { calls, resume } = runToggle({ speaking: true, resumePending: true });
+  assert.deepEqual(calls, ['clear']);
   assert.equal(resume, false);
 });
 

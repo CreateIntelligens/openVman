@@ -32,7 +32,8 @@ function openVoice(provider = "r2t2-live", decision = "IGNORE", { interruptWhile
       isSpeaking: ref(false), isStarting: ref(false), isTranscribing: ref(false),
       start() { calls.push(`${name}:start`); this.isListening.value = true; },
       stop() { calls.push(`${name}:stop`); this.isListening.value = false; this.isStarting.value = false; },
-      pause() { calls.push(`${name}:pause`); },
+      // VadRecognizer.pause() 就是 stop()，resume() 什麼都不做，假引擎要跟真的一樣。
+      pause() { calls.push(`${name}:pause`); if (name === "vad") this.isListening.value = false; },
       resume() { calls.push(`${name}:resume`); },
     };
     engines[name] = engine;
@@ -162,6 +163,42 @@ test("reply recovery waits for pending TTS and user cancellation disables anothe
   } finally { app.dispose(); }
 });
 
+for (const provider of ["r2t2-live", "breeze"]) {
+  const engine = provider === "breeze" ? "vad" : "stream";
+
+  test(`${engine}: the toggle ends a paused voice session without reopening the mic`, async () => {
+    const app = openVoice(provider);
+    try {
+      app.voice.handleAsrToggle();
+      app.ttsPending.value = true;
+      await nextTick();
+      assert.equal(app.engines[engine].isListening.value, false, "出聲時麥克風是關的");
+      assert.equal(app.voice.voiceSessionOn.value, true, "但語音對話還開著，按鈕要能停");
+      assert.equal(app.voice.asrPaused.value, true);
+      const startsBefore = app.calls.filter((call) => call === `${engine}:start`).length;
+      app.voice.handleAsrToggle();
+      assert.equal(app.voice.voiceSessionOn.value, false);
+      assert.ok(!app.calls.includes("interrupt"), "停麥克風不是打斷回答，那是「停止」鈕的事");
+      app.ttsPending.value = false;
+      await nextTick();
+      assert.equal(app.engines[engine].isListening.value, false, "講完不能自己打開");
+      assert.equal(app.calls.filter((call) => call === `${engine}:start`).length, startsBefore);
+    } finally { app.dispose(); }
+  });
+}
+
+test("with no voice session, pressing the mic during a reply still interrupts and listens", async () => {
+  const app = openVoice();
+  try {
+    app.ttsPending.value = true;
+    await nextTick();
+    assert.equal(app.voice.voiceSessionOn.value, false);
+    app.voice.handleAsrToggle();
+    assert.ok(app.calls.includes("interrupt"));
+    assert.ok(app.calls.includes("stream:start"));
+  } finally { app.dispose(); }
+});
+
 test("a sentence added while thinking is sent and does not restart the idle countdown", async () => {
   const app = openVoice();
   try {
@@ -197,7 +234,7 @@ test("Breeze VAD keeps listening through thinking and pauses only while the avat
     assert.ok(app.calls.includes("vad:pause"));
     app.ttsPending.value = false;
     await nextTick();
-    assert.equal(app.calls.at(-1), "vad:resume");
+    assert.equal(app.calls.at(-1), "vad:start");
   } finally { app.dispose(); }
 });
 

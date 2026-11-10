@@ -37,7 +37,7 @@ export function useAvatarVoiceInput({ conversation, preferences, languageRoutes,
   let asrIdleTimer: ReturnType<typeof setTimeout> | null = null;
   // 虛擬人出聲時停止收音，免得收到自己的聲音；講完自動恢復，使用者不必每輪重按麥克風。
   // 在想的時候不出聲，麥克風照開，使用者可以補一句（useAvatarChat 會把兩句合併重送）。
-  let resumeAsrAfterReply = false;
+  const resumeAsrAfterReply = ref(false);
   let interruptionRevision = 0;
   // 講話中插話（docs/plans/full-duplex-voice.md 階段 B）：串流辨識在虛擬人出聲時也收音，
   // 交給 /api/v1/voice/interrupt 判斷要不要停。回音過濾只擋「完全包含在回答裡」的文字，
@@ -259,6 +259,12 @@ export function useAvatarVoiceInput({ conversation, preferences, languageRoutes,
     return false;
   });
 
+  // 語音對話開著：出聲時麥克風雖然關了，講完會自己打開，所以按鈕要顯示成可以停。
+  const voiceSessionOn = computed(
+    () => activeAsr.value.isListening.value || asrStarting.value || resumeAsrAfterReply.value,
+  );
+  const asrPaused = computed(() => resumeAsrAfterReply.value);
+
   watch(asrSpeaking, (speaking) => {
     if (speaking) {
       turnTiming.speechStarted();
@@ -275,17 +281,16 @@ export function useAvatarVoiceInput({ conversation, preferences, languageRoutes,
     asrInterim.value = "";
     const active = activeAsr.value;
     // 啟動中的按鈕已經顯示成收音中，再按一次要能關掉，不是再啟動一次。
-    if (active.isListening.value || asrStarting.value) {
+    if (voiceSessionOn.value) {
       clearAsrIdleTimer();
       // 使用者自己關掉麥克風：講完不要又自動打開。
-      resumeAsrAfterReply = false;
-      active.stop();
+      resumeAsrAfterReply.value = false;
+      if (active.isListening.value || asrStarting.value) active.stop();
       return;
     }
     // 虛擬人出聲時按麥克風是要插話：先停掉這輪回答再開麥。不停的話開麥會立刻被
     // 「出聲時關麥」關掉，變成排隊到講完才開（2026-10-13 現場回報按了沒反應）。
     if (avatarSpeaking.value) {
-      resumeAsrAfterReply = false;
       conversation.handleStopResponse();
     }
     scheduleAsrIdleTimer();
@@ -302,7 +307,7 @@ export function useAvatarVoiceInput({ conversation, preferences, languageRoutes,
     if (!shouldPause) return;
     clearAsrIdleTimer();
     if (activeAsr.value === streamAsr && INTERRUPT_WHILE_SPEAKING) return;
-    resumeAsrAfterReply = true;
+    resumeAsrAfterReply.value = true;
     // 串流連線閒著可能被 Gemini 斷掉，斷線會被當成「串流不可用」而一直退回批次，
     // 所以先正常關掉、講完再連；其他引擎暫停即可。
     if (activeAsr.value === streamAsr) activeAsr.value.stop();
@@ -312,12 +317,12 @@ export function useAvatarVoiceInput({ conversation, preferences, languageRoutes,
   watch(avatarResponding, (responding) => {
     if (responding) return;
     const active = activeAsr.value;
-    if (!resumeAsrAfterReply) {
+    if (!resumeAsrAfterReply.value) {
       // 想完沒出聲（出錯、被停止）：麥克風一直開著，從現在開始倒數。
       if (active.isListening.value) scheduleAsrIdleTimer(ASR_RESUME_IDLE_TIMEOUT_MS);
       return;
     }
-    resumeAsrAfterReply = false;
+    resumeAsrAfterReply.value = false;
     if (active.isListening.value) active.resume();
     else void active.start();
     scheduleAsrIdleTimer(ASR_RESUME_IDLE_TIMEOUT_MS);
@@ -328,5 +333,5 @@ export function useAvatarVoiceInput({ conversation, preferences, languageRoutes,
     clearAsrIdleTimer();
   });
 
-  return { activeAsr, serverAsr, vadAsr, streamAsr, useBrowserAsr, asrSpeaking, asrInputMode, asrInterim, asrError, handleAsrToggle };
+  return { activeAsr, serverAsr, vadAsr, streamAsr, useBrowserAsr, asrSpeaking, asrInputMode, asrInterim, asrError, voiceSessionOn, asrPaused, handleAsrToggle };
 }

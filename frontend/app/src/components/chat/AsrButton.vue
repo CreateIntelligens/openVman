@@ -1,7 +1,8 @@
 <script setup lang="ts">
 defineProps<{
   isListening?: boolean
-  /** 音檔已送出、等伺服器回字。這段期間不能再按，也不能看起來像沒事。 */
+  isPaused?: boolean
+  /** 音檔已送出、等伺服器回字。沒在收音時不能再按，也不能看起來像沒事；收音中一律可以按停止。 */
   isTranscribing?: boolean
   disabled?: boolean
   isSupported?: boolean
@@ -19,25 +20,26 @@ const emit = defineEmits<{
     class="asr-btn"
     :class="{
       'asr-btn--active': isListening,
-      'asr-btn--transcribing': isTranscribing,
+      'asr-btn--transcribing': isTranscribing && !isListening,
+      'asr-btn--paused': isPaused,
       'asr-btn--labeled': label,
     }"
-    :disabled="disabled || isTranscribing || isSupported === false"
+    :disabled="!isListening && (disabled || isTranscribing || isSupported === false)"
     :aria-label="isSupported === false
       ? '此瀏覽器不支援語音輸入'
-      : isTranscribing ? '辨識中' : isListening ? '停止語音輸入' : '開始語音輸入'"
+      : isListening ? '停止語音輸入' : isTranscribing ? '辨識中' : '開始語音輸入'"
     :aria-pressed="Boolean(isListening)"
-    :aria-busy="Boolean(isTranscribing)"
+    :aria-busy="Boolean(isTranscribing && !isListening)"
     :title="isSupported === false
       ? '此瀏覽器不支援語音輸入'
-      : isTranscribing ? '辨識中…' : isListening ? '收音中，再按一次送出' : '語音輸入'"
+      : isListening ? '收音中，再按一次停止' : isTranscribing ? '辨識中…' : '語音輸入'"
     @click="emit('toggle')"
   >
     <span class="asr-btn__icon">
-      <span v-if="isTranscribing" class="asr-btn__spinner" aria-hidden="true" />
-      <svg v-else-if="isListening" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <svg v-if="isListening" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
         <rect x="4" y="4" width="16" height="16" rx="2" />
       </svg>
+      <span v-else-if="isTranscribing" class="asr-btn__spinner" aria-hidden="true" />
       <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
         <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
@@ -171,6 +173,12 @@ const emit = defineEmits<{
 
 @keyframes asr-spin {
   to { transform: rotate(360deg); }
+}
+
+/* 虛擬人出聲時麥克風其實關著，不呼吸，免得看起來還在收音。 */
+.asr-btn--active.asr-btn--paused,
+.asr-btn--paused .asr-btn__status {
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -168,6 +168,8 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/` 載入。離線部署需將相符版本資產自架並調整 `vad-recognizer.ts` 的來源；目前不是完全離線可用，也沒有自動 CDN 鏡像切換。模型或 WASM 載入失敗回報 `vad-unavailable`，由共用控制器處理降級。
 
+**語音對話的停止**：收音中、啟動中，或虛擬人出聲而等著恢復收音的期間都算語音對話開著（`voiceSessionOn`），這段期間麥克風鈕一律可按，不受上一句辨識中或連線狀態影響，按下只結束語音對話，講完不再自動開麥，也不打斷回答。語音對話沒開時，虛擬人出聲中按麥克風才是插話：先停回答再開麥。
+
 串流 ASR 的 `start()` 共用尚未完成的啟動；停止或卸載使舊啟動失效，延遲取得的 media track 必須立即停止。ready 等待上限 10 秒。正常停止傳送 `{"type":"end"}` 後保留最多 5 秒等待最後定稿；重新啟動及卸載則直接關閉舊連線。Backend 在離開串流前取消並等待雙向工作結束。
 
 * 使用瀏覽器原生的 `SpeechRecognition` 或 `webkitSpeechRecognition` API。

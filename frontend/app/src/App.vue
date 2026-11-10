@@ -111,7 +111,8 @@
         :placeholder="chatPlaceholder"
         :is-thinking="chat.state.value === 'THINKING'"
         :is-typing="isTyping"
-        :asr-listening="activeAsr.isListening.value || vadAsr.isStarting.value || streamAsr.isStarting.value"
+        :asr-listening="voiceSessionOn"
+        :asr-paused="asrPaused"
         :asr-supported="activeAsr.isSupported.value"
         :asr-transcribing="serverAsr.isTranscribing.value || vadAsr.isTranscribing.value"
         :asr-speaking="asrSpeaking"
@@ -298,8 +299,8 @@ function handleMotionGesture(state: "greeting" | "bye"): void {
 }
 const voice = useAvatarVoiceInput({ conversation, preferences,
   languageRoutes, turnTiming, statusToastRef });
-const { activeAsr, serverAsr, vadAsr, streamAsr, asrSpeaking,
-  asrInputMode, asrInterim, asrError, handleAsrToggle } = voice;
+const { activeAsr, serverAsr, vadAsr, asrSpeaking,
+  asrInputMode, asrInterim, asrError, voiceSessionOn, asrPaused, handleAsrToggle } = voice;
 const camera = useAvatarCamera(settings, conversation, showMessage);
 const { webcam, visionAvailable, cameraPreviewStyle,
   handleCameraPreviewScaleChange, handleToggleCamera } = camera;
