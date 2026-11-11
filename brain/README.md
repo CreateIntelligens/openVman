@@ -101,7 +101,8 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 語言：整理時不翻譯。每段輸出都和原文比對語言，並檢查中文字有沒有憑空出現或消失，不一致就保留那段原文。
 - LLM 呼叫失敗或輸出沒通過檢查時，匯入保留那段原文；後台的「AI 整理排版」（`POST /knowledge/renormalize/preview`、`/renormalize`）則回 400，`detail` 寫白話原因，文件不變。
 - 同一來源重傳：目標文件已被問答節點引用時，只更新該節點的題目，名稱、上層與隱藏狀態不動；`knowledge/qa/<檔名>.csv` 已掛在樹上時更新那份 CSV。一般文件同路徑時覆蓋，手動指定的語言保留。題目全部拿掉後分類還留著時，接回當初匯入建立的分類，不另開同名分類。
-- 問答表的內容：有一列只有答案沒有題目，或同一題有不同答案時，整份不匯入並寫明是哪一列；同一題答案相同只算一題。
+- 問答表的內容：有列只有答案沒有題目，或同一題有不同答案時，整份不匯入，原因一次列出所有這類題目；同一題答案相同只算一題。
+- 混語言的問答表（`knowledge/qa_import_review.py`）：沒人標語言時，逐題以 `detect_row_language` 判斷，判出兩種以上語言才算混語言；這時空白的 `language` 欄由系統補上（人寫的值不改，看不懂的值照留），表存成 CSV，每題放進自己語言的第一層分類底下、以檔名命名的分類。只有一種語言的表照舊整份一個語言、存成 Markdown。重傳到原本是 Markdown 的同名文件時，分類照語言分開，但 Markdown 存不了語言欄，檢索只看整份的語言。
 - 新問答的位置：第一層有符合語言的節點就放進去，沒有就放最上層，不自動建立語言分類。名稱對照是 `knowledge/qa_nodes.py` 的 `LANGUAGE_LABELS`，與前台 `quickQaText.ts` 相同，有測試鎖住兩邊一致。
 - 寫入：目標文件原子寫入，並和拖曳併入（`ingest-source`）共用 `qa_document_lock`，兩者不會互相蓋掉。`.doc_meta.json` 同樣原子寫入，匯入與後台列文件同時進行也不會蓋掉彼此的欄位。問答表轉 Markdown 前先讀回比對，答案裡有 `##` 開頭的行或題目有換行時整份不匯入，原因會指出是哪一題。
 - 失敗：單一檔案失敗不影響其他檔案。沒匯入的留在 `raw/`，原因記在 `skip_reasons`；成功的原檔搬到 `archive/originals/`。匯入途中同一路徑又傳了新版時，新版留在 `raw/` 等下一批。
@@ -120,7 +121,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 `GET /knowledge/raw/commit/status` 回傳 `state`（`idle`、`running`、`done`、`failed`）、`started_at`、`finished_at`、`files`（路徑對應 `pending`、`normalizing`、`committed`、`skipped`）、`committed`、`skipped`、`error`，以及逐檔處理完就更新的：
 
-- `results`：路徑對應 `{ target, kind, language, updated, qa_node_id?, qa_node_label?, qa_parent_label?, question_count? }`。`kind` 是 `qa` 或 `document`；`updated` 表示目標文件原本就存在；`qa_` 開頭的欄位與 `question_count` 只有問答表才有，沒有上層時不帶 `qa_parent_label`。
+- `results`：路徑對應 `{ target, kind, language, updated, qa_node_id?, qa_node_label?, qa_parent_label?, question_count?, languages?, notes? }`。`languages` 只在混語言的表出現，是每種語言的題數；`notes` 是匯入成功但要人回頭看的白話提示：沒讀進去的欄位、看不懂的語言值、還沒有的語言分類、沒有答案的題目、找不到的圖片，以及 CSV／Excel 因為缺問題或答案欄而當成一般文件。`kind` 是 `qa` 或 `document`；`updated` 表示目標文件原本就存在；`qa_` 開頭的欄位與 `question_count` 只有問答表才有，沒有上層時不帶 `qa_parent_label`。
 - `skip_reasons`：路徑對應給工作人員看的原因。
 
 進度存在記憶體，服務重啟後回到 `idle`，`raw/` 裡的檔案不受影響。

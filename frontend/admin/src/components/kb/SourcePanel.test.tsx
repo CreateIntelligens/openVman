@@ -35,6 +35,7 @@ describe("SourcePanel", () => {
 
     expect(screen.getByRole("button", { name: "把檔案拖到這裡，或點這裡選擇檔案" })).toBeTruthy();
     expect(screen.getByText("有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。")).toBeTruthy();
+    expect(screen.getByText(/中文、英文、西文混在同一張表也可以/)).toBeTruthy();
     expect(screen.getByText("其他文件會切成段落加入知識庫，AI 回答時查得到，不會變成問答。選 AI 整理時，內容維持原本的語言，不會翻譯。")).toBeTruthy();
     expect(screen.getByText(/每個檔案 100 MB 以內/)).toBeTruthy();
     expect(screen.getByText(/Excel（\.xlsx）/)).toBeTruthy();

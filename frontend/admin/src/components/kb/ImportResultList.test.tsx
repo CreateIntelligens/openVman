@@ -211,6 +211,47 @@ describe("ImportResultList", () => {
     expect(screen.getByText("已放進快速問答：產品 等 3 個分類（4 題）")).toBeTruthy();
   });
 
+  it("says a mixed-language table was split by language", () => {
+    renderList([row({
+      name: "faq.csv",
+      result: {
+        target: "knowledge/qa/faq.csv", kind: "qa", updated: false,
+        qa_node_label: "faq", qa_parent_label: "中文", question_count: 5, qa_category_count: 3,
+        languages: { zh: 2, en: 2, es: 1 },
+      },
+    })]);
+
+    expect(screen.getByText(
+      "已放進快速問答：中文 › faq 等 3 個分類（5 題）。表裡有不同語言，已依語言分開放：中文 2 題、English 2 題、Español 1 題",
+    )).toBeTruthy();
+  });
+
+  it("lists what to check after an import, in plain words", () => {
+    renderList([row({
+      name: "faq.csv",
+      result: {
+        target: "knowledge/qa/faq.md", kind: "qa", updated: false,
+        qa_node_label: "faq", question_count: 2,
+        notes: ["這些欄位沒有讀進去：來源檔、備註", "「可以停車嗎？」沒有答案，請到快速問答補上"],
+      },
+    })]);
+
+    const notes = within(screen.getByRole("list", { name: "faq.csv 要注意的地方" })).getAllByRole("listitem");
+    expect(notes.map((note) => note.textContent)).toEqual([
+      "info這些欄位沒有讀進去：來源檔、備註",
+      "info「可以停車嗎？」沒有答案，請到快速問答補上",
+    ]);
+  });
+
+  it("shows why a spreadsheet became an ordinary document", () => {
+    renderList([row({
+      name: "price.csv",
+      result: { ...documentResult, notes: ["這份表格沒有「問題」「答案」兩欄，所以當成一般文件匯入"] },
+    })]);
+
+    expect(screen.getByText("這份表格沒有「問題」「答案」兩欄，所以當成一般文件匯入")).toBeTruthy();
+  });
+
   it("names questions that could not go on the menu", () => {
     renderList([row({
       name: "faq.csv",

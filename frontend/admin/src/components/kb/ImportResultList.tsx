@@ -49,6 +49,18 @@ function qaPlacement(result: KnowledgeCommitFileResult, nodesTree: QaNode[]) {
   return { nodeId: node?.node_id, text: `${place}${count}` };
 }
 
+// 和 Brain 的 qa_import_review.LANGUAGE_NAMES 同一份寫法：分類名稱用該語言自己的寫法。
+const ROW_LANGUAGE_NAMES: Record<string, string> = {
+  zh: "中文", en: "English", es: "Español", ja: "日本語", ko: "한국어", nan: "台語",
+};
+
+function languageSplitNote(result: KnowledgeCommitFileResult | undefined): string {
+  const counts = Object.entries(result?.languages ?? {});
+  if (counts.length < 2) return "";
+  const parts = counts.map(([code, count]) => `${ROW_LANGUAGE_NAMES[code] ?? code} ${count} 題`);
+  return `。表裡有不同語言，已依語言分開放：${parts.join("、")}`;
+}
+
 function normalizeNote(item: ImportItem): string {
   if (item.normalize === undefined) return "";
   return item.normalize ? "，AI 已整理排版" : "，內容未經 AI 修改";
@@ -118,7 +130,7 @@ function ImportResultRow({
     const clashes = result?.name_clashes?.length
       ? `。有 ${result.name_clashes.length} 題沒放進選單，分類裡已有同名題目：${result.name_clashes.slice(0, 3).join("、")}`
       : "";
-    text = `${verb}：${placement.text}${merged}${clashes}`;
+    text = `${verb}：${placement.text}${merged}${languageSplitNote(result)}${clashes}`;
   } else {
     const verb = result?.updated ? "已更新既有文件" : "已加入知識庫";
     text = `${verb}${result ? documentFolderNote(result.target) : ""}${normalizeNote(item)}`;
@@ -147,6 +159,16 @@ function ImportResultRow({
           {text}
           {language && <span className="chip ml-2 align-middle">{language}</span>}
         </p>
+        {result?.notes?.length ? (
+          <ul aria-label={`${item.name} 要注意的地方`} className="mt-1.5 space-y-1 text-sm text-content">
+            {result.notes.map((note) => (
+              <li key={note} className="flex gap-1.5 break-words">
+                <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[1rem] leading-5 text-warn">info</span>
+                <span className="min-w-0">{note}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
       {!active && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">

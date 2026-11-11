@@ -39,6 +39,7 @@
 
 - [Avatar JavaScript SDK](guides/avatar-embed/README.md)
 - [角色動作測試頁](guides/avatar-motion-lab.md)：HCIOT 四段素材準備、快取切換與錄影、兩院正式 Vman 人物試用、部署還原、真實有聲 E2E 與 WebM／MP4 混播效能對照。
+- [問答表匯入格式](guides/qa-table-format.md)：給客戶照著填的欄位說明，多語言怎麼處理，匯入後會看到哪些提示。
 - [工業型錄 PDF 轉 QA SOP](guides/PDF_CATALOG_TO_QA_SOP.md)
 
 ## 計畫與實驗

@@ -22,6 +22,7 @@ from knowledge.qa_csv import (
     convert_csv_to_qa_markdown,
     is_qa_csv,
     normalize_fieldname,
+    parse_csv_table,
 )
 
 logger = logging.getLogger("brain.knowledge.converters")
@@ -227,6 +228,34 @@ def _qa_workbook_csv_bytes(path: Path) -> bytes | None:
         if field in ("q", "a") or any(field in record for record in records)
     ]
     return _rows_to_csv_bytes(fieldnames, records)
+
+
+def qa_table_ignored_columns(path: Path, file_bytes: bytes) -> list[str]:
+    """Header names of an uploaded QA table that the import does not read, in order."""
+    suffix = path.suffix.lower()
+    headers: list[str] = []
+    try:
+        if suffix == ".csv":
+            table = parse_csv_table(file_bytes)
+            headers = [str(name).strip() for name in table[0]] if table else []
+        elif suffix == ".xlsx":
+            import openpyxl
+
+            workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            try:
+                for sheet in workbook.worksheets:
+                    first = next((row for row in sheet.iter_rows(values_only=True) if _has_content(row)), None)
+                    if first:
+                        headers.extend(_cell_text(first, position) for position in range(len(first)))
+            finally:
+                workbook.close()
+    except Exception:  # noqa: BLE001 — a note is optional; the import itself already succeeded
+        logger.warning("Failed to read the header of %s", path, exc_info=True)
+        return []
+    known = {*_QA_TABLE_FIELDS, "index"}
+    return list(dict.fromkeys(
+        name for name in headers if name and normalize_fieldname(name) not in known
+    ))
 
 
 def qa_table_csv_bytes(path: Path, file_bytes: bytes) -> bytes | None:

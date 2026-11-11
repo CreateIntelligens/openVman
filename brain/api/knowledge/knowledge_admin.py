@@ -688,22 +688,12 @@ def _qa_table_target(filename: str, project_id: str, keep_csv: bool = False) -> 
 
 
 def _refuse_unclear_questions(entries: list[dict[str, Any]]) -> None:
-    """Refuse rows the quick Q&A cannot show correctly, instead of guessing.
+    """Refuse rows the quick Q&A cannot show correctly, listing all of them at once."""
+    from knowledge.qa_import_review import unclear_question_problems
 
-    編輯器一題只顯示一個答案，同一題有兩個答案時另一個會看不到，AI 卻兩個都查得到。
-    沒有題目的列在選單上只會是一顆「未命名問題」。
-    """
-    answers: dict[str, str] = {}
-    for entry in entries:
-        question, answer = entry["q"].strip(), entry["a"].strip()
-        if question == UNTITLED_QUESTION:
-            raise _ImportRefused(
-                f"有一列只有答案、沒有題目（「{' '.join(answer.split())[:20]}」），"
-                "請補上題目後重新上傳"
-            )
-        if answers.setdefault(question, answer) != answer:
-            short = " ".join(question.split())[:40]
-            raise _ImportRefused(f"「{short}」這一題在檔案裡有不同的答案，請只留一個後重新上傳")
+    problems = unclear_question_problems(entries, UNTITLED_QUESTION)
+    if problems:
+        raise _ImportRefused("；".join(problems) + "。改好後重新上傳")
 
 
 def _render_qa_document(csv_bytes: bytes, target: Path) -> str:
@@ -776,18 +766,28 @@ def _commit_raw_file(
     )
     from knowledge.doc_meta import resolve_document_languages
     from knowledge.normalizer import normalize_to_markdown
+    from knowledge.qa_csv import qa_csv_row_extras
+    from knowledge.qa_images import resolve_qa_image_path
+    from knowledge.qa_import_review import (
+        is_mixed,
+        label_mixed_languages,
+        language_counts,
+        missing_language_category,
+        not_a_qa_table_note,
+        qa_table_notes,
+        question_paths,
+        row_languages,
+    )
+    from knowledge.qa_merged import MergedSaveError, merge_reupload
     from knowledge.qa_nodes import (
         create_node_for_source,
         find_language_category,
         is_qa_document,
         is_source_referenced,
-        node_label,
         place_questions_by_path,
         refill_emptied_node,
         sync_entries_for_source,
     )
-    from knowledge.qa_csv import qa_csv_row_extras
-    from knowledge.qa_merged import MergedSaveError, merge_reupload
 
     root = ensure_workspace_scaffold(project_id)
     src = root / "raw" / relative
@@ -802,7 +802,12 @@ def _commit_raw_file(
     origin_bytes = src.read_bytes()
     qa_csv = qa_table_csv_bytes(src, origin_bytes)
     is_qa = qa_csv is not None
-    extras = qa_csv_row_extras(qa_csv) if is_qa else {}
+    if qa_csv is not None:
+        qa_csv = label_mixed_languages(qa_csv)
+    extras = qa_csv_row_extras(qa_csv) if qa_csv is not None else {}
+    languages = row_languages(extras)
+    mixed = is_mixed(languages)
+    missing_categories: dict[str, int] = {}
     target_rel = (
         _qa_table_target(
             src.name, project_id, keep_csv=any(row["language"] for row in extras.values()),
@@ -857,19 +862,20 @@ def _commit_raw_file(
             refill_emptied_node(target, target_rel.stem, project_id)
         elif is_qa:
             category = find_language_category(language, project_id)
-            if any(row["path"] for row in extras.values()):
-                # 同一份表裡沒填 path 的題目，不論第一次匯入或重傳，都放以檔名命名的分類。
-                parents = [node_label(category, project_id)] if category else []
-                name_clashes = place_questions_by_path(
-                    target,
-                    {q: row["path"] or [*parents, target_rel.stem] for q, row in extras.items()},
-                    project_id,
+            if mixed or any(row["path"] for row in extras.values()):
+                # 同一份表裡沒填 path 的題目，不論第一次匯入或重傳，都放以檔名命名的分類；
+                # 混了語言的表，每題放進自己語言的分類。語言分類不自動建立，沒有就放最上層。
+                paths, missing_categories = question_paths(
+                    extras, languages if mixed else {}, category, target_rel.stem, project_id,
+                    report_missing=not existing_qa,
                 )
+                name_clashes = place_questions_by_path(target, paths, project_id)
                 if referenced:
                     sync_entries_for_source(target, project_id)
             elif referenced:
                 sync_entries_for_source(target, project_id)
             elif not refill_emptied_node(target, target_rel.stem, project_id):
+                missing_categories = missing_language_category(language, category, project_id)
                 create_node_for_source(
                     target,
                     target_rel.stem,
@@ -884,6 +890,18 @@ def _commit_raw_file(
                 target, project_id, origin_path=archived_rel, origin_hash=origin_hash,
             )
 
+    if qa_csv is not None:
+        notes = qa_table_notes(
+            src,
+            origin_bytes,
+            entries=parse_qa_csv(normalize_qa_csv_rows(qa_csv) or b""),
+            extras=extras,
+            missing_categories=missing_categories,
+            stem=target_rel.stem,
+            image_exists=lambda image_id: resolve_qa_image_path(image_id, project_id) is not None,
+        )
+    else:
+        notes = [note] if (note := not_a_qa_table_note(src)) else []
     result = {
         "target": target,
         "kind": "qa" if is_qa else "document",
@@ -891,6 +909,8 @@ def _commit_raw_file(
         "updated": updated,
         **merge_counts,
         **({"name_clashes": name_clashes} if name_clashes else {}),
+        **({"languages": language_counts(languages)} if mixed else {}),
+        **({"notes": notes} if notes else {}),
     }
     return {**result, **_qa_node_summary(target, project_id)} if is_qa else result
 

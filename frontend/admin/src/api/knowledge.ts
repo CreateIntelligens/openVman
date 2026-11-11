@@ -229,6 +229,10 @@ export interface KnowledgeCommitFileResult {
   question_count?: number;
   /** 題目分到不只一個分類時才有。 */
   qa_category_count?: number;
+  /** 表裡混了不同語言時才有：每種語言幾題，鍵是語言代碼（zh、en、es…）。 */
+  languages?: Record<string, number>;
+  /** 匯入成功但要人回頭看的事：沒讀進去的欄位、沒有答案的題目、找不到的圖片等，已是白話。 */
+  notes?: string[];
 }
 
 export interface KnowledgeCommitJob {
