@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **[2026-11-11]** **watchtower 改用社群維護的版本**：`containrrr/watchtower` 已停止維護，改用 `nickfedor/watchtower:1.24.0`（版本固定），不再需要 `--api-version` 參數；檢查間隔維持 5 分鐘。原本放在本機、未進版本控制的 `docker-compose.override.yml` 已刪除，設定都在 `docker-compose.yml`。
+
 - **[2026-11-11]** **Embedding 批次並行維持 1**：新增隔離 gateway 的並行 1／2 對照腳本與 Compose 設定，檢查吞吐、查詢／文件 p95、GPU 顯存與向量一致性。兩輪純查詢在並行 2 較慢，混合文件的聊天查詢延遲沒有穩定改善，因此不調整正式預設值。方法與結果見 `scripts/experiments/embedding-load/README.md`。
 
 - **[2026-11-11]** **Brain 重用重複問題的查詢向量**：新增每 worker 的有界 LRU 與同鍵請求合併，減少熱門題與同輪知識／記憶搜尋重複呼叫 embedding。快取依專案、gateway client 與完整 query identities 隔離；先確認可查詢資料表，只快取驗證成功的首選向量，錯誤與暫時回退不快取，等待者逾時不取消共用計算。新增入口、快取與實際 HTTP 次數指標，`EMBEDDING_QUERY_CACHE_SIZE=0` 可關閉。HTTP Chat 與 Gemini Live 共用，文件索引不變，規格與驗證方式見 `brain/README.md`。
