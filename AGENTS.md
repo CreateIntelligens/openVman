@@ -97,6 +97,7 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 - New tools and external services MUST document their tool names, request/response contract, provider or fallback order, authentication requirements, and important safety rules.
 - Before reporting completion, inspect `git diff --name-only` and `git status --short` and verify that the required changelog and README/documentation updates are included, including untracked files. A code-only change is incomplete.
 - Run `git diff --check` before handoff. If the appropriate project environment is available, run the focused tests and the relevant full test suite.
+- Pushing to `main` deploys to production (CI builds the images, watchtower replaces the containers), so dev comes first. Before every push that changes Brain, Backend or the admin UI, check the exact commit out in `.worktree/dev` (`docker restart openvman-dev-api-1` for Brain code) and run the changed flow end to end on the dev stack, over HTTP or in the admin UI, against a test project. Back up any project you write to and restore it afterwards. Unit tests alone do not count, and a fix made after the dev run needs another dev run before it is pushed. Afterwards, return `.worktree/dev` to `main`.
 
 ## Documentation
 
