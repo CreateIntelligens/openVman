@@ -281,13 +281,15 @@ services:
 
   watchtower:
     <<: *shared
-    image: containrrr/watchtower:1.7.1
+    # containrrr/watchtower 已停止維護，要指定舊 API 版本才連得上新版 Docker；
+    # 改用社群維護的分支，版本固定，不讓它自己升級成行為不同的版本。
+    image: nickfedor/watchtower:1.24.0
     environment:
       - DOCKER_API_VERSION=1.44
       - TZ=Asia/Taipei
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --api-version 1.44 --label-enable --interval 300 --cleanup
+    command: --label-enable --interval 300 --cleanup
 
 volumes:
   hf-cache:
