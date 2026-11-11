@@ -18,7 +18,7 @@ pytesseract>=0.3,<1
 pyyaml>=6,<7
 readability-lxml>=0.8,<1
 youtube-transcript-api>=1.2.4,<2
-Pillow>=10,<11
+Pillow>=13.0.0,<14
 PyJWT==2.15.1
 pytest>=8.0.0
 pytest-xdist>=3.5.0
