@@ -157,6 +157,23 @@ test('controller error rejects a pending finish and clears polling waiters', asy
   } finally { engine.dispose(); }
 });
 
+test('an inference error ends only its own utterance', async () => {
+  for (const recover of ['finish', 'stop']) {
+    const { engine, calls } = engineWithController();
+    try {
+      await engine.appendPcm(new Int16Array([1]));
+      engine.stateChanged('error', 'playing', { error: 'worker failed' });
+      await assert.rejects(engine.appendPcm(new Int16Array([2])), /worker failed/, 'the failed utterance takes no more audio');
+      if (recover === 'finish') await assert.rejects(engine.finishAudio(), /worker failed/);
+      else engine.stop();
+      await engine.appendPcm(new Int16Array([3]));
+      const begins = calls.filter(call => call[0] === 'begin');
+      assert.equal(begins.length, 2, `${recover}: the next utterance opens a new stream`);
+      assert.equal(calls.at(-1)[2].samples[0], 3);
+    } finally { engine.dispose(); }
+  }
+});
+
 test('aborted video wait rejects and removes listeners promptly', async () => {
   const { engine } = engineWithController(); const abort = new AbortController();
   try {

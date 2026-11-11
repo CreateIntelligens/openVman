@@ -68,6 +68,15 @@ async function initSession(modelPath) {
   return performance.now() - started;
 }
 
+function pcmLength(pcm) {
+  return (pcm && (pcm.length || pcm.byteLength / 2)) || 0;
+}
+
+/** Discarded audio no longer waits for inference, so it leaves the backlog count too. */
+function discardPcm(item) {
+  totalQueuedPcmSamples = Math.max(0, totalQueuedPcmSamples - pcmLength(item.pcm));
+}
+
 function resetUtteranceState(generation, utteranceId) {
   activeGeneration = generation;
   activeUtteranceId = utteranceId;
@@ -86,7 +95,7 @@ function resetUtteranceState(generation, utteranceId) {
   // Purge any pcmQueue items from old generations
   for (let i = pcmQueue.length - 1; i >= 0; i -= 1) {
     if (pcmQueue[i].generation !== generation) {
-      pcmQueue.splice(i, 1);
+      discardPcm(pcmQueue.splice(i, 1)[0]);
     }
   }
 }
@@ -125,7 +134,7 @@ async function pump() {
       while (pcmQueue.length > 0) {
         const item = pcmQueue.shift();
         if (item.generation !== activeGeneration) {
-          // Stale item, discard
+          discardPcm(item);
           continue;
         }
 
@@ -289,7 +298,7 @@ if (typeof self !== 'undefined') {
           return;
         }
 
-        const pcmLen = (pcm && (pcm.length || pcm.byteLength / 2)) || 0;
+        const pcmLen = pcmLength(pcm);
         if (totalQueuedPcmSamples + pcmLen > MAX_UNCONSUMED_PCM_SAMPLES || pcmQueue.length > MAX_PCM_CAPACITY) {
           self.postMessage({
             type: 'ERROR',

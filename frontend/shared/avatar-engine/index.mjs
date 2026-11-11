@@ -326,17 +326,27 @@ export class AvatarEngine {
   }
 
   finishAudio() {
-    return this.serial(async (generation) => {
+    const task = this.serial(async (generation) => {
       if (!this.handle || this.handle.stopped) return;
       const result = this.controller.endStream(this.handle);
       if (result.status === "rejected") throw new Error(result.reason);
       await this.waitUntil(() => this.controller.state === "ready", generation);
+    });
+    // A failure belongs to the utterance it happened in. Once that utterance is
+    // finished, the next one starts a fresh stream instead of inheriting the error.
+    return task.catch((error) => {
+      if (error === this.error) {
+        this.error = null;
+        this.handle = null;
+      }
+      throw error;
     });
   }
 
   stop() {
     this.generation++;
     this.queue = Promise.resolve();
+    this.error = null;
     if (this.handle) this.controller.stop(this.handle);
     this.handle = null;
     if (this.player) {

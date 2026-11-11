@@ -65,13 +65,16 @@ def contours_from_landmarks(points, width: int, height: int):
     centre = (outer[0] + outer[10]) / 2
     top_left = np.clip(centre - side / 2, 0, [width - side, height - side])
     bottom_right = top_left + side
-    if np.any(outer < top_left) or np.any(outer > bottom_right):
+    lips = np.concatenate([outer, inner])
+    if np.any(lips < top_left) or np.any(lips > bottom_right):
         raise ValueError("Mouth extends beyond its video crop")
     scale = LOCAL_SIZE / side
+    # A lip exactly on the crop edge can round a hair past LOCAL_SIZE when scaled.
+    local = lambda contour: np.clip((contour - top_left) * scale, 0, LOCAL_SIZE)
     return {
         "region": [*top_left.tolist(), *bottom_right.tolist()],
-        "outer": ((outer - top_left) * scale).reshape(-1).tolist(),
-        "inner": ((inner - top_left) * scale).reshape(-1).tolist(),
+        "outer": local(outer).reshape(-1).tolist(),
+        "inner": local(inner).reshape(-1).tolist(),
     }
 
 

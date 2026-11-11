@@ -265,3 +265,15 @@ def test_production_cli_imports_without_historical_modules_or_assets(tmp_path):
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_lips_on_the_crop_edge_stay_within_the_local_range(landmarks):
+    # A lip on the video's edge sits exactly on the crop boundary; scaling it back
+    # must not round past 180, which the backend rejects.
+    for step in range(40):
+        values = landmarks.copy()
+        values[:, 0] *= 1 + step * 0.0137
+        values[:, 0] += 320 - values[list(video_lips.OUTER_LIP), 0].max()
+        frame = video_lips.contours_from_landmarks(values, 320, 240)
+        for name in ("outer", "inner"):
+            assert all(0 <= value <= video_lips.LOCAL_SIZE for value in frame[name]), (step, name)

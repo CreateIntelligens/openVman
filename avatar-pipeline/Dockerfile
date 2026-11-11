@@ -21,9 +21,10 @@ COPY --from=builder /install /usr/local
 WORKDIR /app
 # The v2 producer works from the user's video. Historical conversion helpers,
 # extracted templates and compatibility profiles are not production inputs.
+# render_data converts existing v1 bundles; the README documents running it here.
 COPY pipeline/__init__.py pipeline/bundle.py pipeline/cli.py \
-     pipeline/frames.py pipeline/video_lips.py pipeline/status.py \
-     pipeline/worker.py ./pipeline/
+     pipeline/frames.py pipeline/render_data.py pipeline/status.py \
+     pipeline/video_lips.py pipeline/worker.py ./pipeline/
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
