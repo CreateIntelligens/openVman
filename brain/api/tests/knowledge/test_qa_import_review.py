@@ -214,3 +214,72 @@ def test_the_written_labels_reach_the_search_index(workspace: Path):
     chunks = _extract_csv_chunks(workspace / "knowledge" / "qa" / "faq.csv", workspace)
     languages = {chunk.metadata.get("language") for chunk in chunks}
     assert {"zh", "en", "es"} <= languages
+
+
+# --- found in review ------------------------------------------------------------
+
+
+def _workbook(path: Path, rows: list[list[str]]) -> None:
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    for row in rows:
+        book.active.append(row)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    book.save(path)
+
+
+def test_excel_imports_report_their_notes_too(workspace: Path):
+    _workbook(workspace / "raw" / "faq.xlsx", [["問題", "答案", "備註"], ["Q1", "A1", "x"]])
+
+    result = commit_raw_documents("default")["results"]["faq.xlsx"]
+
+    assert "這些欄位沒有讀進去：備註" in result["notes"]
+
+
+def test_a_second_question_or_answer_column_is_reported(workspace: Path):
+    result = _import(workspace, "faq.csv", "問題,答案,Question,Answer\nQ1,A1,Q2,A2\n")
+
+    assert "這些欄位沒有讀進去：Question、Answer" in result["notes"]
+
+
+def test_a_split_table_keeps_new_questions_in_their_language_on_reupload(workspace: Path):
+    _languages()
+    _import(workspace, "faq.csv", MIXED)
+
+    _import(workspace, "faq.csv", CHINESE + "有無障礙廁所嗎？,一樓電梯旁。\n")
+
+    assert _questions_under("中文")["faq"] == {"營業時間是幾點？", "可以停車嗎？", "有無障礙廁所嗎？"}
+    rows = (workspace / "knowledge" / "qa" / "faq.csv").read_text(encoding="utf-8").splitlines()
+    assert next(row for row in rows if "有無障礙廁所嗎" in row).endswith(",zh")
+
+
+def test_a_fully_labelled_table_from_before_this_change_reuploads_cleanly(workspace: Path, monkeypatch):
+    import knowledge.qa_import_review as review
+
+    table = 'q,a,language\r\n"多行\r\n題目？",答,zh\r\nHours,Nine,en\r\n'
+    with monkeypatch.context() as before:
+        # 這個改動之前匯入的表沒經過標語言，原樣存檔。
+        before.setattr(review, "label_mixed_languages", lambda qa_csv, **_: qa_csv)
+        _import(workspace, "faq.csv", table)
+
+    result = _import(workspace, "faq.csv", table)
+
+    assert result["added"] == 0
+
+
+def test_mixing_languages_into_a_single_language_table_is_explained_not_claimed(workspace: Path):
+    _languages()
+    _import(workspace, "faq.csv", CHINESE)
+
+    result = _import(workspace, "faq.csv", MIXED)
+
+    assert "languages" not in result
+    assert any("原本只有一種語言" in note for note in result["notes"])
+    assert set(_questions_under("中文")["faq"]) >= {"What are the opening hours?"}
+
+
+def test_no_split_is_claimed_without_language_categories(workspace: Path):
+    result = _import(workspace, "faq.csv", MIXED)
+
+    assert "languages" not in result

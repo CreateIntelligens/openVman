@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -41,11 +42,12 @@ def _listing(items: list[str]) -> str:
     return f"{shown}等 {len(items)} 題" if len(items) > _LIST_LIMIT else shown
 
 
-def label_mixed_languages(qa_csv: bytes) -> bytes:
+def label_mixed_languages(qa_csv: bytes, *, force: bool = False) -> bytes:
     """Write each question's language into the table when it mixes languages.
 
     整份只有一種語言、也沒人標語言時不動，照舊整份一個語言、存成 Markdown。混了語言才逐題判斷，
     否則英文題會跟著整份放進「中文」分類，搜尋也排錯。人寫的語言不改，看不懂的值也留著，只補空白。
+    ``force``：同名文件已經依語言分開時，這次只有一種語言也要標，新題才放得進對的語言分類。
     """
     from memory.language_detect import detect_document_language, detect_row_language
 
@@ -54,8 +56,11 @@ def label_mixed_languages(qa_csv: bytes) -> bytes:
         return qa_csv
     texts = [f"{entry['q']} {entry['a']}" for entry in entries]
     fallback = detect_document_language(" ".join(texts)[:4000])
-    labelled = any(row["language"] for row in qa_csv_row_extras(qa_csv).values())
-    if not labelled and len({detect_row_language(text, fallback) for text in texts}) < 2:
+    labels = [row["language"] for row in qa_csv_row_extras(qa_csv).values()]
+    if all(labels):
+        # 全部都標了就不重寫：重寫會把格子裡的 \r\n 統一成 \n，重傳時題目對不上舊檔，多出一份。
+        return qa_csv
+    if not force and not any(labels) and len({detect_row_language(text, fallback) for text in texts}) < 2:
         return qa_csv
     try:
         content, _ = label_qa_csv_languages(
@@ -64,6 +69,71 @@ def label_mixed_languages(qa_csv: bytes) -> bytes:
     except ValueError:
         return qa_csv
     return content.encode("utf-8")
+
+
+def stored_split(filename: str, project_id: str) -> bool:
+    """Whether the stored QA table of the same name already splits its questions by language."""
+    from knowledge.qa_nodes import is_qa_document
+    from knowledge.workspace import ensure_workspace_scaffold
+
+    relative = (Path("knowledge/qa") / filename).with_suffix(".csv")
+    path = ensure_workspace_scaffold(project_id) / relative
+    if not path.is_file() or not is_qa_document(relative.as_posix(), project_id):
+        return False
+    return is_mixed(row_languages(qa_csv_row_extras(path.read_bytes())))
+
+
+def splits_by_language(languages: dict[str, str], project_id: str) -> bool:
+    """Whether any language of a mixed table has a category to go to."""
+    from knowledge.qa_nodes import find_language_category
+
+    return is_mixed(languages) and any(
+        find_language_category(code, project_id) for code in set(languages.values())
+    )
+
+
+SINGLE_LANGUAGE_FILE_NOTE = (
+    "這份表原本只有一種語言，這次多了其他語言的題目，先跟原本的題目放在一起。"
+    "要依語言分開放，請把檔名改掉重新上傳，或在快速問答把題目拖到對的分類"
+)
+
+
+@dataclass
+class QaTable:
+    """An uploaded QA table after languages were labelled, ready to store and place."""
+
+    qa_csv: bytes
+    extras: dict[str, dict[str, Any]]
+    languages: dict[str, str]
+    already_split: bool
+    ignored: list[str] = field(default_factory=list)
+
+    def split_for(self, target: Path, project_id: str, notes: list[str]) -> bool:
+        """Whether to place each question under its own language for this target.
+
+        原本是 Markdown 的同名文件存不了每題的語言，分開放了搜尋也排不對，照舊放在一起並說明。
+        """
+        from knowledge.qa_nodes import is_qa_document
+
+        mixed = is_mixed(self.languages) or self.already_split
+        if mixed and target.suffix == ".md" and is_qa_document(target.as_posix(), project_id):
+            notes.append(SINGLE_LANGUAGE_FILE_NOTE)
+            return False
+        return mixed
+
+
+def prepare_qa_table(source: Path, origin_bytes: bytes, qa_csv: bytes, project_id: str) -> QaTable:
+    """Label languages and read what the import will skip, before the original is archived."""
+    already_split = stored_split(source.name, project_id)
+    labelled = label_mixed_languages(qa_csv, force=already_split)
+    extras = qa_csv_row_extras(labelled)
+    return QaTable(
+        qa_csv=labelled,
+        extras=extras,
+        languages=row_languages(extras),
+        already_split=already_split,
+        ignored=qa_table_ignored_columns(source, origin_bytes),
+    )
 
 
 def row_languages(extras: dict[str, dict[str, Any]]) -> dict[str, str]:
@@ -149,9 +219,8 @@ def unclear_question_problems(entries: list[dict[str, Any]], untitled: str) -> l
 
 
 def qa_table_notes(
-    source: Path,
-    origin_bytes: bytes,
     *,
+    ignored: list[str],
     entries: list[dict[str, Any]],
     extras: dict[str, dict[str, Any]],
     missing_categories: dict[str, int],
@@ -160,7 +229,6 @@ def qa_table_notes(
 ) -> list[str]:
     """What a person should know about an imported QA table, in plain words."""
     notes: list[str] = []
-    ignored = qa_table_ignored_columns(source, origin_bytes)
     if ignored:
         notes.append(f"這些欄位沒有讀進去：{'、'.join(ignored)}")
     unknown = Counter(

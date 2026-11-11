@@ -766,17 +766,15 @@ def _commit_raw_file(
     )
     from knowledge.doc_meta import resolve_document_languages
     from knowledge.normalizer import normalize_to_markdown
-    from knowledge.qa_csv import qa_csv_row_extras
     from knowledge.qa_images import resolve_qa_image_path
     from knowledge.qa_import_review import (
-        is_mixed,
-        label_mixed_languages,
         language_counts,
         missing_language_category,
         not_a_qa_table_note,
+        prepare_qa_table,
         qa_table_notes,
         question_paths,
-        row_languages,
+        splits_by_language,
     )
     from knowledge.qa_merged import MergedSaveError, merge_reupload
     from knowledge.qa_nodes import (
@@ -802,11 +800,9 @@ def _commit_raw_file(
     origin_bytes = src.read_bytes()
     qa_csv = qa_table_csv_bytes(src, origin_bytes)
     is_qa = qa_csv is not None
-    if qa_csv is not None:
-        qa_csv = label_mixed_languages(qa_csv)
-    extras = qa_csv_row_extras(qa_csv) if qa_csv is not None else {}
-    languages = row_languages(extras)
-    mixed = is_mixed(languages)
+    table = prepare_qa_table(src, origin_bytes, qa_csv, project_id) if qa_csv is not None else None
+    qa_csv, extras, languages = (table.qa_csv, table.extras, table.languages) if table else (None, {}, {})
+    notes: list[str] = []
     missing_categories: dict[str, int] = {}
     target_rel = (
         _qa_table_target(
@@ -816,6 +812,7 @@ def _commit_raw_file(
         else (Path("knowledge") / relative).with_suffix(".md")
     )
     target = target_rel.as_posix()
+    mixed = bool(table and table.split_for(target_rel, project_id, notes))
     if target in claimed_targets:
         # 同名不同副檔名（a.csv、a.xlsx）或不同資料夾的問答表會存成同一份，後面的會蓋掉前面的。
         raise _ImportRefused(
@@ -891,9 +888,8 @@ def _commit_raw_file(
             )
 
     if qa_csv is not None:
-        notes = qa_table_notes(
-            src,
-            origin_bytes,
+        notes += qa_table_notes(
+            ignored=table.ignored if table else [],
             entries=parse_qa_csv(normalize_qa_csv_rows(qa_csv) or b""),
             extras=extras,
             missing_categories=missing_categories,
@@ -901,7 +897,7 @@ def _commit_raw_file(
             image_exists=lambda image_id: resolve_qa_image_path(image_id, project_id) is not None,
         )
     else:
-        notes = [note] if (note := not_a_qa_table_note(src)) else []
+        notes += [note] if (note := not_a_qa_table_note(src)) else []
     result = {
         "target": target,
         "kind": "qa" if is_qa else "document",
@@ -909,7 +905,7 @@ def _commit_raw_file(
         "updated": updated,
         **merge_counts,
         **({"name_clashes": name_clashes} if name_clashes else {}),
-        **({"languages": language_counts(languages)} if mixed else {}),
+        **({"languages": language_counts(languages)} if mixed and splits_by_language(languages, project_id) else {}),
         **({"notes": notes} if notes else {}),
     }
     return {**result, **_qa_node_summary(target, project_id)} if is_qa else result

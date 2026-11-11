@@ -246,16 +246,23 @@ def qa_table_ignored_columns(path: Path, file_bytes: bytes) -> list[str]:
                 for sheet in workbook.worksheets:
                     first = next((row for row in sheet.iter_rows(values_only=True) if _has_content(row)), None)
                     if first:
-                        headers.extend(_cell_text(first, position) for position in range(len(first)))
+                        sheet_header = [_cell_text(first, position) for position in range(len(first))]
+                        headers.extend(name for name in sheet_header if name not in headers)
             finally:
                 workbook.close()
     except Exception:  # noqa: BLE001 — a note is optional; the import itself already succeeded
         logger.warning("Failed to read the header of %s", path, exc_info=True)
         return []
+    # 同一個欄位出現第二次（例如中英各一組問題、答案）只讀第一欄，後面的也算沒讀進去。
     known = {*_QA_TABLE_FIELDS, "index"}
-    return list(dict.fromkeys(
-        name for name in headers if name and normalize_fieldname(name) not in known
-    ))
+    seen: set[str] = set()
+    ignored: list[str] = []
+    for name in headers:
+        field = normalize_fieldname(name)
+        if name and (field not in known or field in seen):
+            ignored.append(name)
+        seen.add(field)
+    return list(dict.fromkeys(ignored))
 
 
 def qa_table_csv_bytes(path: Path, file_bytes: bytes) -> bytes | None:
