@@ -250,6 +250,31 @@ def qa_table_notes(
     return notes
 
 
+def markdown_breaking_questions(entries: list[dict[str, Any]]) -> list[str]:
+    """Questions a Markdown QA document would split or swallow, so a refusal can name them all.
+
+    每題單獨轉成 Markdown 再讀回來比對：答案裡 ## 開頭的行會變成新題目、題目換行會被截斷。
+    沒收尾的 ``` 單題讀回來沒事，但會把後面的題目吞進程式碼區塊，所以另外數。
+    """
+    from knowledge.qa_csv import parse_qa_markdown, qa_entry_values, qa_markdown_block
+
+    broken: list[str] = []
+    for entry in entries:
+        block = qa_markdown_block(
+            entry["q"], entry["a"], entry.get("img") or "", entry.get("url") or "", bool(entry.get("hidden")),
+        )
+        if qa_entry_values(parse_qa_markdown(block)) != qa_entry_values([entry]) or entry["a"].count("```") % 2:
+            broken.append(entry["q"])
+    return broken
+
+
+def markdown_refusal(questions: list[str]) -> str:
+    return (
+        f"{_listing(questions, None)}的答案裡有以「##」開頭的行或沒有收尾的「```」，或題目有換行。"
+        "請在檔案裡刪掉這些符號或換行，存檔後重新上傳"
+    )
+
+
 def not_a_qa_table_note(source: Path) -> str | None:
     """Why a spreadsheet became an ordinary document, when it may have been meant as Q&A."""
     suffix = source.suffix.lower()

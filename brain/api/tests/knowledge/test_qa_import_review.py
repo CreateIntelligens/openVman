@@ -326,3 +326,19 @@ def test_the_same_header_on_two_excel_sheets_is_not_a_repeat(workspace: Path):
     result = commit_raw_documents("default")["results"]["faq.xlsx"]
 
     assert "notes" not in result
+
+
+def test_every_question_markdown_cannot_hold_is_listed(workspace: Path):
+    table = (
+        "q,a\n"
+        '題一,"第一行\n## 小標題"\n'
+        "題二,正常答案\n"
+        '"題三\n換行",答案\n'
+        '題四,"```\n程式碼沒有收尾"\n'
+    )
+    _raw(workspace, "faq.csv", table)
+
+    reason = commit_raw_documents("default")["skip_reasons"]["faq.csv"]
+
+    assert "「題一」" in reason and "「題三 換行」" in reason and "「題四」" in reason
+    assert "題二" not in reason

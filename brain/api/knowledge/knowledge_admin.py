@@ -710,16 +710,17 @@ def _render_qa_document(csv_bytes: bytes, target: Path) -> str:
     if target.suffix == ".csv":
         return normalized.decode("utf-8")
 
+    from knowledge.qa_import_review import markdown_breaking_questions, markdown_refusal
+
+    if broken := markdown_breaking_questions(entries):
+        raise _ImportRefused(markdown_refusal(broken))
     markdown = convert_csv_to_qa_markdown(csv_bytes)
     expected = qa_entry_values(entries)
     actual = qa_entry_values(parse_qa_markdown(markdown))
     if expected != actual:
-        broken = next((e for e, a in zip(expected, actual) if e != a), expected[-1])
-        question = " ".join(broken[0].split())[:40]
-        raise _ImportRefused(
-            f"「{question}」這題的答案裡有「##」或「```」符號，或題目有換行，"
-            "請在檔案裡刪掉這些符號或換行，存檔後重新上傳"
-        )
+        # 逐題檢查沒抓到、整份讀回來卻不一樣：保底，指出第一個對不上的題目。
+        first = next((e for e, a in zip(expected, actual) if e != a), expected[-1])
+        raise _ImportRefused(markdown_refusal([first[0]]))
     return markdown
 
 
