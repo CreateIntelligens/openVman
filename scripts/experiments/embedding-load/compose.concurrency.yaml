@@ -4,13 +4,13 @@ services:
     environment:
       EMBEDDING_BEARER_TOKEN: synthetic-concurrency-probe
       EMBEDDING_MAX_CONCURRENCY: ${EMBEDDING_TEST_CONCURRENCY:-1}
-      HF_HOME: /home/appuser/.cache/huggingface
+      HF_HOME: /cache/huggingface
       HF_HUB_OFFLINE: "1"
       LOG_LEVEL: WARNING
     volumes:
       - ../../../brain/embedding:/app:ro
       - .:/experiments:ro
-      - model-cache:/home/appuser/.cache/huggingface:ro
+      - model-cache:/cache/huggingface:ro
       - trial-results:/results
     healthcheck:
       test:

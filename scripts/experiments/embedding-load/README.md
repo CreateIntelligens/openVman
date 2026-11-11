@@ -81,7 +81,7 @@ python ../../scripts/experiments/embedding-load/retrieval_cache.py
 
 ```bash
 bench_compose=scripts/experiments/embedding-load/compose.concurrency.yaml
-docker compose -p openvman-embedding-tune -f "$bench_compose" run --rm --no-deps --user 0 --entrypoint chown gateway 1000:1000 /results
+docker compose -p openvman-embedding-tune -f "$bench_compose" run --rm --no-deps --user root --entrypoint chown gateway 1000:1000 /results
 for trial in 1-a 2-a 1-b 2-b; do
   EMBEDDING_TEST_CONCURRENCY="${trial%%-*}" docker compose -p openvman-embedding-tune -f "$bench_compose" up -d --wait --wait-timeout 150 gateway
   case "$trial" in
