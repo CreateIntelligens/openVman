@@ -432,3 +432,74 @@ class TestLanguageRouting:
         monkeypatch.setattr(self, "ROUTES", ["zh", "nan"])
         table(["zh.md"] * 30 + ["nan.md"])
         assert self._search("nan")[0] == "chunk-nan.md"
+
+
+class TestLanguageWindowStopsEarly:
+    """同語言段落不夠時，候選窗不必每次都擴到整張表。
+
+    _FakeConfig 的一般門檻是距離 0.85、字面命中門檻 1.1。
+    """
+
+    @pytest.fixture()
+    def rounds(self, patched, monkeypatch):
+        monkeypatch.setattr(
+            retrieval, "project_language_routes", lambda project_id="default": ["zh", "en", "es"],
+        )
+        monkeypatch.setattr(
+            retrieval,
+            "resolve_document_languages",
+            lambda paths, project_id: {p: p.split(".")[0] for p in paths},
+        )
+        calls: list[int] = []
+        original = retrieval._safe_search
+
+        def counting(*args, **kwargs):
+            calls.append(kwargs["limit"])
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(retrieval, "_safe_search", counting)
+        self.patched = patched
+        return calls
+
+    @staticmethod
+    def _chunks(distances, path="zh.md"):
+        return [
+            _rec(f"{path}-{i}", d, metadata=json.dumps({"path": path}))
+            for i, d in enumerate(distances)
+        ]
+
+    def _search(self):
+        return [
+            r["text"] for r in retrieval.search_records(
+                "knowledge", query_vector=[0.1, 0.2], top_k=3,
+                query_text="pump", query_type="hybrid", language="en",
+            )
+        ]
+
+    def test_stops_once_the_window_tail_is_past_the_threshold(self, rounds):
+        # 英文提問、知識庫只有兩段相關的中文：第一輪窗尾已遠過門檻，不再擴查。
+        self.patched(_FakeTable(self._chunks([0.2, 0.3] + [1.5] * 200)))
+        assert self._search() == ["zh.md-0", "zh.md-1"]
+        assert rounds == [12]
+
+    def test_keeps_expanding_while_the_tail_could_still_pass(self, rounds):
+        self.patched(_FakeTable(self._chunks([0.2] + [0.5] * 30 + [1.5] * 200)))
+        self._search()
+        assert rounds == [12, 24, 48]
+
+    def test_keeps_expanding_while_lexical_hits_fill_their_window(self, rounds):
+        vector = self._chunks([0.2, 0.3] + [1.5] * 200)
+        fts = self._chunks([None] * 12, path="es.md")
+        self.patched(_FakeTable(vector, fts_records=fts))
+        self._search()
+        # 字面命中塞滿窗口，代表後面可能還有，照舊擴查。
+        assert len(rounds) > 1
+
+    def test_lexical_hit_outside_the_vector_window_keeps_expanding(self, rounds):
+        # 只有字面命中、還沒進向量窗口的段落：擴大後會多一份向量名次分數，
+        # 排序可能改變，所以要查到它進窗為止，結果才跟查完整張表一樣。
+        far = _rec("en.md-far", 1.0, metadata=json.dumps({"path": "en.md"}))
+        vector = self._chunks([0.2, 0.3] + [0.9] * 40) + [far] + self._chunks([1.5] * 100, "es.md")
+        self.patched(_FakeTable(vector, fts_records=[dict(far)]))
+        assert self._search()[0] == "en.md-far"
+        assert rounds[-1] >= 48

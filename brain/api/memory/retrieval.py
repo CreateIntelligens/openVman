@@ -19,7 +19,7 @@ from knowledge.doc_meta import (
 from knowledge.kb_settings import language_routes as project_language_routes
 from memory.dreaming.recall_tracker import record_trace
 from memory.embedder import encode_text
-from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
+from memory.fusion import _default_key, deduplicate, min_max_normalize, rrf_fuse
 from memory.language_detect import DEFAULT_LANGUAGE
 from memory.thresholds import distance_for
 from personas.personas import normalize_persona_id
@@ -96,6 +96,7 @@ def search_records(
     expansion_vectors: dict[str, list[float] | None] = {}
 
     while True:
+        window: dict[str, Any] = {}
         raw_records = _safe_search(
             table,
             query_vector,
@@ -106,6 +107,7 @@ def search_records(
             expansion_terms=expansion_terms or [],
             embedding_version=embedding_version,
             expansion_vectors=expansion_vectors,
+            window=window,
         )
         visible = [
             record
@@ -131,7 +133,8 @@ def search_records(
             similarity_threshold=thresholds.dedup,
         )
         enough = rank is not None and sum(rank(r) == 0 for r in deduped) >= limit
-        if not expand or exhausted or enough:
+        settled = not expansion_terms and _window_settled(window, cutoff, fts_cutoff)
+        if not expand or exhausted or enough or settled:
             break
         search_limit = min(search_limit * 2, record_count)
     filtered = [_strip_vector(record) for record in deduped[:limit]]
@@ -161,8 +164,13 @@ def _safe_search(
     expansion_terms: list[str] | None = None,
     embedding_version: str | None = None,
     expansion_vectors: dict[str, list[float] | None] | None = None,
+    window: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Execute search with fallback and error handling."""
+    """Execute search with fallback and error handling.
+
+    *window* 有給就填入這一輪候選窗的邊界（見 ``_window_settled``）；查詢失敗時
+    保持空的，呼叫端就當作還沒查完。
+    """
     try:
         if query_type == "hybrid":
             return _hybrid_search(
@@ -174,10 +182,12 @@ def _safe_search(
                 expansion_terms or [],
                 embedding_version,
                 expansion_vectors,
+                window,
             )
-        return _normalize_vector_results(
-            _search_to_records(table.search(query_vector).limit(limit))
-        )
+        records = _search_to_records(table.search(query_vector).limit(limit))
+        if window is not None:
+            window.update(_window_bounds(records, [], limit))
+        return _normalize_vector_results(records)
     except Exception as exc:
         logger.warning("Search failed for %s: %s", table, exc)
         return []
@@ -192,6 +202,7 @@ def _hybrid_search(
     expansion_terms: list[str],
     embedding_version: str | None,
     expansion_vectors: dict[str, list[float] | None] | None = None,
+    window: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Hybrid search:原文與擴展詞各跑 vector + FTS,所有名次表一次 RRF 融合。
 
@@ -226,12 +237,58 @@ def _hybrid_search(
             ranked_lists.append(term_fts)
 
     if len(ranked_lists) == 1:
+        if window is not None:
+            window.update(_window_bounds(vector_records, fts_records, limit))
         return _normalize_vector_results(vector_records)
 
     fused = rrf_fuse(ranked_lists, k=rrf_k)
+    if window is not None:
+        window.update(_window_bounds(vector_records, fts_records, limit, fused=fused))
     return min_max_normalize(fused, source_field="_rrf_score", out_field="_score")[
         :limit
     ]
+
+
+def _window_bounds(
+    vector_records: list[dict[str, Any]],
+    fts_records: list[dict[str, Any]],
+    limit: int,
+    *,
+    fused: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    tail = vector_records[-1].get("_distance") if vector_records else None
+    in_vector = {_default_key(r) for r in vector_records}
+    fused = fused or []
+    # 窗口再大會變的只有兩種：被截掉的，和還沒進向量窗口、之後會多拿一份向量
+    # 名次分數而改變 RRF 排序的字面命中。
+    unsettled = fused[limit:] + [r for r in fused[:limit] if _default_key(r) not in in_vector]
+    return {
+        "vector_tail": tail,
+        "vector_full": len(vector_records) >= limit,
+        "fts_full": len(fts_records) >= limit,
+        "unsettled": unsettled,
+    }
+
+
+def _window_settled(window: dict[str, Any], cutoff: float, fts_cutoff: float) -> bool:
+    """擴大候選窗已經不可能改變過門檻的段落。
+
+    字面命中沒塞滿窗口，代表所有字面命中都拿到了，窗外只剩純向量的段落，要過
+    的是一般門檻。向量是精確搜尋、照距離排：窗尾已經比一般門檻遠，更後面的
+    段落一定過不了。融合後截掉的、還沒進向量窗口的字面命中也都過不了門檻時，
+    這一輪的結果與排序就跟查完整張表一樣，再加倍只是重查到整張表（實測 100 人
+    同時問時一成多的提問多查 8 輪、慢 4 秒）。
+    """
+    if not window or window.get("fts_full", True):
+        return False
+    if any(
+        _passes_relevance_cutoff(r, cutoff, fts_cutoff) for r in window.get("unsettled", [])
+    ):
+        return False
+    if not window.get("vector_full"):
+        return True
+    tail = window.get("vector_tail")
+    return tail is not None and float(tail) > cutoff
 
 
 def _record_search_node(node: str, started: float, hits: int, limit: int) -> None:

@@ -318,7 +318,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 ## 語言分流與回答長度
 
 - 支援語言：`zh`、`en`、`es`、`nan`（台語）、`ja`、`ko`。每個專案在 `.kb_settings.json` 設定 `language_routes`（至少一條，順序即優先序，第一條為主要語言），由 `GET/PUT /brain/knowledge/settings` 讀寫。
-- 只有一條分流時不分流。多條時文件不會被過濾，只排先後：使用者語言的文件優先，不足再以主要語言與其他語言補；候選窗逐次擴大直到同語言結果足夠。圖譜帶入的相關段落只保留命中段落有的語言。
+- 只有一條分流時不分流。多條時文件不會被過濾，只排先後：使用者語言的文件優先，不足再以主要語言與其他語言補；候選窗逐次擴大，直到同語言結果足夠，或確定再擴大也不會改變結果為止。圖譜帶入的相關段落只保留命中段落有的語言。
 - 文件語言存在 `.doc_meta.json`，可由 `PATCH /brain/knowledge/document/meta` 指定（`zh|en|es|auto`）。
 - 使用者訊息語言先以規則即時判斷，看不出語言的短句（ok、型號）歸主要語言，hi、hola 這類只有一種語言會用的招呼照該語言；`JEV_LANGUAGE_ENABLED` 時再於背景由決策供應鏈校正存檔的標籤。
 - 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。
