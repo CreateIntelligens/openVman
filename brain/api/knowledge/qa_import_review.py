@@ -37,9 +37,10 @@ def _short(text: str, limit: int = 20) -> str:
     return flat if len(flat) <= limit else f"{flat[:limit]}…"
 
 
-def _listing(items: list[str]) -> str:
-    shown = "、".join(f"「{_short(item)}」" for item in items[:_LIST_LIMIT])
-    return f"{shown}等 {len(items)} 題" if len(items) > _LIST_LIMIT else shown
+def _listing(items: list[str], limit: int | None = _LIST_LIMIT) -> str:
+    """Name the questions; ``limit=None`` names every one (a refusal must, or the fix takes several uploads)."""
+    shown = "、".join(f"「{_short(item)}」" for item in items[:limit])
+    return f"{shown}等 {len(items)} 題" if limit is not None and len(items) > limit else shown
 
 
 def label_mixed_languages(qa_csv: bytes, *, force: bool = False) -> bytes:
@@ -81,15 +82,6 @@ def stored_split(filename: str, project_id: str) -> bool:
     if not path.is_file() or not is_qa_document(relative.as_posix(), project_id):
         return False
     return is_mixed(row_languages(qa_csv_row_extras(path.read_bytes())))
-
-
-def splits_by_language(languages: dict[str, str], project_id: str) -> bool:
-    """Whether any language of a mixed table has a category to go to."""
-    from knowledge.qa_nodes import find_language_category
-
-    return is_mixed(languages) and any(
-        find_language_category(code, project_id) for code in set(languages.values())
-    )
 
 
 SINGLE_LANGUAGE_FILE_NOTE = (
@@ -157,8 +149,8 @@ def question_paths(
     project_id: str,
     *,
     report_missing: bool,
-) -> tuple[dict[str, list[str]], dict[str, int]]:
-    """Where each question goes on the menu, and languages that have no category yet.
+) -> tuple[dict[str, list[str]], dict[str, int], bool]:
+    """Where each question goes, languages with no category yet, and whether any went by language.
 
     有填 path 的照填的放。沒填的放進以檔名命名的分類，上層是語言分類：``languages`` 有值（混語言的表）
     時用每題自己的語言，否則用整份的分類。語言分類不自動建立，沒有就放最上層；專案有其他語言分類時，
@@ -172,6 +164,7 @@ def question_paths(
     has_language_categories = file_category is not None or any(categories.values())
     missing: Counter[str] = Counter()
     paths: dict[str, list[str]] = {}
+    by_language = False
     for question, row in extras.items():
         if row["path"]:
             paths[question] = row["path"]
@@ -180,8 +173,9 @@ def question_paths(
         chosen = categories[code] if code else file_category
         if code in nameable and chosen is None and has_language_categories and report_missing:
             missing[code] += 1
+        by_language = by_language or bool(code and chosen)
         paths[question] = [*([node_label(chosen, project_id)] if chosen else []), stem]
-    return paths, dict(missing)
+    return paths, dict(missing), by_language
 
 
 def missing_language_category(language: str, category: str | None, project_id: str) -> dict[str, int]:
@@ -212,9 +206,9 @@ def unclear_question_problems(entries: list[dict[str, Any]], untitled: str) -> l
             conflicts.append(question)
     problems: list[str] = []
     if orphans:
-        problems.append(f"{len(orphans)} 列只有答案、沒有題目（{_listing(orphans)}），請補上題目")
+        problems.append(f"{len(orphans)} 列只有答案、沒有題目（{_listing(orphans, None)}），請補上題目")
     if conflicts:
-        problems.append(f"{_listing(conflicts)}在檔案裡有不同的答案，每題請只留一個答案")
+        problems.append(f"{_listing(conflicts, None)}在檔案裡有不同的答案，每題請只留一個答案")
     return problems
 
 

@@ -283,3 +283,46 @@ def test_no_split_is_claimed_without_language_categories(workspace: Path):
     result = _import(workspace, "faq.csv", MIXED)
 
     assert "languages" not in result
+
+
+def test_a_refusal_lists_every_unclear_question(workspace: Path):
+    rows = "".join(f"Q{n},A{n}\nQ{n},B{n}\n" for n in range(1, 6))
+    _raw(workspace, "faq.csv", "q,a\n" + rows)
+
+    reason = commit_raw_documents("default")["skip_reasons"]["faq.csv"]
+
+    assert all(f"「Q{n}」" in reason for n in range(1, 6))
+
+
+def test_no_split_is_claimed_when_every_row_names_its_own_category(workspace: Path):
+    _languages()
+    table = "問題,答案,分類\n營業時間是幾點？,早上九點。,服務\nWhat are the opening hours?,From nine.,服務\n"
+
+    result = _import(workspace, "faq.csv", table)
+
+    assert "languages" not in result
+
+
+def test_a_repeated_column_name_in_one_excel_sheet_is_reported(workspace: Path):
+    _workbook(workspace / "raw" / "faq.xlsx", [["問題", "答案", "問題", "答案"], ["Q1", "A1", "Q2", "A2"]])
+
+    result = commit_raw_documents("default")["results"]["faq.xlsx"]
+
+    assert "這些欄位沒有讀進去：問題、答案" in result["notes"]
+
+
+def test_the_same_header_on_two_excel_sheets_is_not_a_repeat(workspace: Path):
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    book.active.append(["問題", "答案"])
+    book.active.append(["Q1", "A1"])
+    second = book.create_sheet("二")
+    second.append(["問題", "答案"])
+    second.append(["Q2", "A2"])
+    (workspace / "raw").mkdir(parents=True, exist_ok=True)
+    book.save(workspace / "raw" / "faq.xlsx")
+
+    result = commit_raw_documents("default")["results"]["faq.xlsx"]
+
+    assert "notes" not in result

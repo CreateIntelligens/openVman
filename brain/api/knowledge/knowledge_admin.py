@@ -768,13 +768,13 @@ def _commit_raw_file(
     from knowledge.normalizer import normalize_to_markdown
     from knowledge.qa_images import resolve_qa_image_path
     from knowledge.qa_import_review import (
+        is_mixed,
         language_counts,
         missing_language_category,
         not_a_qa_table_note,
         prepare_qa_table,
         qa_table_notes,
         question_paths,
-        splits_by_language,
     )
     from knowledge.qa_merged import MergedSaveError, merge_reupload
     from knowledge.qa_nodes import (
@@ -804,6 +804,7 @@ def _commit_raw_file(
     qa_csv, extras, languages = (table.qa_csv, table.extras, table.languages) if table else (None, {}, {})
     notes: list[str] = []
     missing_categories: dict[str, int] = {}
+    by_language = False
     target_rel = (
         _qa_table_target(
             src.name, project_id, keep_csv=any(row["language"] for row in extras.values()),
@@ -862,7 +863,7 @@ def _commit_raw_file(
             if mixed or any(row["path"] for row in extras.values()):
                 # 同一份表裡沒填 path 的題目，不論第一次匯入或重傳，都放以檔名命名的分類；
                 # 混了語言的表，每題放進自己語言的分類。語言分類不自動建立，沒有就放最上層。
-                paths, missing_categories = question_paths(
+                paths, missing_categories, by_language = question_paths(
                     extras, languages if mixed else {}, category, target_rel.stem, project_id,
                     report_missing=not existing_qa,
                 )
@@ -905,7 +906,7 @@ def _commit_raw_file(
         "updated": updated,
         **merge_counts,
         **({"name_clashes": name_clashes} if name_clashes else {}),
-        **({"languages": language_counts(languages)} if mixed and splits_by_language(languages, project_id) else {}),
+        **({"languages": language_counts(languages)} if by_language and is_mixed(languages) else {}),
         **({"notes": notes} if notes else {}),
     }
     return {**result, **_qa_node_summary(target, project_id)} if is_qa else result

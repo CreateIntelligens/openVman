@@ -233,11 +233,11 @@ def _qa_workbook_csv_bytes(path: Path) -> bytes | None:
 def qa_table_ignored_columns(path: Path, file_bytes: bytes) -> list[str]:
     """Header names of an uploaded QA table that the import does not read, in order."""
     suffix = path.suffix.lower()
-    headers: list[str] = []
+    sheets: list[list[str]] = []
     try:
         if suffix == ".csv":
             table = parse_csv_table(file_bytes)
-            headers = [str(name).strip() for name in table[0]] if table else []
+            sheets = [[str(name).strip() for name in table[0]]] if table else []
         elif suffix == ".xlsx":
             import openpyxl
 
@@ -246,22 +246,23 @@ def qa_table_ignored_columns(path: Path, file_bytes: bytes) -> list[str]:
                 for sheet in workbook.worksheets:
                     first = next((row for row in sheet.iter_rows(values_only=True) if _has_content(row)), None)
                     if first:
-                        sheet_header = [_cell_text(first, position) for position in range(len(first))]
-                        headers.extend(name for name in sheet_header if name not in headers)
+                        sheets.append([_cell_text(first, position) for position in range(len(first))])
             finally:
                 workbook.close()
     except Exception:  # noqa: BLE001 — a note is optional; the import itself already succeeded
         logger.warning("Failed to read the header of %s", path, exc_info=True)
         return []
-    # 同一個欄位出現第二次（例如中英各一組問題、答案）只讀第一欄，後面的也算沒讀進去。
+    # 同一張表裡同一個欄位出現第二次（例如中英各一組問題、答案）只讀第一欄，後面的也算沒讀進去；
+    # 不同工作表各有一組欄名是正常的。
     known = {*_QA_TABLE_FIELDS, "index"}
-    seen: set[str] = set()
     ignored: list[str] = []
-    for name in headers:
-        field = normalize_fieldname(name)
-        if name and (field not in known or field in seen):
-            ignored.append(name)
-        seen.add(field)
+    for header in sheets:
+        seen: set[str] = set()
+        for name in header:
+            field = normalize_fieldname(name)
+            if name and (field not in known or field in seen):
+                ignored.append(name)
+            seen.add(field)
     return list(dict.fromkeys(ignored))
 
 
