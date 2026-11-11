@@ -300,3 +300,63 @@ def test_prompt_line_only_for_projects_with_a_catalog(workspace, monkeypatch):
     assert "規格表收錄的範圍是「測試泵浦」" in line
     monkeypatch.setattr(product_tools, "load_product_catalog", lambda _project: None)
     assert product_tools.product_prompt_line("p") == ""
+
+
+def _count_yaml_parses(monkeypatch) -> list[int]:
+    calls = [0]
+    original = product_catalog.yaml.safe_load
+
+    def counting(text):
+        calls[0] += 1
+        return original(text)
+
+    monkeypatch.setattr(product_catalog.yaml, "safe_load", counting)
+    return calls
+
+
+def test_unchanged_catalog_is_not_parsed_again(workspace, monkeypatch):
+    first = load_product_catalog("cache-unchanged")
+    calls = _count_yaml_parses(monkeypatch)
+    assert load_product_catalog("cache-unchanged") is first
+    assert calls == [0]
+
+
+def test_edited_product_is_seen_at_once(workspace):
+    root, _disabled = workspace
+    load_product_catalog("cache-edited")
+    note = root / "knowledge" / "products" / "50EUB-M-5.20S.md"
+    note.write_text(_note({**PRODUCTS["50EUB-M-5.20S.md"], "hp": 9}), encoding="utf-8")
+    catalog = load_product_catalog("cache-edited")
+    assert {p.values["model"]: p.values["hp"] for p in catalog.products}["50EUB-M-5.20S"] == 9
+
+
+def test_added_and_removed_products_are_seen_at_once(workspace):
+    root, _disabled = workspace
+    before = len(load_product_catalog("cache-files").products)
+    directory = root / "knowledge" / "products"
+    (directory / "NEW.md").write_text(_note({**PRODUCTS["50EUB-M-5.20S.md"], "model": "NEW"}), encoding="utf-8")
+    assert len(load_product_catalog("cache-files").products) == before + 1
+    (directory / "NEW.md").unlink()
+    assert len(load_product_catalog("cache-files").products) == before
+
+
+def test_disabling_a_document_is_seen_at_once(workspace):
+    _root, disabled = workspace
+    before = len(load_product_catalog("cache-disabled").products)
+    disabled.add("knowledge/products/50EUB-M-5.20S.md")
+    assert len(load_product_catalog("cache-disabled").products) == before - 1
+
+
+def test_catalog_definition_change_is_seen_at_once(workspace):
+    root, _disabled = workspace
+    load_product_catalog("cache-definition")
+    path = root / "knowledge" / "products" / "_catalog.yaml"
+    path.write_text(CATALOG.replace("測試泵浦", "新名稱"), encoding="utf-8")
+    assert load_product_catalog("cache-definition").title == "新名稱"
+
+
+def test_removing_the_definition_ends_the_catalog(workspace):
+    root, _disabled = workspace
+    load_product_catalog("cache-removed")
+    (root / "knowledge" / "products" / "_catalog.yaml").unlink()
+    assert load_product_catalog("cache-removed") is None

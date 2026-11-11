@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from math import isfinite
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -20,6 +21,10 @@ from knowledge.workspace import get_workspace_root
 PRODUCTS_DIR = "knowledge/products"
 CATALOG_FILENAME = "_catalog.yaml"
 FIELD_TYPES = frozenset({"number", "text", "number_set"})
+
+# 每輪對話會讀兩次型錄（組 prompt、決定給哪些工具），一次要解析全部產品的 YAML，
+# 是純 CPU 工作：鶴記 118 篇約 0.15 秒，多人同時問就排隊。檔案沒變就不重新解析。
+_catalog_cache: dict[str, tuple[tuple[object, ...], "ProductCatalog"]] = {}
 
 
 class CatalogError(ValueError):
@@ -111,13 +116,40 @@ def _check_value(spec: CatalogField, value: Any) -> Any:
     return value
 
 
+def _catalog_signature(root: Path, directory: Path, disabled: set[str]) -> tuple[object, ...]:
+    """Changes whenever a file is added, removed, edited, or a document is disabled."""
+    files = []
+    for path in sorted(directory.rglob("*")):
+        if path.suffix in {".md", ".yaml"}:
+            stat = path.stat()
+            files.append((path.relative_to(root).as_posix(), stat.st_mtime_ns, stat.st_size))
+    return (str(root), tuple(files), tuple(sorted(disabled)))
+
+
 def load_product_catalog(project_id: str) -> ProductCatalog | None:
-    """Load the project's catalog, or None when the project has no ``_catalog.yaml``."""
+    """Load the project's catalog, or None when the project has no ``_catalog.yaml``.
+
+    The result is shared between callers while the files are unchanged: treat it as read-only.
+    """
     root = get_workspace_root(project_id)
     directory = root / PRODUCTS_DIR
     catalog_path = directory / CATALOG_FILENAME
     if not catalog_path.is_file():
+        _catalog_cache.pop(project_id, None)
         return None
+    disabled = set(list_disabled_document_paths(project_id))
+    signature = _catalog_signature(root, directory, disabled)
+    cached = _catalog_cache.get(project_id)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+    catalog = _parse_catalog(root, directory, catalog_path, disabled)
+    _catalog_cache[project_id] = (signature, catalog)
+    return catalog
+
+
+def _parse_catalog(
+    root: Path, directory: Path, catalog_path: Path, disabled: set[str],
+) -> ProductCatalog:
     try:
         raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
@@ -129,7 +161,6 @@ def load_product_catalog(project_id: str) -> ProductCatalog | None:
     if key not in fields or fields[key].type != "text":
         raise CatalogError(f"key 欄位 {key} 必須定義在 fields 裡，且型別是 text")
 
-    disabled = list_disabled_document_paths(project_id)
     products: list[Product] = []
     skipped: list[dict[str, str]] = []
     for path in sorted(directory.rglob("*.md")):
