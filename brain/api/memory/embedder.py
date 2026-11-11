@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import logging
+import math
 import random
 from threading import Lock
 import time
@@ -14,7 +15,8 @@ import httpx
 
 from config import EmbeddingBackend, get_settings
 from core.turn_budget import number_setting
-from safety.observability import record_node_attempt
+from memory.query_embedding_cache import QueryEmbeddingCache
+from safety.observability import get_metrics_store, record_node_attempt
 
 logger = logging.getLogger("brain.memory.embedder")
 
@@ -84,6 +86,9 @@ class QueryEmbeddingRoute:
 
 _embedder_cache: dict[str, TextEmbedder] = {}
 _embedder_lock = Lock()
+_query_vector_cache: QueryEmbeddingCache[QueryEmbeddingRoute] = (
+    QueryEmbeddingCache()
+)
 
 
 def get_embedder(embedding_version: str | None = None) -> TextEmbedder:
@@ -123,6 +128,8 @@ def encode_query_with_fallback(
     table_names: tuple[str, ...] = ("knowledge", "memories"),
 ) -> QueryEmbeddingRoute:
     """Encode search query via remote embedding gateway with candidate identity filtering."""
+    started = time.monotonic()
+    get_metrics_store().increment("embedding_query_requests_total")
     cfg = get_settings()
     active_version = cfg.resolved_embedding_active_version
 
@@ -150,11 +157,21 @@ def encode_query_with_fallback(
         candidate_versions.append(identity)
 
     if not candidate_versions:
+        get_metrics_store().increment(
+            "embedding_query_cache_total", status="error",
+        )
+        record_node_attempt(
+            "rag_embed_query",
+            outcome="error",
+            elapsed_ms=(time.monotonic() - started) * 1000,
+            component=active_version,
+            cache_status="error",
+            reason="missing_tables",
+        )
         raise RuntimeError("沒有可用的 embedding version 可供查詢")
 
     embedder = get_embedder(active_version)
     if hasattr(embedder, "encode_with_metadata"):
-        started = time.monotonic()
         # 查詢是使用者那一句：短逾時、最多重試一次；建索引走 encode()／encode_with_metadata 預設的長設定。
         query_limits: dict[str, Any] = {}
         if isinstance(embedder, GatewayRemoteTextEmbedder):
@@ -163,35 +180,47 @@ def encode_query_with_fallback(
                 "max_retries": int(number_setting(cfg, "embedding_query_max_retries", 1)),
             }
         try:
-            vectors, spec, attempts = embedder.encode_with_metadata(
-                [query],
-                input_type="query",
-                acceptable_identities=candidate_versions,
-                **query_limits,
+            # Candidate filtering precedes cache lookup: a dropped table must
+            # never become queryable merely because its vector is still cached.
+            route, cache_status = _query_vector_cache.get_or_compute(
+                (embedder, project_id, query, tuple(candidate_versions)),
+                lambda: _encode_gateway_query(
+                    embedder, query, candidate_versions, query_limits,
+                ),
+                max_entries=(
+                    int(number_setting(cfg, "embedding_query_cache_size", 1024))
+                    if len(query) <= 4096 else 0
+                ),
+                wait_timeout=number_setting(
+                    cfg, "embedding_query_timeout_seconds", 2.0,
+                ),
+                # Do not pin a temporary fallback after the preferred model
+                # recovers. The current gateway has one provider.
+                cacheable=lambda result: result.version == candidate_versions[0],
             )
-            selected_identity = spec.get("identity", "") if spec else ""
-            if selected_identity not in candidate_versions:
-                raise RuntimeError("Gateway returned an unrequested embedding identity")
             record_node_attempt(
                 "rag_embed_query",
                 outcome="ok",
                 elapsed_ms=(time.monotonic() - started) * 1000,
-                component=selected_identity,
+                component=route.version,
                 timeout_s=query_limits.get("timeout"),
+                cache_status=cache_status,
             )
-            return QueryEmbeddingRoute(
-                version=selected_identity,
-                vector=vectors[0],
-                attempted_versions=attempts,
-                embedding_spec=spec,
+            get_metrics_store().increment(
+                "embedding_query_cache_total", status=cache_status,
             )
+            return route
         except Exception as exc:
+            get_metrics_store().increment(
+                "embedding_query_cache_total", status="error",
+            )
             record_node_attempt(
                 "rag_embed_query",
                 outcome="timeout" if _is_timeout(exc) else "error",
                 elapsed_ms=(time.monotonic() - started) * 1000,
                 component=active_version,
                 timeout_s=query_limits.get("timeout"),
+                cache_status="error",
                 exc=exc,
             )
             logger.warning("Gateway query encode failed: %s", exc)
@@ -217,6 +246,33 @@ def encode_query_with_fallback(
             continue
 
     raise RuntimeError("沒有可用的 embedding version 可供查詢")
+
+
+def _encode_gateway_query(
+    embedder: TextEmbedder,
+    query: str,
+    candidates: list[str],
+    limits: dict[str, Any],
+) -> QueryEmbeddingRoute:
+    vectors, spec, attempts = embedder.encode_with_metadata(
+        [query], input_type="query", acceptable_identities=candidates, **limits,
+    )
+    identity = spec.get("identity", "") if spec else ""
+    if identity not in candidates:
+        raise RuntimeError("Gateway returned an unrequested embedding identity")
+    if len(vectors) != 1 or not vectors[0]:
+        raise ValueError("Gateway returned an invalid query vector count")
+    dimension = spec.get("dimensions")
+    if dimension and len(vectors[0]) != dimension:
+        raise ValueError("Gateway returned an invalid query vector dimension")
+    if not all(math.isfinite(value) for value in vectors[0]):
+        raise ValueError("Gateway returned a non-finite query vector")
+    return QueryEmbeddingRoute(
+        version=identity,
+        vector=vectors[0],
+        attempted_versions=attempts,
+        embedding_spec=spec,
+    )
 
 
 def _is_timeout(exc: BaseException) -> bool:
@@ -319,6 +375,10 @@ class GatewayRemoteTextEmbedder:
 
         for attempt in range(retries + 1):
             try:
+                get_metrics_store().increment(
+                    "embedding_http_requests_total",
+                    input_type=payload.get("input_type", "document"),
+                )
                 resp = client.post("/embed", json=payload, **post_kwargs)
                 status_code = getattr(resp, "status_code", 200)
                 if status_code in retryable_statuses and attempt < retries:

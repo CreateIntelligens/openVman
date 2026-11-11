@@ -1,0 +1,37 @@
+services:
+  gateway:
+    image: tbdavid2019/openvman-embedding:latest
+    environment:
+      EMBEDDING_BEARER_TOKEN: synthetic-concurrency-probe
+      EMBEDDING_MAX_CONCURRENCY: ${EMBEDDING_TEST_CONCURRENCY:-1}
+      HF_HOME: /home/appuser/.cache/huggingface
+      HF_HUB_OFFLINE: "1"
+      LOG_LEVEL: WARNING
+    volumes:
+      - ../../../brain/embedding:/app:ro
+      - .:/experiments:ro
+      - model-cache:/home/appuser/.cache/huggingface:ro
+      - trial-results:/results
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8009/health/ready',headers={'Authorization':'Bearer synthetic-concurrency-probe'}); urllib.request.urlopen(r,timeout=8).read()"
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 5s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: cdi
+              capabilities: [gpu]
+              device_ids: [nvidia.com/gpu=all]
+
+volumes:
+  trial-results:
+  model-cache:
+    external: true
+    name: ${EMBEDDING_BENCH_MODEL_CACHE_VOLUME:-openvman_hf-cache}

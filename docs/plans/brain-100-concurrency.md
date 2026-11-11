@@ -170,3 +170,15 @@ WAL 加 4 workers 也用同一組 E2E 驗過對話路徑：瀏覽器 40 項、�
 - 瞬間大量請求時，共用資源裡到底是哪一個先滿。
 - 長時間運作下，WAL 檔大小與多 worker 記憶體（每個約 300～800 MB）的影響。
 - 資料量更大時的檢索時間，這次只測約 120 篇產品文件的專案。
+
+## 查詢向量重用實測（2026-11-11）
+
+已實作 Brain worker 內的查詢向量 LRU 與同鍵請求合併。隔離容器連真實 embedding，100 次請求重複問 5 題，兩輪 HTTP 次數皆由 100 降到 5；暖快取為 0。100 題皆不同時仍為 100 次，沒有證據顯示加速。這只量查詢向量階段，不能當作完整聊天的加速比例。
+
+另以真實 LanceDB、虛構服務中心測一輪知識兩條查詢＋記憶一條查詢，入口 3 次的 HTTP 計算由 3 降至冷快取 2、暖快取 0；vector／FTS 搜尋次數與檢索內容不變。快取後停用文件立即隱藏，刪表後拒絕查詢。數據與重現腳本見 `scripts/experiments/embedding-load/README.md`。快取目前完成本機隔離驗證，尚未部署正式服務；GPU 並行對照見下節，api-chat 與 WAL 未在此修改。
+
+## Gateway 並行對照（2026-11-11）
+
+在 `perf/embedding-query-cache` 的 `.worktree/embedding-performance` 用隔離 gateway 測同一份模型的批次並行 1／2。每種各兩輪、client 並行 1／16／32，純查詢及混入 20% 小文件，共 5386 次請求成功。client 並行 32 時，純查詢吞吐從 worker＝1 的 105.6–112.2 次／秒降為 worker＝2 的 63.7–66.2 次／秒；混合文件的聊天查詢延遲沒有穩定改善，試驗 server 顯存取樣峰值則從 2764 升至 3312 MiB。
+
+決定維持 `EMBEDDING_MAX_CONCURRENCY=1`，不調正式站。完整方法、向量一致性與限制見 `scripts/experiments/embedding-load/README.md`；這不是完整聊天或獨佔 GPU 測試。

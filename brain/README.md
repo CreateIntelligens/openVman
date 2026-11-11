@@ -137,6 +137,8 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - Markdown 依標題切段（`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO`）；QA 形式的 Markdown 與 CSV 每題一段。
 - 向量寫入目前的 write identity 對應的資料表（每個 embedding 版本一組，例如 `knowledge__gemma`），並建立 FTS 索引。EmbeddingGemma 2 是非對稱模型：查詢加 question answering 前綴，文件帶檔名當標題（`titles` 欄位送給 gateway）。Gateway 另有 `input_type: "search_query"`（search result 前綴），給共用端點上檢索效果較好的其他 stack（jtai）用。
 - 換 embedding 模型時，新版本寫進另一組資料表、索引與記憶要用新模型重算，建好之前查詢退回有索引的版本；2026-10 從 BGE-M3 換到 EmbeddingGemma 2 的做法與數據見 `scripts/experiments/embeddinggemma2/`。
+- 查詢向量使用每個 Brain worker 各自的 LRU，`EMBEDDING_QUERY_CACHE_SIZE` 預設 1024 筆、設 0 關閉快取與同鍵請求合併。key 包含 gateway client、專案、原始文字與依順位排列的完整 query identities；每次先確認資料表可用的 identities，才查快取。同鍵同時請求共用一次計算，等待者最多等 `EMBEDDING_QUERY_TIMEOUT_SECONDS`，逾時不取消其他回合的計算。只儲存通過規格驗證的首選 identity 向量，暫時回退與錯誤不儲存；超過 4096 字的查詢略過快取。只重用向量，檢索、文件可見性與語言排序仍每次執行；HTTP Chat 與 Gemini Live 的共用查詢路徑都適用，文件建索引不使用此快取。
+- 觀測：`embedding_query_requests_total` 是查詢入口呼叫次數，`embedding_query_cache_total{status}` 區分 `hit`／`miss`／`coalesced`／`disabled`／`error`；`embedding_http_requests_total{input_type}` 在實際送出 HTTP 時累計，包含重試與文件批次。`rag_embed_query` 的 `node_attempt` 另帶 `cache_status` 與既有 trace ID，可核對同一輪的呼叫與命中情況，不記錄查詢原文。指標與快取一樣只涵蓋單一 worker；比較多 worker 時須各自彙整。重現方式見 `scripts/experiments/embedding-load/query_cache.py`。
 - 知識圖譜由 `POST /brain/knowledge/graph/rebuild` 在背景以 graphify 建立，產物在 `graphify-out/`。
 
 檢索（`memory/retrieval.py`、`tools/builtin/knowledge_tools.py`）：
@@ -464,6 +466,7 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 - 主對話那一區沒存過（或按了「改回部署設定」）時，`LLM_FALLBACK_CHAIN` 有值就是實際呼叫順序；後台存過的 key（`chat_llm.credential_overrides`，含刻意清除）仍會取代同一家的環境變數 key。
 - 失敗的站會往後排（`core/provider_health.py`，主對話與決策共用）：401／403 視為 key 無效，換 key 或重開前都排到最後；配額用完（429）冷卻 5 分鐘；逾時、5xx、連線或回應錯誤連續 2 次冷卻 60 秒，時間到再試一次，成功即恢復。站不會被拿掉：健康的站都失敗後仍會試冷卻中與 key 無效的站。決策的逾時若是因為前面的站把時間用掉（剩不到一半），不算這一站失敗。狀態以 key 的 sha256 前 12 碼區分，後台換新 key 立即重試；決策鏈再依用途（每輪決策、附圖選擇、插話判斷…）分開記，小請求成功不會把大請求的失敗次數歸零；`GET /brain/internal/provider-health` 列出正在失敗的站，後台「模型供應商」頁據此顯示每站狀態；頁面的「重置」按鈕經 Backend 呼叫 `POST /brain/internal/provider-health/reset`（可只清某一類或某一站）。後台存檔後 Backend 呼叫 `POST /brain/internal/model-providers/refresh` 立即清掉設定快取，Brain 連不上時照常 10 秒內生效。決策鏈每站時限之外，跨公網的 OpenAI Decisions 每站至少 1.5 秒（仍受整次請求期限限制）。
 - 未設定外部 `EMBEDDING_SERVICE_URL` 時，`COMPOSE_PROFILES` 必須包含 `embedding`。Gateway 的模型、revision、批次大小等預設值都寫在 `brain/embedding/app.py`，compose 只傳 token 與雲端 API key；要覆寫再在 compose 的 embedding 服務加環境變數。
+- `EMBEDDING_MAX_CONCURRENCY` 是同一容器、同一模型的批次 worker 數，預設 1；不會新增容器或模型副本。2026-11-11 隔離實測並行 2 使純查詢吞吐下降，混合文件的查詢延遲也沒有穩定改善，維持 1；方法與限制見 `scripts/experiments/embedding-load/README.md`。
 - Embedding gateway 沒有 Bearer token 時 fail closed；預設不允許瀏覽器跨來源呼叫（目前所有呼叫端都是後端）。
 
 ## 本機執行與部署

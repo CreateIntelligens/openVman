@@ -109,6 +109,7 @@ class BrainSettings(BaseSettings):
     # 每次嘗試 2 秒、最多重試 1 次；建索引、記憶整理照上面的長設定。
     embedding_query_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
     embedding_query_max_retries: int = Field(default=1, ge=0, le=3)
+    embedding_query_cache_size: int = Field(default=1024, ge=0, le=16384)
     embedding_write_identity: str = ""
     embedding_identity_aliases: str = ""
     embedding_gemma_model: str = "google/embeddinggemma-2"

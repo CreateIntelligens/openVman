@@ -27,6 +27,37 @@ def test_external_url_precedence_and_internal_default():
     assert cfg_external.is_embedding_service_external is True
 
 
+def test_http_counter_includes_retries(monkeypatch):
+    from safety import observability
+
+    metrics = observability.MetricsStore()
+    monkeypatch.setattr(observability, "_metrics", metrics)
+    monkeypatch.setattr("memory.embedder.time.sleep", lambda _: None)
+    statuses = iter([503, 200])
+
+    def post(self, endpoint, **kwargs):
+        return httpx.Response(
+            next(statuses),
+            json={
+                "vectors": [[0.1] * 768],
+                "embedding_spec": {"identity": "query-r1", "dimensions": 768},
+            },
+            request=httpx.Request("POST", f"http://test{endpoint}"),
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", post)
+    adapter = GatewayRemoteTextEmbedder("http://test", max_retries=1)
+    try:
+        adapter.encode(["question"], input_type="query")
+    finally:
+        adapter.close()
+    assert (
+        "embedding_http_requests_total",
+        {"input_type": "query"},
+        2,
+    ) in metrics.iter_counters()
+
+
 def test_remote_adapter_chunks_requests_and_leases_identity(monkeypatch):
     recorded_batches: list[list[str]] = []
 
