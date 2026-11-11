@@ -32,8 +32,18 @@ from safety.observability import log_event
 
 logger = logging.getLogger(__name__)
 
-_maintenance_lock = Lock()
+# 維護會讀整張記憶表、重算摘要向量再整表覆寫，一次要好幾秒。同一個專案同時只跑一份；
+# 跑的期間進來的請求合併成「跑完再補一次」，呼叫端不必排隊等（多人同時問時，原本每輪
+# 都整表重建，背景執行緒全卡在這裡）。
+_state_lock = Lock()
+_project_locks: dict[str, Lock] = {}
+_pending_maintenance: set[str] = set()
 _last_maintenance_at: dict[str, float] = {}
+
+
+def _project_lock(project_id: str) -> Lock:
+    with _state_lock:
+        return _project_locks.setdefault(project_id, Lock())
 
 
 @dataclass(slots=True)
@@ -50,13 +60,38 @@ def maybe_run_memory_maintenance(force: bool = False, project_id: str = "default
     cfg = get_settings()
     now = monotonic()
 
-    with _maintenance_lock:
+    with _project_lock(project_id):
         last = _last_maintenance_at.get(project_id, 0.0)
         if not force and now - last < cfg.memory_maintenance_interval_seconds:
             return {"status": "skipped", "reason": "throttled"}
         result = run_memory_maintenance(project_id)
         _last_maintenance_at[project_id] = monotonic()
         return result
+
+
+def request_memory_maintenance(project_id: str = "default") -> bool:
+    """Run maintenance now, or leave it to the run already in progress for this project.
+
+    Returns True when this call ran it. A request that arrives during a run is
+    picked up by that run's owner once it finishes, so nothing is lost.
+    """
+    lock = _project_lock(project_id)
+    with _state_lock:
+        _pending_maintenance.add(project_id)
+    ran = False
+    while True:
+        if not lock.acquire(blocking=False):
+            return ran
+        try:
+            with _state_lock:
+                if project_id not in _pending_maintenance:
+                    return ran
+                _pending_maintenance.discard(project_id)
+            run_memory_maintenance(project_id)
+            _last_maintenance_at[project_id] = monotonic()
+            ran = True
+        finally:
+            lock.release()
 
 
 @project_model_entry("memory_maintenance")
@@ -204,8 +239,8 @@ def write_summary_and_reindex(
         fingerprint=fingerprint[:12],
     )
 
-    # Trigger reindex
-    reindex_result = run_memory_maintenance(project_id)
+    ran = request_memory_maintenance(project_id)
+    reindex_result = {"status": "ok" if ran else "queued"}
     return {
         "status": "ok",
         "writeback": "appended",

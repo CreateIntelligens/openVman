@@ -43,10 +43,7 @@ from memory.memory import (
     list_session_messages,
     update_session_message_metadata,
 )
-from memory.memory_governance import (
-    maybe_run_memory_maintenance,
-    write_summary_and_reindex,
-)
+from memory.memory_governance import write_summary_and_reindex
 from privacy.filter import PiiDetectionReport, scan_text_for_pii
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
@@ -246,7 +243,6 @@ def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> N
                 session_id=session_id,
                 project_id=project_id,
             )
-            maybe_run_memory_maintenance(project_id=project_id)
         except Exception as exc:  # noqa: BLE001
             logger.warning("background memory write failed project=%s: %s", project_id, exc)
 
