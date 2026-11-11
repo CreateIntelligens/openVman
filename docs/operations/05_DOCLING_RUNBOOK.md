@@ -10,8 +10,8 @@
 | 知識上傳 `.md` / `.txt` / `.csv` | 直接轉發，不經 parser |
 | 知識上傳 PDF | pdf-inspector 安全 fast path → Docling → AnyDoc fallback |
 | 知識上傳 DOCX / PPTX / XLSX | Docling → AnyDoc fallback |
-| `/documents/convert` 的 `.md` / `.markdown` / `.txt` | UTF-8 直接讀取 |
-| `/documents/convert` 其他格式 | AnyDoc 直接轉 Markdown |
+| `/api/v1/documents/convert` 的 `.md` / `.markdown` / `.txt` | UTF-8 直接讀取 |
+| `/api/v1/documents/convert` 其他格式 | AnyDoc 直接轉 Markdown |
 
 ### 1. 目標
 
@@ -114,10 +114,17 @@ docker compose exec -T backend python -c \
 - `sample-table.pdf`
 - `sample-table.docx`
 
+以下請求都經 admin nginx 入口（`${PORT:-8786}`）進入 Backend，需帶登入憑證；範例用 API key（後台「API 金鑰」建立），帳號須有目標專案的編輯權限。
+
+```bash
+export OPENVMAN_API_KEY='ovk_<key_id>.<secret>'
+```
+
 使用 Knowledge Upload route：
 
 ```bash
-curl -s -X POST "http://localhost:${PORT:-8786}/api/knowledge/upload" \
+curl -s -X POST "http://localhost:${PORT:-8786}/api/v1/knowledge/upload" \
+  -H "Authorization: Bearer $OPENVMAN_API_KEY" \
   -F "target_dir=knowledge/ingested" \
   -F "project_id=default" \
   -F "files=@/absolute/path/to/sample-table.pdf;type=application/pdf"
@@ -127,7 +134,8 @@ curl -s -X POST "http://localhost:${PORT:-8786}/api/knowledge/upload" \
 
 ```bash
 printf 'name,count\nalpha,3\n' | \
-  curl -s -X POST "http://localhost:${PORT:-8786}/documents/convert" \
+  curl -s -X POST "http://localhost:${PORT:-8786}/api/v1/documents/convert" \
+    -H "Authorization: Bearer $OPENVMAN_API_KEY" \
     -F 'file=@-;filename=sample.csv;type=text/csv' | jq
 ```
 
@@ -153,8 +161,11 @@ docker compose exec api sh -lc 'find /data -path "*knowledge*" -name "*.md" | he
 
 #### 6.3 驗證索引是否已重建
 
+Brain 的 `8100` 不對 host 公開，經 nginx 走 Backend 代理：
+
 ```bash
-curl -s -X POST http://localhost:8100/brain/knowledge/reindex \
+curl -s -X POST "http://localhost:${PORT:-8786}/api/v1/knowledge/reindex" \
+  -H "Authorization: Bearer $OPENVMAN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"project_id":"default"}' | jq
 ```

@@ -72,7 +72,7 @@ pnpm build
 BASE_URL=https://localhost:8787 \
 MOTION_TEST_USERNAME='<測試帳號>' \
 MOTION_TEST_PASSWORD='<測試密碼>' \
-MOTION_ARTIFACT_DIR=/tmp/openvman-motion-e2e \
+MOTION_ARTIFACT_DIR=<輸出目錄> \
 node frontend/app/scripts/e2e/avatar-motion.mjs
 ```
 
@@ -86,9 +86,9 @@ E2E 包含匿名登入引導與同頁登入恢復、真實 SDK／WASM、canvas �
 
 ## 接入正式 Vman
 
-正式 Vue 前台可選擇 `HCIOT 醫院動作試用`（`hciot-motion`），動作設定只在元復醫院與創造智能醫院衛教助理兩個專案啟用。兩案的專案 ID 定義在 `frontend/app/src/composables/avatarMotionProfile.ts`，安裝與 E2E 腳本以環境變數帶入同一組 ID。
+正式 Vue 前台可選擇 `HCIOT 醫院動作試用`（`hciot-motion`），動作設定只在兩個試用專案啟用。專案 ID 定義在 `frontend/app/src/composables/avatarMotionProfile.ts`，安裝與 E2E 腳本以環境變數帶入同一組 ID。
 
-此人物歸屬元復醫院，透過既有專案資源指派分享給另一院，素材保持受保護；兩案的預設人物均指向它。安裝會保留原資源清單與其他政策，只新增此人物及更新人物預設值。使用者已儲存的人物偏好優先，需在設定選取新人物；不覆寫個人偏好。
+此人物歸屬其中一個試用專案，透過既有專案資源指派分享給另一個，素材保持受保護；兩個專案的預設人物均指向它。安裝會保留原資源清單與其他政策，只新增此人物及更新人物預設值。使用者已儲存的人物偏好優先，需在設定選取新人物；不覆寫個人偏好。
 
 角色的一般 `01.webm` 與 JSON 是 waiting-command 前 200 幀的中立 8 秒底片。SDK、嵌入 widget 與其他專案可依原本的載入契約使用中立底片。正式 Vue 前台的允許專案則載入 `/static/characters/hciot-motion/motions/hciot-v1/` 完整動作包；缺少或不符規格時回到中立底片。正式 API 與 Avatar SDK 公開介面未增加動作參數。
 
@@ -105,16 +105,6 @@ E2E 包含匿名登入引導與同頁登入恢復、真實 SDK／WASM、canvas �
 
 揭幕前先透過 `requestVideoFrameCallback` 確認解碼幀的 `mediaTime` 位於目標片段，再等待其後一次 WASM 畫面；`play()` 成功或繪製來源是同一個 video 元素，均不能單獨當成新片段已解碼的證據。可取消／逾時，舊片段的回呼不會提早揭幕；不支援此 API 的瀏覽器使用 RAF 檢查 readyState／跳轉狀態作較弱的降級。
 
-2026-10-22 晚間使用者釐清的「畫面瞬間閃一下」與前述姿勢跳接是不同問題，不能把淡化改善當成閃爍已修復。`MOTION_FLASH_CAPTURE=1 MOTION_IMMERSIVE=1` 可在正式 E2E 額外保存畫布 alpha／亮度樣本與 CDP 螢幕合成幀。`/tmp/openvman-motion-20261022/flash-before/` 這輪的 1,250 筆畫布樣本皆不透明，201 張合成幀未觀察到整體亮暗跳變；這只是未重現，不足以排除使用者裝置上的單幀、局部嘴型或 GPU 合成閃爍。解碼幀檢查屬交接正確性補強，並非已證實的閃爍根因修復。
-
-補上解碼幀檢查後，`flash-after/report.json` 的正式全螢幕有聲／停止／人物回切八項通過，另存 1,447 筆畫布樣本與 245 張合成幀；樣本皆不透明，仍未重現使用者所指的瞬間閃爍。前端共 409 個測試通過。全螢幕輸入區另在 `/tmp/openvman-fullscreen-chat/deployed/report.json` 完成 12 項實際部署 E2E：九種尺寸、真實送出／停止、訊息紀錄及長文字錯誤提示樣式，39 張截圖可回看。`deployed-attempt1/` 保留首次串流中斷的失敗；重測的手動停止只有預期的 fetch abort，沒有同樣的斷線提示。實體手機鍵盤與使用者原本瀏覽器的閃爍仍未驗證。
-
-使用者後續確認是「整頁黑閃」，診斷範圍已擴到整頁。`MOTION_FLASH_CAPTURE=1` 也會保存 `pageEvents`，記錄全螢幕、可見性、頁面生命週期、WebGL context 事件與整頁遮罩／App 是否存在；加上 `MOTION_FLASH_CHAT_ONLY=1` 可只跑正式真實對話及停止。`full-page-flash/report.json` 的第一輪實際思考／有聲回答通過，第二輪 `/v1/audio/speech` 與 `/api/v1/chat/stream` 遇到 `ERR_NETWORK_CHANGED`，測試逾時，整份報告保留失敗。這輪 1,800 張整頁合成幀沒有整頁黑畫面，對話期間沒有額外全螢幕切換、整頁遮罩或頁面卸載事件；既有兩輪 201／245 張也已重新檢查整頁。這些紀錄仍不足以排除使用者裝置的螢幕合成問題，不能宣稱黑閃修復。
-
-2026-10-23 依「kiosk 較明顯」補測本機 Chrome 的 2160×3840 直向全螢幕。正式 E2E 的 `MOTION_VIEWPORT_WIDTH`／`MOTION_VIEWPORT_HEIGHT` 可指定 viewport，`MOTION_DEVICE_SCALE_FACTOR` 預設 1，`MOTION_DEVICE_KIOSK=1` 會透過設定中的「切換成展示機台」及開始畫面進入訪客模式。搭配前述 capture／chat-only／immersive 旗標執行；錄影維持長寬比，最高 1440×1920，避免錄影本身無限制放大。`/tmp/openvman-motion-20261023/kiosk-4k/report.json` 四項通過，無非預期網路失敗或 page error，記錄 166 張整頁合成幀。
-
-逐幀分析保存在 `/tmp/openvman-motion-20261023/frame-analysis/`，含原始幀、CSV、亮度曲線、逐幀縮圖及四倍無聲慢放。一般全螢幕切換片段拆出 38 幀，4K 直向片段拆出 59 幀，均保留原錄影的 25 fps（包含重複幀）；同時以 CDP 的 wall clock 對齊動作狀態及淡化，錄影剪輯時間僅近似對齊。比較整頁、人物、牆面與工具列區域，未見整頁黑幀，兩輪 4K 切換的背景與工具列亮度保持穩定。4K 在雙重擷取下的完整交接等待約 1.17–1.24 秒，一般案例約 0.42 秒；這包含準備與淡化，不能當作純播放器效能比較。4K 的 CDP 擷取有約 200–250 ms 間隔，整輪最大間隔約 3 秒，25 fps 錄影亦非每次螢幕刷新都記錄，不能以此排除現場短暫黑閃。尚需使用者現場 kiosk 的系統／瀏覽器資訊與實際黑閃片段；未據此更改正式 GPU／圖層策略。一般人物、SDK 與嵌入 widget 不涉及本輪診斷旗標。
-
 片段結尾除了每次畫面更新檢查，也依影片時間排計時器在結尾前 0.04 秒觸發；播到結尾先停在該段最後一幀再交接，避免畫面更新變慢時播進下一段，交接失敗則恢復播放。
 
 連續底片重用由共用播放器的 `reuseContinuousSegment` 選項啟用，預設關閉；正式 session 才開啟。因此獨立預覽的手動切換與格式首輪對照保留原先每次重播起點的行為。
@@ -122,12 +112,6 @@ E2E 包含匿名登入引導與同頁登入恢復、真實 SDK／WASM、canvas �
 180 ms 淡化比原先 80 ms 多約 100 ms，首段語音仍等這段交接完成後排程。這是降低姿勢閃跳的取捨，不表示完整交接時間縮短；總時間仍包含準備、首個 WASM 畫面與淡化。
 
 這能減少短暫停住及閃跳，但思考中段手在下巴、說話起點雙手放下的姿勢差異仍存在。若需要自然的放手過程，須另準備思考退場／接說話的過渡素材，或在可接受的回應時間內等到匹配姿勢；增加淡化不能產生缺少的動作影格。
-
-交接修正的驗證紀錄在 `/tmp/openvman-motion-20261022/`：`handoff-before/`、`handoff-after/` 保存相同三個思考進度的切換錄影，前後對照為 `handoff-after/comparison.mp4`。前端 408 個測試通過；`handoff-vman/report.json` 為兩院 26 項正式有聲／RWD 檢查通過。最後映像補驗時，元復八項對話／手勢／停止／人物回切檢查通過（`handoff-final-vman/`），創造智能醫院同樣八項以新的瀏覽器程序通過（`handoff-final-chuang/`）。
-
-獨立測試頁同步 180 ms 交接後，`handoff-lab/report.json` 的 16 項聚焦 E2E 全部通過，包含 375 寬／2 GiB 模擬、兩個待命播放器、快取 miss、單播放器降級、循環／單次動作完整播放、不中途重載，以及預載失敗時不初始化 WASM。
-
-補驗沒有全部一路成功：`handoff-final-vman-attempt1/` 保留一次素材下載 `ERR_NETWORK_CHANGED` 後退回中立底片的失敗；`handoff-final-vman/report.json` 整體仍為失敗，因同一瀏覽器程序第二院啟動時只觀察到一幀 WASM 畫面，未能進入動作模式。新的瀏覽器程序測同一部署成功，尚不足以判定前次啟動異常的根因。不能把成功重測當成這個偶發啟動問題已修復，也不能把兩個啟動失敗歸因於姿勢交接。
 
 控制器與快取的共用來源在 `frontend/shared/avatar/motion/`。預覽的靜態副本以 `node frontend/app/scripts/sync-avatar-motion.mjs` 同步；`pnpm check:motion`、build 與回歸測試會拒絕副本分歧。
 
@@ -138,7 +122,7 @@ E2E 包含匿名登入引導與同頁登入恢復、真實 SDK／WASM、canvas �
 ```bash
 MOTION_TEST_USERNAME='<管理員帳號>' \
 MOTION_TEST_PASSWORD='<管理員密碼>' \
-MOTION_PILOT_PROJECT_IDS='<元復醫院專案 ID>,<創造智能醫院專案 ID>' \
+MOTION_PILOT_PROJECT_IDS='<試用專案 ID>,<試用專案 ID>' \
 bash frontend/app/scripts/install-hciot-motion-pilot.sh
 ```
 
@@ -165,12 +149,14 @@ docker compose -f docker-compose.yml up -d --no-build --no-deps avatar
 BASE_URL=https://localhost:8787 \
 MOTION_TEST_USERNAME='<測試帳號>' \
 MOTION_TEST_PASSWORD='<測試密碼>' \
-MOTION_TEST_PROJECT_IDS='<元復醫院專案 ID>,<創造智能醫院專案 ID>' \
-MOTION_ARTIFACT_DIR=/tmp/openvman-motion-vman \
+MOTION_TEST_PROJECT_IDS='<試用專案 ID>,<試用專案 ID>' \
+MOTION_ARTIFACT_DIR=<輸出目錄> \
 node frontend/app/scripts/e2e/avatar-motion-vman.mjs
 ```
 
 這份腳本驗證正式前台的真實聊天、TTS／AudioContext 輸出、對話動作切換、手勢、停止取消、換人物／回切、五種寬度與角色就緒後不重載，另保存實際 UI＋音訊錄影。它隔離測試帳號的遠端偏好 PUT，使用者的個人選擇維持原樣，因此不驗證偏好持久化；不偽造聊天或 TTS 成功。實體手機與實體喇叭／麥克風仍需另驗。
+
+排查畫面閃爍時可加診斷旗標：`MOTION_FLASH_CAPTURE=1` 額外保存畫布 alpha／亮度樣本、CDP 整頁合成幀與頁面事件（全螢幕、可見性、生命週期、WebGL context），`MOTION_IMMERSIVE=1` 以全螢幕執行，`MOTION_FLASH_CHAT_ONLY=1` 只跑真實對話與停止。`MOTION_VIEWPORT_WIDTH`／`MOTION_VIEWPORT_HEIGHT`／`MOTION_DEVICE_SCALE_FACTOR` 指定 viewport，`MOTION_DEVICE_KIOSK=1` 經設定切成展示機台模式。這些擷取有取樣間隔，未錄到閃爍不代表現場不會閃。
 
 前台全螢幕對話輸入列另有獨立 E2E，驗證實際 fullscreen、五種寬度與短高畫面、真實送出／停止及操作區遮擋；同樣隔離遠端偏好寫入，未涵蓋實體手機鍵盤：
 
@@ -181,19 +167,17 @@ MOTION_TEST_PASSWORD='<測試密碼>' \
 node frontend/app/scripts/e2e/avatar-fullscreen-chat.mjs
 ```
 
-2026-10-22 已在上述兩案完成實測：320／375／414／768／1440 寬度、兩次真實對話、比心／道別完整播放、停止後取消舊音訊，以及一般人物與試用人物回切皆通過。首段實際語音出現時已切到說話狀態；每案全程只初始化一次 SDK／WASM。E2E 的專案選擇走正式設定 UI，不以 `?project_id` 當成已支援的前台切換契約。結果與實際有聲 MP4 保存在 `/tmp/openvman-motion-20261022/vman/`；元復的五種寬度證據在同目錄首輪報告，其餘檢查在最終報告。
-
 ## WebM／MP4 混播效能對照
 
-`frontend/app/scripts/e2e/avatar-motion-formats.mjs` 使用真實 SDK／WASM，分別執行全 VP9 WebM、全 H.264 MP4，以及待機／說話用 WebM、思考／比心／道別用 MP4 三組。每組固定四個播放器、相同時間軸、控制器、80 ms 淡化與動作流程；混播組兩個 WebM、兩個 MP4，各播放器只設定一次 Blob 來源。這是獨立的格式快取實驗，正式兩院人物目前仍使用 WebM 與原本的 `MotionVideoCache`。
+`frontend/app/scripts/e2e/avatar-motion-formats.mjs` 使用真實 SDK／WASM，分別執行全 VP9 WebM、全 H.264 MP4，以及待機／說話用 WebM、思考／比心／道別用 MP4 三組。每組固定四個播放器、相同時間軸、控制器、80 ms 淡化與動作流程；混播組兩個 WebM、兩個 MP4，各播放器只設定一次 Blob 來源。這是獨立的格式快取實驗，正式試用人物目前仍使用 WebM 與原本的 `MotionVideoCache`。
 
-前置條件為已安裝正式試用人物，以及完整動作包目錄內的 `01.mp4`：1080×1920、25 fps、800 幀、H.264／yuv420p、無音軌，0／8／16／24 秒為關鍵幀。MP4 必須保留 WebM 的所有逐幀同步標記，沿用同一份 JSON；轉檔與檢查須在 `avatar-pipeline` 容器內完成，不能只換檔名或使用原始 30 fps MP4。2026-10-22 的測試副本已逐幀檢查 800 個標記。
+前置條件為已安裝正式試用人物，以及完整動作包目錄內的 `01.mp4`：1080×1920、25 fps、800 幀、H.264／yuv420p、無音軌，0／8／16／24 秒為關鍵幀。MP4 必須保留 WebM 的所有逐幀同步標記，沿用同一份 JSON；轉檔與檢查須在 `avatar-pipeline` 容器內完成，不能只換檔名或使用原始 30 fps MP4。
 
 ```bash
 BASE_URL=https://localhost:8787 \
 MOTION_TEST_USERNAME='<測試帳號>' \
 MOTION_TEST_PASSWORD='<測試密碼>' \
-MOTION_ARTIFACT_DIR=/tmp/openvman-motion-formats \
+MOTION_ARTIFACT_DIR=<輸出目錄> \
 node frontend/app/scripts/e2e/avatar-motion-formats.mjs
 ```
 
@@ -201,21 +185,6 @@ node frontend/app/scripts/e2e/avatar-motion-formats.mjs
 
 報告同時列出 `getVideoPlaybackQuality` 的總幀／掉幀、`requestVideoFrameCallback` 的來源幀間距、實際 SDK canvas 新畫面的間距，以及包含淡化的交接時間。連續播放與交接分開計數；總幀計數含待命播放器的解碼／跳轉，不可直接當成觀眾看到的掉幀率。每個來源為 25 fps，不以螢幕 60 Hz 為目標。這份短測每組只跑一輪，375 寬為同一台主機的瀏覽器模擬，不能推論實體手機、Safari 或長時間記憶體表現。
 
-2026-10-22 Chrome 150 首輪結果（正式前台 180 ms 交接修正前），產物在 `/tmp/openvman-motion-20261022/formats/`：
-
-| 情境 | 瀏覽器掉幀／總幀 | 連續 canvas 畫面最大間距 | 連續畫面 >200 ms 次數 | 交接中位數／最大值 |
-|---|---|---|---|---|
-| 1440 全 WebM | 9／780 | 128.1 ms | 0 | 187／344 ms |
-| 1440 全 MP4 | 17／781 | 100.7 ms | 0 | 191／505 ms |
-| 1440 混播 | 4／760 | 90.7 ms | 0 | 153／380 ms |
-| 375 全 WebM | 7／771 | 96.7 ms | 0 | 140／247 ms |
-| 375 全 MP4 | 23／778 | 84.3 ms | 0 | 188／439 ms |
-| 375 混播 | 13／765 | 271.1 ms | 1 | 199／430 ms |
-
-混播兩種寬度均實際跨格式切換，未重新初始化 WASM，沒有逐幀標記比對異常；375 組仍有一次可量到的短暫停頓，不可宣稱完全不卡。全 MP4 的 375 組有一筆 rVFC metadata 與當下擷取像素的標記差一幀，保留失敗原始樣本，首輪總報告為 `passed: false`。該比對同時讀取 callback metadata 與 video 當下畫面，尚不能單憑這一筆判定為素材、SDK 對嘴或取樣時序問題；沒有以重跑覆蓋失敗。格式實驗未切換正式兩院的播放來源。
-
 單獨對嘴基準使用同一腳本，設定 `MOTION_FORMAT_MODES=single-lipsync` 與 `MOTION_FORMAT_REPORT_PREFIX=single-report`，保留原六組報告。此模式改載入 `hciot-motion` 原生中立 8 秒／200 幀素材，只建立一個影片播放器、使用原生循環，不建立快取或動作控制器。暖機後持續播放 18 秒測試語音，記錄實際音訊 RMS、AudioContext 排程及 WASM 嘴型貼圖繪製次數，確保量到實際對嘴。量測後另外錄製 8 秒畫面與真實音訊，錄影負載不計入掉幀數據。
 
-同日單獨對嘴兩組皆通過：桌面 449 幀掉 1 幀（約 0.22%）、375 寬模擬 450 幀掉 2 幀（約 0.44%），均沒有 >200 ms 的 canvas 畫面間距；最大值為 125.6／130.8 ms，p95 為 48.4／48.8 ms。每案只有一個 video，實際語音排程 18 秒且 AudioContext 為 running；嘴型貼圖繪製與非零音訊 RMS 已驗證。此結果表示單純對嘴仍可能少量掉幀，沒有在這次短測觀察到長停頓，不代表所有裝置或長時間播放都能零掉幀。原始資料與有聲短片在同一產物目錄，摘要為 `single-report.json`／`.md`。
-
-`frontend/app/scripts/e2e/avatar-motion-handoff.mjs` 是交接專用錄影探針：用真實 SDK 預載完整的 800 幀 JSON，再載入目前的正式 motion session 原始碼，分別在思考約 1.2／3.5／6.5 秒後切到說話並播放測試語音，保存實際淡化合成影片與逐格像素變化。設定 `MOTION_ARTIFACT_DIR` 可保留修改前後兩份產物。此探針沒有正式 Vue 對話狀態機，不能替代前述正式兩院有聲 E2E；錄影本身有負載，也不是效能比較基準。
+`frontend/app/scripts/e2e/avatar-motion-handoff.mjs` 是交接專用錄影探針：用真實 SDK 預載完整的 800 幀 JSON，再載入目前的正式 motion session 原始碼，分別在思考約 1.2／3.5／6.5 秒後切到說話並播放測試語音，保存實際淡化合成影片與逐格像素變化。設定 `MOTION_ARTIFACT_DIR` 可保留修改前後兩份產物。此探針沒有正式 Vue 對話狀態機，不能替代前述正式有聲 E2E；錄影本身有負載，也不是效能比較基準。

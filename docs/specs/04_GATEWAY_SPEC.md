@@ -67,27 +67,31 @@
 Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-8786}` / `${HTTPS_PORT:-8787}` 入口；容器內診斷才使用 `http://127.0.0.1:8200`。
 
 ### 4. 插件系統協定 (Plugin Protocol)
-所有插件必須實作 `IPlugin` 介面，並在 `src/plugins/` 下註冊。
+所有插件實作 `backend/app/gateway/plugins/__init__.py` 的 `IPlugin` 協定（`id`、`execute`、`health_check`、`cleanup`），程式放在 `backend/app/gateway/plugins/`，由 `backend/app/gateway/worker.py` 建立單例。
 
-| 插件名稱 | 輸入參數 | 輸出事件 | 說明 |
+| 插件 `id` | 主要輸入參數 | 回傳內容 | 說明 |
 |----------|----------|----------|------|
-| `camera-live` | `camera_url` | `camera_scene` | 每 N 秒截圖描述 |
-| `api-tool` | `api_id`, `params` | `tool_result` | 代理外部系統串接 |
-| `web-crawler` | `url` | `crawl_result` | 網頁爬取與知識入庫 |
+| `camera_live` | `session_id`, `camera_url`, `action` (`start`/`stop`/`snapshot`) | `type: "camera_snapshot"` 與 `description` | 長跑模式每 `camera_snapshot_interval_sec`（預設 5 秒）截圖描述 |
+| `api_tool` | `api_id`, `method`, `body`, `query` | `status`, `body`, `api_id` | 代理外部系統串接 |
+| `web_crawler` | `url` | `url`, `title`, `content`, `status` | 網頁爬取 |
 
-`camera-live` 的長跑模式會將每次 VLM 描述轉成短 observation，透過 `/api/v1/internal/enrich` 注入對應 Brain session；單次 `snapshot` 模式預設只回傳結果，帶 `forward: true` 時才注入 Brain。
+`camera_live` 的長跑模式會將每次 VLM 描述轉成短 observation，透過 `/api/v1/internal/enrich` 注入對應 Brain session；單次 `snapshot` 模式預設只回傳結果，帶 `forward: true` 時才注入 Brain。
 
 ### 5. 增強訊息轉發 (Enrichment Forwarding)
-處理完媒體或插件任務後，Gateway 必須組裝 `UserInputEnriched` 封包並發送至 Backend：
-* **URL**: `POST ${BACKEND_INTERNAL_URL}/api/v1/internal/enrich`
+媒體或插件任務的結果以 enriched context 送進 Backend 的 internal enrich 端點，由 Backend 驗證 internal token 後轉發至 Brain `/internal/enrich`：
+* **URL**: `POST /api/v1/internal/enrich`（容器之間直接呼叫 Backend，例如 `http://backend:8200`；邊緣 nginx 不對外提供 `/api/v1/internal/`）
+* **Header**: `X-Internal-Token: ${GATEWAY_INTERNAL_TOKEN}`
 * **Payload**:
   ```json
   {
     "trace_id": "...",
     "session_id": "...",
     "enriched_context": [
-      { "type": "image_description", "content": "..." }
-    ]
+      { "type": "camera_snapshot", "content": "...", "source": "camera_live" }
+    ],
+    "media_refs": [],
+    "project_id": "default",
+    "persona_id": "default"
   }
   ```
 

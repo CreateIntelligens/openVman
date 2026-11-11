@@ -6,21 +6,21 @@
 
 ## 固定頁面路徑
 
-側欄分四組，頁面與路徑如下。
+側欄分四組（畫面顯示「互動」「知識」「角色」「系統」；`tabGroups` 的內部 `label` 仍為 `Workspace`／`Knowledge`／`Character`／`System`，作為收合狀態的儲存鍵），頁面與路徑如下。
 
 | 群組 | 頁面 | Canonical path |
 |------|------|----------------|
-| Workspace（對話） | 對話 | `/admin/chat` |
+| 互動 | 對話 | `/admin/chat` |
 | | 語音 | `/admin/voice` |
 | | 對話紀錄 | `/admin/sessions` |
 | | 知識庫搜尋 | `/admin/search` |
-| Knowledge（知識） | 知識庫 | `/admin/knowledge` |
+| 知識 | 知識庫 | `/admin/knowledge` |
 | | 記憶管理 | `/admin/memory` |
 | | 工作區 | `/admin/workspace` |
-| Character（角色） | 角色管理 | `/admin/personas` |
-| | Avatar | `/admin/avatar` |
+| 角色 | 角色管理 | `/admin/personas` |
+| | 虛擬人 | `/admin/avatar` |
 | | 工具與技能 | `/admin/tools` |
-| System（管理） | 專案與權限 | `/admin/access` |
+| 系統 | 專案與權限 | `/admin/access` |
 | | 模型供應商（僅 ROOT） | `/admin/model-providers` |
 | | 用量 | `/admin/usage` |
 | | 系統狀態 | `/admin/system` |
@@ -29,11 +29,11 @@
 
 | 頁面 | 預設子頁（省略子路徑） | 其他固定子路徑 |
 |------|------------------------|----------------|
-| 語音 | 聲音試聽：`/admin/voice` | ASR 試辨識：`/admin/voice/asr` |
+| 語音 | 聲音試聽：`/admin/voice` | 語音辨識：`/admin/voice/asr` |
 | 知識庫 | 文件：`/admin/knowledge` | 圖譜：`/admin/knowledge/graph` |
-| Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds` |
+| 虛擬人 | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
-| 專案與權限 | 專案：`/admin/access` | 帳號：`/admin/access/accounts`（正式建立）、`/admin/access/accounts/temporary`（臨時建立）、`/admin/access/accounts/manage`（編輯／管理）；API 金鑰：`/admin/access/api-keys`；權限圖譜：`/admin/access/graph`；Embed 金鑰：`/admin/access/embed-keys` |
+| 專案與權限 | 專案：`/admin/access` | 帳號：`/admin/access/accounts`（正式建立）、`/admin/access/accounts/temporary`（臨時建立）、`/admin/access/accounts/manage`（編輯／管理）；API 金鑰：`/admin/access/api-keys`；權限圖譜：`/admin/access/graph`；網站嵌入金鑰：`/admin/access/embed-keys` |
 | 模型供應商 | 主對話模型：`/admin/model-providers` | 決策模型：`/admin/model-providers/decision`；API 金鑰：`/admin/model-providers/keys` |
 | 系統狀態 | 健康：`/admin/system` | 監控（Grafana）：`/admin/system/monitoring` |
 
@@ -49,7 +49,7 @@
 | 帳號（含臨時、編輯／管理） | 權限不足 | 可見 | 可見 |
 | API 金鑰 | 可見（只管本人 key） | 可見 | 可見 |
 | 權限圖譜 | 權限不足 | 可見 | 可見 |
-| Embed 金鑰 | 權限不足 | 可見 | 可見 |
+| 網站嵌入金鑰 | 權限不足 | 可見 | 可見 |
 
 一般帳號只看得到「專案」「API 金鑰」兩個分頁；直接開啟沒有權限的分頁網址會顯示「權限不足」。系統狀態頁只掛目前分頁：離開健康分頁即停止 30 秒輪詢，沒進監控分頁不載入 Grafana iframe。
 
@@ -71,7 +71,7 @@
 
 公開子路徑部署時加上 `/openvman`，例如 `/openvman/admin/knowledge/graph?project=demo`。`publicAdminPath()` 依目前網址保留此部署前綴。
 
-API 金鑰分頁在既有後台門禁內開放正式帳號管理本人 key，入口位於「專案與權限」頁、桌面頁首及手機導覽。帳號、權限圖譜與 Embed 金鑰分頁仍需 admin／root。
+API 金鑰分頁在既有後台門禁內開放正式帳號管理本人 key，入口位於「專案與權限」頁、桌面頁首及手機導覽。帳號、權限圖譜與網站嵌入金鑰分頁仍需 admin／root。
 
 ## 正規化與導覽
 

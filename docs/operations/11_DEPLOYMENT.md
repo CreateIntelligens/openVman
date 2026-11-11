@@ -220,7 +220,7 @@ Backend 每 `TTS_EDGE_PROBE_INTERVAL_SECONDS`（預設 1800 秒）試念一句�
 
 修法是重建 backend image：Dockerfile 最後一層每次建置都裝最新的 `edge-tts<8`。
 CI 只在 backend 檔案有變時才重建，只改 Brain、前台或文件**不會**更新 Edge；
-到 GitHub Actions 手動執行 Docker Publish（`workflow_dispatch`，五個 runner 都會重建），
+到 GitHub Actions 手動執行 Docker Publish（`workflow_dispatch`，矩陣中六個 image 都會重建），
 watchtower 換上新 image 後即恢復。上游若還沒發修正版，重建也沒用，先到 PyPI 確認
 `edge-tts` 是否有新版本。
 
@@ -282,6 +282,7 @@ Buildx + QEMU 建立並推送：
 | `openvman-backend` | `linux/amd64`, `linux/arm64` | Backend 與 Gateway Worker，`FROM openvman-backend-base` |
 | `openvman-admin` | `linux/amd64`, `linux/arm64` | Admin UI |
 | `openvman-avatar` | `linux/amd64`, `linux/arm64` | Avatar frontend |
+| `openvman-avatar-pipeline` | `linux/amd64`, `linux/arm64` | 角色素材產生 worker（MediaPipe、ffmpeg） |
 | `openvman-api` | `linux/amd64` | CUDA Brain API |
 | `openvman-embedding` | `linux/amd64` | CUDA/PyTorch Embedding |
 
@@ -319,8 +320,8 @@ build 只疊 `requirements.txt` 與 `app/`。
 
 首次採用指紋 tag 時，舊 `latest` 不足以證明輸入一致，所有 image 會各重建一次。
 指紋 tag 應只由此 workflow 寫入；清除 tag 後下次會安全重建。手動
-`workflow_dispatch` 會強制重建五個 runner，是否重建 base 則由 `rebuild_base` 決定。
-發布前的 `test-build-inputs` job 會先執行下列 regression tests，涵蓋五種 image、
+`workflow_dispatch` 會強制重建矩陣中的六個 image，是否重建 base 則由 `rebuild_base` 決定。
+發布前的 `test-build-inputs` job 會先執行下列 regression tests，涵蓋 backend、admin、avatar、api、embedding 五種 image、
 單／多 commit、shared dependency、workflow、ignore、COPY 來源變動、取消／失敗
 後的 stale latest，以及 base digest 更新：
 

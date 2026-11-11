@@ -2,11 +2,9 @@
 
 ## Purpose
 Defines how interruption is classified, how control signals differ from formal user input, and how active audio/Brain generation is stopped safely.
-
 ## Requirements
-
 ### Requirement: Interruption is evaluated as a backend control decision
-The system SHALL treat `client_interrupt` as a control signal that is classified by a lightweight Backend Guard Agent before any live pipeline teardown occurs.
+The system SHALL treat `client_interrupt` as a control signal classified by the local Backend Guard Agent before pipeline teardown. The Guard Agent SHALL use the configured decision-provider chain only when local rules cannot classify the transcript, and SHALL use the existing conservative stop behavior if the chain fails.
 
 #### Scenario: Noise-like interruption is ignored
 - **WHEN** the frontend sends `client_interrupt` with ASR text that the Guard Agent classifies as ignorable
@@ -15,6 +13,15 @@ The system SHALL treat `client_interrupt` as a control signal that is classified
 #### Scenario: Valid interruption stops the active response
 - **WHEN** the frontend sends `client_interrupt` with ASR text that the Guard Agent classifies as a real interruption
 - **THEN** the backend stops in-flight speech output, aborts the active Brain/TTS work, and emits `server_stop_audio`
+
+#### Scenario: Uncertain interruption uses decision providers
+- **WHEN** local rules cannot classify an interruption transcript
+- **THEN** the Guard Agent asks the configured decision-provider chain to classify it within the interruption deadline
+- **THEN** it uses the returned valid decision and records the provider used
+
+#### Scenario: Decision chain fails for an interruption
+- **WHEN** every configured provider fails, refuses, or exceeds the interruption deadline
+- **THEN** the Guard Agent preserves its existing conservative stop behavior
 
 #### Scenario: Early speech start can interrupt before transcript stabilization
 - **WHEN** the frontend emits `client_interrupt` because browser-side turn detection has identified speech start before a final transcript exists

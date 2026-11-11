@@ -96,7 +96,7 @@ D-ID 企業自架可用官方角色或製作專屬角色，錄製規格由 D-ID 
 | DHLiveMini2 | 真人虛擬人核心，瀏覽器本地算圖 | 上游 DH_live／MatesX；角色商用與模型授權要分開看 [^dh] | 目前保留 MatesX／DHLiveMini2；其他真人方案會改變架構與成本 |
 | BGE-M3、FlagEmbedding | 已移除（2026-10-07） | 北京智源，MIT 授權 [^bge] | 改用 Google EmbeddingGemma 2（Apache 2.0，自架），工業示範專案實測打平；雲端 embedding 備援一併拿掉 |
 | Qwen VLM | 啟用 `vlm` profile 才使用 | 阿里巴巴，該模型標 Apache-2.0 [^qwen] | Google Gemma、Microsoft Phi，或雲端圖片理解服務 |
-| IndexTTS | 啟用服務後使用 | 專案內模型協議要求商用書面許可；官方模型頁標 Apache-2.0，兩份內容不同 [^index] | 已接 GCP TTS／Gemini TTS／AWS Polly |
+| IndexTTS | 外部 TTS 節點，設定 `TTS_INDEXTTS_URL` 後才使用；本 repo 不含伺服器 | 上游模型協議要求商用書面許可；官方模型頁標 Apache-2.0，兩份內容不同 [^index] | 已接 GCP TTS／Gemini TTS／AWS Polly |
 | VoxCPM、CosyVoice | 外部 TTS 服務，CosyVoice adapter 用於臺語 | OpenBMB／ModelBest／清華、阿里巴巴；聲音與客製模型授權要查 [^vox][^cosy] | 華語可改 GCP；臺語要先試聽替代服務 |
 | Xiaomi-CocktailASR-1 | 已移除（2026-10-07） | 小米 [^xiaomi] | 主機停機、部署設定早已停用；引擎、帳號授權與存著它的偏好一併清掉 |
 | SenseVoice | 可選語音辨識，也可能在主服務失敗時接手 | 阿里巴巴；模型授權與實際備援設定要查 [^sense] | 已接臺灣 MediaTek Breeze、OpenAI；自架可用 Whisper |

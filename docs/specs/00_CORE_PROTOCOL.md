@@ -173,13 +173,13 @@ Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 
 
 **5.1 虛擬人狀態 (Frontend States)**
 前端必須維護以下三種狀態，控制 `<video>` 和 `<canvas>` 的表現：
-1. IDLE (待機)：清空 `<canvas>`，底層 `<video>` 循環播放 `idle.mp4`。
+1. IDLE (待機)：角色底片 `01.webm` 循環播放，不疊加說話嘴型。
 2. THINKING (思考)：收到 `user_speak` 到收到第一個 `server_stream_chunk` 的過渡期。（此時大腦層正在檢索 LanceDB 與推理）
 3. SPEAKING (說話)：依賴 Web Audio API 時鐘，在 `<canvas>` 上繪製對應的嘴型。
 
 **5.2 絕對時鐘原則 (The Golden Sync Rule)**
 嚴格禁止前端使用 `setTimeout` 或 `setInterval` 進行對時。
-前端必須優先使用 `video.currentTime` (透過 `VideoSyncManager` 封裝) 作為唯一真相來源 (Source of Truth) 以確保影音不漂移。在 `requestAnimationFrame` 迴圈中，驅動 DINet 或 Wav2Lip AI 模型生成當前幀的嘴型畫面。
+對嘴由 `OpenVmanAvatarRuntime` WASM 內部處理：前端把解碼後的 PCM 交給 runtime（`useOpenVmanAvatarRuntime.ts` 的 `pushAudio`），runtime 依音訊排程繪製嘴型，前端沒有獨立的 JS 對嘴渲染迴圈。角色影片右上角的幀同步標記讓 runtime 從畫面反推幀序（見 `avatar-pipeline/README.md`），避免嘴型與底片漂移。
 
 ### 6. 協定版本管理 (Protocol Versioning)
 

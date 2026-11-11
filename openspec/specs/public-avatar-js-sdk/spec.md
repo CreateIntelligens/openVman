@@ -9,26 +9,26 @@ TBD - created by archiving change replace-iframe-with-avatar-js-sdk. Update Purp
 系統 SHALL 提供 `openvman-avatar-sdk.js` IIFE 腳本，載入後 SHALL 在 `window.OpenVmanAvatar` 暴露 `init(options)`，且 SHALL 不依賴 iframe、Vue、React 或宿主頁的 bundler。
 
 #### Scenario: 純 HTML 頁面初始化
-- **WHEN** 第三方頁面載入 `https://<openvman-host>/openvman-avatar-sdk.js` 並呼叫 `OpenVmanAvatar.init({ characterId: "000" })`
+- **WHEN** 第三方頁面載入 `https://<openvman-host>/static/sdk/openvman-avatar-sdk.js` 並呼叫 `OpenVmanAvatar.init({ characterId: "000" })`
 - **THEN** SDK 在目前頁面建立虛擬人 DOM 並回傳 Promise 型 instance
 - **AND** 頁面中不存在 openVman iframe
 - **AND** 初始化不要求 API Key 或 backend session
 
 ### Requirement: 公開角色探索 API
-系統 SHALL 在 `window.OpenVmanAvatar` 提供可於 `init()` 前呼叫的 `listCharacters()`。此方法 SHALL 向 SDK origin 的無 Key、唯讀 `GET /characters` 取得角色清單，並回傳 `{ charId, label }[]`。系統 SHALL 只列出同時具備角色影片與驅動資料的角色，且 SHALL NOT 建立 backend session。
+系統 SHALL 在 `window.OpenVmanAvatar` 提供可於 `init()` 前呼叫的 `listCharacters()`。此方法 SHALL 向 SDK origin 的無 Key、唯讀 `GET /api/v1/characters` 取得角色清單，並回傳 `{ charId, label }[]`。系統 SHALL 只列出同時具備角色影片與驅動資料的角色，且 SHALL NOT 建立 backend session。
 
 #### Scenario: 查詢可用角色
 - **WHEN** 第三方頁面呼叫 `OpenVmanAvatar.listCharacters()`
-- **THEN** SDK 向自身 origin 的 `/characters` 發出請求
+- **THEN** SDK 向自身 origin 的 `/api/v1/characters` 發出請求
 - **AND** 回傳清單只包含 `charId` 與 `label`
 - **AND** 請求不要求 API Key 或建立 backend session
 
 #### Scenario: 排除素材不完整角色
 - **WHEN** 角色缺少影片或驅動資料
-- **THEN** `/characters` 回應不包含該角色
+- **THEN** `/api/v1/characters` 回應不包含該角色
 
 #### Scenario: 角色清單請求失敗
-- **WHEN** `/characters` 發生網路錯誤或回傳非成功 HTTP 狀態
+- **WHEN** `/api/v1/characters` 發生網路錯誤或回傳非成功 HTTP 狀態
 - **THEN** `listCharacters()` Promise 以 `RESOURCE_LOAD_FAILED` 拒絕
 
 ### Requirement: 直接 DOM 與透明懸浮呈現
@@ -102,18 +102,21 @@ Instance SHALL 提供 `on(type, handler)` 與 `off(type, handler)`，至少支�
 - **WHEN** 呼叫端訂閱 `speaking`
 - **THEN** 完整音檔或 PCM 佇列開始與停止時分別收到 `{ state: "start" }` 與 `{ state: "stop" }`
 
-### Requirement: 無受保護 backend 與 Key 依賴
-SDK 初始化與所有 instance API SHALL 不接受或要求 API Key。除無 Key、唯讀的 `GET /characters` 外，SDK SHALL NOT 呼叫 `/api/embed/*`、`/ws/embed/*`、Brain、TTS、ASR、WebSocket 或其他 backend 能力。SDK 靜態資源與角色探索 API SHALL 提供跨網域載入所需的精準 CORS header；正式使用 SHALL 要求 HTTPS。
+### Requirement: 預設播放模式不需金鑰
+SDK 預設為播放模式：初始化與播放 API SHALL 不要求任何金鑰或 backend session，除無 Key、唯讀的 `GET /api/v1/characters` 外 SHALL NOT 呼叫 backend。呼叫端提供 `embedKey`（或在同源頁面沿用既有 session）時，SDK 才進入對話模式，`ask()` 以 `X-Embed-Key` 標頭（不帶 cookie）或同源 session cookie 呼叫 `/api/v1/chat/stream`、`/api/v1/chat` 與 `/v1/audio/speech`，行為見 `avatar-sdk-conversation`。SDK 任何模式都 SHALL NOT 呼叫 `/api/embed/*`、`/ws/embed/*`、ASR 或 WebSocket。SDK 靜態資源與角色探索 API SHALL 提供跨網域載入所需的精準 CORS header；正式使用 SHALL 要求 HTTPS。
 
 #### Scenario: 無 Key 初始化
-- **WHEN** `https://shop.example` 不帶 API Key 初始化 SDK
+- **WHEN** `https://shop.example` 不帶 `embedKey` 初始化 SDK
 - **THEN** runtime 與角色資源成功載入
-- **AND** SDK 不建立 backend session
+- **AND** SDK 不建立 backend session，也不發出 chat 或語音合成請求
 
-#### Scenario: 公開 Embed backend 已移除
-- **WHEN** client 請求舊 `/api/embed/*`、`/ws/embed/*` 或 `/api/admin/embed-keys`
+#### Scenario: 帶 embed key 的對話模式
+- **WHEN** 呼叫端以 `embedKey` 初始化後呼叫 `ask(text)`
+- **THEN** chat 與語音合成請求帶 `X-Embed-Key` 且 `credentials` 為 `omit`
+
+#### Scenario: 舊 Embed 路徑已移除
+- **WHEN** client 請求舊 `/api/embed/*` 或 `/ws/embed/*`
 - **THEN** edge 或 backend 不再提供該能力
-- **AND** 一般 `/api/*`、`/ws/*`、`/tts/*` 與 `/v1/*` 維持原有行為
 
 ### Requirement: 宿主隔離與衝突防護
 SDK SHALL 對自建 class、data attribute、事件與 global namespace 使用 `openvman` 前綴，並 SHALL 在初始化前偵測 vendor 固定 DOM ID 衝突。SDK SHALL NOT 修改宿主頁既有元素的全域樣式。

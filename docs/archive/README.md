@@ -1,11 +1,13 @@
 # 歷史資料索引
 
-保留仍有研究價值的選型背景。已移除被現行規格取代的八週 MVP／TASK 草稿、過期 Live Pipeline 驗證與 README 快照，以及重複的 DINet 研究稿；原始版本可從 Git 歷史查閱。
+這裡放已不再代表現況、但仍有追溯價值的評估與計畫。目前架構、協定與操作方式以 [文件總覽](../README.md)、[現行規格](../specs/00_SYSTEM_ARCHITECTURE.md)及 [部署手冊](../operations/11_DEPLOYMENT.md)為準；已完成並被規格涵蓋的計畫不另外保留，原始版本可從 Git 歷史查閱。
 
-目前架構、協定與操作方式以 [文件總覽](../README.md)、[現行規格](../specs/00_SYSTEM_ARCHITECTURE.md)及 [部署手冊](../operations/11_DEPLOYMENT.md)為準。OpenSpec 的變更規格與實驗結果附件仍保留，以便追溯設計與驗證依據。
+## 計畫
 
-## 技術研究
+- [Jev 決策層計畫](plans/jev-decision-layer.md)：Jev 取代 SemIf 的評估。文中的意圖分流影子觀測與 RAG 證據篩選已移除，Jev 現在用於語言判斷與記憶寫入把關。
 
-- [虛擬人技術比較與評估](research/vman20260323.md)：包含 DINet、MuseTalk 及不同渲染方式的研究摘錄。
+## 評估
 
-研究內容是歷史背景，不表示目前採用方案或已通過正式環境驗證。
+- [前台費茨法則評估](guides/frontend-fitts-law-audit.md)：前台可點擊區域大小與距離的一次性評估。
+
+內容是當時的判斷，不表示目前採用方案。

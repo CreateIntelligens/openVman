@@ -8,7 +8,7 @@ openVman 採用三層（邏輯上為四層）解耦架構，將「低延遲的�
 
 #### 2.1 表現層 (Frontend / Sensory Layer)
 * **角色**：感官器官。
-* **職責**：採集語音 (ASR)、執行低延遲 AI 對嘴渲染 (DINet/Wav2Lip)、維護 UI 狀態。
+* **職責**：採集語音 (ASR)、以 `OpenVmanAvatarRuntime` WASM 在瀏覽器端驅動 2D 影片角色對嘴（前端把解碼後的 PCM 交給 runtime，由 runtime 內部完成嘴型繪製）、維護 UI 狀態。角色素材（`01.webm` 與 `combined_data.json.gz`）由 `avatar-pipeline/` 從上傳的影片或人像離線產生。
 * **路徑**：`frontend/app/`
 
 #### 2.2 神經中樞層 (Backend / Nervous System)
@@ -66,7 +66,7 @@ graph TD
 
 ### 5. 關鍵工作流
 
-1. **對話流**：Frontend ASR -> Backend -> Brain (Stream Token) -> Backend (TTS Chunk) -> Frontend -> AI 對嘴播放。
+1. **對話流**：Frontend ASR -> Backend -> Brain (Stream Token) -> Backend (TTS Chunk) -> Frontend -> 音訊播放並交給 WASM runtime 對嘴。
 2. **知識庫流**：Admin 上傳檔案 -> Gateway 保存 `raw/` 原始檔 -> PDF 優先走 pdf-inspector fast path，PDF / Office 文件走 Docling 主轉換，Docling 失敗時回退 AnyDoc -> 存入 `knowledge/` 並通知 Brain 重新索引。
 
 ### 5. 後續擴充

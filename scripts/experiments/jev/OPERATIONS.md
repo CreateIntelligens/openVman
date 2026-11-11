@@ -4,7 +4,7 @@
 
 實驗功能的操作契約：只觀察、不控制正式路由，設定預設關閉。結果以 `trace_id`
 對照實際走的路徑。（原本並排的 BGE embedding 影子已於 2026-09-23 移除。）計畫與驗收條件見
-[docs/plans/jev-decision-layer.md](../../../docs/plans/jev-decision-layer.md) §2。
+[docs/archive/plans/jev-decision-layer.md](../../../docs/archive/plans/jev-decision-layer.md) §2。
 
 ## 設定
 

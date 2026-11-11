@@ -81,7 +81,7 @@ const avatar = await OpenVmanAvatar.init({
 
 ### 外部網站（embed key）
 
-embed key 是公開識別碼，不是密鑰，可以直接寫在前端。實際權限由後端的 origin allowlist、專案綁定、速率與每日配額決定，請在 Admin 的 Embed Keys 頁面建立並限定允許的 origin。每輪 `ask()` 會用掉 1 個對話串流請求，加上 1 個以上的語音請求（合成期間到的句子會併進同一個請求），設定速率與每日配額時請一併計入。
+embed key 是公開識別碼，不是密鑰，可以直接寫在前端。實際權限由後端的 origin allowlist、專案綁定、速率與每日配額決定，請在後台「專案與權限 → 網站嵌入金鑰」分頁建立並限定允許的 origin。每輪 `ask()` 會用掉 1 個對話串流請求，加上 1 個以上的語音請求（合成期間到的句子會併進同一個請求），設定速率與每日配額時請一併計入。
 
 ```html
 <button id="ask" type="button">問一句</button>

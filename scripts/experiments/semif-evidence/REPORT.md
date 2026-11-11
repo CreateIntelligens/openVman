@@ -44,7 +44,7 @@
 此實驗已退場。2026-10-13 清理時移除四份冗長的逐筆推論 JSONL，保留凍結案例、環境、摘要及診斷；原始逐筆記錄可從 Git 歷史查閱。以下數字是原測量結果，現存摘要不足以重新核算每筆推論，不宣稱本目錄可獨立完整重現。
 
 - [案例政策](README.fixture.md)。執行方式與基線方式的說明隨可執行的實驗一起退場
-  （2026-09-22，見 `docs/plans/jev-decision-layer.md` §4）；模型、revision、NF4 設定
+  （2026-09-22，見 `docs/archive/plans/jev-decision-layer.md` §4）；模型、revision、NF4 設定
   與載入時間保留在 [環境與驗證](results/environment.json) 與各 `metadata.json`。
 - [初始摘要](results/summary.json)
 - [提示診斷摘要](results/prompt-v2/summary.json)
