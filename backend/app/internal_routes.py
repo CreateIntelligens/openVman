@@ -22,6 +22,10 @@ INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 _http = SharedAsyncClient(read=8)
 
 
+# Gateway worker 轉送畫面描述用；forward.py 共用這個常數，避免兩邊路徑又岔開。
+ENRICH_PATH = "/api/v1/internal/enrich"
+
+
 class InternalEnrichRequest(BaseModel):
     trace_id: str = ""
     session_id: str | None = None
@@ -31,7 +35,7 @@ class InternalEnrichRequest(BaseModel):
     persona_id: str = "default"
 
 
-@router.post("/api/v1/internal/enrich")
+@router.post(ENRICH_PATH)
 async def internal_enrich(
     payload: InternalEnrichRequest,
     x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),

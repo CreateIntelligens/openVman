@@ -85,7 +85,7 @@ graph TD
 1.  **請求/響應 (Request/Response)**：`backend` 向 `api` 或外部 TTS 節點（IndexTTS、VoxCPM、CosyVoice 等）發起同步請求。
 2.  **串流 (Streaming)**：`api` -> `backend` -> 外部 TTS 節點的 Token-to-Audio 流式處理。
 3.  **非同步任務 (Async Tasks)**：`backend` 將繁重任務（如多模態預處理）丟進 `redis` 隊列。
-4.  **視覺觀察 (Vision Observation)**：`backend` 的 camera/media gateway 呼叫 OpenAI-compatible VLM，將短描述透過 `/internal/enrich` 注入 `api` session context。
+4.  **視覺觀察 (Vision Observation)**：`backend` 的 camera/media gateway 呼叫 OpenAI-compatible VLM，將短描述經 Backend 的 `/api/v1/internal/enrich` 轉給 Brain 的 `/internal/enrich`，注入 session context。
 
 ---
 

@@ -1,4 +1,4 @@
-"""Forward enriched context to brain via Backend's /internal/enrich endpoint."""
+"""Forward enriched context to brain via Backend's internal enrich endpoint."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
-from app.internal_routes import INTERNAL_TOKEN_HEADER
+from app.internal_routes import ENRICH_PATH, INTERNAL_TOKEN_HEADER
 
 logger = logging.getLogger("gateway.forward")
 
@@ -22,7 +22,7 @@ async def forward_to_brain(
     project_id: str = "default",
     persona_id: str = "default",
 ) -> bool:
-    """POST enriched context to Backend's /internal/enrich endpoint.
+    """POST enriched context to Backend's internal enrich endpoint.
 
     The Backend endpoint validates the internal token and forwards to Brain.
     Fire-and-forget: only logs errors, never raises.
@@ -31,7 +31,7 @@ async def forward_to_brain(
     forward_base_url = cfg.gateway_forward_url.rstrip("/") or (
         f"http://127.0.0.1:{cfg.backend_port}"
     )
-    url = f"{forward_base_url}/internal/enrich"
+    url = f"{forward_base_url}{ENRICH_PATH}"
 
     payload = {
         "trace_id": trace_id,

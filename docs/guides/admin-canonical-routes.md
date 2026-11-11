@@ -1,8 +1,8 @@
 # 後台 Canonical Routes 現況
 
-評估日期：2026-09-30。範圍：`frontend/admin` 管理介面的頁面網址與瀏覽器導覽。
+範圍：`frontend/admin` 管理介面的頁面網址與瀏覽器導覽。
 
-目前已補齊 Canonical Routes 的子頁直達。每個管理頁面與可切換子頁有固定路徑，路徑解析與產生集中在 `frontend/admin/src/components/app/navigation.ts`；`App.tsx` 用 History API 同步畫面與網址，`useAdminSubView` 讓子頁依導覽狀態呈現。本次修改後台程式、測試與文件。
+每個管理頁面與可切換子頁有固定路徑，路徑解析與產生集中在 `frontend/admin/src/components/app/navigation.ts`；`App.tsx` 用 History API 同步畫面與網址，`useAdminSubView` 讓子頁依導覽狀態呈現。
 
 ## 固定頁面路徑
 
@@ -55,7 +55,7 @@
 
 ### 已失效的舊路徑
 
-2026-10-15 起側欄合併，下列舊路徑不轉址、直接失效（解析為無效路由，`/admin/` 入口走還原流程）：
+下列舊路徑不轉址、直接失效（解析為無效路由，`/admin/` 入口走還原流程）：
 
 | 舊路徑 | 新路徑 |
 |--------|--------|
@@ -68,6 +68,8 @@
 | `/admin/embed-keys` | `/admin/access/embed-keys` |
 | `/admin/health` | `/admin/system` |
 | `/admin/monitoring` | `/admin/system/monitoring` |
+| `/admin/tts` | `/admin/voice` |
+| `/admin/tts/asr` | `/admin/voice/asr` |
 
 公開子路徑部署時加上 `/openvman`，例如 `/openvman/admin/knowledge/graph?project=demo`。`publicAdminPath()` 依目前網址保留此部署前綴。
 
@@ -83,19 +85,8 @@ API 金鑰分頁在既有後台門禁內開放正式帳號管理本人 key，入
 - Chat 的 `session`／`persona` 是一次性開啟對話參數，在 lazy Chat 頁面尚未載入時保持於網址，由 `consumeChatDeepLink()` 在頁面掛載時消費並清除，重新整理後保持一般對話頁網址。
 - Production nginx 的 `frontend/admin/nginx/production.conf` 使用 `/admin/index.html` 作為 SPA fallback，讓固定頁面路徑重新整理時可載入；原生 nginx 的 `/openvman/` 代理保留公開前綴對應。
 
-## 邊界與驗證結果
+## 邊界與專案選擇
 
-此機制處理 SPA 頁面導覽，SEO 的 HTML `rel=canonical` 與 API endpoint 路由是其他範圍。合法子視圖集中在路由表；未知子路徑解析為無效路由，App 仍採還原頁面的既有行為，獨立 404 頁可另行設計。
+此機制處理 SPA 頁面導覽，SEO 的 HTML `rel=canonical` 與 API endpoint 路由是其他範圍。合法子視圖集中在路由表；未知子路徑解析為無效路由，App 走 `/admin/` 入口的還原流程，沒有獨立的 404 頁。
 
-**明確的頁面／子頁網址優先於瀏覽器偏好**：`project` 省略時先採 default；有 `project` 時先採指定專案。載入頁面前先取得帳號可用專案清單；若指定或預設專案不可用，回退到清單中的 default 或第一個可用專案，並更新網址。清單讀取失敗時顯示重試，不先以未確認的專案發出頁面請求。沒有可用專案時不掛載 Chat 等專案頁面，保留專案與帳號管理入口供管理員設定權限。只有 `/admin/` 入口才會還原保存的專案、頁面與子視圖。各子頁不再使用先前的 localStorage tab 偏好覆蓋路由。
-
-本機執行 `pnpm test` 與 `pnpm build` 驗證路由解析、子頁直達、重新掛載、網址優先於保存偏好、跨專案對話深連結、專案授權清單載入與導覽確認。完整測試結果為 85 個檔案、518 項測試通過；測試輸出有既有 Usage 重複 key 與 KnowledgeBase React `act()` 警告。
-
-另以本機 Chrome + Playwright，mock 本地帳號／專案及頁面讀取 API，驗證以下結果：
-
-- `/admin/voice/asr?project=audit` 直達 ASR，切換 TTS、重新整理及上一頁／下一頁均還原對應畫面與網址。
-- `/admin/accounts/temporary`（2026-10-15 起改為 `/admin/access/accounts/temporary`）直達指定子頁；省略 project 採 default。
-- 舊 `?view=asr` 正規化為 `/admin/voice/asr`。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址（2026-10-05 起）。
-- Chat lazy module 載入前保留 `session`／`persona`，掛載後對指定對話讀取 history 並清除一次性參數。
-
-瀏覽器 `pageerror` 為空；console 僅有本地 HTTP 環境的既有 Vite wss HMR SSL 警告及測試隔離外部字體的訊息。正式 nginx 的直接開啟與重新整理須在部署後確認，這次保留已具備的 SPA fallback 設定。
+明確的頁面與子頁網址優先於瀏覽器偏好：`project` 省略時先採 default；有 `project` 時先採指定專案。載入頁面前先取得帳號可用專案清單；若指定或預設專案不可用，回退到清單中的 default 或第一個可用專案，並更新網址。清單讀取失敗時顯示重試，不先以未確認的專案發出頁面請求。沒有可用專案時不掛載 Chat 等專案頁面，保留專案與帳號管理入口供管理員設定權限。只有 `/admin/` 入口才會還原保存的專案、頁面與子視圖。各子頁不以 localStorage 的分頁偏好覆蓋路由。

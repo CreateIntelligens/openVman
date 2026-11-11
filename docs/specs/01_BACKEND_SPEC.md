@@ -592,8 +592,8 @@ process.on('SIGTERM', async () => {
 後端作為「神經中樞」，必須接收來自 Gateway 的增強訊息並轉發給大腦。
 
 #### 15.1 內部增強介面 (Internal Enrichment)
-* **POST `/internal/enrich`**
-* **Payload**: `UserInputEnriched` (詳見 `04_GATEWAY_SPEC.md`)
+* **POST `/api/v1/internal/enrich`**（只給容器之間呼叫，帶 `X-Internal-Token`）
+* **Payload**: `trace_id`、`session_id`、`enriched_context`、`media_refs`、`project_id`、`persona_id`（詳見 `04_GATEWAY_SPEC.md`）
 * **行為**:
     1. 驗證 `GATEWAY_INTERNAL_TOKEN`。
     2. 根據 `session_id` 找到活躍的 WebSocket。

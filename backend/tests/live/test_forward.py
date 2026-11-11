@@ -47,7 +47,7 @@ class TestForwardToBrain:
         assert ok is True
         mock_client.post.assert_called_once()
         call_args = mock_client.post.call_args
-        assert call_args[0][0] == "http://127.0.0.1:8200/internal/enrich"
+        assert call_args[0][0] == "http://127.0.0.1:8200/api/v1/internal/enrich"
         assert call_args[1]["json"]["trace_id"] == "t1"
         assert call_args[1]["json"]["session_id"] == "s1"
         assert call_args[1]["json"]["project_id"] == "store-a"
@@ -73,7 +73,7 @@ class TestForwardToBrain:
 
         assert ok is True
         assert mock_client.post.call_args.args[0] == (
-            "http://backend:8200/internal/enrich"
+            "http://backend:8200/api/v1/internal/enrich"
         )
 
     @pytest.mark.asyncio
@@ -114,3 +114,11 @@ class TestForwardToBrain:
         assert payload["media_refs"] == []
         assert payload["project_id"] == "default"
         assert payload["persona_id"] == "default"
+
+
+def test_forward_targets_a_registered_backend_route():
+    # 舊的 /internal/enrich 退役時這裡沒跟著改，轉送靜悄悄 404 了好一陣子。
+    from app.gateway.forward import ENRICH_PATH
+    from app.internal_routes import router
+
+    assert ENRICH_PATH in {route.path for route in router.routes}
