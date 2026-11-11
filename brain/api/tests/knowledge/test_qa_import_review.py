@@ -108,7 +108,7 @@ def test_a_language_without_a_category_stays_at_the_top_and_is_reported(workspac
 
     top = [node for node in qa_nodes.list_nodes("default").values() if not node["parent_ids"]]
     assert sorted(node["label"] for node in top) == ["faq", "中文"]
-    assert any("還沒有「English」分類，English的 2 題先放在最上層的「faq」" in note for note in result["notes"])
+    assert any("還沒有「English」分類，English 的 2 題先放在最上層的「faq」" in note for note in result["notes"])
     assert any("還沒有「Español」分類" in note for note in result["notes"])
 
 

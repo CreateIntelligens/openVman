@@ -173,7 +173,7 @@ def qa_table_notes(
         notes.append(f"語言欄看不懂：{values}，這幾題照整份的語言處理。語言請填中文、英文、西文、日文或韓文")
     for code, count in missing_categories.items():
         name = LANGUAGE_NAMES.get(code, code)
-        which = f"{name}的 {count} 題" if count else "這份"
+        which = f"{name} 的 {count} 題" if count else "這份"
         notes.append(
             f"還沒有「{name}」分類，{which}先放在最上層的「{stem}」。"
             f"要放進語言分類，請先建立「{name}」分類再把它拖進去"
