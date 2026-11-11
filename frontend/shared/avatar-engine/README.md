@@ -1,0 +1,29 @@
+# 共用人物引擎
+
+Vue 前台、Admin 的人物試用與 Avatar SDK 共用 `AvatarEngine`，以同一 WebAudio 取樣時鐘驅動 ONNX 推論及 WebGL 渲染，沒有舊 Avatar runtime 備援。獨立 Live2D widget 不使用此引擎。
+
+`create({canvas, video?, runtimeBaseUrl, audioOutput?, onSpeakingChange?, onError?})` 初始化；`loadCharacter(base)` 載入受原資源授權保護的 `render_data.json.gz` 及 `01.webm`；`prepare()` 在使用者手勢內恢復音訊；`appendPcm(Int16Array)` 接收16kHz單聲道並等待背壓；`finishAudio()` 宣告EOS且等待真正播完；`stop()` 取消世代與待播工作並歸零；`dispose()` 回收Worker、音源與GPU資源。外層播放器不得另行排程同份PCM。
+
+`openvman.render.v2` 包含 frameRate=25、frameSize、geometrySource=`mediapipe-video`，每幀為 `region`（原影片裁切框xyxy）、`outer`／`inner`（各20點、40個180單位局部xy）。產製端直接從人物影片以MediaPipe追蹤，不讀原模板、姿態、密集參考或rig。瀏覽器依量測的嘴唇環建立程序網格，解剖位移、牙冠輪廓、口腔著色與融合範圍均由本專案程式產生，沒有抽出的二進位資產下載。追蹤器可能在影片開頭短暫偏移，載入時會以前後穩定的量測替換這類孤立跳點，真實的頭部移動不受影響。舊v1人物需從原影片重新產製v2；新引擎拒絕舊契約並提示重新產製，沒有舊rig備援。
+
+## 嘴型控制
+
+全零向量是控制器的待機與停止訊號，直接保留原影片畫素。音訊模型在靜音時收斂到 `LATENT_REST`，那才是閉口；全零反而是微張。因此六維輸出一律先減去這個點，再由有號矩陣解碼成三個解剖控制：`gap`（內唇開口）、`jaw`（下顎與牙齒間距）、`round`（正為圓唇、負為展唇）。六維名稱只是相容方向的假說，不是標準FACS或ARKit權重；矩陣來源見[來源說明](../../../scripts/experiments/avatar-renderer-next/PROVENANCE.md)。
+
+- 內唇開口超過 `SEAL_MARGIN` 才分開，所以閉口音與靜音附近其他通道仍可微動而不張嘴。分開時從中央開始，隨開口變大才延伸到嘴角。負的開口值不截掉，會讓雙唇互壓變薄，也能讓待機就微張的人物閉上嘴。
+- 下唇跟著下顎承擔大部分開口；超出下顎解釋的開口（如 i、s）改由上唇上提露齒。內外唇各走不同比例，唇形在開合時會變薄或變厚，而非整圈平移。下顎帶動下巴與周圍皮膚，並在裁切邊界前歸零。
+- 牙齒、牙齦與舌頭只畫在內唇邊界內。上排牙固定於顱骨、下排牙隨下顎；上排牙不跟著上唇或即時下顎移動，只有持續張大的母音才緩慢往上收，避免露出太多牙。色彩取自該人物當前影格的唇色與臉頰亮度，往口角與唇下陰影漸暗；口腔維持暗紅，窄開口的邊界從唇色開始，不會變成一條黑線。
+
+只有網格能帶動的皮膚才會蓋回畫面，鼻子、臉頰上半與裁切邊界保留影片原本的畫素，所以沒有方形遮罩。合成解析度隨裁切範圍調整（180到360），避免大人物開口時嘴周圍變軟。控制器每 40ms 才有一組係數，播放時在相鄰兩組之間內插，再依經過時間平滑到畫面上；停止時控制值立即歸零，嘴在約 0.2 秒內緩和閉回，之後畫素與原影片一致。`holdControls()` 只給固定影格的診斷工具用。WebGL 繪製後必須 `flush()`，否則複製到 2D 畫布時可能拿到舊快照，造成舊嘴型閃回一幀。
+
+幾何、方向與對稱性有測試保護，但畫面自然度只能由人看比較頁判定，測試通過不代表已驗收。
+
+部署資源由 `frontend/app/scripts/prepare-avatar-engine.mjs` 組裝，含逐檔雜湊。音訊模型以本專案的 `assets/models/mouth-model.wasm` 執行：推論程式與加密後的權重編在同一個WebAssembly模組，worker載入後由 `init()` 在模組記憶體內還原，每步約0.3ms，不需要ONNX Runtime或WebGPU。明文模型、金鑰與建置工具不放在這個公開repo；`.gitignore` 排除 `*.onnx`，`tests/mouth-model.test.mjs` 比對參考輸出並確認沒有ONNX檔隨引擎發布。加密只防止直接下載取用，執行時權重仍在瀏覽器記憶體中，擋不住逆向。SDK跨origin採Blob Worker bootstrap；主機CSP需允許該來源的script/connect及 `worker-src blob:`，影片與模型資源需正確CORS。
+
+## 來源邊界
+
+渲染、程序網格／拓樸、解剖位移場、口腔著色與融合範圍由本專案撰寫；人物座標由使用者影片經第三方MediaPipe取得。共用引擎的舊 `assets/rig/*.bin` 已移出，不隨前台build交付。音訊特徵及模型介面維持既有相容契約；`model_audio.onnx`仍為原來源權重，六維語義校準也受此模型輸出契約影響。這不是整包法律clean-room或零第三方依賴的宣稱。
+
+原template／rig／profile的歷史紀錄保留於既有實驗與離線遷移程式；它們不被v2產製容器或新版人物引擎載入。正式站與凍結候選不因本分支完成而自動替換，舊人物也不會因改一個schema字串就成為獨立來源。
+
+MediaPipe及其偵測權重、OpenCV、NumPy、ffmpeg等維持各自來源與授權；人物影片按使用者提供的己方素材保留。第三方套件清冊、模型來源與資料產製清冊需分開解讀。

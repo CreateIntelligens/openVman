@@ -21,6 +21,7 @@ RUN npm install -g corepack@latest \
 
 COPY frontend/avatar-sdk/src ./src
 COPY frontend/shared/avatar /shared/avatar
+COPY frontend/shared/avatar-engine /shared/avatar-engine
 COPY frontend/avatar-sdk/tests ./tests
 COPY frontend/avatar-sdk/tsconfig.json frontend/avatar-sdk/vite.config.ts ./
 RUN pnpm test

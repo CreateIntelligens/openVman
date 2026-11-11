@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
-const bundleUrl = new URL("../dist/openvman-avatar-sdk.js", import.meta.url);
+const bundleUrl = new URL("../dist/test/openvman-avatar-sdk.js", import.meta.url);
 
 async function loadSdk({
   audioState = "running",
@@ -57,57 +57,7 @@ async function loadSdk({
         for (const child of children) {
           child.parent = this;
           this.children.push(child);
-          if (child.tagName === "script") {
-            const videoListeners = new Map();
-            context.window.characterVideo = {
-              addEventListener(type, handler) {
-                const handlers = videoListeners.get(type) ?? new Set();
-                handlers.add(handler);
-                videoListeners.set(type, handlers);
-              },
-              error: null,
-              load() {
-                const finish = () => {
-                  const type = videoLoadSucceeds ? "canplay" : "error";
-                  if (videoLoadSucceeds) this.readyState = 3;
-                  for (const handler of videoListeners.get(type) ?? []) {
-                    handler();
-                  }
-                };
-                if (deferVideoReady) {
-                  finishVideoReady = finish;
-                } else {
-                  queueMicrotask(finish);
-                }
-              },
-              play: async () => {
-                if (!videoPlaySucceeds) {
-                  throw new Error("playback rejected");
-                }
-              },
-              readyState: 0,
-              remove() {
-                runtimeCalls.videoRemoved += 1;
-              },
-              removeEventListener(type, handler) {
-                videoListeners.get(type)?.delete(handler);
-              },
-            };
-            context.window.createQtAppInstance = async () => ({
-              HEAPU8: new Uint8Array(16384),
-              _clearAudio() {
-                runtimeCalls.clearAudio += 1;
-              },
-              _free() {},
-              _malloc: () => 0,
-              _processSecret() {},
-              _setAudioBuffer() {
-                runtimeCalls.pushedAudio += 1;
-              },
-              stringToUTF8() {},
-            });
-            queueMicrotask(() => child.onload());
-          }
+
         }
       },
       remove() {
@@ -121,6 +71,23 @@ async function loadSdk({
       },
       tagName,
     };
+    if (tagName === "video") {
+      const listeners = new Map();
+      element.addEventListener = (type, handler) => {
+        const handlers = listeners.get(type) ?? new Set();
+        handlers.add(handler);
+        listeners.set(type, handlers);
+      };
+      element.load = () => {
+        const finish = () => {
+          for (const handler of listeners.get(videoLoadSucceeds ? "canplay" : "error") ?? []) handler();
+        };
+        if (deferVideoReady) finishVideoReady = finish;
+        else queueMicrotask(finish);
+      };
+      element.play = async () => { if (!videoPlaySucceeds) throw new Error("playback rejected"); };
+      element.remove = () => { runtimeCalls.videoRemoved += 1; };
+    }
     if (tagName === "canvas") {
       element.getContext = () => canvasContext;
     }
@@ -165,7 +132,7 @@ async function loadSdk({
           status: charactersStatus,
         };
       }
-      const isCharacter = url.includes("combined_data.json.gz");
+      const isCharacter = url.includes("render_data.json.gz");
       return {
         arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
         ok: !isCharacter || characterStatus === 200,
@@ -181,6 +148,7 @@ async function loadSdk({
       setTimeout,
     },
   };
+  context.window.engineStopped = () => { runtimeCalls.clearAudio += 1; };
   context.window.AudioContext = class {
     constructor() {
       this.currentTime = 0;
@@ -189,6 +157,7 @@ async function loadSdk({
     }
     async close() {}
     createBuffer(_channels, length, sampleRate) {
+      runtimeCalls.pushedAudio += 1;
       return {
         copyToChannel() {},
         getChannelData: () => new Float32Array(length),
@@ -275,7 +244,7 @@ test("loads character files from the /static family", async () => {
   assert.ok(
     requests.some(
       ({ url }) =>
-        url === "https://avatar.example/static/characters/000/combined_data.json.gz",
+        url === "https://avatar.example/static/characters/000/render_data.json.gz",
     ),
   );
   assert.equal(
@@ -291,6 +260,19 @@ test("reuses identical init and rejects different page-lifetime init", async () 
   assert.equal(await sdk.init({ characterId: "000" }), first);
   await assert.rejects(
     sdk.init({ characterId: "other" }),
+    (error) => error.code === "INSTANCE_EXISTS",
+  );
+});
+
+test("custom runtime assets remain separate from character data and singleton identity", async () => {
+  const { sdk, requests } = await loadSdk();
+  const options = { characterId: "000", runtimeBaseUrl: "https://runtime.example/isolated/" };
+  const first = await sdk.init(options);
+  assert.equal(await sdk.init(options), first);
+  assert.ok(requests.some(({ url }) => url === "https://runtime.example/isolated/models/audio.onnx"));
+  assert.ok(requests.some(({ url }) => url === "https://avatar.example/static/characters/000/render_data.json.gz"));
+  await assert.rejects(
+    sdk.init({ ...options, runtimeBaseUrl: "https://runtime.example/other/" }),
     (error) => error.code === "INSTANCE_EXISTS",
   );
 });
@@ -479,45 +461,9 @@ test("pushPcm queues host chunks in order without backend requests", async () =>
   assert.deepEqual(runtimeCalls.scheduledStarts, [0, 0.1]);
 });
 
-test("idle rendering keeps the native frame until PCM playback begins", async () => {
-  const { document, runtimeCalls, sdk, setRenderingTime } = await loadSdk({
-    autoEnd: false,
-  });
-  const avatar = await sdk.init({ characterId: "000" });
-  const canvas = document.getElementById("canvas_video");
-  const context = canvas.getContext("2d");
-  canvas.width = 1080;
-  canvas.height = 1920;
-  const renderFrame = () => {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.drawImage({}, 0, 0, canvas.width, canvas.height);
-    context.clearRect(452, 486, 232, 232);
-    context.drawImage({}, 0, 0, 180, 180, 452, 486, 232, 232);
-  };
-
-  renderFrame();
-  assert.deepEqual(runtimeCalls.canvasCalls, [
-    "clearRect 1080x1920",
-    "drawImage 5 alpha=1",
-  ]);
-
-  runtimeCalls.canvasCalls.length = 0;
-  await avatar.pushPcm(new Int16Array(1600));
-  setRenderingTime(100);
-  renderFrame();
-  assert.deepEqual(runtimeCalls.canvasCalls, [
-    "clearRect 1080x1920",
-    "drawImage 5 alpha=1",
-    "drawImage 9 alpha=0.5",
-  ]);
-
-  runtimeCalls.canvasCalls.length = 0;
-  avatar.interrupt();
-  renderFrame();
-  assert.deepEqual(runtimeCalls.canvasCalls, [
-    "clearRect 1080x1920",
-    "drawImage 5 alpha=1",
-  ]);
+test("production bundle excludes the legacy runtime and test engine", async () => {
+  const production = await readFile(new URL("../dist/openvman-avatar-sdk.js", import.meta.url), "utf8");
+  assert.doesNotMatch(production, /createQtAppInstance|_setAudioBuffer|OpenVmanAvatarRuntime|engineStopped/);
 });
 
 test("a new playAudio call replaces current playback", async () => {
@@ -572,7 +518,6 @@ test("supports a silent audio output for host-driven playback", async () => {
 
   assert.match(typesSource, /audioOutput\?: OpenVmanAvatarAudioOutput/);
   assert.match(typesSource, /"speaker" \| "silent"/);
-  assert.match(audioSource, /createGain\(\)/);
-  assert.match(audioSource, /gain\.value = 0/);
-  assert.match(mainSource, /audioOutput: options\.audioOutput \?\? "speaker"/);
+  assert.doesNotMatch(audioSource, /createBufferSource|new AudioContext|createGain/);
+  assert.match(mainSource, /options\.audioOutput \?\? "speaker"/);
 });

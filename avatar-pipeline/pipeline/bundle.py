@@ -8,22 +8,21 @@ A bundle is the pair the avatar runtime loads from ``data/avatar/<id>/``:
   transparent source keeps its alpha (``yuva420p``) so the stage background
   shows through; a clip whose last frame does not match its first is
   extended with itself played backwards so the loop has no jump.
-* ``combined_data.json.gz`` — ``json_data`` holds one row per frame: a
-  flattened 4×4 pose matrix followed by the 209 warp landmarks (x, y) in
-  the 180-square; ``combined_data`` is the AES-128-CBC encrypted inner JSON
-  with the face template, per-frame mouth crops and the frame count.
+* ``combined_data.json.gz`` — contains only ``render_data`` in the v2
+  measured-video format. The filename remains compatible with upload APIs.
+* ``render_data.json.gz`` — the same v2 payload for direct browser loading.
+
+Legacy encryption and pose helpers below are retained for offline migration;
+the default builder never loads their shared template or calibration profile.
 """
 
 from __future__ import annotations
 
 import base64
-import gzip
 import json
 import os
-import shutil
 import subprocess
 import tempfile
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,14 +31,6 @@ import numpy as np
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from .geometry import (
-    INDEX_WRAP,
-    MAIN_KEYPOINTS_INDEX,
-    STANDARD_SIZE,
-    crop_mouth,
-    smooth_array,
-    standardize_points,
-)
 from .frames import (
     DEFAULT_MAX_SIDE,
     FPS,
@@ -50,7 +41,7 @@ from .frames import (
     read_frames,
     write_ping_pong,
 )
-from .landmarks import extract_landmarks
+from .video_lips import generate_video_lips, write_video_lips
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 FACE_TEMPLATE_PATH = ASSETS_DIR / "face_template.json"
@@ -180,6 +171,8 @@ def transcode_with_marker(
 
 def mouth_crops(pts_smooth: np.ndarray, width: int, height: int) -> np.ndarray:
     """One fixed-size square per frame, centred on the smoothed lip centre."""
+    from .geometry import MAIN_KEYPOINTS_INDEX, crop_mouth, smooth_array
+
     frame_count = len(pts_smooth)
     raw_rects = np.array([
         crop_mouth(pts[MAIN_KEYPOINTS_INDEX], width, height) for pts in pts_smooth
@@ -203,6 +196,13 @@ def pose_rows(
     vertices onto the frame's standardized warp landmarks; it absorbs the
     difference between the shared template and this person's face.
     """
+    from .geometry import (
+        INDEX_WRAP,
+        STANDARD_SIZE,
+        smooth_array,
+        standardize_points,
+    )
+
     template_pts = np.array(template).reshape(-1, 3)
     template_h = np.hstack([template_pts[:len(INDEX_WRAP)], np.ones((len(INDEX_WRAP), 1))])
     standardized = [
@@ -226,7 +226,7 @@ def build_bundle(
     input_video: Path,
     output_dir: Path,
     *,
-    key: bytes,
+    key: bytes | None = None,
     max_side: int = DEFAULT_MAX_SIDE,
     template_path: Path = FACE_TEMPLATE_PATH,
     loop_mode: str = "auto",
@@ -240,7 +240,8 @@ def build_bundle(
     if loop_mode not in LOOP_MODES:
         raise ValueError(f"loop_mode 必須是 {', '.join(LOOP_MODES)} 之一")
     output_dir.mkdir(parents=True, exist_ok=True)
-    template = load_face_template(template_path)
+    # key/template_path remain accepted for callers migrating from v1.
+    # Neither is read: v2 geometry comes exclusively from the produced video.
 
     def report(stage: str, done: int = 0, total: int = 0) -> None:
         if progress:
@@ -269,44 +270,26 @@ def build_bundle(
                 progress=lambda done, total: report("loop", done, total),
             )
 
-        report("landmarks")
-        pts_3d = extract_landmarks(
-            frames_path, width, height, frame_total,
-            progress=lambda done, total: report("landmarks", done, total),
-        )
-
         video_path = output_dir / "01.webm"
         frame_count = transcode_with_marker(
             frames_path, video_path, width, height, frame_total,
             alpha=info.has_alpha, progress=progress,
         )
-        if frame_count != len(pts_3d):
+        report("landmarks")
+        payload = generate_video_lips(
+            video_path,
+            progress=lambda done: report("landmarks", done, frame_count),
+        )
+        if frame_count != len(payload["frames"]):
             raise RuntimeError(
-                f"影格數不一致：轉檔 {frame_count} 幀、特徵點 {len(pts_3d)} 幀"
+                f"影格數不一致：轉檔 {frame_count} 幀、特徵點 {len(payload['frames'])} 幀"
             )
-
-        report("geometry")
-        pts_smooth = smooth_array(
-            pts_3d.reshape(frame_count, -1), LANDMARK_SMOOTHING,
-        ).reshape(frame_count, -1, 3)
-        rects = mouth_crops(pts_smooth, width, height)
-        rows = pose_rows(pts_smooth, rects, template)
+        write_video_lips(output_dir / "render_data.json.gz", payload)
 
         report("package")
-        inner = {
-            "uid": f"{UID_PREFIX}{uuid.uuid4()}",
-            "frame_num": frame_count,
-            "face3D_obj": template,
-            "rect": rects.tolist(),
-            "reverse_option": 0,
-        }
-        inner_bytes = json.dumps(inner, separators=(",", ":")).encode("utf-8")
-        outer = {"combined_data": encrypt_inner(key, inner_bytes), "json_data": rows}
+        outer = {"render_data": payload}
         data_path = output_dir / "combined_data.json.gz"
-        tmp_data = data_path.with_suffix(".tmp")
-        with gzip.open(tmp_data, "wt", encoding="utf-8") as handle:
-            json.dump(outer, handle, separators=(",", ":"))
-        shutil.move(tmp_data, data_path)
+        write_video_lips(data_path, outer)
 
     return BundleResult(
         video_path=video_path,

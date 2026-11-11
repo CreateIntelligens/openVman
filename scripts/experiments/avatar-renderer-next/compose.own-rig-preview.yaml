@@ -1,0 +1,14 @@
+# 比較頁獨立站台：正式容器每次換版都會清掉寫進去的檔案，這裡不受 watchtower 影響。
+services:
+  preview:
+    image: nginx:1.27-alpine
+    container_name: openvman-own-rig-preview
+    restart: unless-stopped
+    ports:
+      - "${OWN_RIG_PREVIEW_PORT:-8790}:443"
+    volumes:
+      - ${OWN_RIG_PREVIEW_DIR:?}/html:/usr/share/nginx/html
+      - ${OWN_RIG_PREVIEW_DIR:?}/default.conf:/etc/nginx/conf.d/default.conf
+      - ${OWN_RIG_PREVIEW_CERTS:?}:/etc/nginx/certs:ro
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"

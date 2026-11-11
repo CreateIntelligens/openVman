@@ -39,6 +39,15 @@ function locationBody(prefix) {
 }
 
 describe("nginx default config", () => {
+  it("copies the complete shared engine into the SDK image build stage", () => {
+    const dockerfile = readFileSync(resolve(__dirname, "../Dockerfile"), "utf8");
+    const sdkStage = dockerfile.split(" AS avatar-sdk-builder")[1]?.split("\nFROM ")[0];
+
+    // 整個目錄才會同時包含 .mjs、.d.mts 與引擎內部相依，不能只複製入口 JS。
+    expect(sdkStage).toMatch(/^COPY frontend\/shared\/avatar-engine \/shared\/avatar-engine$/m);
+    expect(sdkStage).toContain("RUN pnpm test");
+  });
+
   it.each(RETIRED_LOCATIONS)("carries no location for the retired %s", (prefix) => {
     // /static/backgrounds/ 之類的現行路徑本身含有舊前綴字串，所以比對整個
     // location 指令而不是裸字串。
@@ -58,7 +67,7 @@ describe("nginx default config", () => {
     );
   });
 
-  it("serves the avatar SDK bundle and branded runtime under /static/sdk with CORS", () => {
+  it("serves the avatar SDK bundle and shared engine under /static/sdk with CORS", () => {
     expect(source).toMatch(
       /location = \/static\/sdk\/openvman-avatar-sdk\.js \{[\s\S]*Access-Control-Allow-Origin "\*"/,
     );
@@ -66,19 +75,21 @@ describe("nginx default config", () => {
       /location = \/static\/sdk\/openvman-avatar-sdk\.js \{[\s\S]*alias \/usr\/share\/nginx\/html\/openvman-avatar-sdk\.js/,
     );
     expect(source).not.toContain("avatar-sdk:80");
-    expect(source).toMatch(
-      /location = \/static\/sdk\/runtime\/OpenVmanAvatarRuntime\.wasm \{[\s\S]*application\/wasm/,
-    );
-    expect(source).toMatch(
-      /location = \/static\/sdk\/runtime\/OpenVmanAvatarRuntime\.js \{[\s\S]*proxy_pass \$avatar\/js\/OpenVmanAvatarRuntime\.js;/,
-    );
-    expect(source.match(/proxy_hide_header Access-Control-Allow-Origin;/g)).toHaveLength(2);
+    const engine = locationBody("/static/sdk/engine/");
+    expect(engine).toContain("rewrite ^/static/sdk/engine/(.*)$ /avatar-engine/$1 break;");
+    expect(engine).toContain("proxy_pass $avatar$uri$is_args$args;");
+    expect(engine).toContain('Access-Control-Allow-Origin "*"');
+    expect(source).not.toContain("OpenVmanAvatarRuntime");
+    expect(engine).toContain("proxy_hide_header Access-Control-Allow-Origin;");
   });
 
   it("proxies public and authorized character files without unsafe shared caching", () => {
     const characters = locationBody("/static/characters/");
 
-    expect(characters).toContain('Access-Control-Allow-Origin "*"');
+    // Backend 可能反射宿主 Origin；先移除該標頭，避免與 edge 的 * 重複而被瀏覽器拒絕。
+    expect(characters).toContain("proxy_hide_header Access-Control-Allow-Origin;");
+    expect(characters.match(/add_header Access-Control-Allow-Origin/g)).toHaveLength(1);
+    expect(characters).toContain('add_header Access-Control-Allow-Origin "*" always;');
     expect(characters).toContain("proxy_set_header Authorization $http_authorization;");
     expect(characters).not.toContain('Cache-Control "public');
   });

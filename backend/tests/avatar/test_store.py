@@ -1,3 +1,5 @@
+import gzip
+
 import pytest
 
 from app.avatar.store import (
@@ -17,7 +19,7 @@ def _make_char(store, char_id="008", label="角色八"):
         char_id=char_id,
         label=label,
         video_bytes=b"\x1a\x45\xdf\xa3video",
-        data_bytes=b"\x1f\x8bdata",
+        data_bytes=gzip.compress(b"{}", mtime=0),
     )
 
 
@@ -42,7 +44,7 @@ def test_create_writes_files(store, tmp_path):
     _make_char(store)
     d = tmp_path / "008"
     assert (d / "01.webm").read_bytes() == b"\x1a\x45\xdf\xa3video"
-    assert (d / "combined_data.json.gz").read_bytes() == b"\x1f\x8bdata"
+    assert (d / "combined_data.json.gz").read_bytes() == gzip.compress(b"{}", mtime=0)
     assert (d / "meta.json").exists()
 
 

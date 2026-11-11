@@ -92,6 +92,9 @@ frontend/admin/public/models/
 # Git worktrees
 .worktree/
 
+# Generated from the locked ONNX package and canonical shared engine assets.
+frontend/app/public/avatar-engine/
+
 # 由 scripts/render-native-nginx.sh 產生，內容依機器而異
 infra/nginx/native/openvman.conf
 
@@ -108,3 +111,10 @@ scripts/experiments/intent-shadow/smoke.json
 # scripts/voice_e2e：合成語音快取與逐題結果（可重建、含對話內容）
 scripts/voice_e2e/.cache/
 scripts/voice_e2e/results/
+
+# 嘴型模型的明文權重不進公開 repo，只放加密後的 mouth-model.wasm。
+*.onnx
+!frontend/admin/public/vad/*.onnx
+# 原版引擎抽出的素材只留本機，不進公開 repo（見 avatar-renderer-next/PROVENANCE.md）。
+scripts/experiments/avatar-renderer-next/assets/character/*.bin
+scripts/experiments/avatar-renderer-next/assets/character/json_data_151.json

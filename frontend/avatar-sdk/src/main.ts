@@ -43,6 +43,7 @@ function containerId(container?: HTMLElement): string {
 function signature(options: OpenVmanAvatarOptions): string {
   return JSON.stringify({
     assetsBaseUrl: options.assetsBaseUrl,
+    runtimeBaseUrl: options.runtimeBaseUrl,
     audioOutput: options.audioOutput ?? "speaker",
     characterId: options.characterId,
     container: containerId(options.container),
@@ -132,7 +133,10 @@ async function createInstance(
 
   let runtime: AvatarRuntime | null = null;
   try {
-    runtime = await AvatarRuntime.create(resourceBaseUrl);
+    runtime = await AvatarRuntime.create(
+      resourceBaseUrl, dom.canvas, options.audioOutput ?? "speaker",
+      options.runtimeBaseUrl,
+    );
     const assetsBaseUrl = new URL(
       options.assetsBaseUrl ?? "/static/characters/",
       `${resourceBaseUrl}/`,
@@ -157,6 +161,11 @@ async function createInstance(
   ): void => {
     for (const handler of handlers.get(type) ?? []) handler(event);
   };
+  runtime.onError((error) => emit("error", {
+    code: "AUDIO_PLAYBACK_FAILED",
+    message: error instanceof Error ? error.message : String(error),
+    type: "error",
+  }));
   const audio = new AvatarAudio(
     runtime,
     (speaking) => {
@@ -165,7 +174,11 @@ async function createInstance(
         type: "speaking",
       });
     },
-    options.audioOutput ?? "speaker",
+    (error) => emit("error", {
+      code: "AUDIO_PLAYBACK_FAILED",
+      message: error instanceof Error ? error.message : String(error),
+      type: "error",
+    }),
   );
 
   const runAudio = async (operation: () => Promise<void>): Promise<void> => {

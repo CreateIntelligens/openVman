@@ -2,6 +2,8 @@
 
 openVman Avatar SDK 會直接在宿主網站的 DOM 建立透明虛擬人，不使用 iframe，也不依賴 Vue、React 或宿主網站的 bundler。公開 global 為 `window.OpenVmanAvatar`。
 
+正式 SDK 與 Vue 前台共用 `frontend/shared/avatar-engine/` 的渲染及串流引擎，角色只讀取 `render_data.json.gz` 與既有 `01.webm`；角色缺失或新引擎失敗會明確報錯，沒有舊 WASM 備援。嵌入 widget 使用 SDK 時同步套用；後台內建 Live2D Haru 為獨立引擎，不在此次替換範圍。音訊解碼、PCM 串流與嘴型共用引擎唯一的 AudioContext，SDK 不會另排一份聲音。
+
 SDK 有兩種使用方式。預設是**播放模式**：只做角色渲染、音訊播放與嘴形同步，外部網站自行產生音訊後交給 SDK，初始化不需要任何金鑰。另一種是**對話模式**：初始化時提供 embed key（或在同源頁面沿用既有 session），即可用 `ask()` 讓 openVman 完成「回答 + 語音 + 嘴形」一整輪。未提供對話選項時，SDK 完全不會發出 chat 或 TTS 請求。
 
 ## 串接前準備
@@ -62,14 +64,15 @@ const avatar = await OpenVmanAvatar.init({
 | `height` | 否 | `min(72dvh, 42rem)` | CSS height 值。 |
 | `zIndex` | 否 | `2147483000` | 覆寫 root 的 stacking order。 |
 | `container` | 否 | `document.body` | 指定時改為填滿該容器，不使用 viewport 懸浮位置。 |
-| `assetsBaseUrl` | 否 | SDK origin 的 `/static/characters` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
+| `assetsBaseUrl` | 否 | SDK origin 的 `/static/characters` | 自訂角色資料根路徑，可用相對或絕對 URL；新引擎需v2角色資料。 |
+| `runtimeBaseUrl` | 否 | SDK origin 的 `/static/sdk/engine/` | 自訂ORT／模型資源根路徑，用於隔離部署；不改對話API的origin或授權。跨站仍須CORS與Blob Worker CSP。 |
 | `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。 |
 | `embedKey` | 否 | 無 | 對話模式用的 embed key。設定後 `ask()` 會帶 `X-Embed-Key` 且不送 cookie；未設定則以同源 session cookie 呼叫。 |
 | `projectId` | 否 | 後端預設 | `ask()` 使用的專案 ID。使用 embed key 時必須與該金鑰綁定的專案一致，否則回 403。 |
 | `personaId` | 否 | 後端預設 | `ask()` 使用的人格 ID。 |
 | `tts` | 否 | 後端預設 | `{ provider, voice, language }`，指定 `ask()` 合成語音的 TTS 供應商與音色；`language` 是回答要唸的語言（`zh`、`en`、`nan`…），`nan` 且專案開了台語分流時改用台語引擎。 |
 
-同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`embedKey`、`projectId`、`personaId` 與 `tts` 一併計入設定比對，因此只改對話選項再次 `init()` 同樣會被拒絕。`destroy()` 後必須重新載入頁面才能再次初始化。
+同一頁只允許一個人物引擎 instance。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`embedKey`、`projectId`、`personaId` 與 `tts` 一併計入設定比對，因此只改對話選項再次 `init()` 同樣會被拒絕。`destroy()` 後必須重新載入頁面才能再次初始化。
 
 ## 對話模式
 
@@ -180,7 +183,7 @@ await avatar.playAudio(await response.arrayBuffer());
 
 ### `await avatar.pushPcm(chunk)`
 
-接受 `Int16Array` PCM chunk。SDK 會按照呼叫順序排入 Web Audio 時間軸，適合外部 TTS 的串流結果。
+接受 `Int16Array` PCM chunk。SDK 會按照呼叫順序交給共用引擎排入唯一的 Web Audio 時間軸，並等待引擎接受資料及背壓解除，適合外部 TTS 的串流結果。此方法不等待整段播放完；連續 160 ms 沒有新 chunk 時，自動結束該批輸入並排空尾端，恢復中立嘴型。
 
 ```js
 for await (const chunk of pcmStream) {
@@ -202,7 +205,7 @@ for await (const chunk of pcmStream) {
 
 ### `avatar.destroy()`
 
-停止音訊並移除 SDK 建立的 root、style 與可見資源。vendor WASM 沒有 terminate API，因此 destroy 後必須重新載入頁面才能建立新 runtime。
+停止音訊、終止共用引擎 worker、關閉唯一的 AudioContext，並移除 SDK 建立的 root、style 與可見資源。SDK 保留同頁單一 instance 契約，destroy 後必須重新載入頁面才能再次 init。
 
 ## 事件
 
@@ -219,10 +222,10 @@ for await (const chunk of pcmStream) {
 宿主網站若有 Content-Security-Policy，至少需允許 openVman origin：
 
 ```http
-Content-Security-Policy: script-src 'self' https://YOUR_OPENVMAN_HOST; connect-src 'self' https://YOUR_OPENVMAN_HOST; media-src 'self' https://YOUR_OPENVMAN_HOST; style-src 'self' 'unsafe-inline'
+Content-Security-Policy: script-src 'self' 'wasm-unsafe-eval' https://YOUR_OPENVMAN_HOST; worker-src 'self' blob:; connect-src 'self' https://YOUR_OPENVMAN_HOST; media-src 'self' https://YOUR_OPENVMAN_HOST; style-src 'self' 'unsafe-inline'
 ```
 
-SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'unsafe-inline'`。
+SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'unsafe-inline'`。共用引擎以 Blob worker 載入同源發布的推論程式；需允許 `worker-src blob:` 與官方 ONNX Runtime Web 使用的 `script-src 'wasm-unsafe-eval'`，不需載入舊 Avatar WASM。
 
 ## 公開資源
 
@@ -240,10 +243,9 @@ location /static/characters/ {
 | 路徑 | 用途 |
 |---|---|
 | `/static/sdk/openvman-avatar-sdk.js` | IIFE SDK。 |
-| `/static/sdk/runtime/OpenVmanAvatarRuntime.js` | 內部 runtime 公開別名。 |
-| `/static/sdk/runtime/OpenVmanAvatarRuntime.wasm` | 內部 WASM 公開別名。 |
+| `/static/sdk/engine/` | 共用引擎 worker 與加密的嘴型模型 `mouth-model.wasm`。嘴型資產由引擎程式產生，沒有 rig 靜態檔；舊 SDK runtime JS／WASM 路徑已移除。 |
 | `/api/v1/characters` | 可用角色清單（唯讀）。不帶憑證只列全域公開的人物；帶 `X-Embed-Key` 時另外列出金鑰綁定專案的專屬與指派人物（限金鑰允許的人物）。 |
-| `/static/characters/<characterId>/combined_data.json.gz` | 角色驅動資料。專案專屬人物要帶 `X-Embed-Key`。 |
+| `/static/characters/<characterId>/render_data.json.gz` | 新格式角色驅動資料（`openvman.render.v2`，與原影片並存；舊角色需從影片重新產製）。專案專屬人物要帶 `X-Embed-Key`。 |
 | `/static/characters/<characterId>/01.webm` | 透明角色影片。專案專屬人物要帶 `X-Embed-Key`。 |
 | `/api/v1/chat` | 對話模式的回答端點（需 embed key 或 session）。 |
 | `/api/v1/chat/stream` | 同一個回答以 SSE 逐句送出（需 embed key 或 session；SDK 的 `ask()` 不使用，事件格式見[串接快速開始](../integration-quickstart.md)）。 |
@@ -271,7 +273,7 @@ location /static/characters/ {
 
 ### SDK 或 runtime 404
 
-確認 script 使用完整 openVman URL，並確認 `admin` service 已建置最新 SDK 且正常運行。
+確認 script 使用完整 openVman URL，並確認 `admin` service 已建置最新 SDK 且正常運行。Admin Docker 的 `avatar-sdk-builder` 會一併複製完整 `frontend/shared/avatar-engine/`（含 `.d.mts` 型別與內部模組），並執行 SDK 建置與契約測試；只在 host 建置 SDK 不會更新映像中的交付包。
 
 ### 有角色但沒有聲音
 

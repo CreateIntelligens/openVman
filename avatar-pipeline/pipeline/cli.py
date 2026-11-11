@@ -11,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-from .bundle import LOOP_MODES, build_bundle, load_bundle_key
+from .bundle import LOOP_MODES, build_bundle
 from .frames import DEFAULT_MAX_SIDE, LOOP_SEAM_THRESHOLD, VideoProcessingError
 
 
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--key", default=None,
-        help="16-char bundle key; defaults to AVATAR_BUNDLE_KEY from the environment",
+        help="deprecated v1 compatibility option; v2 geometry is not encrypted",
     )
     parser.add_argument(
         "--quiet", action="store_true", help="suppress per-frame progress lines",
@@ -45,11 +45,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        key = load_bundle_key(args.key)
         result = build_bundle(
             args.input,
             args.output,
-            key=key,
             max_side=args.max_side,
             loop_mode=args.loop,
             seam_threshold=args.seam_threshold,

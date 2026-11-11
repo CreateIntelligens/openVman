@@ -38,8 +38,8 @@ const STAGE_LABELS: Record<string, string> = {
   loop: "檢查首尾銜接",
   landmarks: "擷取臉部特徵",
   transcode: "轉成 VP9",
-  geometry: "計算姿態",
-  package: "打包加密",
+  geometry: "計算嘴型",
+  package: "封裝素材",
   done: "完成",
   failed: "失敗",
 };

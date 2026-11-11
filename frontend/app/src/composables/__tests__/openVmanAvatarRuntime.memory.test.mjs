@@ -1,133 +1,75 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import test from "node:test";
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { gzipSync } from 'node:zlib'
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const runtimeSource = readFileSync(
-  resolve(__dirname, "../useOpenVmanAvatarRuntime.ts"),
-  "utf-8",
-);
+import { decodeRenderPayload } from '../../../../shared/avatar-engine/index.mjs'
+import { deferred, runtimeHarness } from './avatarRuntimeHarness.mjs'
 
-/**
- * 取出某個函式的內容（從 `function <name>` 到下一個同縮排的 `  }`）。
- * 這些測試檢查的是 WASM 記憶體的配置/釋放配對，靜態檢查就足夠，
- * 也避開了在 node --test 裡跑 TypeScript 的麻煩。
- */
-function functionBody(source, name) {
-  const start = source.indexOf(`function ${name}(`);
-  assert.notEqual(start, -1, `找不到函式 ${name}`);
-  const end = source.indexOf("\n  }", start);
-  assert.notEqual(end, -1, `找不到函式 ${name} 的結尾`);
-  return source.slice(start, end);
-}
+test('shared engines survive one consumer unmount and release on the last', async t => {
+  const h = await runtimeHarness(t)
+  const first = h.use(), second = h.use()
+  const engine = await first.initWasm()
+  await second.initWasm()
+  h.unmount()
+  assert.equal(engine.disposals, 0)
+  h.unmount()
+  assert.equal(engine.disposals, 1)
+  assert.equal(engine.stops, 1)
+  assert.equal(engine.video.removed, true)
+})
 
-test("every _malloc is paired with a _free in a finally block", () => {
-  // 漏掉 _free 會讓 WASM heap 一路長大；loadCharacter 的症狀是例外指標
-  // 每次重試都往上跳，pushAudio 則是講話時持續洩漏。
-  const mallocCount = (runtimeSource.match(/_malloc\(/g) ?? []).length;
-  const freeCount = (runtimeSource.match(/_free\(/g) ?? []).length;
-  assert.equal(
-    mallocCount,
-    freeCount,
-    `_malloc (${mallocCount}) 與 _free (${freeCount}) 數量必須相同`,
-  );
+test('last consumer removal aborts pending character work and prevents late state writes', async t => {
+  const loaded = deferred()
+  const h = await runtimeHarness(t, { load: () => loaded.promise })
+  const avatar = h.use(), engine = await avatar.initWasm()
+  const pending = avatar.loadCharacter('slow')
+  h.unmount()
+  assert.equal(engine.loads[0].signal.aborted, true)
+  loaded.resolve()
+  await pending
+  assert.deepEqual(engine.commits, [])
+  assert.equal(avatar.currentCharId.value, null)
+  assert.equal(avatar.isLoading.value, false)
+})
 
-  for (const name of ["loadCharacter", "pushAudio"]) {
-    const body = functionBody(runtimeSource, name);
-    if (!body.includes("_malloc(")) continue;
-    assert.match(
-      body,
-      /finally\s*\{[^}]*_free\(/,
-      `${name} 的 _free 必須放在 finally，否則例外會跳過它`,
-    );
-  }
-});
+test('PCM backpressure and natural drain are returned to their callers', async t => {
+  const accepted = deferred(), drained = deferred()
+  const h = await runtimeHarness(t, { append: () => accepted.promise, finish: () => drained.promise })
+  const avatar = h.use(), engine = await avatar.initWasm()
+  let appended = false, finished = false
+  const push = avatar.pushAudio(new Int16Array([1, -2])).then(() => { appended = true })
+  await new Promise(setImmediate)
+  assert.equal(appended, false)
+  assert.deepEqual(engine.pcm, [[1, -2]])
+  accepted.resolve()
+  await push
+  const finish = avatar.finishAudio().then(() => { finished = true })
+  await new Promise(setImmediate)
+  assert.equal(finished, false)
+  drained.resolve()
+  await finish
+  assert.equal(finished, true)
+  avatar.clearAudio()
+  assert.equal(engine.stops, 1)
+})
 
-test("pushAudio reads HEAPU8 only after allocating", () => {
-  // heap 成長時 Emscripten 會換掉 HEAPU8，舊的 view 會被 detach。
-  // 先讀 view 再 _malloc 就可能寫進一塊已經失效的記憶體。
-  const body = functionBody(runtimeSource, "pushAudio");
-  const mallocAt = body.indexOf("_malloc(");
-  const heapAt = body.indexOf("HEAPU8");
-  assert.ok(mallocAt !== -1 && heapAt !== -1);
-  assert.ok(
-    mallocAt < heapAt,
-    "HEAPU8 必須在 _malloc 之後才讀取",
-  );
-});
+test('playback state subscriptions can be removed without disturbing other consumers', async t => {
+  const h = await runtimeHarness(t)
+  const avatar = h.use(), engine = await avatar.initWasm()
+  const first = [], second = []
+  const unsubscribe = avatar.subscribePlayback(state => first.push(state))
+  avatar.subscribePlayback(state => second.push(state))
+  engine.emit('playing')
+  unsubscribe()
+  engine.emit('ready')
+  assert.deepEqual(first, ['playing'])
+  assert.deepEqual(second, ['playing', 'ready'])
+})
 
-test("pushAudio bails out when the allocation fails", () => {
-  const body = functionBody(runtimeSource, "pushAudio");
-  assert.match(
-    body,
-    /if \(!pointer\)/,
-    "_malloc 回傳 0 代表配置失敗，必須提早返回而不是寫進位址 0",
-  );
-});
-
-test("the canvas patch is restored when the last consumer unmounts", () => {
-  // installIdleLipSyncBypass 換掉了 canvas 的 clearRect / drawImage。
-  // 不還原的話，patch 和它的 closure 會跟著 canvas 一直活著。
-  assert.match(runtimeSource, /activeConsumers \+= 1/);
-  assert.match(runtimeSource, /idleLipSyncBypass\?\.restore\(\)/);
-  assert.match(
-    runtimeSource,
-    /activeConsumers === 0/,
-    "必須用引用計數，單例被多個元件共用時才不會提早拆掉",
-  );
-});
-
-test("unmounting still clears queued audio", () => {
-  assert.match(runtimeSource, /onUnmounted\(\(\) => \{[\s\S]*clearAudio\(\)/);
-});
-
-test("an SPA-shell response is rejected before it reaches the WASM parser", () => {
-  // 角色素材沒部署時，dev server / SPA fallback 會用 200 回 index.html。
-  // response.ok 擋不住，HTML 一路餵到 _processSecret 才炸成看不懂的指標。
-  const source = runtimeSource;
-  assert.match(
-    source,
-    /function assertCharacterPayload/,
-    "必須在餵給 WASM 之前先驗證 payload",
-  );
-  assert.match(
-    source,
-    /assertCharacterPayload\(payload, dataUrl\)[\s\S]{0,80}decodeCharacterPayload/,
-    "驗證必須發生在解碼與 _processSecret 之前",
-  );
-  assert.match(source, /回傳的是 HTML 而不是資料檔/);
-});
-
-test("character assets are fetched from the path the Backend actually serves", () => {
-  // Backend 在 /static/characters/ 下提供角色素材；舊的預設 '/assets' 沒有
-  // 對應路由，會落到 SPA fallback 拿回 index.html，最後炸在 WASM 裡。
-  assert.match(
-    runtimeSource,
-    /const CHARACTER_ASSETS_BASE = '\/static\/characters'/,
-  );
-  assert.doesNotMatch(
-    runtimeSource,
-    /assetsBase = '\/assets'/,
-    "不可再退回沒有路由的 /assets",
-  );
-});
-
-test("a remounted stage reloads instead of reusing a runtime bound to the old canvas", () => {
-  // vendor 只在 script 載入時抓一次 #canvas_video；App 重掛後新 canvas 永遠
-  // 不會被畫到（同分頁登出再登入時人物不見）。initWasm 必須先檢查再沿用單例。
-  const settle = functionBody(runtimeSource, "settleRuntimeScriptLoad");
-  assert.match(settle, /vendorCanvas = document\.getElementById\('canvas_video'\)/);
-  assert.match(
-    functionBody(runtimeSource, "vendorCanvasDetached"),
-    /!vendorCanvas\.isConnected/,
-  );
-  const init = functionBody(runtimeSource, "initWasm");
-  const reloadAt = init.indexOf("window.location.reload()");
-  assert.ok(init.indexOf("vendorCanvasDetached()") >= 0 && reloadAt >= 0);
-  assert.ok(
-    reloadAt < init.indexOf("return runtimeInstance"),
-    "必須在沿用既有 runtimeInstance 之前檢查",
-  );
-});
+test('the real render-data decoder accepts gzip and rejects HTML or invalid layouts', async () => {
+  const ring = (width, height) => Array.from({length: 20}, (_, i) => [90-width*Math.cos(i*Math.PI/10), 90-height*Math.sin(i*Math.PI/10)]).flat()
+  const data = { schema: 'openvman.render.v2', geometrySource: 'mediapipe-video', frameRate: 25, frameSize: [64, 40], frames: [{region: [0, 0, 30, 30], outer: ring(30, 8), inner: ring(25, 1)}] }
+  assert.deepEqual(await decodeRenderPayload(gzipSync(JSON.stringify(data))), data)
+  await assert.rejects(decodeRenderPayload(new TextEncoder().encode('<html>SPA fallback</html>')))
+  await assert.rejects(decodeRenderPayload(new TextEncoder().encode(JSON.stringify({ ...data, frames: [[1]] }))), /人物渲染資料不符/)
+})

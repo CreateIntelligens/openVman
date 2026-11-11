@@ -57,14 +57,13 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     }
   }
   const audio = useAudioPlayer({
-    onPcmChunk: (pcm) => wasm.pushAudio(pcm),
+    engine: wasm,
     onPlaybackStart: () => {
       wasm.beginSpeaking();
       turnTiming.playbackStarted();
     },
     onPlaybackReset: wasm.resetSpeaking,
     onPlaybackEnd: () => {
-      wasm.clearAudio();
       wasm.endSpeaking();
     },
     onQueueEmpty: onAudioQueueEmpty,
@@ -118,11 +117,11 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       // 聲音又來了：句與句之間的短暫斷音不算卡住，取消欠載看門狗。
       clearUnderrunTimer();
       const copy = new Int16Array(pcm);
-      void motionAudio.play(copy.buffer);
+      return motionAudio.play(copy.buffer);
     },
     // TTS 下載完不代表播完：這時把字幕倒完，長回覆會在講到一半時整段跳出來。
     // 打字機（約 22 字／秒）本來就比語音快，讓它自己跑完；出錯、停止播放才一次顯示。
-    onEnd: () => {},
+    onEnd: () => { void audio.finish().catch(error => console.error("[Avatar] EOS failed:", error)); },
     onError: (err) => {
       ttsPending.value = false;
       console.error("[TTS] stream error:", err);

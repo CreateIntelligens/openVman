@@ -12,14 +12,9 @@
       :class="backgroundClass"
       :style="backgroundStyle"
     />
-    <!-- Main rendering canvas required by the avatar runtime -->
+    <!-- The shared engine owns offscreen WebGL and composites onto this display canvas. -->
     <canvas id="canvas_video" class="avatar-display" :width="width" :height="height" />
     <canvas id="avatar-motion-held" class="avatar-motion-held" aria-hidden="true" />
-    <!-- WebGL canvas required by WASM engine -->
-    <canvas id="canvas_gl" class="avatar-gl-hidden" width="180" height="180" />
-    <!-- Screen div required by WASM engine -->
-    <div id="screen" class="avatar-screen-hidden" />
-
     <!-- Overlay states -->
     <div v-if="showLoading" class="avatar-overlay loading">
       <div class="spinner" />
@@ -164,16 +159,7 @@ defineEmits<{}>()
   object-fit: contain;
 }
 
-.avatar-gl-hidden {
-  position: absolute;
-  top: 6.25rem;
-  left: 6.25rem;
-  width: 11.25rem;
-  height: 11.25rem;
-  opacity: 0.001;
-  z-index: 1;
-  pointer-events: none;
-}
+
 
 .avatar-motion-held {
   position: absolute;
@@ -186,14 +172,7 @@ defineEmits<{}>()
   opacity: 0;
 }
 
-.avatar-screen-hidden {
-  position: absolute;
-  bottom: -62.5rem;
-  right: -62.5rem;
-  width: 0.0625rem;
-  height: 0.0625rem;
-  overflow: hidden;
-}
+
 
 .avatar-overlay {
   position: absolute;

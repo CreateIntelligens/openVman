@@ -17,6 +17,7 @@ export interface OpenVmanAvatarTtsOptions {
 
 export interface OpenVmanAvatarOptions {
   assetsBaseUrl?: string;
+  runtimeBaseUrl?: string;
   // 宿主自行播放音訊時，可用 silent 只驅動嘴型。
   audioOutput?: OpenVmanAvatarAudioOutput;
   characterId?: string;

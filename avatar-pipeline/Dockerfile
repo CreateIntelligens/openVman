@@ -19,8 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 
 WORKDIR /app
-COPY pipeline ./pipeline
-COPY assets ./assets
+# The v2 producer works from the user's video. Historical conversion helpers,
+# extracted templates and compatibility profiles are not production inputs.
+COPY pipeline/__init__.py pipeline/bundle.py pipeline/cli.py \
+     pipeline/frames.py pipeline/video_lips.py pipeline/status.py \
+     pipeline/worker.py ./pipeline/
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

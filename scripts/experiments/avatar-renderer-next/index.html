@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>人物渲染器替換驗證</title>
+  <link rel="icon" href="data:," />
+  <style>
+    /* Hallmark · component scope: experimental player · pre-emit critique: P4 H4 E4 S5 R5 V3 */
+    :root {
+      --paper: #f5f4ef;
+      --ink: #242c29;
+      --line: #c8ccc5;
+      --accent: #155e49;
+      --font: system-ui, sans-serif;
+    }
+    html,
+    body {
+      margin: 0;
+      overflow-x: clip;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font);
+    }
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.25rem;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+    canvas {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: 72dvh;
+      object-fit: contain;
+      border: 1px solid var(--line);
+    }
+    nav {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      padding: 0.6rem 0.9rem;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--ink);
+      font: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:first-child {
+      background: var(--accent);
+      color: var(--paper);
+    }
+    output {
+      font-size: 0.875rem;
+    }
+  </style>
+  <main>
+    <h1>人物渲染器替換驗證</h1>
+    <canvas id="stage" width="720" height="1280" aria-label="人物預覽"></canvas>
+    <nav aria-label="播放控制">
+      <button id="speak" disabled>播放測試語音</button
+      ><button id="stop" disabled>停止</button>
+      <button id="neutral" disabled>定格閉嘴</button
+      ><button id="open" disabled>定格張嘴</button>
+    </nav>
+    <output id="status" role="status">載入中</output>
+  </main>
+  <script type="module" src="./main.mjs"></script>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>共用人物引擎整合預覽</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--paper:#f5f4ef;--ink:#242c29;--line:#c8ccc5;--accent:#155e49;--font:system-ui,sans-serif}
+html,body{margin:0;overflow-x:clip;background:var(--paper);color:var(--ink);font-family:var(--font)}
+main{display:flex;flex-direction:column;align-items:center;gap:1rem;padding:1rem}
+h1{font-size:1.25rem;margin:0;overflow-wrap:anywhere}
+canvas{height:72dvh;max-width:100%;object-fit:contain;border:1px solid var(--line)}
+nav{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+button{font:inherit;white-space:nowrap;border:1px solid var(--line);padding:.6rem .9rem;background:var(--paper);color:var(--ink);cursor:pointer}
+button:first-child{background:var(--accent);color:var(--paper)}
+output{font-size:.875rem}
+</style>
+<main><h1>共用人物引擎整合預覽</h1><canvas id="stage" aria-label="人物預覽"></canvas>
+<nav aria-label="播放控制"><button id="play" disabled>播放測試語音</button><button id="stop" disabled>停止</button><button id="switch" disabled>切換人物</button></nav>
+<output id="status" role="status">載入中</output></main>
+<script type="module">
+import { AvatarEngine } from '/avatar-engine/core/index.mjs';
+const status=document.querySelector('#status');
+const fail=error=>{status.textContent=`失敗：${error.message}`;console.error(error)};
+try {
+  window.engine=await AvatarEngine.create({canvas:document.querySelector('canvas'),runtimeBaseUrl:'/avatar-engine/'});
+  const roles=['/static/characters/dev-123','./sample'];let role=0,revision=0;
+  await engine.loadCharacter(roles[role]);
+  const bytes=await(await fetch('./speech.wav')).arrayBuffer();
+  engine.subscribe(state=>{status.textContent=state});
+  document.querySelector('#play').onclick=()=>{
+    const generation=++revision;engine.stop();
+    (async()=>{
+      await engine.prepare();
+      const audio=await engine.audioContext.decodeAudioData(bytes.slice(0));
+      if(generation!==revision)return;
+      await engine.appendPcm(Int16Array.from(audio.getChannelData(0),x=>Math.round(x*32767)));
+      if(generation===revision)await engine.finishAudio();
+    })().catch(fail);
+  };
+  document.querySelector('#stop').onclick=()=>{revision++;engine.stop()};
+  document.querySelector('#switch').onclick=()=>{
+    revision++;role=(role+1)%roles.length;
+    engine.loadCharacter(roles[role]).then(()=>{status.textContent='人物已切換'}).catch(fail);
+  };
+  document.querySelectorAll('button').forEach(button=>{button.disabled=false});
+  status.textContent='可播放';window.engineReady=true;
+  window.addEventListener('pagehide',()=>engine.dispose(),{once:true});
+} catch(error){fail(error)}
+</script>
+</html>

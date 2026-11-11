@@ -2,7 +2,13 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "vite";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  resolve: {
+    alias: mode === "test" ? [{
+      find: /.*shared\/avatar-engine\/index\.mjs$/,
+      replacement: resolve(__dirname, "tests/fake-engine.ts"),
+    }] : [],
+  },
   build: {
     lib: {
       entry: resolve(__dirname, "src/main.ts"),
@@ -10,7 +16,7 @@ export default defineConfig({
       name: "OpenVmanAvatarBundle",
       fileName: () => "openvman-avatar-sdk.js",
     },
-    outDir: "dist",
+    outDir: mode === "test" ? "dist/test" : "dist",
     emptyOutDir: true,
   },
-});
+}));

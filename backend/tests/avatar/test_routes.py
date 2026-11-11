@@ -1,3 +1,4 @@
+import gzip
 import io
 
 import pytest
@@ -37,7 +38,7 @@ def client(tmp_path, monkeypatch):
     return TestClient(app)
 
 
-def _upload(client, char_id="008", label="角色八", video=b"\x1a\x45\xdf\xa3v", data=b"\x1f\x8bd"):
+def _upload(client, char_id="008", label="角色八", video=b"\x1a\x45\xdf\xa3v", data=gzip.compress(b"{}", mtime=0)):
     return client.post(
         "/api/v1/avatar",
         data={"char_id": char_id, "label": label},

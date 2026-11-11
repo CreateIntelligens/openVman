@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:clip;background:transparent}
+#canvas_video{width:100%;height:100%;object-fit:contain;display:block}
+/* Keep the native SDK's compositor participation: a fully offscreen canvas can
+   retain the previous depth buffer and suppress all subsequent mouth draws. */
+#canvas_gl{position:absolute;left:6.25rem;top:6.25rem;width:11.25rem;height:11.25rem;opacity:.001;pointer-events:none}
+#screen{position:absolute;left:-20rem;width:.0625rem;height:.0625rem;overflow:hidden}
+</style>
+<canvas id="canvas_video" width="720" height="1280"></canvas>
+<canvas id="canvas_gl" width="180" height="180"></canvas><div id="screen"></div>
+<script src="./OpenVmanAvatarRuntime.js"></script>
+<script type="module" src="./reference.js"></script>
+</html>

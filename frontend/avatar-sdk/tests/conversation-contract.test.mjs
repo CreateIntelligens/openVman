@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
-const bundleUrl = new URL("../dist/openvman-avatar-sdk.js", import.meta.url);
+const bundleUrl = new URL("../dist/test/openvman-avatar-sdk.js", import.meta.url);
 
 /**
  * Mirrors the public-contract harness, adding chat/speech stubs so the
@@ -47,45 +47,7 @@ async function loadSdk({
         for (const child of children) {
           child.parent = this;
           this.children.push(child);
-          if (child.tagName === "script") {
-            const videoListeners = new Map();
-            context.window.characterVideo = {
-              addEventListener(type, handler) {
-                const handlers = videoListeners.get(type) ?? new Set();
-                handlers.add(handler);
-                videoListeners.set(type, handlers);
-              },
-              error: null,
-              load() {
-                queueMicrotask(() => {
-                  this.readyState = 3;
-                  for (const handler of videoListeners.get("canplay") ?? []) {
-                    handler();
-                  }
-                });
-              },
-              play: async () => {},
-              readyState: 0,
-              remove() {},
-              removeEventListener(type, handler) {
-                videoListeners.get(type)?.delete(handler);
-              },
-            };
-            context.window.createQtAppInstance = async () => ({
-              HEAPU8: new Uint8Array(16384),
-              _clearAudio() {
-                runtimeCalls.clearAudio += 1;
-              },
-              _free() {},
-              _malloc: () => 0,
-              _processSecret() {},
-              _setAudioBuffer() {
-                runtimeCalls.pushedAudio += 1;
-              },
-              stringToUTF8() {},
-            });
-            queueMicrotask(() => child.onload());
-          }
+
         }
       },
       remove() {
@@ -99,6 +61,12 @@ async function loadSdk({
       },
       tagName,
     };
+    if (tagName === "video") {
+      const listeners = new Map();
+      element.addEventListener = (type, handler) => listeners.set(type, handler);
+      element.load = () => queueMicrotask(() => listeners.get("canplay")?.());
+      element.play = async () => {};
+    }
     if (tagName === "canvas") {
       element.getContext = () => ({
         globalAlpha: 1,
@@ -218,6 +186,7 @@ async function loadSdk({
   if (withCryptoUuid) {
     context.crypto = { randomUUID: () => globalThis.crypto.randomUUID() };
   }
+  context.window.engineStopped = () => { runtimeCalls.clearAudio += 1; };
   context.window.AudioContext = class {
     constructor() {
       this.currentTime = 0;
@@ -226,6 +195,7 @@ async function loadSdk({
     }
     async close() {}
     createBuffer(_channels, length, sampleRate) {
+      runtimeCalls.pushedAudio += 1;
       return {
         copyToChannel() {},
         getChannelData: () => new Float32Array(length),

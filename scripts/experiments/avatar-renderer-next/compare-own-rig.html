@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>人物資產新舊對照</title>
+<link rel="icon" href="data:,">
+<style>
+/* Existing preview typography and colours; comparison, not a product redesign. */
+:root{--paper:#f5f4ef;--ink:#242c29;--line:#c8ccc5;--accent:#155e49}
+html,body{margin:0;overflow-x:clip;background:var(--paper);color:var(--ink);font-family:system-ui,sans-serif}
+main{padding:1rem;display:grid;gap:1rem}h1{font-size:1.4rem;margin:0;overflow-wrap:anywhere}
+p{margin:0;line-height:1.6}nav{display:flex;gap:.5rem;flex-wrap:wrap}
+button{font:inherit;white-space:nowrap;padding:.6rem 1rem;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+button:first-child{background:var(--accent);color:var(--paper)}
+.stages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+figure{margin:0;min-width:0}figcaption{margin-bottom:.5rem;font-weight:600}
+.view{height:64dvh;overflow:hidden;border:1px solid var(--line);box-sizing:border-box}
+canvas,iframe{display:block;width:100%;height:100%;object-fit:contain;border:0}
+button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+@media(max-width:40rem){.stages{grid-template-columns:minmax(0,1fr)}.view{height:55dvh}}
+</style>
+<main>
+<h1>同一人物、同一聲音，新舊嘴型對照</h1>
+<p>左邊是原版引擎，右邊是新版。按播放後，兩邊會跟同一句語音對嘴，聲音只播一次。</p>
+<nav aria-label="對照控制">
+<button id="play" disabled>播放 5 秒語音</button><button id="play-long" disabled>播放 30 秒語音</button><button id="stop" disabled>停止</button>
+<button id="neutral" disabled>回到待機動作</button><button id="close-up" disabled aria-pressed="false">放大看臉</button>
+</nav>
+<output id="status" role="status">載入中</output>
+<div class="stages"><figure><figcaption>原版引擎</figcaption><div class="view"><iframe id="native" title="原版引擎語音對嘴" src="/experiments/avatar-native-reference/"></iframe></div></figure>
+<figure><figcaption>自產資產版 v2</figcaption><div class="view"><canvas id="after"></canvas></div></figure></div>
+<p><a href="./">只看新版</a></p>
+</main>
+<script type="module">
+import { AvatarEngine } from './runtime/core/index.mjs';
+const status=document.querySelector('#status');
+const fail=error=>{status.textContent=`失敗：${error.message}`;console.error(error)};
+try{
+ const iframe=document.querySelector('#native');
+ const nativeLoaded=new Promise((resolve,reject)=>{
+  const loaded=()=>{const pending=iframe.contentWindow.nativeReady;
+   if(!pending){reject(new Error('原版引擎未能初始化'));return;}
+   pending.then(resolve,reject);
+  };
+  if(iframe.contentWindow.nativeReady)loaded();else iframe.addEventListener('load',loaded,{once:true});
+ });
+ const newer=await AvatarEngine.create({canvas:document.querySelector('#after'),runtimeBaseUrl:'./runtime/'});
+ await newer.loadCharacter('./sample');
+ const native=await nativeLoaded;
+ native.attachVideo(newer.video);
+ window.comparison={native,newer};
+ let revision=0,nativeTimer=null,pcmForNative=null,nativeStarted=false;
+ const stop=()=>{revision++;clearTimeout(nativeTimer);pcmForNative=null;nativeStarted=false;
+  newer.stop();native.stop();status.textContent='已停止';
+ };
+ newer.controller.onFirstAudio=({playbackStartTime})=>{
+  if(nativeStarted||!pcmForNative)return;
+  nativeStarted=true;const generation=revision,pcm=pcmForNative;
+  const delay=Math.max(0,(playbackStartTime-newer.audioContext.currentTime)*1000-8);
+  nativeTimer=setTimeout(()=>{if(generation===revision)native.beginPcm(pcm)},delay);
+ };
+ const play=url=>{
+  stop();const generation=revision;
+  (async()=>{
+   await newer.prepare();
+   const response=await fetch(url);
+   if(!response.ok)throw new Error(`找不到語音檔（${response.status}）`);
+   const bytes=await response.arrayBuffer();
+   const audio=await newer.audioContext.decodeAudioData(bytes);
+   if(generation!==revision)return;
+   pcmForNative=Int16Array.from(audio.getChannelData(0),x=>Math.round(x*32767));
+   newer.video.pause();newer.video.currentTime=0;
+   await newer.video.play();newer.player.start();
+   if(generation!==revision)return;
+   status.textContent='播放中：原版與新版各自對嘴，聲音播放一次';
+   await newer.appendPcm(pcmForNative);await newer.finishAudio();
+   if(generation===revision){native.stop();status.textContent='播放完成'}
+  })().catch(fail);
+ };
+ document.querySelector('#play').onclick=()=>play('./speech.wav');
+ document.querySelector('#play-long').onclick=()=>play('./speech-30s.wav');
+ document.querySelector('#stop').onclick=stop;
+ // Both columns letterbox the same 720x1280 video, so one transform frames both.
+ // Inside the reference page only its video canvas may move: scaling the whole iframe
+ // pushes its hidden WebGL canvas out of view, and its mouth then stops updating.
+ const closeUp=document.querySelector('#close-up');
+ const framed=[document.querySelector('#after'),iframe.contentDocument.querySelector('#canvas_video')];
+ framed.forEach(element=>{element.style.transformOrigin='0 0'});
+ const frameFace=()=>{
+  const on=closeUp.getAttribute('aria-pressed')==='true';
+  const box=document.querySelector('.view').getBoundingClientRect();
+  const {canvas,player}=newer,[left,top,right,bottom]=player.binding.region(player.videoFrame);
+  const fit=Math.min(box.width/canvas.width,box.height/canvas.height);
+  const zoom=box.height/((bottom-top)*2.4*fit);
+  const x=(box.width-canvas.width*fit)/2+(left+right)/2*fit,y=(box.height-canvas.height*fit)/2+(top+bottom)/2*fit;
+  const view=on?`translate(${box.width/2-x*zoom}px,${box.height*.6-y*zoom}px) scale(${zoom})`:'';
+  framed.forEach(element=>{element.style.transform=view});
+ };
+ closeUp.onclick=()=>{
+  closeUp.setAttribute('aria-pressed',String(closeUp.getAttribute('aria-pressed')!=='true'));
+  frameFace();
+ };
+ window.addEventListener('resize',frameFace);
+ document.querySelector('#neutral').onclick=()=>{
+  stop();newer.video.play().then(()=>{newer.player.start();status.textContent='待機動作播放中'}).catch(fail);
+ };
+ document.querySelectorAll('button').forEach(b=>b.disabled=false);
+ status.textContent='可播放';window.comparisonReady=true;
+ window.addEventListener('pagehide',()=>{clearTimeout(nativeTimer);native.stop();newer.dispose()},{once:true});
+}catch(error){fail(error)}
+</script>
+</html>

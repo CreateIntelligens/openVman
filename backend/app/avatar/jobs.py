@@ -21,6 +21,7 @@ from typing import Any
 
 from app.auth.models import ResourceType, ResourceVisibility
 from app.auth.runtime import AuthRuntime
+from app.avatar.render_data import RenderDataError
 from app.avatar.store import AvatarStore, CharacterExists
 from app.config import get_tts_config
 from app.gateway.queue import get_arq_pool
@@ -213,7 +214,7 @@ def _finalize(
             video_bytes=video.read_bytes(),
             data_bytes=data.read_bytes(),
         )
-    except CharacterExists as exc:
+    except (CharacterExists, RenderDataError) as exc:
         record["state"] = STATE_FAILED
         record["error"] = str(exc)
         return record

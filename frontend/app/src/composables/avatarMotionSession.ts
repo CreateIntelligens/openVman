@@ -11,12 +11,13 @@ const cancelled = () => new DOMException('取消', 'AbortError')
 interface SessionOptions {
   baseUrl: string
   signal: AbortSignal
-  applyData: (payload: Uint8Array, url: string) => void
+  dataFile?: string
+  applyData: (payload: Uint8Array, url: string) => void | Promise<void>
   onChange: (state: AvatarMotionState) => void
   onUpdate: () => void
 }
 
-/** Owns decoders and canvas observation, while the existing WASM instance owns all mouth rendering. */
+/** Owns decoders and canvas observation, while the shared engine owns mouth rendering. */
 export class AvatarMotionSession {
   private readonly abort = new AbortController()
   private readonly initialVideo: HTMLVideoElement
@@ -55,7 +56,7 @@ export class AvatarMotionSession {
       const signal = this.abort.signal
       const [manifest, data, video] = await Promise.all([
         this.fetch('manifest.json').then((response) => response.json()),
-        this.fetch('combined_data.json.gz').then((response) => response.arrayBuffer()),
+        this.fetch(this.options.dataFile || 'combined_data.json.gz').then((response) => response.arrayBuffer()),
         this.fetch('01.webm').then((response) => response.blob()),
       ])
       this.assertActive()
@@ -70,7 +71,7 @@ export class AvatarMotionSession {
         || this.initialVideo.duration < 31.99 || this.initialVideo.duration > 32.2) {
         throw new Error('HCIOT 動作影片尺寸或長度不符')
       }
-      this.options.applyData(new Uint8Array(data), `${this.options.baseUrl}/combined_data.json.gz`)
+      await this.options.applyData(new Uint8Array(data), `${this.options.baseUrl}/${this.options.dataFile || 'combined_data.json.gz'}`)
       this.assertActive()
       // Speaking uses the same idle entry decoder, keeping the pool bounded and useful.
       const cacheSegments = { ...HCIOT_MOTION_SEGMENTS }
@@ -116,7 +117,7 @@ export class AvatarMotionSession {
         },
         ...(this.cache ? {
           acquireVideo: (state: string, requestSignal: AbortSignal) => this.cache!.acquire(cacheState(state), requestSignal),
-          // Only remember the standby here; it starts playing next while WASM keeps
+          // Only remember the standby here; it starts playing next while the engine keeps
           // drawing the outgoing motion, and is swapped in once it has a frame.
           activateVideo: (selected: HTMLVideoElement, state: string) => {
             this.assertActive()
@@ -128,7 +129,7 @@ export class AvatarMotionSession {
           const incoming = this.incoming?.video === selected ? this.incoming : null
           if (incoming) {
             // 新播放器在背景解出畫面前，舊動作照常播放、不凍結；
-            // 凍結只留給「切換來源到 WASM 畫出新畫面」這一小段。
+            // 凍結只留給「切換來源到引擎畫出新畫面」這一小段。
             try { incoming.decoded = await this.waitForIncomingFrame(selected, requestSignal, segment) }
             catch (error) {
               if (this.incoming === incoming) this.incoming = null
@@ -363,7 +364,7 @@ export class AvatarMotionSession {
     this.restoreDraw?.()
     this.restoreDraw = null
     if (this.held) this.held.style.opacity = '0'
-    // The standby may already be playing mid-handoff; WASM still draws activeVideo.
+    // The standby may already be playing mid-handoff; the engine still draws activeVideo.
     for (const video of new Set([this.activeVideo, this.player?.video ?? this.activeVideo])) video.pause()
     this.activeVideo.loop = false
     if (this.blobUrl) URL.revokeObjectURL(this.blobUrl)

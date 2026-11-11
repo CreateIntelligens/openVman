@@ -4,6 +4,8 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D 影片角色�
 
 文件中的帳號、專案 ID、自架網址及主機位址為匿名示例，使用前請換成自己的部署設定。文件與實驗附件的保留規則及 CI 檢查見 [去識別化原則](docs/guides/document-privacy.md)。
 
+人物引擎分支採 `openvman.render.v2`：從己方影片追蹤嘴唇並程序產生網格、形變、牙齒與遮罩，不再載入舊rig；音訊ONNX權重與第三方MediaPipe仍保留來源。舊角色須重新產製，獨立預覽通過不代表正式站已換版。格式與操作見 [人物素材指南](docs/guides/avatar-character-assets.md)。
+
 ## 系統架構
 
 | 服務（compose） | 位置 | 技術 | 職責 |
@@ -12,7 +14,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D 影片角色�
 | `avatar` | `frontend/app/` | Vue 3、Vite | 虛擬人前台：角色舞台、語音輸入、播放與對嘴 |
 | `backend` | `backend/` | FastAPI | 對外 API、帳號與權限、ASR／TTS 路由、Gemini Live 中繼、Brain 代理 |
 | `gateway-worker` | `backend/app/gateway/` | arq + Redis | 文件轉換、爬蟲與其他非同步媒體處理 |
-| `avatar-pipeline` | `avatar-pipeline/` | arq + MediaPipe + ffmpeg | 把說話影片或人像圖轉成虛擬人素材包（`01.webm` + `combined_data.json.gz`，可保留透明背景），一次一件 |
+| `avatar-pipeline` | `avatar-pipeline/` | arq + MediaPipe + ffmpeg | 把說話影片或人像圖轉成虛擬人素材包（影片、相容資料包與 `render_data.json.gz`，可保留透明背景），一次一件 |
 | `api` | `brain/api/` | FastAPI | Brain：LLM 路由、RAG、記憶、工具、用量帳本；僅供內部呼叫 |
 | `embedding` | `brain/embedding/` | EmbeddingGemma 2（GPU） | 向量嵌入服務，Brain 與其他 stack 共用 |
 | `redis` | — | Redis 7 | gateway 佇列、快取與跨 worker 狀態 |
@@ -121,6 +123,8 @@ TTS、批次 ASR 與 Brain proxy 的每個外部節點都有連線上限（預�
 
 第三方網站以 Avatar JavaScript SDK（`frontend/avatar-sdk/`，發布於 `/static/sdk/openvman-avatar-sdk.js`）搭配 Embed 金鑰載入角色，以 `playAudio()` 或 `pushPcm()` 提供自己的音訊驅動對嘴，或以 `ask(text)` 走對話模式：經 `POST /api/v1/chat/stream` 逐句取得回答，每句一到就以 `POST /v1/audio/speech` 合成並播放。整合方式見 [Avatar 外部整合指南](docs/guides/avatar-embed/README.md)。
 
+本分支的 Vue 與 SDK 已改用 [共用 ONNX／WebGL 人物引擎](frontend/shared/avatar-engine/README.md)，新建置不再交付舊 Avatar JS／WASM。舊人物可經授權轉換成 `render_data.json.gz`；原影片及素材包保留。正式站是否已換版、驗證範圍與來源限制見 [來源拆分計畫](docs/plans/avatar-source-decoupling.md)，不可只憑文件判定正式環境已切換。獨立 Live2D Haru 與其授權仍另外管理。
+
 動作切換技術預覽位於 `/experiments/avatar-motion/`，以 HCIOT 四段素材與專屬逐幀對嘴資料切換待機、思考、說話、比心與道別，沿用同一個 SDK 與預載快取，不影響正式對話流程。正式 Vman 另提供限定兩個醫院專案使用的 `HCIOT 醫院動作試用` 人物，依思考與實際播放狀態換動作。素材準備、安裝、還原與 E2E 見 [角色動作測試頁](docs/guides/avatar-motion-lab.md)。
 
 同一個 edge nginx 也以 Bearer token 對其他 stack 提供 Embedding 端點（`/api/embedding`、OpenAI 相容的 `/api/embedding/v1/embeddings`），設定見 [GPU 服務共用指南](docs/operations/gpu-service-sharing.md)。
@@ -129,7 +133,7 @@ TTS、批次 ASR 與 Brain proxy 的每個外部節點都有連線上限（預�
 
 ### 環境變數
 
-所有服務共用根目錄唯一一份 `.env`：compose 的 `${VAR}` 插值與 `api`、`backend`、`gateway-worker` 的 `env_file` 都讀它。例外是 `avatar-pipeline`，它只讀 `avatar-pipeline/.env`（素材包加密金鑰 `AVATAR_BUNDLE_KEY`，見 [avatar-pipeline/README.md](avatar-pipeline/README.md)）。
+一般服務共用根目錄 `.env`。歷史素材包金鑰 `AVATAR_BUNDLE_KEY` 保留於既有 `avatar-pipeline/.env`，僅歷史v1包轉換需要；新版v2產製不需金鑰。不要更換舊金鑰，否則舊包不能轉換，見 [avatar-pipeline/README.md](avatar-pipeline/README.md)。
 
 ```bash
 cp .env.example .env

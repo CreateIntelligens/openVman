@@ -1,16 +1,17 @@
-"""MediaPipe landmark extraction over the prepared intermediate.
+"""MediaPipe adapter with explicit frame, region and coordinate boundaries.
 
-Ported from DH_live's ``data_preparation_mini`` (MIT licence). The detector
-and mesh models are built once per video instead of once per frame.
+The former implementation was ported from DH_live (MIT). This replacement
+calls the same installed MediaPipe Solutions API directly; historical model
+settings, crop calibration and pixel quantization are retained in the
+compatibility profile. Model/data provenance is not a clean-room claim.
 """
 
 from __future__ import annotations
 
-import math
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
-import cv2
 import numpy as np
 
 from .frames import (
@@ -20,7 +21,7 @@ from .frames import (
     flatten_for_detection,
     read_frames,
 )
-from .geometry import LANDMARK_COUNT
+from .geometry import COMPATIBILITY_PROFILE, LANDMARK_COUNT
 
 __all__ = [
     "DEFAULT_MAX_SIDE",
@@ -30,8 +31,8 @@ __all__ = [
     "extract_landmarks",
 ]
 
-MIN_FACE_PIXELS = 80
-
+_DETECTION = COMPATIBILITY_PROFILE["detection"]
+MIN_FACE_PIXELS = _DETECTION["min_face_pixels"]
 ProgressCallback = Callable[[int, int], None]
 
 
@@ -39,112 +40,224 @@ class FaceDetectionError(VideoProcessingError):
     """No usable single frontal face in the first frame."""
 
 
-def _detect_face(face_detection, frame: np.ndarray, min_confidence: float) -> list[float]:
-    """Relative ``[x_min, x_max, y_min, y_max]`` of the single frontal face."""
+def _positive_integer(value, name: str) -> int:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, np.integer),
+    ) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return int(value)
+
+
+def _validate_frame(frame: np.ndarray, channels: int) -> None:
+    if (
+        not isinstance(frame, np.ndarray)
+        or frame.ndim != 3
+        or frame.shape[2] != channels
+        or min(frame.shape[:2]) == 0
+        or frame.dtype != np.uint8
+    ):
+        raise VideoProcessingError(
+            f"影格必須是非空 uint8 陣列，通道數為 {channels}"
+        )
+
+
+def _rgb(frame: np.ndarray) -> np.ndarray:
+    _validate_frame(frame, 3)
+    return np.ascontiguousarray(frame[..., ::-1])
+
+
+@dataclass(frozen=True)
+class _Region:
+    """Integer pixel bounds with a local-to-frame coordinate transform."""
+
+    left: int
+    top: int
+    right: int
+    bottom: int
+
+    @property
+    def size(self) -> np.ndarray:
+        return np.array([self.right - self.left, self.bottom - self.top])
+
+    def image(self, frame: np.ndarray) -> np.ndarray:
+        if np.any(self.size <= 0):
+            raise VideoProcessingError("人臉裁切區域為空")
+        return frame[self.top:self.bottom, self.left:self.right]
+
+    def relative_bounds(self, bounds: list[float]) -> np.ndarray:
+        # Scale by the actual detector input, including a central retry ROI.
+        corners = np.array(bounds).reshape(2, 2).T
+        return np.trunc(
+            corners * self.size + [self.left, self.top],
+        ).astype(np.int64)
+
+    def restore(self, points: np.ndarray) -> np.ndarray:
+        return points + np.array([self.left, self.top, 0])
+
+
+def _detect_face(
+    face_detection, frame: np.ndarray, min_confidence: float,
+) -> list[float]:
+    """Validate the detector result and return [left, right, top, bottom]."""
     import mediapipe as mp
 
-    results = face_detection.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    if not results.detections:
+    if not np.isfinite(min_confidence) or not 0 <= min_confidence <= 1:
+        raise ValueError("min_confidence must be between zero and one")
+    result = face_detection.process(_rgb(frame))
+    detections = result.detections or []
+    if not detections:
         raise FaceDetectionError("第一幀偵測不到人臉")
-    if len(results.detections) > 1:
+    if len(detections) != 1:
         raise FaceDetectionError("第一幀偵測到多張人臉，影片裡只能有一個人")
 
-    detection = results.detections[0]
+    detection = detections[0]
+    scores = np.asarray(detection.score, dtype=np.float64)
+    if not scores.size or not np.isfinite(scores).all():
+        raise FaceDetectionError("人臉偵測信心值無效")
+    if scores[0] < min_confidence:
+        raise FaceDetectionError("人臉偵測信心不足")
     rect = detection.location_data.relative_bounding_box
-    out_rect = [rect.xmin, rect.xmin + rect.width, rect.ymin, rect.ymin + rect.height]
-
-    key_point = mp.solutions.face_detection.get_key_point
-    points = mp.solutions.face_detection.FaceKeyPoint
-    nose = key_point(detection, points.NOSE_TIP)
-    left_eye = key_point(detection, points.LEFT_EYE)
-    right_eye = key_point(detection, points.RIGHT_EYE)
-    if nose.x > left_eye.x or nose.x < right_eye.x:
-        raise FaceDetectionError("人臉角度太偏，請提供正面影片")
-
-    h, w = frame.shape[:2]
-    if out_rect[0] < 0 or out_rect[2] < 0 or out_rect[1] > 1 or out_rect[3] > 1:
+    bounds = np.array([
+        [rect.xmin, rect.ymin],
+        [rect.xmin + rect.width, rect.ymin + rect.height],
+    ])
+    if not np.isfinite(bounds).all() or np.any(bounds[1] <= bounds[0]):
+        raise FaceDetectionError("人臉偵測範圍無效")
+    if np.any(bounds < 0) or np.any(bounds > 1):
         raise FaceDetectionError("人臉超出畫面邊界")
-    if rect.width * w < MIN_FACE_PIXELS or rect.height * h < MIN_FACE_PIXELS:
-        raise FaceDetectionError(f"人臉太小，至少要 {MIN_FACE_PIXELS}×{MIN_FACE_PIXELS} 像素")
-    return out_rect
+
+    api = mp.solutions.face_detection
+    nose = api.get_key_point(detection, api.FaceKeyPoint.NOSE_TIP)
+    left = api.get_key_point(detection, api.FaceKeyPoint.LEFT_EYE)
+    right = api.get_key_point(detection, api.FaceKeyPoint.RIGHT_EYE)
+    positions = np.array([right.x, nose.x, left.x])
+    if not np.isfinite(positions).all() or np.any(np.diff(positions) < 0):
+        raise FaceDetectionError("人臉角度太偏，請提供正面影片")
+    height, width = frame.shape[:2]
+    if np.any((bounds[1] - bounds[0]) * [width, height] < MIN_FACE_PIXELS):
+        raise FaceDetectionError(
+            f"人臉太小，至少要 {MIN_FACE_PIXELS}×{MIN_FACE_PIXELS} 像素"
+        )
+    return bounds.T.reshape(4).tolist()
 
 
 def _first_frame_face_rect(
     face_detection, frame: np.ndarray, vid_w: float, vid_h: float,
 ) -> tuple[int, int, int, int]:
-    """Square crop around the face, padded so the mesh tracker has context."""
+    """Locate the face once and establish its mesh-processing context ROI."""
+    _validate_frame(frame, 3)
+    height, width = frame.shape[:2]
+    if width != vid_w or height != vid_h:
+        raise VideoProcessingError("第一幀尺寸與影片資訊不符")
+    region = _Region(0, 0, width, height)
     try:
-        rect = _detect_face(face_detection, frame, 0.25)
-        x_min, y_min = int(rect[0] * vid_w), int(rect[2] * vid_h)
-        x_max, y_max = int(rect[1] * vid_w), int(rect[3] * vid_h)
+        detected = _detect_face(
+            face_detection, frame, _DETECTION["min_confidence"],
+        )
     except FaceDetectionError:
-        # Retry on the central 80 %: a busy border sometimes fools the detector.
-        cropped = frame[
-            int(0.1 * vid_h):int(0.9 * vid_h), int(0.1 * vid_w):int(0.9 * vid_w),
-        ]
-        rect = _detect_face(face_detection, cropped, 0.25)
-        x_min = int(rect[0] * vid_w + 0.1 * vid_w)
-        y_min = int(rect[2] * vid_h + 0.1 * vid_h)
-        x_max = int(rect[1] * vid_w + 0.1 * vid_w)
-        y_max = int(rect[3] * vid_h + 0.1 * vid_h)
-
-    x_mid, y_mid = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
-    side = max(x_max - x_min, y_max - y_min)
-    crop_size = int(side * 2 * 1.35)
-    x0 = int(max(0, x_mid - crop_size * 0.5))
-    y0 = int(max(0, y_mid - crop_size * 0.45))
-    x1 = int(min(vid_w, x0 + crop_size))
-    y1 = int(min(vid_h, y0 + crop_size))
-    return x0, y0, x1, y1
+        inset = _DETECTION["retry_inset"]
+        region = _Region(
+            int(inset * width), int(inset * height),
+            int((1 - inset) * width), int((1 - inset) * height),
+        )
+        detected = _detect_face(
+            face_detection, region.image(frame),
+            _DETECTION["min_confidence"],
+        )
+    bounds = region.relative_bounds(detected)
+    centre = bounds.mean(axis=0)
+    side = int((bounds[1] - bounds[0]).max() * _DETECTION["context_scale"])
+    top_left = np.trunc(np.maximum(
+        0, centre - side * np.array([
+            0.5, _DETECTION["context_top_fraction"],
+        ]),
+    )).astype(np.int64)
+    bottom_right = np.minimum(top_left + side, [width, height])
+    if np.any(bottom_right <= top_left):
+        raise FaceDetectionError("人臉裁切區域為空")
+    return tuple(int(value) for value in np.concatenate((
+        top_left, bottom_right,
+    )))
 
 
 def _mesh_points(face_mesh, frame: np.ndarray) -> np.ndarray:
-    results = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    if not results.multi_face_landmarks:
+    result = face_mesh.process(_rgb(frame))
+    faces = result.multi_face_landmarks or []
+    if not faces:
         raise VideoProcessingError("偵測不到面部網格")
+    if len(faces) != 1:
+        raise VideoProcessingError("面部網格必須只包含一張人臉")
+    values = np.array([
+        (point.x, point.y, point.z) for point in faces[0].landmark
+    ], dtype=np.float64)
+    if values.shape != (LANDMARK_COUNT, 3) or not np.isfinite(values).all():
+        raise VideoProcessingError(
+            f"面部網格必須包含 {LANDMARK_COUNT} 個有效 xyz 特徵點"
+        )
     height, width = frame.shape[:2]
-    pts = np.zeros((LANDMARK_COUNT, 3))
-    for idx, landmark in enumerate(results.multi_face_landmarks[0].landmark):
-        pts[idx] = [
-            min(math.floor(landmark.x * width), width - 1),
-            min(math.floor(landmark.y * height), height - 1),
-            min(math.floor(landmark.z * width), width - 1),
-        ]
-    return pts
+    # Preserve negative x/y and signed z: clipping them would change poses.
+    return np.minimum(
+        np.floor(values * [width, height, width]),
+        np.array([width, height, width]) - 1,
+    )
 
 
 def extract_landmarks(
     video_path: Path, width: int, height: int, frame_count: int,
     *, progress: ProgressCallback | None = None,
 ) -> np.ndarray:
-    """478 × 3 pixel-space landmarks for every frame of the intermediate."""
-    import mediapipe as mp
+    """Extract up to frame_count frames as (frames, 478, 3) pixel coordinates.
 
-    pts_3d = np.zeros((frame_count, LANDMARK_COUNT, 3))
-    face_rect: tuple[int, int, int, int] | None = None
+    A shorter stream returns the frames actually read, allowing the bundle
+    builder's count check to diagnose decoder disagreement. All MediaPipe
+    resources and the frame iterator close on success or failure.
+    """
+    width = _positive_integer(width, "width")
+    height = _positive_integer(height, "height")
+    frame_count = _positive_integer(frame_count, "frame_count")
+
+    import mediapipe as mp
+    output = np.empty((frame_count, LANDMARK_COUNT, 3), dtype=np.float64)
+    mesh_options = {
+        name: value for name, value in COMPATIBILITY_PROFILE["mesh"].items()
+        if name != "coordinates"
+    }
+    frames = read_frames(video_path, width, height)
     read = 0
-    with mp.solutions.face_detection.FaceDetection(
-        model_selection=1, min_detection_confidence=0.25,
-    ) as face_detection, mp.solutions.face_mesh.FaceMesh(
-        static_image_mode=True,
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
-    ) as face_mesh:
-        for frame_index, raw in enumerate(read_frames(video_path, width, height)):
-            if frame_index >= frame_count:
-                break
-            frame = flatten_for_detection(raw)
-            if face_rect is None:
-                face_rect = _first_frame_face_rect(face_detection, frame, width, height)
-            x0, y0, x1, y1 = face_rect
-            try:
-                pts_3d[frame_index] = _mesh_points(face_mesh, frame[y0:y1, x0:x1]) + [x0, y0, 0]
-            except VideoProcessingError as exc:
-                raise VideoProcessingError(f"第 {frame_index} 幀{exc}") from exc
-            read = frame_index + 1
-            if progress:
-                progress(read, frame_count)
+    region = None
+    try:
+        with mp.solutions.face_detection.FaceDetection(
+            model_selection=_DETECTION["model_selection"],
+            min_detection_confidence=_DETECTION["min_confidence"],
+        ) as detector, mp.solutions.face_mesh.FaceMesh(
+            **mesh_options,
+        ) as mesh:
+            for index in range(frame_count):
+                try:
+                    raw = next(frames)
+                except StopIteration:
+                    break
+                try:
+                    _validate_frame(raw, 4)
+                    if raw.shape[:2] != (height, width):
+                        raise VideoProcessingError("影格尺寸與影片資訊不符")
+                    frame = flatten_for_detection(raw)
+                    if region is None:
+                        region = _Region(*_first_frame_face_rect(
+                            detector, frame, width, height,
+                        ))
+                    output[index] = region.restore(
+                        _mesh_points(mesh, region.image(frame)),
+                    )
+                except FaceDetectionError:
+                    raise
+                except VideoProcessingError as exc:
+                    raise VideoProcessingError(f"第 {index} 幀{exc}") from exc
+                read += 1
+                if progress:
+                    progress(read, frame_count)
+    finally:
+        frames.close()
     if read == 0:
         raise VideoProcessingError("影片沒有任何畫面")
-    return pts_3d[:read]
+    return output[:read]

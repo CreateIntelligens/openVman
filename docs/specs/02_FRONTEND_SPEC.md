@@ -1,3 +1,5 @@
+> **2026-11-05 來源拆分分支契約**：Vue／Avatar SDK 的 2D 人物播放已改接共用 `AvatarEngine`（`frontend/shared/avatar-engine/`）；音訊推論由本專案的加密 WebAssembly 模組 `mouth-model.wasm` 執行，同一 WebAudio 取樣時鐘管理出聲與 +3 步嘴型，WebGL 合成。新交付不含舊 Avatar JS／WASM，人物讀取 `render_data.json.gz` 與 `01.webm`。以下舊 WASM 描述保留為歷史對照；正式環境是否已切換、尚未驗收項目及來源邊界，以 [來源拆分計畫](../plans/avatar-source-decoupling.md) 為準。
+
 # 02_FRONTEND_SPEC.md
 ## 前端實作指南 (Frontend Implementation Spec)
 

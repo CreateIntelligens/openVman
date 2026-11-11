@@ -1,3 +1,4 @@
+import gzip
 import io
 
 import pytest
@@ -53,7 +54,7 @@ def _upload(
     char_id="008",
     label="角色八",
     video=b"\x1a\x45\xdf\xa3v",
-    data=b"\x1f\x8bd",
+    data=gzip.compress(b"{}", mtime=0),
 ):
     return client.post(
         "/api/v1/avatar",
@@ -110,7 +111,7 @@ def test_private_character_is_not_public_but_owner_and_grantee_can_read(
         char_id="private",
         label="私有角色",
         video_bytes=b"private-video",
-        data_bytes=b"private-data",
+        data_bytes=gzip.compress(b"{}", mtime=0),
     )
 
     runtime = get_auth_runtime()
@@ -165,7 +166,7 @@ def test_unregistered_character_is_not_listed_or_publicly_readable(client):
         char_id="unregistered",
         label="未登記角色",
         video_bytes=b"unregistered-video",
-        data_bytes=b"unregistered-data",
+        data_bytes=gzip.compress(b"{}", mtime=0),
     )
 
     assert client.get("/api/v1/characters").json() == {"characters": []}

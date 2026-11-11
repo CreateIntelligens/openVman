@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.auth.dependencies import (
     CurrentAccount,
@@ -26,6 +28,13 @@ from app.auth.resources import (
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
+from app.avatar.render_data import (
+    ERROR_MESSAGE as RENDER_ERROR_MESSAGE,
+    RENDER_FILENAME,
+    RenderDataError,
+    build_legacy_render_data,
+    write_render_sidecar,
+)
 from app.config import get_tts_config
 
 logger = logging.getLogger("backend.static_assets")
@@ -134,8 +143,16 @@ def _resolve_asset_file(
     relative_path: str,
 ) -> Path:
     base_dir = Path(base_directory).resolve()
-    target = (base_dir / resource_id / relative_path).resolve()
-    if not target.is_relative_to(base_dir) or not target.is_file():
+    resource_path = base_dir / resource_id
+    resource_dir = resource_path.resolve()
+    target = (resource_dir / relative_path).resolve()
+    if (
+        resource_dir == base_dir
+        or resource_dir != resource_path
+        or not resource_dir.is_relative_to(base_dir)
+        or not target.is_relative_to(resource_dir)
+        or not target.is_file()
+    ):
         raise HTTPException(status_code=404, detail="File not found")
     return target
 
@@ -172,7 +189,32 @@ async def get_character_asset(
         and resource.visibility is ResourceVisibility.SYSTEM_PUBLIC
         else "private, no-store"
     )
+    try:
+        target = _resolve_asset_file(cfg.avatar_assets_dir, char_id, file_path)
+    except HTTPException as exc:
+        if exc.status_code != 404 or file_path != RENDER_FILENAME:
+            raise
+        try:
+            # Resolve both source files only after the character's access check.
+            data_path = _resolve_asset_file(
+                cfg.avatar_assets_dir, char_id, "combined_data.json.gz",
+            )
+            video_path = _resolve_asset_file(
+                cfg.avatar_assets_dir, char_id, "01.webm",
+            )
+            payload = await run_in_threadpool(
+                build_legacy_render_data, data_path, video_path,
+                key=os.environ.get("AVATAR_BUNDLE_KEY"),
+                limit=cfg.avatar_max_upload_bytes,
+            )
+            character_dir = (Path(cfg.avatar_assets_dir) / char_id).resolve()
+            await run_in_threadpool(write_render_sidecar, character_dir, payload)
+        except (HTTPException, RenderDataError) as conversion_error:
+            raise HTTPException(
+                status_code=409, detail=RENDER_ERROR_MESSAGE,
+            ) from conversion_error
+        target = _resolve_asset_file(cfg.avatar_assets_dir, char_id, file_path)
     return FileResponse(
-        _resolve_asset_file(cfg.avatar_assets_dir, char_id, file_path),
+        target,
         headers={"Cache-Control": cache_control},
     )

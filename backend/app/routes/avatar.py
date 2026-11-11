@@ -23,6 +23,7 @@ from app.auth.resources import (
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.avatar import jobs as avatar_jobs
+from app.avatar.render_data import RenderDataError
 from app.avatar.store import (
     AvatarStore,
     CharacterExists,
@@ -255,6 +256,8 @@ async def create_character(
             pass
     except CharacterExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RenderDataError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"status": "ok", "character": character}
 
 

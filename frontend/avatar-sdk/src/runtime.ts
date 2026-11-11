@@ -1,230 +1,102 @@
-import { inflate } from "pako";
-
-import {
-  installFrameSyncMarkerRepair,
-  type FrameSyncMarkerRepair,
-} from "../../shared/avatar/avatarFrameSyncRepair";
+import { AvatarEngine } from "../../shared/avatar-engine/index.mjs";
 import { OpenVmanAvatarError } from "./errors";
-import {
-  installIdleLipSyncBypass,
-  type IdleLipSyncBypass,
-} from "./idleLipSyncBypass";
-
-export interface AvatarRuntimeInstance {
-  HEAPU8: Uint8Array;
-  _clearAudio(): void;
-  _free(pointer: number): void;
-  _malloc(bytes: number): number;
-  _processSecret(pointer: number): void;
-  _setAudioBuffer(pointer: number, byteLength: number, index: number): void;
-  stringToUTF8(value: string, pointer: number, maxBytes: number): void;
-}
+import type { OpenVmanAvatarAudioOutput } from "./types";
 
 declare global {
   interface Window {
     characterVideo?: HTMLVideoElement;
-    createQtAppInstance?: (options: {
-      locateFile(path: string): string;
-      onRuntimeInitialized(): void;
-    }) => Promise<AvatarRuntimeInstance>;
   }
 }
 
 export class AvatarRuntime {
-  private chunkIndex = 0;
-  private readonly instance: AvatarRuntimeInstance;
-  private readonly idleLipSyncBypass: IdleLipSyncBypass | null;
-  private readonly frameSyncMarkerRepair: FrameSyncMarkerRepair | null;
+  private readonly speakingListeners = new Set<(speaking: boolean) => void>();
+  private readonly errorListeners = new Set<(error: unknown) => void>();
+  private disposed = false;
 
-  private constructor(
-    instance: AvatarRuntimeInstance,
-    idleLipSyncBypass: IdleLipSyncBypass | null,
-    frameSyncMarkerRepair: FrameSyncMarkerRepair | null,
-  ) {
-    this.instance = instance;
-    this.idleLipSyncBypass = idleLipSyncBypass;
-    this.frameSyncMarkerRepair = frameSyncMarkerRepair;
+  private constructor(private readonly engine: AvatarEngine) {}
+
+  static async create(
+    baseUrl: string,
+    canvas: HTMLCanvasElement,
+    audioOutput: OpenVmanAvatarAudioOutput = "speaker",
+    runtimeBaseUrl?: string,
+  ): Promise<AvatarRuntime> {
+    let runtime: AvatarRuntime | undefined;
+    const video = document.createElement("video");
+    const engine = await AvatarEngine.create({
+      canvas,
+      video,
+      videoSource: () => window.characterVideo ?? video,
+      runtimeBaseUrl: runtimeBaseUrl ?? `${baseUrl}/static/sdk/engine/`,
+      audioOutput,
+      onError: (error) => {
+        for (const listener of runtime?.errorListeners ?? []) listener(error);
+      },
+      onSpeakingChange: (speaking) => {
+        for (const listener of runtime?.speakingListeners ?? []) listener(speaking);
+      },
+    });
+    runtime = new AvatarRuntime(engine);
+    // 動作預覽沿用此播放器切換快取影片；渲染與音訊仍由共用引擎持有。
+    window.characterVideo = engine.video;
+    return runtime;
   }
 
-  static async create(baseUrl: string): Promise<AvatarRuntime> {
-    await loadRuntimeScript(`${baseUrl}/static/sdk/runtime/OpenVmanAvatarRuntime.js`);
-    const idleLipSyncBypass = installIdleLipSyncBypass();
-    const frameSyncMarkerRepair = installFrameSyncMarkerRepair();
-    if (!window.createQtAppInstance) {
-      idleLipSyncBypass?.restore();
-      frameSyncMarkerRepair?.restore();
+  get audioContext(): AudioContext {
+    return this.engine.audioContext;
+  }
+
+  async prepare(): Promise<void> {
+    try {
+      await this.engine.prepare();
+    } catch (error) {
       throw new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        "Avatar runtime factory is unavailable.",
+        "AUTOPLAY_BLOCKED",
+        error instanceof Error ? error.message : String(error),
       );
     }
-    try {
-      const instance = await window.createQtAppInstance({
-        locateFile: (path) => path.endsWith(".wasm")
-          ? `${baseUrl}/static/sdk/runtime/OpenVmanAvatarRuntime.wasm`
-          : path,
-        onRuntimeInitialized() {},
-      });
-      return new AvatarRuntime(instance, idleLipSyncBypass, frameSyncMarkerRepair);
-    } catch (error) {
-      idleLipSyncBypass?.restore();
-      frameSyncMarkerRepair?.restore();
-      throw error;
+    if (this.audioContext.state !== "running") {
+      throw new OpenVmanAvatarError(
+        "AUTOPLAY_BLOCKED",
+        "Audio playback requires a user gesture.",
+      );
     }
   }
 
   async loadCharacter(characterId: string, assetsBaseUrl: string): Promise<void> {
-    const characterBaseUrl = `${assetsBaseUrl}/${encodeURIComponent(characterId)}`;
-    const dataUrl = `${characterBaseUrl}/combined_data.json.gz`;
-    const response = await fetch(dataUrl);
-    if (!response.ok) {
-      throw new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        `Character data request failed with HTTP ${response.status}.`,
-      );
-    }
+    await this.engine.loadCharacter(
+      `${assetsBaseUrl}/${encodeURIComponent(characterId)}`,
+    );
+  }
 
-    const payload = new Uint8Array(await response.arrayBuffer());
-    const text = isGzip(payload)
-      ? inflate(payload, { to: "string" })
-      : new TextDecoder().decode(payload);
-    const encoded = new TextEncoder().encode(text);
-    const pointer = this.instance._malloc(encoded.length + 1);
-    try {
-      this.instance.stringToUTF8(text, pointer, encoded.length + 1);
-      this.instance._processSecret(pointer);
-    } finally {
-      this.instance._free(pointer);
-    }
+  onSpeakingChange(listener: (speaking: boolean) => void): () => void {
+    this.speakingListeners.add(listener);
+    return () => this.speakingListeners.delete(listener);
+  }
 
-    const video = window.characterVideo;
-    if (!video) {
-      throw new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        "Avatar character video was not created by the runtime.",
-      );
-    }
-    video.src = `${characterBaseUrl}/01.webm`;
-    video.loop = true;
-    video.muted = true;
-    video.playsInline = true;
-    const ready = waitForVideoReady(video, video.src);
-    video.load();
-    await ready;
-    try {
-      await video.play();
-    } catch (error) {
-      throw new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        `Avatar character video could not start: ${errorMessage(error)}.`,
-      );
-    }
+  onError(listener: (error: unknown) => void): () => void {
+    this.errorListeners.add(listener);
+    return () => this.errorListeners.delete(listener);
   }
 
   clearAudio(): void {
-    this.instance._clearAudio();
-    this.chunkIndex = 0;
+    this.engine.stop();
   }
 
-  beginSpeaking(): void {
-    this.idleLipSyncBypass?.beginSpeaking();
+  pushAudio(pcm: Int16Array): Promise<void> {
+    return this.engine.appendPcm(pcm);
   }
 
-  endSpeaking(): void {
-    this.idleLipSyncBypass?.endSpeaking();
-  }
-
-  resetSpeaking(): void {
-    this.idleLipSyncBypass?.resetSpeaking();
+  finishAudio(): Promise<void> {
+    return this.engine.finishAudio();
   }
 
   dispose(): void {
-    this.idleLipSyncBypass?.resetSpeaking();
-    this.idleLipSyncBypass?.restore();
-    this.frameSyncMarkerRepair?.restore();
+    if (this.disposed) return;
+    this.disposed = true;
+    this.engine.dispose();
+    this.speakingListeners.clear();
+    this.errorListeners.clear();
+    if (window.characterVideo === this.engine.video) delete window.characterVideo;
   }
-
-  pushAudio(pcm: Int16Array): void {
-    const bytes = new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength);
-    const pointer = this.instance._malloc(bytes.length);
-    try {
-      this.instance.HEAPU8.set(bytes, pointer);
-      this.instance._setAudioBuffer(pointer, bytes.length, this.chunkIndex++);
-    } finally {
-      this.instance._free(pointer);
-    }
-  }
-}
-
-function isGzip(payload: Uint8Array): boolean {
-  return payload.length >= 2 && payload[0] === 0x1f && payload[1] === 0x8b;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function waitForVideoReady(
-  video: HTMLVideoElement,
-  src: string,
-): Promise<void> {
-  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
-      cleanup();
-      reject(new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        `Avatar character video timed out while loading ${src}.`,
-      ));
-    }, 15_000);
-
-    const cleanup = (): void => {
-      window.clearTimeout(timeout);
-      video.removeEventListener("canplay", handleCanPlay);
-      video.removeEventListener("error", handleError);
-      video.removeEventListener("loadeddata", handleCanPlay);
-    };
-    const handleCanPlay = (): void => {
-      cleanup();
-      resolve();
-    };
-    const handleError = (): void => {
-      cleanup();
-      const mediaMessage = video.error?.message
-        ? `: ${video.error.message}`
-        : "";
-      reject(new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        `Avatar character video failed to load ${src}${mediaMessage}.`,
-      ));
-    };
-
-    video.addEventListener("canplay", handleCanPlay, { once: true });
-    video.addEventListener("error", handleError, { once: true });
-    video.addEventListener("loadeddata", handleCanPlay, { once: true });
-
-    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      handleCanPlay();
-    }
-  });
-}
-
-async function loadRuntimeScript(src: string): Promise<void> {
-  if (window.createQtAppInstance) return;
-
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.async = true;
-    script.dataset.openvmanRuntime = "true";
-    script.src = src;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new OpenVmanAvatarError(
-      "RESOURCE_LOAD_FAILED",
-      `Unable to load ${src}.`,
-    ));
-    document.body.append(script);
-  });
 }

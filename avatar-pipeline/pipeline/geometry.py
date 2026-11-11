@@ -1,133 +1,166 @@
-"""Landmark index tables and the pure-numpy geometry the bundle builder needs.
+"""Validated NumPy operations for the avatar bundle's coordinate contract.
 
-The index tables and the three helpers (``crop_mouth``, ``smooth_array``,
-``standardize_points``) are ported from DH_live (MIT licence,
-https://github.com/kleinlee/DH_live) with the torch code path dropped: the
-pipeline only ever smooths offline arrays, and numpy is enough for that.
+This module replaces the previous DH_live-ported implementation. Landmark
+ordering and appearance calibration remain historical compatibility data in
+``profiles/legacy_dh_live.json`` (DH_live, MIT); retaining that contract does
+not establish legal clean-room independence.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 
-INDEX_LEFT_EYEBROW = [276, 283, 282, 295, 285, 336, 296, 334, 293, 300]
-INDEX_RIGHT_EYEBROW = [46, 53, 52, 65, 55, 107, 66, 105, 63, 70]
+
+with Path(__file__).with_name("profiles").joinpath(
+    "legacy_dh_live.json",
+).open(encoding="utf-8") as _handle:
+    COMPATIBILITY_PROFILE = json.load(_handle)
+
+if COMPATIBILITY_PROFILE.get("schema_version") != 1:
+    raise ValueError("unsupported avatar compatibility profile")
+
+LANDMARK_COUNT = COMPATIBILITY_PROFILE["landmark_count"]
+STANDARD_SIZE = COMPATIBILITY_PROFILE["standard_size"]
+_TABLES = COMPATIBILITY_PROFILE["indices"]
+for _name, _indices in _TABLES.items():
+    if not _indices or any(
+        type(index) is not int or not 0 <= index < LANDMARK_COUNT
+        for index in _indices
+    ) or len(set(_indices)) != len(_indices):
+        raise ValueError(f"invalid landmark index table: {_name}")
+
+INDEX_LEFT_EYEBROW = list(_TABLES["INDEX_LEFT_EYEBROW"])
+INDEX_RIGHT_EYEBROW = list(_TABLES["INDEX_RIGHT_EYEBROW"])
 INDEX_EYEBROW = INDEX_LEFT_EYEBROW + INDEX_RIGHT_EYEBROW
-
-INDEX_NOSE_EDGE = [343, 355, 358, 327, 326, 2, 97, 98, 129, 126, 114]
-INDEX_NOSE_MID = [6, 197, 195, 5, 4]
+INDEX_NOSE_EDGE = list(_TABLES["INDEX_NOSE_EDGE"])
+INDEX_NOSE_MID = list(_TABLES["INDEX_NOSE_MID"])
 INDEX_NOSE = INDEX_NOSE_EDGE + INDEX_NOSE_MID
-
-INDEX_LIPS_INNER = [
-    78, 95, 88, 178, 87, 14, 317, 402, 318, 324,
-    308, 415, 310, 311, 312, 13, 82, 81, 80, 191,
-]
-INDEX_LIPS_OUTER = [
-    61, 146, 91, 181, 84, 17, 314, 405, 321, 375,
-    291, 409, 270, 269, 267, 0, 37, 39, 40, 185,
-]
+INDEX_LIPS_INNER = list(_TABLES["INDEX_LIPS_INNER"])
+INDEX_LIPS_OUTER = list(_TABLES["INDEX_LIPS_OUTER"])
 INDEX_LIPS = INDEX_LIPS_INNER + INDEX_LIPS_OUTER
-
-INDEX_LEFT_EYE = [
-    263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466,
-]
-INDEX_RIGHT_EYE = [
-    33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246,
-]
+INDEX_LEFT_EYE = list(_TABLES["INDEX_LEFT_EYE"])
+INDEX_RIGHT_EYE = list(_TABLES["INDEX_RIGHT_EYE"])
 INDEX_EYE = INDEX_LEFT_EYE + INDEX_RIGHT_EYE
-
-INDEX_FACE_OVAL = [
-    454, 323, 361, 288, 397, 365,
-    379, 378, 400, 377, 152, 148, 176, 149, 150,
-    136, 172, 58, 132, 93, 234,
-]
-
-INDEX_MUSCLE = [371, 266, 425, 427, 434, 394, 169, 214, 207, 205, 36, 142]
-
-#: The subset of MediaPipe's 478 landmarks that drives mouth cropping.
-MAIN_KEYPOINTS_INDEX = (
-    INDEX_EYEBROW + INDEX_NOSE + INDEX_LIPS + INDEX_EYE + INDEX_FACE_OVAL + INDEX_MUSCLE
-)
-
-#: ``crop_mouth`` receives the MAIN_KEYPOINTS_INDEX subset, so it addresses
-#: lips and oval by their position inside that subset, not by raw landmark id.
-_LIPS_OUTER_OFFSET = len(INDEX_EYEBROW) + len(INDEX_NOSE) + len(INDEX_LIPS_INNER)
-SUBSET_LIPS_OUTER = list(range(_LIPS_OUTER_OFFSET, _LIPS_OUTER_OFFSET + len(INDEX_LIPS_OUTER)))
-_OVAL_OFFSET = len(INDEX_EYEBROW) + len(INDEX_NOSE) + len(INDEX_LIPS) + len(INDEX_EYE)
-SUBSET_FACE_OVAL = list(range(_OVAL_OFFSET, _OVAL_OFFSET + len(INDEX_FACE_OVAL)))
-
-#: The 209 landmarks the renderer warps; ``json_data`` carries them in this order.
-INDEX_WRAP = [
-    0, 2, 11, 12, 13, 14, 15, 16, 17, 18, 32, 36, 37, 38, 39, 40, 41, 42, 43, 50, 57, 58, 61,
-    62, 72, 73, 74, 76, 77, 78, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 95,
-    96, 97, 98, 100, 101, 106, 116, 117, 118, 119, 123, 129, 132, 135, 136, 137, 138, 140,
-    142, 146, 147, 148, 149, 150, 152, 164, 165, 167, 169, 170, 171, 172, 175, 176, 177,
-    178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 191, 192, 194, 199, 200, 201, 202,
-    203, 204, 205, 206, 207, 208, 210, 211, 212, 213, 214, 215, 216, 227, 234, 262, 266,
-    267, 268, 269, 270, 271, 272, 273, 280, 287, 288, 291, 292, 302, 303, 304, 306, 307,
-    308, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325,
-    326, 327, 329, 330, 335, 345, 346, 347, 348, 352, 358, 361, 364, 365, 366, 367, 369,
-    371, 375, 376, 377, 378, 379, 391, 393, 394, 395, 396, 397, 400, 401, 402, 403, 404,
-    405, 406, 407, 408, 409, 410, 411, 415, 416, 418, 421, 422, 423, 424, 425, 426, 427,
-    428, 430, 431, 432, 433, 434, 435, 436, 447, 454,
-]
-
-LANDMARK_COUNT = 478
+INDEX_FACE_OVAL = list(_TABLES["INDEX_FACE_OVAL"])
+INDEX_MUSCLE = list(_TABLES["INDEX_MUSCLE"])
+INDEX_WRAP = list(_TABLES["INDEX_WRAP"])
 WRAP_COUNT = len(INDEX_WRAP)
-#: Side of the square the renderer works in; landmarks and the pose matrix
-#: are expressed in this space.
-STANDARD_SIZE = 180
+
+_GROUPS = (
+    INDEX_EYEBROW,
+    INDEX_NOSE,
+    INDEX_LIPS_INNER,
+    INDEX_LIPS_OUTER,
+    INDEX_EYE,
+    INDEX_FACE_OVAL,
+    INDEX_MUSCLE,
+)
+MAIN_KEYPOINTS_INDEX = [index for group in _GROUPS for index in group]
+_OFFSETS = np.cumsum([0] + [len(group) for group in _GROUPS])
+SUBSET_LIPS_OUTER = list(range(int(_OFFSETS[3]), int(_OFFSETS[4])))
+SUBSET_FACE_OVAL = list(range(int(_OFFSETS[5]), int(_OFFSETS[6])))
+
+
+def _finite_array(value, name: str) -> np.ndarray:
+    array = np.asarray(value, dtype=np.float64)
+    if not np.isfinite(array).all():
+        raise ValueError(f"{name} must contain only finite values")
+    return array
+
+
+def _positive_dimension(value, name: str) -> None:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating),
+    ):
+        raise ValueError(f"{name} must be a positive integer")
+    if not np.isfinite(value) or value <= 0 or int(value) != value:
+        raise ValueError(f"{name} must be a positive integer")
 
 
 def crop_mouth(points: np.ndarray, img_w: int, img_h: int) -> np.ndarray:
-    """Square-ish crop around the lips, sized from the face oval.
+    """Return an integer, frame-clipped lip ROI using the retained calibration.
 
-    ``points`` are the ``MAIN_KEYPOINTS_INDEX`` landmarks of one frame.
+    Input rows follow ``MAIN_KEYPOINTS_INDEX``. The face extent determines
+    scale, and the lip centroid determines translation. Empty intersections
+    are rejected rather than producing inverted crop coordinates.
     """
-    center_x = np.mean(points[SUBSET_LIPS_OUTER, 0])
-    center_y = np.mean(points[SUBSET_LIPS_OUTER, 1])
-    oval = points[SUBSET_FACE_OVAL[2:-2]]
-    x_min = max(0, np.min(oval[:, 0]))
-    y_min = max(0, np.min(oval[:, 1]))
-    x_max = min(np.max(oval[:, 0]), img_w)
-    y_max = min(np.max(oval[:, 1]), img_h)
-    new_size = max(x_max - x_min, y_max - y_min) * 0.46
+    _positive_dimension(img_w, "img_w")
+    _positive_dimension(img_h, "img_h")
+    values = _finite_array(points, "points")
+    if values.ndim != 2 or values.shape[0] != len(MAIN_KEYPOINTS_INDEX):
+        raise ValueError("points must follow MAIN_KEYPOINTS_INDEX")
+    if values.shape[1] not in (2, 3):
+        raise ValueError("points must have two or three coordinates per row")
 
-    x_min = int(center_x - new_size)
-    y_min = int(center_y - new_size * 0.89)
-    x_max = int(center_x + new_size)
-    y_max = int(center_y + new_size * 1.11)
-    return np.array([
-        max(0, x_min), max(0, y_min), min(img_w, x_max), min(img_h, y_max),
+    calibration = COMPATIBILITY_PROFILE["mouth_crop"]
+    trim = calibration["oval_trim"]
+    boundary = values[SUBSET_FACE_OVAL[trim:-trim], :2]
+    frame_size = np.array([img_w, img_h])
+    visible_min = np.maximum(boundary.min(axis=0), 0)
+    visible_max = np.minimum(boundary.max(axis=0), frame_size)
+    extent = visible_max - visible_min
+    if np.any(extent <= 0):
+        raise ValueError("face oval has no positive area inside the frame")
+
+    radius = extent.max() * calibration["half_extent"]
+    centre = values[SUBSET_LIPS_OUTER, :2].mean(axis=0)
+    # Keep the historical slightly lower lip window for existing characters.
+    offsets = np.array([
+        [-1, -(1 - calibration["vertical_bias"])],
+        [1, 1 + calibration["vertical_bias"]],
     ])
+    corners = np.trunc(centre + offsets * radius)
+    corners = np.clip(corners, 0, frame_size)
+    if np.any(corners[1] <= corners[0]):
+        raise ValueError("mouth crop has no positive area inside the frame")
+    return corners.astype(np.int64).reshape(4)
 
 
 def smooth_array(array: np.ndarray, weight: list[float]) -> np.ndarray:
-    """Zero-phase 1-D smoothing along axis 0 with an odd, centred kernel.
+    """Filter axis zero, preserving the source frames outside complete windows.
 
-    Frames within ``len(weight) // 2`` of either end are copied through
-    unchanged, exactly like the upstream implementation, so the first and
-    last frames stay anchored to the source.
+    Any finite odd-length kernel is accepted without implicit normalization.
+    Symmetric weights give a zero-phase filter. Trailing dimensions may be
+    scalar samples, coordinates or complete matrices.
     """
-    if len(weight) % 2 != 1:
-        raise ValueError("smoothing kernel must have an odd length")
-    pad = len(weight) // 2
-    kernel = np.array(weight, dtype=np.float64)[:, np.newaxis]
-    out = np.array(array, dtype=np.float64, copy=True)
-    for i in range(pad, len(array) - pad):
-        out[i] = np.sum(array[i - pad:i + pad + 1] * kernel, axis=0)
-    return out
+    samples = _finite_array(array, "array")
+    kernel = _finite_array(weight, "weight")
+    if samples.ndim == 0:
+        raise ValueError("array must have a frame axis")
+    if kernel.ndim != 1 or kernel.size == 0 or kernel.size % 2 != 1:
+        raise ValueError("smoothing kernel must have a nonempty odd length")
+    result = samples.copy()
+    if len(samples) < len(kernel):
+        return result
+    windows = np.lib.stride_tricks.sliding_window_view(
+        samples, len(kernel), axis=0,
+    )
+    # NumPy appends the window axis; contracting it keeps all other axes.
+    filtered = np.einsum("...k,k->...", windows, kernel, optimize=False)
+    start = len(kernel) // 2
+    result[start:start + len(filtered)] = filtered
+    return result
 
 
 def standardize_points(
     points: np.ndarray, crop: np.ndarray, size: int = STANDARD_SIZE,
 ) -> np.ndarray:
-    """Map 3-D landmarks into the ``size``-square defined by ``crop``.
+    """Apply crop-origin translation and isotropic scaling to xyz coordinates.
 
-    Depth is shifted so the nearest point sits at zero and scaled with the
-    crop width, matching what the renderer expects from ``json_data``.
+    Depth uses the same scale as x and y and is translated by its maximum.
+    The crop width remains the scale reference even for nonsquare input ROIs,
+    as required by the bundle's existing 180-unit coordinate contract.
     """
-    x_min, y_min, x_max, _ = crop
-    pts = np.array(points, dtype=np.float64, copy=True)
-    pts[:, 2] -= np.max(pts[:, 2])
-    return (pts - np.array([x_min, y_min, 0])) * size / (x_max - x_min)
+    _positive_dimension(size, "size")
+    values = _finite_array(points, "points")
+    bounds = _finite_array(crop, "crop")
+    if values.ndim != 2 or values.shape[1] != 3 or not len(values):
+        raise ValueError("points must be a nonempty array of xyz triples")
+    if bounds.shape != (4,) or np.any(bounds[2:] <= bounds[:2]):
+        raise ValueError("crop must contain increasing x/y bounds")
+    origin = np.array([bounds[0], bounds[1], values[:, 2].max()])
+    translated = values - origin
+    return translated * size / (bounds[2] - bounds[0])

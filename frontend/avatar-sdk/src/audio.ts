@@ -1,225 +1,111 @@
-import { OpenVmanAvatarError } from "./errors";
 import type { AvatarRuntime } from "./runtime";
-import type { OpenVmanAvatarAudioOutput } from "./types";
 
 const PCM_SAMPLE_RATE = 16000;
 const PCM_CHUNK_SAMPLES = 4096;
+const PCM_IDLE_DRAIN_MS = 160;
 
 export class AvatarAudio {
-  private context: AudioContext | null = null;
   private destroyed = false;
-  private outputNode: AudioNode | null = null;
-  private nextStartTime = 0;
   private playbackGeneration = 0;
-  // 讓排隊中的片段依呼叫順序解碼、排上時間軸。
   private queueTail: Promise<void> = Promise.resolve();
-  private settlers = new Set<() => void>();
-  private sources = new Set<AudioBufferSourceNode>();
-  private speaking = false;
+  private readonly unsubscribe: () => void;
+  private pcmDrainTimer: number | null = null;
+  private pcmInputRevision = 0;
 
   constructor(
     private readonly runtime: AvatarRuntime,
-    private readonly onSpeakingChange: (speaking: boolean) => void,
-    private readonly audioOutput: OpenVmanAvatarAudioOutput = "speaker",
-  ) {}
+    onSpeakingChange: (speaking: boolean) => void,
+    private readonly onError: (error: unknown) => void = () => {},
+  ) {
+    this.unsubscribe = runtime.onSpeakingChange(onSpeakingChange);
+  }
 
   async prepare(): Promise<void> {
-    const context = this.ensureContext();
-    if (context.state === "suspended") await context.resume();
-    if (context.state !== "running") {
-      throw new OpenVmanAvatarError(
-        "AUTOPLAY_BLOCKED",
-        "Audio playback requires a user gesture.",
-      );
-    }
+    await this.runtime.prepare();
   }
 
   async playAudio(source: Blob | ArrayBuffer): Promise<void> {
     this.interrupt();
     const generation = this.playbackGeneration;
     if (this.destroyed) return;
-    // 先在使用者手勢內恢復 AudioContext，再去等 Blob 讀完。
+    // 在使用者手勢內恢復唯一的引擎 AudioContext，再等待 Blob。
     await this.prepare();
-    if (generation !== this.playbackGeneration || this.destroyed) return;
+    if (this.isStale(generation)) return;
     const encoded = typeof (source as Blob).arrayBuffer === "function"
       ? await (source as Blob).arrayBuffer()
       : source as ArrayBuffer;
-    const scheduled = await this.decodeAndSchedule(encoded, generation);
-    if (scheduled) await this.untilFinished(scheduled);
+    await this.decodeAndPlay(encoded, generation);
   }
 
-  /**
-   * Plays encoded audio right after whatever is already scheduled, without
-   * interrupting it. Resolves when this segment ends or playback is
-   * interrupted, so a reply can be spoken one segment at a time without gaps.
-   */
   async queueAudio(source: ArrayBuffer): Promise<void> {
+    this.cancelPcmDrain();
     const generation = this.playbackGeneration;
-    const step = this.queueTail.then(() =>
-      this.decodeAndSchedule(source, generation)
-    );
-    this.queueTail = step.then(() => undefined, () => undefined);
-    const scheduled = await step;
-    if (scheduled) await this.untilFinished(scheduled);
+    const step = this.queueTail.then(() => this.decodeAndPlay(source, generation));
+    this.queueTail = step.catch(() => undefined);
+    await step;
   }
 
-  private async decodeAndSchedule(
+  private async decodeAndPlay(
     encoded: ArrayBuffer,
     generation: number,
-  ): Promise<ScheduledSource | null> {
-    const stale = () =>
-      generation !== this.playbackGeneration || this.destroyed;
-    if (stale()) return null;
-    const context = this.ensureContext();
+  ): Promise<void> {
+    if (this.isStale(generation)) return;
     await this.prepare();
-    if (stale()) return null;
-    const decoded = await context.decodeAudioData(encoded);
-    if (stale()) return null;
-    this.runtime.beginSpeaking();
+    if (this.isStale(generation)) return;
+    const decoded = await this.runtime.audioContext.decodeAudioData(encoded);
+    if (this.isStale(generation)) return;
     for (const chunk of decodedAudioBufferToPcmChunks(decoded)) {
-      this.runtime.pushAudio(chunk);
+      if (this.isStale(generation)) return;
+      await this.runtime.pushAudio(chunk);
     }
-    return this.scheduleSource(context, decoded);
-  }
-
-  private untilFinished(scheduled: ScheduledSource): Promise<void> {
-    return new Promise<void>((resolve) => {
-      const settle = () => {
-        this.settlers.delete(settle);
-        resolve();
-      };
-      this.settlers.add(settle);
-      scheduled.onFinished(settle);
-    });
+    if (!this.isStale(generation)) await this.runtime.finishAudio();
   }
 
   async pushPcm(chunk: Int16Array): Promise<void> {
     if (this.destroyed || chunk.length === 0) return;
+    this.cancelPcmDrain();
+    const inputRevision = this.pcmInputRevision;
+    const generation = this.playbackGeneration;
     await this.prepare();
-    if (this.destroyed) return;
-
-    const context = this.ensureContext();
-    const buffer = context.createBuffer(1, chunk.length, PCM_SAMPLE_RATE);
-    const samples = new Float32Array(chunk.length);
-    for (let index = 0; index < chunk.length; index += 1) {
-      samples[index] = chunk[index] < 0
-        ? chunk[index] / 32768
-        : chunk[index] / 32767;
-    }
-    buffer.copyToChannel(samples, 0);
-    this.runtime.beginSpeaking();
-    this.runtime.pushAudio(chunk);
-
-    this.scheduleSource(context, buffer);
-  }
-
-  private scheduleSource(
-    context: AudioContext,
-    buffer: AudioBuffer,
-  ): ScheduledSource {
-    const playbackSource = context.createBufferSource();
-    this.sources.add(playbackSource);
-    playbackSource.buffer = buffer;
-    playbackSource.connect(this.ensureOutputNode(context));
-    let listener: (() => void) | null = null;
-    let finished = false;
-    const finish = () => {
-      finished = true;
-      this.sources.delete(playbackSource);
-      this.finishIfIdle();
-      listener?.();
-    };
-    playbackSource.onended = finish;
-    try {
-      this.setSpeaking(true);
-      const startTime = Math.max(context.currentTime, this.nextStartTime);
-      playbackSource.start(startTime);
-      this.nextStartTime = startTime + buffer.length / buffer.sampleRate;
-    } catch (error) {
-      this.sources.delete(playbackSource);
-      this.finishIfIdle();
-      throw error;
-    }
-    return {
-      // 片段可能在呼叫端掛上 listener 前就播完了。
-      onFinished: (next) => {
-        if (finished) next();
-        else listener = next;
-      },
-    };
+    if (this.isStale(generation)) return;
+    await this.runtime.pushAudio(chunk);
+    if (this.isStale(generation) || inputRevision !== this.pcmInputRevision) return;
+    // 公開 PCM API 沒有 EOS；短暫閒置後沖出推論尾端，避免嘴型停在 rebuffering。
+    this.pcmDrainTimer = window.setTimeout(() => {
+      this.pcmDrainTimer = null;
+      if (!this.isStale(generation)) {
+        void this.runtime.finishAudio().catch((error) => {
+          if (!this.isStale(generation)) this.onError(error);
+        });
+      }
+    }, PCM_IDLE_DRAIN_MS);
   }
 
   interrupt(): void {
     this.playbackGeneration += 1;
-    for (const source of this.sources) {
-      source.onended = null;
-      try {
-        source.stop();
-      } catch {
-        void 0;
-      }
-    }
-    this.sources.clear();
-    this.nextStartTime = this.context?.currentTime ?? 0;
-    for (const settle of [...this.settlers]) settle();
+    this.cancelPcmDrain();
+    // 舊解碼可能尚未結束，新一輪不可被舊 queue 阻擋。
+    this.queueTail = Promise.resolve();
     this.runtime.clearAudio();
-    this.runtime.resetSpeaking();
-    this.setSpeaking(false);
   }
 
   destroy(): void {
+    if (this.destroyed) return;
     this.destroyed = true;
     this.interrupt();
-    void this.context?.close();
-    this.context = null;
-    this.outputNode = null;
+    this.unsubscribe();
   }
 
-  // silent 模式仍讓 source 跑完整個排程（onended 才會觸發 speaking 結束），
-  // 只是經過 gain=0 不出聲；嘴型由 runtime 依 pushAudio 的節奏驅動。
-  private ensureOutputNode(context: AudioContext): AudioNode {
-    if (this.outputNode) return this.outputNode;
-    if (this.audioOutput === "silent") {
-      const mute = context.createGain();
-      mute.gain.value = 0;
-      mute.connect(context.destination);
-      this.outputNode = mute;
-    } else {
-      this.outputNode = context.destination;
-    }
-    return this.outputNode;
+  private cancelPcmDrain(): void {
+    this.pcmInputRevision += 1;
+    if (this.pcmDrainTimer === null) return;
+    window.clearTimeout(this.pcmDrainTimer);
+    this.pcmDrainTimer = null;
   }
 
-  private ensureContext(): AudioContext {
-    const AudioContextConstructor = window.AudioContext
-      ?? (window as Window & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioContextConstructor) {
-      throw new OpenVmanAvatarError(
-        "AUTOPLAY_BLOCKED",
-        "This browser does not support Web Audio.",
-      );
-    }
-    this.context ??= new AudioContextConstructor({ sampleRate: PCM_SAMPLE_RATE });
-    return this.context;
+  private isStale(generation: number): boolean {
+    return this.destroyed || generation !== this.playbackGeneration;
   }
-
-  private finishIfIdle(): void {
-    if (this.sources.size > 0) return;
-    this.runtime.clearAudio();
-    this.runtime.endSpeaking();
-    this.setSpeaking(false);
-  }
-
-  private setSpeaking(speaking: boolean): void {
-    if (this.speaking === speaking) return;
-    this.speaking = speaking;
-    this.onSpeakingChange(speaking);
-  }
-}
-
-interface ScheduledSource {
-  onFinished: (listener: () => void) => void;
 }
 
 export function decodedAudioBufferToPcmChunks(

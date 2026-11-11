@@ -240,6 +240,11 @@ services:
 
   backend:
     <<: [*shared, *backend-runtime]
+    # Legacy character metadata conversion uses the existing pipeline bundle key.
+    env_file:
+      - ./.env
+      - path: ./avatar-pipeline/.env
+        required: false
     environment: *backend-environment
     build:
       context: ./backend

@@ -1,0 +1,15 @@
+services:
+  avatar-preview:
+    image: openvman/avatar-source-preview:local
+    build:
+      context: ../../..
+      dockerfile: frontend/app/Dockerfile
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    networks:
+      edge:
+        aliases: [avatar-source-preview]
+networks:
+  edge:
+    external: true
+    name: openvman_default

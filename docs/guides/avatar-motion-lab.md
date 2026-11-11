@@ -1,3 +1,5 @@
+> **2026-11-05 分支整合說明**：正式播放程式已改接共用 ONNX／WebGL 引擎；動作包另外需要 v2 的 `render_data.json.gz`，須從動作影片重新產製（Backend 轉換既有包得到的是新引擎不接受的 v1）。下方 2026-10 的 SDK／WASM 實驗數據及舊 factory 計數屬歷史版本，不可沿用為新引擎動作驗收。新分支保留動作 API，但全部動作及登入對話尚待實頁複驗，見 [來源拆分計畫](../plans/avatar-source-decoupling.md)。
+
 # 角色動作測試頁
 
 測試入口為現有站台的 `/experiments/avatar-motion/`，由 avatar 靜態服務提供，經既有 nginx 對外。此入口為獨立技術預覽；正式 Vue 前台的限定人物試用見下方「接入正式 Vman」，嵌入 widget 與 Avatar SDK 公開介面維持既有契約。

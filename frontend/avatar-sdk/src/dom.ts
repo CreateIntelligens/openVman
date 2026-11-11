@@ -6,6 +6,7 @@ const VENDOR_IDS = ["canvas_video", "canvas_gl", "screen"] as const;
 export interface AvatarDom {
   root: HTMLDivElement;
   style: HTMLStyleElement;
+  canvas: HTMLCanvasElement;
 }
 
 export function createAvatarDom(options: OpenVmanAvatarOptions): AvatarDom {
@@ -94,11 +95,10 @@ export function createAvatarDom(options: OpenVmanAvatarOptions): AvatarDom {
   }
   document.head.append(style);
   container.append(root);
-  return { root, style };
+  return { root, style, canvas: videoCanvas };
 }
 
 export function removeAvatarDom(dom: AvatarDom): void {
   dom.root.remove();
   dom.style.remove();
-  window.characterVideo?.remove();
 }

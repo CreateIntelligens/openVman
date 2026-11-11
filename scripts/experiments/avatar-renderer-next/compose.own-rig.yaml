@@ -1,0 +1,17 @@
+services:
+  frontend:
+    image: openvman/avatar-own-rig-frontend:local
+    build:
+      context: ../../..
+      dockerfile: frontend/app/Dockerfile
+    network_mode: none
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+  producer:
+    image: openvman/avatar-own-rig-producer:local
+    build:
+      context: ../../../avatar-pipeline
+    command: ["python", "-m", "pipeline.video_lips", "--help"]
+    network_mode: none
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"

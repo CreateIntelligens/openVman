@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import io
 import json
 from pathlib import Path
@@ -224,7 +225,7 @@ def test_default_source_limits():
 def test_submit_conflicts_with_existing_character(env):
     client, _, _, _ = env
     avatar_routes.get_store().create_character(
-        char_id="hero", label="x", video_bytes=WEBM_BYTES, data_bytes=b"\x1f\x8bd",
+        char_id="hero", label="x", video_bytes=WEBM_BYTES, data_bytes=gzip.compress(b"{}", mtime=0),
     )
     assert _submit(client).status_code == 409
 
@@ -243,7 +244,7 @@ def test_get_finalizes_done_job_into_a_character(env):
     job_id = _submit(client).json()["job"]["job_id"]
     out = Path(pool.calls[0][1]["output_dir"])
     (out / "01.webm").write_bytes(WEBM_BYTES)
-    (out / "combined_data.json.gz").write_bytes(b"\x1f\x8bdata")
+    (out / "combined_data.json.gz").write_bytes(gzip.compress(b"{}", mtime=0))
     record = json.loads(redis.store[f"vman:avatar-pipeline:job:{job_id}"])
     record.update({"state": "done", "stage": "done", "frame_count": 150})
     redis.store[f"vman:avatar-pipeline:job:{job_id}"] = json.dumps(record)

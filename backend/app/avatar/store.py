@@ -3,6 +3,7 @@
 Layout (under base_dir):
     {char_id}/01.webm
     {char_id}/combined_data.json.gz
+    {char_id}/render_data.json.gz  -> optional CPU render contract
     {char_id}/meta.json   -> {"label", "created_at", "updated_at"}
 """
 
@@ -16,7 +17,13 @@ import time
 from pathlib import Path
 from typing import Any
 
+from app.avatar.render_data import (
+    RENDER_FILENAME,
+    extract_uploaded_render_data,
+    write_render_sidecar,
+)
 from app.avatar.validation import normalize_char_id
+from app.config import get_tts_config
 
 VIDEO_FILENAME = "01.webm"
 DATA_FILENAME = "combined_data.json.gz"
@@ -86,6 +93,11 @@ class AvatarStore:
         try:
             (tmp / VIDEO_FILENAME).write_bytes(video_bytes)
             (tmp / DATA_FILENAME).write_bytes(data_bytes)
+            render_data = extract_uploaded_render_data(
+                data_bytes, limit=get_tts_config().avatar_max_upload_bytes,
+            )
+            if render_data is not None:
+                write_render_sidecar(tmp, render_data)
             now = _now()
             self._write_meta(
                 tmp,
@@ -134,7 +146,7 @@ class AvatarStore:
         video = path / VIDEO_FILENAME
         data = path / DATA_FILENAME
         size = 0
-        for f in (video, data):
+        for f in (video, data, path / RENDER_FILENAME):
             if f.exists():
                 size += f.stat().st_size
         return {

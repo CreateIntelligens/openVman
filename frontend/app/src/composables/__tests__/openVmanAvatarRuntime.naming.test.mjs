@@ -1,50 +1,36 @@
-import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import test from "node:test";
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
+import test from 'node:test'
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const srcRoot = resolve(__dirname, "../..");
+import { runtimeHarness } from './avatarRuntimeHarness.mjs'
 
-test("frontend wraps the vendor engine behind the openVman runtime name", () => {
-  const runtimePath = resolve(srcRoot, "composables/useOpenVmanAvatarRuntime.ts");
-  assert.equal(existsSync(runtimePath), true);
+const source = readFileSync(new URL('../useOpenVmanAvatarRuntime.ts', import.meta.url), 'utf8')
 
-  const runtime = readFileSync(runtimePath, "utf-8");
-  const app = readFileSync(resolve(srcRoot, "App.vue"), "utf-8") + "\n" + readFileSync(resolve(srcRoot, "composables/useAvatarStage.ts"), "utf8");
-  const settings = readFileSync(
-    resolve(srcRoot, "components/controls/SettingsModal.vue"),
-    "utf-8",
-  );
+test('the historical composable name loads only the shared engine API', () => {
+  assert.match(source, /export function useOpenVmanAvatarRuntime\(\)/)
+  assert.match(source, /import\s*\{\s*AvatarEngine,\s*decodeRenderPayload,?\s*\}\s*from\s*["']\.\.\/\.\.\/\.\.\/shared\/avatar-engine\/index\.mjs["']/)
+  assert.doesNotMatch(source, /createQtAppInstance|_malloc|_free|_processSecret|OpenVmanAvatarRuntime\.(?:js|wasm)/)
+})
 
-  assert.match(runtime, /export function useOpenVmanAvatarRuntime\(\)/);
-  assert.match(app, /useOpenVmanAvatarRuntime/);
-  assert.doesNotMatch(app, /useMatesX/);
-  assert.doesNotMatch(settings, /· MatesX/);
-});
+test('runtime assets remain same-origin and character paths encode only the identifier', async t => {
+  const h = await runtimeHarness(t)
+  const avatar = h.use(), engine = await avatar.initWasm()
+  assert.equal(h.creations[0].runtimeBaseUrl, '/avatar-engine/')
+  await avatar.loadCharacter('角色 / 1')
+  assert.equal(engine.loads[0].base, `/static/characters/${encodeURIComponent('角色 / 1')}`)
+})
 
-test("avatar runtime loads the engine from the same origin", () => {
-  const runtime = readFileSync(resolve(srcRoot, "../public/js/OpenVmanAvatarRuntime.js"), "utf-8");
-  assert.deepEqual(runtime.match(/https?:\/\/[^\s"'`]+/g) ?? [], []);
-});
-
-test("engine wasm ships under the openVman runtime name", () => {
-  const publicRoot = resolve(srcRoot, "../public");
-  assert.equal(existsSync(resolve(publicRoot, "wasm/OpenVmanAvatarRuntime.wasm")), true);
-  assert.equal(existsSync(resolve(publicRoot, "wasm/DHLiveMini2.wasm")), false);
-
-  const runtime = readFileSync(resolve(publicRoot, "js/OpenVmanAvatarRuntime.js"), "utf-8");
-  const adapter = readFileSync(resolve(srcRoot, "composables/useOpenVmanAvatarRuntime.ts"), "utf-8");
-  for (const source of [runtime, adapter]) {
-    assert.match(source, /wasm\/OpenVmanAvatarRuntime\.wasm/);
-    assert.doesNotMatch(source, /DHLiveMini/);
+test('the public directory no longer ships the old vendor bundle or WASM aliases', () => {
+  for (const path of ['js/OpenVmanAvatarRuntime.js', 'wasm/OpenVmanAvatarRuntime.wasm', 'js/DHLiveMini2.js', 'wasm/DHLiveMini2.wasm']) {
+    assert.equal(existsSync(new URL(`../../../public/${path}`, import.meta.url)), false, path)
   }
-});
+})
 
-test("runtime comments and prompts use Traditional Chinese", () => {
-  const runtime = readFileSync(resolve(srcRoot, "../public/js/OpenVmanAvatarRuntime.js"), "utf-8");
-  // 只列這支檔案曾出現過的簡體字，不是完整的簡繁對照。
-  const simplified = /[获频画检统于选择执后续将挂载还页录帧脚绘过个视]/g;
-  assert.deepEqual(runtime.match(simplified) ?? [], []);
-});
+test('the production build prepares the new worker and model assets before Vite', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'))
+  assert.match(pkg.scripts.build, /^pnpm prepare:avatar &&/)
+  assert.equal(pkg.scripts['prepare:avatar'], 'node scripts/prepare-avatar-engine.mjs')
+  const prepare = readFileSync(new URL('../../../scripts/prepare-avatar-engine.mjs', import.meta.url), 'utf8')
+  assert.match(prepare, /avatar-engine/)
+  assert.doesNotMatch(prepare, /OpenVmanAvatarRuntime\.(?:js|wasm)|DHLiveMini2/)
+})
