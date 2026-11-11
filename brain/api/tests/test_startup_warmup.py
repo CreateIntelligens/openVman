@@ -20,7 +20,7 @@ def _reset_warmup_state():
 def _no_gemini_warmup(monkeypatch, request):
     """其他預熱測試不該真的連 Gemini；測台語判斷預熱的測試自己換掉 client。"""
     if "audio_language" not in request.node.name:
-        monkeypatch.setattr(_load_startup(), "_warmup_audio_language", lambda project_id="default": None)
+        monkeypatch.setattr(_load_startup(), "_warmup_audio_language", lambda *args, **kwargs: None)
 
 
 def test_warmup_project_ids_include_projects_with_knowledge_state(monkeypatch):
@@ -240,11 +240,56 @@ def test_warmup_audio_language_failure_does_not_raise(monkeypatch, caplog):
     assert "ConnectionError" in caplog.text
 
 
+def test_warmup_audio_language_retries_until_backend_is_back(monkeypatch, caplog):
+    # watchtower 換版時 Backend 跟 Brain 一起重啟，剛開始拿不到金鑰。
+    import types
+
+    import memory.language_detect as language_detect
+
+    startup = _load_startup()
+    _audio_settings(monkeypatch, startup)
+    monkeypatch.setattr(startup, "_AUDIO_WARMUP_RETRY_SECONDS", 0)
+    calls: list[str] = []
+
+    def client(key):
+        calls.append(key)
+        if len(calls) < 3:
+            raise ConnectionError("backend restarting")
+        return types.SimpleNamespace(models=types.SimpleNamespace(get=lambda model: None))
+
+    monkeypatch.setattr(language_detect, "_audio_language_client", client)
+
+    startup._warmup_audio_language("default", attempts=5)
+
+    assert len(calls) == 3
+    assert "預熱失敗" not in caplog.text
+
+
+def test_warmup_audio_language_gives_up_after_the_last_attempt(monkeypatch, caplog):
+    import memory.language_detect as language_detect
+
+    startup = _load_startup()
+    _audio_settings(monkeypatch, startup)
+    monkeypatch.setattr(startup, "_AUDIO_WARMUP_RETRY_SECONDS", 0)
+    calls: list[str] = []
+
+    def boom(key):
+        calls.append(key)
+        raise ConnectionError("backend down")
+
+    monkeypatch.setattr(language_detect, "_audio_language_client", boom)
+
+    startup._warmup_audio_language("default", attempts=3)
+
+    assert len(calls) == 3
+    assert caplog.text.count("預熱失敗") == 1
+
+
 @pytest.mark.asyncio
 async def test_audio_language_warmup_runs_before_retrieval_warmup(monkeypatch):
     startup = _load_startup()
     order: list[str] = []
-    monkeypatch.setattr(startup, "_warmup_audio_language", lambda: order.append("audio"))
+    monkeypatch.setattr(startup, "_warmup_audio_language", lambda *args: order.append("audio"))
     monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default"])
     monkeypatch.setattr(startup, "ensure_workspace_scaffold", lambda project_id: None)
     monkeypatch.setattr(startup, "get_embedder", lambda: order.append("embedder"))

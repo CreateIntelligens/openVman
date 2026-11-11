@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
@@ -18,6 +19,10 @@ from memory.memory_governance import maybe_run_memory_maintenance
 from warmup_state import mark_warmup_done
 
 logger = logging.getLogger("brain")
+
+# 等 Backend 重啟最多約 10 秒；之後各專案的預熱只試一次，Backend 真的掛了不拖慢啟動。
+_AUDIO_WARMUP_ATTEMPTS = 6
+_AUDIO_WARMUP_RETRY_SECONDS = 2.0
 
 
 def _warmup_project_ids() -> list[str]:
@@ -81,33 +86,41 @@ def _warmup_retrieval_path(project_id: str = "default") -> None:
             )
 
 
-def _warmup_audio_language(project_id: str = "default") -> None:
+def _warmup_audio_language(project_id: str = "default", attempts: int = 1) -> None:
     """Import google-genai and warm the selected project's resolved client.
 
     台語判斷只能等 2.5 秒；部署重啟後第一句要付載入套件、建 client、跟 Gemini
     建連線，實測 2.5 秒（之後 1.2 秒），第一個講台語的人會被當成講華語。
     models.get 不花 token。
+
+    *attempts* > 1 時失敗會隔幾秒重試：watchtower 換版會同時重啟 Backend，
+    剛啟動時拿不到金鑰（ConnectError），等 Backend 起來就好了。
     """
     cfg = get_settings()
     from core.gemini_credentials import resolve_gemini_credential
     from memory.language_detect import _audio_language_client
 
-    try:
-        credential = resolve_gemini_credential(project_id)
-        if not credential.api_key:
+    for attempt in range(1, attempts + 1):
+        try:
+            credential = resolve_gemini_credential(project_id)
+            if not credential.api_key:
+                return
+            _audio_language_client(credential.api_key).models.get(
+                model=cfg.live_audio_language_id_model,
+            )
             return
-        _audio_language_client(credential.api_key).models.get(
-            model=cfg.live_audio_language_id_model,
-        )
-    except Exception as exc:  # noqa: BLE001 - 預熱失敗只是第一句慢，不擋啟動
-        logger.warning("台語判斷預熱失敗（不影響啟動）: %s", type(exc).__name__)
+        except Exception as exc:  # noqa: BLE001 - 預熱失敗只是第一句慢，不擋啟動
+            if attempt < attempts:
+                time.sleep(_AUDIO_WARMUP_RETRY_SECONDS)
+                continue
+            logger.warning("台語判斷預熱失敗（不影響啟動）: %s", type(exc).__name__)
 
 
 async def warmup_resources() -> None:
     """背景預熱 remote embedding 與資料路徑。"""
     logger.info("背景預熱開始...")
     # 最先做：部署後第一句台語可能在其他預熱跑完前就到。
-    await asyncio.to_thread(_warmup_audio_language)
+    await asyncio.to_thread(_warmup_audio_language, "default", _AUDIO_WARMUP_ATTEMPTS)
     try:
         project_ids = _warmup_project_ids()
         await asyncio.to_thread(get_embedder)
