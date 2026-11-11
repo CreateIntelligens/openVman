@@ -56,6 +56,7 @@ from protocol.message_envelope import (
     serialize_context,
 )
 from safety.guardrails import enforce_guardrails, enforce_session_limits
+from safety.observability import timed_node
 from tools.context import (
     active_retrieval_language,
     active_speech_language,
@@ -109,12 +110,15 @@ def prepare_generation(
         raise ValueError("message 不可為空")
     if len(cleaned_message) > cfg.max_input_length:
         raise ValueError(f"message 不可超過 {cfg.max_input_length} 字")
-    enforce_guardrails("chat", cleaned_message, envelope.context)
-    enforce_session_limits(envelope.context.session_id, persona_id, project_id)
+    trace_id = envelope.context.trace_id
+    with timed_node("chat_guardrails", trace_id=trace_id):
+        enforce_guardrails("chat", cleaned_message, envelope.context)
+        enforce_session_limits(envelope.context.session_id, persona_id, project_id)
 
     route = route_message(normalize_to_brain_message(envelope))
-    session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
-    prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
+    with timed_node("chat_session_load", trace_id=trace_id):
+        session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
+        prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
 
     # Decision policy is server-owned and bound to this finalized user turn.
     # Client metadata can provide ASR evidence, but cannot supply a policy.
@@ -133,20 +137,21 @@ def prepare_generation(
             tool.get("function", {}).get("name")
             for tool in get_tool_registry().build_openai_tools()
         }
-        turn_decision = run_turn_decision(
-            user_text=stored_user_message,
-            history=prior_messages,
-            project_id=project_id,
-            project_language=primary_language(project_id),
-            speech_language=str(metadata.get("speech_language") or ""),
-            available_tools=tuple(registered),
-            config=cfg,
-            turn_id=envelope.context.trace_id,
-            # 用戶端斷線時連同進行中的決策請求一起停，不等它跑完。
-            cancel_event=current_cancel_event(),
-            capture_debug=decision_debug,
-            preferred_language=preferred_language or "",
-        )
+        with timed_node("chat_turn_decision", trace_id=trace_id):
+            turn_decision = run_turn_decision(
+                user_text=stored_user_message,
+                history=prior_messages,
+                project_id=project_id,
+                project_language=primary_language(project_id),
+                speech_language=str(metadata.get("speech_language") or ""),
+                available_tools=tuple(registered),
+                config=cfg,
+                turn_id=envelope.context.trace_id,
+                # 用戶端斷線時連同進行中的決策請求一起停，不等它跑完。
+                cancel_event=current_cancel_event(),
+                capture_debug=decision_debug,
+                preferred_language=preferred_language or "",
+            )
         turn_decision = without_disabled_recall(turn_decision, session.session_id, project_id)
 
     request_ctx = serialize_context(envelope.context)
@@ -165,17 +170,18 @@ def prepare_generation(
                 stored_user_message, preferred_language or primary_language(project_id),
             )
         )
-    prompt_messages = build_chat_messages(
-        user_message=cleaned_message,
-        request_context=request_ctx,
-        session_messages=prior_messages,
-        allow_tools=not route.skip_tools,
-        turn_policy=turn_decision.policy if turn_decision else None,
-        decision_dependency_unavailable=bool(
-            turn_decision and turn_decision.dependency_unavailable
-        ),
-        preferred_language=preferred_language,
-    )
+    with timed_node("chat_build_prompt", trace_id=trace_id):
+        prompt_messages = build_chat_messages(
+            user_message=cleaned_message,
+            request_context=request_ctx,
+            session_messages=prior_messages,
+            allow_tools=not route.skip_tools,
+            turn_policy=turn_decision.policy if turn_decision else None,
+            decision_dependency_unavailable=bool(
+                turn_decision and turn_decision.dependency_unavailable
+            ),
+            preferred_language=preferred_language,
+        )
 
     return GenerationContext(
         trace_id=envelope.context.trace_id,

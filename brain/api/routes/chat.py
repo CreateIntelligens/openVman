@@ -5,7 +5,7 @@ import json
 import logging
 import threading
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any, NoReturn
 
@@ -56,7 +56,13 @@ from safety.internal_auth import (
     may_see_decision_debug,
     require_internal_token,
 )
-from safety.observability import get_metrics_store, log_event, log_exception
+from safety.observability import (
+    get_metrics_store,
+    log_event,
+    log_exception,
+    record_node_attempt,
+    timed_node,
+)
 from tools.skill_manager import get_skill_manager
 
 logger = logging.getLogger("brain.chat")
@@ -239,6 +245,26 @@ class _ChatRun:
     deadline_exceeded: bool = False
 
 
+async def _to_thread_timed(
+    request: Request, step: str, func: Callable[..., Any], /, *args: Any, **kwargs: Any,
+) -> Any:
+    """Run *func* in a worker thread, logging its wait for a thread and its duration."""
+    trace_id = getattr(request.state, "trace_id", "") or ""
+    scheduled = time.monotonic()
+
+    def run() -> Any:
+        # 分開記：多人同時問時，要看得出是在等執行緒，還是這一步本身慢。
+        record_node_attempt(
+            "chat_thread_wait", outcome="ok",
+            elapsed_ms=(time.monotonic() - scheduled) * 1000,
+            trace_id=trace_id, step=step,
+        )
+        with timed_node(f"chat_{step}", trace_id=trace_id):
+            return func(*args, **kwargs)
+
+    return await asyncio.to_thread(run)
+
+
 async def _generate_chat_response(
     request: Request,
     payload: ChatRequest,
@@ -250,7 +276,7 @@ async def _generate_chat_response(
     turn_budget_s = number_setting(get_settings(), "chat_turn_budget_seconds", 30.0)
     with bind_cancel_event(cancel_event), bind_turn_budget(turn_budget_s, started=run.started):
         if payload.turn_id is not None:
-            await asyncio.to_thread(register_turn, request, payload)
+            await _to_thread_timed(request, "register_turn", register_turn, request, payload)
         logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
 
         # 用量歸屬：prepare 階段（recall 摘要、query expansion）也會呼叫 LLM，
@@ -271,7 +297,7 @@ async def _generate_chat_response(
             trace_id=getattr(request.state, "trace_id", "") or "",
         ) as scope:
             run.scope = scope
-            context = await asyncio.to_thread(_prepare_chat_context, request, payload)
+            context = await _to_thread_timed(request, "prepare", _prepare_chat_context, request, payload)
             run.context = context
             scope.project_id = context.project_id
             scope.session_id = context.session_id
@@ -279,10 +305,10 @@ async def _generate_chat_response(
             scope.trace_id = context.trace_id
             scope.channel = str(context.request_context.get("channel", ""))
             if reply_stream is None:
-                result = await asyncio.to_thread(execute_generation, context)
+                result = await _to_thread_timed(request, "execute", execute_generation, context)
             else:
-                result = await asyncio.to_thread(
-                    execute_generation, context, text_listener=reply_stream,
+                result = await _to_thread_timed(
+                    request, "execute", execute_generation, context, text_listener=reply_stream,
                 )
                 # 句子先送完再挑圖、寫紀錄、判斷 no_answer：整合方的 TTS 不用等這些。
                 if not cancel_event.is_set():

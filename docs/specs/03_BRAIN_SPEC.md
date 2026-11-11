@@ -334,6 +334,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 * **原因碼**：`timeout_connect`、`timeout_first_token`、`timeout_stall`、`timeout_total` 與 `transient_error`（連線被拒、其他錯誤）、`provider_error`（5xx）等分開記。key pool 與 `provider_health` 仍把逾時當暫時性失敗（短冷卻、連續 2 次冷卻 60 秒）。
 * **串流中途失敗**：已有句子送出的站逾時，仍換下一站重答，`ReplyStream.finish` 補送完整答案，並記 `llm_restart_after_partial_text`。
+* **回合準備階段的時間**：`chat_thread_wait`（等工作執行緒）、`chat_register_turn`、`chat_prepare`、`chat_guardrails`、`chat_session_load`、`chat_turn_decision`、`chat_build_prompt`、`chat_execute`、`chat_agent_setup`、`chat_prefetch_knowledge` 也各記一筆 `node_attempt`，事件帶毫秒 `ts_ms`。
 * **事件**：每次節點嘗試一筆。LLM 為 `llm_route_attempt`（`node=llm_hop`、`provider`、`model`、`hop_index`、`outcome`、`elapsed_ms`、`mode`、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`、`error`）；檢索與其他節點為 `node_attempt`（`node` 為 `rag_embed_query`／`rag_query`／`rag_vector`／`rag_lexical`／`rag_graph`／`auto_recall`，`outcome` 為 `ok`／`empty`／`timeout`／`error`／`skipped`，加 `component`、`elapsed_ms`、`timeout_s`、`error_type`）。另有 `llm_chain_budget_exhausted`、`turn_budget_exhausted`、`tool_timeout`、`chat_deadline_exceeded`，以及逾時後仍在跑的工具或 auto recall 執行緒跑完時的 `node_orphan_finished`。所有事件帶本輪 `trace_id`；`str(exc)` 為空時 `error` 用例外型別名稱。
 
 ### 9. 工具調用 (Tool Calling)

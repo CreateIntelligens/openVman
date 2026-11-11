@@ -26,7 +26,7 @@ from core.reply_modes import ModeSettings, ReplyMode, resolve_mode
 from core.turn_budget import current_trace_id, current_turn_budget
 from core.turn_reads import planned_reads, previous_user_text, user_texts
 from core.usage import current_usage_scope
-from safety.observability import log_event
+from safety.observability import log_event, record_node_attempt, timed_node
 from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, fit_product_tool
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
@@ -340,6 +340,7 @@ def _run_tool_phase(
     Returns (working_messages, tool_steps, final_turn) where final_turn is the
     LLMReply that ended the loop (no tool calls), or None if max rounds were hit.
     """
+    setup_started = time.monotonic()
     mode = resolve_mode(reply_mode)
     cfg = ModeSettings(get_settings(), mode)
     working_messages = [dict(message) for message in messages]
@@ -418,10 +419,15 @@ def _run_tool_phase(
     with bind_tool_context(
         persona_id, project_id, user_message=last_user_message, reply_mode=mode.name
     ):
+        record_node_attempt(
+            "chat_agent_setup", outcome="ok",
+            elapsed_ms=(time.monotonic() - setup_started) * 1000,
+        )
         if prefetch:
-            _append_tool_turns(
-                working_messages, tool_steps, _prefetched_knowledge_turn(reads[0][1]), round_index=0,
-            )
+            with timed_node("chat_prefetch_knowledge"):
+                _append_tool_turns(
+                    working_messages, tool_steps, _prefetched_knowledge_turn(reads[0][1]), round_index=0,
+                )
             _notify_tool_round(on_tool_round, tool_steps)
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             raise_if_cancelled(f"llm_round_{iteration}", tool_steps=len(tool_steps))

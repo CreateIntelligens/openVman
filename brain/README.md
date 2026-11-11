@@ -215,6 +215,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 每個節點的每次嘗試記一筆結構化事件，`trace_id` 是這一輪的 trace id（綁在用量 scope 上，準備階段就有）：
 
 - LLM：`llm_route_attempt`，欄位 `node: "llm_hop"`、`provider`、`model`、`hop_index`、`outcome`（成功是 `ok`，失敗是原因碼）、`elapsed_ms`、`mode`（`stream`／`nonstream`）、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`、`error`（訊息是空的就用型別名稱）；跨站預算用完記 `llm_chain_budget_exhausted`（`skipped_hops`）。
+- 回合的準備階段：`node_attempt`，`node` 為 `chat_thread_wait`（等工作執行緒，`step` 欄標示等哪一步）、`chat_register_turn`、`chat_prepare`、`chat_guardrails`、`chat_session_load`、`chat_turn_decision`、`chat_build_prompt`、`chat_execute`、`chat_agent_setup`、`chat_prefetch_knowledge`，用來分清多人同時問時時間花在哪。所有事件另有毫秒時間 `ts_ms`（`ts` 只到整秒）。
 - 檢索與其他節點：`node_attempt`，`node` 為 `rag_embed_query`、`rag_query`、`rag_vector`、`rag_lexical`、`rag_graph`、`auto_recall`，`outcome` 為 `ok`／`empty`／`timeout`／`error`／`skipped`，加上 `component`、`elapsed_ms`、`timeout_s`、`error_type`。工具逾時記 `tool_timeout`（`clamped_by_turn_budget`），整輪預算用完記 `turn_budget_exhausted`。
 
 ```json

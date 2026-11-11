@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from threading import Lock
-from time import time
+from time import monotonic, time
 from typing import Any
 
 logger = logging.getLogger("brain")
@@ -77,8 +79,10 @@ def get_metrics_store() -> MetricsStore:
 
 
 def log_event(event: str, **fields: object) -> None:
+    now = time()
     payload = {
-        "ts": int(time()),
+        "ts": int(now),
+        "ts_ms": int(now * 1000),
         "event": event,
         **fields,
     }
@@ -222,6 +226,26 @@ def record_node_attempt(
     payload.update(error_fields(exc))
     payload.update(fields)
     log_event("node_attempt", **payload)
+
+
+@contextmanager
+def timed_node(
+    node: str, *, trace_id: str | None = None, **fields: object,
+) -> Iterator[None]:
+    """Record how long the enclosed step took as one ``node_attempt``."""
+    started = monotonic()
+    try:
+        yield
+    except BaseException as exc:
+        record_node_attempt(
+            node, outcome="error", elapsed_ms=(monotonic() - started) * 1000,
+            trace_id=trace_id, exc=exc, **fields,
+        )
+        raise
+    record_node_attempt(
+        node, outcome="ok", elapsed_ms=(monotonic() - started) * 1000,
+        trace_id=trace_id, **fields,
+    )
 
 
 def record_fallback_hop(
