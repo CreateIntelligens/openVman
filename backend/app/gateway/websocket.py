@@ -28,6 +28,7 @@ from app.observability import (
 )
 from app.project_ids import DEFAULT_PROJECT_ALIAS, canonical_project_id
 from app.session_manager import Session, SessionManager
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("backend")
 router = APIRouter()
@@ -76,7 +77,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     if is_reconnect:
         record_ws_reconnect()
     set_active_sessions(len(_session_manager.active_sessions))
-    logger.info("WebSocket session created: %s for client: %s", session.session_id, client_id)
+    logger.info(
+        "WebSocket session created: %s for client: %s",
+        log_safe(session.session_id), log_safe(client_id),
+    )
 
     heartbeat_task = asyncio.create_task(_run_heartbeat(websocket, session.session_id))
     session.add_task(heartbeat_task, interruptible=False)
@@ -149,7 +153,7 @@ async def _handle_websocket_event(
     elif event == "client_camera_reset":
         _handle_client_camera_reset(session)
     elif event:
-        logger.warning("Unhandled WebSocket event: %s", event)
+        logger.warning("Unhandled WebSocket event: %s", log_safe(event))
 
 
 async def _handle_client_init(data: dict, session: Session, websocket: WebSocket) -> None:
@@ -237,7 +241,7 @@ async def _handle_client_interrupt(data: dict, session: Session, websocket: WebS
     # A control event without a transcript is the UI's explicit stop request.
     action = await _guard_agent.classify(text) if text.strip() else "STOP"
     if action != "STOP":
-        logger.debug("Ignoring potential interruption: %s", text)
+        logger.debug("Ignoring potential interruption: %s", log_safe(text))
         return
 
     cancelled = await session.interrupt_tasks()
@@ -270,7 +274,7 @@ def _handle_set_lip_sync_mode(data: dict, session: Session) -> None:
         session.lip_sync_mode = mode
         logger.info("Session %s lip-sync mode set to %s", session.session_id, mode)
     else:
-        logger.warning("Invalid lip-sync mode: %s", mode)
+        logger.warning("Invalid lip-sync mode: %s", log_safe(mode))
 
 
 async def _handle_user_speak(data: dict, session: Session, websocket: WebSocket) -> None:
@@ -279,7 +283,7 @@ async def _handle_user_speak(data: dict, session: Session, websocket: WebSocket)
         logger.warning("user_speak received with no text")
         return
 
-    logger.info("[LIVE CHAT] User: %r", text)
+    logger.info("[LIVE CHAT] User: %r", log_safe(text))
     await _ensure_brain_relay(session, websocket)
     assert session.brain_live_relay is not None
     await session.brain_live_relay.send_event(
@@ -294,7 +298,10 @@ async def _handle_user_speak(data: dict, session: Session, websocket: WebSocket)
 
 async def _handle_client_audio_event(data: dict, session: Session, websocket: WebSocket) -> None:
     if session.brain_live_relay is None and not session.metadata.get("client_initialized"):
-        logger.debug("Dropping %s before client_init for session %s", data.get("event"), session.session_id)
+        logger.debug(
+            "Dropping %s before client_init for session %s",
+            log_safe(data.get("event")), log_safe(session.session_id),
+        )
         return
     await _ensure_brain_relay(session, websocket)
     assert session.brain_live_relay is not None

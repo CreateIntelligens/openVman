@@ -35,6 +35,7 @@ from app.auth.resources import (
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.brain_proxy import proxy_to_brain
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("backend.project_routes")
 
@@ -279,7 +280,7 @@ async def delete_project(
     except Exception as exc:
         logger.error(
             "project ownership cleanup failed project_id=%s",
-            body.project_id,
+            log_safe(body.project_id),
             exc_info=exc,
         )
         removed = False
@@ -473,11 +474,11 @@ def put_project_policy(
         ) from exc
     logger.info(
         "project policy updated project_id=%s by=%s asr=%s tts=%s chars=%s",
-        project_id,
-        current.user.id,
-        ",".join(record.allowed_asr_engines) or "-",
-        ",".join(record.allowed_tts_voices) or "-",
-        ",".join(record.allowed_characters) or "-",
+        log_safe(project_id),
+        log_safe(current.user.id),
+        log_safe(",".join(record.allowed_asr_engines) or "-"),
+        log_safe(",".join(record.allowed_tts_voices) or "-"),
+        log_safe(",".join(record.allowed_characters) or "-"),
     )
     return ProjectPolicyProfile.from_record(record)
 

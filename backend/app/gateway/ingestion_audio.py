@@ -43,6 +43,7 @@ from app.upstream_guard import (
     worth_trying,
 )
 from app.utils.chinese import convert_to_traditional
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("gateway.ingestion_audio")
 
@@ -500,8 +501,11 @@ async def transcribe(
     chain = _skip_unreachable(configured)
     logger.info(
         "transcribe trace_id=%s provider=%s preferred=%s chain=%s skipped=%s",
-        trace_id, cfg.asr_provider, preferred or "-", ",".join(chain),
-        ",".join(name for name in configured if name not in chain) or "-",
+        log_safe(trace_id),
+        log_safe(cfg.asr_provider),
+        log_safe(preferred or "-"),
+        log_safe(",".join(chain)),
+        log_safe(",".join(name for name in configured if name not in chain) or "-"),
     )
 
     for name in configured:
@@ -551,7 +555,7 @@ async def transcribe(
             outcome, error = classify_outcome(exc)
             logger.warning(
                 "transcription_attempt_failed trace_id=%s provider=%s err=%s",
-                trace_id, name, describe_error(exc),
+                log_safe(trace_id), log_safe(name), log_safe(describe_error(exc)),
             )
             opened = ASR_BREAKER.record_failure(name, exc)
             emit_attempt(
@@ -564,7 +568,7 @@ async def transcribe(
                 _unreachable_until[name] = time.monotonic() + cooldown
                 logger.warning(
                     "asr_provider_unreachable provider=%s skip_for=%.0fs",
-                    name, cooldown,
+                    log_safe(name), cooldown,
                 )
             continue
         _unreachable_until.pop(name, None)
@@ -576,13 +580,16 @@ async def transcribe(
 
         logger.info(
             "transcription_ok trace_id=%s provider=%s chars=%d",
-            trace_id, name, len(content),
+            log_safe(trace_id), log_safe(name), len(content),
         )
         return IngestionResult(
             content_type="audio_transcription", content=content, provider=name,
         )
 
-    logger.error("transcription_failed trace_id=%s tried=%s", trace_id, ",".join(chain))
+    logger.error(
+        "transcription_failed trace_id=%s tried=%s",
+        log_safe(trace_id), log_safe(",".join(chain)),
+    )
     return IngestionResult(
         content_type="audio_transcription",
         content="（音訊轉錄失敗）",

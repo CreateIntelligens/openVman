@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 from app.gateway.redis_pool import get_redis
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("gateway.job_status")
 
@@ -29,7 +30,10 @@ async def _read_from_redis(job_id: str) -> dict[str, Any] | None:
     try:
         raw = await redis.get(_job_key(job_id))
     except Exception as exc:
-        logger.warning("job_status_read_failed job_id=%s err=%s", job_id, exc)
+        logger.warning(
+            "job_status_read_failed job_id=%s err=%s",
+            log_safe(job_id), log_safe(exc),
+        )
         return None
 
     if raw is None:
@@ -40,7 +44,10 @@ async def _read_from_redis(job_id: str) -> dict[str, Any] | None:
             raw = raw.decode("utf-8")
         payload = json.loads(raw)
     except (TypeError, ValueError) as exc:
-        logger.warning("job_status_decode_failed job_id=%s err=%s", job_id, exc)
+        logger.warning(
+            "job_status_decode_failed job_id=%s err=%s",
+            log_safe(job_id), log_safe(exc),
+        )
         return None
 
     if isinstance(payload, dict):

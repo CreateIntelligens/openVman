@@ -27,6 +27,7 @@ from app.gateway.queue import get_arq_pool
 from app.gateway.redis_pool import get_redis
 from app.utils import media as media_mod
 from app.utils.images import IMAGE_EXTENSIONS, sniff_image_mime, validate_image_file
+from app.utils.log_safe import log_safe
 from app.utils.upload import UploadTooLargeError, format_limit
 
 logger = logging.getLogger("backend.avatar.jobs")
@@ -191,7 +192,10 @@ async def submit_job(
         shutil.rmtree(paths.root, ignore_errors=True)
         await redis.delete(_job_key(job_id))
         raise QueueUnavailable(f"無法排入轉換佇列：{exc}") from exc
-    logger.info("avatar_job_enqueued job_id=%s char_id=%s", job_id, char_id)
+    logger.info(
+        "avatar_job_enqueued job_id=%s char_id=%s",
+        log_safe(job_id), log_safe(char_id),
+    )
     return _public(record)
 
 

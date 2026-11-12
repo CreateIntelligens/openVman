@@ -15,6 +15,7 @@ except Exception:  # pragma: no cover
 
 from app.config import get_tts_config
 from app.tts_text_cleaner import clean_for_tts
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,10 @@ async def _normalize_via_api_async(
             data = response.json()
             field = "simplified" if simplified else "norm_text"
             result = data.get(field) or data.get("norm_text") or data.get("clean_text")
-            logger.info("normalize API async hit: %r -> %r", text[:40], (result or "")[:40])
+            logger.info(
+                "normalize API async hit: %r -> %r",
+                log_safe(text[:40]), log_safe((result or "")[:40]),
+            )
             return result
     except Exception as exc:
         logger.warning("normalize API async call failed, falling back to regex: %s", exc)

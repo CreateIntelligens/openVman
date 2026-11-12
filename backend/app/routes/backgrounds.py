@@ -42,6 +42,7 @@ from app.avatar.background_validation import (
 )
 from app.config import get_tts_config
 from app.utils.images import validate_image
+from app.utils.log_safe import log_safe
 from app.utils.upload import UploadLimitError, as_http_exception, read_upload_limited
 
 logger = logging.getLogger("backend.backgrounds")
@@ -228,7 +229,10 @@ async def delete_background(
         try:
             runtime.resources.unregister(ResourceType.AVATAR_BACKGROUND, bid)
         except Exception as exc:
-            logger.warning("failed to unregister background resource %s: %s", bid, exc)
+            logger.warning(
+                "failed to unregister background resource %s: %s",
+                log_safe(bid), log_safe(exc),
+            )
     except BackgroundNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"status": "ok", "background_id": bid}
@@ -254,7 +258,10 @@ async def update_background_label(
                 metadata={"label": label},
             )
         except Exception as exc:
-            logger.warning("failed to update background metadata %s: %s", bid, exc)
+            logger.warning(
+                "failed to update background metadata %s: %s",
+                log_safe(bid), log_safe(exc),
+            )
     except BackgroundNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"status": "ok", "background": background}

@@ -64,6 +64,7 @@ from app.usage_ledger_client import (
     usage_scope_for,
 )
 from app.utils.chinese import convert_to_traditional
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("gateway.asr_stream")
 router = APIRouter()
@@ -514,7 +515,9 @@ async def asr_stream(websocket: WebSocket) -> None:
         pass
     except Exception as exc:  # noqa: BLE001 - 上游失敗時讓前台退回批次 ASR
         outcome, error = classify_outcome(exc)
-        logger.warning("asr stream failed engine=%s: %s", engine, error)
+        logger.warning(
+            "asr stream failed engine=%s: %s", log_safe(engine), log_safe(error),
+        )
         try:
             await websocket.send_json({"type": "error", "code": "upstream_failed"})
             await websocket.close()

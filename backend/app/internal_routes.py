@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("backend.internal")
 
@@ -59,17 +60,17 @@ async def internal_enrich(
         result = resp.json()
         logger.info(
             "enrich_forwarded trace_id=%s session_id=%s stored=%s",
-            payload.trace_id,
-            result.get("session_id"),
-            result.get("stored_count"),
+            log_safe(payload.trace_id),
+            log_safe(result.get("session_id")),
+            log_safe(result.get("stored_count")),
         )
         return result
     except httpx.TimeoutException as exc:
         logger.warning(
             "brain_enrich_timeout trace_id=%s url=%s err=%r",
-            payload.trace_id,
-            brain_url,
-            exc,
+            log_safe(payload.trace_id),
+            log_safe(brain_url),
+            log_safe(repr(exc)),
         )
         raise HTTPException(status_code=504, detail="brain enrich timeout") from exc
     except httpx.ConnectError as exc:
@@ -78,15 +79,15 @@ async def internal_enrich(
     except httpx.RequestError as exc:
         logger.warning(
             "brain_enrich_request_error trace_id=%s url=%s err=%r",
-            payload.trace_id,
-            brain_url,
-            exc,
+            log_safe(payload.trace_id),
+            log_safe(brain_url),
+            log_safe(repr(exc)),
         )
         raise HTTPException(status_code=502, detail="brain service unavailable") from exc
     except httpx.HTTPStatusError as exc:
         logger.error(
             "brain_enrich_error trace_id=%s status=%d",
-            payload.trace_id,
+            log_safe(payload.trace_id),
             exc.response.status_code,
         )
         raise HTTPException(

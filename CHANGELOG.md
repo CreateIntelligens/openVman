@@ -24,6 +24,12 @@
 
 ### Fixed
 
+- **[2026-11-12]** **語音與媒體錯誤不再回傳上游細節**：TTS 失敗時，`/v1/audio/speech` 與 `/api/v1/tts/stream` 會把各節點的例外原文回給呼叫端，內容可能有內部節點網址、query 與上游回應本文，而這兩個端點用嵌入金鑰就打得到。現在回固定的 `tts_unavailable` 與白話訊息，細節只記在伺服器 log；YouTube 字幕擷取、文件轉檔（`conversion_failed`）與 DLQ 讀取（`dlq_read_failed`）的非預期錯誤也改回固定代碼。
+
+- **[2026-11-12]** **使用者輸入不能再偽造 log 行**：正式環境的 Backend log 是純文字，網址、檔名、session ID 等外部值帶換行就能在 `docker logs` 裡多印出一行假紀錄。被 CodeQL 標出的 40 個 log 呼叫改以 `log_safe` 把換行轉成 `\n`。
+
+- **[2026-11-12]** **CI 與後台小助理收緊信任範圍**：Docker Hub 權杖會經過的四個 `docker/*` action 改釘 commit SHA；Contracts workflow 宣告唯讀權限；後台小助理只接受自己同源 iframe 送來的關閉訊息，其他頁面不能遠端把它關掉。
+
 - **[2026-11-12]** **TTS 文字清理不會再被一個請求拖住**：去除 Markdown 連結、圖片與 HTML 標籤的正規式遇到一長串 `[`、`![` 或 `<` 會逐字回溯，5 萬字要 8 秒以上，期間整個 Backend 停住；`/v1/audio/speech`、`/api/v1/tts/stream` 用公開的嵌入金鑰就打得到。改寫成線性的寫法（`a < b` 這類文字也不再被誤刪），兩個端點的文字上限設為 4096 字（與 OpenAI 相同），超過回 422。
 
 - **[2026-11-12]** **網頁擷取不能再繞到 provider 或內網**：`POST /api/v1/knowledge/fetch` 的網址路徑原樣接在 provider 後面，`..` 會被化簡成打 provider 的其他路徑；provider 回轉址時也會照著連過去，且 電信級 NAT 網段與 6to4／Teredo 包著的內部位址沒被擋。現在拒絕含 `.`／`..` 的路徑、不跟轉址，位址判斷改成只放行公開網段（IPv6 包著的 IPv4 先拆出來判斷）。

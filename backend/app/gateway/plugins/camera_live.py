@@ -13,6 +13,7 @@ import httpx
 
 from app.config import get_tts_config
 from app.gateway.forward import forward_to_brain
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("gateway.plugin.camera_live")
 
@@ -143,7 +144,10 @@ class CameraLivePlugin:
                 "visual_state": format_visual_state(new_events_state),
             }
         except Exception as exc:
-            logger.warning("camera_describe_frame_err session_id=%s err=%s", session_id, exc)
+            logger.warning(
+                "camera_describe_frame_err session_id=%s err=%s",
+                log_safe(session_id), log_safe(exc),
+            )
             return {
                 "status": "error",
                 "session_id": session_id,

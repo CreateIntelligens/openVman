@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import get_tts_config
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("gateway.temp_storage")
 
@@ -94,7 +95,7 @@ class TempStorageService:
         os.makedirs(session_dir, exist_ok=True)
         file_path = os.path.join(session_dir, f"{uuid.uuid4().hex}.{ext}")
         shutil.move(source_path, file_path)
-        logger.info("file_written path=%s", file_path)
+        logger.info("file_written path=%s", log_safe(file_path))
         return file_path
 
     def validate_file_size(self, size_bytes: int) -> bool:

@@ -24,6 +24,7 @@ from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
 from app.project_ids import canonical_project_id
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("language_routes")
 
@@ -97,10 +98,14 @@ async def admin_routes(project_id: str | None) -> list[str]:
         # 那段時間講台語都被當華語。上次查到的設定（即使過期）比預設接近事實。
         if cached:
             logger.warning(
-                "language routes lookup failed for %s, using last known: %s", project_id, exc,
+                "language routes lookup failed for %s, using last known: %s",
+                log_safe(project_id), log_safe(exc),
             )
             return cached[1]
-        logger.warning("language routes lookup failed for %s: %s", project_id, exc)
+        logger.warning(
+            "language routes lookup failed for %s: %s",
+            log_safe(project_id), log_safe(exc),
+        )
         return [CHINESE]
     routes = routes or [CHINESE]
     _cache[project_id] = (time.monotonic(), routes)

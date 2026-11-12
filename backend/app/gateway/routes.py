@@ -39,6 +39,7 @@ from app.gateway.worker import process_media
 from app.utils import media as media_mod
 from app.utils.document_checks import check_document_upload, require_document_suffix
 from app.utils.images import validate_image_file
+from app.utils.log_safe import log_safe
 from app.utils.upload import (
     MIB,
     UnsupportedUploadError,
@@ -474,7 +475,9 @@ async def _fetch_youtube_transcript(
             return await _fetch_youtube_metadata_fallback(url, str(exc))
         return _error_response(422, str(exc))
     except Exception as exc:
-        logger.error("yt_transcript_failed url=%s err=%s", url, exc)
+        logger.error(
+            "yt_transcript_failed url=%s err=%s", log_safe(url), log_safe(exc),
+        )
         # 非預期例外可能帶內部細節，只記在 log。
         return _error_response(500, "YouTube 字幕擷取失敗")
 
@@ -666,10 +669,16 @@ async def upload_knowledge_documents(
     except UploadLimitError as exc:
         return upload_rejected_response(exc)
     except httpx.ConnectError:
-        logger.warning("knowledge_upload_brain_unreachable target_dir=%s project_id=%s", target_dir, project_id)
+        logger.warning(
+            "knowledge_upload_brain_unreachable target_dir=%s project_id=%s",
+            log_safe(target_dir), log_safe(project_id),
+        )
         return _error_response(502, "brain service unavailable")
     except Exception as exc:
-        logger.error("knowledge_upload_failed target_dir=%s project_id=%s err=%s", target_dir, project_id, exc)
+        logger.error(
+            "knowledge_upload_failed target_dir=%s project_id=%s err=%s",
+            log_safe(target_dir), log_safe(project_id), log_safe(exc),
+        )
         return upload_failed_response(
             status_code=500,
             error=str(exc),
@@ -747,7 +756,10 @@ async def ingest_youtube_transcript(
         )
         resp.raise_for_status()
     except Exception as exc:
-        logger.error("yt_knowledge_upload_failed url=%s err=%s", req.url, exc)
+        logger.error(
+            "yt_knowledge_upload_failed url=%s err=%s",
+            log_safe(req.url), log_safe(exc),
+        )
         return _error_response(502, f"字幕擷取成功但存入知識庫失敗: {exc}")
 
     result["saved_to_knowledge"] = True

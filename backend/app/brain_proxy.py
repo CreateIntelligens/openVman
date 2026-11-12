@@ -48,6 +48,7 @@ from app.upstream_guard import (
     host_of,
     knob,
 )
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("backend.brain_proxy")
 
@@ -498,7 +499,10 @@ async def _stream_upstream_bytes(
             yield chunk
     except httpx.HTTPError as exc:
         outcome, error = classify_outcome(exc)
-        logger.warning("brain stream interrupted path=%s error=%s", path, error)
+        logger.warning(
+            "brain stream interrupted path=%s error=%s",
+            log_safe(path), log_safe(error),
+        )
         if sse:
             status = 504 if outcome.startswith("timeout") else 502
             body = json.dumps({"status": status, "detail": f"brain stream interrupted: {outcome}"})
@@ -639,13 +643,16 @@ async def proxy_to_brain(
         _attempt(ERROR, "client disconnected")
         logger.info(
             "client disconnected; closed brain request method=%s path=%s",
-            request.method, path,
+            log_safe(request.method), log_safe(path),
         )
         return Response(status_code=CLIENT_CLOSED_REQUEST)
     except httpx.TimeoutException as exc:
         outcome, error = classify_outcome(exc)
         _attempt(outcome, error)
-        logger.warning("brain request timeout path=%s outcome=%s error=%s", path, outcome, error)
+        logger.warning(
+            "brain request timeout path=%s outcome=%s error=%s",
+            log_safe(path), log_safe(outcome), log_safe(error),
+        )
         return JSONResponse(
             content={"error": "brain request timeout"},
             status_code=504,
@@ -659,21 +666,30 @@ async def proxy_to_brain(
         )
     except httpx.RemoteProtocolError as exc:
         _attempt(*classify_outcome(exc))
-        logger.warning("brain upstream disconnected path=%s error=%s", path, describe_error(exc))
+        logger.warning(
+            "brain upstream disconnected path=%s error=%s",
+            log_safe(path), log_safe(describe_error(exc)),
+        )
         return JSONResponse(
             content={"error": "brain upstream disconnected"},
             status_code=502,
         )
     except httpx.ReadError as exc:
         _attempt(*classify_outcome(exc))
-        logger.warning("brain upstream read error path=%s error=%s", path, describe_error(exc))
+        logger.warning(
+            "brain upstream read error path=%s error=%s",
+            log_safe(path), log_safe(describe_error(exc)),
+        )
         return JSONResponse(
             content={"error": "brain upstream read error"},
             status_code=502,
         )
     except httpx.RequestError as exc:
         _attempt(*classify_outcome(exc))
-        logger.warning("brain request error path=%s error=%s", path, describe_error(exc))
+        logger.warning(
+            "brain request error path=%s error=%s",
+            log_safe(path), log_safe(describe_error(exc)),
+        )
         return JSONResponse(
             content={"error": "brain request error"},
             status_code=502,

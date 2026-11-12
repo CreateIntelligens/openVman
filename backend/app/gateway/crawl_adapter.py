@@ -14,6 +14,7 @@ import httpx
 
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
+from app.utils.log_safe import log_safe
 
 logger = logging.getLogger("gateway.crawl_adapter")
 
@@ -301,7 +302,9 @@ async def fetch_page(url: str) -> CrawlResult:
         target += f"?{parsed.query}"
     fetch_url = f"{provider_url}/{target}"
 
-    logger.info("fetch_page url=%s provider_url=%s", url, fetch_url)
+    logger.info(
+        "fetch_page url=%s provider_url=%s", log_safe(url), log_safe(fetch_url),
+    )
 
     client = _http.get()
 
@@ -313,7 +316,8 @@ async def fetch_page(url: str) -> CrawlResult:
         except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError) as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             logger.warning("fetch_page attempt=%d/%d failed url=%s status=%s err=%s",
-                           attempt, _MAX_FETCH_RETRIES, url, status, exc)
+                           attempt, _MAX_FETCH_RETRIES, log_safe(url), status,
+                           log_safe(exc))
 
             if isinstance(exc, httpx.HTTPStatusError) and 400 <= (status or 0) < 500:
                 raise ValueError(f"無法擷取該網址（HTTP {status}），請確認網址是否正確且可公開存取") from exc
