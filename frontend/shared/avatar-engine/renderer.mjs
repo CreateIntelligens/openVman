@@ -9,15 +9,16 @@ layout(location=0) in vec2 point;
 layout(location=1) in vec2 source;
 layout(location=2) in float material;
 layout(location=3) in vec2 rest;
-out vec2 uv;out float dentalCoverage;out vec2 restUv;flat out int surface;
-void main(){gl_Position=vec4(point.x/90.-1.,1.-point.y/90.,0.,1.);uv=source;dentalCoverage=max(0.,material-1.);restUv=rest;surface=int(material);}`;
+out vec2 uv;out vec2 here;out float dentalCoverage;out vec2 restUv;flat out int surface;
+void main(){gl_Position=vec4(point.x/90.-1.,1.-point.y/90.,0.,1.);uv=source;here=point/180.;dentalCoverage=max(0.,material-1.);restUv=rest;surface=int(material);}`;
 // The interior is lit and tinted by sampling this person's own frame, so teeth and
 // gums sit in the video's lighting. It stays a soft dark red, never black: at the rim
 // it starts from the lip's own shade, so a narrow opening reads as a dim slit rather
 // than an inked line. Teeth recede towards the corners and under the upper lip.
 const FRAGMENT = `#version 300 es
 precision highp float;
-in vec2 uv;in float dentalCoverage;in vec2 restUv;flat in int surface;out vec4 color;
+in vec2 uv;in vec2 here;in float dentalCoverage;in vec2 restUv;flat in int surface;out vec4 color;
+uniform float realTeeth;
 uniform sampler2D skin;uniform sampler2D dental;uniform float exposure;uniform float opening;uniform float reach;uniform float tilt;
 uniform vec4 teeth;uniform vec2 lipProbe;uniform vec4 cheekProbes;
 vec3 oral(vec2 p){
@@ -63,14 +64,17 @@ vec3 oral(vec2 p){
   return mix(lip*vec3(.46,.28,.29),col,rim);
 }
 void main(){
+  // The video's own resting mouth, sampled where it is: real teeth stay put.
+  if(surface>=3){color=vec4(texture(skin,here).rgb,smoothstep(0.,.3,dentalCoverage-2.)*realTeeth);return;}
   vec4 mapped;
   if(surface==0){
     // MSAA can evaluate just outside a triangle, so this ramp must tolerate overshoot.
     float wet=clamp(restUv.x,0.,1.);
-    mapped=texture(skin,uv);mapped.rgb*=1.-.14*exposure*wet*wet;
+    // Only the wet inner rim darkens; shading the whole lip dulled it while talking.
+    mapped=texture(skin,uv);mapped.rgb*=1.-.14*exposure*pow(wet,6.);
     // The lip rolls into the mouth rather than ending at a cut edge; the last sliver
     // falls towards the interior so the opening is as soft as the face around it.
-    float rolled=smoothstep(.55,1.,wet)*exposure;
+    float rolled=smoothstep(.85,1.,wet)*exposure;
     mapped.rgb=mix(mapped.rgb,texture(skin,lipProbe).rgb*vec3(.46,.28,.29),rolled*.72);
     mapped.a*=clamp(restUv.y,0.,1.);
   }else{
@@ -124,7 +128,7 @@ export class SurfaceRenderer {
       this.skin = this.texture(180, 180, null);
       this.dental = this.texture(...asset.atlasSize, asset.teeth);
       this.locations = Object.fromEntries(
-        ['skin', 'dental', 'exposure', 'opening', 'reach', 'tilt', 'teeth', 'lipProbe', 'cheekProbes']
+        ['skin', 'dental', 'exposure', 'opening', 'reach', 'tilt', 'teeth', 'lipProbe', 'cheekProbes', 'realTeeth']
           .map(name => [name, g.getUniformLocation?.(this.program, name)]),
       );
     } catch (error) {
@@ -162,6 +166,7 @@ export class SurfaceRenderer {
     g.uniform1f(at.opening, dental.opening);
     g.uniform1f(at.reach, dental.reach);
     g.uniform1f(at.tilt, dental.tilt);
+    g.uniform1f(at.realTeeth, geometry.realTeeth ?? 0);
     g.uniform4f(at.teeth, dental.upperEdge, dental.lowerEdge, dental.bend, dental.upperLip);
     g.uniform2f(at.lipProbe, dental.lipProbe[0], dental.lipProbe[1]);
     g.uniform4f(at.cheekProbes, dental.cheekProbes[0], dental.cheekProbes[1],
@@ -172,6 +177,13 @@ export class SurfaceRenderer {
     if (!geometry.neutral) {
       g.bufferData(g.ARRAY_BUFFER, geometry.cavity, g.DYNAMIC_DRAW);
       g.drawArrays(g.TRIANGLE_FAN, 0, geometry.cavity.length / 7);
+      if (geometry.realTeeth > 0) {
+        // Blend colour only; the cavity's coverage alpha stays as it was.
+        g.enable(g.BLEND); g.blendFuncSeparate(g.SRC_ALPHA, g.ONE_MINUS_SRC_ALPHA, g.ZERO, g.ONE);
+        g.bufferData(g.ARRAY_BUFFER, geometry.restCavity, g.DYNAMIC_DRAW);
+        g.drawArrays(g.TRIANGLE_FAN, 0, geometry.restCavity.length / 7);
+        g.disable(g.BLEND);
+      }
       g.bufferData(g.ARRAY_BUFFER, geometry.skin, g.DYNAMIC_DRAW);
       g.drawElements(g.TRIANGLES, this.asset.indices.length, g.UNSIGNED_INT, 0);
     }

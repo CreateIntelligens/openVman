@@ -519,23 +519,36 @@ export class CharacterBinding {
     const upperLipEdge = (rest.innerLocal[SEGMENTS / 4][1] + innerShift[(SEGMENTS / 4) * 2 + 1] - rest.seam) / width;
     const lower = rest.outerLocal[3 * SEGMENTS / 4], inner = rest.innerLocal[3 * SEGMENTS / 4];
     const probe = fraction => world(rest.centre, 0, inner[1] + (lower[1] - inner[1]) * fraction);
+    // A held wide vowel retracts the row so it shows as a sliver, not buck teeth;
+    // closed rows still meet (s, x). Tying this to the lip or to the live jaw made
+    // the row slide with every syllable and vanish whenever the jaw crossed zero.
+    // However far it retracts, a sliver stays below the lip instead of the row vanishing.
+    const upperEdge = Math.max(Math.min(-0.012, upperLipEdge + 0.015),
+      -0.012 - 0.45 * softPositive((controls.dentalGap ?? controls.gap) - 0.1, 0.02)
+        * smooth(((controls.dentalJaw ?? controls.jaw) + 0.02) / 0.14));
+    // A video already resting open shows its own real teeth. They stay, drawn from
+    // their own place in the frame over the painted interior, fading out towards the
+    // lower lip so the newly opened space below shows mouth interior and lower teeth.
+    const realTeeth = smooth((rest.originalGap / width - REST_SEAM) / 0.03);
+    const restCavity = this.restCavity ??= new Float32Array((SEGMENTS + 2) * 7);
+    write(restCavity, 0, restX, restY, 0, 0, 3, 0, 0);
+    for (let i = 0; i <= SEGMENTS; i++) {
+      const k = i % SEGMENTS, source = rest.inner[k];
+      write(restCavity, i + 1, source[0], source[1], 0, 0, k <= HALF ? 4 : 3, 0, 0);
+    }
     return {
-      skin: buffer, cavity: this.cavity, neutral, opening, gap, width, exposure, activity,
+      skin: buffer, cavity: this.cavity, restCavity: this.restCavity, realTeeth,
+      neutral, opening, gap, width, exposure, activity,
       coefficients: Array.from(coefficients).slice(0, 6),
       pose: { gap: open - closure, jaw, round: rounding },
       // Upper teeth hang from the skull just below the rest seam; lower teeth ride
       // the jaw, tucked behind the uppers until it opens.
       dental: {
-        // A held wide vowel retracts the row so it shows as a sliver, not buck teeth;
-        // closed rows still meet (s, x). Tying this to the lip or to the live jaw made
-        // the row slide with every syllable and vanish whenever the jaw crossed zero.
-        upperEdge: -0.012 - 0.45 * softPositive((controls.dentalGap ?? controls.gap) - 0.1, 0.02)
-          * smooth(((controls.dentalJaw ?? controls.jaw) + 0.02) / 0.14),
-        // Lower teeth follow the lower lip down as the jaw opens; with the jaw closed
-        // (s, x) the rows stay together even though the lips are apart. The ramp is
-        // wide because speech keeps crossing zero jaw, and a narrow one made them jump.
-        lowerEdge: -0.002 + Math.max(0, lowerLipEdge - LOWER_TEETH_SHOWING + 0.002)
-          * smooth((jaw + 0.02) / 0.1),
+        upperEdge,
+        // Lower teeth follow the lower lip down, never rising past the upper row; with
+        // the jaw closed (s, x) the lip stays high and the rows meet. No jaw gate: speech
+        // keeps crossing zero jaw, and gating made the row jump back to the seam.
+        lowerEdge: Math.max(upperEdge + 0.01, lowerLipEdge - LOWER_TEETH_SHOWING),
         bend: rest.bend, tilt: rest.tilt,
         upperLip: upperLipEdge,
         // The real aperture, not the change from rest: a video resting with parted lips

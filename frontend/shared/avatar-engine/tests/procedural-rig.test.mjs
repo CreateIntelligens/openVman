@@ -554,3 +554,31 @@ test('the lower teeth ride down with the jaw, leaving mouth interior between the
   const closed = binding.update(0, SOUNDS.a, { gap: 0.12, jaw: -0.03, round: 0 }).dental;
   assert.ok(Math.abs(closed.lowerEdge + 0.002) < 1e-9, 'a closed jaw (s, x) keeps the rows together');
 });
+
+test('a video resting open keeps its own teeth layer; a closed one paints all of it', async () => {
+  const realFor = async innerHeight => new CharacterBinding({ ...await loadCharacter(),
+    frames: [{ ...frame(), inner: loop(31, innerHeight) }] }).update(0, SOUNDS.a);
+  const open = await realFor(5), closed = await realFor(0.7);
+  assert.ok(open.realTeeth > 0.9, `open rest ${open.realTeeth}`);
+  assert.equal(closed.realTeeth, 0);
+  assert.equal(open.restCavity.length, (80 + 2) * 7);
+});
+
+test('the lower teeth stay with an open lower lip even when the jaw reads near zero', async () => {
+  const binding = new CharacterBinding(await rig());
+  // Speech hovers around zero jaw while the lower lip is already down; a jaw gate
+  // used to pull the lower row back up to the seam there.
+  for (const jaw of [0, 0.01, 0.02]) {
+    const { dental } = binding.update(0, SOUNDS.a, { gap: 0.25, jaw, round: 0 });
+    const below = dental.lowerEdge - dental.upperEdge;
+    assert.ok(below > 0.04, `jaw ${jaw}: lower row only ${below} below the upper row with the lips apart`);
+  }
+});
+
+test('the upper row keeps a sliver below the lip however wide the vowel', async () => {
+  const binding = new CharacterBinding(await rig());
+  for (const gap of [0.2, 0.3, 0.4, 0.6]) {
+    const { dental } = binding.update(0, SOUNDS.a, { gap, jaw: 0.2, round: 0, dentalGap: 0.6, dentalJaw: 0.2 });
+    assert.ok(dental.upperEdge - dental.upperLip >= 0.015 - 1e-9, `gap ${gap}: ${dental.upperEdge - dental.upperLip}`);
+  }
+});
