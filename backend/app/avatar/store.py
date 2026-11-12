@@ -44,7 +44,8 @@ class AvatarStore:
         # ID 已先過白名單；這裡再確認組出的路徑仍在根目錄內，任何呼叫端漏了驗證也跳不出去。
         base = os.path.realpath(self._base)
         path = os.path.normpath(os.path.join(base, char_id))
-        if os.path.dirname(path) != base:
+        # startswith 是 CodeQL 認得的路徑檢查；dirname 再確認只有一層，ID 不能帶子目錄。
+        if not path.startswith(base + os.sep) or os.path.dirname(path) != base:
             raise InvalidCharId("ID 超出素材目錄")
         return Path(path)
 

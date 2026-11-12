@@ -66,7 +66,7 @@ class TempStorageService:
             raise ValueError("INVALID_SESSION_ID: path traversal detected")
         base = os.path.realpath(self.base_dir)
         session_dir = os.path.normpath(os.path.join(base, session_id))
-        if os.path.dirname(session_dir) != base:
+        if not session_dir.startswith(base + os.sep) or os.path.dirname(session_dir) != base:
             raise ValueError("INVALID_SESSION_ID: path traversal detected")
         return session_dir
 
