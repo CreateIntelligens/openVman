@@ -54,6 +54,9 @@ const REST_SEAM = 0.03;
 const MOUTH_TO_EYES = 0.47;
 const NEUTRAL_THICKNESS = 0.14;
 const OPENING_SCALE = [0.6, 1.15];
+// The lower incisors ride the jaw just behind the lower lip, showing only this much
+// above it; the opening above them is mouth interior, not more teeth.
+const LOWER_TEETH_SHOWING = 0.035;
 
 /** Signed anatomy for one latent vector, in mouth widths (round is -1..1 after gain). */
 export function decodeMouthPose(coefficients) {
@@ -528,10 +531,11 @@ export class CharacterBinding {
         // the row slide with every syllable and vanish whenever the jaw crossed zero.
         upperEdge: -0.012 - 0.45 * softPositive((controls.dentalGap ?? controls.gap) - 0.1, 0.02)
           * smooth(((controls.dentalJaw ?? controls.jaw) + 0.02) / 0.14),
-        // Lower teeth sit a fixed band above the lower lip as the mouth opens; with the
-        // jaw closed (s, x) the rows stay together even though the lips are apart.
-        lowerEdge: -0.002 + Math.max(0, lowerLipEdge - (0.07 + 0.26 * open) + 0.002)
-          * smooth((jaw + 0.02) / 0.06),
+        // Lower teeth follow the lower lip down as the jaw opens; with the jaw closed
+        // (s, x) the rows stay together even though the lips are apart. The ramp is
+        // wide because speech keeps crossing zero jaw, and a narrow one made them jump.
+        lowerEdge: -0.002 + Math.max(0, lowerLipEdge - LOWER_TEETH_SHOWING + 0.002)
+          * smooth((jaw + 0.02) / 0.1),
         bend: rest.bend, tilt: rest.tilt,
         upperLip: upperLipEdge,
         // The real aperture, not the change from rest: a video resting with parted lips

@@ -34,7 +34,10 @@ vec3 oral(vec2 p){
   vec3 back=lip*vec3(.4,.18,.19)*(.5+.5*depth)*(.62+.5*smoothstep(-.04,.16,p.y)*(1.-side*side));
   float seam=teeth.z*p.x*p.x+tilt*p.x;
   float lowerEdge=teeth.y+seam*.9+.022*side*side+(1.-crown.a)*.012;
-  float tongue=smoothstep(lowerEdge-.03,lowerEdge+.04,p.y)*(1.-side*side);
+  // The tongue rests behind the lower teeth and fills the floor of the mouth as the
+  // rows part, lower towards the corners.
+  float tongueTop=lowerEdge-.012-.35*max(0.,lowerEdge-teeth.x)+.05*side*side;
+  float tongue=smoothstep(tongueTop-.02,tongueTop+.03,p.y)*(1.-side*side);
   vec3 col=mix(back,lip*vec3(.64,.38,.38)*(.55+.45*depth),tongue*.85);
   vec3 enamel=vec3(.97,.94,.88)*mix(vec3(1.),skinTint,.25)*light;
   // Crowns separate at the biting edge and merge towards the gum, so grooves fade

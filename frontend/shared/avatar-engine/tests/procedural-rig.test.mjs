@@ -544,3 +544,13 @@ test('tracking wobble is smoothed away while real movement is kept', () => {
   const kept = smoothTracking(moved);
   assert.ok(kept[5].outer.every((v, i) => Math.abs(v - moved[5].outer[i]) < 1e-9), 'a jump of half a mouth width is motion, not wobble');
 });
+
+test('the lower teeth ride down with the jaw, leaving mouth interior between the rows', async () => {
+  const binding = new CharacterBinding(await rig());
+  const at = gap => binding.update(0, SOUNDS.a, { gap, jaw: 0.12, round: 0 }).dental;
+  const small = at(0.12), large = at(0.3);
+  assert.ok(large.lowerEdge - small.lowerEdge > 0.03, `lower teeth moved ${large.lowerEdge - small.lowerEdge}`);
+  assert.ok(large.lowerEdge - large.upperEdge > 0.08, `rows only ${large.lowerEdge - large.upperEdge} apart`);
+  const closed = binding.update(0, SOUNDS.a, { gap: 0.12, jaw: -0.03, round: 0 }).dental;
+  assert.ok(Math.abs(closed.lowerEdge + 0.002) < 1e-9, 'a closed jaw (s, x) keeps the rows together');
+});
