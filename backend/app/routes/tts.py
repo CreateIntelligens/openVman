@@ -123,6 +123,17 @@ def _tts_locale(provider: str, language: str) -> str:
     return locale
 
 
+
+def _tts_failure(exc: BaseException, *, status_code: int = 502) -> JSONResponse:
+    # 例外字串帶著上游節點的網址、query 與回應本文；嵌入金鑰的匿名訪客也打得到這兩個端點，
+    # 所以回固定訊息，細節只留在伺服器 log。
+    logger.warning("tts_request_failed status=%s error=%r", status_code, str(exc))
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": "tts_unavailable", "message": "語音合成暫時無法使用，請稍後再試"},
+    )
+
+
 # 與 OpenAI /v1/audio/speech 相同上限；文字清理與合成時間都隨長度增加，不設上限一個請求就能拖住服務。
 TTS_MAX_INPUT_CHARS = 4096
 
@@ -262,7 +273,7 @@ async def create_speech(
             partners=plan.partners, order=_project_engine_order(policy),
         )
     except RuntimeError as exc:
-        return JSONResponse(status_code=502, content={"error": str(exc)})
+        return _tts_failure(exc)
 
     headers = {
         "X-TTS-Latency-Ms": str(round(output.result.latency_ms, 2)),
@@ -672,10 +683,10 @@ async def tts_stream_endpoint(
                 stream = await gemini.open_stream(gemini_request)
             except GeminiTTSHTTPError as exc:
                 _stream_failed(GEMINI_PROVIDER_NAME, gemini_host, exc, started, "")
-                return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
+                return _tts_failure(exc, status_code=exc.status_code)
             except RuntimeError as exc:
                 _stream_failed(GEMINI_PROVIDER_NAME, gemini_host, exc, started, "")
-                return JSONResponse(status_code=502, content={"error": str(exc)})
+                return _tts_failure(exc)
             _meter_stream(GEMINI_PROVIDER_NAME)
             return _stream_audio(
                 _guarded(stream, GEMINI_PROVIDER_NAME, gemini_host, started=started),
@@ -748,7 +759,7 @@ async def tts_stream_endpoint(
                             partners=partners[1:],
                         )
                     except RuntimeError as partner_exc:
-                        return JSONResponse(status_code=502, content={"error": str(partner_exc)})
+                        return _tts_failure(partner_exc)
                     return _buffered_audio(output, body.format, partner)
                 record_fallback_hop(
                     from_target=VOXCPM_PROVIDER_NAME,
@@ -772,7 +783,7 @@ async def tts_stream_endpoint(
                 partners=partners,
             )
         except RuntimeError as exc:
-            return JSONResponse(status_code=502, content={"error": str(exc)})
+            return _tts_failure(exc)
         return _buffered_audio(output, body.format, provider)
 
     # Primary: proxy stream directly from IndexTTS — 只在沒指定或指定 IndexTTS 時。明確指定
@@ -873,6 +884,6 @@ async def tts_stream_endpoint(
             order=engine_order,
         )
     except RuntimeError as exc:
-        return JSONResponse(status_code=502, content={"error": str(exc)})
+        return _tts_failure(exc)
 
     return _buffered_audio(output, body.format, provider)

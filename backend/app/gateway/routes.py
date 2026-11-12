@@ -431,7 +431,7 @@ async def get_dlq(
         return JSONResponse(content={"count": len(entries), "entries": entries})
     except Exception as exc:
         logger.error("dlq_read_error err=%s", exc)
-        return JSONResponse(status_code=500, content={"error": str(exc)})
+        return JSONResponse(status_code=500, content={"error": "dlq_read_failed"})
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +475,8 @@ async def _fetch_youtube_transcript(
         return _error_response(422, str(exc))
     except Exception as exc:
         logger.error("yt_transcript_failed url=%s err=%s", url, exc)
-        return _error_response(500, f"YouTube 字幕擷取失敗: {exc}")
+        # 非預期例外可能帶內部細節，只記在 log。
+        return _error_response(500, "YouTube 字幕擷取失敗")
 
 
 async def _fetch_youtube_metadata_fallback(url: str, transcript_error: str) -> dict[str, Any] | JSONResponse:

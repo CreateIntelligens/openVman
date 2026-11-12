@@ -35,3 +35,18 @@ def test_tts_requests_reject_text_over_the_limit():
     with pytest.raises(ValidationError):
         TtsStreamRequest(text=too_long)
     assert SpeechRequest(input="字" * TTS_MAX_INPUT_CHARS).input
+
+
+def test_tts_failure_hides_upstream_details():
+    import json
+
+    from app.routes.tts import _tts_failure
+
+    response = _tts_failure(
+        RuntimeError("voxcpm: HTTPStatusError: Server error '503' for url 'http://10.0.0.5:8800/v1/tts?key=SECRET'")
+    )
+
+    body = json.loads(response.body)
+    assert response.status_code == 502
+    assert body["error"] == "tts_unavailable"
+    assert "SECRET" not in response.body.decode() and "10.0.0.5" not in response.body.decode()

@@ -66,9 +66,10 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
         return upload_rejected_response(exc)
     except Exception as exc:
         logger.error("Conversion failed: %s", exc)
+        # 解析器的例外會帶暫存路徑與函式庫內部訊息，回固定代碼即可。
         return upload_failed_response(
             status_code=500,
-            error=str(exc),
+            error="conversion_failed",
         )
     finally:
         await file.close()

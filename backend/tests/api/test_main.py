@@ -236,7 +236,8 @@ def test_convert_returns_upload_failed_code_when_conversion_crashes(monkeypatch)
     )
 
     assert response.status_code == 500
-    assert response.json()["error"] == "boom"
+    assert response.json()["error"] == "conversion_failed"
+    assert "boom" not in response.text
     assert response.json()["error_code"] == "UPLOAD_FAILED"
     assert response.json()["message"] == "檔案上傳失敗"
 
