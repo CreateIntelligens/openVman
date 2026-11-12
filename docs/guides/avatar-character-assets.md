@@ -21,7 +21,7 @@
 |---|---|
 | `schema`／`geometrySource` | 固定為 `openvman.render.v2`／`mediapipe-video` |
 | `frameRate`／`frameSize` | 固定25 fps；`[width, height]`為1～8192的整數 |
-| `frames` | 非空陣列，每幀物件含 `region`（原圖xyxy）、`outer`／`inner`（各20點、40個局部xy數值，範圍0～180） |
+| `frames` | 非空陣列，每幀物件含 `region`（原圖xyxy）、`outer`／`inner`（各20點、40個局部xy數值，範圍0～180），以及選用的 `eyeSpan`（兩外眼角距離，同樣的局部單位；引擎用它依臉的大小決定張嘴幅度，舊資料沒有時改以唇厚估計） |
 | `provenance` | 影片SHA-256、產製實作及MediaPipe偵測模型身分；上傳此欄不等於伺服器已證實其真實性 |
 
 產製管線直接解碼原影片追蹤嘴唇，依嘴寬計算ROI，不讀舊模板、rig或姿態。瀏覽器程序產生嘴唇網格、解剖位移、牙冠輪廓、口腔著色及融合範圍。新角色的上傳包與sidecar包含相同v2物件。

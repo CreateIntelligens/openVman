@@ -317,3 +317,15 @@ def test_malformed_gzip_upload_is_rejected_without_partial_character(env):
         )
     assert not (env.root / "bad-gzip").exists()
     assert list(env.root.glob(".bad-gzip.tmp.*")) == []
+
+
+def test_eye_span_face_scale_is_kept_when_valid_and_optional():
+    payload = _video_geometry()
+    payload["frames"][0]["eyeSpan"] = 150.5
+    clean = render_data.validate_render_data(payload)
+    assert clean["frames"][0]["eyeSpan"] == 150.5
+    assert "eyeSpan" not in render_data.validate_render_data(_video_geometry())["frames"][0]
+    for bad in (0, -3, 1e6, float("nan"), "150"):
+        payload["frames"][0]["eyeSpan"] = bad
+        with pytest.raises(render_data.RenderDataError):
+            render_data.validate_render_data(payload)

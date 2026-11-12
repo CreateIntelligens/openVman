@@ -140,7 +140,15 @@ def _validate_video_geometry(payload: dict) -> dict:
             if not 1 <= width_squared <= 180 ** 2:
                 raise RenderDataError(ERROR_MESSAGE)
         _validate_outer_rays(frame["outer"])
-        clean_frames.append({name: frame[name] for name in ("region", "outer", "inner")})
+        clean = {name: frame[name] for name in ("region", "outer", "inner")}
+        # Optional face scale: the distance between the outer eye corners, in the
+        # same local units. Older sidecars lack it and remain valid.
+        if "eyeSpan" in frame:
+            (eye_span,) = _numbers([frame["eyeSpan"]], 1)
+            if not 1 <= eye_span <= 4 * 180:
+                raise RenderDataError(ERROR_MESSAGE)
+            clean["eyeSpan"] = eye_span
+        clean_frames.append(clean)
     result = {
         "schema": "openvman.render.v2",
         "frameRate": 25,

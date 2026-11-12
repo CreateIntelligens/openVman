@@ -16,7 +16,7 @@ FastAPI 服務處理帳號與專案授權、角色素材儲存、對話及媒體
 | `frameRate` | `25` |
 | `frameSize` | `[width, height]`，正整數，單邊至多8192 |
 | `geometrySource` | v2固定 `mediapipe-video` |
-| `frames` | 非空、最多100000幀；每幀region為影片內有效xyxy，outer／inner各40個0～180有限數值 |
+| `frames` | 非空、最多100000幀；每幀region為影片內有效xyxy，outer／inner各40個0～180有限數值；選用 `eyeSpan` 為1～720的有限數值 |
 | `provenance` | 有界白名單來源欄位；接受資料不代表已驗證產製來源 |
 
 v2不含原模板／姿態或抽出rig。新引擎只讀v2；Backend為既有資料保留的v1驗證／離線轉換不代表v1可由新引擎播放，既有角色需從影片重新產製。授權邊界與原始資料不因格式升級而改變。

@@ -30,6 +30,10 @@ INNER_LIP = (
 )
 
 
+# MediaPipe FaceMesh outer eye corners (right, left).
+OUTER_EYE_CORNERS = (33, 263)
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as stream:
@@ -71,10 +75,16 @@ def contours_from_landmarks(points, width: int, height: int):
     scale = LOCAL_SIZE / side
     # A lip exactly on the crop edge can round a hair past LOCAL_SIZE when scaled.
     local = lambda contour: np.clip((contour - top_left) * scale, 0, LOCAL_SIZE)
+    # Openings are sized by the face, not the mouth: a smile widens the mouth but
+    # leaves the eyes where they were.
+    eye_span = float(np.linalg.norm(values[OUTER_EYE_CORNERS[1]] - values[OUTER_EYE_CORNERS[0]]))
+    if not eye_span > 0:
+        raise ValueError("Degenerate measured eyes")
     return {
         "region": [*top_left.tolist(), *bottom_right.tolist()],
         "outer": local(outer).reshape(-1).tolist(),
         "inner": local(inner).reshape(-1).tolist(),
+        "eyeSpan": eye_span * scale,
     }
 
 

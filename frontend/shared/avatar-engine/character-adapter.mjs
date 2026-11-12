@@ -41,17 +41,19 @@ const SEAL_KNEE = 0.006;
 // to zero, and when it does the fade only closes the mouth slightly.
 const ANCHOR_BLEND = 1;
 const ROUND_GAIN = 2;
-const MAX_GAP = 0.42;
+const MAX_GAP = 0.26;
 const MAX_CLOSURE = 0.07;
 const MAX_JAW = 0.26;
 // A closed mouth's measured seam is a few hundredths of its width; above this the
 // source video is showing an open mouth.
 const REST_SEAM = 0.03;
-// Openings are sized in mouth widths, but a smile stretches the width (and thins the
-// lips) without giving the jaw any more travel. A mouth wide for its lip thickness is
-// read as smiling and opens proportionally less, down to this floor.
+// Openings are sized in mouth widths, but a smile stretches the width without giving
+// the jaw any more travel, so they are rescaled to the face. With the measured eye
+// span the reference is a mouth this wide relative to it; older data without the eye
+// span falls back to lip thickness, since a smile also thins the lips.
+const MOUTH_TO_EYES = 0.47;
 const NEUTRAL_THICKNESS = 0.14;
-const MIN_SMILE_SCALE = 0.65;
+const OPENING_SCALE = [0.6, 1.15];
 
 /** Signed anatomy for one latent vector, in mouth widths (round is -1..1 after gain). */
 export function decodeMouthPose(coefficients) {
@@ -177,6 +179,8 @@ export function validateLipFrame(frame) {
     const width = Math.hypot(p[20] - p[0], p[21] - p[1]);
     if (width < 1 || width > SIZE) throw new Error('Invalid video-derived lip width');
   }
+  if (frame.eyeSpan !== undefined && !(Number.isFinite(frame.eyeSpan) && frame.eyeSpan >= 1 && frame.eyeSpan <= 4 * SIZE))
+    throw new Error('Invalid video-derived eye span');
   const origin = rayOrigin(frame.outer);
   for (let i = 0; i < SEGMENTS; i++) {
     const point = curve(frame.outer, i / 4);
@@ -256,7 +260,10 @@ export function smoothTracking(frames) {
     const average = name => frame[name].map((_, i) => clamp(
       (near.reduce((sum, [weight, j]) => sum + weight * placed[j][name][i], 0) / total - frame.region[i % 2]) / here.scale,
       0, SIZE));
-    return { ...frame, outer: average('outer'), inner: average('inner') };
+    const smoothed = { ...frame, outer: average('outer'), inner: average('inner') };
+    if (frame.eyeSpan !== undefined) smoothed.eyeSpan = near.reduce(
+      (sum, [weight, j]) => sum + weight * (frames[j].eyeSpan ?? frame.eyeSpan) * placed[j].scale, 0) / total / here.scale;
+    return smoothed;
   });
 }
 
@@ -335,9 +342,11 @@ export class CharacterBinding {
       originalGap: Math.max(0.3, innerLocal[3 * SEGMENTS / 4][1] - innerLocal[SEGMENTS / 4][1]),
       bend: (cornerY - seam) / width / Math.max(0.1, cornerSide * cornerSide),
       thickness: innerLocal.map((point, i) => Math.abs(point[1] - outerLocal[i][1])),
-      smileScale: clamp((Math.abs(innerLocal[SEGMENTS / 4][1] - outerLocal[SEGMENTS / 4][1])
-        + Math.abs(innerLocal[3 * SEGMENTS / 4][1] - outerLocal[3 * SEGMENTS / 4][1])) / 2 / width
-        / NEUTRAL_THICKNESS, MIN_SMILE_SCALE, 1),
+      openingScale: clamp(f.eyeSpan
+        ? f.eyeSpan * MOUTH_TO_EYES / width
+        : (Math.abs(innerLocal[SEGMENTS / 4][1] - outerLocal[SEGMENTS / 4][1])
+          + Math.abs(innerLocal[3 * SEGMENTS / 4][1] - outerLocal[3 * SEGMENTS / 4][1])) / 2 / width
+          / NEUTRAL_THICKNESS, OPENING_SCALE[0], f.eyeSpan ? OPENING_SCALE[1] : 1),
       jawAtLips: outerLocal.map(point => jawReach(point[0], point[1])),
     };
     this.cachedIndex = index;
@@ -357,19 +366,20 @@ export class CharacterBinding {
     const neutral = zero && settled;
 
     const jaw = soft(controls.jaw, MAX_JAW);
-    const jawOpen = Math.max(0, jaw) * rest.smileScale, clench = Math.max(0, -jaw);
+    const jawOpen = Math.max(0, jaw) * rest.openingScale, clench = Math.max(0, -jaw);
     const rounding = soft(controls.round * ROUND_GAIN, 1);
     const pucker = Math.max(0, rounding), spread = Math.max(0, -rounding);
     // Between sounds the lips usually keep a hairline apart; only real closures seal.
     const parted = softPositive(controls.gap - SEAL_MARGIN, SEAL_KNEE)
       - softPositive(-SEAL_MARGIN, SEAL_KNEE) + 0.014 * smooth(controls.gap / 0.03);
-    // Stressed syllables need to read: peaks open up more than the fitted line says.
-    const unsealed = soft(parted * (1 + 0.12 * smooth((parted - 0.06) / 0.14)), MAX_GAP);
+    // Conversation rarely opens the mouth all the way: large openings ease off
+    // towards the cap while small and middle ones stay nearly as decoded.
+    const unsealed = soft(parted, MAX_GAP);
     // Pursing draws the lips around a small opening whatever the jaw is doing.
     // A video whose mouth already rests open (smiling, or mid-speech in the source)
     // only gets the difference; adding the full opening on top would open it twice.
     const restExcess = Math.max(0, rest.originalGap / width - REST_SEAM);
-    const target = unsealed * (1 - 0.45 * pucker) * rest.smileScale;
+    const target = unsealed * (1 - 0.45 * pucker) * rest.openingScale;
     const open = restExcess > 0
       ? softPositive(target - restExcess, 0.02) - softPositive(-restExcess, 0.02)
       : target;
@@ -395,7 +405,7 @@ export class CharacterBinding {
     // A small opening parts in the middle while the sides stay sealed; it only
     // reaches the corners as it widens, rather than appearing full width at once.
     // Closing needs no such taper: m, b and p must seal right out to the corners.
-    const unzip = (1 - smooth(open / 0.13)) * (1 - smooth(closure / 0.01));
+    const unzip = (1 - smooth(open / 0.1)) * (1 - smooth(closure / 0.01));
     // A wide vowel lifts a broad arch instead of a narrow peak.
     const upperPower = 1.05 - 0.3 * pucker + 1.3 * unzip - 0.25 * smooth((open - 0.12) / 0.14);
     const lowerPower = 0.82 - 0.22 * pucker + 1.5 * unzip;

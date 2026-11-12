@@ -26,6 +26,8 @@ def landmarks():
     values[list(video_lips.INNER_LIP)] = np.column_stack([
         160 + 25 * np.cos(angle), 120 - 4 * np.sin(angle),
     ])
+    # Outer eye corners about twice the mouth width apart, above it.
+    values[list(video_lips.OUTER_EYE_CORNERS)] = [[100, 60], [220, 60]]
     return values
 
 
@@ -39,7 +41,8 @@ def test_contours_preserve_fractional_positions_and_square_bounds(landmarks):
     restored = restored * (right - left) / 180 + [left, top]
     np.testing.assert_allclose(restored, landmarks[list(video_lips.OUTER_LIP)])
     assert not np.equal(np.floor(restored), restored).all()
-    assert set(frame) == {"region", "outer", "inner"}
+    # Only the lips and one face-scale number leave the tracker, never face landmarks.
+    assert set(frame) == {"region", "outer", "inner", "eyeSpan"}
 
 
 @pytest.mark.parametrize("shape", [(0, 2), (468, 3), (415, 2), (936,)])
@@ -277,3 +280,9 @@ def test_lips_on_the_crop_edge_stay_within_the_local_range(landmarks):
         frame = video_lips.contours_from_landmarks(values, 320, 240)
         for name in ("outer", "inner"):
             assert all(0 <= value <= video_lips.LOCAL_SIZE for value in frame[name]), (step, name)
+
+
+def test_eye_span_is_reported_in_the_same_local_units(landmarks):
+    frame = video_lips.contours_from_landmarks(landmarks, 320, 240)
+    side = frame["region"][2] - frame["region"][0]
+    assert frame["eyeSpan"] == pytest.approx(120 * video_lips.LOCAL_SIZE / side)

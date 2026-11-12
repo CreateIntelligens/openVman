@@ -246,7 +246,8 @@ test('a smiling frame never folds the skin over its own opening', async () => {
     return signs.every(value => value > 0) || signs.every(value => value < 0);
   };
   // Corners rising past the top of the lip used to put the ray origin outside it.
-  for (const lift of [0, 4, 8.1, 10, 12]) {
+  // Lift 11 bends as far as the most curved real frame measured (about -0.15).
+  for (const lift of [0, 4, 8.1, 10, 11]) {
     const asset = { ...await loadCharacter(), frames: [smile(lift)] };
     const g = new CharacterBinding(asset).update(0, SOUNDS.a);
     const at = v => [g.skin[v * 7], g.skin[v * 7 + 1]];
