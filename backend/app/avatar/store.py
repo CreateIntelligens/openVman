@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from app.avatar.validation import normalize_char_id
+from app.avatar.validation import InvalidCharId, normalize_char_id
 
 VIDEO_FILENAME = "01.webm"
 DATA_FILENAME = "combined_data.json.gz"
@@ -41,7 +41,12 @@ class AvatarStore:
         self._base.mkdir(parents=True, exist_ok=True)
 
     def _dir(self, char_id: str) -> Path:
-        return self._base / char_id
+        # ID 已先過白名單；這裡再確認組出的路徑仍在根目錄內，任何呼叫端漏了驗證也跳不出去。
+        base = os.path.realpath(self._base)
+        path = os.path.normpath(os.path.join(base, char_id))
+        if os.path.dirname(path) != base:
+            raise InvalidCharId("ID 超出素材目錄")
+        return Path(path)
 
     def exists(self, char_id: str) -> bool:
         return self._dir(normalize_char_id(char_id)).is_dir()

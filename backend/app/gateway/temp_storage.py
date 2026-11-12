@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import shutil
 import time
 import uuid
@@ -15,6 +16,7 @@ from app.config import get_tts_config
 
 logger = logging.getLogger("gateway.temp_storage")
 
+_SESSION_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
 _MIME_EXT: dict[str, str] = {
     "image/jpeg": "jpg",
     "image/png": "png",
@@ -57,12 +59,21 @@ class TempStorageService:
 
     # --- write ---
 
-    def write_file(self, session_id: str, data: bytes, mime_type: str) -> str:
-        if ".." in session_id or "/" in session_id or "%2F" in session_id:
+    def _session_dir(self, session_id: str) -> str:
+        # 白名單取代黑名單：空字串或 "." 會把檔案寫在根目錄、TTL 清理掃不到，
+        # cleanup_session("") 甚至會刪掉整個根目錄。
+        if not _SESSION_ID_RE.fullmatch(session_id or ""):
             raise ValueError("INVALID_SESSION_ID: path traversal detected")
+        base = os.path.realpath(self.base_dir)
+        session_dir = os.path.normpath(os.path.join(base, session_id))
+        if os.path.dirname(session_dir) != base:
+            raise ValueError("INVALID_SESSION_ID: path traversal detected")
+        return session_dir
+
+    def write_file(self, session_id: str, data: bytes, mime_type: str) -> str:
+        session_dir = self._session_dir(session_id)
 
         ext = _MIME_EXT.get(mime_type, "bin")
-        session_dir = os.path.join(self.base_dir, session_id)
         os.makedirs(session_dir, exist_ok=True)
 
         filename = f"{uuid.uuid4().hex}.{ext}"
@@ -77,11 +88,9 @@ class TempStorageService:
 
     def store_file(self, session_id: str, source_path: str, mime_type: str) -> str:
         """Move an already-streamed upload into the session directory."""
-        if ".." in session_id or "/" in session_id or "%2F" in session_id:
-            raise ValueError("INVALID_SESSION_ID: path traversal detected")
+        session_dir = self._session_dir(session_id)
 
         ext = _MIME_EXT.get(mime_type, "bin")
-        session_dir = os.path.join(self.base_dir, session_id)
         os.makedirs(session_dir, exist_ok=True)
         file_path = os.path.join(session_dir, f"{uuid.uuid4().hex}.{ext}")
         shutil.move(source_path, file_path)
@@ -96,9 +105,10 @@ class TempStorageService:
     # --- cleanup ---
 
     def cleanup_session(self, session_id: str) -> None:
-        if ".." in session_id or "/" in session_id:
+        try:
+            session_dir = self._session_dir(session_id)
+        except ValueError:
             return
-        session_dir = os.path.join(self.base_dir, session_id)
         shutil.rmtree(session_dir, ignore_errors=True)
         logger.info("session_cleanup session_id=%s", session_id)
 

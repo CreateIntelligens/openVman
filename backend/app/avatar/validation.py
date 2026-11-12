@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import re
 
-_CHAR_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+# 第一個字元限英數：點開頭的目錄會被列表略過，也可能撞上上傳中的 ".<id>.tmp." 暫存目錄。
+_CHAR_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 _WEBM_MAGIC = b"\x1a\x45\xdf\xa3"
 _GZIP_MAGIC = b"\x1f\x8b"
 
@@ -19,8 +20,8 @@ class InvalidUpload(ValueError):
 
 def normalize_char_id(char_id: str | None) -> str:
     text = (char_id or "").strip()
-    if not _CHAR_ID_RE.match(text):
-        raise InvalidCharId("char_id 格式不合法（僅允許英數與 . _ -，長度 1-64）")
+    if not _CHAR_ID_RE.fullmatch(text):
+        raise InvalidCharId("char_id 格式不合法（英數開頭，僅允許英數與 . _ -，長度 1-64）")
     if text in {".", ".."}:
         raise InvalidCharId("char_id 不可為 . 或 ..")
     return text

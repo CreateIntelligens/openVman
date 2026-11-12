@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-_BACKGROUND_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+_BACKGROUND_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 _JPEG_MAGIC = b"\xff\xd8\xff"
 _SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -20,8 +20,8 @@ class InvalidBackgroundUpload(ValueError):
 
 def normalize_background_id(background_id: str | None) -> str:
     text = (background_id or "").strip()
-    if not _BACKGROUND_ID_RE.match(text):
-        raise InvalidBackgroundId("background_id 格式不合法（僅允許英數與 . _ -，長度 1-64）")
+    if not _BACKGROUND_ID_RE.fullmatch(text):
+        raise InvalidBackgroundId("background_id 格式不合法（英數開頭，僅允許英數與 . _ -，長度 1-64）")
     if text in {".", ".."}:
         raise InvalidBackgroundId("background_id 不可為 . 或 ..")
     return text
