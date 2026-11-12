@@ -194,6 +194,9 @@ async def test_fetch_page_rejects_invalid_url():
     "http://127.0.0.1/admin",
     "http://169.254.169.254/latest/meta-data",
     "http://localhost/admin",
+    "http://100.64.0.1/",
+    "http://[::ffff:127.0.0.1]/",
+    "http://[2002:7f00:1::]/",
 ])
 async def test_fetch_page_rejects_private_targets(url):
     with patch("app.gateway.crawl_adapter.get_tts_config", return_value=_crawler_cfg()):
@@ -236,3 +239,22 @@ async def test_fetch_page_empty_response_raises():
     ):
         with pytest.raises(RuntimeError, match="抓取結果為空"):
             await fetch_page("https://example.com")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", [
+    "http://example.com/../169.254.169.254/latest/meta-data/",
+    "http://example.com/%2e%2e/admin",
+    "http://example.com/a/./b",
+])
+async def test_fetch_page_rejects_dot_segments(url):
+    # 路徑直接接在 provider 網址後面，".." 會被化簡成打 provider 的其他路徑。
+    with patch("app.gateway.crawl_adapter.get_tts_config", return_value=_crawler_cfg()):
+        with pytest.raises(ValueError, match="不可包含"):
+            await fetch_page(url)
+
+
+def test_crawler_client_does_not_follow_redirects():
+    from app.gateway import crawl_adapter
+
+    assert crawl_adapter._http.get().follow_redirects is False

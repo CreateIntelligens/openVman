@@ -8,7 +8,7 @@ import logging
 import re
 import socket
 from dataclasses import dataclass
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import httpx
 
@@ -39,15 +39,20 @@ def _validate_public_target(hostname: str) -> None:
             parsed_address = ipaddress.ip_address(address)
         except ValueError as exc:
             raise ValueError("網址解析結果無效") from exc
-        if (
-            parsed_address.is_private
-            or parsed_address.is_loopback
-            or parsed_address.is_link_local
-            or parsed_address.is_reserved
-            or parsed_address.is_multicast
-            or parsed_address.is_unspecified
-        ):
+        if not _is_public_address(parsed_address):
             raise ValueError("不允許擷取內部或特殊網路位址")
+
+
+def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    # IPv6 包著的 IPv4（::ffff:、6to4、Teredo）要拆出來再判斷；只看 is_private
+    # 會放行 100.64.0.0/10（CGNAT／Tailscale）與 2002:7f00:1:: 這類位址。
+    if isinstance(address, ipaddress.IPv6Address):
+        embedded = address.ipv4_mapped or address.sixtofour
+        if embedded is None and address.teredo:
+            embedded = address.teredo[1]
+        if embedded is not None:
+            return _is_public_address(embedded)
+    return address.is_global and not address.is_multicast
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,7 +244,8 @@ def _parse_provider_response(raw_text: str, fallback_url: str) -> tuple[str, str
 # Public API
 # ---------------------------------------------------------------------------
 
-_http = SharedAsyncClient(read=30, follow_redirects=True)
+# 不跟轉址：provider 回 3xx 指向內網時，跟過去等於從後端自己的網路發請求。
+_http = SharedAsyncClient(read=30, follow_redirects=False)
 
 
 async def fetch_page(url: str) -> CrawlResult:
@@ -268,6 +274,9 @@ async def fetch_page(url: str) -> CrawlResult:
         raise ValueError(f"無效的網址：{url}")
     if parsed.username or parsed.password:
         raise ValueError("不允許帶有帳號密碼的網址")
+    # 路徑直接接在 provider 網址後面；".." 會被 httpx 化簡，跳出目標主機改打 provider 的其他路徑。
+    if any(unquote(segment) in (".", "..") for segment in parsed.path.split("/")):
+        raise ValueError("網址路徑不可包含 . 或 ..")
 
     # Domain blocking（複用現有設定）
     domain = parsed.hostname.lower()
