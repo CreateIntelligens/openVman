@@ -7,7 +7,7 @@ import re
 import llm
 
 rows = {f"{r['file']}#{r['index']}": r for r in json.load(open("rows.json"))}
-CITE = re.compile(r"\[([^\[\]]+?\.csv#\d+(?:\s*[,，、]\s*[^\[\]]+?\.csv#\d+)*)\]")
+CITE = re.compile(r"\[([^\[\],，、]+?\.csv#\d+(?:\s*[,，、]\s*[^\[\],，、]+?\.csv#\d+)*)\]")
 
 claims = []
 for path in sorted(glob.glob("wiki/*.md")):

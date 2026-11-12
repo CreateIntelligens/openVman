@@ -5,7 +5,8 @@
  * MOTION_ARTIFACT_DIR selects the evidence directory. Does not replace formal Vue chat E2E.
  */
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { delimiter, dirname, join, resolve } from 'node:path';
 
@@ -24,7 +25,9 @@ function playwright() {
 const { build } = require('../../node_modules/esbuild');
 const { outputFiles } = await build({ entryPoints: [resolve('frontend/app/src/composables/avatarMotionSession.ts')], bundle: true, write: false, format: 'iife', globalName: 'MotionSessionProbe' });
 const base = process.env.BASE_URL ?? 'https://10.9.0.32:8787';
-const output = resolve(process.env.MOTION_ARTIFACT_DIR ?? '/tmp/openvman-motion-20261022/handoff-before');
+const output = process.env.MOTION_ARTIFACT_DIR
+  ? resolve(process.env.MOTION_ARTIFACT_DIR)
+  : await mkdtemp(join(tmpdir(), 'openvman-motion-handoff-'));
 await mkdir(output, { recursive: true });
 const { chromium } = playwright();
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'], headless: true });

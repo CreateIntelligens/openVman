@@ -6,7 +6,8 @@
  * MP4 must be prepared and its 800 frame markers independently verified first.
  */
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { delimiter, dirname, join, resolve } from 'node:path';
 
@@ -22,7 +23,9 @@ function playwright() {
   throw new Error('playwright-core unavailable; set MOTION_PLAYWRIGHT_PACKAGE');
 }
 const base = process.env.BASE_URL ?? 'https://localhost:8787';
-const output = resolve(process.env.MOTION_ARTIFACT_DIR ?? '/tmp/openvman-motion-20261022/formats');
+const output = process.env.MOTION_ARTIFACT_DIR
+  ? resolve(process.env.MOTION_ARTIFACT_DIR)
+  : await mkdtemp(join(tmpdir(), 'openvman-motion-formats-'));
 const modes = (process.env.MOTION_FORMAT_MODES ?? 'all-webm,all-mp4,mixed-state').split(',');
 const viewports = (process.env.MOTION_FORMAT_VIEWPORTS ?? 'desktop,mobile').split(',');
 const reportPrefix = process.env.MOTION_FORMAT_REPORT_PREFIX ?? 'report';

@@ -9,13 +9,14 @@
  * MOTION_TEST_PROJECT_IDS defaults to the confirmed Yuanfu pilot only. Add the
  * second pilot through this variable only after the user confirms its identity.
  * MOTION_CHARACTER_ID defaults to hciot-motion; MOTION_LEGACY_CHARACTER_ID is optional.
- * MOTION_ARTIFACT_DIR defaults to /tmp/openvman-motion-20261022/vman/.
+ * MOTION_ARTIFACT_DIR defaults to a fresh mkdtemp directory under the OS temp dir.
  * MOTION_VIEWPORT_WIDTH/HEIGHT and MOTION_DEVICE_SCALE_FACTOR configure the
  * real browser viewport. MOTION_DEVICE_KIOSK=1 enters visitor mode through UI.
  */
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -37,7 +38,9 @@ function playwright() {
 const base = new URL(process.env.BASE_URL ?? 'https://10.9.0.32:8787');
 const username = process.env.MOTION_TEST_USERNAME;
 const password = process.env.MOTION_TEST_PASSWORD;
-const artifactDir = resolve(process.env.MOTION_ARTIFACT_DIR ?? '/tmp/openvman-motion-20261022/vman');
+const artifactDir = process.env.MOTION_ARTIFACT_DIR
+  ? resolve(process.env.MOTION_ARTIFACT_DIR)
+  : await mkdtemp(join(tmpdir(), 'openvman-motion-vman-'));
 const characterId = process.env.MOTION_CHARACTER_ID ?? 'hciot-motion';
 const pilots = ['proj-9c042e94e0', 'proj-b85afb8bb6'];
 const projectIds = [...new Set((process.env.MOTION_TEST_PROJECT_IDS ?? pilots[0]).split(',').map((id) => id.trim()).filter(Boolean))];

@@ -6,7 +6,8 @@
  * Account preference PUTs receive 409; chat/TTS always use the real services.
  */
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +20,9 @@ let chromium;
 try { ({ chromium } = localRequire('playwright-core')); } catch { ({ chromium } = globalRequire('playwright-core')); }
 const base = new URL(process.env.BASE_URL ?? 'https://10.9.0.32:8787');
 const mode = process.env.FULLSCREEN_TEST_MODE ?? 'deployed';
-const out = resolve(process.env.MOTION_ARTIFACT_DIR ?? `/tmp/openvman-fullscreen-chat/${mode}`);
+const out = process.env.MOTION_ARTIFACT_DIR
+  ? resolve(process.env.MOTION_ARTIFACT_DIR)
+  : await mkdtemp(join(tmpdir(), `openvman-fullscreen-chat-${mode}-`));
 const username = process.env.MOTION_TEST_USERNAME;
 const password = process.env.MOTION_TEST_PASSWORD;
 const projectId = 'proj-9c042e94e0';

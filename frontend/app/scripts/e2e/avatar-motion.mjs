@@ -3,13 +3,14 @@
  * Real SDK smoke/E2E test; run after the motion experiment is deployed.
  * MOTION_TEST_USERNAME and MOTION_TEST_PASSWORD are required.
  * BASE_URL defaults to https://localhost:8787.
- * MOTION_ARTIFACT_DIR defaults to /tmp/openvman-avatar-motion-<timestamp>.
+ * MOTION_ARTIFACT_DIR defaults to a fresh mkdtemp directory under the OS temp dir.
  * MOTION_CACHE_FOCUSED_ONLY=1 runs mobile cache, decoder fallback and preload failure tests.
  * This script intentionally never sends chat messages or changes settings.
  */
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -34,8 +35,9 @@ function loadPlaywright() {
 
 const baseURL = new URL(process.env.BASE_URL ?? 'https://localhost:8787');
 const demoURL = new URL('/experiments/avatar-motion/', baseURL).href;
-const artifactDir = resolve(process.env.MOTION_ARTIFACT_DIR
-  ?? `/tmp/openvman-avatar-motion-${new Date().toISOString().replaceAll(':', '-')}`);
+const artifactDir = process.env.MOTION_ARTIFACT_DIR
+  ? resolve(process.env.MOTION_ARTIFACT_DIR)
+  : await mkdtemp(join(tmpdir(), 'openvman-avatar-motion-'));
 const username = process.env.MOTION_TEST_USERNAME;
 const password = process.env.MOTION_TEST_PASSWORD;
 const readyTimeout = Number(process.env.MOTION_READY_TIMEOUT_MS ?? 180000);

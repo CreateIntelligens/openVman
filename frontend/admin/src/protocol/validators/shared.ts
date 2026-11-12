@@ -69,11 +69,13 @@ export function expectStringMap(
   fieldName: string,
 ) {
   const record = expectRecord(value, version);
-  const normalized: Record<string, string> = {};
-  for (const [key, item] of Object.entries(record)) {
-    normalized[key] = expectNonEmptyString(item, version, fieldName, eventName);
-  }
-  return normalized;
+  // fromEntries 以 CreateDataProperty 寫入：伺服器送來的 "__proto__" 會留成一般 key，不會碰到原型。
+  return Object.fromEntries(
+    Object.entries(record).map(([key, item]) => [
+      key,
+      expectNonEmptyString(item, version, fieldName, eventName),
+    ]),
+  ) as Record<string, string>;
 }
 
 export function expectOptionalStringMap(
