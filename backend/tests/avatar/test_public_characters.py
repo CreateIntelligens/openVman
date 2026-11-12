@@ -191,3 +191,41 @@ def test_list_excludes_in_progress_upload_tempdirs(tmp_path, client):
     response = client.get("/api/v1/characters")
 
     assert response.json() == {"characters": []}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/static/characters/008/..%2Fsecret%2F01.webm",
+        "/static/characters/008/%2e%2e/secret/01.webm",
+        "/static/characters/008/..%2F..%2Fsecret%2F01.webm",
+        "/static/characters/008/01.webm%00",
+    ],
+)
+def test_public_character_path_cannot_reach_another_character(client, path):
+    # 權限只看網址第一段的 ID；借公開角色的目錄往上跳，曾經能匿名讀到私有角色。
+    assert _upload(client).status_code == 200
+    store = public_characters_routes.get_store()
+    store.create_character(
+        char_id="secret",
+        label="私有角色",
+        video_bytes=b"secret-video",
+        data_bytes=b"secret-data",
+    )
+    runtime = get_auth_runtime()
+    owner = runtime.users.get_by_username("secret-owner") or runtime.users.create(
+        username="secret-owner",
+        password_hash=hash_password("owner-password"),
+        role=AccountRole.USER,
+    )
+    runtime.resources.register(
+        resource_type=ResourceType.AVATAR_CHARACTER,
+        resource_id="secret",
+        owner_user_id=owner.id,
+        visibility=ResourceVisibility.PRIVATE,
+    )
+
+    response = client.get(path)
+
+    assert response.status_code == 404
+    assert b"secret-video" not in response.content

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -133,11 +134,21 @@ def _resolve_asset_file(
     resource_id: str,
     relative_path: str,
 ) -> Path:
-    base_dir = Path(base_directory).resolve()
-    target = (base_dir / resource_id / relative_path).resolve()
-    if not target.is_relative_to(base_dir) or not target.is_file():
+    # 權限只檢查了 resource_id，所以檔案必須落在該資源自己的目錄裡；只檢查
+    # 「在 base 底下」會讓 `<公開ID>/..%2F<私有ID>/…` 讀到別的資源。
+    try:
+        base_dir = os.path.realpath(base_directory)
+        resource_dir = os.path.realpath(os.path.join(base_dir, resource_id))
+        target = os.path.realpath(os.path.join(resource_dir, relative_path))
+    except ValueError as exc:  # NUL 等無法當路徑的字元
+        raise HTTPException(status_code=404, detail="File not found") from exc
+    if (
+        os.path.dirname(resource_dir) != base_dir
+        or not target.startswith(resource_dir + os.sep)
+        or not os.path.isfile(target)
+    ):
         raise HTTPException(status_code=404, detail="File not found")
-    return target
+    return Path(target)
 
 
 @router.get("/static/backgrounds/{background_id}/{file_path:path}", summary="讀取背景檔案")
