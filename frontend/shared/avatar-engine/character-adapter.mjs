@@ -524,17 +524,19 @@ export class CharacterBinding {
     // the row slide with every syllable and vanish whenever the jaw crossed zero.
     // However far it retracts, a sliver stays below the lip instead of the row vanishing.
     const upperEdge = Math.max(Math.min(-0.012, upperLipEdge + 0.015),
-      -0.012 - 0.45 * softPositive((controls.dentalGap ?? controls.gap) - 0.1, 0.02)
+      -0.012 - 0.15 * softPositive((controls.dentalGap ?? controls.gap) - 0.1, 0.02)
         * smooth(((controls.dentalJaw ?? controls.jaw) + 0.02) / 0.14));
     // A video already resting open shows its own real teeth. They stay, drawn from
     // their own place in the frame over the painted interior, fading out towards the
     // lower lip so the newly opened space below shows mouth interior and lower teeth.
     const realTeeth = smooth((rest.originalGap / width - REST_SEAM) / 0.03);
-    const restCavity = this.restCavity ??= new Float32Array((SEGMENTS + 2) * 7);
-    write(restCavity, 0, restX, restY, 0, 0, 3, 0, 0);
-    for (let i = 0; i <= SEGMENTS; i++) {
-      const k = i % SEGMENTS, source = rest.inner[k];
-      write(restCavity, i + 1, source[0], source[1], 0, 0, k <= HALF ? 4 : 3, 0, 0);
+    // A strip pairing each upper lip point with the lower one opposite: a smiling
+    // mouth is crescent-shaped, and a fan from its centroid covered almost nothing.
+    const restCavity = this.restCavity ??= new Float32Array((HALF + 1) * 2 * 7);
+    for (let i = 0; i <= HALF; i++) {
+      const upper = rest.inner[i], lower = rest.inner[(SEGMENTS - i) % SEGMENTS];
+      write(restCavity, i * 2, upper[0], upper[1], 0, 0, 4, 0, 0);
+      write(restCavity, i * 2 + 1, lower[0], lower[1], 0, 0, 3, 0, 0);
     }
     return {
       skin: buffer, cavity: this.cavity, restCavity: this.restCavity, realTeeth,

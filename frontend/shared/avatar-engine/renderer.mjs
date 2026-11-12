@@ -33,6 +33,9 @@ vec3 oral(vec2 p){
   vec3 skinTint=(dot(cheekA,toLuma)>dot(cheekB,toLuma)?cheekA:cheekB)/max(cheekLuma,.2);
   float depth=1.-smoothstep(.36,.98,side);
   vec3 back=lip*vec3(.4,.18,.19)*(.5+.5*depth)*(.62+.5*smoothstep(-.04,.16,p.y)*(1.-side*side));
+  // A nearly closed slit shows the shadowed lip tone rather than a hard black line;
+  // only the background softens, the teeth stay solid.
+  back=mix(lip*vec3(.46,.28,.29),back,mix(.3,1.,smoothstep(.015,.09,opening)));
   float seam=teeth.z*p.x*p.x+tilt*p.x;
   float lowerEdge=teeth.y+seam*.9+.022*side*side+(1.-crown.a)*.012;
   // The tongue rests behind the lower teeth and fills the floor of the mouth as the
@@ -45,8 +48,9 @@ vec3 oral(vec2 p){
   // away from it instead of ruling a straight line through every tooth.
   float lowerEdgeNear=1.-smoothstep(lowerEdge+.006,lowerEdge+.05,p.y);
   float lowerBody=mix(1.,crown.b,.3+.7*lowerEdgeNear);
-  // A slit between nearly closed lips is too thin to show separate teeth.
-  float showTeeth=smoothstep(.025,.075,opening);
+  // Teeth are always solid; how much shows is decided by the lips parting over them,
+  // so they are uncovered from under the lip instead of fading in from transparent.
+  float showTeeth=1.;
   float lowerTeeth=showTeeth*smoothstep(lowerEdge-.009,lowerEdge+.009,p.y)*(1.-smoothstep(.62,.95,side));
   // Shaded enamel falls towards the person's warm oral tone, not towards grey.
   vec3 shaded=lip*vec3(.36,.24,.24);
@@ -60,7 +64,7 @@ vec3 oral(vec2 p){
   float shadow=mix(.45,1.,smoothstep(0.,.07,p.y-(teeth.w+seam)));
   float upperDepth=1.-smoothstep(.14,.84,side);
   col=mix(col,mix(shaded,enamel*upperBody,(.26+.62*upperDepth)*shadow),upperTeeth*.9);
-  float rim=smoothstep(0.,.14,dentalCoverage)*mix(.3,1.,smoothstep(.015,.09,opening));
+  float rim=smoothstep(0.,.14,dentalCoverage);
   return mix(lip*vec3(.46,.28,.29),col,rim);
 }
 void main(){
@@ -74,7 +78,8 @@ void main(){
     mapped=texture(skin,uv);mapped.rgb*=1.-.14*exposure*pow(wet,6.);
     // The lip rolls into the mouth rather than ending at a cut edge; the last sliver
     // falls towards the interior so the opening is as soft as the face around it.
-    float rolled=smoothstep(.85,1.,wet)*exposure;
+    // A wide, gentle gradient: a narrow one drew a hairline that read as a crack.
+    float rolled=smoothstep(.55,1.,wet)*exposure*.5;
     mapped.rgb=mix(mapped.rgb,texture(skin,lipProbe).rgb*vec3(.46,.28,.29),rolled*.72);
     mapped.a*=clamp(restUv.y,0.,1.);
   }else{
@@ -82,7 +87,7 @@ void main(){
     // Past the unzipped part the lips still touch, so the video's own seam stays: the
     // opening grows out from the middle instead of appearing as a full-width line.
     float parted=1.-smoothstep(reach-.14,reach+.04,abs(uv.x));
-    mapped=vec4(mix(seam.rgb,oral(uv),exposure*parted*smoothstep(0.,.14,dentalCoverage)),max(seam.a,exposure));
+    mapped=vec4(mix(seam.rgb,oral(uv),parted*smoothstep(0.,.14,dentalCoverage)),1.);
   }
   color=mapped;
 }`;
@@ -181,7 +186,7 @@ export class SurfaceRenderer {
         // Blend colour only; the cavity's coverage alpha stays as it was.
         g.enable(g.BLEND); g.blendFuncSeparate(g.SRC_ALPHA, g.ONE_MINUS_SRC_ALPHA, g.ZERO, g.ONE);
         g.bufferData(g.ARRAY_BUFFER, geometry.restCavity, g.DYNAMIC_DRAW);
-        g.drawArrays(g.TRIANGLE_FAN, 0, geometry.restCavity.length / 7);
+        g.drawArrays(g.TRIANGLE_STRIP, 0, geometry.restCavity.length / 7);
         g.disable(g.BLEND);
       }
       g.bufferData(g.ARRAY_BUFFER, geometry.skin, g.DYNAMIC_DRAW);
