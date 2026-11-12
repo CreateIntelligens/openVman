@@ -44,6 +44,14 @@ const ROUND_GAIN = 2;
 const MAX_GAP = 0.42;
 const MAX_CLOSURE = 0.07;
 const MAX_JAW = 0.26;
+// A closed mouth's measured seam is a few hundredths of its width; above this the
+// source video is showing an open mouth.
+const REST_SEAM = 0.03;
+// Openings are sized in mouth widths, but a smile stretches the width (and thins the
+// lips) without giving the jaw any more travel. A mouth wide for its lip thickness is
+// read as smiling and opens proportionally less, down to this floor.
+const NEUTRAL_THICKNESS = 0.14;
+const MIN_SMILE_SCALE = 0.65;
 
 /** Signed anatomy for one latent vector, in mouth widths (round is -1..1 after gain). */
 export function decodeMouthPose(coefficients) {
@@ -221,6 +229,37 @@ export function repairTrackingJumps(frames, maximumRun = 3) {
   return repaired;
 }
 
+const SMOOTHING = [1, 4, 6, 4, 1];
+
+/**
+ * Average each tracked lip point with its neighbouring frames, in video pixels.
+ * The tracker wobbles by a pixel or so on a still face (beards make it worse), and the
+ * teeth, drawn from these points, would shake with it. Neighbours that moved further
+ * than a fifth of the mouth width are real motion and are left out. Returns new frames.
+ */
+export function smoothTracking(frames) {
+  const count = frames.length;
+  const placed = frames.map(frame => {
+    const scale = (frame.region[2] - frame.region[0]) / SIZE;
+    const toVideo = points => points.map((value, i) => frame.region[i % 2] + value * scale);
+    const outer = toVideo(frame.outer);
+    return { outer, inner: toVideo(frame.inner), scale,
+      centre: [(outer[0] + outer[20]) / 2, (outer[1] + outer[21]) / 2],
+      width: Math.hypot(outer[20] - outer[0], outer[21] - outer[1]) };
+  });
+  return frames.map((frame, index) => {
+    const here = placed[index];
+    const near = SMOOTHING.map((weight, offset) => [weight, index + offset - 2])
+      .filter(([, j]) => j >= 0 && j < count
+        && Math.hypot(placed[j].centre[0] - here.centre[0], placed[j].centre[1] - here.centre[1]) <= 0.2 * here.width);
+    const total = near.reduce((sum, [weight]) => sum + weight, 0);
+    const average = name => frame[name].map((_, i) => clamp(
+      (near.reduce((sum, [weight, j]) => sum + weight * placed[j][name][i], 0) / total - frame.region[i % 2]) / here.scale,
+      0, SIZE));
+    return { ...frame, outer: average('outer'), inner: average('inner') };
+  });
+}
+
 /** Authored anatomical fields driven by the decoded signed pose. */
 export class CharacterBinding {
   constructor(asset) {
@@ -296,6 +335,9 @@ export class CharacterBinding {
       originalGap: Math.max(0.3, innerLocal[3 * SEGMENTS / 4][1] - innerLocal[SEGMENTS / 4][1]),
       bend: (cornerY - seam) / width / Math.max(0.1, cornerSide * cornerSide),
       thickness: innerLocal.map((point, i) => Math.abs(point[1] - outerLocal[i][1])),
+      smileScale: clamp((Math.abs(innerLocal[SEGMENTS / 4][1] - outerLocal[SEGMENTS / 4][1])
+        + Math.abs(innerLocal[3 * SEGMENTS / 4][1] - outerLocal[3 * SEGMENTS / 4][1])) / 2 / width
+        / NEUTRAL_THICKNESS, MIN_SMILE_SCALE, 1),
       jawAtLips: outerLocal.map(point => jawReach(point[0], point[1])),
     };
     this.cachedIndex = index;
@@ -315,7 +357,7 @@ export class CharacterBinding {
     const neutral = zero && settled;
 
     const jaw = soft(controls.jaw, MAX_JAW);
-    const jawOpen = Math.max(0, jaw), clench = Math.max(0, -jaw);
+    const jawOpen = Math.max(0, jaw) * rest.smileScale, clench = Math.max(0, -jaw);
     const rounding = soft(controls.round * ROUND_GAIN, 1);
     const pucker = Math.max(0, rounding), spread = Math.max(0, -rounding);
     // Between sounds the lips usually keep a hairline apart; only real closures seal.
@@ -324,7 +366,13 @@ export class CharacterBinding {
     // Stressed syllables need to read: peaks open up more than the fitted line says.
     const unsealed = soft(parted * (1 + 0.12 * smooth((parted - 0.06) / 0.14)), MAX_GAP);
     // Pursing draws the lips around a small opening whatever the jaw is doing.
-    const open = unsealed * (1 - 0.45 * pucker);
+    // A video whose mouth already rests open (smiling, or mid-speech in the source)
+    // only gets the difference; adding the full opening on top would open it twice.
+    const restExcess = Math.max(0, rest.originalGap / width - REST_SEAM);
+    const target = unsealed * (1 - 0.45 * pucker) * rest.smileScale;
+    const open = restExcess > 0
+      ? softPositive(target - restExcess, 0.02) - softPositive(-restExcess, 0.02)
+      : target;
     const closure = soft(Math.max(0, -controls.gap), MAX_CLOSURE);
 
     // The lower lip rides on the jaw and takes most of the gap; lips parted beyond

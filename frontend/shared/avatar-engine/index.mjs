@@ -1,5 +1,5 @@
 import { FramePlayer } from "./frame-player.mjs";
-import { loadCharacter, repairTrackingJumps, validateLipFrame } from "./character-adapter.mjs";
+import { loadCharacter, repairTrackingJumps, smoothTracking, validateLipFrame } from "./character-adapter.mjs";
 import { StreamingPlaybackController } from "./inference/streaming-playback.mjs";
 
 const interrupted = () => new DOMException("播放已取消", "AbortError");
@@ -214,7 +214,7 @@ export class AvatarEngine {
   applyCharacterData(data) {
     if (this.disposed) throw new Error("人物引擎已關閉");
     this.player?.dispose({ keepVideo: true });
-    const character = { ...this.rig, frames: repairTrackingJumps(data.frames) };
+    const character = { ...this.rig, frames: smoothTracking(repairTrackingJumps(data.frames)) };
     [this.canvas.width, this.canvas.height] = data.frameSize;
     this.player = new FramePlayer(this.canvas, this.video, character);
     this.player.videoSource = this.options.videoSource;

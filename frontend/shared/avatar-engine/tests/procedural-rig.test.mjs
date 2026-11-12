@@ -3,14 +3,15 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import {
   CharacterBinding, LATENT_REST, MouthDynamics, createDentalProfile,
-  decodeMouthPose, loadCharacter, repairTrackingJumps,
+  decodeMouthPose, loadCharacter, repairTrackingJumps, smoothTracking,
 } from '../character-adapter.mjs';
 
 const loop = (rx, ry) => Array.from({ length: 20 }, (_, i) => {
   const angle = i * Math.PI / 10;
   return [90 - Math.cos(angle) * rx, 85 - Math.sin(angle) * ry];
 }).flat();
-const frame = () => ({ region: [100, 200, 280, 380], outer: loop(36, 8), inner: loop(31, 0.7) });
+// Lips about a sixth of the mouth width thick, like an unsmiling face: thinner reads as a smile.
+const frame = () => ({ region: [100, 200, 280, 380], outer: loop(36, 12), inner: loop(31, 0.7) });
 const rig = async () => ({ ...await loadCharacter(), frames: [frame()] });
 
 // Median model output per labelled sound over six synthetic voices, from
@@ -510,4 +511,35 @@ test('tracking that starts on the wrong spot is repaired, while real head moveme
     if (run <= 3) assert.equal(touched.length, run, `run ${run} replaced whole`);
     else assert.deepEqual(touched, [], `run ${run} left alone`);
   }
+});
+
+test('a smile-stretched mouth opens less than a neutral one of the same width', async () => {
+  const apertureFor = async outerHeight => {
+    const binding = new CharacterBinding({ ...await loadCharacter(), frames: [{ ...frame(), outer: loop(36, outerHeight) }] });
+    const g = binding.update(0, SOUNDS.a);
+    return g.gap / g.width;
+  };
+  const neutral = await apertureFor(12), smiling = await apertureFor(6);
+  assert.ok(smiling < neutral * 0.85, `smiling ${smiling} vs neutral ${neutral}`);
+  assert.ok(smiling > neutral * 0.5, 'the floor keeps a smiling mouth talking');
+});
+
+test('a video already resting open is not opened a second time', async () => {
+  const apertureFor = async innerHeight => {
+    const binding = new CharacterBinding({ ...await loadCharacter(), frames: [{ ...frame(), inner: loop(31, innerHeight) }] });
+    const g = binding.update(0, SOUNDS.a);
+    return g.gap / g.width;
+  };
+  const closed = await apertureFor(0.7), open = await apertureFor(4);
+  assert.ok(open < closed * 1.1, `open rest ${open} vs closed rest ${closed}`);
+});
+
+test('tracking wobble is smoothed away while real movement is kept', () => {
+  const still = Array.from({ length: 40 }, (_, i) => ({ ...frame(), inner: loop(31, 0.7 + (i % 2 ? 0.3 : -0.3)) }));
+  const smoothed = smoothTracking(still);
+  const wobble = frames => Math.max(...frames.slice(3, -3).map((f, i) => Math.abs(f.inner[11] - frames[i + 4].inner[11])));
+  assert.ok(wobble(smoothed) < wobble(still) * 0.5, `${wobble(smoothed)} vs ${wobble(still)}`);
+  const moved = Array.from({ length: 10 }, (_, i) => ({ ...frame(), region: i < 5 ? [100, 200, 280, 380] : [160, 200, 340, 380] }));
+  const kept = smoothTracking(moved);
+  assert.ok(kept[5].outer.every((v, i) => Math.abs(v - moved[5].outer[i]) < 1e-9), 'a jump of half a mouth width is motion, not wobble');
 });
