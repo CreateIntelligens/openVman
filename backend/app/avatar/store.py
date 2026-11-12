@@ -88,7 +88,7 @@ class AvatarStore:
         if target.exists():
             raise CharacterExists(f"角色已存在：{cid}")
 
-        tmp = Path(tempfile.mkdtemp(dir=self._base, prefix=f".{cid}.tmp."))
+        tmp = Path(tempfile.mkdtemp(dir=self._base, prefix=".upload.tmp."))
         try:
             (tmp / VIDEO_FILENAME).write_bytes(video_bytes)
             (tmp / DATA_FILENAME).write_bytes(data_bytes)

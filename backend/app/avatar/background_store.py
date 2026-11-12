@@ -79,7 +79,7 @@ class AvatarBackgroundStore:
         if target.exists():
             raise BackgroundExists(f"背景已存在：{bid}")
 
-        tmp = Path(tempfile.mkdtemp(dir=self._base, prefix=f".{bid}.tmp."))
+        tmp = Path(tempfile.mkdtemp(dir=self._base, prefix=".upload.tmp."))
         try:
             (tmp / f"{IMAGE_BASENAME}{suffix}").write_bytes(image_bytes)
             now = _now()
