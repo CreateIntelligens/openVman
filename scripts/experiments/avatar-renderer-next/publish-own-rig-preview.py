@@ -26,6 +26,9 @@ def main():
     parser.add_argument("--comparison-summary", type=Path)
     parser.add_argument("--long-speech", type=Path,
                         help="16 kHz mono WAV behind the page's 30 second button")
+    parser.add_argument("--character", nargs=3, action="append", default=[],
+                        metavar=("ID", "RENDER_DATA", "VIDEO"),
+                        help="extra character for the comparison page's selector")
     args = parser.parse_args()
     sample = ROOT / "scripts/experiments/avatar-renderer-next/assets"
     files = {}
@@ -46,6 +49,14 @@ def main():
     files["speech.wav"] = (sample / "speech.wav").read_bytes()
     if args.long_speech:
         files["speech-30s.wav"] = args.long_speech.read_bytes()
+    characters = []
+    for name, render_data, video in args.character:
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            raise ValueError(f"Unsafe character id: {name}")
+        files[f"characters/{name}/render_data.json.gz"] = Path(render_data).read_bytes()
+        files[f"characters/{name}/01.webm"] = Path(video).read_bytes()
+        characters.append(name)
+    files["characters/index.json"] = json.dumps(characters).encode()
     page = (ROOT / "scripts/experiments/avatar-renderer-next/integration-preview.html").read_text()
     page = page.replace("/avatar-engine/", "./runtime/")
     page = page.replace("['/static/characters/dev-123','./sample']", "['./sample','./sample']")

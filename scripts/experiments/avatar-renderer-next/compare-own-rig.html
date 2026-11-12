@@ -17,6 +17,7 @@ figure{margin:0;min-width:0}figcaption{margin-bottom:.5rem;font-weight:600}
 .view{height:64dvh;overflow:hidden;border:1px solid var(--line);box-sizing:border-box}
 canvas,iframe{display:block;width:100%;height:100%;object-fit:contain;border:0}
 button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+label{display:flex;gap:.5rem;align-items:center}select{font:inherit;padding:.5rem;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
 @media(max-width:40rem){.stages{grid-template-columns:minmax(0,1fr)}.view{height:55dvh}}
 </style>
 <main>
@@ -25,9 +26,10 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 <nav aria-label="對照控制">
 <button id="play" disabled>播放 5 秒語音</button><button id="play-long" disabled>播放 30 秒語音</button><button id="stop" disabled>停止</button>
 <button id="neutral" disabled>回到待機動作</button><button id="close-up" disabled aria-pressed="false">放大看臉</button>
+<label>人物 <select id="character" disabled><option value="">範例人物</option></select></label>
 </nav>
 <output id="status" role="status">載入中</output>
-<div class="stages"><figure><figcaption>原版引擎</figcaption><div class="view"><iframe id="native" title="原版引擎語音對嘴" src="/experiments/avatar-native-reference/"></iframe></div></figure>
+<div class="stages"><figure><figcaption>原版引擎</figcaption><div class="view"><iframe id="native" title="原版引擎語音對嘴"></iframe></div></figure>
 <figure><figcaption>自產資產版 v2</figcaption><div class="view"><canvas id="after"></canvas></div></figure></div>
 <p><a href="./">只看新版</a></p>
 </main>
@@ -36,7 +38,17 @@ import { AvatarEngine } from './runtime/core/index.mjs';
 const status=document.querySelector('#status');
 const fail=error=>{status.textContent=`失敗：${error.message}`;console.error(error)};
 try{
+ // ?c=<id> 換人物：兩欄都載入同一人物，原版用它原本的素材包，新版用從影片產生的資料。
+ const picker=document.querySelector('#character');
+ const listed=await fetch('./characters/index.json').then(r=>r.ok?r.json():[]).catch(()=>[]);
+ const wanted=new URLSearchParams(location.search).get('c')||'';
+ const character=listed.includes(wanted)?wanted:'';
+ for(const id of listed)picker.add(new Option(id,id));
+ picker.value=character;
+ picker.onchange=()=>{const next=new URL(location.href);
+  picker.value?next.searchParams.set('c',picker.value):next.searchParams.delete('c');location.assign(next)};
  const iframe=document.querySelector('#native');
+ iframe.src=`/experiments/avatar-native-reference/${character?character+'/':''}`;
  const nativeLoaded=new Promise((resolve,reject)=>{
   const loaded=()=>{const pending=iframe.contentWindow.nativeReady;
    if(!pending){reject(new Error('原版引擎未能初始化'));return;}
@@ -45,7 +57,7 @@ try{
   if(iframe.contentWindow.nativeReady)loaded();else iframe.addEventListener('load',loaded,{once:true});
  });
  const newer=await AvatarEngine.create({canvas:document.querySelector('#after'),runtimeBaseUrl:'./runtime/'});
- await newer.loadCharacter('./sample');
+ await newer.loadCharacter(character?`./characters/${character}`:'./sample');
  const native=await nativeLoaded;
  native.attachVideo(newer.video);
  window.comparison={native,newer};
@@ -104,7 +116,7 @@ try{
  document.querySelector('#neutral').onclick=()=>{
   stop();newer.video.play().then(()=>{newer.player.start();status.textContent='待機動作播放中'}).catch(fail);
  };
- document.querySelectorAll('button').forEach(b=>b.disabled=false);
+ document.querySelectorAll('button,select').forEach(b=>b.disabled=false);
  status.textContent='可播放';window.comparisonReady=true;
  window.addEventListener('pagehide',()=>{clearTimeout(nativeTimer);native.stop();newer.dispose()},{once:true});
 }catch(error){fail(error)}

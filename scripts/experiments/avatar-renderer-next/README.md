@@ -193,7 +193,7 @@ python3 scripts/experiments/avatar-renderer-next/benchmark-own-rig.py \
   --baseline-runtime /path/to/motion-r4b/baseline-runtime --groups 3 --seconds 30 --out /path/to/performance
 ```
 
-比較頁若發布到 `openvman-avatar-1`，下一次正式換版就會被 watchtower 清掉。需要長時間給人看時，改用獨立站台 `compose.own-rig-preview.yaml`（預設 port 8790，HTTPS 自簽憑證，不受 watchtower 更新）。`OWN_RIG_PREVIEW_DIR` 底下放 `html/` 與由 `own-rig-preview-nginx.conf` 複製來的 `default.conf`，`OWN_RIG_PREVIEW_CERTS` 指向含 `openvman.crt`／`openvman.key` 的目錄。檔案與 nginx 設定都在主機目錄，容器重建後仍在。
+比較頁若發布到 `openvman-avatar-1`，下一次正式換版就會被 watchtower 清掉。需要長時間給人看時，改用獨立站台 `compose.own-rig-preview.yaml`（預設 port 8790，HTTPS 自簽憑證，不受 watchtower 更新）。`OWN_RIG_PREVIEW_DIR` 底下放 `html/` 與由 `own-rig-preview-nginx.conf` 複製來的 `default.conf`，`OWN_RIG_PREVIEW_CERTS` 指向含 `openvman.crt`／`openvman.key` 的目錄。檔案與 nginx 設定都在主機目錄，容器重建後仍在。比較頁可用 `?c=<人物代號>` 或頁面上的人物選單切換人物：兩支發布腳本各加 `--character`（新版給該人物的 `render_data.json.gz` 與 `01.webm`，原版給它原本的 `combined_data.json.gz`），原版每個人物發布在 `avatar-native-reference/<代號>/`。
 
 ```bash
 docker compose -p openvman-own-rig-preview -f scripts/experiments/avatar-renderer-next/compose.own-rig-preview.yaml up -d

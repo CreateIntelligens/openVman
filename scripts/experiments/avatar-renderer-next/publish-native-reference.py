@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import io
 import json
+import re
 import subprocess
 import tarfile
 from pathlib import Path
@@ -13,6 +14,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True, type=Path)
     parser.add_argument("--container", default="openvman-avatar-1")
+    parser.add_argument("--character", nargs=2, action="append", default=[],
+                        metavar=("ID", "COMBINED_DATA"),
+                        help="extra character served from <prefix>/<ID>/ with its own package")
     args = parser.parse_args()
     names = ("OpenVmanAvatarRuntime.js", "OpenVmanAvatarRuntime.wasm",
              "combined_data.json.gz", "reference.mjs")
@@ -26,6 +30,15 @@ def main():
         if hashlib.sha256(files[name]).hexdigest() != identity[name]["sha256"]:
             raise ValueError(f"Original engine identity changed: {name}")
     files["identity.json"] = json.dumps(identity, indent=2).encode()
+    # Each extra character gets the same runtime beside its own package, so the page's
+    # relative paths resolve unchanged inside <ID>/.
+    shared = {name: data for name, data in files.items() if name != "combined_data.json.gz"}
+    for name, combined in args.character:
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            raise ValueError(f"Unsafe character id: {name}")
+        for path, data in shared.items():
+            files[f"{name}/{path}"] = data
+        files[f"{name}/combined_data.json.gz"] = Path(combined).read_bytes()
     payload = io.BytesIO()
     with tarfile.open(fileobj=payload, mode="w") as archive:
         for name, data in files.items():
