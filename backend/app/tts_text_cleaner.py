@@ -8,13 +8,14 @@ _MD_EMPHASIS = re.compile(r"(\*{1,3}|_{1,3}|~~)(.*?)\1")
 _MD_INLINE_CODE = re.compile(r"`([^`]*)`")
 _MD_CODE_BLOCK = re.compile(r"```[\s\S]*?```")
 _MD_HEADING = re.compile(r"^#{1,6}\s+", re.MULTILINE)
-_MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
-_MD_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+# 連結文字與網址都排除 "["：否則一長串 "[" 會讓每個起點都掃到結尾（實測 5 萬字 8.6 秒）。
+_MD_LINK = re.compile(r"\[([^\[\]]*)\]\([^)\[]*\)")
+_MD_IMAGE = re.compile(r"!\[[^\[\]]*\]\([^)\[]*\)")
 _MD_UL = re.compile(r"^[\s]*[-*+]\s+", re.MULTILINE)
 _MD_OL = re.compile(r"^[\s]*\d+\.\s+", re.MULTILINE)
 _MD_BLOCKQUOTE = re.compile(r"^>\s?", re.MULTILINE)
 _MD_HR = re.compile(r"^[-*_]{3,}\s*$", re.MULTILINE)
-_HTML_TAG = re.compile(r"<[^>]+>")
+_HTML_TAG = re.compile(r"<[^<>]+>")
 # Emoji and miscellaneous symbols — TTS engines either skip or mispronounce them
 _EMOJI = re.compile(
     "["

@@ -123,8 +123,12 @@ def _tts_locale(provider: str, language: str) -> str:
     return locale
 
 
+# 與 OpenAI /v1/audio/speech 相同上限；文字清理與合成時間都隨長度增加，不設上限一個請求就能拖住服務。
+TTS_MAX_INPUT_CHARS = 4096
+
+
 class SpeechRequest(BaseModel):
-    input: str
+    input: str = Field(..., max_length=TTS_MAX_INPUT_CHARS)
     voice: str = ""
     provider: str = ""
     response_format: str = "wav"
@@ -276,7 +280,7 @@ async def create_speech(
 
 
 class TtsStreamRequest(BaseModel):
-    text: str = Field(..., description="要念的文字")
+    text: str = Field(..., description="要念的文字", max_length=TTS_MAX_INPUT_CHARS)
     character: str = Field(
         "", description="舊欄位，等同 voice；新串接請用 voice",
     )
