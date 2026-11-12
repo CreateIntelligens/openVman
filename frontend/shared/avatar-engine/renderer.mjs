@@ -9,15 +9,15 @@ layout(location=0) in vec2 point;
 layout(location=1) in vec2 source;
 layout(location=2) in float material;
 layout(location=3) in vec2 rest;
-out vec2 uv;out vec2 here;out float dentalCoverage;out vec2 restUv;flat out int surface;
-void main(){gl_Position=vec4(point.x/90.-1.,1.-point.y/90.,0.,1.);uv=source;here=point/180.;dentalCoverage=max(0.,material-1.);restUv=rest;surface=int(material);}`;
+out vec2 uv;out float dentalCoverage;out vec2 restUv;flat out int surface;
+void main(){gl_Position=vec4(point.x/90.-1.,1.-point.y/90.,0.,1.);uv=source;dentalCoverage=max(0.,material-1.);restUv=rest;surface=int(material);}`;
 // The interior is lit and tinted by sampling this person's own frame, so teeth and
 // gums sit in the video's lighting. It stays a soft dark red, never black: at the rim
 // it starts from the lip's own shade, so a narrow opening reads as a dim slit rather
 // than an inked line. Teeth recede towards the corners and under the upper lip.
 const FRAGMENT = `#version 300 es
 precision highp float;
-in vec2 uv;in vec2 here;in float dentalCoverage;in vec2 restUv;flat in int surface;out vec4 color;
+in vec2 uv;in float dentalCoverage;in vec2 restUv;flat in int surface;out vec4 color;
 uniform float realTeeth;
 uniform sampler2D skin;uniform sampler2D dental;uniform float exposure;uniform float opening;uniform float reach;uniform float tilt;
 uniform vec4 teeth;uniform vec2 lipProbe;uniform vec4 cheekProbes;
@@ -68,8 +68,8 @@ vec3 oral(vec2 p){
   return mix(lip*vec3(.46,.28,.29),col,rim);
 }
 void main(){
-  // The video's own resting mouth, sampled where it is: real teeth stay put.
-  if(surface>=3){color=vec4(texture(skin,here).rgb,smoothstep(0.,.3,dentalCoverage-2.)*realTeeth);return;}
+  // The video's own real teeth, sampled from where they rest in the frame.
+  if(surface>=3){color=vec4(texture(skin,uv).rgb,realTeeth);return;}
   vec4 mapped;
   if(surface==0){
     // MSAA can evaluate just outside a triangle, so this ramp must tolerate overshoot.
@@ -186,7 +186,10 @@ export class SurfaceRenderer {
         // Blend colour only; the cavity's coverage alpha stays as it was.
         g.enable(g.BLEND); g.blendFuncSeparate(g.SRC_ALPHA, g.ONE_MINUS_SRC_ALPHA, g.ZERO, g.ONE);
         g.bufferData(g.ARRAY_BUFFER, geometry.restCavity, g.DYNAMIC_DRAW);
-        g.drawArrays(g.TRIANGLE_STRIP, 0, geometry.restCavity.length / 7);
+        // Two strips: the fixed upper teeth, then the lower teeth carried by the jaw.
+        const strip = geometry.restCavity.length / 7 / 2;
+        g.drawArrays(g.TRIANGLE_STRIP, 0, strip);
+        g.drawArrays(g.TRIANGLE_STRIP, strip, strip);
         g.disable(g.BLEND);
       }
       g.bufferData(g.ARRAY_BUFFER, geometry.skin, g.DYNAMIC_DRAW);

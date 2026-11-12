@@ -561,7 +561,7 @@ test('a video resting open keeps its own teeth layer; a closed one paints all of
   const open = await realFor(5), closed = await realFor(0.7);
   assert.ok(open.realTeeth > 0.9, `open rest ${open.realTeeth}`);
   assert.equal(closed.realTeeth, 0);
-  assert.equal(open.restCavity.length, (80 + 2) * 7);
+  assert.equal(open.restCavity.length, 41 * 4 * 7);
 });
 
 test('the lower teeth stay with an open lower lip even when the jaw reads near zero', async () => {
@@ -580,4 +580,15 @@ test('the upper row keeps a sliver below the lip however wide the vowel', async 
     const { dental } = binding.update(0, SOUNDS.a, { gap, jaw: 0.2, round: 0, dentalGap: 0.6, dentalJaw: 0.2 });
     assert.ok(dental.upperEdge - dental.upperLip >= 0.015 - 1e-9, `gap ${gap}: ${dental.upperEdge - dental.upperLip}`);
   }
+});
+
+test('the real lower teeth are carried down with the lower lip while the upper ones stay', async () => {
+  const binding = new CharacterBinding({ ...await loadCharacter(), frames: [{ ...frame(), inner: loop(31, 5) }] });
+  const middle = 20, columns = 41;
+  const yOf = (g, vertex) => g.restCavity[vertex * 7 + 1];
+  const closedish = binding.update(0, SOUNDS.a, { gap: 0.05, jaw: 0.02, round: 0 });
+  const upperClosed = yOf(closedish, middle * 2 + 1), lowerClosed = yOf(closedish, columns * 2 + middle * 2 + 1);
+  const open = binding.update(0, SOUNDS.a, { gap: 0.3, jaw: 0.15, round: 0 });
+  assert.ok(Math.abs(yOf(open, middle * 2 + 1) - upperClosed) < 1e-9, 'the upper real teeth end at the same bite line');
+  assert.ok(yOf(open, columns * 2 + middle * 2 + 1) - lowerClosed > 1.5, 'lower real teeth move down with the jaw');
 });

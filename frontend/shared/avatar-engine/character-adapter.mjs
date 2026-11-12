@@ -526,17 +526,32 @@ export class CharacterBinding {
     const upperEdge = Math.max(Math.min(-0.012, upperLipEdge + 0.015),
       -0.012 - 0.15 * softPositive((controls.dentalGap ?? controls.gap) - 0.1, 0.02)
         * smooth(((controls.dentalJaw ?? controls.jaw) + 0.02) / 0.14));
-    // A video already resting open shows its own real teeth. They stay, drawn from
-    // their own place in the frame over the painted interior, fading out towards the
-    // lower lip so the newly opened space below shows mouth interior and lower teeth.
+    // A video already resting open shows its own real teeth, drawn over the painted
+    // interior. They are split at the bite line, halfway between the lips: the upper
+    // half stays where it is, fixed to the skull, and the lower half is carried down
+    // with the lower lip, so the rows part like a jaw opening and show the mouth
+    // between them. Strips pair each upper lip point with the lower one opposite,
+    // since a smiling mouth is crescent-shaped.
     const realTeeth = smooth((rest.originalGap / width - REST_SEAM) / 0.03);
-    // A strip pairing each upper lip point with the lower one opposite: a smiling
-    // mouth is crescent-shaped, and a fan from its centroid covered almost nothing.
-    const restCavity = this.restCavity ??= new Float32Array((HALF + 1) * 2 * 7);
+    const columns = HALF + 1;
+    const restCavity = this.restCavity ??= new Float32Array(columns * 4 * 7);
     for (let i = 0; i <= HALF; i++) {
-      const upper = rest.inner[i], lower = rest.inner[(SEGMENTS - i) % SEGMENTS];
-      write(restCavity, i * 2, upper[0], upper[1], 0, 0, 4, 0, 0);
-      write(restCavity, i * 2 + 1, lower[0], lower[1], 0, 0, 3, 0, 0);
+      const lowerIndex = (SEGMENTS - i) % SEGMENTS;
+      const upper = rest.inner[i], lower = rest.inner[lowerIndex];
+      const bite = [(upper[0] + lower[0]) / 2, (upper[1] + lower[1]) / 2];
+      const moved = targetInner[lowerIndex];
+      const drop = [moved[0] - lower[0], moved[1] - lower[1]];
+      const vertex = (index, point, sample) =>
+        write(restCavity, index, point[0], point[1], sample[0] / SIZE, sample[1] / SIZE, 4, 0, 0);
+      // When the upper lip lifts past where it rested, the strip's top follows it and
+      // samples a little below the rest edge, so the real teeth reach up under the lip
+      // instead of leaving a dark band between them.
+      const lifted = Math.min(0, innerShift[i * 2 + 1]);
+      vertex(i * 2, lifted < 0 ? world(upper, 0, lifted - 0.5) : upper,
+        lifted < 0 ? [upper[0] + (bite[0] - upper[0]) * 0.1, upper[1] + (bite[1] - upper[1]) * 0.1] : upper);
+      vertex(i * 2 + 1, bite, bite);
+      vertex(columns * 2 + i * 2, [bite[0] + drop[0], bite[1] + drop[1]], bite);
+      vertex(columns * 2 + i * 2 + 1, moved, lower);
     }
     return {
       skin: buffer, cavity: this.cavity, restCavity: this.restCavity, realTeeth,
