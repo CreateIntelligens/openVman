@@ -26,6 +26,8 @@
 
 ### Fixed
 
+- **[2026-11-12]** **Brain 重建後缺 httpx 而無法啟動**：`brain/api/requirements.txt` 只寫 `google-genai>=0.3.0`，CI 重建時解到 google-genai 3.2，新版不再依賴 httpx，而 Brain 直接 `import httpx` 卻沒有自己列，正式站 Brain 自 17:16 起持續重啟。現在明列 `httpx`、`networkx`，google-genai 限制在 3 以下、openai 在 4 以下；新增測試檢查 Brain 直接匯入的第三方套件都有寫進 requirements。另發現 PDF 轉換用的 PyMuPDF（`fitz`）從未安裝，Brain 端 PDF 匯入會失敗，PyMuPDF 為 AGPL，是否引入待決定。
+
 - **[2026-11-12]** **語音與媒體錯誤不再回傳上游細節**：TTS 失敗時，`/v1/audio/speech` 與 `/api/v1/tts/stream` 會把各節點的例外原文回給呼叫端，內容可能有內部節點網址、query 與上游回應本文，而這兩個端點用嵌入金鑰就打得到。現在回固定的 `tts_unavailable` 與白話訊息，細節只記在伺服器 log；YouTube 字幕擷取、文件轉檔（`conversion_failed`）與 DLQ 讀取（`dlq_read_failed`）的非預期錯誤也改回固定代碼。
 
 - **[2026-11-12]** **使用者輸入不能再偽造 log 行**：正式環境的 Backend log 是純文字，網址、檔名、session ID 等外部值帶換行就能在 `docker logs` 裡多印出一行假紀錄。被 CodeQL 標出的 40 個 log 呼叫改以 `log_safe` 把換行轉成 `\n`。

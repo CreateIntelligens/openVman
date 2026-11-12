@@ -4,8 +4,10 @@ websockets>=12.0
 lancedb>=0.4.0
 pylance>=0.25.0
 huggingface-hub>=0.23,<1
-openai>=1.0.0
-google-genai>=0.3.0
+openai>=1.0.0,<4
+# google-genai 3 起不再帶 httpx；httpx 我們直接 import，要自己列。大版本升級要先驗過再放寬。
+google-genai>=2.34,<3
+httpx>=0.28,<1
 openpyxl>=3.1.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
@@ -19,5 +21,7 @@ pytest-asyncio>=0.23.0
 PyYAML>=6.0.0
 tzdata>=2024.1
 graphifyy>=0.9.102
+# knowledge/graph.py 直接用；不要只靠 graphifyy 帶進來。
+networkx>=3,<4
 opencc-python-reimplemented>=0.1,<1
 opencv-python-headless>=4.10,<6
