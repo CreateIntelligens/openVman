@@ -117,9 +117,7 @@ describe("MascotWidget", () => {
 
     const frame = screen.getByTitle("AI 虛擬人小助理");
     // 關閉鍵在 widget iframe 內，透過 postMessage 通知宿主
-    fireEvent(window, new MessageEvent("message", {
-      data: { ns: "avatar-widget", type: "close" },
-    }));
+    fireEvent(window, closeFrom(frame));
 
     expect(screen.getByTitle("AI 虛擬人小助理")).toBe(frame);
     expect(frame.closest(".mascot-widget")?.hasAttribute("hidden")).toBe(true);
@@ -149,10 +147,40 @@ describe("MascotWidget", () => {
 
     expect(stopper).not.toHaveBeenCalled();
 
-    fireEvent(window, new MessageEvent("message", {
-      data: { ns: "avatar-widget", type: "close" },
-    }));
+    fireEvent(window, closeFrom(screen.getByTitle("AI 虛擬人小助理")));
 
     expect(stopper).toHaveBeenCalledTimes(1);
   });
+
+  it("ignores close messages that do not come from its own widget frame", () => {
+    window.localStorage.setItem("admin-mascot-open", "1");
+    render(
+      <MascotProvider>
+        <MascotWidget />
+      </MascotProvider>,
+    );
+    const frame = screen.getByTitle("AI 虛擬人小助理");
+
+    fireEvent(window, new MessageEvent("message", {
+      data: { ns: "avatar-widget", type: "close" },
+      origin: "https://evil.example",
+      source: (frame as HTMLIFrameElement).contentWindow,
+    }));
+    fireEvent(window, new MessageEvent("message", {
+      data: { ns: "avatar-widget", type: "close" },
+      origin: window.location.origin,
+      source: window,
+    }));
+
+    expect(frame.closest(".mascot-widget")?.hasAttribute("hidden")).toBe(false);
+  });
 });
+
+// 小助理只聽自己同源 iframe 的關閉訊息，測試要照真的 iframe 送。
+function closeFrom(frame: HTMLElement): MessageEvent {
+  return new MessageEvent("message", {
+    data: { ns: "avatar-widget", type: "close" },
+    origin: window.location.origin,
+    source: (frame as HTMLIFrameElement).contentWindow,
+  });
+}

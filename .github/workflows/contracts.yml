@@ -28,6 +28,10 @@ on:
       - main
       - master
 
+# 只 checkout 跑測試，不需要寫 repo。
+permissions:
+  contents: read
+
 jobs:
   protocol-contracts:
     runs-on: ubuntu-latest

@@ -104,6 +104,9 @@ export default function MascotWidget() {
 
   useEffect(() => {
     function handleMessage(event: MessageEvent): void {
+      // 只收自己同源 iframe 送來的訊息；其他頁面不能遠端把小助理關掉。
+      if (event.origin !== window.location.origin) return;
+      if (event.source !== frameRef.current?.contentWindow) return;
       if (!isWidgetMessage(event.data)) return;
       if (event.data.type === "close") closeMascot();
     }
