@@ -97,7 +97,11 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 - New tools and external services MUST document their tool names, request/response contract, provider or fallback order, authentication requirements, and important safety rules.
 - Before reporting completion, inspect `git diff --name-only` and `git status --short` and verify that the required changelog and README/documentation updates are included, including untracked files. A code-only change is incomplete.
 - Run `git diff --check` before handoff. If the appropriate project environment is available, run the focused tests and the relevant full test suite.
-- Pushing to `main` deploys to production (CI builds the images, watchtower replaces the containers), so dev comes first. Before every push that changes Brain, Backend or the admin UI, move the `dev` branch in `.worktree/dev` to the exact commit (`git switch -C dev <commit>`, not a detached checkout, so the dev position stays visible in the branch graph) (`docker restart openvman-dev-api-1` for Brain code) and run the changed flow end to end on the dev stack, over HTTP or in the admin UI, against a test project. Back up any project you write to and restore it afterwards. Unit tests alone do not count, and a fix made after the dev run needs another dev run before it is pushed. Afterwards, return it with `git switch -C dev origin/main`.
+- Pushing to `main` deploys to production (CI builds the images, watchtower replaces the containers), so every change goes through the `dev` branch first:
+  1. Finish the work in its own worktree, then merge it into the local `dev` branch. Do not merge feature branches into `main` directly.
+  2. `.worktree/dev` always has the `dev` branch checked out and drives the dev stack (`docker restart openvman-dev-api-1` after Brain code changes). Run every changed flow end to end on the dev stack, over HTTP or in the admin UI, against a test project. Back up any project you write to and restore it afterwards. Unit tests alone do not count.
+  3. Only after the dev run passes, fast-forward `main` to `dev` (`git merge --ff-only dev` in the main checkout) and push. A fix made after the dev run goes into `dev` and needs another dev run before it is pushed.
+  4. If something on `dev` fails and must not ship, take it out of `dev` (revert, or rebuild `dev` from `main` plus the passing branches) before fast-forwarding `main`. Never leave `.worktree/dev` on a detached commit; the `dev` branch is how everyone sees what is under test.
 
 ## Documentation
 
