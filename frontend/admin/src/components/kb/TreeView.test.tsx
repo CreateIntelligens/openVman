@@ -672,7 +672,7 @@ describe("TreeView", () => {
     });
   });
 
-  it("opens up a category that holds subcategories when it is selected", () => {
+  it("opens a category when its name is clicked, whatever it holds", () => {
     const onSelectQaNode = vi.fn();
     const child = categoryNode({
       name: "郵寄",
@@ -691,19 +691,49 @@ describe("TreeView", () => {
     expect(props.onToggle).toHaveBeenCalledWith(qaTreeNodePath("returns"));
     unmount();
 
-    // 已經展開的不收起，只有題目的分類右邊就看得到內容，也不用展開。
+    // 只有題目的分類也一樣展開，看得到底下的題目。
+    const question = categoryNode({
+      name: "多久可以退",
+      path: `${qaTreeNodePath("returns")}/q1`,
+      treeKind: "qa-entry",
+      qaEntryQuestion: "多久可以退",
+    });
+    const questionsOnly = renderTreeView({
+      node: categoryNode({ children: [question] }),
+      expandedDirs: new Set<string>(),
+      onSelectQaNode,
+    });
+    fireEvent.click(screen.getByText("退換貨"));
+    expect(questionsOnly.props.onToggle).toHaveBeenCalledWith(qaTreeNodePath("returns"));
+    questionsOnly.unmount();
+
+    // 沒有子項目就沒東西可展開。
+    const empty = renderTreeView({ node: categoryNode(), onSelectQaNode });
+    fireEvent.click(screen.getByText("退換貨"));
+    expect(empty.props.onToggle).not.toHaveBeenCalled();
+  });
+
+  it("keeps an open category open when another row was selected, and closes it on a second click", () => {
+    const onSelectQaNode = vi.fn();
+    const child = categoryNode({ name: "郵寄", path: qaTreeNodePath("mail"), qaNodeId: "mail" });
     const open = renderTreeView({
       node: categoryNode({ children: [child] }),
       expandedDirs: new Set([qaTreeNodePath("returns")]),
+      selectedPath: "knowledge",
       onSelectQaNode,
     });
     fireEvent.click(screen.getByText("退換貨"));
     expect(open.props.onToggle).not.toHaveBeenCalled();
     open.unmount();
 
-    const questionsOnly = renderTreeView({ node: categoryNode(), onSelectQaNode });
+    const selected = renderTreeView({
+      node: categoryNode({ children: [child] }),
+      expandedDirs: new Set([qaTreeNodePath("returns")]),
+      selectedPath: qaTreeNodePath("returns"),
+      onSelectQaNode,
+    });
     fireEvent.click(screen.getByText("退換貨"));
-    expect(questionsOnly.props.onToggle).not.toHaveBeenCalled();
+    expect(selected.props.onToggle).toHaveBeenCalledWith(qaTreeNodePath("returns"));
   });
 
   describe("dragging", () => {

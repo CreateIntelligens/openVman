@@ -447,8 +447,8 @@ function TreeBranch({
     }
     if (isQaNode && qaNodeId && onSelectQaNode) {
       onSelectQaNode(qaNodeId);
-      // 只放子分類的上層自己沒有題目，右邊是空的；不展開的話使用者會以為什麼都沒有。
-      if (!isExpanded && node.children.some((child) => child.treeKind === "qa-node")) {
+      // 點名稱就像點箭頭一樣展開，不用再找那顆小箭頭；已經選著又開著的再點一次就收起。
+      if (node.children.length > 0 && (!isExpanded || isSelected)) {
         onToggle(node.path);
       }
       return;

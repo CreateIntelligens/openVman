@@ -297,7 +297,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 選型問題（「3 吋、揚程 20 米以上有哪幾款」）需要完整清單，相似度檢索容易漏款或排錯，因此另以規格表篩選。專案在 `knowledge/products/` 放：
 
-- `_catalog.yaml`：`title`、`key`（產品代號欄位，預設 `model`，型別須為 text）、`fields`（每欄 `label`、`type` 為 `number`／`text`／`number_set`、`unit`、`description`）、`notes`（給模型的注意事項，例如單位換算）。欄位由各專案自訂。
+- `_catalog.yaml`：`title`、`key`（產品代號欄位，預設 `model`，型別須為 text）、`fields`（每欄 `label`、`type` 為 `number`／`text`／`number_set`、`unit`、`description`）、`notes`（給模型的注意事項，例如單位換算）。欄位由各專案自訂。這是系統設定檔：`GET /knowledge/base/documents` 不列出（後台文件樹看不到，搜尋索引照舊），資料夾只剩它時 `DELETE /knowledge/directory` 回 400 並說明原因，不會刪掉。
 - 每個產品一篇 Markdown，YAML frontmatter 放規格值，缺值填 `null`；正文照常進知識索引。停用的文件不列入；格式不對的筆記略過，並在結果的 `skipped_notes` 回報。
 
 參數是結構化的 `scenarios[]`，每個情境有 `name`、`conditions[]`（`{field, op, value}`，全部成立才算符合）、`sort[]`（`{field, direction}`，`direction` 為 `asc`／`desc`）與選填的 `limit`。運算子 `eq ne lt lte gt gte in contains`；`value` 一律是字串，依欄位型別轉成數字，`in` 用逗號分隔（例如 `"1,3"`）。「A 或 B」在同一欄位用 `in`，跨欄位或不同需求（例如兩個現場）拆成不同情境。`field` 以該專案的欄位做 enum。每個情境回傳：

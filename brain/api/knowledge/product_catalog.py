@@ -189,6 +189,27 @@ def _parse_catalog(
     )
 
 
+def is_catalog_definition(relative_path: str) -> bool:
+    """Whether a workspace path is a product catalog definition, at any depth under products/.
+
+    這是選型篩選的設定檔，不給工作人員看或改：文件樹不列，刪資料夾時另外說明。
+    """
+    path = Path(relative_path)
+    return path.name == CATALOG_FILENAME and path.as_posix().startswith(f"{PRODUCTS_DIR}/")
+
+
+def refuse_catalog_only_folder(files: list[str]) -> None:
+    """Refuse to delete a folder whose only files are hidden catalog definitions, saying why.
+
+    設定檔在畫面上看不到，資料夾看起來是空的；不能默默刪掉讓選型篩選消失，也不能沒說原因。
+    """
+    if files and all(is_catalog_definition(path) for path in files):
+        raise ValueError(
+            "這個資料夾裡有選型篩選的設定檔（畫面上不會顯示），刪掉後產品選型就會停用，"
+            "所以不能從這裡刪除。要停用選型請聯絡系統管理員"
+        )
+
+
 def has_product_catalog(project_id: str) -> bool:
     return (get_workspace_root(project_id) / PRODUCTS_DIR / CATALOG_FILENAME).is_file()
 

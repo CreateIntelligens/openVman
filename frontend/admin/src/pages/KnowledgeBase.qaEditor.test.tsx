@@ -337,7 +337,7 @@ describe("jumping to a question from the tree", () => {
   it("scrolls inside the open category without asking, keeping the unsaved edit, and again on a second click", async () => {
     const first = await openCategoryA();
     fireEvent.change(first, { target: { value: "改過的甲一" } });
-    expandInTree("分類甲");
+    // 點分類名稱就已經展開，題目直接在樹上。
 
     fireEvent.click(inTree("甲三"));
 

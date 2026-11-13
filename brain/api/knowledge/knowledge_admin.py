@@ -107,11 +107,16 @@ def _list_document_summaries(paths: Iterable[Path], project_id: str) -> list[dic
 
 
 def list_knowledge_base_documents(project_id: str = "default") -> list[dict[str, Any]]:
-    """Return documents under the workspace knowledge/ directory."""
+    """Return documents under the workspace knowledge/ directory, minus system files."""
     from knowledge.doc_meta import resolve_document_languages
+    from knowledge.product_catalog import is_catalog_definition
 
-    paths = list(iter_knowledge_documents(project_id))
     root = ensure_workspace_scaffold(project_id)
+    # 選型篩選的 _catalog.yaml 照樣進索引，只是不列給後台；索引走 iter_indexable_documents。
+    paths = [
+        path for path in iter_knowledge_documents(project_id)
+        if not is_catalog_definition(path.relative_to(root).as_posix())
+    ]
     # 列表要顯示每份文件的語言；還沒判斷過的在這裡判斷並存起來。
     resolve_document_languages(
         (path.relative_to(root).as_posix() for path in paths if is_indexable_document(path, project_id)),
@@ -403,9 +408,12 @@ def delete_workspace_directory(relative_path: str, project_id: str = "default") 
         raise ValueError("path 不可超出 workspace")
     if not target.is_dir():
         raise FileNotFoundError("找不到指定目錄")
+    from knowledge.product_catalog import refuse_catalog_only_folder
+
     # Check if directory has files (allow removing dirs with only subdirs)
-    has_files = any(p.is_file() for p in target.rglob("*"))
-    if has_files:
+    files = [p.relative_to(root).as_posix() for p in target.rglob("*") if p.is_file()]
+    refuse_catalog_only_folder(files)
+    if files:
         raise ValueError("目錄內仍有檔案，請先移除或移動檔案")
     shutil.rmtree(target)
     return {"status": "ok", "path": cleaned}
