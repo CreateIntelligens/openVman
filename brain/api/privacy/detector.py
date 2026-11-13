@@ -17,6 +17,7 @@ from threading import BoundedSemaphore
 
 from config import get_settings
 from core.decision_router import decide
+from infra.shared_budgets import FileSlots
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +83,13 @@ _inflight: BoundedSemaphore | None = None
 _inflight_size = 0
 
 
-def _slot() -> BoundedSemaphore:
+def _slot() -> BoundedSemaphore | FileSlots:
     global _inflight, _inflight_size
-    size = max(1, int(get_settings().privacy_max_inflight))
+    cfg = get_settings()
+    size = max(1, int(cfg.privacy_max_inflight))
+    directory = getattr(cfg, "brain_coordination_dir", "")
+    if directory:
+        return FileSlots(directory, size)
     if _inflight is None or _inflight_size != size:
         _inflight, _inflight_size = BoundedSemaphore(size), size
     return _inflight
@@ -98,8 +103,12 @@ def detect_pii(text: str) -> dict[str, int] | None:
     """
     if not text.strip():
         return {}
-    slot = _slot()
-    if not slot.acquire(blocking=False):
+    try:
+        slot = _slot()
+        if not slot.acquire(blocking=False):
+            return None
+    except OSError as exc:
+        logger.warning("[privacy] PII slot unavailable: %s", exc)
         return None
     try:
         if not _found(_ask(text, _GATE)).get("has_pii"):

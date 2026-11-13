@@ -1,0 +1,145 @@
+# No repo .env, production data, GPU reservation, host ports, build, or watchtower.
+x-brain: &brain
+  image: ${WORKER_BRAIN_IMAGE:-tbdavid2019/openvman-api:latest}
+  user: "0:0"
+  labels:
+    com.centurylinklabs.watchtower.enable: "false"
+  volumes:
+    - ../../../brain/api:/app:ro
+    - ../../../contracts:/contracts:ro
+    - ./fixture-skills:/skills:ro
+    - .:/experiments:ro
+    - brain-data:/data
+  environment: &brain-env
+    ENV: prod
+    PYTHONPATH: /app
+    PYTHONDONTWRITEBYTECODE: "1"
+    DEFAULT_PROJECT_ID: synthetic-worker-split
+    BRAIN_ROLE: admin
+    BRAIN_WORKERS: "1"
+    BRAIN_THREAD_POOL_SIZE: ${WORKER_THREAD_POOL_SIZE:-0}
+    BRAIN_COORDINATION_DIR: /data/.coordination
+    GATEWAY_INTERNAL_TOKEN: synthetic-worker-internal-token
+    GATEWAY_BASE_URL: http://split-backend:8200
+    LLM_PROVIDER: openai
+    LLM_MODEL: synthetic-chat
+    LLM_API_KEY: synthetic-not-an-external-key
+    LLM_BASE_URL: http://fake-llm:8080/v1
+    LLM_FALLBACK_CHAIN: openai:synthetic-chat
+    LLM_DISABLE_MODEL_DISCOVERY: "true"
+    EMBEDDING_SERVICE_URL: http://openvman-embedding-1:8009
+    EMBEDDING_SERVICE_TOKEN: ${EMBEDDING_TEST_TOKEN:?Set only the existing embedding service token}
+    TURN_DECISIONS_ENABLED: "false"
+    JEV_LANGUAGE_ENABLED: "false"
+    JEV_MEMORY_GATE_ENABLED: "false"
+    ASR_FINAL_JUDGE_ENABLED: "false"
+    AUTO_RECALL_USE_JEV_FILTER: "false"
+    AUTO_RECALL_USE_LLM_SUMMARIZER: "false"
+    NO_ANSWER_JUDGE_ENABLED: "false"
+    CHAT_REFERENCE_MEDIA_DECISION_ENABLED: "false"
+    PRIVACY_FILTER_ENABLED: "false"
+    URL2MD_SEARCH_ENABLED: "false"
+    URL2MD_READ_ENABLED: "false"
+    WIKI_PUBLISH_ENABLED: "false"
+    DREAMING_ENABLED: "false"
+    SESSION_BACKUP_ENABLED: "false"
+    REQUEST_RATE_LIMIT_PER_MINUTE: "100000"
+  networks: [isolated, embedding]
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/brain/health/ready',timeout=3).read()"]
+    interval: 3s
+    timeout: 5s
+    retries: 60
+
+services:
+  fake-llm:
+    image: ${WORKER_BACKEND_IMAGE:-tbdavid2019/openvman-backend:latest}
+    entrypoint: [python, /experiments/fake_llm.py]
+    volumes: [".:/experiments:ro"]
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    networks: [isolated]
+
+  redis:
+    image: redis:7-alpine
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    networks: [isolated]
+
+  split-admin:
+    <<: *brain
+    entrypoint: [python, /experiments/bootstrap.py, brain]
+    depends_on: [fake-llm, redis]
+
+  split-chat:
+    <<: *brain
+    entrypoint: [python, /app/main.py]
+    environment:
+      <<: *brain-env
+      BRAIN_ROLE: chat
+      BRAIN_WORKERS: ${WORKER_COUNT:-4}
+    depends_on:
+      split-admin:
+        condition: service_healthy
+
+  split-backend:
+    image: ${WORKER_BACKEND_IMAGE:-tbdavid2019/openvman-backend:latest}
+    user: "0:0"
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    entrypoint: [python, /experiments/bootstrap.py, backend]
+    volumes:
+      - ../../../backend/app:/app/app:ro
+      - ../../../contracts:/contracts:ro
+      - .:/experiments:ro
+      - brain-data:/brain-data:ro
+      - backend-data:/data
+    environment:
+      ENV: prod
+      PYTHONPATH: /app
+      PYTHONDONTWRITEBYTECODE: "1"
+      DEFAULT_PROJECT_ID: synthetic-worker-split
+      BRAIN_URL: http://split-admin:8100
+      BRAIN_CHAT_URL: http://split-chat:8100
+      GATEWAY_INTERNAL_TOKEN: synthetic-worker-internal-token
+      SESSION_JWT_SECRET: synthetic-worker-jwt-secret-at-least-32-bytes
+      MODEL_PROVIDER_ENCRYPTION_SECRET: synthetic-model-secret-at-least-32-bytes
+      AUTH_ROOT_USERNAME: worker-load
+      AUTH_DATABASE_PATH: /data/auth/accounts.db
+      REDIS_URL: redis://redis:6379
+      GATEWAY_TEMP_DIR: /data/gateway-temp
+      TTS_EDGE_ENABLED: "true"
+      UPSTREAM_PROBE_INTERVAL_SECONDS: "0"
+      A2A_ENABLED: "false"
+      TTS_INDEXTTS_URL: ""
+      TTS_COSYVOICE_URL: ""
+      TTS_VOXCPM_URL: ""
+    depends_on:
+      split-chat:
+        condition: service_healthy
+    networks: [isolated]
+
+  client:
+    image: ${WORKER_BACKEND_IMAGE:-tbdavid2019/openvman-backend:latest}
+    entrypoint: [python, /experiments/load.py]
+    volumes:
+      - .:/experiments:ro
+      - results:/results
+      - brain-data:/brain-data:ro
+    environment:
+      WORKER_COUNT: ${WORKER_COUNT:-4}
+      WORKER_THREAD_POOL_SIZE: ${WORKER_THREAD_POOL_SIZE:-0}
+    depends_on: [split-backend]
+    networks: [isolated]
+    profiles: [test]
+
+networks:
+  isolated: {}
+  embedding:
+    external: true
+    name: openvman_default
+
+volumes:
+  brain-data: {}
+  backend-data: {}
+  results: {}

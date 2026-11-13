@@ -23,6 +23,17 @@ services:
       - hf-cache:/home/appuser/.cache/huggingface
       - triton-cache:/home/appuser/.triton
 
+  api-chat:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    volumes: !override
+      - ./brain/api:/app
+      - ./brain/data:/data
+      - ./brain/skills:/skills:ro
+      - ./contracts:/contracts:ro
+      - hf-cache:/home/appuser/.cache/huggingface
+      - triton-cache:/home/appuser/.triton
+
   embedding:
     labels:
       com.centurylinklabs.watchtower.enable: "false"

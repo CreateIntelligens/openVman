@@ -129,3 +129,30 @@ class TestErrorRotation:
         lines_before = [l for l in content_before.splitlines() if l.strip()]
         lines_after = [l for l in content_after.splitlines() if l.strip()]
         assert len(lines_after) == len(lines_before)
+
+
+def test_parallel_error_writers_preserve_archived_and_current_entries(monkeypatch, tmp_path):
+    import multiprocessing
+
+    learnings, errors_path, archive_dir = _stub_deps(monkeypatch, tmp_path, max_lines=25)
+
+    def write_errors(worker):
+        for index in range(50):
+            learnings.record_error_event("parallel", f"worker-{worker}-entry-{index}")
+
+    context = multiprocessing.get_context("fork")
+    processes = [context.Process(target=write_errors, args=(number,)) for number in range(4)]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(20)
+        if process.is_alive():
+            process.terminate()
+            process.join(5)
+        assert process.exitcode == 0
+    lines = errors_path.read_text().splitlines()
+    assert len(lines) == 25
+    for path in archive_dir.glob("*.md"):
+        lines.extend(path.read_text().splitlines())
+    assert len(lines) == 200
+    assert len(set(lines)) == 200

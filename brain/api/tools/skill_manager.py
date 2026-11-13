@@ -15,18 +15,28 @@ memory use with many projects.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import os
 import shutil
 import sys
+from functools import wraps
 from pathlib import Path
+from threading import RLock
 from typing import TYPE_CHECKING, Any
 
 import yaml
-
+from infra.file_lock import atomic_write_text, file_lock
 from safety.observability import log_event, log_exception
 
-from .skill import Skill, SkillManifest, SkillRef, SkillScope, SkillToolDefinition
+from .skill import (
+    Skill,
+    SkillManifest,
+    SkillRef,
+    SkillScope,
+    SkillToolDefinition,
+)
 
 if TYPE_CHECKING:
     from .tool_registry import ToolRegistry
@@ -63,18 +73,37 @@ def {skill_id}_action(args: dict) -> dict:
 '''
 
 
+def _synchronized(method):
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return guarded
+
+
 class SkillManager:
     """Manages the lifecycle of brain skills across shared + project scopes."""
 
     def __init__(self, shared_dir: str, project_root: str | None = None):
+        self._lock = RLock()
         self.shared_dir = Path(shared_dir)
         self.project_root = Path(project_root) if project_root else None
+        # Shared skill packages are mounted read-only; mutable state belongs in /data.
+        self.state_root = (
+            self.project_root.parent if self.project_root else self.shared_dir.parent
+        ) / "skill_states"
         self.skills: dict[str, Skill] = {}
         self._loaded_project: str | None = None
+        self._signature: tuple = ()
+        self.revision = 0
 
     # ------------------------------------------------------------------
     # Paths
     # ------------------------------------------------------------------
+
+    def _state_path(self, skill_dir: Path) -> Path:
+        key = hashlib.sha256(str(skill_dir.resolve()).encode("utf-8")).hexdigest()
+        return self.state_root / f"{key}.json"
 
     def _project_skills_dir(self, project_id: str) -> Path | None:
         if not self.project_root:
@@ -106,9 +135,53 @@ class SkillManager:
     # Discovery & Loading
     # ------------------------------------------------------------------
 
+    @_synchronized
     def scan_and_load_skills(self) -> None:
         """Load shared skills (always) and the active project's skills if any."""
         self._scan_dir(self.shared_dir, scope="shared", project_id=None)
+        self._signature = self._disk_signature()
+        self.revision += 1
+
+    def _disk_signature(self) -> tuple:
+        directories = [self.shared_dir]
+        if self._loaded_project:
+            project_dir = self._project_skills_dir(self._loaded_project)
+            if project_dir is not None:
+                directories.append(project_dir)
+        signature = []
+        for directory in directories:
+            try:
+                children = sorted(directory.iterdir())
+            except FileNotFoundError:
+                signature.append((str(directory), None))
+                continue
+            for child in children:
+                if not child.is_dir():
+                    continue
+                paths = [child / name for name in SKILL_FILE_NAMES]
+                paths.append(self._state_path(child))
+                for path in paths:
+                    try:
+                        stat = path.stat()
+                        signature.append((str(path), stat.st_mtime_ns, stat.st_size, stat.st_ino))
+                    except FileNotFoundError:
+                        signature.append((str(path), None))
+        return tuple(signature)
+
+    @_synchronized
+    def refresh_if_changed(self) -> None:
+        """Notice changes made by the admin process without an HTTP refresh fanout."""
+        signature = self._disk_signature()
+        if signature == self._signature:
+            return
+        self.skills.clear()
+        self._scan_dir(self.shared_dir, scope="shared", project_id=None)
+        if self._loaded_project:
+            project_dir = self._project_skills_dir(self._loaded_project)
+            if project_dir is not None:
+                self._scan_dir(project_dir, scope="project", project_id=self._loaded_project)
+        self._signature = signature
+        self.revision += 1
 
     def _scan_dir(self, skills_dir: Path, *, scope: SkillScope, project_id: str | None) -> None:
         if not skills_dir.exists():
@@ -126,8 +199,10 @@ class SkillManager:
                         project_id=project_id,
                     )
 
+    @_synchronized
     def reload_project_skills(self, project_id: str) -> None:
         """Unload previously active project's skills and load ``project_id``'s."""
+        self.refresh_if_changed()
         if self._loaded_project == project_id:
             return
         self._unload_project_skills()
@@ -135,6 +210,8 @@ class SkillManager:
         proj_dir = self._project_skills_dir(project_id)
         if proj_dir is not None:
             self._scan_dir(proj_dir, scope="project", project_id=project_id)
+        self._signature = self._disk_signature()
+        self.revision += 1
 
     def _unload_project_skills(self) -> None:
         project_keys = [key for key, skill in self.skills.items() if skill.scope == "project"]
@@ -188,6 +265,12 @@ class SkillManager:
             scope=scope,
             project_id=project_id,
         )
+        state_path = self._state_path(skill_dir)
+        if state_path.exists():
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            if not isinstance(state, dict) or not isinstance(state.get("enabled"), bool):
+                raise ValueError(f"Invalid skill state: {state_path}")
+            skill.enabled = state["enabled"]
 
         main_py = skill_dir / "main.py"
         if main_py.exists():
@@ -209,7 +292,10 @@ class SkillManager:
         spec = importlib.util.spec_from_file_location(module_name, str(main_py))
         if spec and spec.loader:
             module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            # Reload same-sized edits immediately instead of accepting timestamp-based pyc.
+            exec(  # noqa: S102 - Skill Python is an existing operator-managed extension.
+                compile(main_py.read_bytes(), str(main_py), "exec"), module.__dict__,
+            )
 
             for tool_def in skill.manifest.tools:
                 handler = getattr(module, tool_def.name, None)
@@ -248,11 +334,16 @@ class SkillManager:
     # Query helpers
     # ------------------------------------------------------------------
 
+    @_synchronized
     def _require_skill(self, ref: SkillRef) -> Skill:
         """Return a loaded skill or raise ValueError.
 
         When no explicit scope is given, project scope takes precedence over shared.
         """
+        if ref.project_id and ref.scope != "shared":
+            self.reload_project_skills(ref.project_id)
+        else:
+            self.refresh_if_changed()
         if ref.scope:
             key = ref.resolve_key()
             skill = self.skills.get(key)
@@ -268,6 +359,7 @@ class SkillManager:
             raise ValueError(f"Skill not found: {ref.skill_id}")
         return shared
 
+    @_synchronized
     def get_skill(self, ref: SkillRef) -> Skill | None:
         """Retrieve a loaded skill. Project scope takes precedence on collision."""
         try:
@@ -275,22 +367,30 @@ class SkillManager:
         except ValueError:
             return None
 
-    def list_skills(self) -> list[Skill]:
-        """List all loaded skills (shared + currently-loaded project)."""
+    @_synchronized
+    def list_skills(self, project_id: str | None = None) -> list[Skill]:
+        """Snapshot shared skills and the requested project's skills under one lock."""
+        if project_id is not None:
+            self.reload_project_skills(project_id)
+        else:
+            self.refresh_if_changed()
         return list(self.skills.values())
 
     # ------------------------------------------------------------------
     # Enable / Disable
     # ------------------------------------------------------------------
 
+    @_synchronized
     def toggle_skill(self, ref: SkillRef, registry: ToolRegistry) -> Skill:
         skill = self._require_skill(ref)
         return self._set_skill_enabled(skill, registry, enabled=not skill.enabled)
 
+    @_synchronized
     def enable_skill(self, ref: SkillRef, registry: ToolRegistry) -> Skill:
         skill = self._require_skill(ref)
         return self._set_skill_enabled(skill, registry, enabled=True)
 
+    @_synchronized
     def disable_skill(self, ref: SkillRef, registry: ToolRegistry) -> Skill:
         skill = self._require_skill(ref)
         return self._set_skill_enabled(skill, registry, enabled=False)
@@ -302,7 +402,12 @@ class SkillManager:
         *,
         enabled: bool,
     ) -> Skill:
+        state_path = self._state_path(Path(skill.path))
+        with file_lock(state_path):
+            atomic_write_text(state_path, json.dumps({"enabled": enabled}) + "\n")
         skill.enabled = enabled
+        self._signature = self._disk_signature()
+        self.revision += 1
         if enabled:
             registry.register_skill_tools(skill)
         else:
@@ -319,6 +424,7 @@ class SkillManager:
     # CRUD
     # ------------------------------------------------------------------
 
+    @_synchronized
     def create_skill(
         self,
         ref: SkillRef,
@@ -344,28 +450,37 @@ class SkillManager:
         skill_dir.mkdir(parents=True, exist_ok=True)
 
         yaml_content = _SKILL_YAML_TEMPLATE.format(skill_id=ref.skill_id, name=name, description=description)
-        (skill_dir / "skill.yaml").write_text(yaml_content, encoding="utf-8")
+        atomic_write_text(skill_dir / "skill.yaml", yaml_content)
 
         py_content = _MAIN_PY_TEMPLATE.format(skill_id=ref.skill_id, name=name)
-        (skill_dir / "main.py").write_text(py_content, encoding="utf-8")
+        atomic_write_text(skill_dir / "main.py", py_content)
 
         self._load_skill(skill_dir, scope=scope, project_id=ref.project_id)
+        self._signature = self._disk_signature()
+        self.revision += 1
         skill = self._require_skill(concrete_ref)
         registry.register_skill_tools(skill)
         log_event("skill_created", skill_id=ref.skill_id, scope=scope, project_id=ref.project_id)
         return skill
 
+    @_synchronized
     def delete_skill(self, ref: SkillRef, registry: ToolRegistry) -> None:
         skill = self._require_skill(ref)
         registry.unregister_skill_tools(skill)
         shutil.rmtree(skill.path, ignore_errors=True)
+        state_path = self._state_path(Path(skill.path))
+        with file_lock(state_path):
+            state_path.unlink(missing_ok=True)
         del self.skills[skill.key]
+        self._signature = self._disk_signature()
+        self.revision += 1
         log_event("skill_deleted", skill_id=ref.skill_id, scope=skill.scope, project_id=skill.project_id)
 
     # ------------------------------------------------------------------
     # File read / write
     # ------------------------------------------------------------------
 
+    @_synchronized
     def get_skill_files(self, ref: SkillRef) -> dict[str, str]:
         skill = self._require_skill(ref)
         skill_dir = Path(skill.path)
@@ -377,6 +492,7 @@ class SkillManager:
                 continue
         return files
 
+    @_synchronized
     def update_skill_files(
         self,
         ref: SkillRef,
@@ -393,7 +509,7 @@ class SkillManager:
                 # project user to replace Python source is equivalent to
                 # granting arbitrary code execution in that process.
                 raise ValueError("main.py is operator-managed and cannot be updated via the API")
-            (skill_dir / fname).write_text(content, encoding="utf-8")
+            atomic_write_text(skill_dir / fname, content)
 
         return self._reload_single(
             SkillRef(skill_id=skill.manifest.id, scope=skill.scope, project_id=skill.project_id),
@@ -409,7 +525,6 @@ class SkillManager:
         resolved_ref = SkillRef(skill_id=ref.skill_id, scope=scope, project_id=ref.project_id)
         key = resolved_ref.resolve_key()
         old_skill = self.skills.get(key)
-        was_enabled = old_skill.enabled if old_skill else True
         if old_skill:
             registry.unregister_skill_tools(old_skill)
             del self.skills[key]
@@ -420,12 +535,12 @@ class SkillManager:
             self._load_skill(skill_dir, scope=scope, project_id=ref.project_id)
 
         skill = self._require_skill(resolved_ref)
-        skill.enabled = was_enabled
         if skill.enabled:
             registry.register_skill_tools(skill)
         log_event("skill_reloaded", skill_id=ref.skill_id, scope=scope, project_id=ref.project_id)
         return skill
 
+    @_synchronized
     def reload_all(self, registry: ToolRegistry, *, project_id: str | None = None) -> list[Skill]:
         """Re-scan shared + (optionally) a specific project's skills dir."""
         for skill in list(self.skills.values()):

@@ -197,8 +197,12 @@ async def _probe_downstream_services(
     cfg = get_tts_config()
 
     targets: dict[str, str] = {
-        "brain": f"{cfg.brain_url}/brain/health/ready",
+        "brain": f"{cfg.brain_url.rstrip('/')}/brain/health/ready",
     }
+    if cfg.resolved_brain_chat_url.rstrip("/") != cfg.brain_url.rstrip("/"):
+        targets["brain-chat"] = (
+            f"{cfg.resolved_brain_chat_url.rstrip('/')}/brain/health/ready"
+        )
     if cfg.docling_serve_url:
         targets["docling-serve"] = f"{cfg.docling_serve_url.rstrip('/')}/health"
 

@@ -18,7 +18,6 @@ from fastapi import (
 from fastapi.responses import HTMLResponse
 
 from core.chat_service import record_generation_failure
-from knowledge.doc_meta import get_document_meta
 from knowledge.graph import (
     GRAPH_SUBDIR,
     EmptyGraphError,
@@ -126,6 +125,13 @@ async def _background_rename_document(source_path: str, target_path: str, projec
     )
 
 
+chat_router = APIRouter(
+    prefix="/brain",
+    tags=["Knowledge"],
+    dependencies=[Depends(require_internal_token)],
+)
+
+
 @router.get("/knowledge/documents", summary="取得工作區所有文件")
 async def list_knowledge_documents_route(project_id: str = "default"):
     documents = list_workspace_documents(project_id)
@@ -227,6 +233,7 @@ def _with_speech_rates(settings: dict) -> dict:
 
 
 @router.get("/knowledge/settings", summary="取得知識庫設定（語言分流、回答長度）")
+@chat_router.get("/knowledge/settings", summary="取得知識庫設定（語言分流、回答長度）")
 async def get_knowledge_settings_route(project_id: str = "default"):
     from knowledge.kb_settings import load_kb_settings
 

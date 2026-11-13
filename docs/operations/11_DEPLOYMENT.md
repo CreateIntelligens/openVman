@@ -31,7 +31,7 @@ cp .env.example .env
 ```
 
 填入外部服務網址、`PUBLIC_DOMAIN` 與 `LETSENCRYPT_EMAIL`。所有服務共用**根目錄
-唯一一份 `.env`**：compose 對 `api`、`backend` 用 `env_file: ./.env` 注入，compose
+唯一一份 `.env`**：compose 對 `api`、`api-chat`、`backend` 用 `env_file: ./.env` 注入，compose
 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD` 等）
 也讀這一份。
 
@@ -90,6 +90,54 @@ false。正式多 worker 部署必須保留 Redis，讓單一 leader 持有 A2A 
 ```
 
 `up.sh` 只做 `up`，不建置。重型 build 請分開執行，一次一個服務（見第五節）。
+
+### Brain 對話與管理分流
+
+`api` 與 `api-chat` 使用同一個 Brain image、相同 `/data` 資料與專案資產。`api` 固定 `BRAIN_ROLE=admin`、`BRAIN_WORKERS=1`，保留管理、排程與對話路由；`api-chat` 使用 `BRAIN_ROLE=chat`，`BRAIN_WORKERS` 預設 4，只提供對話相關端點，不執行匯入管理、Dreaming、對話備份或記憶維護排程。chat 依賴 admin 健康後啟動，Backend 與 gateway-worker 再等待兩者健康；`api-chat` 不保留 GPU，也不開放額外 host port。
+
+| 設定 | 行為 |
+|---|---|
+| `BRAIN_CHAT_URL` 未定義 | Compose 注入 `http://api-chat:8100`；直接執行 Backend 則沿用 `BRAIN_URL` |
+| `BRAIN_CHAT_URL=` | Backend 與 gateway-worker 全部回到 `BRAIN_URL`（預設 `http://api:8100`） |
+| `BRAIN_WORKERS=4` | 對話服務 4 workers；不會增加 admin worker 數 |
+| `BRAIN_THREAD_POOL_SIZE=0` | 保留 Python executor 預設值；調整前先壓測 |
+| `BRAIN_COORDINATION_DIR=/data/.coordination` | Compose 強制兩個 Brain 服務使用同一目錄，跨程序共用限流與 PII 併發額度 |
+
+`/data/.coordination` 必須與資料一樣位於兩個服務可讀寫的相同本機檔案系統。限流使用 SQLite 交易統一計數；PII 併發使用檔案鎖租約，worker 結束會由核心釋放。日誌追加、記憶維護與新增、技能狀態、文件 metadata 的跨程序同步亦依賴共同檔案系統。這套部署只支援單一主機，不能只把兩個不同目錄取成相同名字，或拆到不同主機。
+
+Backend 的 `POST chat`、串流、accept、查歷史／模式、檢索，以及視覺、Live、A2A、ASR、語言與 enrich 路徑送 chat；管理、用量與備份保留 admin。完整操作對應見 [Backend 規格](../specs/01_BACKEND_SPEC.md#brain-對話與管理分流)。前台與後台沿用既有 API，不需要改公開 URL。
+
+**設定與監控限制**：供應商、Gemini 專案金鑰與決策設定由各 worker 以 10 秒 TTL 取得；正常連線下變更最多 10 秒後全部生效，refresh 無法保證一次清掉全部 worker。Backend 失聯時可能沿用上一次設定，不能保證 10 秒內更新。模型斷路器仍各 worker 各自累積失敗與冷卻；後台模型供應商頁只顯示及重置 admin 狀態，不代表所有 chat workers 的狀態。
+
+Prometheus 分別抓 `api:8100`、`api-chat:8100` 的 `/brain/metrics/prometheus`。以 `python main.py` 啟動時自動產生 `BRAIN_METRICS_RUN_ID`，讓 uvicorn 子程序共用本次啟動目錄；每個 worker 寫入自己的 metrics shard，任一 worker 接到抓取都彙總同一 run 的計數及耗時。預設目錄 `/tmp/brain-metrics` 只在容器內使用，可用 `BRAIN_METRICS_DIR` 覆寫；不要讓 admin 與 chat 共用 run ID。自行使用 uvicorn 啟動多 worker chat 時需明確提供同一個有效 run ID，否則啟動失敗；建議沿用 image 入口。容器重啟開始新 run，worker 在同一 run 內重啟仍保留已累積計數。
+
+**更新與驗證**：首次加入 `api-chat` 或修改環境變數時，要更新 compose 並執行 `./scripts/up.sh`；Watchtower 只換既有 image，不會建立新服務或套用新的 env。先在 dev 驗證文字、批次與串流語音、Live、後台技能切換、匯入期間對話、備份與壓測，再更新正式服務。新服務啟動後檢查 `/healthz` 的 `brain`／`brain-chat`、兩個 Prometheus targets、錯誤 log、重啟次數、每日對話與記憶維護結果。
+
+**回退**：在根目錄 `.env` 寫入 `BRAIN_CHAT_URL=`，依序執行：
+
+```bash
+docker compose up -d --no-deps backend gateway-worker
+```
+
+這會重建環境設定有變的兩個容器，將聊天與直連呼叫都改回 admin；只 restart 不會更新 env。`api-chat` 可以保留運行但不接上述流量。不要刪掉變數來回退：Compose 在未定義時會重新使用 chat 預設。直接啟動 Backend 的部署則可清空或移除 `BRAIN_CHAT_URL`。
+
+**SQLite WAL 與備份**：對話與用量資料庫使用 WAL、`synchronous=NORMAL`、5 秒 busy timeout。每日 JSON 對話備份的 exporter 以單一 SQLite SELECT 讀取一致性快照，會自動看見已提交的 WAL，不需額外複製 WAL 檔。人工備份使用中的 `.db` 請在容器內使用 `sqlite3.Connection.backup` 產生獨立快照，再備份快照檔；不要在線上逐檔複製 `.db`、`-wal`、`-shm`，三次複製不具原子性。以下目的檔使用專用目錄，請換成實際資料庫路徑與備份名稱：
+
+```bash
+docker compose exec -T api python - <<'PYTHON'
+import sqlite3
+from pathlib import Path
+
+source = Path("/data/projects/example/sessions.db")
+target = Path("/data/backups/manual/example-sessions.db")
+target.parent.mkdir(parents=True, exist_ok=True)
+with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True) as connection:
+    with sqlite3.connect(target) as backup:
+        connection.backup(backup)
+PYTHON
+```
+
+還原前先停止所有會寫入該資料庫的服務，包括 `api`、`api-chat` 與 Backend／gateway-worker；不要在資料庫仍使用舊 WAL 時覆蓋主檔。Auth DB 與 `.env` 的加密 secret 必須同時保留，規則見本節前段。
 
 ### 3. 建立 ROOT 帳號
 
@@ -253,8 +301,10 @@ build 對應服務。
 
 開發時從 worktree 根目錄疊加 `docker-compose.dev.yml`。這份 override 會恢復
 frontend、backend 與 Brain 原始碼 bind mounts、保留 frontend node_modules volumes、
-將 Admin build target 改回 `dev` 並移除正式 registry image 名稱、強制 Python runtime
-使用 `ENV=dev`，同時把 dev container 的 Watchtower label 設為 `false`，避免同一台
+將 Admin build target 改回 `dev` 並移除正式 registry image 名稱，讓管理服務與 Backend
+使用 `ENV=dev`；`api-chat` 保留 `ENV=prod` 與多 worker，避免 reload 與 workers 衝突。
+兩個 Brain 服務都掛同一份 worktree 資料與原始碼，同時把 dev container 的 Watchtower
+label 設為 `false`，避免同一台
 主機的正式 Watchtower 把本機開發 image 換回 Docker Hub 版本。
 
 worktree 自己的 git-ignored `.env`：

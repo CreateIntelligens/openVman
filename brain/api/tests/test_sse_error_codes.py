@@ -103,3 +103,27 @@ def test_rate_limit_table_forgets_idle_callers(monkeypatch):
 
     assert list(guardrails._recent_requests) == ["chat:p:api_key:new:web"]
     guardrails._recent_requests.clear()
+
+
+def test_rate_limit_uses_shared_budget_across_local_counter_reset(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    import pytest
+
+    import safety.guardrails as guardrails
+    from protocol.message_envelope import RequestContext
+
+    cfg = SimpleNamespace(
+        request_rate_limit_per_minute=1, brain_coordination_dir=str(tmp_path),
+    )
+    monkeypatch.setattr(guardrails, "get_settings", lambda: cfg)
+    context = RequestContext(
+        trace_id="t", session_id=None, message_type="user", channel="web",
+        locale="zh-TW", persona_id="default", project_id="test",
+        client_ip="172.18.0.5", metadata={}, principal="api_key:worker-test",
+    )
+    guardrails._enforce_rate_limit("chat", context)
+    guardrails._recent_requests.clear()
+    with pytest.raises(guardrails.RequestRateLimitedError) as caught:
+        guardrails._enforce_rate_limit("chat", context)
+    assert 1 <= caught.value.retry_after_seconds <= 60

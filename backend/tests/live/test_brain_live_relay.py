@@ -162,6 +162,7 @@ async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send
         (),
         {
             "brain_url": "http://brain:8100",
+            "resolved_brain_chat_url": "http://brain:8100",
             "gateway_internal_token": "internal-secret",
         },
     )()

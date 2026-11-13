@@ -8,8 +8,10 @@ from typing import Any
 from uuid import uuid4
 
 from infra.db import get_memories_table
+from infra.file_lock import file_lock
 from infra.project_context import get_project_session_store, resolve_project_context
 from knowledge.workspace import ensure_workspace_scaffold
+from memory.locking import memory_table_lock
 from memory.session_store import SessionState, SessionStore
 from personas.personas import normalize_persona_id
 
@@ -51,7 +53,8 @@ def add_memory(
         metadata=metadata,
         persona_id=persona_id,
     )
-    get_memories_table(project_id).add([record])
+    with memory_table_lock(project_id):
+        get_memories_table(project_id).add([record])
     return record
 
 
@@ -181,13 +184,14 @@ def archive_session_turn(
     now = datetime.now().strftime("%H:%M:%S")
     path = log_dir / f"{today}.md"
 
-    if not path.exists():
-        path.write_text(f"# {today} 對話日誌\n\n", encoding="utf-8")
+    with file_lock(path):
+        if not path.exists():
+            path.write_text(f"# {today} 對話日誌\n\n", encoding="utf-8")
 
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(f"## {now} | session {session_id}\n\n")
-        handle.write(f"### User\n{user_message.strip()}\n\n")
-        handle.write(f"### Assistant\n{assistant_message.strip()}\n\n")
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(f"## {now} | session {session_id}\n\n")
+            handle.write(f"### User\n{user_message.strip()}\n\n")
+            handle.write(f"### Assistant\n{assistant_message.strip()}\n\n")
 
 
 def list_memories(
@@ -233,8 +237,9 @@ def delete_memory(
     # use the administrative data path rather than this legacy text endpoint.
     if not text or any(char in text for char in "'\"\\;=<>`()"):
         raise ValueError("memory text contains unsupported filter syntax")
-    table = get_memories_table(project_id)
-    table.delete(f"text = '{text}'")
+    with memory_table_lock(project_id):
+        table = get_memories_table(project_id)
+        table.delete(f"text = '{text}'")
     return True
 
 

@@ -466,16 +466,30 @@ def _trusted_upstream_headers(
     return headers
 
 
-def _target_url(path: str, query: str) -> str:
+def _brain_base_url(path: str, method: str) -> str:
     cfg = get_tts_config()
-    target_url = f"{cfg.brain_url}{_INTERNAL_BRAIN_PREFIX}/{path}"
+    chat_methods = {
+        "chat": "POST",
+        "chat/stream": "POST",
+        "chat/accept": "POST",
+        "chat/history": "GET",
+        "chat/modes": "GET",
+        "search": "POST",
+    }
+    if chat_methods.get(path.strip("/")) == method.upper():
+        return cfg.resolved_brain_chat_url.rstrip("/")
+    return cfg.brain_url.rstrip("/")
+
+
+def _target_url(path: str, query: str, method: str = "GET") -> str:
+    target_url = f"{_brain_base_url(path, method)}{_INTERNAL_BRAIN_PREFIX}/{path}"
     if query:
         return f"{target_url}?{query}"
     return target_url
 
 
-def _brain_host() -> str:
-    return host_of(get_tts_config().brain_url)
+def _brain_host(path: str = "", method: str = "GET") -> str:
+    return host_of(_brain_base_url(path, method))
 
 
 async def _stream_upstream_bytes(
@@ -484,6 +498,7 @@ async def _stream_upstream_bytes(
     path: str = "",
     started: float | None = None,
     sse: bool = False,
+    method: str = "GET",
 ) -> AsyncIterator[bytes]:
     """Relay Brain's stream; a mid-stream timeout ends it with an SSE ``error`` event.
 
@@ -511,7 +526,7 @@ async def _stream_upstream_bytes(
     finally:
         emit_attempt(
             "brain", "brain", outcome, (monotonic() - started) * 1000,
-            host=_brain_host(), error=error, path=path,
+            host=_brain_host(path, method), error=error, path=path,
             status=upstream.status_code, streaming=True,
         )
         await upstream.aclose()
@@ -584,7 +599,7 @@ async def proxy_to_brain(
     def _attempt(outcome: str, error: str = "", status: int | None = None) -> None:
         emit_attempt(
             "brain", "brain", outcome, (monotonic() - started) * 1000,
-            host=_brain_host(), error=error, path=path, status=status,
+            host=_brain_host(path, request.method), error=error, path=path, status=status,
         )
 
     try:
@@ -593,7 +608,7 @@ async def proxy_to_brain(
             client.send(
                 client.build_request(
                     method=request.method,
-                    url=_target_url(path, request.url.query),
+                    url=_target_url(path, request.url.query, request.method),
                     headers=headers,
                     content=body,
                 ),
@@ -607,6 +622,7 @@ async def proxy_to_brain(
         if "text/event-stream" in content_type:
             body_stream = _stream_upstream_bytes(
                 upstream, path=path, started=started, sse=True,
+                method=request.method,
             )
             if normalized_path in TTS_TEXT_STREAM_PATHS and upstream.status_code == 200:
                 body_stream = annotate_sse(body_stream)
@@ -659,7 +675,10 @@ async def proxy_to_brain(
         )
     except httpx.ConnectError as exc:
         _attempt(*classify_outcome(exc))
-        logger.warning("brain unreachable at %s: %s", _brain_host(), describe_error(exc))
+        logger.warning(
+            "brain unreachable at %s: %s",
+            _brain_host(path, request.method), describe_error(exc),
+        )
         return JSONResponse(
             content={"error": "brain service unavailable"},
             status_code=502,

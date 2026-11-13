@@ -707,3 +707,12 @@ Content-Type: application/json
 * **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 背景預熱（先預熱台語判斷的 Gemini client，Backend 暫時連不上時每 2 秒重試、最多約 10 秒，再對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索；預熱失敗只記 warning，不擋 readiness）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
 * **Gemini Live**：`live/gemini_live.py` 的 `GeminiLiveSession` 負責連線、收訊、重連與保活，並把事件分派給三個各自持有狀態的元件：`gemini_turns.py` 的 `GeminiLiveTurns` 持有回合版本、決策與預取結果，負責每輪決策、預取（查什麼由 `core/turn_reads.py` 決定）與工具呼叫；`gemini_audio.py` 的 `GeminiLiveAudio` 持有語句暫存、台語判定與音訊秒數，負責輸出音訊與用量；`gemini_transcripts.py` 的 `GeminiLiveTranscripts` 持有串流中的回覆，負責轉錄與回覆的持久化。三者共用的身分、設定與事件送出由 `gemini_context.py` 的 `LiveSessionContext` 在建構時傳入；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 的系統指令由 IDENTITY、SOUL、近期對話、記憶、工具使用規則與預設語言（第 14.3 節）組成；宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選），`save_memory` 同樣只在使用者明確要求時執行。上下行音訊以秒數記入用量帳本。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
 * 根目錄 `tests/test_entry_boundaries.py` 禁止 inline 業務處理回到入口檔，並檢查自有正式程式碼每檔不超過 1000 實體行。
+
+
+### Brain 對話／管理角色與同機共用狀態（2026-11-13）
+
+`BRAIN_ROLE=admin` 僅允許一個 worker，保留所有路由及資料遷移、Dreaming、備份、記憶維護排程；`chat` 僅掛對話、搜尋、Live、decision、enrich、ASR／語言讀取、KB 設定 GET 與健康指標。每個 worker 各自預熱。chat 不啟動管理工作、不在回合結束後執行記憶維護；admin 依對話 SQLite 的新訊息定時處理各專案。
+
+對話與用量 SQLite 以 WAL／NORMAL／5 秒 busy timeout 運作。每日日誌追加與摘要重寫使用同一 sidecar 檔案鎖；記憶表新增、刪除與整表維護共享專案鎖。知識 metadata 讀改寫跨程序互斥，KB 設定原子發佈。技能開關以技能來源絕對路徑雜湊持久化於資料卷 `skill_states/`，各 worker 取用時比對技能檔案及開關簽章重新同步工具 registry。
+
+同主機兩種角色必須共用 `BRAIN_COORDINATION_DIR`：限流以共用 SQLite 滑動視窗原子計數，PII 以 flock slot 限制整體併發。此機制不支援多主機或不保證 flock／SQLite 語義的網路檔案系統。計數指標存於容器內按啟動 epoch 隔離的 worker shard，抓取端彙總該 epoch 的所有 worker。供應商斷路器仍獨立，後台查詢與 reset 只針對 admin；模型／憑證／決策設定最長 10 秒 TTL。詳細參數與回退見 [Brain README](../../brain/README.md#對話與管理分流)。

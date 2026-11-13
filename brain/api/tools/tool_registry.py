@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
-from contextlib import contextmanager
+from collections.abc import Callable
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from threading import RLock
+from typing import TYPE_CHECKING, Any
 
 from safety.observability import log_exception
 from tools.context import (
@@ -14,7 +16,6 @@ from tools.context import (
     active_reply_mode,
     active_user_message,
 )
-
 
 logger = logging.getLogger("brain.tools")
 
@@ -85,9 +86,11 @@ class ToolRegistry:
         ]
 
 
+_registry_lock = RLock()
 _registry: ToolRegistry | None = None
 _last_synced_project: str | None = None
 _sync_invalidated: bool = True
+_last_skill_revision: int | None = None
 
 
 def activate_project_sync(project_id: str) -> ToolRegistry:
@@ -118,13 +121,17 @@ def _sync_skill_tools(registry: ToolRegistry, manager: Any) -> None:
         for skill in manager.list_skills()
         if skill.scope == "shared" or skill.project_id == active_project
     ]
-    enabled_prefixes = {skill.tool_prefix for skill in visible if skill.enabled}
+    enabled_names = {
+        f"{skill.tool_prefix}{tool.name}"
+        for skill in visible if skill.enabled
+        for tool in skill.manifest.tools if tool.name in skill.handlers
+    }
 
     stale = [
         name
         for name in registry._tools
         if ":" in name
-        and not any(name.startswith(prefix) for prefix in enabled_prefixes)
+        and name not in enabled_names
     ]
     for name in stale:
         del registry._tools[name]
@@ -135,8 +142,14 @@ def _sync_skill_tools(registry: ToolRegistry, manager: Any) -> None:
 
 
 def get_tool_registry() -> ToolRegistry:
+    # A request keeps its own tools even when another thread selects a project.
+    with _registry_lock:
+        return _get_tool_registry_snapshot()
+
+
+def _get_tool_registry_snapshot() -> ToolRegistry:
     """Return the global tool registry, ensuring built-in and skill tools are synced."""
-    global _registry, _last_synced_project, _sync_invalidated
+    global _registry, _last_synced_project, _sync_invalidated, _last_skill_revision
 
     # 1. Initialize core registry and built-in tools if first call
     if _registry is None:
@@ -145,19 +158,34 @@ def get_tool_registry() -> ToolRegistry:
         for tool in list_builtin_tools():
             _registry.register(tool)
 
-    # 2. Check if re-sync of skill tools is needed
+    # Admin changes are discovered from shared files by every worker.
     active_project = active_project_id.get()
-    if _sync_invalidated or active_project != _last_synced_project:
-        try:
-            from .skill_manager import get_skill_manager
-            _sync_skill_tools(_registry, get_skill_manager())
-            _last_synced_project = active_project
-            _sync_invalidated = False
-        except Exception as exc:
-            log_exception("skill_registry_sync_failed", exc, project_id=active_project)
+    try:
+        from .skill_manager import get_skill_manager
 
-    return _registry
+        manager = get_skill_manager()
+        with getattr(manager, "_lock", nullcontext()):
+            manager.reload_project_skills(active_project)
+            revision = manager.revision
+            if (
+                _sync_invalidated
+                or active_project != _last_synced_project
+                or revision != _last_skill_revision
+            ):
+                _sync_skill_tools(_registry, manager)
+                _last_synced_project = active_project
+                _last_skill_revision = revision
+                _sync_invalidated = False
+    except Exception as exc:
+        log_exception("skill_registry_sync_failed", exc, project_id=active_project)
 
+    snapshot = ToolRegistry()
+    project_prefix = f"proj:{active_project}:"
+    snapshot._tools = {
+        name: tool for name, tool in _registry._tools.items()
+        if not name.startswith("proj:") or name.startswith(project_prefix)
+    }
+    return snapshot
 
 
 @contextmanager

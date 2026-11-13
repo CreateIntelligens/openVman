@@ -11,7 +11,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from knowledge.workspace import ensure_workspace_scaffold
+from infra.file_lock import file_lock
+from knowledge.workspace import ensure_workspace_scaffold, write_text_atomic
 from memory.language_detect import DEFAULT_LANGUAGE, LANGUAGES
 
 KB_SETTINGS_FILENAME = ".kb_settings.json"
@@ -43,17 +44,18 @@ def save_kb_settings(
     reply_seconds: int | None = None,
 ) -> dict[str, Any]:
     """Save the settings; ``reply_seconds`` None keeps the stored value."""
-    settings = {
-        "language_routes": _normalize_routes(language_routes),
-        "reply_seconds": (
-            load_kb_settings(project_id)["reply_seconds"]
-            if reply_seconds is None else _normalize_seconds(reply_seconds)
-        ),
-    }
-    _path(project_id).write_text(
-        json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8",
-    )
-    return settings
+    with file_lock(_path(project_id)):
+        settings = {
+            "language_routes": _normalize_routes(language_routes),
+            "reply_seconds": (
+                load_kb_settings(project_id)["reply_seconds"]
+                if reply_seconds is None else _normalize_seconds(reply_seconds)
+            ),
+        }
+        write_text_atomic(
+            _path(project_id), json.dumps(settings, ensure_ascii=False, indent=2),
+        )
+        return settings
 
 
 def reply_seconds(project_id: str = "default") -> int:

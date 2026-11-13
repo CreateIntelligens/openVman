@@ -18,6 +18,24 @@
 
 **chat 回應的 `tts_text`（2026-10-19）**：`proxy_to_brain` 轉發 `chat`、`chat/accept` 的 200 JSON 與 `chat/stream` 的 SSE 時，由 `app/chat_tts_text.py` 替 `reply`（`sentence` 事件為 `text`）加上 `tts_text`：`prepare_tts_text` 的本地路徑（不打 normalize API），去 markdown／emoji、電話與長數字轉逐字讀法、保留繁體；有漢字才套中文規則。SSE 逐事件改寫，收齊一個事件（空行）就轉出，不等整段。Brain 本身不產生這個欄位，OpenAPI 以 Backend 文件為準。
 
+### Brain 對話與管理分流
+
+Backend 設定 `brain_chat_url` 對應環境變數 `BRAIN_CHAT_URL`；`resolved_brain_chat_url` 在空白或未設定時回傳 `BRAIN_URL`。Compose 的預設與直接執行不同：`${BRAIN_CHAT_URL-http://api-chat:8100}` 只在未定義時使用 `api-chat`，明確設定空字串才回退 admin。URL 保留代理前綴並移除結尾斜線；Live 中繼依 HTTP／HTTPS 轉換為 WS／WSS。
+
+| 呼叫入口 | Brain 目的地 |
+|---|---|
+| Proxy：`POST /api/v1/chat`、`/chat/stream`、`/chat/accept`、`/search`；`GET /api/v1/chat/history`、`/chat/modes` | `resolved_brain_chat_url` 下相同的 `/brain/*` 操作 |
+| 視覺主動回覆、A2A 回覆 | chat 的 `POST /brain/chat` |
+| Gemini Live 中繼、舊版 Live 工具檢索 | chat 的 `WS /brain/internal/live/{id}`、`POST /brain/search` |
+| 打斷決策 | chat 的 `POST /internal/decision` |
+| ASR 定稿判斷、音訊語言、詞表 | chat 的 `/brain/internal/asr-judge`、`/audio-language`、`/asr-glossary` |
+| 語音分流讀設定、Gateway enrich | chat 的 `GET /brain/knowledge/settings`、`POST /internal/enrich` |
+| 其他 Proxy 操作、`DELETE /api/v1/chat/history`、知識與技能管理、用量、備份、OpenAPI、模型設定 refresh | `BRAIN_URL`（admin） |
+
+Proxy 以完整路徑與 HTTP method 配對，不以 `chat` 前綴分流；外部身分驗證、專案授權、可信任標頭、斷線取消與 SSE 逐句處理不變。語音分流的內部唯讀設定請求走 chat，後台經 Proxy 讀寫知識設定仍走 admin。
+
+`/healthz` 保留 `dependencies.brain`，當 chat 與 admin 網址不同時額外探測 `dependencies["brain-chat"]`。任一服務不可用使整體狀態為 `degraded`；空值回退或相同網址時只探測一次。服務角色、共用鎖、WAL 與 metrics 的執行限制見 [部署手冊](../operations/11_DEPLOYMENT.md#brain-對話與管理分流)。
+
 ### 台語 TTS 詞表（2026-10-28）
 
 `TTS_HANJI_CONVERT_URL` 可覆寫文字轉換服務網址；留空時從 `TTS_COSYVOICE_URL` 移除尾端 `/v1` 並接上 `/api/convert`，保留反向代理路徑前綴。`TTS_HANJI_CONVERT_ENABLED` 預設 true，設 false 可獨立停用詞表（即使填了覆寫網址也停用）。Backend 以免權杖的 `GET` 送 `text`、`version`、`log_unknown=false`，只接受同版且 `converted` 為非空字串的回應；其餘欄位為 `text`、`changed`、`unknown`。此 API 只查表，不合成、不使用 GPU、不呼叫 LLM，不把未知詞寫進上游補表清單。每次轉換逾時為 3 秒。

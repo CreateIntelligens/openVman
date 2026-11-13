@@ -54,3 +54,38 @@ def test_saving_routes_without_seconds_keeps_the_stored_seconds(kb):
 
 def test_reply_seconds_is_clamped(kb):
     assert kb.save_kb_settings("p", language_routes=["zh"], reply_seconds=999)["reply_seconds"] == kb.MAX_REPLY_SECONDS
+
+
+def test_concurrent_readers_never_see_partial_settings(kb):
+    import multiprocessing
+
+    kb.save_kb_settings("p", language_routes=["en"], reply_seconds=7)
+    context = multiprocessing.get_context("fork")
+    ready = context.Event()
+    finished = context.Event()
+
+    def rewrite():
+        ready.wait(10)
+        try:
+            for index in range(250):
+                kb.save_kb_settings("p", language_routes=["en", "es"], reply_seconds=7)
+        finally:
+            finished.set()
+
+    process = context.Process(target=rewrite)
+    process.start()
+    observed = []
+    ready.set()
+    try:
+        while not finished.is_set():
+            settings = kb.load_kb_settings("p")
+            observed.append(settings)
+            assert settings["language_routes"][0] == "en"
+            assert settings["reply_seconds"] == 7
+    finally:
+        process.join(10)
+        if process.is_alive():
+            process.terminate()
+            process.join(5)
+    assert process.exitcode == 0
+    assert observed

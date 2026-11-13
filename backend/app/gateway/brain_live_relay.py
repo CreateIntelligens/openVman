@@ -78,7 +78,7 @@ class BrainLiveRelay:
                 return
 
             url = _build_brain_live_ws_url(
-                self.config.brain_url,
+                self.config.resolved_brain_chat_url,
                 self.session.session_id,
             )
             caller = usage_scope_for(self.session.metadata.get("_current_account"))

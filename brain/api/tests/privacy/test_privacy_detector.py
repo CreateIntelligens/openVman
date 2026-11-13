@@ -90,3 +90,19 @@ def test_busy_slot_skips_instead_of_queueing(settings, monkeypatch: pytest.Monke
 def test_blank_text_is_not_sent(settings, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(detector, "decide", lambda *a, **k: pytest.fail("should not ask"))
     assert detector.detect_pii("   ") == {}
+
+
+def test_shared_slot_respects_other_worker_and_releases(settings, monkeypatch, tmp_path):
+    from infra.shared_budgets import FileSlots
+
+    settings.brain_coordination_dir = str(tmp_path)
+    other_worker = FileSlots(str(tmp_path), 1)
+    assert other_worker.acquire(blocking=False)
+    monkeypatch.setattr(detector, "decide", lambda *a, **k: _answers(has_pii=0.1))
+    try:
+        assert detector.detect_pii("請問怎麼掛號？") is None
+    finally:
+        other_worker.release()
+    assert detector.detect_pii("請問怎麼掛號？") == {}
+    assert other_worker.acquire(blocking=False)
+    other_worker.release()

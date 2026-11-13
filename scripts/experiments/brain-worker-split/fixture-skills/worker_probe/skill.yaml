@@ -1,0 +1,10 @@
+id: worker_probe
+name: 隔離驗收技能
+description: 檢查管理端技能開關是否傳到每個聊天 worker
+version: '1.0.0'
+tools:
+  - name: worker_probe_status
+    description: 隔離驗收技能狀態
+    parameters:
+      type: object
+      properties: {}

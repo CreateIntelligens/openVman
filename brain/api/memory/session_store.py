@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 from config import get_settings
 from infra.datetime_utils import normalize_iso_timestamp, utc_now_iso
+from infra.file_lock import file_lock
 from memory.language_detect import (
     LANGUAGES,
     detect_language,
@@ -228,7 +229,8 @@ class SessionStore:
         self._db_path = Path(db_path or cfg.session_db_resolved_path).expanduser()
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = Lock()
-        self._init_db()
+        with file_lock(self._db_path):
+            self._init_db()
 
         # Inflight guard: per-session lock (session_id → threading.Lock)
         self._inflight_locks: dict[str, threading.Lock] = {}
@@ -834,6 +836,9 @@ class SessionStore:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA foreign_keys = ON")
         conn.create_function("search_fold", 1, search_fold, deterministic=True)
         return conn
@@ -875,20 +880,17 @@ class SessionStore:
         now: str | None = None,
     ) -> None:
         timestamp = now or utc_now_iso()
+        # Claim the session before reading its persona. A SELECT then INSERT
+        # races when separate workers see the same new session simultaneously.
+        conn.execute(
+            "INSERT OR IGNORE INTO sessions"
+            "(session_id, persona_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (session_id, persona_id, timestamp, timestamp),
+        )
         row = conn.execute(
             "SELECT persona_id FROM sessions WHERE session_id = ?",
             (session_id,),
         ).fetchone()
-        if row is None:
-            conn.execute(
-                """
-                INSERT INTO sessions(session_id, persona_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?)
-                """,
-                (session_id, persona_id, timestamp, timestamp),
-            )
-            return
-
         _validate_persona_match(row[0], persona_id)
         conn.execute(
             "UPDATE sessions SET updated_at = ? WHERE session_id = ?",

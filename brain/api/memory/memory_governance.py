@@ -23,10 +23,17 @@ from infra.db import (
     parse_record_metadata,
     resolve_vector_table_name,
 )
-from knowledge.workspace import ensure_workspace_scaffold, get_archive_paths, get_core_documents, get_workspace_root
+from infra.file_lock import atomic_write_text, file_lock
+from knowledge.workspace import (
+    ensure_workspace_scaffold,
+    get_archive_paths,
+    get_core_documents,
+    get_workspace_root,
+)
 from memory.embedder import get_embedder
 from memory.fusion import cosine_similarity as _cosine_similarity
 from memory.importance import score_importance
+from memory.locking import memory_table_lock
 from personas.personas import normalize_persona_id
 from safety.observability import log_event
 
@@ -58,6 +65,8 @@ class DailyMemorySummary:
 def maybe_run_memory_maintenance(force: bool = False, project_id: str = "default") -> dict[str, Any]:
     """Run maintenance on a throttle to avoid heavy work every turn."""
     cfg = get_settings()
+    if cfg.brain_role == "chat":
+        return {"status": "skipped", "reason": "chat_role"}
     now = monotonic()
 
     with _project_lock(project_id):
@@ -75,6 +84,8 @@ def request_memory_maintenance(project_id: str = "default") -> bool:
     Returns True when this call ran it. A request that arrives during a run is
     picked up by that run's owner once it finishes, so nothing is lost.
     """
+    if get_settings().brain_role == "chat":
+        return False
     lock = _project_lock(project_id)
     with _state_lock:
         _pending_maintenance.add(project_id)
@@ -97,6 +108,13 @@ def request_memory_maintenance(project_id: str = "default") -> bool:
 @project_model_entry("memory_maintenance")
 def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
     """Summarize archived logs and rewrite the memories table without duplicates."""
+    if get_settings().brain_role == "chat":
+        return {"status": "skipped", "reason": "chat_role"}
+    with memory_table_lock(project_id):
+        return _run_memory_maintenance_locked(project_id)
+
+
+def _run_memory_maintenance_locked(project_id: str) -> dict[str, Any]:
     ensure_workspace_scaffold(project_id)
     archived_count = _archive_old_transcripts(project_id)
     summaries = _build_daily_summaries(project_id)
@@ -211,26 +229,27 @@ def write_summary_and_reindex(
 
     daily_path = _resolve_daily_file(normalized_persona, day, project_id)
 
-    # Duplicate check: scan existing summary section for same fingerprint
-    if _daily_file_has_fingerprint(daily_path, fingerprint):
-        log_event(
-            "memory_writeback_skipped",
+    with file_lock(daily_path):
+        # Duplicate check: scan existing summary section for same fingerprint
+        if _daily_file_has_fingerprint(daily_path, fingerprint):
+            log_event(
+                "memory_writeback_skipped",
+                persona_id=normalized_persona,
+                day=day,
+                reason="duplicate_fingerprint",
+            )
+            return {"status": "skipped", "reason": "duplicate_fingerprint"}
+
+        # Append summary block
+        block = _format_summary_block(
             persona_id=normalized_persona,
             day=day,
-            reason="duplicate_fingerprint",
+            fingerprint=fingerprint,
+            summary_text=summary_text,
+            source_turns=source_turns,
+            session_id=session_id,
         )
-        return {"status": "skipped", "reason": "duplicate_fingerprint"}
-
-    # Append summary block
-    block = _format_summary_block(
-        persona_id=normalized_persona,
-        day=day,
-        fingerprint=fingerprint,
-        summary_text=summary_text,
-        source_turns=source_turns,
-        session_id=session_id,
-    )
-    _append_summary_block(daily_path, block)
+        _append_summary_block(daily_path, block)
 
     log_event(
         "memory_writeback_completed",
@@ -292,24 +311,25 @@ def _format_summary_block(
 
 def _append_summary_block(path: Path, block: str) -> None:
     """Append a summary block to the daily file under the summary section."""
-    if not path.exists():
-        path.write_text(
-            f"# {path.stem} 對話日誌\n\n"
-            f"{_SUMMARY_SECTION_HEADER}\n\n"
-            f"{block}\n",
-            encoding="utf-8",
-        )
-        return
+    with file_lock(path):
+        if not path.exists():
+            path.write_text(
+                f"# {path.stem} 對話日誌\n\n"
+                f"{_SUMMARY_SECTION_HEADER}\n\n"
+                f"{block}\n",
+                encoding="utf-8",
+            )
+            return
 
-    content = path.read_text(encoding="utf-8-sig")
-    if _SUMMARY_SECTION_HEADER in content:
-        # Append after existing summary section
-        content = content.rstrip() + "\n\n" + block + "\n"
-    else:
-        # Add summary section at end
-        content = content.rstrip() + "\n\n" + _SUMMARY_SECTION_HEADER + "\n\n" + block + "\n"
+        content = path.read_text(encoding="utf-8-sig")
+        if _SUMMARY_SECTION_HEADER in content:
+            # Append after existing summary section
+            content = content.rstrip() + "\n\n" + block + "\n"
+        else:
+            # Add summary section at end
+            content = content.rstrip() + "\n\n" + _SUMMARY_SECTION_HEADER + "\n\n" + block + "\n"
 
-    path.write_text(content, encoding="utf-8")
+        path.write_text(content, encoding="utf-8")
 
 
 _DATE_STEM_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -336,13 +356,15 @@ def _archive_old_transcripts(project_id: str = "default") -> int:
         dest = archive_memory_dir / path.relative_to(memory_dir)
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        if dest.exists():
-            # Merge: append source content to existing archive
-            with dest.open("a", encoding="utf-8") as f:
-                f.write("\n\n" + path.read_text(encoding="utf-8-sig"))
-            path.unlink()
-        else:
-            shutil.move(str(path), str(dest))
+        with file_lock(path), file_lock(dest):
+            if not path.exists():
+                continue
+            if dest.exists():
+                with dest.open("a", encoding="utf-8") as f:
+                    f.write("\n\n" + path.read_text(encoding="utf-8-sig"))
+                path.unlink()
+            else:
+                shutil.move(str(path), str(dest))
         archived += 1
 
     return archived
@@ -363,7 +385,10 @@ def _build_daily_summaries(project_id: str = "default") -> list[DailyMemorySumma
 
 def _summarize_daily_file(path: Path, memory_dir: Path) -> DailyMemorySummary | None:
     """Build a summary from a single daily transcript file, or None if empty."""
-    content = path.read_text(encoding="utf-8-sig").strip()
+    with file_lock(path):
+        if not path.exists():
+            return None
+        content = path.read_text(encoding="utf-8-sig").strip()
     if not content:
         return None
     turns = _extract_turns(content)
@@ -379,13 +404,13 @@ def _summarize_daily_file(path: Path, memory_dir: Path) -> DailyMemorySummary | 
     summary_text = (
         f"Persona：{persona_id}\n日期：{day}\n對話輪次：{len(turns)}\n"
         f"使用者主題：\n" + "\n".join(f"- {t}" for t in user_topics) +
-        f"\n回覆重點：\n" + "\n".join(f"- {n}" for n in assistant_notes)
+        "\n回覆重點：\n" + "\n".join(f"- {n}" for n in assistant_notes)
     )
     markdown = (
         f"## [{persona_id}] {day}\n\n"
         f"- 指紋：`{fingerprint[:12]}`\n- 對話輪次：{len(turns)}\n\n"
         f"### 使用者主題\n" + "\n".join(f"- {t}" for t in user_topics) +
-        f"\n\n### 回覆重點\n" + "\n".join(f"- {n}" for n in assistant_notes)
+        "\n\n### 回覆重點\n" + "\n".join(f"- {n}" for n in assistant_notes)
     ).strip()
 
     return DailyMemorySummary(persona_id, day, fingerprint, summary_text, markdown)
@@ -396,7 +421,7 @@ def _write_summary_document(summaries: list[DailyMemorySummary], project_id: str
     path = core_docs["memory_summaries"]
     header = ["# 記憶摘要 (MEMORY_SUMMARIES)", ""]
     body = [s.markdown + "\n" for s in summaries] if summaries else ["- 尚未有可整理的每日對話。"]
-    path.write_text("\n".join(header + body).strip() + "\n", encoding="utf-8")
+    atomic_write_text(path, "\n".join(header + body).strip() + "\n")
 
 
 def _extract_turns(content: str) -> list[dict[str, str]]:

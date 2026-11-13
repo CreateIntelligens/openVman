@@ -9,9 +9,9 @@ from math import ceil
 from threading import Lock
 from time import monotonic
 
-from infra.datetime_utils import ensure_utc
-
 from config import get_settings
+from infra.datetime_utils import ensure_utc
+from infra.shared_budgets import shared_request_budget
 from protocol.message_envelope import ALLOWED_ROLES, RequestContext
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
@@ -121,6 +121,12 @@ def _enforce_rate_limit(action: str, context: RequestContext) -> None:
     # 全部是 Backend 的 IP，整個專案共用同一份額度。
     caller = context.principal or context.client_ip or "unknown"
     key = f"{action}:{context.project_id}:{caller}:{context.channel}"
+    directory = getattr(cfg, "brain_coordination_dir", "")
+    if directory:
+        retry = shared_request_budget(directory).admit(key, limit)
+        if retry:
+            raise RequestRateLimitedError(max(1, ceil(retry)))
+        return
     now = monotonic()
     window_start = now - 60
 

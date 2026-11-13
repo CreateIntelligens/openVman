@@ -117,7 +117,7 @@ async def _judge_final(project_id: str, routes: list[str], interim: str, final: 
     started = time.monotonic()
     try:
         response = await _http.get().post(
-            f"{cfg.brain_url.rstrip('/')}/brain/internal/asr-judge",
+            f"{cfg.resolved_brain_chat_url.rstrip('/')}/brain/internal/asr-judge",
             # 語言跟著這條連線實際生效的分流走（前台可以臨時關掉某個語言），不是只看後台設定。
             json={
                 "project_id": project_id or "default",

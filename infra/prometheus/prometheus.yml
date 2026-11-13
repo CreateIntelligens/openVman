@@ -15,3 +15,11 @@ scrape_configs:
     http_headers:
       X-Internal-Token:
         files: ["/run/secrets/gateway_internal_token"]
+
+  - job_name: brain-chat
+    static_configs:
+      - targets: ["api-chat:8100"]
+    metrics_path: /brain/metrics/prometheus
+    http_headers:
+      X-Internal-Token:
+        files: ["/run/secrets/gateway_internal_token"]

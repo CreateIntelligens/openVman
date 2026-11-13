@@ -104,7 +104,9 @@ def test_get_tool_registry_syncs_skill_tools_after_invalidation(monkeypatch: pyt
     import tools.skill_manager as skill_manager_module
     from tools.skill import Skill, SkillManifest, SkillToolDefinition
 
-    manager = SimpleNamespace(skills=[])
+    manager = SimpleNamespace(
+        skills=[], revision=0, reload_project_skills=lambda project_id: None,
+    )
     manager.list_skills = lambda: list(manager.skills)
 
     def make_skill() -> Skill:

@@ -26,7 +26,8 @@ PUBLIC_HOSTS = {
     "www.motc.gov.tw", "www.ntu.edu.tw", "www.cwa.gov.tw",
 }
 SERVICE_HOSTS = {
-    "localhost", "backend", "api", "brain", "admin", "avatar", "nginx",
+    "localhost", "backend", "api", "api-chat", "brain", "admin", "avatar", "nginx",
+    "split-admin", "split-chat", "split-backend", "split-avatar", "split-edge", "fake-llm", "openvman-embedding-1",
     "redis", "embedding", "vlm", "index-tts-vllm", "voxcpm-gateway", "shared-gpu-node",
     "grafana", "prometheus", "server1", "server2",
 }

@@ -84,7 +84,7 @@ async def admin_routes(project_id: str | None) -> list[str]:
     cfg = get_tts_config()
     try:
         response = await _http.get().get(
-            f"{cfg.brain_url.rstrip('/')}/brain/knowledge/settings",
+            f"{cfg.resolved_brain_chat_url.rstrip('/')}/brain/knowledge/settings",
             params={"project_id": project_id},
             headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
         )
@@ -221,7 +221,7 @@ async def _ask_brain_language(
     try:
         wav_bytes = await asyncio.to_thread(_to_wav_bytes, file_path)
         response = await _http.get().post(
-            f"{cfg.brain_url.rstrip('/')}/brain/internal/audio-language",
+            f"{cfg.resolved_brain_chat_url.rstrip('/')}/brain/internal/audio-language",
             content=wav_bytes,
             headers={
                 _INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token,

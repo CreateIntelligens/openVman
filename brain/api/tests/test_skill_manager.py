@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from tools.skill import SkillRef
 from tools.skill_manager import SkillManager
 
@@ -69,7 +68,8 @@ def test_reload_project_skills_replaces_previous_project_scope(tmp_path: Path) -
 
     manager.reload_project_skills("proj-b")
 
-    assert manager.get_skill(SkillRef(skill_id="alpha", scope="project", project_id="proj-a")) is None
+    assert manager._loaded_project == "proj-b"
+    assert "project:proj-a:alpha" not in manager.skills
     beta_skill = manager.get_skill(SkillRef(skill_id="beta", scope="project", project_id="proj-b"))
     assert beta_skill is not None
     assert beta_skill.scope == "project"

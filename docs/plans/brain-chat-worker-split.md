@@ -125,8 +125,70 @@ Backend ──對話請求──▶ api-chat（N 個 uvicorn worker，BRAIN_ROLE
 - 換資料庫：100 台的寫入量（每秒約 10～20 次）SQLite WAL 足夠；多主機或備援時再評估。
 - 真實 LLM 配額與正式 TTS 在 100 台下的容量：另行壓測，這份只處理 Brain。
 
-## 待決
+## 實作決定（2026-11-13）
 
-- 技能狀態檔的位置與格式（每個專案一份或全域一份）。
-- 限流與 Clef 併發要先用換算還是直接上 Redis。
-- 記憶表維護與 chat 端新增的並行策略：檔案鎖或改成差異更新。
+- 技能開關存於 `/data/skill_states/<來源目錄 SHA-256>.json`，內容為 `{"enabled": false}`；shared／project 來源各自獨立，唯讀 `/skills` 可用。檔案與狀態簽章變更後各 worker 自動重載，工具 registry 使用請求快照，避免另一個專案的同步改掉已取得的工具。
+- 採同主機共用 `/data/.coordination`：SQLite WAL 原子限流與 flock PII slot，保持整體原額度，不依 worker 數除法，也不新增 Redis 依賴。適用本機共用資料卷；不宣稱支援多主機／網路檔案系統。
+- 記憶表新增、刪除、維護覆寫與 Dreaming 寫入拿同一個專案檔案鎖；每日追加、摘要讀改寫與歸檔拿同一個檔案 sidecar 鎖。
+- `BRAIN_THREAD_POOL_SIZE=0` 保留 Python 預設 executor，可調整 `asyncio.to_thread` 使用的池；worker 預設先保留 4，依下面實測決定是否調整。
+
+## 實作與驗證紀錄（2026-11-13）
+
+狀態仍為 Draft；未提交、未推送、未部署正式站，也未將本計畫標為 Done。
+
+實作位於 `.worktree/brain-chat-worker-split`、分支 `feat/brain-chat-worker-split`，基底 `c12fc083`。已涵蓋角色與啟動分流、SQLite WAL、共用狀態、Backend 全部列出的 HTTP／WebSocket 呼叫點、正式／dev Compose 與 Prometheus。前台、admin、SDK 對外 URL 與授權契約不變，這三個用戶端不需改碼；瀏覽器仍列入驗收。
+
+驗證：
+
+- Backend 全套：`1890 passed, 2 skipped`。
+- Brain 首輪全套：`1922 passed, 1 failed`；失敗為 `tests/knowledge/test_graph_pipeline.py::test_graph_extraction_checkpoint_resume`，本機 graphify 的 `detect` 不接受 `cache_root`。在未修改的 main 獨立重跑同一項，也以相同 TypeError 失敗。
+- 真實多程序：同新 session 競爭與 persona 隔離、200 筆對話／用量寫入、新舊用量 schema 同時初始化、200 筆日誌與摘要重寫、真實 LanceDB 維護期間新增、技能重啟與跨程序同步、跨專案工具快照、限流額度、PII 程序死亡後釋放、metrics 彙總及新啟動歸零均通過。
+- 根目錄 Compose／文件／入口選測：`111 passed, 3 failed`；三項為 main 既有的 Watchtower 舊參數與 embedding 環境注入預期，新增分流測試通過。文件隱私與入口邊界單獨為 `106 passed`；合約產生物檢查與變更 Python 的 F 類 lint 通過。
+- 隔離容器使用現有已安裝 image、目前 worktree 唯讀原始碼、新建 volume 與虛構專案。真登入、授權拒絕、角色隔離、真實 embedding／LanceDB、SSE／跨連線 accept／history、技能關閉後 16 個新連線一致、KB 設定、80 題 QA 匯入時聊天、備份讀回、enrich 與跨 worker 指標均通過。
+
+負載工具位於 `scripts/experiments/brain-worker-split/`。這是新建可重現工具與合成資料集，與舊實驗的資料複本不同，不能把兩者數字視為同資料前後加速比。每輪固定 0.8 秒假 LLM；真實 embedding、檢索與 SQLite 保留，外部決策、PII、語言校正、記憶相關性判斷／LLM 摘要關閉；auto-recall 的檢索仍保留。最早兩輪尚未關閉記憶相關性判斷，不列入隔離驗收結果。
+
+正式站的真實 LLM／ASR／TTS 100 台容量與上線後一天的穩定性觀察，仍未驗證。
+
+隔離負載結果（同一份合成資料，4 workers、Python 預設執行緒池）：
+
+| 情境 | 請求／成功 | 首句中位數 | p95 |
+|---|---:|---:|---:|
+| 每秒 3 題、30 秒 | 90／90 | 0.907 秒 | 0.965 秒 |
+| 每秒 5 題、30 秒 | 150／150 | 0.909 秒 | 0.974 秒 |
+| 每秒 10 題、30 秒 | 300／300 | 0.923 秒 | 1.063 秒 |
+| 瞬間 100 題 | 100／100 | 3.581 秒 | 4.291 秒 |
+
+零失敗，達到本計畫隔離驗收目標。原始逐筆結果在隔離 `results` volume 的 `acceptance-workers4-isolated.json`；知識資料為 164 rows、記憶 2 rows。早先未完整停用記憶相關性判斷的兩輪（4／8 workers）受外部決策影響，不用來判定這個隔離目標。
+
+瀏覽器驗收使用同一隔離 Backend 及既有安裝的 admin／avatar image，入口僅綁本機 `127.0.0.1:18889`。測試 avatar 只取 dev 中明確標為 test 的 fixture 兩個必要素材，不複製 metadata、不接正式資料卷。桌機、390×844 手機尺寸前台均以真 UI 送題並顯示回答；WASM runtime／WebGL2、canvas 與影片首幀已確認。兩輪共 4 筆批次語音請求為 200 `audio/mpeg`；較早一次 Edge 上游逾時 502 有保留，後續自行恢復，沒有以假音訊替代。admin 對話真 UI 顯示兩則訊息與回答。瀏覽器截圖在 `/tmp/worker-split-{desktop,mobile,admin}.png`，屬本次測試暫存，不進 repo。
+
+獨立語音驗收（真登入 → Backend → 真 Edge，無重試）：批次端點 200 `audio/mpeg`，19,008 bytes，ffmpeg 解出 101,376 bytes PCM／3.168 秒；串流端點 200 `audio/mpeg`，18,864 bytes，解出 100,608 bytes PCM／3.144 秒，首 byte 約 1.04 秒。重現腳本為 `browser_voice.py`，本次報告 `/tmp/worker-split-voice/voice.json`。這證明實際音訊可解碼，不代表真人聽感、實體麥克風／ASR 或 100 台語音容量已通過。
+
+最後多程序審查另外重現 workspace 初始化模板覆蓋別的 worker 已追加的錯誤日誌；已改成僅缺檔時取得同一檔案鎖並在鎖內重查，舊日誌移轉共鎖。新增 2 項真實 4 程序回歸通過；用量帳本空／舊 schema 並行測試連續 3 輪、共 1,200 筆皆完整。
+
+單 worker 的 executor 對照（每秒 3／5 題各 30 秒，瞬間 100 題，同一合成資料）：
+
+| executor | 每秒 3 題中位數 | 每秒 5 題中位數 | 瞬間 100 中位數／p95 | 成功 |
+|---|---:|---:|---:|---:|
+| Python 預設（設定 0） | 0.932 秒 | 0.922 秒 | 8.787／11.793 秒 | 340／340 |
+| 64 執行緒 | 0.942 秒 | 0.924 秒 | 13.907／14.945 秒 | 340／340 |
+
+測試與其他本機工作共用主機、各輪累積不同的 session 歷史，不是獨佔 CPU 或完全單變量的比較；沒有看到放大 executor 的收益，因此保持 `BRAIN_THREAD_POOL_SIZE=0`，容量以 4 個對話 worker 擴充。
+
+補完 workspace 共鎖後第二輪 Brain 全套為 `1923 passed, 2 failed`：graphify 既有 TypeError，以及 `test_first_token_timeout_falls_back_to_next_hop` 的實際 1519.6 ms 超過測試 1500 ms 門檻（同機正跑容器負載）。後續針對該時序測試與新增專案技能／workspace 回歸重跑為 `6 passed`；不把先前整輪寫成全過。
+
+另補專案技能管理的 HTTP 回歸：registry 改用快照後，後台原先先同步指定專案、再重取 registry 的流程會同步回 default。已在依賴函式直接保留指定專案快照，各 CRUD 依 ref 載入正確專案，並測過 project／shared 的 list、toggle、files；最新技能相關選測 `40 passed`。
+
+最新修正重新啟動後，再跑整組 HTTP 驗收（含 project skill CRUD）及容量驗收，`acceptance-latest-workers4.json` 全部通過：
+
+| 情境 | 成功 | 首句中位數 | p95 |
+|---|---:|---:|---:|
+| 每秒 3 題、30 秒 | 90／90 | 0.914 秒 | 1.004 秒 |
+| 每秒 5 題、30 秒 | 150／150 | 0.919 秒 | 0.971 秒 |
+| 每秒 10 題、30 秒 | 300／300 | 0.930 秒 | 1.043 秒 |
+| 瞬間 100 題 | 100／100 | 4.517 秒 | 5.553 秒 |
+
+零失敗且中位數符合目標；p95 並不是 5 秒內的承諾。連續兩輪 4-worker 隔離結果均達標，但本機共享負載與累積會話不同，不把兩輪差異解讀為程式回歸。測試時四個 metric shard 各有非零聊天計數，確認實際使用了四個 worker。
+
+收尾：變更 Python F 類 lint、合約產生物檢查、文件隱私與 `git diff --check` 通過；文件／入口邊界為 `106 passed`。測試容器停止，保留隔離 volumes 供查驗；可依工具 README 重啟或明確清除。原 `.worktree/dev`、正式服務與主目錄的 Watchtower 間隔不屬本次修改範圍。仍待明確授權的提交／推送／正式部署；上線後一天觀察尚未執行。

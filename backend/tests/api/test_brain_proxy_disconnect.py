@@ -32,6 +32,7 @@ from app.client_disconnect import (
 def _mock_cfg() -> MagicMock:
     return MagicMock(
         brain_url="http://brain:8100",
+        resolved_brain_chat_url="http://brain:8100",
         gateway_internal_token="internal-secret",
         brain_proxy_max_body_bytes=110 * 1024 * 1024,
     )

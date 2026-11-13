@@ -21,7 +21,7 @@ def _shared_client() -> httpx.AsyncClient:
 def jev_available() -> bool:
     """Whether Backend can reach Brain's configured decision broker."""
     cfg = get_tts_config()
-    return bool(cfg.brain_url and cfg.gateway_internal_token)
+    return bool(cfg.resolved_brain_chat_url and cfg.gateway_internal_token)
 
 
 async def jev_answer(
@@ -33,7 +33,7 @@ async def jev_answer(
     """Ask one typed question through Brain's shared provider chain."""
     cfg = get_tts_config()
     response = await _shared_client().post(
-        f"{cfg.brain_url.rstrip('/')}/internal/decision",
+        f"{cfg.resolved_brain_chat_url.rstrip('/')}/internal/decision",
         json={
             "state": state,
             "questions": {"q": question},

@@ -13,7 +13,8 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D 影片角色�
 | `backend` | `backend/` | FastAPI | 對外 API、帳號與權限、ASR／TTS 路由、Gemini Live 中繼、Brain 代理 |
 | `gateway-worker` | `backend/app/gateway/` | arq + Redis | 文件轉換、爬蟲與其他非同步媒體處理 |
 | `avatar-pipeline` | `avatar-pipeline/` | arq + MediaPipe + ffmpeg | 把說話影片或人像圖轉成虛擬人素材包（`01.webm` + `combined_data.json.gz`，可保留透明背景），一次一件 |
-| `api` | `brain/api/` | FastAPI | Brain：LLM 路由、RAG、記憶、工具、用量帳本；僅供內部呼叫 |
+| `api` | `brain/api/` | FastAPI | Brain 管理服務：單 worker，負責匯入、技能管理、用量、備份與記憶維護；保留對話入口供回退 |
+| `api-chat` | `brain/api/` | FastAPI + uvicorn workers | Brain 對話服務：預設 4 workers，負責文字、語音相關判斷、Live 與檢索；僅供內部呼叫 |
 | `embedding` | `brain/embedding/` | EmbeddingGemma 2（GPU） | 向量嵌入服務，Brain 與其他 stack 共用 |
 | `redis` | — | Redis 7 | gateway 佇列、快取與跨 worker 狀態 |
 | `prometheus`、`grafana` | `infra/` | — | 指標收集與監控儀表板 |
@@ -24,7 +25,8 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D 影片角色�
                       └──> admin（edge nginx）
                              ├── /            → avatar 前台
                              ├── /admin/      → 管理後台
-                             ├── /api/        → backend ──> api（Brain）──> embedding、LanceDB
+                             ├── /api/        → backend ──> api-chat（對話）／api（管理）
+                             │                              └──> embedding、LanceDB
                              │                    ├──> ASR／TTS 外部節點、Gemini Live
                              │                    └──> redis ──> gateway-worker、avatar-pipeline
                              └── /grafana/    → grafana ──> prometheus
@@ -130,7 +132,7 @@ TTS、批次 ASR 與 Brain proxy 的每個外部節點都有連線上限（預�
 
 ### 環境變數
 
-所有服務共用根目錄唯一一份 `.env`：compose 的 `${VAR}` 插值與 `api`、`backend`、`gateway-worker` 的 `env_file` 都讀它。例外是 `avatar-pipeline`，它只讀 `avatar-pipeline/.env`（素材包加密金鑰 `AVATAR_BUNDLE_KEY`，見 [avatar-pipeline/README.md](avatar-pipeline/README.md)）。
+所有服務共用根目錄唯一一份 `.env`：compose 的 `${VAR}` 插值與 `api`、`api-chat`、`backend`、`gateway-worker` 的 `env_file` 都讀它。例外是 `avatar-pipeline`，它只讀 `avatar-pipeline/.env`（素材包加密金鑰 `AVATAR_BUNDLE_KEY`，見 [avatar-pipeline/README.md](avatar-pipeline/README.md)）。
 
 ```bash
 cp .env.example .env
@@ -141,10 +143,15 @@ cp .env.example .env
 | Compose | `PORT`、`HTTPS_PORT`、`COMPOSE_PROFILES`（目前為 `embedding`）、`OPENVMAN_IMAGE_TAG` |
 | 公開網域 | `PUBLIC_DOMAIN`、`LETSENCRYPT_EMAIL` |
 | 安全 | `GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`AUTH_TEMPORARY_PASSWORD_SECRET`、`MODEL_PROVIDER_ENCRYPTION_SECRET`、`GRAFANA_PASSWORD` |
+| Brain 分流 | `BRAIN_CHAT_URL`、`BRAIN_WORKERS`（Compose 預設 4）、`BRAIN_THREAD_POOL_SIZE`（預設 0） |
 | LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`GEMINI_API_KEY` 及各供應商金鑰 |
 | 語音 | 見上方語音引擎表 |
 
 缺少的內部 token、session secret 與 Grafana 密碼由 `./scripts/up.sh` 自動產生（也可單獨執行 `./scripts/ensure-runtime-secrets.sh`）。外部服務金鑰向服務管理者取得，不寫入版本控制。
+
+Compose 預設將對話送到 `http://api-chat:8100`；直接執行 Backend 時，未設 `BRAIN_CHAT_URL` 則沿用 `BRAIN_URL`。Compose 部署要回退單程序時，必須在 `.env` **明確設 `BRAIN_CHAT_URL=`**，再重建 Backend 與 gateway-worker 容器；刪掉這個變數會恢復 Compose 的分流預設。`api-chat` 可保留但不再接收這些請求，詳見 [部署與回退](docs/operations/11_DEPLOYMENT.md#brain-對話與管理分流)。
+
+兩個 Brain 服務共用 `/data` 與 `/data/.coordination`：對話紀錄及用量使用 SQLite WAL，限流與 PII 併發上限跨程序共用。對話服務不執行管理排程；Prometheus 分別抓取兩個服務，並彙總各服務本次啟動下所有 worker 的指標。模型供應商設定正常情況最多 10 秒同步，斷路器仍各 worker 獨立，後台顯示的是管理服務狀態。手動備份使用中的 `.db` 請使用 SQLite backup API；日常 JSON 對話備份沿用一致性 SELECT 快照，操作細節見同一份部署文件。
 
 ### 啟動
 

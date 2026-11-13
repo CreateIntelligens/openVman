@@ -469,6 +469,7 @@ class TTSRouterConfig(BaseSettings):
 
     # --- Internal ---
     brain_url: str = "http://api:8100"
+    brain_chat_url: str = ""
     gateway_forward_url: str = Field(
         default="",
         validation_alias="GATEWAY_FORWARD_URL",
@@ -618,6 +619,10 @@ class TTSRouterConfig(BaseSettings):
         default=False,
         validation_alias="A2A_ALLOW_GROUP_BROADCAST",
     )
+
+    @property
+    def resolved_brain_chat_url(self) -> str:
+        return self.brain_chat_url.strip() or self.brain_url
 
     @property
     def effective_asr_r2t2_stream_url(self) -> str:

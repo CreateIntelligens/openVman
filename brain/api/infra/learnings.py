@@ -7,8 +7,12 @@ from datetime import datetime
 from pathlib import Path
 
 from config import get_settings
-from knowledge.workspace import ensure_workspace_scaffold, get_archive_paths, get_core_documents
-
+from infra.file_lock import atomic_write_text, file_lock
+from knowledge.workspace import (
+    ensure_workspace_scaffold,
+    get_archive_paths,
+    get_core_documents,
+)
 
 _MONTH_RE = re.compile(r"^\- \[(\d{4}-\d{2})")
 
@@ -22,17 +26,18 @@ def record_error_event(area: str, summary: str, detail: str = "", project_id: st
     if detail.strip():
         new_line += f" | {detail.strip()}"
 
-    existing_lines = _read_all_lines(path)
+    with file_lock(path):
+        existing_lines = _read_all_lines(path)
 
-    # Dedup against recent tail
-    tail_text = "\n".join(existing_lines[-20:])
-    if new_line in tail_text:
-        return
+        # Dedup against recent tail
+        tail_text = "\n".join(existing_lines[-20:])
+        if new_line in tail_text:
+            return
 
-    all_lines = [*existing_lines, new_line]
-    trimmed = _rotate_if_needed(all_lines, get_settings().errors_rotation_max_lines, project_id)
+        all_lines = [*existing_lines, new_line]
+        trimmed = _rotate_if_needed(all_lines, get_settings().errors_rotation_max_lines, project_id)
 
-    path.write_text("\n".join(trimmed) + "\n", encoding="utf-8")
+        atomic_write_text(path, "\n".join(trimmed) + "\n")
 
 
 def _read_all_lines(path: Path) -> list[str]:

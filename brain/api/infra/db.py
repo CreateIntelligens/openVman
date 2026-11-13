@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import date
 import hashlib
 import json
+from datetime import date
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from config import get_settings
+from infra.file_lock import file_lock
 from infra.project_context import get_project_db, resolve_project_context
 from memory.embedder import encode_text
 
@@ -43,7 +44,9 @@ def ensure_tables(
         if table_key in _tables_ready:
             return
 
-        _create_missing_tables(get_db(project_id), embedding_version)
+        ctx = resolve_project_context(project_id)
+        with file_lock(ctx.project_root / "vector-tables"):
+            _create_missing_tables(get_db(project_id), embedding_version)
         _tables_ready.add(table_key)
 
 

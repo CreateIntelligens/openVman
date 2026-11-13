@@ -75,6 +75,7 @@ async def test_gemini_live_pipeline_emits_audio_chunks_from_server_content():
         live_gemini_tools_enabled=True,
         live_gemini_thinking_level="minimal",
         brain_url="http://api:8100",
+        resolved_brain_chat_url="http://api:8100",
     )
     pipeline = GeminiLivePipeline(
         session,
@@ -132,6 +133,7 @@ async def test_gemini_live_pipeline_executes_search_tool_calls_and_returns_tool_
         live_gemini_tools_enabled=True,
         live_gemini_thinking_level="minimal",
         brain_url="http://api:8100",
+        resolved_brain_chat_url="http://api:8100",
     )
     pipeline = GeminiLivePipeline(
         session,

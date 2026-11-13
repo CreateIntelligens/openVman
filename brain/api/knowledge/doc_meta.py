@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import inspect
+import json
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from functools import wraps
-import json
 from pathlib import Path
-import threading
-from typing import Any, Iterable
+from typing import Any
 
+from infra.file_lock import file_lock
 from knowledge.workspace import ensure_workspace_scaffold, write_text_atomic
 
 DOC_META_FILENAME = ".doc_meta.json"
@@ -20,15 +21,16 @@ LANGUAGE_SOURCE_AUTO = "auto"
 LANGUAGE_SOURCE_MANUAL = "manual"
 # 判斷語言只看開頭這麼多字；整份型錄讀進來沒有必要。
 _LANGUAGE_SAMPLE_CHARS = 20000
-# 匯入在背景執行緒寫中繼資料，同時後台在列文件也會寫。讀改寫沒有包起來的話，後寫的會蓋掉
-# 先寫的欄位；讀到寫一半的檔案則會當成沒有資料，整個專案的來源類型、停用與手動語言都被洗掉。
-_META_LOCK = threading.RLock()
 
 
 def _serialized(function: Callable) -> Callable:
+    signature = inspect.signature(function)
+
     @wraps(function)
     def locked(*args: Any, **kwargs: Any) -> Any:
-        with _META_LOCK:
+        arguments = signature.bind(*args, **kwargs)
+        project_id = arguments.arguments.get("project_id", "default")
+        with file_lock(get_doc_meta_path(project_id)):
             return function(*args, **kwargs)
     return locked
 
@@ -56,6 +58,7 @@ def load_doc_meta(project_id: str = "default") -> dict[str, dict[str, Any]]:
     return result
 
 
+@_serialized
 def save_doc_meta(metadata: dict[str, dict[str, Any]], project_id: str = "default") -> None:
     path = get_doc_meta_path(project_id)
     cleaned = {
@@ -186,7 +189,7 @@ def resolve_document_languages(
         detected[relative_path] = detect_document_language(sample)
     if detected:
         # 讀檔判斷時不拿鎖，文件多的專案第一次列表會讀很久；寫回時併到最新內容上。
-        with _META_LOCK:
+        with file_lock(get_doc_meta_path(project_id)):
             latest = load_doc_meta(project_id)
             for relative_path, language in detected.items():
                 entry = latest.get(relative_path, {})

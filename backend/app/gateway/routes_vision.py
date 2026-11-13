@@ -156,7 +156,7 @@ async def _generate_reply(
     client = _http.get()
     try:
         resp = await client.post(
-            f"{cfg.brain_url}/brain/chat",
+            f"{cfg.resolved_brain_chat_url.rstrip('/')}/brain/chat",
             json={
                 "message": context_text,
                 "persona_id": payload.persona_id,

@@ -489,7 +489,7 @@ class A2ABridgeDaemon:
         context_id: str | None,
     ) -> str | None:
         """Call openVman Brain internal POST /brain/chat."""
-        brain_base = self.config.brain_url.rstrip("/")
+        brain_base = self.config.resolved_brain_chat_url.rstrip("/")
         chat_url = f"{brain_base}/brain/chat"
 
         prompt_with_guard = (

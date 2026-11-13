@@ -6,10 +6,12 @@ from fastapi import FastAPI
 
 from config import API_INTERNAL_PORT, get_settings
 from infra.client_disconnect import ClientDisconnectMiddleware
+from internal_routes import chat_router as internal_chat_router
 from internal_routes import router as internal_router
 from routes.backups import router as backups_router
 from routes.chat import router as chat_router
 from routes.health import router as health_router
+from routes.knowledge import chat_router as knowledge_chat_router
 from routes.knowledge import router as knowledge_router
 from routes.knowledge_qa import router as knowledge_qa_router
 from routes.memory import router as memory_router
@@ -28,7 +30,6 @@ from safety.server_http import (
 )
 from startup import lifespan
 
-
 configure_logging()
 
 _OPENAPI_TAGS = [
@@ -46,48 +47,53 @@ _OPENAPI_TAGS = [
 ]
 
 
-app = FastAPI(
-    title="openVman Brain",
-    version="0.1.0",
-    lifespan=lifespan,
-    docs_url="/brain/docs",
-    redoc_url="/brain/redoc",
-    openapi_url="/brain/openapi.json",
-    swagger_ui_oauth2_redirect_url="/brain/docs/oauth2-redirect",
-    openapi_tags=_OPENAPI_TAGS,
-)
-for router in (
-    internal_router,
-    health_router,
-    tools_router,
-    projects_router,
-    personas_router,
-    chat_router,
-    search_router,
-    memory_router,
-    sessions_router,
-    knowledge_router,
-    knowledge_qa_router,
-    workspace_router,
-    protocol_router,
-    usage_router,
-    backups_router,
-):
-    app.include_router(router)
+def create_app(role: str | None = None) -> FastAPI:
+    role = role or get_settings().brain_role
+    if role not in {"admin", "chat"}:
+        raise ValueError("unknown Brain role")
+    application = FastAPI(
+        title="openVman Brain",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url="/brain/docs",
+        redoc_url="/brain/redoc",
+        openapi_url="/brain/openapi.json",
+        swagger_ui_oauth2_redirect_url="/brain/docs/oauth2-redirect",
+        openapi_tags=_OPENAPI_TAGS,
+    )
+    application.state.brain_role = role
+    routers = (
+        internal_chat_router, health_router, chat_router,
+        search_router, knowledge_chat_router,
+    ) if role == "chat" else (
+        internal_router, health_router, tools_router, projects_router,
+        personas_router, chat_router, search_router, memory_router,
+        sessions_router, knowledge_router, knowledge_qa_router,
+        workspace_router, protocol_router, usage_router, backups_router,
+    )
+    for router in routers:
+        application.include_router(router)
+    application.middleware("http")(metrics_middleware)
+    # Outermost middleware must see disconnects before BaseHTTPMiddleware.
+    application.add_middleware(ClientDisconnectMiddleware)
+    return application
 
-app.middleware("http")(metrics_middleware)
-# 最後加的在最外層：要在 BaseHTTPMiddleware 吞掉斷線訊息之前先看到它，
-# /brain/chat 才能在用戶端離開時停止生成。
-app.add_middleware(ClientDisconnectMiddleware)
+
+app = create_app()
 
 if __name__ == "__main__":
+    import os
+    from uuid import uuid4
+
     import uvicorn
 
     cfg = get_settings()
+    os.environ["BRAIN_METRICS_RUN_ID"] = uuid4().hex
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=API_INTERNAL_PORT,
-        reload=cfg.is_dev,
+        reload=cfg.is_dev and cfg.brain_role == "admin",
+        workers=cfg.brain_workers,
         log_config=UVICORN_LOG_CONFIG,
     )

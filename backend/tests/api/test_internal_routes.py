@@ -37,6 +37,7 @@ def test_internal_enrich_returns_504_when_brain_times_out():
             "get_tts_config",
             return_value=SimpleNamespace(
                 brain_url="http://brain:8100",
+                resolved_brain_chat_url="http://brain:8100",
                 gateway_internal_token="test-token",
             ),
         ),
@@ -63,6 +64,7 @@ def test_internal_enrich_fails_closed_when_token_is_not_configured():
             "get_tts_config",
             return_value=SimpleNamespace(
                 brain_url="http://brain:8100",
+                resolved_brain_chat_url="http://brain:8100",
                 gateway_internal_token="",
             ),
         ),

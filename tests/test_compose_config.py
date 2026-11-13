@@ -1,4 +1,4 @@
-"""Tests for direct Docker Compose GPU profile and consumer routing."""
+"""Test Compose service routing, worker roles, GPU profiles and rollback."""
 
 from __future__ import annotations
 
@@ -12,11 +12,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def compose_config(
-    overrides: dict[str, str],
+    overrides: dict[str, str | None],
     compose_files: tuple[str, ...] = (),
 ) -> dict:
     env = os.environ.copy()
-    env.update(overrides)
+    for name, value in overrides.items():
+        if value is None:
+            env.pop(name, None)
+        else:
+            env[name] = value
     command = ["docker", "compose"]
     for compose_file in compose_files:
         command.extend(["-f", compose_file])
@@ -178,3 +182,76 @@ def test_second_indextts_server_reaches_backend_and_gateway_worker():
         assert environment["TTS_INDEXTTS_NURSE_URL"] == "http://nurse-tts:8001"
         # 沒設時展開成 hayley，不能是空字串。
         assert environment["TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER"] == "hayley"
+
+
+def test_chat_workers_share_data_without_inheriting_admin_gpu():
+    services = compose_config({
+        "COMPOSE_PROFILES": "",
+        "BRAIN_CHAT_URL": None,
+        "BRAIN_WORKERS": "",
+    })["services"]
+    admin = services["api"]
+    chat = services["api-chat"]
+
+    assert admin["environment"]["BRAIN_ROLE"] == "admin"
+    assert admin["environment"]["BRAIN_WORKERS"] == "1"
+    assert chat["environment"]["BRAIN_ROLE"] == "chat"
+    assert chat["environment"]["BRAIN_WORKERS"] == "4"
+    assert chat["environment"]["ENV"] == "prod"
+    assert chat["environment"]["SESSION_BACKUP_ENABLED"] == "false"
+    assert chat["environment"]["DREAMING_ENABLED"] == "false"
+    assert chat["image"] == admin["image"]
+    assert chat["healthcheck"] == admin["healthcheck"]
+    assert not chat.get("deploy", {}).get("resources", {}).get("reservations")
+    assert not chat.get("ports")
+    assert "/app" not in volume_targets(chat)
+    for target in ("/data", "/skills", "/contracts"):
+        admin_mount = next(v for v in admin["volumes"] if v["target"] == target)
+        chat_mount = next(v for v in chat["volumes"] if v["target"] == target)
+        assert admin_mount["source"] == chat_mount["source"]
+    for service in (admin, chat):
+        assert service["environment"]["BRAIN_COORDINATION_DIR"] == (
+            "/data/.coordination"
+        )
+        assert service["labels"]["com.centurylinklabs.watchtower.enable"] == "true"
+    assert chat["depends_on"]["api"]["condition"] == "service_healthy"
+    for name in ("backend", "gateway-worker"):
+        assert services[name]["environment"]["BRAIN_CHAT_URL"] == (
+            "http://api-chat:8100"
+        )
+        for dependency in ("api", "api-chat"):
+            assert services[name]["depends_on"][dependency]["condition"] == (
+                "service_healthy"
+            )
+
+
+def test_explicit_empty_chat_url_rolls_back_without_changing_admin_workers():
+    services = compose_config({
+        "BRAIN_CHAT_URL": "",
+        "BRAIN_WORKERS": "8",
+    })["services"]
+    assert services["api"]["environment"]["BRAIN_WORKERS"] == "1"
+    assert services["api-chat"]["environment"]["BRAIN_WORKERS"] == "8"
+    for name in ("backend", "gateway-worker"):
+        assert services[name]["environment"]["BRAIN_CHAT_URL"] == ""
+
+
+def test_dev_chat_keeps_workers_source_mounts_and_disables_watchtower():
+    services = compose_config(
+        {"COMPOSE_PROFILES": "", "BRAIN_WORKERS": "4"},
+        ("docker-compose.yml", "docker-compose.dev.yml"),
+    )["services"]
+    admin = services["api"]
+    chat = services["api-chat"]
+    assert admin["environment"]["ENV"] == "dev"
+    assert admin["environment"]["BRAIN_WORKERS"] == "1"
+    assert chat["environment"]["ENV"] == "prod"
+    assert chat["environment"]["BRAIN_ROLE"] == "chat"
+    assert chat["environment"]["BRAIN_WORKERS"] == "4"
+    for target in ("/app", "/data", "/skills", "/contracts"):
+        admin_mount = next(v for v in admin["volumes"] if v["target"] == target)
+        chat_mount = next(v for v in chat["volumes"] if v["target"] == target)
+        assert admin_mount["source"] == chat_mount["source"]
+    assert chat["labels"]["com.centurylinklabs.watchtower.enable"] == "false"
+    assert not chat.get("deploy", {}).get("resources", {}).get("reservations")
+    assert not chat.get("ports")

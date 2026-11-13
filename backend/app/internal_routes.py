@@ -48,7 +48,7 @@ async def internal_enrich(
     if not hmac.compare_digest(x_internal_token, cfg.gateway_internal_token):
         raise HTTPException(status_code=403, detail="invalid internal token")
 
-    brain_url = f"{cfg.brain_url}/internal/enrich"
+    brain_url = f"{cfg.resolved_brain_chat_url.rstrip('/')}/internal/enrich"
 
     try:
         resp = await _http.get().post(

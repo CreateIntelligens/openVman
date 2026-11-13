@@ -36,6 +36,24 @@ Edge nginx 對 `/brain/` 一律回 404。除了 `GET /brain/health` 與 `GET /br
 
 Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符時，Brain fail closed，不會在 API process 內自行改用其他 provider。
 
+## 對話與管理分流
+
+Brain 使用同一個 image 啟動兩種角色。`BRAIN_ROLE=admin` 固定單一 worker，保留完整 API、匯入互斥、技能管理與所有排程，也保留對話 API 供回退。`BRAIN_ROLE=chat` 只提供聊天、搜尋、Live、決策、ASR／語言讀取與健康指標；不提供知識管理、用量寫入或後台排程。Compose 的 `api-chat` 預設 4 個 worker，不保留 GPU，與 `api` 共用本機 `/data`。啟動時 chat 等待 admin readiness；每個 chat worker 分別預熱檢索與語言判斷。
+
+Backend 的 `BRAIN_CHAT_URL` 只分流指定的 HTTP operation 與 Live WebSocket；留空時沿用 `BRAIN_URL`。Compose 未定義此變數時預設 `http://api-chat:8100`，回退須在 `.env` 明確寫 `BRAIN_CHAT_URL=`，再重建 Backend 與 gateway-worker。路由清單與驗收見 [實作計畫](../docs/plans/brain-chat-worker-split.md)。前台、後台、SDK 的 URL 與授權契約維持原介面，不需前端或 SDK 改版。
+
+共用狀態適用於**單主機、同一本機資料卷**：
+
+- 對話 SQLite 與用量 SQLite 使用 WAL、`synchronous=NORMAL`、5 秒 busy timeout，schema 初始化跨程序互斥。每日 JSONL 對話備份透過 SQLite 一致性查詢讀取，包含 WAL 中的資料；人工複製資料庫須用 SQLite backup API，見部署文件。
+- `BRAIN_COORDINATION_DIR=/data/.coordination` 必須在兩種角色指向同一目錄。限流以 SQLite 原子滑動視窗共同計數；PII 以核心檔案鎖共同限制併發，worker 結束自動釋放。協調失敗不退回放大額度。
+- 記憶日誌的追加、摘要讀改寫、歸檔共用檔案鎖；記憶表新增、刪除、維護覆寫與 Dreaming 寫入共用專案鎖。admin 定時掃描有新對話的專案並維護，chat 不觸發維護。知識 metadata 讀改寫跨程序互斥，KB 設定原子發佈，錯誤日誌與輪替共鎖。工作區缺檔初始化與舊日誌移轉亦共用目標鎖，避免新 worker 的模板覆蓋已追加的記錄。
+- 技能狀態存於 `/data/skill_states/<技能目錄路徑雜湊>.json`，shared 與 project 技能各自獨立；`/skills` 可保持唯讀。各 worker 取用技能與工具時比對檔案與狀態簽章，變更後重載，重啟保留開關。此狀態目錄應隨 `/data` 備份。
+- `python main.py` 在 supervisor 啟動時產生新的 `BRAIN_METRICS_RUN_ID`。各 worker 寫容器本機 `/tmp/brain-metrics/<run-id>/` 的 SQLite shard，抓取時加總當次啟動的全部 worker，包含已退出 worker 的計數；Prometheus 分別抓 `api` 與 `api-chat`。外部 uvicorn 啟動器須傳入相同且每次啟動重新產生的英數 run ID。多 worker 缺少 run ID 或協調目錄會拒絕啟動。
+
+`BRAIN_THREAD_POOL_SIZE=0` 保留 Python 預設 executor；聊天使用 `asyncio.to_thread`。可設定正整數調整每 worker 的池大小，應以隔離壓測結果決定，避免一次放大所有 worker 的執行緒。admin 不允許 `BRAIN_WORKERS>1`；chat 強制停用 reload。
+
+供應商斷路器仍是每個 worker 一份，後台供應商頁讀取與重設僅影響 admin，不代表 chat worker 的即時狀態。模型供應商、專案 Gemini 憑證與決策設定的 TTL 快取最多 10 秒後才在所有 worker 生效；refresh 不是廣播。這次不改 Backend 程序數，也不代表正式 LLM、ASR 或 TTS 已通過 100 台容量驗證。
+
 ## 目錄結構
 
 | 路徑 | 職責 |

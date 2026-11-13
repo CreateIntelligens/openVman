@@ -1,7 +1,8 @@
+import json
 from dataclasses import dataclass
 from functools import cached_property
-import json
 from pathlib import Path
+from typing import Literal
 
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +34,18 @@ class BrainSettings(BaseSettings):
 
     # === 環境 ===
     env: str = "dev"  # dev | prod
+    brain_role: Literal["admin", "chat"] = "admin"
+    brain_workers: int = Field(default=1, ge=1, le=64)
+    # 0 retains Python's executor default; benchmark before increasing it.
+    brain_thread_pool_size: int = Field(default=0, ge=0, le=512)
+    brain_coordination_dir: str = ""
+
+    @model_validator(mode="after")
+    def validate_role_workers(self) -> "BrainSettings":
+        if self.brain_role == "admin" and self.brain_workers != 1:
+            raise ValueError("admin role requires BRAIN_WORKERS=1")
+        return self
+
     # 沒帶 project_id 的請求落在哪個專案；"default" 是它的保留別名。
     default_project_id: str = Field(default="default", validation_alias="DEFAULT_PROJECT_ID")
 

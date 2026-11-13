@@ -23,6 +23,7 @@ from memory.dreaming.paths import (
 )
 from memory.dreaming.scoring import passes_threshold
 from memory.embedder import get_embedder
+from memory.locking import memory_table_lock
 from memory.thresholds import similarity_for
 
 logger = logging.getLogger(__name__)
@@ -162,7 +163,8 @@ def _promote_to_memories(
 
     if records:
         try:
-            get_memories_table(project_id).add(records)
+            with memory_table_lock(project_id):
+                get_memories_table(project_id).add(records)
             logger.info("deep phase: promoted %d records", len(records))
         except Exception as exc:
             logger.error("deep phase: promotion failed: %s", exc)

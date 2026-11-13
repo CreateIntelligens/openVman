@@ -11,7 +11,6 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    HTTPException,
     Request,
     WebSocket,
     WebSocketDisconnect,
@@ -38,7 +37,13 @@ class InternalDecisionRequest(BaseModel):
     timeout_seconds: float = Field(gt=0, le=10)
 
 
-@router.post("/internal/decision")
+chat_router = APIRouter(
+    tags=["Internal"],
+    dependencies=[Depends(require_internal_token)],
+)
+
+
+@chat_router.post("/internal/decision")
 def internal_decision(payload: InternalDecisionRequest) -> dict[str, Any]:
     """Internal decision endpoint for Backend control paths."""
     from core.decision_router import DecisionProviderError, decide
@@ -295,7 +300,7 @@ async def internal_provider_health():
     return {"hops": provider_health().snapshot()}
 
 
-@router.get(
+@chat_router.get(
     "/brain/internal/asr-glossary",
     summary="專案的語音專有名詞（給辨識引擎當前文）",
     description="Backend 送音檔給 Breeze／OpenAI／R2T2 辨識前呼叫；只回正確的詞，「常見誤聽：A→B」對照行不回（會把錯字也教給引擎）。`terms` 是一整串前文，`vocabulary` 是逐詞清單（最多 100 個，給 Gemini 串流的 customVocabulary）。",
@@ -306,7 +311,7 @@ async def internal_asr_glossary(project_id: str = "default"):
     return {"terms": asr_terms(project_id), "vocabulary": asr_vocabulary(project_id)}
 
 
-@router.post(
+@chat_router.post(
     "/brain/internal/asr-judge",
     summary="串流辨識定稿與暫定字幕二選一",
     description="Backend 的 Gemini 串流辨識定稿跟最後的暫定字幕不同時呼叫；Jev 明顯偏好暫定字幕才換，否則照定稿。",
@@ -320,7 +325,7 @@ async def internal_asr_judge(payload: InternalAsrJudgeRequest):
     return {"text": verdict.text, "chosen": verdict.chosen, "scores": verdict.scores, "reason": verdict.reason}
 
 
-@router.post(
+@chat_router.post(
     "/brain/internal/audio-language",
     summary="判斷一段語音是不是台語",
     description="Backend 的 ASR 在專案開了台語分流時呼叫；body 是 WAV。台語轉錄後是中文字，只能聽聲音分辨。",
@@ -341,7 +346,7 @@ async def internal_audio_language(request: Request, project_id: str = "default")
     return {"language": language}
 
 
-@router.post(
+@chat_router.post(
     "/internal/enrich",
     summary="內部對話豐富化",
     description="接收來自其他微服務的外部內容並作為系統訊息存入指定 Session 中。",
@@ -365,7 +370,7 @@ async def internal_enrich(payload: InternalEnrichRequest):
     return {"status": "ok", "trace_id": payload.trace_id, "session_id": session.session_id, "stored_count": len(items)}
 
 
-@router.websocket("/brain/internal/live/{relay_session_id}")
+@chat_router.websocket("/brain/internal/live/{relay_session_id}")
 async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
     try:
         require_internal_token(websocket.headers.get(INTERNAL_TOKEN_HEADER, ""))
@@ -538,3 +543,6 @@ async def dreaming_report(project_id: str = "default"):
     if not content:
         return {"report": None, "message": "尚無報告"}
     return {"report": content}
+
+
+router.include_router(chat_router)

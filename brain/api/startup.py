@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
@@ -13,9 +15,11 @@ from fastapi import FastAPI
 from config import get_settings
 from infra.db import ensure_tables, get_db
 from infra.project_admin import list_projects
+from infra.shared_budgets import shared_request_budget
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from memory.memory_governance import maybe_run_memory_maintenance
+from safety.observability import get_metrics_store
 from warmup_state import mark_warmup_done
 
 logger = logging.getLogger("brain")
@@ -116,8 +120,9 @@ def _warmup_audio_language(project_id: str = "default", attempts: int = 1) -> No
             logger.warning("台語判斷預熱失敗（不影響啟動）: %s", type(exc).__name__)
 
 
-async def warmup_resources() -> None:
+async def warmup_resources(role: str | None = None) -> None:
     """背景預熱 remote embedding 與資料路徑。"""
+    role = role or get_settings().brain_role
     logger.info("背景預熱開始...")
     # 最先做：部署後第一句台語可能在其他預熱跑完前就到。
     await asyncio.to_thread(_warmup_audio_language, "default", _AUDIO_WARMUP_ATTEMPTS)
@@ -127,11 +132,13 @@ async def warmup_resources() -> None:
         for project_id in project_ids:
             if project_id != "default":
                 await asyncio.to_thread(_warmup_audio_language, project_id)
-            ensure_workspace_scaffold(project_id)
-            await asyncio.to_thread(ensure_tables, project_id)
+            if role == "admin":
+                ensure_workspace_scaffold(project_id)
+                await asyncio.to_thread(ensure_tables, project_id)
             # _warmup_retrieval_path 內部已逐表吞掉預熱失敗、不會 raise。
             await asyncio.to_thread(_warmup_retrieval_path, project_id)
-        await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
+        if role == "admin":
+            await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
     except Exception as exc:
         logger.warning(
             "背景預熱未完整執行（不阻斷服務 readiness）: %s",
@@ -155,29 +162,49 @@ async def cancel_task(task: asyncio.Task[None] | None) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """啟動時先讓服務可用，再背景預熱重資源。"""
     logger.info("初始化大腦層資源...")
-    # 確保預設工作區與資料庫連線
-    ensure_workspace_scaffold("default")
-    get_db("default")
+    cfg = get_settings()
+    role = getattr(app.state, "brain_role", cfg.brain_role)
+    if role == "chat" and cfg.brain_workers > 1:
+        if not os.environ.get("BRAIN_METRICS_RUN_ID"):
+            raise RuntimeError("multi-worker chat requires BRAIN_METRICS_RUN_ID")
+        if not cfg.brain_coordination_dir:
+            raise RuntimeError("multi-worker chat requires BRAIN_COORDINATION_DIR")
+    # Validate shared paths at startup, before the first user's request.
+    if cfg.brain_coordination_dir:
+        shared_request_budget(cfg.brain_coordination_dir)
+    get_metrics_store()
+    if cfg.brain_thread_pool_size:
+        asyncio.get_running_loop().set_default_executor(
+            ThreadPoolExecutor(max_workers=cfg.brain_thread_pool_size)
+        )
 
-    # 執行資料遷移
-    from scripts.migrate_to_projects import run_migration
-    await asyncio.to_thread(run_migration)
+    if role == "admin":
+        ensure_workspace_scaffold("default")
+        get_db("default")
+        from scripts.migrate_to_projects import run_migration
 
-    # 背景預熱 remote embedding 與資料路徑
-    app.state.warmup_task = asyncio.create_task(warmup_resources())
+        await asyncio.to_thread(run_migration)
 
-    # Start dreaming scheduler (opt-in)
-    if get_settings().dreaming_enabled:
-        from memory.dreaming.scheduler import start_dreaming_scheduler
-        await start_dreaming_scheduler(app)
+    app.state.warmup_task = asyncio.create_task(warmup_resources(role))
+    if role == "admin":
+        if cfg.dreaming_enabled:
+            from memory.dreaming.scheduler import start_dreaming_scheduler
 
-    from memory.session_backup import start_backup_scheduler
-    app.state.session_backup_task = start_backup_scheduler()
+            await start_dreaming_scheduler(app)
+        from memory.maintenance_scheduler import start_maintenance_scheduler
+        from memory.session_backup import start_backup_scheduler
 
-    logger.info("大腦層就緒")
-    yield
-    await asyncio.gather(
-        cancel_task(getattr(app.state, "session_backup_task", None)),
-        cancel_task(getattr(app.state, "dreaming_task", None)),
-        cancel_task(getattr(app.state, "warmup_task", None)),
-    )
+        app.state.session_backup_task = start_backup_scheduler()
+        app.state.memory_maintenance_task = start_maintenance_scheduler()
+
+    logger.info("大腦層就緒（role=%s）", role)
+    try:
+        yield
+    finally:
+        await asyncio.gather(*(
+            cancel_task(getattr(app.state, name, None))
+            for name in (
+                "session_backup_task", "dreaming_task", "warmup_task",
+                "memory_maintenance_task",
+            )
+        ))

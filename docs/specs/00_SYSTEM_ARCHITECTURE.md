@@ -20,6 +20,7 @@ openVman 採用三層（邏輯上為四層）解耦架構，將「低延遲的�
 * **角色**：靈魂與記憶。
 * **職責**：LLM 人格推理、RAG 向量檢索 (LanceDB)、技能工具調用 (Skills)。
 * **路徑**：`brain/api/`
+* **執行角色**：同一個 image 的 `api` 為單程序管理角色，`api-chat` 為多 worker 對話角色；Backend 以 `BRAIN_CHAT_URL` 分流。兩者共用本機資料卷、SQLite WAL 及跨程序寫入鎖，排程只由 `api` 執行；空白 chat URL 可回退所有流量到 `api`。詳見 `brain/README.md`。
 
 #### 2.4 外部感官層 (Gateway / External Sensory Layer)
 * **角色**：外部連結器。

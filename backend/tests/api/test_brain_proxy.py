@@ -24,6 +24,7 @@ from app.auth.resources import ResourceAccess
 def _mock_cfg():
     return MagicMock(
         brain_url="http://brain:8100",
+        resolved_brain_chat_url="http://brain:8100",
         gateway_internal_token="internal-secret",
         brain_proxy_max_body_bytes=110 * 1024 * 1024,
     )
@@ -378,7 +379,7 @@ def test_readable_but_not_editable_project_says_403(monkeypatch) -> None:
     # 2026-10-14：一般帳號刪對話回 404，串接方以為對話不存在；看得到的專案改成明說沒權限。
     from datetime import datetime, timezone
 
-    from app.auth.models import ResourceType, ResourceVisibility
+    from app.auth.models import ResourceVisibility
     from app.auth.runtime import get_auth_runtime
     from tests.api.test_main import _authenticated_client, _load_main
 
@@ -438,7 +439,7 @@ def test_default_alias_is_authorized_as_the_configured_default_project(monkeypat
     # 要用醫院專案的授權判斷，不能拿已刪掉的 default 授權，也不能因此變成 404。
     from datetime import datetime, timezone
 
-    from app.auth.models import ResourceType, ResourceVisibility
+    from app.auth.models import ResourceVisibility
     from app.auth.runtime import get_auth_runtime
     from tests.api.test_main import _authenticated_client, _load_main
 

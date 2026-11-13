@@ -43,6 +43,7 @@ def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
         "document_max_upload_bytes": max_upload_bytes,
         "gateway_internal_token": "test-internal-token",
         "brain_url": "http://brain:8100",
+        "resolved_brain_chat_url": "http://brain:8100",
         "tts_indextts_url": "http://index-tts-vllm:8011",
         "tts_indextts_default_character": "hayley",
         "tts_gcp_enabled": False,
@@ -1561,6 +1562,7 @@ def _install_fake_brain_usage(module, captured: dict[str, object], monkeypatch):
 
     monkey_cfg = types.SimpleNamespace(
         brain_url="http://brain:8100/",
+        resolved_brain_chat_url="http://brain:8100/",
         gateway_internal_token="internal-secret",
     )
     monkeypatch.setattr(module.admin_routes, "_health_http", FakeClient())

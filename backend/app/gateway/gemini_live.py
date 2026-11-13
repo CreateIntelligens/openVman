@@ -302,7 +302,7 @@ class GeminiLivePipeline:
             "project_id": str(self.session.metadata.get("project_id", "default")),
         }
         response = await brain_client.post(
-            f"{self.config.brain_url.rstrip('/')}/brain/search",
+            f"{self.config.resolved_brain_chat_url.rstrip('/')}/brain/search",
             json=payload,
         )
         response.raise_for_status()

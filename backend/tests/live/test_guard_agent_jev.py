@@ -85,6 +85,7 @@ async def test_backend_decision_client_calls_brain_broker(monkeypatch):
     client = SimpleNamespace(post=AsyncMock(return_value=response))
     monkeypatch.setattr(jev_client, "get_tts_config", lambda: SimpleNamespace(
         brain_url="http://api:8100",
+        resolved_brain_chat_url="http://api:8100",
         gateway_internal_token="internal-key",
     ))
     monkeypatch.setattr(jev_client, "_shared_client", lambda: client)

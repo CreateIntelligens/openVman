@@ -1,12 +1,14 @@
-"""Structured logging and lightweight in-process metrics."""
+"""Structured logging and container-wide metric aggregation."""
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from threading import Lock
 from time import monotonic, time
 from typing import Any
@@ -18,7 +20,10 @@ MetricSeriesKey = tuple[str, MetricLabels]
 
 
 class MetricsStore:
-    def __init__(self) -> None:
+    def __init__(self, directory: Path | None = None) -> None:
+        from infra.multiprocess_metrics import MetricShards
+
+        self._shards = MetricShards(directory.resolve()) if directory else None
         self._lock = Lock()
         self._counters: dict[MetricSeriesKey, int] = defaultdict(int)
         self._timings: dict[MetricSeriesKey, dict[str, float]] = defaultdict(
@@ -27,54 +32,77 @@ class MetricsStore:
 
     def increment(self, name: str, value: int = 1, **labels: object) -> None:
         with self._lock:
-            self._counters[(name, _metric_labels(labels))] += value
+            if self._shards is not None:
+                self._shards.record(name, _metric_labels(labels), "counter", value)
+            else:
+                self._counters[(name, _metric_labels(labels))] += value
 
     def observe(self, name: str, value_ms: float, **labels: object) -> None:
         with self._lock:
+            if self._shards is not None:
+                self._shards.record(name, _metric_labels(labels), "timing", value_ms)
+                return
             bucket = self._timings[(name, _metric_labels(labels))]
             bucket["count"] += 1
             bucket["sum_ms"] += value_ms
             bucket["max_ms"] = max(bucket["max_ms"], value_ms)
 
+    def _series(self) -> tuple[dict, dict]:
+        if self._shards is not None:
+            return self._shards.read()
+        return dict(self._counters), {
+            key: dict(value) for key, value in self._timings.items()
+        }
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
+            counters, observed = self._series()
             timings = {
                 _metric_key(name, labels): {
                     **value,
                     "avg_ms": round(value["sum_ms"] / value["count"], 2) if value["count"] else 0.0,
                 }
-                for (name, labels), value in self._timings.items()
+                for (name, labels), value in observed.items()
             }
             return {
                 "counters": {
                     _metric_key(name, labels): value
-                    for (name, labels), value in self._counters.items()
+                    for (name, labels), value in counters.items()
                 },
                 "timings": timings,
             }
 
     def iter_counters(self) -> list[tuple[str, dict[str, str], int]]:
         with self._lock:
+            counters, _ = self._series()
             return [
                 (name, dict(labels), value)
-                for (name, labels), value in self._counters.items()
+                for (name, labels), value in counters.items()
             ]
 
     def iter_timings(self) -> list[tuple[str, dict[str, str], dict[str, float]]]:
         with self._lock:
+            _, timings = self._series()
             return [
                 (name, dict(labels), dict(value))
-                for (name, labels), value in self._timings.items()
+                for (name, labels), value in timings.items()
             ]
 
 
 _metrics: MetricsStore | None = None
+_metrics_lock = Lock()
 
 
 def get_metrics_store() -> MetricsStore:
     global _metrics
     if _metrics is None:
-        _metrics = MetricsStore()
+        with _metrics_lock:
+            if _metrics is None:
+                run_id = os.environ.get("BRAIN_METRICS_RUN_ID", "")
+                if run_id and (not run_id.isalnum() or len(run_id) > 128):
+                    raise ValueError("BRAIN_METRICS_RUN_ID must be alphanumeric")
+                root = Path(os.environ.get("BRAIN_METRICS_DIR", "/tmp/brain-metrics"))
+                _metrics = MetricsStore(root / run_id if run_id else None)
     return _metrics
 
 

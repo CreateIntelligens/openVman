@@ -7,6 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 
+from infra.file_lock import file_lock
 from infra.project_context import resolve_project_context
 
 ALLOWED_DOCUMENT_SUFFIX_ORDER = (".md", ".txt", ".csv")
@@ -173,8 +174,11 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     for template_path, template in WORKSPACE_TEMPLATES.items():
         path = ws / template_path
         if not path.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(template, encoding="utf-8")
+            # Another worker may already append to a newly created journal;
+            # initialization must share its lock and recheck after waiting.
+            with file_lock(path):
+                if not path.exists():
+                    path.write_text(template, encoding="utf-8")
 
     return ws
 
@@ -185,7 +189,9 @@ def _migrate_learnings_layout(ws: Path) -> None:
         old = ws / filename
         new = ws / ".learnings" / filename
         if old.exists() and not new.exists():
-            old.rename(new)
+            with file_lock(new):
+                if old.exists() and not new.exists():
+                    old.rename(new)
 
 
 def get_archive_paths(project_id: str = "default") -> dict[str, Path]:

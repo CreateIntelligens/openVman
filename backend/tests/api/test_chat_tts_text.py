@@ -71,7 +71,7 @@ def _json_upstream(payload: dict[str, Any]) -> MagicMock:
 def test_chat_reply_gains_tts_text():
     client = _json_upstream({"reply": "請撥 **0800-123-456** 洽詢。", "citations": []})
     cfg = MagicMock(
-        brain_url="http://brain:8100", gateway_internal_token="t",
+        brain_url="http://brain:8100", resolved_brain_chat_url="http://brain:8100", gateway_internal_token="t",
         brain_proxy_max_body_bytes=110 * 1024 * 1024,
     )
     with (
@@ -89,7 +89,7 @@ def test_chat_reply_gains_tts_text():
 def test_non_chat_json_is_left_alone():
     client = _json_upstream({"reply": "x", "personas": []})
     cfg = MagicMock(
-        brain_url="http://brain:8100", gateway_internal_token="t",
+        brain_url="http://brain:8100", resolved_brain_chat_url="http://brain:8100", gateway_internal_token="t",
         brain_proxy_max_body_bytes=110 * 1024 * 1024,
     )
     with (

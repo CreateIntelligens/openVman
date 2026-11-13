@@ -35,7 +35,7 @@ async def _fetch(current: CurrentAccount, supplied_project_id: str) -> dict:
     cfg = get_tts_config()
     try:
         response = await _http.get().get(
-            f"{cfg.brain_url.rstrip('/')}/brain/internal/asr-glossary",
+            f"{cfg.resolved_brain_chat_url.rstrip('/')}/brain/internal/asr-glossary",
             params={"project_id": project_id},
             headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
         )

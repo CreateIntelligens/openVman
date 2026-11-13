@@ -1,0 +1,17 @@
+services:
+  split-avatar:
+    image: tbdavid2019/openvman-avatar:latest
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    networks: [isolated]
+  split-edge:
+    image: tbdavid2019/openvman-admin:latest
+    entrypoint: [nginx, -g, 'daemon off;']
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    volumes:
+      - ./browser-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:18889:80"
+    depends_on: [split-backend, split-avatar]
+    networks: [isolated]

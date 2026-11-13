@@ -3,14 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-
 from protocol.schemas import SkillCreateRequest, SkillFilesUpdateRequest
 from safety.internal_auth import require_internal_token
 from tools.skill import SkillRef, SkillScope
 from tools.skill_manager import get_skill_manager
 from tools.tool_registry import (
     activate_project_sync,
-    get_tool_registry,
     invalidate_skill_tools_sync,
 )
 
@@ -21,8 +19,8 @@ router = APIRouter(
 )
 
 
-def _skill_deps() -> tuple[Any, Any]:
-    return get_tool_registry(), get_skill_manager()
+def _skill_deps(project_id: str = "default") -> tuple[Any, Any]:
+    return activate_project_sync(project_id), get_skill_manager()
 
 
 def _parse_scope(scope: str | None, project_id: str | None) -> tuple[SkillScope | None, str | None]:
@@ -44,8 +42,7 @@ def skill_ref(
 
 @router.get("/tools", summary="列出工具與技能")
 async def list_tools(project_id: str = Query("default")):
-    activate_project_sync(project_id)
-    registry, manager = _skill_deps()
+    registry, manager = _skill_deps(project_id)
     all_tools = registry.list_tools()
 
     def serialize(tool: Any) -> dict[str, Any]:
@@ -69,14 +66,14 @@ async def list_tools(project_id: str = Query("default")):
             "tools": [tool.name for tool in skill.manifest.tools],
             "warnings": skill.warnings,
         }
-        for skill in manager.list_skills()
+        for skill in manager.list_skills(project_id)
     ]
     return {"tools": builtin_tools, "skill_tools": skill_tools, "skills": skills}
 
 
 @router.patch("/skills/{skill_id}/toggle", summary="切換技能啟用狀態")
 async def toggle_skill(ref: SkillRef = Depends(skill_ref)):
-    registry, manager = _skill_deps()
+    registry, manager = _skill_deps(ref.project_id or "default")
     try:
         skill = manager.toggle_skill(ref, registry)
     except ValueError as exc:
@@ -95,7 +92,7 @@ async def toggle_skill(ref: SkillRef = Depends(skill_ref)):
 async def create_skill(payload: SkillCreateRequest):
     scope, project_id = _parse_scope(payload.scope, payload.project_id)
     ref = SkillRef(skill_id=payload.skill_id, scope=scope or "shared", project_id=project_id)
-    registry, manager = _skill_deps()
+    registry, manager = _skill_deps(project_id or "default")
     try:
         skill = manager.create_skill(
             ref,
@@ -118,7 +115,7 @@ async def create_skill(payload: SkillCreateRequest):
 
 @router.get("/skills/{skill_id}/files", summary="取得技能檔案")
 async def get_skill_files(ref: SkillRef = Depends(skill_ref)):
-    _, manager = _skill_deps()
+    _, manager = _skill_deps(ref.project_id or "default")
     try:
         files = manager.get_skill_files(ref)
     except ValueError as exc:
@@ -131,7 +128,7 @@ async def update_skill_files(
     payload: SkillFilesUpdateRequest,
     ref: SkillRef = Depends(skill_ref),
 ):
-    registry, manager = _skill_deps()
+    registry, manager = _skill_deps(ref.project_id or "default")
     try:
         skill = manager.update_skill_files(ref, payload.files, registry)
     except ValueError as exc:
@@ -149,7 +146,7 @@ async def update_skill_files(
 
 @router.delete("/skills/{skill_id}", summary="刪除技能")
 async def delete_skill(ref: SkillRef = Depends(skill_ref)):
-    registry, manager = _skill_deps()
+    registry, manager = _skill_deps(ref.project_id or "default")
     try:
         manager.delete_skill(ref, registry)
     except ValueError as exc:
@@ -160,7 +157,7 @@ async def delete_skill(ref: SkillRef = Depends(skill_ref)):
 
 @router.post("/skills/reload", summary="重新載入所有技能")
 async def reload_all_skills(project_id: str = Query("default")):
-    registry, manager = _skill_deps()
+    registry, manager = _skill_deps(project_id)
     skills = manager.reload_all(registry, project_id=project_id)
     invalidate_skill_tools_sync()
     all_warnings = {skill.manifest.id: skill.warnings for skill in skills if skill.warnings}
