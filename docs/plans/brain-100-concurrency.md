@@ -107,6 +107,8 @@ Backend 沒有錯誤，1 process 峰值 CPU 約 0.9 核，瞬間尖峰時多開�
 
 ## 建議做法
 
+實作規格見 [Brain 對話與管理分流（多 worker）](brain-chat-worker-split.md)。
+
 1. 上線型錄快取與分段 log，用真實流量確認效果。
 2. 對話紀錄與用量帳本改 WAL，連線設 busy timeout，確認備份流程包含 `-wal`。
 3. 拆角色：`/brain/chat*` 與對話相關讀取由多個對話 worker 處理；知識庫管理、技能、背景排程只在一個管理 worker。對話 worker 不跑記憶維護，限流與 Clef 併發上限依 worker 數換算，Prometheus 逐 worker 抓取。

@@ -45,6 +45,7 @@
 只放還有待做事項的計畫；做完且規則已寫進規格的計畫會移除，原文可查 Git 歷史。狀態以文件內的狀態列為準。
 
 - [Brain 支撐 100 台併發的評估](plans/brain-100-concurrency.md)：快取、WAL、多 worker 與其他做法的比較，以及多 worker 的風險。
+- [Brain 對話與管理分流（多 worker）](plans/brain-chat-worker-split.md)：WAL、角色旗標、共用狀態處理、Backend 分流與部署的實作規格。
 - [語音對話不再一問一答：插話與連續追問](plans/full-duplex-voice.md)：思考中補一句合併回答已上線；講話中插話待現場回音實測。
 - [產品規格篩選工具](plans/product-spec-filter.md)：Brain `filter_products` 依專案規格表回答選型問題。
 - [每輪回應延遲](plans/turn-latency.md)：講完到聽到聲音的拆解與剩餘待做。
