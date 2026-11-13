@@ -127,10 +127,14 @@ def list_all_questions(project_id: str = "default") -> dict[str, Any]:
     # 每個（來源、題目）掛在哪些分類，照樹上的順序。
     mounts: dict[tuple[str, str], list[str]] = {}
     menu_only: list[dict[str, Any]] = []
+    # 清單照樹上第一次出現的位置排，和工作人員在樹上看到的順序一樣；不在選單上的排最後。
+    position: dict[str, int] = {}
     for category in categories:
         for entry in entries_by_node.get(category["node_id"], []):
             question = entry.get("question") or ""
             source = _source_key(entry.get("source_path") or "")
+            id_key = f"{source}::{question_key(question)}" if source else f"menu::{category['node_id']}::{question_key(question)}"
+            position.setdefault(id_key, len(position))
             if not source:
                 menu_only.append({"node_id": category["node_id"], "question": question})
                 continue
@@ -226,4 +230,10 @@ def list_all_questions(project_id: str = "default") -> dict[str, Any]:
             "document_enabled": True,
         })
 
+    unplaced = len(position)
+    questions = [
+        item for _, item in sorted(
+            enumerate(questions), key=lambda pair: (position.get(pair[1]["id"], unplaced), pair[0]),
+        )
+    ]
     return {"categories": categories, "questions": questions}

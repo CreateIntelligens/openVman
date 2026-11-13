@@ -146,3 +146,18 @@ def test_typed_in_questions_say_so_instead_of_a_file_name(workspace: Path):
 
 def test_a_project_without_questions_returns_empty_lists(workspace: Path):
     assert list_all_questions("default") == {"categories": [], "questions": []}
+
+
+
+def test_questions_follow_the_tree_order_and_off_menu_ones_come_last(workspace):
+    en = _write(workspace, "knowledge/qa/a_en.md", "## Hours?\n\nNine.\n\n## Spare?\n\nYes.\n", language="en")
+    zh = _write(workspace, "knowledge/qa/b_zh.md", "## 幾點開？\n\n九點。\n", language="zh")
+    qa_nodes.create_node("zh", "中文")
+    qa_nodes.create_node("en", "English")
+    _mount("zh", zh, "幾點開？")
+    _mount("en", en, "Hours?")
+
+    order = [row["question"] for row in list_all_questions("default")["questions"]]
+
+    # 檔名排序會是 a_en 在前；清單要照樹上的順序，沒掛上的 Spare? 排最後。
+    assert order == ["幾點開？", "Hours?", "Spare?"]
