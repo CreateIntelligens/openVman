@@ -178,7 +178,7 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD backend \
 
 ### 更新流程
 
-正式環境只透過 CI 更新：push 到 `main` → GitHub Actions（`docker-publish.yml`）建置並推送 `tbdavid2019/openvman-*` image → watchtower 每 5 分鐘檢查並換上新版。在正式目錄本機 build 的 image 會被 watchtower 拉回遠端版本。服務增刪或 ports、volumes、environment 等結構變更，需更新 repository 後重新執行 `./scripts/up.sh --remove-orphans`。
+正式環境只透過 CI 更新：push 到 `main` → GitHub Actions（`docker-publish.yml`）建置並推送 `tbdavid2019/openvman-*` image → watchtower 每小時檢查並換上新版。在正式目錄本機 build 的 image 會被 watchtower 拉回遠端版本。服務增刪或 ports、volumes、environment 等結構變更，需更新 repository 後重新執行 `./scripts/up.sh --remove-orphans`。
 
 開發請使用 worktree 並疊加 `docker-compose.dev.yml`（掛載原始碼、前端 HMR、停用 watchtower）。首次部署、疑難排解、CI 細節與 worktree 流程見 [部署手冊](docs/operations/11_DEPLOYMENT.md)。
 

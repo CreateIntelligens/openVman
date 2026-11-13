@@ -138,8 +138,12 @@ compose 同時保留 `image` 與 `build`，因此會先拉取 `.env` 指定的
 repository 目前都是 public，新主機不需要 `docker login`。
 
 Watchtower 由同一份 compose 啟動，使用 Docker API `1.44`（相容 Docker Engine 29），
-只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 container，每 300 秒檢查
-一次。它**只更新既有 image**：服務增刪，或 ports、volumes、environment 等結構變更，
+只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 container，每 3600 秒檢查
+一次（每次檢查都會向 Docker Hub 查詢，間隔太短容易碰上請求限流）。推上 `main` 後最慢一小時換版；
+急需上線時在主機上跑一次性的 watchtower（重啟常駐的 watchtower 不會立刻檢查，要等滿一個間隔）：
+`docker run --rm -v /var/run/docker.sock:/var/run/docker.sock nickfedor/watchtower:1.24.0 --run-once --label-enable --cleanup`。
+
+Watchtower **只更新既有 image**：服務增刪，或 ports、volumes、environment 等結構變更，
 仍需更新 repository 後重新執行上面的指令。
 
 正式設定不掛載 frontend、backend 或 Brain API 原始碼，image 內容不會被 host 上的
