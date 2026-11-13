@@ -99,7 +99,7 @@ false。正式多 worker 部署必須保留 Redis，讓單一 leader 持有 A2A 
 |---|---|
 | `BRAIN_CHAT_URL` 未定義 | Compose 注入 `http://api-chat:8100`；直接執行 Backend 則沿用 `BRAIN_URL` |
 | `BRAIN_CHAT_URL=` | Backend 與 gateway-worker 全部回到 `BRAIN_URL`（預設 `http://api:8100`） |
-| `BRAIN_WORKERS=4` | 對話服務 4 workers；不會增加 admin worker 數 |
+| `BRAIN_WORKERS=8` | 對話服務 8 workers（每個約 0.3 GB）；不會增加 admin worker 數 |
 | `BRAIN_THREAD_POOL_SIZE=0` | 保留 Python executor 預設值；調整前先壓測 |
 | `BRAIN_COORDINATION_DIR=/data/.coordination` | Compose 強制兩個 Brain 服務使用同一目錄，跨程序共用限流與 PII 併發額度 |
 

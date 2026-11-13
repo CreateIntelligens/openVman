@@ -196,7 +196,7 @@ def test_chat_workers_share_data_without_inheriting_admin_gpu():
     assert admin["environment"]["BRAIN_ROLE"] == "admin"
     assert admin["environment"]["BRAIN_WORKERS"] == "1"
     assert chat["environment"]["BRAIN_ROLE"] == "chat"
-    assert chat["environment"]["BRAIN_WORKERS"] == "4"
+    assert chat["environment"]["BRAIN_WORKERS"] == "8"
     assert chat["environment"]["ENV"] == "prod"
     assert chat["environment"]["SESSION_BACKUP_ENABLED"] == "false"
     assert chat["environment"]["DREAMING_ENABLED"] == "false"

@@ -38,7 +38,7 @@ Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符�
 
 ## 對話與管理分流
 
-Brain 使用同一個 image 啟動兩種角色。`BRAIN_ROLE=admin` 固定單一 worker，保留完整 API、匯入互斥、技能管理與所有排程，也保留對話 API 供回退。`BRAIN_ROLE=chat` 只提供聊天、搜尋、Live、決策、ASR／語言讀取與健康指標；不提供知識管理、用量寫入或後台排程。Compose 的 `api-chat` 預設 4 個 worker，不保留 GPU，與 `api` 共用本機 `/data`。啟動時 chat 等待 admin readiness；每個 chat worker 分別預熱檢索與語言判斷。
+Brain 使用同一個 image 啟動兩種角色。`BRAIN_ROLE=admin` 固定單一 worker，保留完整 API、匯入互斥、技能管理與所有排程，也保留對話 API 供回退。`BRAIN_ROLE=chat` 只提供聊天、搜尋、Live、決策、ASR／語言讀取與健康指標；不提供知識管理、用量寫入或後台排程。Compose 的 `api-chat` 預設 8 個 worker，不保留 GPU，與 `api` 共用本機 `/data`。啟動時 chat 等待 admin readiness；每個 chat worker 分別預熱檢索與語言判斷。
 
 Backend 的 `BRAIN_CHAT_URL` 只分流指定的 HTTP operation 與 Live WebSocket；留空時沿用 `BRAIN_URL`。Compose 未定義此變數時預設 `http://api-chat:8100`，回退須在 `.env` 明確寫 `BRAIN_CHAT_URL=`，再重建 Backend 與 gateway-worker。路由清單與驗收見 [實作計畫](../docs/plans/brain-chat-worker-split.md)。前台、後台、SDK 的 URL 與授權契約維持原介面，不需前端或 SDK 改版。
 

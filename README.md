@@ -14,7 +14,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D 影片角色�
 | `gateway-worker` | `backend/app/gateway/` | arq + Redis | 文件轉換、爬蟲與其他非同步媒體處理 |
 | `avatar-pipeline` | `avatar-pipeline/` | arq + MediaPipe + ffmpeg | 把說話影片或人像圖轉成虛擬人素材包（`01.webm` + `combined_data.json.gz`，可保留透明背景），一次一件 |
 | `api` | `brain/api/` | FastAPI | Brain 管理服務：單 worker，負責匯入、技能管理、用量、備份與記憶維護；保留對話入口供回退 |
-| `api-chat` | `brain/api/` | FastAPI + uvicorn workers | Brain 對話服務：預設 4 workers，負責文字、語音相關判斷、Live 與檢索；僅供內部呼叫 |
+| `api-chat` | `brain/api/` | FastAPI + uvicorn workers | Brain 對話服務：預設 8 workers，負責文字、語音相關判斷、Live 與檢索；僅供內部呼叫 |
 | `embedding` | `brain/embedding/` | EmbeddingGemma 2（GPU） | 向量嵌入服務，Brain 與其他 stack 共用 |
 | `redis` | — | Redis 7 | gateway 佇列、快取與跨 worker 狀態 |
 | `prometheus`、`grafana` | `infra/` | — | 指標收集與監控儀表板 |
@@ -143,7 +143,7 @@ cp .env.example .env
 | Compose | `PORT`、`HTTPS_PORT`、`COMPOSE_PROFILES`（目前為 `embedding`）、`OPENVMAN_IMAGE_TAG` |
 | 公開網域 | `PUBLIC_DOMAIN`、`LETSENCRYPT_EMAIL` |
 | 安全 | `GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`AUTH_TEMPORARY_PASSWORD_SECRET`、`MODEL_PROVIDER_ENCRYPTION_SECRET`、`GRAFANA_PASSWORD` |
-| Brain 分流 | `BRAIN_CHAT_URL`、`BRAIN_WORKERS`（Compose 預設 4）、`BRAIN_THREAD_POOL_SIZE`（預設 0） |
+| Brain 分流 | `BRAIN_CHAT_URL`、`BRAIN_WORKERS`（Compose 預設 8）、`BRAIN_THREAD_POOL_SIZE`（預設 0） |
 | LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`GEMINI_API_KEY` 及各供應商金鑰 |
 | 語音 | 見上方語音引擎表 |
 

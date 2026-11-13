@@ -88,7 +88,7 @@ services:
       - HOME=/home/appuser
       - ENV=prod
       - BRAIN_ROLE=chat
-      - BRAIN_WORKERS=${BRAIN_WORKERS:-4}
+      - BRAIN_WORKERS=${BRAIN_WORKERS:-8}
       - BRAIN_THREAD_POOL_SIZE=${BRAIN_THREAD_POOL_SIZE:-0}
       - BRAIN_COORDINATION_DIR=/data/.coordination
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
