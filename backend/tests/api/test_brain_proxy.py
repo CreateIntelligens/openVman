@@ -609,3 +609,14 @@ async def test_proxy_returns_413_and_never_calls_brain_when_body_too_large():
     assert response.status_code == 413
     assert b"detail" in response.body
     mock_client.send.assert_not_awaited()
+
+
+def test_brain_client_holds_more_than_a_hundred_streams():
+    """Each chat stream keeps a connection open; 200 at once must not queue into 504s."""
+    from app import brain_proxy
+
+    assert brain_proxy._BRAIN_LIMITS.max_connections >= 400
+    assert brain_proxy._http._limits is brain_proxy._BRAIN_LIMITS
+    timeout = brain_proxy._brain_http_timeout()
+    # 排隊等空連線不是連不上 Brain，不能用 connect 的 2 秒把它判成逾時。
+    assert timeout.pool > timeout.connect

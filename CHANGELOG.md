@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-13]** **Backend 同時轉給 Brain 的對話不再卡在 100 段**：每段對話串流從開始到回答結束都佔一條連線，Backend 連 Brain 的 httpx 預設最多 100 條，等空連線的時限又跟連線逾時共用 2 秒，所以同一個 Backend process 同時超過 100 段對話時，多出來的直接回 504。上限改為 1,000 條（閒置保留 200），等空連線改為 30 秒，連線逾時仍是 `BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS`。隔離環境假 LLM 實測：瞬間 200 人原本 4／8／12 個對話 worker 分別有 40%／27%／23% 回 504，修正後 0；2 個 worker 每秒 20 題原本 43／600 失敗，修正後 0。
+
 - **[2026-11-13]** **台語判斷可以先問 Gemini Decisions（預設關閉）**：`AUDIO_LANGUAGE_DECISION_ENABLED=true` 時，`POST /brain/internal/audio-language` 與 Live 的台語判斷同時送出 Gemini Decisions（`gemini-decision-1`，一次問「是不是華語／英語／西語／日語／韓語」五題是非題）和原本的 `LIVE_AUDIO_LANGUAGE_ID_MODEL`。Decisions 有把握就直接回：華語 ≥ 0.8 或英西 ≥ 0.75 判為該語言，華語 ≤ 0.65 且英西日韓都 < 0.5 判為台語；其他情況（多半是日韓分數偏高，真人台語常被聽成韓語）或 Decisions 失敗、逾時（`AUDIO_LANGUAGE_DECISION_TIMEOUT_SECONDS`，預設 2 秒）時等原本的模型，最壞情況跟關閉時一樣。不直接問「是不是台語」：它把台灣腔、台灣情境也算進去，華語常給 0.4～0.6。50 句實測（真人台語連續劇 20 句、合成華語 10 句、合成英西日韓各 5 句）：Decisions 自己下判斷的句子零誤判，台語 12/20、華語 10/10、英西 10/10 不必等原本的模型（p50 約 0.4 秒，原本 1.8 秒），合併後台語 20/20（原本 19/20）。華語只有合成語音，帶台灣腔的真人華語未驗證，所以預設關閉。每句的分數與判定記在 log `audio_language_decision`，用量照 `audio_language` 記帳。實驗腳本見 `scripts/experiments/audio-language-decision/`。
 
 - **[2026-11-13]** **快速問答的分類點名稱就展開**：以前只有底下有子分類的才會展開，只有題目的分類要點小箭頭；現在點名稱就打開右邊的編輯畫面並展開，已經選著又開著的再點一次就收起。

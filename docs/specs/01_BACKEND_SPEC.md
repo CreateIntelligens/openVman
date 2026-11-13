@@ -216,7 +216,7 @@ Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/health` 探
 | `ASR_NODE_BASE_SECONDS`／`ASR_NODE_PER_AUDIO_SECOND`／`ASR_NODE_MAX_SECONDS` | 8／0.5／120 | 5 秒音檔實測 0.8～1.5 秒；上傳上限 5 分鐘，最長那段封頂在舊的 120 秒 |
 | `ASR_CHAIN_FACTOR`／`ASR_CHAIN_MAX_SECONDS` | 1.5／180 | 同 TTS；前端批次辨識的保險時間跟著這個上限 |
 | `ASR_FFMPEG_BASE_SECONDS`／`ASR_FFMPEG_PER_AUDIO_SECOND` | 15／0.2 | 原本固定 60 秒；短句轉檔不到一秒，5 分鐘音檔仍有 75 秒 |
-| `BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS` | 2 | Brain 在同一個 docker 網路，原本 10 秒 |
+| `BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS` | 2 | Brain 在同一個 docker 網路，原本 10 秒。只管連線；等連線池空位固定 30 秒，連線池上限 1,000 條（每段對話串流佔一條，直到回答結束） |
 | `BRAIN_PROXY_READ_TIMEOUT_SECONDS` | 120 | 兩個 chunk 之間的上限；LLM 跑工具時句子之間會停很久，維持原值 |
 | `UPSTREAM_BREAKER_FAILURES`／`UPSTREAM_BREAKER_COOLDOWN_SECONDS` | 2／60 | 同 Brain `provider_health`：逾時或 5xx 連續兩次冷卻一分鐘 |
 | `UPSTREAM_PROBE_INTERVAL_SECONDS`／`UPSTREAM_PROBE_TIMEOUT_SECONDS` | 10／1.5 | 背景健康探測的週期與單次上限；0 表示不探測 |

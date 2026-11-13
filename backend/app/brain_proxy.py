@@ -180,17 +180,23 @@ _BACKEND_OWNED_PREFIXES = (
 def _brain_http_timeout() -> httpx.Timeout:
     # Brain 在同一個 docker 網路：連不上 2 秒就夠判斷；read 是兩個 chunk 之間的上限，
     # LLM 跑工具時一句話之間可能停很久，維持 120 秒。
+    # pool 是等空連線的時間，跟 Brain 連不連得上無關：瞬間 200 人時連線池排隊，
+    # 用 connect 的 2 秒會把還在排隊的請求直接回 504。
     cfg = get_tts_config()
-    connect = knob(cfg, "brain_proxy_connect_timeout_seconds")
     return httpx.Timeout(
-        connect=connect,
+        connect=knob(cfg, "brain_proxy_connect_timeout_seconds"),
         read=knob(cfg, "brain_proxy_read_timeout_seconds"),
         write=30,
-        pool=connect,
+        pool=30,
     )
 
 
-_http = SharedAsyncClient(timeout_factory=_brain_http_timeout)
+# 每段對話串流佔一條連線、一直開到回答結束；httpx 預設上限 100 條，
+# 單一 Backend process 同時超過 100 段對話就排隊（2026-11-13 隔離壓測瞬間 200 人
+# 有 23～49% 回 504）。
+_BRAIN_LIMITS = httpx.Limits(max_connections=1000, max_keepalive_connections=200)
+
+_http = SharedAsyncClient(timeout_factory=_brain_http_timeout, limits=_BRAIN_LIMITS)
 
 
 class _EventStreamResponse(StreamingResponse):

@@ -31,11 +31,13 @@ class SharedAsyncClient:
         pool: float = 5,
         follow_redirects: bool = False,
         timeout_factory: Callable[[], httpx.Timeout] | None = None,
+        limits: httpx.Limits | None = None,
     ) -> None:
         self._timeout = httpx.Timeout(connect=connect, read=read, write=write, pool=pool)
         # 逾時要讀環境設定時用 factory：模組載入時設定還沒準備好，第一次用到才建 client。
         self._timeout_factory = timeout_factory
         self._follow_redirects = follow_redirects
+        self._limits = limits
         self._client: httpx.AsyncClient | None = None
 
     def get(self) -> httpx.AsyncClient:
@@ -43,6 +45,7 @@ class SharedAsyncClient:
             self._client = httpx.AsyncClient(
                 timeout=self._timeout_factory() if self._timeout_factory else self._timeout,
                 follow_redirects=self._follow_redirects,
+                **({"limits": self._limits} if self._limits is not None else {}),
             )
         return self._client
 
