@@ -137,11 +137,11 @@ async def vision_health() -> dict[str, object]:
 async def vision_reset(payload: VisionResetRequest) -> dict[str, object]:
     session_id = payload.session_id.strip()
     camera = get_camera_plugin()
-    camera.reset_session_events(session_id)
+    visual_state = await camera.reset_session_events_shared(session_id)
     return {
         "status": "reset",
         "session_id": session_id,
-        "visual_state": camera.session_visual_state(session_id),
+        "visual_state": visual_state,
     }
 
 

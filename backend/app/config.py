@@ -310,6 +310,9 @@ class TTSRouterConfig(BaseSettings):
 
     # --- Gateway: Redis & Queue ---
     redis_url: str = "redis://redis:6379"
+    # uvicorn process 數（docker/start-backend-container.sh 也讀這個）。大於 1 時，
+    # 只存在記憶體的狀態（登入／API key 限流）改放 Redis，各 process 才算同一份。
+    backend_workers: int = Field(default=1, ge=1, le=32, validation_alias="BACKEND_WORKERS")
     queue_job_timeout_ms: int = 30000
 
     # --- Vision LLM ---

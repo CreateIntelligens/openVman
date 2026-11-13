@@ -22,7 +22,10 @@ logger = logging.getLogger("backend")
 _PROBE_TEXT = "測試"
 _PROBE_TIMEOUT_SECONDS = 15.0
 
-_edge_tts_up = Gauge("vman_edge_tts_up", "1 when the last Edge TTS probe produced audio")
+_edge_tts_up = Gauge(
+    "vman_edge_tts_up", "1 when the last Edge TTS probe produced audio",
+    multiprocess_mode="liveall",
+)
 _state: dict[str, Any] = {"status": "pending", "checked_at": None, "error": None}
 
 

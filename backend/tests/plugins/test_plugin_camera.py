@@ -369,3 +369,49 @@ class TestVisionEventDetection:
         assert [event["key"] for event in first[-1]["events"]] == ["person"]
         assert still_active["events"] == []
         assert [event["key"] for event in second[-1]["events"]] == ["person"]
+
+
+class _SharedRedis:
+    """The few async Redis calls the shared camera state uses."""
+
+    def __init__(self):
+        self.data = {}
+
+    async def set(self, key, value, nx=False, ex=None):
+        if nx and key in self.data:
+            return None
+        self.data[key] = value
+        return True
+
+    async def get(self, key):
+        return self.data.get(key)
+
+    async def delete(self, key):
+        self.data.pop(key, None)
+
+
+@pytest.mark.asyncio
+async def test_frames_spread_over_processes_fire_one_event():
+    """Backend 多 process：同一個 session 的幀落在不同 process，仍只觸發一次。"""
+    redis = _SharedRedis()
+    workers = [CameraLivePlugin(), CameraLivePlugin()]
+    fired = []
+    with patch("app.gateway.plugins.camera_live._shared_redis", AsyncMock(return_value=redis)):
+        for index in range(6):
+            worker = workers[index % 2]
+            with patch.object(worker, "_detect_events", AsyncMock(return_value={"person": True})):
+                result = await worker.describe_frame(b"x", "image/jpeg", "kiosk")
+            fired += [event["name"] for event in result["events"]]
+        reset = await workers[0].reset_session_events_shared("kiosk")
+    assert fired == ["person_appeared"]
+    assert reset["state"] == "clear"
+    assert "vman:camera:kiosk:events" not in redis.data
+
+
+@pytest.mark.asyncio
+async def test_shared_busy_lock_spans_processes():
+    redis = _SharedRedis()
+    redis.data["vman:camera:kiosk:busy"] = b"1"
+    with patch("app.gateway.plugins.camera_live._shared_redis", AsyncMock(return_value=redis)):
+        result = await CameraLivePlugin().describe_frame(b"x", "image/jpeg", "kiosk")
+    assert result["status"] == "busy"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import json
 import logging
 import uuid
 from typing import Any
@@ -18,6 +19,22 @@ from app.utils.log_safe import log_safe
 logger = logging.getLogger("gateway.plugin.camera_live")
 
 INVALID_FRAME_MESSAGE = "影像資料格式錯誤"
+# Backend 開多個 process 時，同一個 session 的畫面會落在不同 process；事件狀態與
+# 「正在判讀」的鎖改放 Redis，連續幾幀才觸發的計數才不會被拆成好幾份。
+_SHARED_BUSY_SECONDS = 30
+_SHARED_STATE_SECONDS = 3600
+
+
+async def _shared_redis():
+    if getattr(get_tts_config(), "backend_workers", 1) <= 1:
+        return None
+    from app.gateway.redis_pool import get_redis
+
+    return await get_redis()
+
+
+def _shared_keys(session_id: str) -> tuple[str, str]:
+    return f"vman:camera:{session_id}:busy", f"vman:camera:{session_id}:events"
 
 
 class InvalidFrameError(ValueError):
@@ -122,6 +139,9 @@ class CameraLivePlugin:
             format_visual_state,
         )
 
+        shared = await _shared_redis()
+        if shared is not None:
+            return await self._describe_frame_shared(shared, image_bytes, mime_type, session_id)
         state = self._state_for_session(session_id)
         if state["analyzing"]:
             return {
@@ -156,6 +176,70 @@ class CameraLivePlugin:
             }
         finally:
             state["analyzing"] = False
+
+    async def _describe_frame_shared(
+        self, shared: Any, image_bytes: bytes, mime_type: str, session_id: str,
+    ) -> dict[str, Any]:
+        from app.gateway.plugins.vision_events import (
+            detect_edges,
+            format_fired_events,
+            format_visual_state,
+        )
+
+        busy_key, events_key = _shared_keys(session_id)
+        if not await shared.set(busy_key, b"1", nx=True, ex=_SHARED_BUSY_SECONDS):
+            return {
+                "status": "busy",
+                "session_id": session_id,
+                "visual_state": format_visual_state(await self._shared_events(shared, session_id)),
+            }
+        events = await self._shared_events(shared, session_id)
+        try:
+            b64 = base64.b64encode(image_bytes).decode("utf-8")
+            detection = await self._detect_events(b64, mime_type)
+            events, fired = detect_edges(events, detection)
+            await shared.set(events_key, json.dumps(events), ex=_SHARED_STATE_SECONDS)
+            return {
+                "status": "processed",
+                "session_id": session_id,
+                "events": format_fired_events(fired),
+                "visual_state": format_visual_state(events),
+            }
+        except Exception as exc:
+            logger.warning(
+                "camera_describe_frame_err session_id=%s err=%s",
+                log_safe(session_id), log_safe(exc),
+            )
+            return {
+                "status": "error",
+                "session_id": session_id,
+                "error": str(exc),
+                "visual_state": format_visual_state(events),
+            }
+        finally:
+            await shared.delete(busy_key)
+
+    @staticmethod
+    async def _shared_events(shared: Any, session_id: str) -> dict[str, Any]:
+        from app.gateway.plugins.vision_events import new_event_state
+
+        raw = await shared.get(_shared_keys(session_id)[1])
+        try:
+            events = json.loads(raw) if raw else None
+        except ValueError:
+            events = None
+        return events if isinstance(events, dict) else new_event_state()
+
+    async def reset_session_events_shared(self, session_id: str) -> dict[str, str | int | bool]:
+        """Reset this session's events everywhere; returns the fresh visual state."""
+        from app.gateway.plugins.vision_events import format_visual_state, new_event_state
+
+        self.reset_session_events(session_id)
+        shared = await _shared_redis()
+        if shared is not None:
+            await shared.delete(_shared_keys(session_id)[1])
+            return format_visual_state(new_event_state())
+        return self.session_visual_state(session_id)
 
     async def _snapshot_loop(
         self,

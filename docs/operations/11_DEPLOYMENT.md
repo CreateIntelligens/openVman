@@ -139,6 +139,23 @@ PYTHON
 
 還原前先停止所有會寫入該資料庫的服務，包括 `api`、`api-chat` 與 Backend／gateway-worker；不要在資料庫仍使用舊 WAL 時覆蓋主檔。Auth DB 與 `.env` 的加密 secret 必須同時保留，規則見本節前段。
 
+### Backend 多 process
+
+Backend 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動，Compose 預設 4（`ENV=dev` 有 `--reload`，固定一個）。同一個 port 由系統分給各 process，不需要多個容器或改 nginx。每個 process 約 0.1～0.2 GB，尖峰約 1 核。
+
+| 狀態 | 多 process 時的作法 |
+|---|---|
+| 解鎖密碼失敗次數、API key 每分鐘上限、embed key 每分鐘上限 | 放 Redis（sorted set；embed 以 Lua 一次完成檢查與記錄）；Redis 失敗時退回各 process 自己計數 |
+| 文字模式攝影機（`/api/v1/vision/describe`、`/reset`）的事件連續幀數與判讀中鎖 | 放 Redis，同一個 session 的幀落在不同 process 也只觸發一次 |
+| 帳號資料庫啟動 migration | 以資料庫旁的 `.init.lock` 檔案鎖讓各 process 依序執行 |
+| 素材包工作完成後登錄角色 | Redis 鎖，只有一個 process 會登錄 |
+| `/metrics/prometheus` | prometheus_client 多 process 模式（`PROMETHEUS_MULTIPROC_DIR`，啟動時清空），計數全部加總 |
+| `/metrics`（JSON） | 計數與耗時的次數、總和、最大值全部加總；百分位數、事件與直接設定的值只代表回應的 process（`scope` 欄位註明） |
+
+仍各 process 各自一份、可接受的：上游斷路器（同一個壞掉的節點每個 process 各要兩次失敗才跳過）、詞表與語言分流的短期快取、上游健康探測與 Edge 探測（每個 process 都跑，負載很小）、啟動時的引擎與資源同步（冪等）。WebSocket（Live、串流 ASR、攝影機）一條連線固定在同一個 process。
+
+`A2A_ENABLED=true` 只能搭配 `BACKEND_WORKERS=1`：A2A 端點只有持有 leader 租約的 process 能回，多 process 時 Backend 會直接啟動失敗。回退或排查時在 `.env` 寫 `BACKEND_WORKERS=1`，再 `docker compose up -d --no-deps backend gateway-worker`（只 restart 不會套用 env）。
+
 ### 3. 建立 ROOT 帳號
 
 ```bash

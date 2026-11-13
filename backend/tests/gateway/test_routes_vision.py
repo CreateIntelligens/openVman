@@ -150,7 +150,7 @@ def test_generate_reply_allocates_unique_session_id_when_none(client):
 
 def test_vision_reset_clears_session_event_state(client):
     cam = MagicMock()
-    cam.session_visual_state.return_value = _GREEN_SIGNAL
+    cam.reset_session_events_shared = AsyncMock(return_value=_GREEN_SIGNAL)
     with patch("app.gateway.routes_vision.get_camera_plugin", return_value=cam):
         resp = client.post("/api/v1/vision/reset", json={"session_id": "vision-text"})
 
@@ -160,8 +160,7 @@ def test_vision_reset_clears_session_event_state(client):
         "session_id": "vision-text",
         "visual_state": _GREEN_SIGNAL,
     }
-    cam.reset_session_events.assert_called_once_with("vision-text")
-    cam.session_visual_state.assert_called_once_with("vision-text")
+    cam.reset_session_events_shared.assert_awaited_once_with("vision-text")
 
 
 def test_vision_health_ready(client):

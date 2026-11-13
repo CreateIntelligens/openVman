@@ -69,8 +69,15 @@ if __name__ == "__main__":
     elif sys.argv[1] == "backend":
         seed_backend()
         Path("/app/logs").mkdir(parents=True, exist_ok=True)
-        # 多 process 只用來量 Backend 的容量；正式 Backend 仍是單一 process（多程序稽核未做）。
+        # 跟 backend/docker/start-backend-container.sh 一樣：多 process 時準備共用的監控目錄。
         workers = os.environ.get("BACKEND_WORKERS", "1")
+        if int(workers) > 1:
+            import shutil
+
+            for name, path in (("BACKEND_METRICS_DIR", "/tmp/vman-metrics"), ("PROMETHEUS_MULTIPROC_DIR", "/tmp/vman-prometheus")):
+                shutil.rmtree(path, ignore_errors=True)
+                os.makedirs(path)
+                os.environ[name] = path
         os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200", "--workers", workers])
     else:
         raise SystemExit("expected brain or backend")

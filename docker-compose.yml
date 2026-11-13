@@ -20,6 +20,7 @@ x-backend-runtime: &backend-runtime
   environment: &backend-environment
     - TZ=Asia/Taipei
     - REDIS_URL=redis://redis:6379
+    - BACKEND_WORKERS=${BACKEND_WORKERS:-4}
     - BRAIN_CHAT_URL=${BRAIN_CHAT_URL-http://api-chat:8100}
     - GATEWAY_TEMP_DIR=/data/gateway-temp
     - GATEWAY_FORWARD_URL=http://backend:8200

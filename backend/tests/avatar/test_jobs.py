@@ -26,8 +26,11 @@ class FakeRedis:
         value = self.store.get(key)
         return value.encode("utf-8") if value is not None else None
 
-    async def set(self, key, value, ex=None):
+    async def set(self, key, value, ex=None, nx=False):
+        if nx and key in self.store:
+            return None
         self.store[key] = value
+        return True
 
     async def delete(self, key):
         self.store.pop(key, None)
@@ -261,6 +264,30 @@ def test_get_finalizes_done_job_into_a_character(env):
 
     # Reading again must not try to create the character a second time.
     assert client.get(f"/api/v1/avatar/jobs/{job_id}").json()["job"]["state"] == "done"
+
+
+def test_only_the_process_holding_the_lock_registers_a_done_job(env):
+    """Backend 多 process：另一個 process 正在登錄時，這邊不能再登錄一次。"""
+    client, redis, pool, _ = env
+    job_id = _submit(client).json()["job"]["job_id"]
+    out = Path(pool.calls[0][1]["output_dir"])
+    (out / "01.webm").write_bytes(WEBM_BYTES)
+    (out / "combined_data.json.gz").write_bytes(b"\x1f\x8bdata")
+    key = f"vman:avatar-pipeline:job:{job_id}"
+    record = json.loads(redis.store[key])
+    record.update({"state": "done", "stage": "done"})
+    redis.store[key] = json.dumps(record)
+    redis.store[key + ":finalize"] = "1"
+
+    job = client.get(f"/api/v1/avatar/jobs/{job_id}").json()["job"]
+    assert job["state"] == "done"
+    assert "character" not in job or not job["character"]
+    assert client.get("/api/v1/avatar").json()["characters"] == []
+
+    del redis.store[key + ":finalize"]
+    job = client.get(f"/api/v1/avatar/jobs/{job_id}").json()["job"]
+    assert job["state"] == "done"
+    assert job["character"]["char_id"] == "hero"
 
 
 def test_get_marks_done_job_failed_when_outputs_missing(env):

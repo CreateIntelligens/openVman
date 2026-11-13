@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import sqlite3
 from collections.abc import Iterator
@@ -71,7 +72,21 @@ class AuthDatabase:
             connection.close()
 
     def initialize(self) -> None:
-        """Apply the current schema exactly once while remaining rerunnable."""
+        """Apply the current schema exactly once while remaining rerunnable.
+
+        Backend 開多個 process 時每個都會跑一次；幾個重建資料表的 migration 先查
+        再上鎖，同時跑會互撞。用資料庫旁的鎖檔讓各 process 依序跑，後來的看到
+        已經做過就跳過。
+        """
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path.with_name(self.path.name + ".init.lock"), "a") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                self._initialize_locked()
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def _initialize_locked(self) -> None:
         connection = self.connect()
         try:
             connection.execute("PRAGMA journal_mode = WAL")

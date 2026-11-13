@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from collections import defaultdict, deque
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
@@ -47,7 +49,25 @@ def _new_timing_bucket() -> dict[str, Any]:
 
 
 _timings: dict[str, dict[str, Any]] = defaultdict(_new_timing_bucket)
-_events: list[dict[str, Any]] = []
+# 只留最近的事件；以前無上限，長時間運作會一直長。
+_events: deque[dict[str, Any]] = deque(maxlen=1000)
+
+# Backend 開多個 process 時（docker/start-backend-container.sh 設 BACKEND_METRICS_DIR），
+# 每個 process 把計數與耗時寫進自己的分片，讀的時候全部加總。
+_shards: Any = None
+_shards_ready = False
+
+
+def _metric_shards() -> Any:
+    global _shards, _shards_ready
+    if not _shards_ready:
+        directory = os.environ.get("BACKEND_METRICS_DIR", "").strip()
+        if directory:
+            from app.multiprocess_metrics import MetricShards
+
+            _shards = MetricShards(Path(directory))
+        _shards_ready = True
+    return _shards
 
 # ---------------------------------------------------------------------------
 # Prometheus metrics registry (bridge alongside existing in-memory store)
@@ -63,7 +83,9 @@ _prom_tts_latency_ms = Histogram(
     "TTS provider end-to-end latency (ms)",
     buckets=[50, 100, 250, 500, 1000, 2500, 5000, 10000],
 )
-_prom_active_sessions = Gauge("vman_active_sessions", "Active WebSocket sessions")
+_prom_active_sessions = Gauge(
+    "vman_active_sessions", "Active WebSocket sessions", multiprocess_mode="livesum",
+)
 _prom_error_total = Counter("vman_error_total", "Total errors")
 _prom_http_requests_total = Counter(
     "http_requests_total",
@@ -92,6 +114,8 @@ def log_event(event: str, **fields: Any) -> None:
 def increment_counter(name: str, amount: int = 1) -> None:
     with _metrics_lock:
         _counters[name] += amount
+    if (shards := _metric_shards()) is not None:
+        shards.record(name, (), "counter", amount)
 
 
 def record_timing(name: str, value_ms: float) -> None:
@@ -101,6 +125,8 @@ def record_timing(name: str, value_ms: float) -> None:
         bucket["sum_ms"] += value_ms
         bucket["max_ms"] = max(bucket["max_ms"], value_ms)
         bucket["history"].append(value_ms)
+    if (shards := _metric_shards()) is not None:
+        shards.record(name, (), "timing", value_ms)
 
 
 def _percentile(sorted_values: list[float], p: float) -> float | None:
@@ -141,11 +167,30 @@ def _timing_summary(bucket: dict[str, Any]) -> dict[str, Any]:
 def get_metrics_snapshot() -> dict[str, Any]:
     """Return a copy of all counters, timings, and events."""
     with _metrics_lock:
-        return {
+        snapshot = {
             "counters": dict(_counters),
             "timings": {k: _timing_summary(v) for k, v in _timings.items()},
             "events": list(_events),
         }
+    shards = _metric_shards()
+    if shards is None:
+        return snapshot
+    # 多 process：次數、總和、最大值是全部 process 加總；百分位數、事件與
+    # 直接設定的值（例如 live_active_sessions）只有回應這次請求的 process。
+    counters, timings = shards.read()
+    merged = dict(snapshot["counters"])
+    merged.update({name: value for (name, _labels), value in counters.items()})
+    snapshot["counters"] = merged
+    for (name, _labels), bucket in timings.items():
+        local = snapshot["timings"].get(name) or {}
+        snapshot["timings"][name] = local | {
+            "count": bucket["count"],
+            "sum_ms": bucket["sum_ms"],
+            "max_ms": bucket["max_ms"],
+            "avg_ms": round(bucket["sum_ms"] / bucket["count"], 2) if bucket["count"] else 0.0,
+        }
+    snapshot["scope"] = {"totals": "all_processes", "percentiles_and_events": "this_process", "pid": os.getpid()}
+    return snapshot
 
 
 def reset_metrics() -> None:
@@ -171,6 +216,13 @@ def get_prometheus_sample_value(metric_name: str) -> float:
 
 def build_prometheus_response() -> Response:
     """Wrap the Prometheus exposition payload in a FastAPI response."""
+    if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        # 多 process：每次抓取把所有 process 的計數加總，不會跳來跳去。
+        from prometheus_client import CollectorRegistry, multiprocess
+
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return Response(content=generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

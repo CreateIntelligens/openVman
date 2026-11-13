@@ -249,8 +249,18 @@ async def get_job(
     if record is None:
         return None
     if record.get("state") == STATE_DONE and not record.get("registered"):
-        record = _finalize(record, store, runtime)
-        await _write(redis, record)
+        # 列表與單筆輪詢可能同時落在不同 Backend process；只讓拿到鎖的那個登錄，
+        # 另一個會撞到 CharacterExists，把已成功的工作改寫成失敗。
+        lock = _job_key(job_id) + ":finalize"
+        if await redis.set(lock, b"1", nx=True, ex=120):
+            try:
+                latest = await _read(redis, job_id)
+                if latest is not None and latest.get("state") == STATE_DONE and not latest.get("registered"):
+                    latest = _finalize(latest, store, runtime)
+                    await _write(redis, latest)
+                record = latest or record
+            finally:
+                await redis.delete(lock)
     return _public(record)
 
 

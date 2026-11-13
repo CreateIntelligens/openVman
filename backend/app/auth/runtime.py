@@ -10,7 +10,7 @@ from app.config import TTSRouterConfig, get_tts_config
 from .account_access_repository import AccountAccessRepository
 from .admin_scopes_repository import AdminScopeRepository
 from .api_keys_repository import ApiKeyRepository
-from .attempt_limiter import FailedAttemptLimiter
+from .attempt_limiter import FailedAttemptLimiter, RedisAttemptLimiter
 from .auth_audit_repository import AuthAuditRepository
 from .database import AuthDatabase
 from .model_provider_repository import ModelProviderRepository
@@ -48,12 +48,25 @@ class AuthRuntime:
     request_origins: RequestOriginRepository
     temporary_passwords: TemporaryPasswordCipher
     # 每個 runtime 各自一份，測試與重建 runtime 時不會共用失敗次數。
-    password_verify_attempts: FailedAttemptLimiter = field(
+    password_verify_attempts: FailedAttemptLimiter | RedisAttemptLimiter = field(
         default_factory=FailedAttemptLimiter,
     )
     # 開放 CORS 後 key 可能被放進瀏覽器，限流擋住失控的迴圈或被拿去濫用。
-    # 只放記憶體：backend 只跑一個 worker，重啟歸零可以接受。
-    api_key_requests: FailedAttemptLimiter | None = None
+    # 單一 process 放記憶體；BACKEND_WORKERS 大於 1 時放 Redis。
+    api_key_requests: FailedAttemptLimiter | RedisAttemptLimiter | None = None
+
+
+def _limiter(
+    config: TTSRouterConfig, namespace: str, **limits: float,
+) -> FailedAttemptLimiter | RedisAttemptLimiter:
+    if getattr(config, "backend_workers", 1) <= 1:
+        return FailedAttemptLimiter(**limits)
+    import redis
+
+    client = redis.Redis.from_url(
+        config.redis_url, socket_timeout=0.5, socket_connect_timeout=0.5,
+    )
+    return RedisAttemptLimiter(client, namespace, **limits)
 
 
 def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
@@ -86,8 +99,10 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
             database
         ),
         request_origins=RequestOriginRepository(database),
+        password_verify_attempts=_limiter(config, "password"),
         api_key_requests=(
-            FailedAttemptLimiter(
+            _limiter(
+                config, "api-key",
                 max_failures=config.api_key_rate_limit_per_minute,
                 window_seconds=60.0,
             )
