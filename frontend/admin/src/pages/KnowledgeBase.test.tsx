@@ -166,6 +166,17 @@ vi.mock("../context/NavigationContext", () => ({
   }),
 }));
 
+const authMocks = vi.hoisted(() => ({
+  account: { id: "admin", username: "admin", role: "admin", disabled: false, created_at: "" } as {
+    id: string; username: string; role: "admin" | "user"; disabled: boolean; created_at: string;
+    ai_cleanup_access?: boolean;
+  },
+}));
+
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: authMocks.account }),
+}));
+
 vi.mock("../context/NavigationGuardContext", () => ({
   useUnsavedChanges: vi.fn(),
   useNavigationGuard: () => guardMocks,
@@ -966,6 +977,44 @@ describe("KnowledgeBase merged tree", () => {
       expect(screen.getByRole("heading", { name: "新增資料" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "把檔案拖到這裡，或點這裡選擇檔案" })).toBeTruthy();
       expect(screen.queryByText(/從檔案樹選擇/)).toBeNull();
+    });
+
+    describe("without the AI cleanup permission", () => {
+      const admin = authMocks.account;
+      beforeEach(() => {
+        authMocks.account = { ...admin, id: "clerk", username: "clerk", role: "user", ai_cleanup_access: false };
+      });
+      afterEach(() => {
+        authMocks.account = admin;
+      });
+
+      it("only offers to put documents straight into the knowledge base", () => {
+        render(<KnowledgeBase />);
+
+        expect(screen.getByText(/這批文件會直接放進知識庫/)).toBeTruthy();
+        expect(screen.queryByText(/先讓 AI 整理排版/)).toBeNull();
+      });
+
+      it("leaves AI cleanup out of the document actions", () => {
+        knowledgeBaseMocks.openDocument = { ...guideDoc, content: "內容" };
+        knowledgeBaseMocks.rightPane = "file";
+        render(<KnowledgeBase />);
+
+        const more = screen.getAllByRole("button", { name: "更多" });
+        fireEvent.click(more[more.length - 1]);
+        expect(screen.getByRole("menuitem", { name: "移動…" })).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "AI 整理排版" })).toBeNull();
+      });
+    });
+
+    it("keeps AI cleanup in the document actions for administrators", () => {
+      knowledgeBaseMocks.openDocument = { ...guideDoc, content: "內容" };
+      knowledgeBaseMocks.rightPane = "file";
+      render(<KnowledgeBase />);
+
+      const more = screen.getAllByRole("button", { name: "更多" });
+      fireEvent.click(more[more.length - 1]);
+      expect(screen.getByRole("menuitem", { name: "AI 整理排版" })).toBeTruthy();
     });
 
     it("does not flash the add-data screen while the last document is being restored", () => {

@@ -1,10 +1,6 @@
 import { useState, type FormEvent } from "react";
 
-import {
-  updateAccountRole,
-  type Account,
-  type AssignableAccountRole,
-} from "../../api/auth";
+import { type Account, type AssignableAccountRole, isAtLeastAdmin, updateAccountRole } from "../../api/auth";
 import { useModalDismiss } from "../useModalDismiss";
 import { errorMessage } from "../../utils/errorMessage";
 import AccountAccessFields, {
@@ -47,6 +43,8 @@ export default function AccountRoleDialog({
         defaults: account.defaults,
         admin_portal_access: account.admin_portal_access ?? false,
         kiosk: account.kiosk ?? false,
+        // 管理員回來的是生效值（一律為真）；降成一般帳號時不能因此默默開放。
+        ai_cleanup_access: isAtLeastAdmin(account.role) ? false : (account.ai_cleanup_access ?? false),
       }
       : undefined,
     // 只有降級才會顯示授權欄位，提升為管理員時不必抓選項。

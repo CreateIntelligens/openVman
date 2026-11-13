@@ -122,6 +122,7 @@ def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
         "defaults": None,
         "admin_portal_access": True,
         "kiosk": False,
+        "ai_cleanup_access": True,
     }
     assert login["token"]
 

@@ -212,6 +212,7 @@ describe("Accounts", () => {
         },
         admin_portal_access: false,
         kiosk: false,
+        ai_cleanup_access: false,
       },
     }));
     await waitFor(() => {
@@ -502,7 +503,8 @@ describe("Accounts", () => {
       username: "ai360",
       role: "root",
     };
-    const admin = formalAccount("admin-b", "operator", "admin");
+    // 後端給管理員的是生效值（一律為真）；降級時不能因此把 AI 整理排版一起帶給一般帳號。
+    const admin = { ...formalAccount("admin-b", "operator", "admin"), ai_cleanup_access: true };
     vi.mocked(listAccounts).mockResolvedValue([admin]);
     vi.mocked(updateAccountRole).mockResolvedValue({
       ...formalAccount("admin-b", "operator", "user"),
@@ -541,6 +543,7 @@ describe("Accounts", () => {
           },
           admin_portal_access: false,
           kiosk: false,
+          ai_cleanup_access: false,
         },
       },
     ));

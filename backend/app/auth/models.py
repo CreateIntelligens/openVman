@@ -38,6 +38,15 @@ def has_admin_portal_access(user: UserRecord) -> bool:
     return is_at_least_admin(user.role) or user.admin_portal_access
 
 
+def has_ai_cleanup_access(user: UserRecord) -> bool:
+    """Whether the account may send documents through the LLM cleanup (「AI 整理排版」).
+
+    整理要呼叫 LLM、花的是專案的額度，所以一般帳號預設不能用，由管理員逐一開放；
+    管理員以上一律可以。
+    """
+    return is_at_least_admin(user.role) or user.ai_cleanup_access
+
+
 # 「admin 以上」的角色值，供 SQL 的 IN 子句使用。從階層推導而非寫死字面
 # 列表，新增角色時不會漏掉這裡。
 ADMIN_OR_ABOVE_VALUES = tuple(
@@ -85,6 +94,8 @@ class UserRecord:
     # 展示機台：前台登入後一律進訪客模式（藏設定與登出），現場人員輸入本帳號
     # 密碼才能解鎖。只影響前台行為，不是權限，所以切換時不撤銷既有 session。
     kiosk: bool = False
+    # 可以用「AI 整理排版」；生效值看 has_ai_cleanup_access（管理員以上一律可以）。
+    ai_cleanup_access: bool = False
     # None 表示升級後還沒登入過；只在登入成功時寫，不代表 API key 的使用。
     last_login_at: str | None = None
 

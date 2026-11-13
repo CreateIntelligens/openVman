@@ -36,6 +36,7 @@ const EMPTY_ACCESS: AccountAccessInput = {
   },
   admin_portal_access: false,
   kiosk: false,
+  ai_cleanup_access: false,
 };
 
 const GROUPS: Array<{
@@ -160,6 +161,7 @@ export function accessFromOptions(
     },
     admin_portal_access: current?.admin_portal_access ?? false,
     kiosk: current?.kiosk ?? false,
+    ai_cleanup_access: current?.ai_cleanup_access ?? false,
   };
 }
 
@@ -214,6 +216,10 @@ export function useAccountAccessForm(
 
   function setKiosk(enabled: boolean) {
     setAccess((current) => ({ ...current, kiosk: enabled }));
+  }
+
+  function setAiCleanupAccess(enabled: boolean) {
+    setAccess((current) => ({ ...current, ai_cleanup_access: enabled }));
   }
 
   function setDefault(grantType: GrantType, value: string) {
@@ -358,6 +364,7 @@ export function useAccountAccessForm(
     reload,
     setAdminPortalAccess,
     setKiosk,
+    setAiCleanupAccess,
     setDefault,
     toggle,
     setSelection,
@@ -438,6 +445,27 @@ export default function AccountAccessFields({
           </span>
           <span className="mt-1 block text-xs leading-5 text-content-muted">
             給現場無人看管的螢幕用；現場人員輸入這個帳號的密碼即可暫時解鎖設定。
+          </span>
+        </span>
+      </label>
+      <label
+        className={`flex items-start gap-3 border-b border-border bg-surface-sunken px-5 py-4 ${
+          unrestricted ? "" : "cursor-pointer"
+        }`}
+      >
+        <input
+          className="mt-1 h-4 w-4 accent-primary"
+          type="checkbox"
+          checked={unrestricted || (form.access.ai_cleanup_access ?? false)}
+          disabled={unrestricted}
+          onChange={(event) => form.setAiCleanupAccess(event.target.checked)}
+        />
+        <span>
+          <span className="block text-sm font-semibold">可以用 AI 整理排版</span>
+          <span className="mt-1 block text-xs leading-5 text-content-muted">
+            {unrestricted
+              ? "管理員一律可以用，不能關閉。"
+              : "預設不開放；開啟後，上傳文件時可以選擇先讓 AI 整理排版，文件頁也會出現「AI 整理排版」。這會使用 AI 額度。"}
           </span>
         </span>
       </label>

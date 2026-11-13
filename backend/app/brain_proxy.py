@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
+from app.ai_cleanup_guard import AiCleanupRefused, guard_ai_cleanup
 from app.auth.dependencies import (
     CurrentAccount,
     authenticate_request,
@@ -591,8 +592,11 @@ async def proxy_to_brain(
     )
     try:
         body = await _read_capped_body(request, get_tts_config().brain_proxy_max_body_bytes)
+        body = guard_ai_cleanup(normalized_path, request.method, body, current)
     except _BodyTooLarge as exc:
         return JSONResponse(status_code=413, content={"detail": str(exc)})
+    except AiCleanupRefused as exc:
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
     client = _http.get()
     started = monotonic()
 

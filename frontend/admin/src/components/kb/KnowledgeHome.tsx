@@ -107,11 +107,14 @@ interface KnowledgeHomeProps {
   onViewQaNode: (nodeId: string) => void;
   onRenameQaNode: (nodeId: string) => void;
   onOpenMobileTree: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  /** 這個帳號能不能用「AI 整理排版」。 */
+  allowAiCleanup?: boolean;
 }
 
 /** 右側的「新增資料」畫面：沒有選任何文件時顯示，頁首的「新增資料」也回到這裡。 */
 export default function KnowledgeHome({
   importer,
+  allowAiCleanup = true,
   documents,
   documentsLoaded,
   nodesTree,
@@ -173,6 +176,7 @@ export default function KnowledgeHome({
           onCrawl={onCrawl}
           onOpenComposer={onOpenComposer}
           prominent={isEmpty}
+          allowAiCleanup={allowAiCleanup}
         />
 
         <div ref={resultsRef}>

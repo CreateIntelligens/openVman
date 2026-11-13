@@ -16,6 +16,8 @@
 
 **Brain proxy 與用戶端斷線（2026-10-14）**：`proxy_to_brain` 等 Brain 回應標頭與讀取非串流回應時，同時等用戶端斷線；用戶端先離開就取消 httpx 請求（連線關閉，Brain 看到斷線而停止生成，見 Brain spec 的 Chat 一節），回 499 並記一行 log。工作完成當下就返回，正常請求不多等；SSE 回應（例如 `POST /api/v1/chat/stream`）交給 `StreamingResponse` 逐塊轉發，不整段收完；串流中用戶端離開時 `StreamingResponse` 結束 generator 並關掉往 Brain 的串流，Brain 同樣看到斷線而停止生成。斷線偵測靠 `app/client_disconnect.py` 的 `ClientDisconnectMiddleware`，必須是最外層 middleware：`request.is_disconnected()` 在 `BaseHTTPMiddleware`（auth、metrics、CORS 來源紀錄）後面永遠是 false。
 
+**「AI 整理排版」權限（2026-11-13）**：`proxy_to_brain` 讀完 request body 後交給 `app/ai_cleanup_guard.py`。帳號沒有 `ai_cleanup_access`（管理員以上一律有）時，`knowledge/renormalize`、`knowledge/renormalize/preview` 與帶 `normalize: true` 的 `knowledge/raw/commit` 回 403；`raw/commit` 沒帶 `normalize` 時改寫成 `false` 再轉給 Brain。API 金鑰照所屬帳號，嵌入金鑰一律不行。細節見 `docs/operations/account-administration.md`。
+
 **chat 回應的 `tts_text`（2026-10-19）**：`proxy_to_brain` 轉發 `chat`、`chat/accept` 的 200 JSON 與 `chat/stream` 的 SSE 時，由 `app/chat_tts_text.py` 替 `reply`（`sentence` 事件為 `text`）加上 `tts_text`：`prepare_tts_text` 的本地路徑（不打 normalize API），去 markdown／emoji、電話與長數字轉逐字讀法、保留繁體；有漢字才套中文規則。SSE 逐事件改寫，收齊一個事件（空行）就轉出，不等整段。Brain 本身不產生這個欄位，OpenAPI 以 Backend 文件為準。
 
 ### Brain 對話與管理分流

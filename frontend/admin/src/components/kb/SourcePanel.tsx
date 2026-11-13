@@ -26,6 +26,8 @@ interface SourcePanelProps {
   onOpenComposer: (format: KnowledgeNoteFormat) => void;
   /** 知識庫還是空的：上傳區是畫面的主角。 */
   prominent?: boolean;
+  /** 這個帳號能不能用「AI 整理排版」；不能的話只有直接放進知識庫一種做法，不給選。 */
+  allowAiCleanup?: boolean;
 }
 
 /** 新增資料的所有入口。規則直接寫在畫面上，不靠滑過才出現的說明。 */
@@ -54,6 +56,7 @@ export default function SourcePanel({
   onCrawl,
   onOpenComposer,
   prominent = false,
+  allowAiCleanup = true,
 }: SourcePanelProps) {
   const ownInputRef = useRef<HTMLInputElement>(null);
   const inputRef = fileInputRef ?? ownInputRef;
@@ -70,32 +73,38 @@ export default function SourcePanel({
     <div className="space-y-6">
       <section aria-label="上傳檔案" className="space-y-4">
         {/* 選了檔案就開始上傳，所以要放在拖放區上面：由上往下操作的人先選好再放檔案。 */}
-        <fieldset className="space-y-2">
-          <legend className="mb-1 text-sm font-medium text-content">這批文件要怎麼放進去</legend>
-          <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
-            <input
-              type="radio"
-              name={normalizeName}
-              className="mt-1 h-4 w-4 shrink-0 accent-primary"
-              checked={skipNormalize}
-              onChange={() => onSkipNormalizeChange(true)}
-            />
-            直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）
-          </label>
-          <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
-            <input
-              type="radio"
-              name={normalizeName}
-              className="mt-1 h-4 w-4 shrink-0 accent-primary"
-              checked={!skipNormalize}
-              onChange={() => onSkipNormalizeChange(false)}
-            />
-            先讓 AI 整理排版再放進去（適合掃描錯字多、排版很亂的檔案）
-          </label>
-          <p className="text-xs text-content-muted">
-            每次上傳開始後，會回到「直接放進知識庫」。問答表不看這個設定。
+        {allowAiCleanup ? (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-medium text-content">這批文件要怎麼放進去</legend>
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
+              <input
+                type="radio"
+                name={normalizeName}
+                className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                checked={skipNormalize}
+                onChange={() => onSkipNormalizeChange(true)}
+              />
+              直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
+              <input
+                type="radio"
+                name={normalizeName}
+                className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                checked={!skipNormalize}
+                onChange={() => onSkipNormalizeChange(false)}
+              />
+              先讓 AI 整理排版再放進去（適合掃描錯字多、排版很亂的檔案）
+            </label>
+            <p className="text-xs text-content-muted">
+              每次上傳開始後，會回到「直接放進知識庫」。問答表不看這個設定。
+            </p>
+          </fieldset>
+        ) : (
+          <p className="text-sm text-content">
+            這批文件會直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）。
           </p>
-        </fieldset>
+        )}
 
         <button
           type="button"

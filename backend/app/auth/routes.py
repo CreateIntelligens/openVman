@@ -31,6 +31,7 @@ from .models import (
     TemporaryCredentialRecord,
     UserRecord,
     has_admin_portal_access,
+    has_ai_cleanup_access,
 )
 from .passwords import PasswordValidationError, hash_password, verify_password
 from .policy import AccountPolicyError
@@ -204,6 +205,8 @@ class AccountProfile(_StrictModel):
     admin_portal_access: bool
     # 前台據此決定登入後是否強制進訪客模式。
     kiosk: bool
+    # 生效值：管理員以上一律為真。後台據此決定要不要顯示「AI 整理排版」。
+    ai_cleanup_access: bool = False
 
     @classmethod
     def from_record(
@@ -242,6 +245,7 @@ class AccountProfile(_StrictModel):
             remaining_seconds=remaining_seconds,
             admin_portal_access=has_admin_portal_access(user),
             kiosk=user.kiosk,
+            ai_cleanup_access=has_ai_cleanup_access(user),
             defaults=(
                 AccountDefaultsProfile.from_record(defaults)
                 if defaults is not None
@@ -315,6 +319,7 @@ class UpdateAccountAccessRequest(_StrictModel):
     admin_portal_access: bool = False
     # None 表示不變更：沿用舊版前端送來、不知道這個欄位的請求不會把它清掉。
     kiosk: bool | None = None
+    ai_cleanup_access: bool | None = None
 
 
 
@@ -788,6 +793,7 @@ def update_account_access(
             defaults=_defaults_tuple(body.defaults),
             admin_portal_access=body.admin_portal_access,
             kiosk=body.kiosk,
+            ai_cleanup_access=body.ai_cleanup_access,
         )
     except UserNotFoundError as exc:
         raise HTTPException(
@@ -827,6 +833,7 @@ def create_account(
             defaults=_defaults_tuple(access.defaults) if access is not None else None,
             admin_portal_access=bool(access and access.admin_portal_access),
             kiosk=bool(access and access.kiosk),
+            ai_cleanup_access=bool(access and access.ai_cleanup_access),
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -919,6 +926,7 @@ def change_account_role(
             defaults=_defaults_tuple(access.defaults) if access is not None else None,
             admin_portal_access=bool(access and access.admin_portal_access),
             kiosk=access.kiosk if access is not None else None,
+            ai_cleanup_access=access.ai_cleanup_access if access is not None else None,
         )
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc

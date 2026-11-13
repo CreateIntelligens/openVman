@@ -52,6 +52,7 @@ function formWith(grants: Partial<AccountAccessForm["access"]["grants"]>): Accou
     reload: vi.fn(),
     setAdminPortalAccess: vi.fn(),
     setKiosk: vi.fn(),
+    setAiCleanupAccess: vi.fn(),
     setDefault: vi.fn(),
     toggle: vi.fn(),
     setSelection: vi.fn(),
@@ -114,6 +115,26 @@ describe("AccountAccessFields 管理員帳號", () => {
     render(<AccountAccessFields form={formWith({})} role="user" />);
     expect(screen.getByLabelText(/允許進入管理後台/)).toBeTruthy();
     expect(screen.queryByRole("note")).toBeNull();
+  });
+});
+
+describe("AccountAccessFields AI 整理排版", () => {
+  it("一般帳號預設沒勾，勾了會交給表單", () => {
+    const form = formWith({});
+    render(<AccountAccessFields form={form} role="user" />);
+    const box = screen.getByLabelText(/可以用 AI 整理排版/) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(box.disabled).toBe(false);
+    fireEvent.click(box);
+    expect(form.setAiCleanupAccess).toHaveBeenCalledWith(true);
+  });
+
+  it("管理員一律可以用，勾選關不掉並寫明原因", () => {
+    render(<AccountAccessFields form={formWith({})} role="admin" />);
+    const box = screen.getByLabelText(/可以用 AI 整理排版/) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    expect(box.disabled).toBe(true);
+    expect(screen.getByText("管理員一律可以用，不能關閉。")).toBeTruthy();
   });
 });
 

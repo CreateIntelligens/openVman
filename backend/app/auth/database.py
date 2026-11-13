@@ -19,6 +19,8 @@ from .schema_migrations import (
     _ASR_ENGINE_RESOURCES_TABLE,
     _KIOSK_MIGRATION_NAME,
     _KIOSK_SCHEMA_VERSION,
+    _AI_CLEANUP_ACCESS_MIGRATION_NAME,
+    _AI_CLEANUP_ACCESS_SCHEMA_VERSION,
     _LAST_LOGIN_MIGRATION_NAME,
     _LAST_LOGIN_SCHEMA_VERSION,
     _MIGRATIONS,
@@ -155,6 +157,36 @@ class AuthDatabase:
         self._add_last_login_at()
         self._migrate_project_resource_scope()
         self._add_project_engine_order()
+        self._add_ai_cleanup_access()
+
+    def _add_ai_cleanup_access(self) -> None:
+        """Add the per-account 「AI 整理排版」 flag, off for every existing account (schema 27)."""
+        with self.transaction(write=True) as connection:
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_AI_CLEANUP_ACCESS_SCHEMA_VERSION,),
+            ).fetchone()
+            if applied is not None:
+                return
+            user_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "ai_cleanup_access" not in user_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN ai_cleanup_access INTEGER NOT NULL DEFAULT 0
+                    CHECK (ai_cleanup_access IN (0, 1))
+                    """
+                )
+            connection.execute(
+                "INSERT INTO schema_migrations(version, details_json) VALUES (?, ?)",
+                (
+                    _AI_CLEANUP_ACCESS_SCHEMA_VERSION,
+                    json.dumps({"name": _AI_CLEANUP_ACCESS_MIGRATION_NAME}, separators=(",", ":")),
+                ),
+            )
 
     def _add_project_engine_order(self) -> None:
         """Add the per-project TTS / batch ASR engine order columns (schema 25)."""

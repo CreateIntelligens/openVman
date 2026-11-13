@@ -54,6 +54,19 @@
 
 建立或編輯帳號（正式帳號的資源權限、角色調整，以及臨時帳號批次）時可勾「展示機台：登入後自動進入訪客模式（藏起設定與登出）」，帳號列表與批次紀錄會標「展示機台」。用這個帳號登入的前台一律是訪客模式；現場人員長按標題 3 秒、輸入這個帳號的密碼（臨時帳號就是它的臨時密碼）可暫時叫出設定與登出。5 分鐘內打錯 5 次會鎖 5 分鐘。改這個勾選不會把正在使用的機台登出，下次讀帳號資料就生效。
 
+## AI 整理排版
+
+「AI 整理排版」會呼叫 LLM 重新整理文件、使用專案的 AI 額度，所以逐帳號開放：ROOT／admin 一律可以用；user 與 temporary 預設不能用，由管理員在正式帳號的權限編輯器（`PUT /api/v1/users/{id}/access` 的 `ai_cleanup_access`）、建立帳號、角色調整或臨時帳號批次建立時勾「可以用 AI 整理排版」。帳號回應（含 `GET /api/v1/auth/me`）的 `ai_cleanup_access` 是生效值，管理員以上一律為 `true`；更新時不帶這個欄位就保持原值。改這個勾選不會登出帳號，下一個請求就生效。
+
+Backend 在轉給 Brain 前檢查（`backend/app/ai_cleanup_guard.py`），Brain 本身不認得帳號：
+
+- `POST /api/v1/knowledge/renormalize/preview`、`/renormalize`：沒有權限回 403，`detail` 寫白話原因。套用預覽（`/renormalize/apply`）只是存下已整理好的內容，不擋。
+- `POST /api/v1/knowledge/raw/commit`：明確帶 `normalize: true` 回 403；沒帶 `normalize` 時 Brain 預設會整理，對沒有權限的帳號改寫成 `false`，照「直接放進知識庫」匯入。選擇改寫而不是擋下，是為了讓沒帶這個欄位的既有串接照樣匯入得了，只是不經過 AI。
+- API 金鑰照它所屬帳號的權限；嵌入金鑰（網站訪客）一律不能用。
+- 貼網址匯入、建立筆記、問答表匯入都不經過 LLM 整理，不受這項權限影響。
+
+後台：沒有權限的帳號在「新增資料」只看到「直接放進知識庫」，文件頁的「更多」選單沒有「AI 整理排版」。
+
 ## 權限階層
 
 正式帳號可在「帳號 → API 金鑰」建立與撤銷獨立串接憑證；管理其他帳號沿用下方階層。key 繼承帳號權限，不另建立管理者身分。停用帳號或變更角色會使原 key 失效；重設密碼與強制登出只作廢登入 session，key 照常可用，懷疑外洩時請另外撤銷 key；來源資料的資源授權則每次依新權限判斷。完整 key 只顯示一次，備份 Auth DB 亦不能還原明文，遺失需重發。API、期限與用量說明見 [整合指南](../guides/account-api-keys.md)。
@@ -132,7 +145,7 @@ Migration 10 新增 nullable `temporary_credentials.password_ciphertext`。新�
 
 `AUTH_TEMPORARY_PASSWORD_SECRET` 可設定至少 32 bytes 的獨立祕密值；未設定時沿用 `SESSION_JWT_SECRET` 作為派生來源。備份時需在資料庫之外妥善保留使用中的祕密值。更換實際使用的祕密值會使舊密文無法解密；若原先未設定專用值，可先將專用值設為原 session 祕密，再輪替 session 祕密。解密失敗時 API 回傳 `password: null`，不影響既有 bcrypt 登入。
 
-- `POST /api/v1/temporary-accounts/batches`：request 沿用 grants、defaults、admin_portal_access；response 的 `credentials[]` 含 user_id、password、expires_at。保存密文與建立帳號在同一個 transaction 完成。
+- `POST /api/v1/temporary-accounts/batches`：request 沿用 grants、defaults、admin_portal_access，可另帶 `ai_cleanup_access`（預設 `false`）；response 的 `credentials[]` 含 user_id、password、expires_at。保存密文與建立帳號在同一個 transaction 完成。
 - `GET /api/v1/temporary-accounts/batches`：response 每個批次的 `accounts[]` 新增 `password: string | null`；只有 ROOT／admin 可以查閱，即使一般或臨時帳號可進管理後台，也不能呼叫此端點。
 - `PATCH /api/v1/temporary-accounts/batches/{batch_id}/admin-portal-access` 與 `POST /api/v1/temporary-accounts/batches/{batch_id}/revoke` 沿用同一批次 response 契約。
 - 上述四個成功 response 都設定 `Cache-Control: no-store`。不對外回傳 password_hash、password_ciphertext 或 code_locator 欄位。

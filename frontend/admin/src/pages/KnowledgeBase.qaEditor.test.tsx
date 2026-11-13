@@ -15,6 +15,10 @@ vi.mock("../context/ProjectContext", () => ({
   useProject: () => ({ projectId: "default" }),
 }));
 
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: { id: "admin", username: "admin", role: "admin", disabled: false, created_at: "" } }),
+}));
+
 interface MergedRow {
   index: string;
   q: string;

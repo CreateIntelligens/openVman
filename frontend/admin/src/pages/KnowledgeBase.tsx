@@ -25,6 +25,8 @@ import UploadDropOverlay from "../components/kb/UploadDropOverlay";
 import type { QaFocusRequest } from "../components/kb/qa/MergedCsvPane";
 import QaNodeModals from "../components/kb/qa/QaNodeModals";
 import type { KnowledgeNoteFormat } from "../api";
+import { canUseAiCleanup } from "../api/auth";
+import { useAuth } from "../context/AuthContext";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 import { useKnowledgeBatchSelection } from "../hooks/useKnowledgeBatchSelection";
@@ -66,6 +68,9 @@ function dropConsumesDocument(
 }
 
 export default function KnowledgeBase() {
+  const { account } = useAuth();
+  // 沒開放「AI 整理排版」的帳號只能直接放進知識庫，文件頁也不給整理按鈕；後端同樣會擋。
+  const allowAiCleanup = canUseAiCleanup(account);
   const {
     projectId = "default",
     documents,
@@ -646,6 +651,7 @@ export default function KnowledgeBase() {
                 home={(
                   <KnowledgeHome
                     importer={importer}
+                    allowAiCleanup={allowAiCleanup}
                     documents={documents}
                     documentsLoaded={documentsLoaded}
                     nodesTree={nodesTree}
@@ -688,7 +694,7 @@ export default function KnowledgeBase() {
                 onMoveFile={(path) => setMovingPath(path)}
                 onToggleEnabled={handleToggleEnabled}
                 onChangeLanguage={handleChangeLanguage}
-                onRenormalize={handleRenormalize}
+                onRenormalize={allowAiCleanup ? handleRenormalize : undefined}
                 renormalizing={renormalizing || previewingNormalization}
               />
             </div>

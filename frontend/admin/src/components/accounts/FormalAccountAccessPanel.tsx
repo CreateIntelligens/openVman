@@ -33,6 +33,8 @@ export default function FormalAccountAccessPanel({
         defaults: account.defaults,
         admin_portal_access: account.admin_portal_access ?? false,
         kiosk: account.kiosk ?? false,
+        // 管理員回來的是生效值（一律為真）；降成一般帳號時不能因此默默開放。
+        ai_cleanup_access: isAtLeastAdmin(account.role) ? false : (account.ai_cleanup_access ?? false),
       }
       : undefined
   );

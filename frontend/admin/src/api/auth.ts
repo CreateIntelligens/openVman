@@ -34,6 +34,8 @@ export interface AccountProfile {
   admin_portal_access?: boolean;
   /** 展示機台：前台登入後一律進訪客模式。 */
   kiosk?: boolean;
+  /** 可以用「AI 整理排版」的生效值：管理員以上一律為真。 */
+  ai_cleanup_access?: boolean;
 }
 
 export interface Account extends AccountProfile {
@@ -55,6 +57,12 @@ interface WrappedAccount {
 
 export function isAtLeastAdmin(role: AccountRole): boolean {
   return role === "root" || role === "admin";
+}
+
+/** 這個帳號能不能用「AI 整理排版」。舊版後端沒有這個欄位時照角色判斷。 */
+export function canUseAiCleanup(account: AccountProfile | null | undefined): boolean {
+  if (!account) return false;
+  return account.ai_cleanup_access ?? isAtLeastAdmin(account.role);
 }
 
 function safeAccountDefaults(
@@ -85,6 +93,7 @@ function safeAccountProfile(account: AccountProfile): AccountProfile {
     defaults: safeAccountDefaults(account.defaults),
     admin_portal_access: account.admin_portal_access,
     kiosk: account.kiosk,
+    ai_cleanup_access: account.ai_cleanup_access,
   };
 }
 
@@ -179,6 +188,7 @@ export interface AccountAccessInput {
   defaults: AccountDefaults;
   admin_portal_access: boolean;
   kiosk?: boolean;
+  ai_cleanup_access?: boolean;
 }
 
 export interface TemporaryCredential {

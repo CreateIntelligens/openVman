@@ -15,6 +15,10 @@ vi.mock("../context/ProjectContext", () => ({
   useProject: () => ({ projectId: "default" }),
 }));
 
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: { id: "admin", username: "admin", role: "admin", disabled: false, created_at: "" } }),
+}));
+
 vi.mock("../components/kb/qa/MergedCsvPane", () => ({
   default: ({ nodeId, nodeLabel }: { nodeId: string | null; nodeLabel?: string }) => (
     <div data-testid="merged-qa-pane">{nodeId}:{nodeLabel}</div>

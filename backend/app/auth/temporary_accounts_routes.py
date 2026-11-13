@@ -50,6 +50,7 @@ class CreateTemporaryBatchRequest(_StrictModel):
     admin_portal_access: bool = False
     # 活動用的整批帳號可以直接開成展示機台。
     kiosk: bool = False
+    ai_cleanup_access: bool = False
 
 
 class SetAdminPortalAccessRequest(_StrictModel):
@@ -68,6 +69,7 @@ class TemporaryBatchCreated(_StrictModel):
     created_at: str
     admin_portal_access: bool
     kiosk: bool = False
+    ai_cleanup_access: bool = False
 
 
 class TemporaryAccountAudit(_StrictModel):
@@ -83,6 +85,7 @@ class TemporaryAccountAudit(_StrictModel):
     defaults: AccountDefaultsProfile
     admin_portal_access: bool
     kiosk: bool = False
+    ai_cleanup_access: bool = False
 
 
 class TemporaryBatchAudit(_StrictModel):
@@ -99,6 +102,7 @@ class TemporaryBatchAudit(_StrictModel):
     accounts: list[TemporaryAccountAudit]
     admin_portal_access: bool
     kiosk: bool = False
+    ai_cleanup_access: bool = False
 
 
 def _new_temporary_password() -> tuple[str, str]:
@@ -149,6 +153,7 @@ def _temporary_account_audit(
         defaults=AccountDefaultsProfile.from_record(account.defaults),
         admin_portal_access=account.user.admin_portal_access,
         kiosk=account.user.kiosk,
+        ai_cleanup_access=account.user.ai_cleanup_access,
     )
 
 
@@ -196,6 +201,7 @@ def _temporary_batch_audit(
         accounts=accounts,
         admin_portal_access=first_account.user.admin_portal_access,
         kiosk=first_account.user.kiosk,
+        ai_cleanup_access=first_account.user.ai_cleanup_access,
     )
 
 
@@ -243,6 +249,7 @@ def create_temporary_batch(
             duration_seconds=_TEMPORARY_DURATION_SECONDS,
             admin_portal_access=body.admin_portal_access,
             kiosk=body.kiosk,
+            ai_cleanup_access=body.ai_cleanup_access,
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -264,6 +271,7 @@ def create_temporary_batch(
         created_at=batch.batch.created_at,
         admin_portal_access=body.admin_portal_access,
         kiosk=body.kiosk,
+        ai_cleanup_access=body.ai_cleanup_access,
     )
 
 

@@ -30,6 +30,22 @@ function renderPanel(overrides: Partial<Parameters<typeof SourcePanel>[0]> = {})
 }
 
 describe("SourcePanel", () => {
+  it("hides the AI cleanup choice from accounts without the permission", () => {
+    renderPanel({ allowAiCleanup: false });
+
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByText(/先讓 AI 整理排版/)).toBeNull();
+    expect(screen.queryByText(/每次上傳開始後/)).toBeNull();
+    expect(screen.getByText(/這批文件會直接放進知識庫/)).toBeTruthy();
+  });
+
+  it("offers both choices to accounts with the permission", () => {
+    renderPanel();
+
+    expect(screen.getAllByRole("radio")).toHaveLength(2);
+    expect(screen.getByText(/先讓 AI 整理排版/)).toBeTruthy();
+  });
+
   it("writes the rules on the screen instead of hiding them in a tooltip", () => {
     renderPanel();
 

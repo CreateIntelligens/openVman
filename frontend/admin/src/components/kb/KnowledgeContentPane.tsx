@@ -50,7 +50,8 @@ interface KnowledgeContentPaneProps {
   onMoveFile: (path: string) => void;
   onToggleEnabled: (doc: KnowledgeDocumentSummary) => void;
   onChangeLanguage: (doc: KnowledgeDocumentSummary, language: KnowledgeLanguage | "auto") => void;
-  onRenormalize: (path: string) => void;
+  /** 沒給就不顯示「AI 整理排版」：帳號沒有開放這個權限。 */
+  onRenormalize?: (path: string) => void;
   renormalizing: boolean;
 }
 

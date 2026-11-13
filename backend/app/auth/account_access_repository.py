@@ -47,6 +47,7 @@ class AccountAccessRepository:
         defaults: tuple[str, ...],
         admin_portal_access: bool = False,
         kiosk: bool | None = None,
+        ai_cleanup_access: bool | None = None,
     ) -> tuple[tuple[ResourceGrantRecord, ...], AccountDefaultsRecord]:
         normalized_grants, normalized_defaults = _normalize_account_access(
             grants,
@@ -109,6 +110,13 @@ class AccountAccessRepository:
                     (int(kiosk), user_id),
                 )
                 metadata["kiosk"] = kiosk
+            if ai_cleanup_access is not None:
+                # 每次請求都從資料庫讀帳號，改了下一個請求就生效，不用撤銷 session。
+                connection.execute(
+                    "UPDATE users SET ai_cleanup_access = ? WHERE id = ?",
+                    (int(ai_cleanup_access), user_id),
+                )
+                metadata["ai_cleanup_access"] = ai_cleanup_access
             _append_auth_audit(
                 connection,
                 action="account_access_updated",
