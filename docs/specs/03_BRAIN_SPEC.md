@@ -97,7 +97,7 @@
         │   ├── LEARNINGS.md          # 學到的新知與偏好（人工維護）
         │   └── ERRORS.md             # 錯誤紀錄（系統自動寫入並輪替）
         ├── personas/<persona_id>/    # 人設覆寫（第 12 節）
-        ├── knowledge/                # 知識文件；knowledge/products/ 為產品規格表
+        ├── knowledge/                # 知識文件；knowledge/products/<商品線>/ 為產品規格表
         ├── raw/                      # 上傳的原始檔
         ├── memory/<persona_id>/YYYY-MM-DD.md  # 每日對話日誌
         ├── archive/memory/、archive/errors/   # 過期日誌與輪替出去的錯誤紀錄
@@ -353,7 +353,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
    - **第一次呼叫（必須用工具，平行檢索；只在沒有先查時）**：下一條的伺服器先查是預設路徑，這條只在還要上網或查記憶、這一句沒有文字、或先查關閉時走。帶完整 tool schema，`tool_choice=required`，模型一次決定要查哪些。`search_knowledge` 一定執行（模型漏叫時系統以使用者原句補上），問題涉及公開或即時資訊時同一輪一併叫 `search_web`；同一輪的工具平行執行（`CHAT_FORCE_KNOWLEDGE_SEARCH`，預設開啟；只在 `search_knowledge` 有註冊時生效）。此回合套用 `FORCED_TOOL_MODEL_OVERRIDE`／`FORCED_TOOL_MAX_TOKENS`（預設 400）。
    - **先查知識庫（有知識庫的專案一律先查）**：一般使用者回合（非 slash command）且不必同時強制 `search_web`／`search_memory` 時，伺服器在第一次呼叫前以使用者原句與「上一句問題＋這一句」執行 `search_knowledge`（圖文混合的訊息只取文字部分；這一句沒有文字時不先查）（同一個工具實作，語言分流與圖譜擴充一致），結果以已完成的工具呼叫（帶 Gemini 要求的 thought_signature 略過值）與工具結果放進對話；第一次呼叫改為 `tool_choice=auto`、提供排除 `search_knowledge` 後的工具，模型可直接作答，或在這一輪叫 `filter_products` 等其他工具。這次先查不計入模型自選的工具輪；模型仍叫已收回的 `search_knowledge`（且沒有其他工具呼叫、沒有文字）時，伺服器丟掉該呼叫並提示「已查過，要篩選就叫 `filter_products`」，這一輪也不計入（每回合只一次），之後的輪數規則同下（`CHAT_PREFETCH_KNOWLEDGE_SEARCH`，預設開啟）。產品規格表的系統提示規則補一句「對話裡已經有這一句的 `search_knowledge` 結果時只叫 `filter_products`」。要不要先查不再由每輪決策的 `needs_knowledge` 判定（`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`，預設開啟；Clef 實測多數問題落在不確定帶、不確定帶原本要多一次只為了產生 `search_knowledge` 呼叫的 LLM 呼叫，還有把門診時間判成否的）：是、不確定、否都先查，閒聊多一次約 0.3 秒檢索；`needs_knowledge` 仍記在決策輸出與 debug／metrics。關閉時照決策：是先查、不確定維持強制工具的第一次呼叫、否不查。
    - **第二次呼叫起（排除知識庫）**：工具結果回填後不再提供 `search_knowledge`，其他工具（`search_web`、wiki、技能）照常，最多再追加 `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS` 輪（依回覆模式），之後不給工具、只能以文字作答（`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`，預設開啟）。總回合數受 `AGENT_LOOP_MAX_ROUNDS`（預設 6）限制。
-   - **產品規格篩選**：專案有 `knowledge/products/_catalog.yaml` 時才提供 `filter_products`（說明帶該專案欄位與單位），system prompt 要求選型、比較、極值類問題在第一輪與 `search_knowledge` 平行呼叫，並寫明規格表收錄的範圍（`_catalog.yaml` 的 `title`），範圍外的產品依檢索片段補列。參數是結構化的情境與條件，回傳各情境的 `matches`／`unknown`／`excluded_count`；null 是未知、不算不符合。格式見 `brain/README.md`「產品規格篩選」。
+   - **產品規格篩選**：專案有 `knowledge/products/<商品線>/_catalog.yaml` 時才提供 `filter_products`（說明帶該專案欄位與單位；多條商品線時多一個必填的 `catalog` 參數指定型錄，舊的 `knowledge/products/_catalog.yaml` 版面仍可讀），system prompt 要求選型、比較、極值類問題在第一輪與 `search_knowledge` 平行呼叫，並寫明規格表收錄的範圍（`_catalog.yaml` 的 `title`），範圍外的產品依檢索片段補列。參數是結構化的情境與條件，回傳各情境的 `matches`／`unknown`／`excluded_count`；null 是未知、不算不符合。格式見 `brain/README.md`「產品規格篩選」。
    - **例外處理**：provider 忽略 `tool_choice` 直接回文字時，第一回合的文字即視為答案並記一筆 warning；工具收掉、只能作答的第一輪（至少跑過一輪工具之後）在呼叫前先加一句「工具已經用完，這一輪請直接以文字回答」（`agent_loop._ANSWER_ONLY_MSG`，每回合一次），模型就不會先叫一次被收回的工具再被催；模型仍呼叫本輪沒提供的工具時，該呼叫不執行，改要求直接用文字回答；空回覆或把工具呼叫寫成文字時各重試一次，重試訊息後面會再附上本輪的回答語言與長度規則（`agent_loop._with_reply_rules`）。工具階段超出輪次或失敗時，以已取得的工具結果加提示再生成一次。
    - 兩個開關都關閉時，第一回合改為 `tool_choice=auto`，每輪都提供全部工具，直到模型以文字作答或達 `AGENT_LOOP_MAX_ROUNDS`。
    - role 為 `tool` 的訊息走同一個 agent loop，但不強制先查知識庫。
@@ -385,7 +385,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 |---|---|---|
 | `search_knowledge` | 檢索專案知識庫（第 5.2 節） | 一般回合第一輪必定執行 |
 | `get_document` | 讀取 workspace 內單一文件（`TOOL_DOCUMENT_CHAR_LIMIT` 截斷） | |
-| `filter_products` | 依產品規格表篩選、排序產品 | 專案有 `knowledge/products/_catalog.yaml` |
+| `filter_products` | 依產品規格表篩選、排序產品 | 專案有 `knowledge/products/<商品線>/_catalog.yaml` |
 | `search_memory` | 檢索 `memories` 表 | |
 | `save_memory` | 寫入長期記憶 | 僅在使用者本輪明確要求記住時執行，由決策供應鏈判斷（失敗時用關鍵字規則） |
 | `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | `URL2MD_SEARCH_ENABLED`；`fast` 模式不提供 |

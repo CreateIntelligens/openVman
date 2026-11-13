@@ -434,31 +434,36 @@ def _save_index_state(documents: dict[str, str], project_id: str = "default") ->
 
 
 def rename_document_records(old_path: str, new_path: str, project_id: str = "default") -> None:
-    """Update LanceDB records and index state when a document is moved.
+    """Update LanceDB records and index state when a document is moved."""
+    rename_many_document_records({old_path: new_path}, project_id)
 
-    Rewrites metadata.path and metadata.chunk_id from old_path to new_path in
-    all matching chunks, then rebuilds the table in-place. No re-embedding is
-    needed because content is unchanged.
+
+def rename_many_document_records(renames: dict[str, str], project_id: str = "default") -> None:
+    """Rewrite metadata.path and chunk_id for every moved document, rebuilding the table once.
+
+    搬整個資料夾時逐檔呼叫會每次重寫整張表、重建全文索引；一次帶齊只重建一次。內容沒變，不用重新 embedding。
     """
     records = _load_existing_knowledge_records(project_id)
     updated = []
     for record in records:
         metadata = parse_record_metadata(record)
-        if str(metadata.get("path", "")).strip() == old_path:
-            metadata["path"] = new_path
-            old_chunk_id = str(metadata.get("chunk_id", ""))
-            if old_chunk_id.startswith(old_path + "::"):
-                metadata["chunk_id"] = new_path + "::" + old_chunk_id[len(old_path) + 2:]
-            updated.append(
-                {
-                    **record,
-                    "path": new_path,
-                    "chunk_id": str(metadata.get("chunk_id", "")),
-                    "metadata": json.dumps(metadata, ensure_ascii=False),
-                }
-            )
-        else:
+        old_path = str(metadata.get("path", "")).strip()
+        new_path = renames.get(old_path)
+        if new_path is None:
             updated.append(record)
+            continue
+        metadata["path"] = new_path
+        old_chunk_id = str(metadata.get("chunk_id", ""))
+        if old_chunk_id.startswith(old_path + "::"):
+            metadata["chunk_id"] = new_path + "::" + old_chunk_id[len(old_path) + 2:]
+        updated.append(
+            {
+                **record,
+                "path": new_path,
+                "chunk_id": str(metadata.get("chunk_id", "")),
+                "metadata": json.dumps(metadata, ensure_ascii=False),
+            }
+        )
 
     if not records:
         updated = _build_placeholder_records()
@@ -471,6 +476,5 @@ def rename_document_records(old_path: str, new_path: str, project_id: str = "def
 
     state = _load_index_state(project_id)
     docs = state.get("documents", {})
-    if old_path in docs:
-        docs = {(new_path if k == old_path else k): v for k, v in docs.items()}
-        _save_index_state(docs, project_id)
+    if any(old in docs for old in renames):
+        _save_index_state({renames.get(key, key): value for key, value in docs.items()}, project_id)

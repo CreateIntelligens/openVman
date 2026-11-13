@@ -91,7 +91,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | `IDENTITY.md`、`SOUL.md`、`AGENTS.md`、`TOOLS.md`、`MEMORY.md` | 核心文件，每輪直接放進 system prompt，不進向量索引 |
 | `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md` | 同樣放進 prompt；`ERRORS.md` 由 `infra/learnings.record_error_event` 寫入並輪替，`LEARNINGS.md` 由人工維護 |
 | `personas/<persona_id>/` | 人設覆寫：同名核心文件優先於 workspace 根目錄 |
-| `knowledge/` | 知識文件；`knowledge/products/` 是產品規格表 |
+| `knowledge/` | 知識文件；`knowledge/products/<商品線>/` 是產品規格表 |
 | `raw/` | 等待匯入的原始檔；匯入後轉成 Markdown 放進 `knowledge/`，原檔搬到 `archive/originals/` |
 | `memory/<persona_id>/YYYY-MM-DD.md` | 每日對話日誌 |
 | `ASR_PROMPT.md` | 選填的語音專有名詞詞表，見「語言分流與回答長度」 |
@@ -279,7 +279,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 |---|---|---|
 | `search_knowledge` | 檢索專案知識庫，參數 `queries`（陣列）、`top_k` | 一般回合第一輪必定執行 |
 | `get_document` | 讀取 workspace 內單一文件（`TOOL_DOCUMENT_CHAR_LIMIT` 截斷） | |
-| `filter_products` | 依產品規格表篩選、排序產品 | 專案有 `knowledge/products/_catalog.yaml` 才提供 |
+| `filter_products` | 依產品規格表篩選、排序產品 | 專案至少有一份 `knowledge/products/<商品線>/_catalog.yaml` 才提供 |
 | `search_memory` | 檢索 `memories` 表 | |
 | `save_memory` | 寫入長期記憶 | 僅在使用者本輪明確要求記住時執行 |
 | `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | `URL2MD_SEARCH_ENABLED`；`fast` 模式不提供 |
@@ -295,10 +295,16 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ### 產品規格篩選（`filter_products`）
 
-選型問題（「3 吋、揚程 20 米以上有哪幾款」）需要完整清單，相似度檢索容易漏款或排錯，因此另以規格表篩選。專案在 `knowledge/products/` 放：
+選型問題（「3 吋、揚程 20 米以上有哪幾款」）需要完整清單，相似度檢索容易漏款或排錯，因此另以規格表篩選。每條商品線在 `knowledge/products/<商品線>/` 放：
 
 - `_catalog.yaml`：`title`、`key`（產品代號欄位，預設 `model`，型別須為 text）、`fields`（每欄 `label`、`type` 為 `number`／`text`／`number_set`、`unit`、`description`）、`notes`（給模型的注意事項，例如單位換算）。欄位由各專案自訂。這是系統設定檔：`GET /knowledge/base/documents` 不列出（後台文件樹看不到，搜尋索引照舊），資料夾只剩它時 `DELETE /knowledge/directory` 回 400 並說明原因，不會刪掉。
 - 每個產品一篇 Markdown，YAML frontmatter 放規格值，缺值填 `null`；正文照常進知識索引。停用的文件不列入；格式不對的筆記略過，並在結果的 `skipped_notes` 回報。
+
+每個商品線資料夾是一份獨立的型錄（`knowledge/product_catalog.py` 的 `load_product_catalogs`），欄位、標題、`key` 各自定義，解析結果以資料夾為單位快取。直接放在 `knowledge/products/_catalog.yaml` 的舊版面仍可讀，型錄名稱記為 `products`，只收 `products/` 底下、不在任何商品線資料夾裡的筆記；新舊並存時兩份都列出，舊版面排第一。某一份型錄格式壞掉時，錯誤訊息前面帶資料夾名稱。
+
+只有一份型錄時，工具說明、參數與系統提示和單一型錄時代一字不差（`tests/knowledge/fixtures/product_tool_single_catalog.json` 鎖住）。兩份以上時參數多一個必填的 `catalog`（各資料夾名稱的 enum），說明分段列出每份型錄的標題、款數與欄位，`field` 的 enum 是所有欄位的聯集；呼叫時照所選型錄驗證，沒給 `catalog`、給了不存在的名稱或用了別份型錄的欄位，都回中文錯誤。系統提示的範圍句列出所有型錄標題。兩份型錄同時存在時的回答品質還沒有實測過。
+
+把既有的 `knowledge/products/` 搬成商品線資料夾，用 `knowledge/folder_move.py` 的 `move_knowledge_folder("knowledge/products", "knowledge/products/<商品線>", project_id)`：檔案一次改名（含 `_catalog.yaml` 這類不在文件列表裡的檔案），`.doc_meta.json` 寫一次，向量表與全文索引只重建一次（`rename_many_document_records`，不重新 embedding）。逐檔搬移每份都會重建一次整張表。資料夾裡有掛在快速問答的文件時拒絕搬移。圖譜的來源路徑要等下一次圖譜重建才會更新。
 
 參數是結構化的 `scenarios[]`，每個情境有 `name`、`conditions[]`（`{field, op, value}`，全部成立才算符合）、`sort[]`（`{field, direction}`，`direction` 為 `asc`／`desc`）與選填的 `limit`。運算子 `eq ne lt lte gt gte in contains`；`value` 一律是字串，依欄位型別轉成數字，`in` 用逗號分隔（例如 `"1,3"`）。「A 或 B」在同一欄位用 `in`，跨欄位或不同需求（例如兩個現場）拆成不同情境。`field` 以該專案的欄位做 enum。每個情境回傳：
 

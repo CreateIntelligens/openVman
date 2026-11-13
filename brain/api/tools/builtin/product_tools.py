@@ -8,7 +8,7 @@ from knowledge.product_catalog import (
     CatalogField,
     ProductCatalog,
     describe_fields,
-    load_product_catalog,
+    load_product_catalogs,
 )
 from knowledge.product_filter import OPERATORS, FilterError, filter_products
 from tools.context import active_project_id
@@ -37,13 +37,18 @@ _QUERY_FORMAT = (
 )
 
 
-def _parameters(field_names: list[str] | None) -> dict[str, Any]:
+def _parameters(field_names: list[str] | None, catalog_names: list[str] | None = None) -> dict[str, Any]:
     field: dict[str, Any] = {"type": "string", "description": "欄位名稱"}
     if field_names:
         field["enum"] = field_names
+    # 只有一份型錄時不加 catalog：單一型錄的說明與參數調過 20 題×3 次，要和以前一字不差。
+    selector: dict[str, Any] = {
+        "catalog": {"type": "string", "enum": catalog_names, "description": "要查的規格表（商品線）"},
+    } if catalog_names else {}
     return {
         "type": "object",
         "properties": {
+            **selector,
             "scenarios": {
                 "type": "array",
                 "description": "需求情境，一個需求一個情境",
@@ -88,26 +93,41 @@ def _parameters(field_names: list[str] | None) -> dict[str, Any]:
                 },
             },
         },
-        "required": ["scenarios"],
+        "required": ["catalog", "scenarios"] if catalog_names else ["scenarios"],
     }
+
+
+def _catalog_section(catalog: ProductCatalog) -> str:
+    notes = f"\n注意：{catalog.notes}" if catalog.notes else ""
+    return (
+        f"規格表：{catalog.title}，共 {len(catalog.products)} 款，產品代號欄位是 {catalog.key}。可用欄位：\n"
+        f"{describe_fields(catalog)}{notes}"
+    )
 
 
 def fit_product_tool(function: dict[str, Any], project_id: str) -> dict[str, Any] | None:
     """This project's filter_products function spec, or None when it has no catalog."""
     try:
-        catalog = load_product_catalog(project_id)
+        catalogs = load_product_catalogs(project_id)
     except ValueError:
         # 目錄格式壞了照樣給工具，讓呼叫時回報錯在哪，比默默消失好查。
         return {**function, "description": f"{_BASE_DESCRIPTION}\n{_QUERY_FORMAT}"}
-    if catalog is None:
+    if not catalogs:
         return None
-    notes = f"\n注意：{catalog.notes}" if catalog.notes else ""
+    if len(catalogs) == 1:
+        description = f"{_BASE_DESCRIPTION}\n{_QUERY_FORMAT}\n{_catalog_section(catalogs[0])}"
+        return {**function, "description": description, "parameters": _parameters(list(catalogs[0].fields))}
+    sections = "\n".join(f"【catalog: {catalog.name}】{_catalog_section(catalog)}" for catalog in catalogs)
     description = (
         f"{_BASE_DESCRIPTION}\n{_QUERY_FORMAT}\n"
-        f"規格表：{catalog.title}，共 {len(catalog.products)} 款，產品代號欄位是 {catalog.key}。可用欄位：\n"
-        f"{describe_fields(catalog)}{notes}"
+        f"本專案有 {len(catalogs)} 份規格表，每次呼叫用 catalog 指定一份，欄位只能用該份規格表的：\n{sections}"
     )
-    return {**function, "description": description, "parameters": _parameters(list(catalog.fields))}
+    fields = list(dict.fromkeys(name for catalog in catalogs for name in catalog.fields))
+    return {
+        **function,
+        "description": description,
+        "parameters": _parameters(fields, [catalog.name for catalog in catalogs]),
+    }
 
 
 # 只寫在工具說明裡時，正式聊天路徑（fast）20 題只有 7 題會叫；系統提示的工具規則寫著
@@ -132,12 +152,12 @@ _SCOPE_LINE = (
 def product_prompt_line(project_id: str) -> str:
     """System prompt rule that tells the model to use filter_products, or "" without a catalog."""
     try:
-        catalog = load_product_catalog(project_id)
+        catalogs = load_product_catalogs(project_id)
     except ValueError:
         return _PROMPT_LINE
-    if catalog is None:
+    if not catalogs:
         return ""
-    return _PROMPT_LINE + _SCOPE_LINE.format(title=catalog.title)
+    return _PROMPT_LINE + _SCOPE_LINE.format(title="」「".join(catalog.title for catalog in catalogs))
 
 
 def _scalar(spec: CatalogField, raw: Any) -> Any:
@@ -182,7 +202,7 @@ def _limit(raw: Any) -> int | None:
 def _to_query(args: dict[str, Any], catalog: ProductCatalog) -> dict[str, Any]:
     if not isinstance(args, dict):
         raise FilterError("參數必須是物件")
-    extra = set(args) - {"scenarios"}
+    extra = set(args) - {"scenarios", "catalog"}
     if extra:
         raise FilterError(f"參數不接受 {', '.join(sorted(map(str, extra)))}")
     scenarios = args.get("scenarios")
@@ -211,11 +231,25 @@ def _to_query(args: dict[str, Any], catalog: ProductCatalog) -> dict[str, Any]:
     return {"scenarios": converted}
 
 
+def _choose_catalog(args: Any, catalogs: list[ProductCatalog]) -> ProductCatalog:
+    requested = args.get("catalog") if isinstance(args, dict) else None
+    names = "、".join(catalog.name for catalog in catalogs)
+    if requested is None:
+        if len(catalogs) == 1:
+            return catalogs[0]
+        raise FilterError(f"本專案有 {len(catalogs)} 份規格表，請用 catalog 指定一份：{names}")
+    chosen = next((catalog for catalog in catalogs if catalog.name == requested), None)
+    if chosen is None:
+        raise FilterError(f"沒有規格表 {requested!r}，可用的有：{names}")
+    return chosen
+
+
 def _filter_products(args: dict[str, Any]) -> dict[str, Any]:
     project_id = active_project_id.get()
-    catalog = load_product_catalog(project_id)
-    if catalog is None:
+    catalogs = load_product_catalogs(project_id)
+    if not catalogs:
         raise FilterError("這個專案沒有產品規格表，請改用 search_knowledge")
+    catalog = _choose_catalog(args, catalogs)
     return filter_products(_to_query(args, catalog), catalog)
 
 

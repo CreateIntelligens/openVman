@@ -82,7 +82,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 - RAG：知識文件轉為 Markdown 後以 EmbeddingGemma 2 向量化，存於 LanceDB；快速問答分類與 CSV 轉換的 QA 同樣索引。
 - 記憶：workspace 核心文件（`SOUL.md`、`MEMORY.md` 等）直接進 prompt，對話歸檔與夜間記憶整理（dreaming）。
-- 工具：知識檢索、圖譜、記憶、網路搜尋與網頁轉 Markdown（2md）、Wiki 發布，以及依專案 `knowledge/products/_catalog.yaml` 啟用的產品規格篩選 `filter_products`。
+- 工具：知識檢索、圖譜、記憶、網路搜尋與網頁轉 Markdown（2md）、Wiki 發布，以及依專案 `knowledge/products/<商品線>/_catalog.yaml` 啟用的產品規格篩選 `filter_products`。
 - 模型路由：主對話依序嘗試 Gemini、OpenAI、Groq 中啟用的供應商；後台沒存過設定時照 `LLM_PROVIDER`／`LLM_FALLBACK_CHAIN`。
 - 決策輔助：本地 Guard Agent 規則先判；規則無法判斷時依後台順序呼叫 Clef 主／備援、Jev、OpenAI Decisions。
 - 模型供應商：ROOT 在後台「System → 模型供應商」調整主對話與決策的順序、啟用狀態、主對話模型名稱，以及各家 API key（加密存放，每家一把、各類共用），約 10 秒內生效。

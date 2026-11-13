@@ -211,13 +211,18 @@ def delete_document_meta(relative_path: str, project_id: str = "default") -> Non
         save_doc_meta(metadata, project_id)
 
 
-@_serialized
 def move_document_meta(source_path: str, target_path: str, project_id: str = "default") -> None:
+    move_many_document_meta({source_path: target_path}, project_id)
+
+
+@_serialized
+def move_many_document_meta(renames: dict[str, str], project_id: str = "default") -> None:
+    """Carry each moved document's metadata (language, enabled, origin) to its new path in one write."""
     metadata = load_doc_meta(project_id)
-    if source_path not in metadata:
-        return
-    metadata[target_path] = metadata.pop(source_path)
-    save_doc_meta(metadata, project_id)
+    moved = {target: metadata.pop(source) for source, target in renames.items() if source in metadata}
+    if moved:
+        metadata.update(moved)
+        save_doc_meta(metadata, project_id)
 
 
 def list_disabled_document_paths(project_id: str = "default") -> set[str]:

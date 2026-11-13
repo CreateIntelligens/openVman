@@ -8,6 +8,8 @@
 
 - **[2026-11-13]** **選型篩選的設定檔不出現在文件樹**：`knowledge/products/`（含底下各商品線資料夾）的 `_catalog.yaml` 不再由 `GET /knowledge/base/documents` 列出，後台的文件樹、文件數與批次全選都看不到；搜尋索引照舊。資料夾只剩這個設定檔時，刪除資料夾會說明裡面有選型設定、不能從後台刪，不會默默刪掉。
 
+- **[2026-11-13]** **產品規格表可以分商品線**：`filter_products` 改讀 `knowledge/products/<商品線>/_catalog.yaml`，同一個專案可放多份型錄，各自定義欄位。只有一份時工具說明與參數和以前一字不差；多份時多一個必填的 `catalog` 參數指定型錄。舊的 `knowledge/products/_catalog.yaml` 版面仍可讀，搬資料前後工具都不會消失。新增 `move_knowledge_folder`，整個資料夾一次搬完，索引只重建一次。
+
 - **[2026-11-13]** **watchtower 改為每小時檢查**：檢查間隔從 300 秒改為 3600 秒，減少對 Docker Hub 的查詢，避免請求限流擋住 CI 發布與換版。推上 `main` 後正式站最慢一小時換版。
 
 - **[2026-11-13]** **Brain 對話與後台管理分流**：新增 `api-chat` 對話角色與多 worker，後台與排程固定單程序；Backend 可用 `BRAIN_CHAT_URL` 分流並以空值回退。對話與用量 SQLite 使用 WAL，共用技能狀態、檔案與記憶表寫入鎖，跨程序共用限流及 PII 併發額度；Prometheus 彙總同一次容器啟動的各 worker。新增 admin 定時維護有新對話的專案，以及角色、分流與真實多程序回歸測試。部署、回退及仍維持 worker 獨立的斷路器限制見 `brain/README.md`。

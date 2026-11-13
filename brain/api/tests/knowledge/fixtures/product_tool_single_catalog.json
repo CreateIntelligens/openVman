@@ -1,0 +1,199 @@
+{
+ "fitted_description": "依本專案產品規格表篩選、比較、排序產品。使用者問「哪幾款符合」「有哪些」「最大／最小／最高」「比較 A 跟 B」「X 以上／以下」這類要完整清單或數值比較的選型問題時，與 search_knowledge 同一輪一起呼叫：這個工具給完整且正確的清單，search_knowledge 補說明文字。回答只能列 matches 裡的產品；unknown 是規格缺值、不能確認符合也不能說不符合，要另外說明；excluded_count 是確定不符合的數量。\nscenarios 是情境陣列；每個情境的 conditions 全部成立才算符合（AND）。需求是「A 或 B」時：同一欄位用 in（value 用逗號分隔，例如 \"1,3\"），不同欄位就拆成兩個情境。兩個不同的需求（例如兩個現場）要分成兩個情境，不要合成一組條件。沒有篩選條件時 conditions 給空陣列。只問最大／最小的一款時用 sort 加 limit 1；要完整清單時不要填 limit。value 一律寫成字串，數字欄位只填數字（例如 \"20\"），先換成欄位的單位。需求方向：使用者需要至少 15 → gte 15；限制不超過 3 → lte 3。運算子：eq、ne、lt、lte、gt、gte、in、contains（文字包含）。\n規格表：測試泵浦，共 4 款，產品代號欄位是 model。可用欄位：\n- model（型號，文字）\n- series（系列，文字）\n- hp（馬力，數字，單位 HP）\n- outlet_inch（口徑，數字，單位 吋）\n- max_head_m（最大揚程，數字，單位 m）\n- max_flow_lpm（最大流量，數字，單位 LPM）\n- phase（電源相數，數字或數字陣列）\n注意：最大揚程與最大流量是各自的極限，不是同一個工作點。",
+ "fitted_parameters": {
+  "type": "object",
+  "properties": {
+   "scenarios": {
+    "type": "array",
+    "description": "需求情境，一個需求一個情境",
+    "items": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "情境名稱，不可重複"
+      },
+      "conditions": {
+       "type": "array",
+       "description": "全部成立才算符合",
+       "items": {
+        "type": "object",
+        "properties": {
+         "field": {
+          "type": "string",
+          "description": "欄位名稱",
+          "enum": [
+           "model",
+           "series",
+           "hp",
+           "outlet_inch",
+           "max_head_m",
+           "max_flow_lpm",
+           "phase"
+          ]
+         },
+         "op": {
+          "type": "string",
+          "enum": [
+           "contains",
+           "eq",
+           "gt",
+           "gte",
+           "in",
+           "lt",
+           "lte",
+           "ne"
+          ]
+         },
+         "value": {
+          "type": "string",
+          "description": "條件值，數字只填數字；in 用逗號分隔"
+         }
+        },
+        "required": [
+         "field",
+         "op",
+         "value"
+        ]
+       }
+      },
+      "sort": {
+       "type": "array",
+       "description": "排序，前面的欄位優先",
+       "items": {
+        "type": "object",
+        "properties": {
+         "field": {
+          "type": "string",
+          "description": "欄位名稱",
+          "enum": [
+           "model",
+           "series",
+           "hp",
+           "outlet_inch",
+           "max_head_m",
+           "max_flow_lpm",
+           "phase"
+          ]
+         },
+         "direction": {
+          "type": "string",
+          "enum": [
+           "asc",
+           "desc"
+          ]
+         }
+        },
+        "required": [
+         "field",
+         "direction"
+        ]
+       }
+      },
+      "limit": {
+       "type": "integer",
+       "description": "只要前幾名時才填；要完整清單就不填"
+      }
+     },
+     "required": [
+      "name",
+      "conditions"
+     ]
+    }
+   }
+  },
+  "required": [
+   "scenarios"
+  ]
+ },
+ "prompt_line": "本專案有產品規格表（filter_products 工具）。使用者問選型、哪幾款符合、有哪些、最大／最小／最高、排序、比較兩款、X 以上／以下這類要完整清單或數值比較的問題時，第一輪必須同時呼叫 filter_products 與 search_knowledge（對話裡已經有這一句的 search_knowledge 結果時只叫 filter_products）；回答列出的產品以 filter_products 的 matches 為準，search_knowledge 的片段常不完整，不能只憑片段列款式或說其他款沒有資料。規格表收錄的範圍是「測試泵浦」：問到範圍以外的產品時，那些款式依 search_knowledge 片段補列，並說明完整比較只涵蓋規格表收錄的範圍。",
+ "registered_description": "依本專案產品規格表篩選、比較、排序產品。使用者問「哪幾款符合」「有哪些」「最大／最小／最高」「比較 A 跟 B」「X 以上／以下」這類要完整清單或數值比較的選型問題時，與 search_knowledge 同一輪一起呼叫：這個工具給完整且正確的清單，search_knowledge 補說明文字。回答只能列 matches 裡的產品；unknown 是規格缺值、不能確認符合也不能說不符合，要另外說明；excluded_count 是確定不符合的數量。\nscenarios 是情境陣列；每個情境的 conditions 全部成立才算符合（AND）。需求是「A 或 B」時：同一欄位用 in（value 用逗號分隔，例如 \"1,3\"），不同欄位就拆成兩個情境。兩個不同的需求（例如兩個現場）要分成兩個情境，不要合成一組條件。沒有篩選條件時 conditions 給空陣列。只問最大／最小的一款時用 sort 加 limit 1；要完整清單時不要填 limit。value 一律寫成字串，數字欄位只填數字（例如 \"20\"），先換成欄位的單位。需求方向：使用者需要至少 15 → gte 15；限制不超過 3 → lte 3。運算子：eq、ne、lt、lte、gt、gte、in、contains（文字包含）。",
+ "registered_parameters": {
+  "type": "object",
+  "properties": {
+   "scenarios": {
+    "type": "array",
+    "description": "需求情境，一個需求一個情境",
+    "items": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "情境名稱，不可重複"
+      },
+      "conditions": {
+       "type": "array",
+       "description": "全部成立才算符合",
+       "items": {
+        "type": "object",
+        "properties": {
+         "field": {
+          "type": "string",
+          "description": "欄位名稱"
+         },
+         "op": {
+          "type": "string",
+          "enum": [
+           "contains",
+           "eq",
+           "gt",
+           "gte",
+           "in",
+           "lt",
+           "lte",
+           "ne"
+          ]
+         },
+         "value": {
+          "type": "string",
+          "description": "條件值，數字只填數字；in 用逗號分隔"
+         }
+        },
+        "required": [
+         "field",
+         "op",
+         "value"
+        ]
+       }
+      },
+      "sort": {
+       "type": "array",
+       "description": "排序，前面的欄位優先",
+       "items": {
+        "type": "object",
+        "properties": {
+         "field": {
+          "type": "string",
+          "description": "欄位名稱"
+         },
+         "direction": {
+          "type": "string",
+          "enum": [
+           "asc",
+           "desc"
+          ]
+         }
+        },
+        "required": [
+         "field",
+         "direction"
+        ]
+       }
+      },
+      "limit": {
+       "type": "integer",
+       "description": "只要前幾名時才填；要完整清單就不填"
+      }
+     },
+     "required": [
+      "name",
+      "conditions"
+     ]
+    }
+   }
+  },
+  "required": [
+   "scenarios"
+  ]
+ }
+}

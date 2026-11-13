@@ -175,7 +175,7 @@ def test_tool_is_dropped_without_a_catalog_and_lists_fields_with_one(workspace, 
     condition = function["parameters"]["properties"]["scenarios"]["items"]["properties"]["conditions"]
     assert condition["items"]["properties"]["field"]["enum"][:2] == ["model", "series"]
 
-    monkeypatch.setattr(product_tools, "load_product_catalog", lambda _project: None)
+    monkeypatch.setattr(product_tools, "load_product_catalogs", lambda _project: [])
     assert [tool["function"]["name"] for tool in agent_loop._tools_for_project(tools, "p")] == [
         "search_knowledge",
     ]
@@ -298,7 +298,7 @@ def test_prompt_line_only_for_projects_with_a_catalog(workspace, monkeypatch):
     line = product_tools.product_prompt_line("p")
     assert "第一輪必須同時呼叫 filter_products" in line
     assert "規格表收錄的範圍是「測試泵浦」" in line
-    monkeypatch.setattr(product_tools, "load_product_catalog", lambda _project: None)
+    monkeypatch.setattr(product_tools, "load_product_catalogs", lambda _project: [])
     assert product_tools.product_prompt_line("p") == ""
 
 
