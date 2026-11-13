@@ -27,7 +27,7 @@ PUBLIC_HOSTS = {
 }
 SERVICE_HOSTS = {
     "localhost", "backend", "api", "api-chat", "brain", "admin", "avatar", "nginx",
-    "split-admin", "split-chat", "split-backend", "split-avatar", "split-edge", "fake-llm", "openvman-embedding-1",
+    "split-admin", "split-chat", "split-backend", "split-avatar", "split-edge", "fake-llm", "fake-tts", "openvman-embedding-1",
     "redis", "embedding", "vlm", "index-tts-vllm", "voxcpm-gateway", "shared-gpu-node",
     "grafana", "prometheus", "server1", "server2",
 }

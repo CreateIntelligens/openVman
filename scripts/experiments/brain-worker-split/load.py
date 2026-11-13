@@ -1,4 +1,4 @@
-"""Authenticated Backend -> split Brain -> fake LLM acceptance and open-loop load."""
+"""Authenticated Backend -> split Brain -> fake LLM (and optional fake TTS) acceptance and open-loop load."""
 
 from __future__ import annotations
 
@@ -30,6 +30,8 @@ CHAT = "http://split-chat:8100"
 INTERNAL_HEADERS = {"X-Internal-Token": "synthetic-worker-internal-token"}
 PASSWORD = "Synthetic-Worker-Only-2026"
 QUESTION = "請簡短介紹服務中心的週末預約諮詢服務"
+FAKE_TTS = "http://fake-tts:8090"
+TTS_ENABLED = False
 
 
 async def wait_ready(client):
@@ -67,6 +69,21 @@ async def login(client):
     raise RuntimeError(f"isolated Backend did not become available: {last_error}")
 
 
+async def first_audio(client, headers, text, started):
+    """Synthesize a sentence the way the avatar front end does; seconds until its first audio byte."""
+    async with client.stream("POST", BACKEND + "/api/v1/tts/stream", headers=headers, json={"text": text, "provider": "indextts"}) as response:
+        response.raise_for_status()
+        heard = None
+        size = 0
+        async for chunk in response.aiter_bytes():
+            if chunk and heard is None:
+                heard = time.perf_counter() - started
+            size += len(chunk)
+    if heard is None or size <= 44:
+        raise RuntimeError("TTS stream ended without audio")
+    return heard
+
+
 async def chat_request(client, headers, *, message=QUESTION, session_id=None, staged=False):
     session_id = session_id or "workerload-" + uuid.uuid4().hex
     payload = {"project_id": PROJECT, "persona_id": "default", "session_id": session_id, "message": message}
@@ -75,6 +92,7 @@ async def chat_request(client, headers, *, message=QUESTION, session_id=None, st
     started = time.perf_counter()
     first_sentence = None
     done = None
+    speaking = None
     try:
         # New sockets also exercise multiple uvicorn workers during small smoke runs.
         async with client.stream("POST", BACKEND + "/api/v1/chat/stream", headers={**headers, "Connection": "close"}, json=payload) as response:
@@ -92,13 +110,19 @@ async def chat_request(client, headers, *, message=QUESTION, session_id=None, st
                         raise RuntimeError(f"SSE error: {body}")
                     if event == "sentence" and body.get("text") and first_sentence is None:
                         first_sentence = time.perf_counter() - started
+                        if TTS_ENABLED:
+                            # 前台收到一句就送去合成，不等整段回答。
+                            speaking = asyncio.create_task(first_audio(client, headers, body["text"], started))
                     if event == "done":
                         done = body
                     data = []
             if first_sentence is None or done is None or not done.get("reply"):
                 raise RuntimeError("stream ended without first sentence and successful done")
-        return {"ok": True, "session_id": session_id, "first_sentence": first_sentence, "elapsed": time.perf_counter() - started, "reply": done["reply"], "turn_id": payload.get("turn_id")}
+        heard = await speaking if speaking is not None else None
+        return {"ok": True, "session_id": session_id, "first_sentence": first_sentence, "first_audio": heard, "elapsed": time.perf_counter() - started, "reply": done["reply"], "turn_id": payload.get("turn_id")}
     except Exception as error:  # noqa: BLE001 - Keep all per-request failures in the report.
+        if speaking is not None and not speaking.done():
+            speaking.cancel()
         return {"ok": False, "session_id": session_id, "elapsed": time.perf_counter() - started, "error": f"{type(error).__name__}: {error}"}
 
 
@@ -164,6 +188,9 @@ async def acceptance(client, headers):
 def summarize(name, results, scheduling_seconds):
     first = sorted(result["first_sentence"] for result in results if result["ok"])
     summary = {"scenario": name, "requests": len(results), "success": len(first), "failures": len(results) - len(first), "scheduling_seconds": scheduling_seconds, "first_sentence_median": statistics.median(first) if first else None, "first_sentence_p95": first[max(0, math.ceil(len(first) * .95) - 1)] if first else None, "request_elapsed_max": max((result["elapsed"] for result in results), default=0)}
+    audio = sorted(result["first_audio"] for result in results if result["ok"] and result.get("first_audio") is not None)
+    if audio:
+        summary.update({"first_audio_median": statistics.median(audio), "first_audio_p95": audio[max(0, math.ceil(len(audio) * .95) - 1)]})
     print(json.dumps(summary, ensure_ascii=False), flush=True)
     return {**summary, "results": results}
 
@@ -180,6 +207,8 @@ async def sustained(client, headers, rate, seconds):
 
 
 async def run(args):
+    global TTS_ENABLED
+    TTS_ENABLED = args.tts
     report = {"workers": int(os.environ.get("WORKER_COUNT", "4")), "thread_pool_size": int(os.environ.get("WORKER_THREAD_POOL_SIZE", "0")), "timestamp": datetime.now(timezone.utc).isoformat(), "project": PROJECT, "synthetic_llm_first_content_seconds": .8, "load_only": args.load_only, "settle_seconds": args.settle_seconds, "scenarios": []}
     output = Path(args.output or f"/results/workers-{report['workers']}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.json")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -210,6 +239,11 @@ async def run(args):
                         target = 5 if scenario["scenario"] == "burst-100" else 2 if scenario["scenario"] in ("rate-5", "rate-10") else None
                         if target is not None:
                             assert scenario["first_sentence_median"] <= target, f"{scenario['scenario']} exceeds {target}s median target"
+            if TTS_ENABLED:
+                tts_stats = await client.get(FAKE_TTS + "/stats")
+                tts_stats.raise_for_status()
+                report["fake_tts"] = tts_stats.json()
+                assert report["fake_tts"]["streams"] > 0, "Backend did not use the fake TTS"
             stats = await client.get("http://fake-llm:8080/stats")
             stats.raise_for_status()
             report["fake_llm"] = stats.json()
@@ -234,6 +268,7 @@ if __name__ == "__main__":
     mode.add_argument("--load-only", action="store_true", help="Skip acceptance fixtures; keep readiness/login and run only load")
     parser.add_argument("--settle-seconds", type=float, default=0, help="Explicit delay before warmup/load; does not claim admin background jobs are idle")
     parser.add_argument("--enforce-targets", action="store_true")
+    parser.add_argument("--tts", action="store_true", help="Also synthesize each first sentence through Backend /api/v1/tts/stream (fake IndexTTS)")
     parser.add_argument("--output")
     arguments = parser.parse_args()
     if arguments.seconds <= 0 or any(rate <= 0 for rate in arguments.rates) or arguments.burst <= 0 or arguments.settle_seconds < 0:

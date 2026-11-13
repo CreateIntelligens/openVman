@@ -69,6 +69,8 @@ if __name__ == "__main__":
     elif sys.argv[1] == "backend":
         seed_backend()
         Path("/app/logs").mkdir(parents=True, exist_ok=True)
-        os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200"])
+        # 多 process 只用來量 Backend 的容量；正式 Backend 仍是單一 process（多程序稽核未做）。
+        workers = os.environ.get("BACKEND_WORKERS", "1")
+        os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200", "--workers", workers])
     else:
         raise SystemExit("expected brain or backend")

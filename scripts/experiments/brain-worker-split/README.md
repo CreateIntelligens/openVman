@@ -29,6 +29,13 @@ docker compose -f compose.yaml run --rm client --enforce-targets
 
 fake LLM 只提供本地 OpenAI 相容介面，每次固定等 0.8 秒才輸出第一句，第二句間隔 0.02 秒。決策、PII、語言校正、記憶相關性判斷／LLM 摘要與外部工具關閉；auto-recall 檢索保留，bootstrap 會檢查這些隔離開關；此測試衡量分流、檢索、SQLite 與執行緒排隊，不代表真實 LLM／決策／語音容量。
 
+fake TTS（`fake_tts.py`）模仿 IndexTTS 的 `/health`、`/audio/voices`、`/tts`、`/tts_stream`，隔離 Backend 預設以 `TTS_INDEXTTS_URL=http://fake-tts:8090` 接它（設 `FAKE_TTS_URL=` 空字串則只剩 Edge）。音檔在啟動時預先做好，延遲照 GB10 實測：串流第一段 0.3 秒，整句 0.3 秒＋每字 0.12 秒。`FAKE_TTS_MAX_CONCURRENCY` 大於 0 時同時只合成這麼多句，用來模擬單一 GPU 節點排隊。client 加 `--tts` 時，收到第一句就照前台作法呼叫 Backend `POST /api/v1/tts/stream`（`provider: indextts`），另外記「聽到第一句」（送出問題到第一段音訊）的中位數與 p95，結束時檢查 fake TTS 確實收到串流請求：
+
+```bash
+docker compose -f compose.yaml up -d split-backend fake-tts
+docker compose -f compose.yaml run --rm client --load-only --tts --rates 10 20 --burst 100
+```
+
 `--enforce-targets` 要求每秒 5／10 題第一句中位數不超過 2 秒、burst 100 不超過 5 秒，且零失敗。每秒 3 題列數據供 WAL／單 worker 比較。瞬間 100 題一次全部發出，等待全部完成，不維持 30 秒的 burst 速率。需快速診斷可先使用 `--seconds 3 --rates 3 --burst 10`。
 
 輸出 JSON 存在新建 `results` volume，含每筆 session、第一句及完整耗時、錯誤與彙總。可在容器內讀取或透過標準輸出取得：

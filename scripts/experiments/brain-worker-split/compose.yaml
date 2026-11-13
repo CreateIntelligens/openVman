@@ -60,6 +60,16 @@ services:
       com.centurylinklabs.watchtower.enable: "false"
     networks: [isolated]
 
+  fake-tts:
+    image: ${WORKER_BACKEND_IMAGE:-tbdavid2019/openvman-backend:latest}
+    entrypoint: [python, /experiments/fake_tts.py]
+    volumes: [".:/experiments:ro"]
+    environment:
+      FAKE_TTS_MAX_CONCURRENCY: ${FAKE_TTS_MAX_CONCURRENCY:-0}
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    networks: [isolated]
+
   redis:
     image: redis:7-alpine
     labels:
@@ -111,7 +121,9 @@ services:
       TTS_EDGE_ENABLED: "true"
       UPSTREAM_PROBE_INTERVAL_SECONDS: "0"
       A2A_ENABLED: "false"
-      TTS_INDEXTTS_URL: ""
+      # 預設接本機假 TTS；設 FAKE_TTS_URL= 空字串就回到只用 Edge。
+      TTS_INDEXTTS_URL: ${FAKE_TTS_URL-http://fake-tts:8090}
+      BACKEND_WORKERS: ${BACKEND_WORKERS:-1}
       TTS_COSYVOICE_URL: ""
       TTS_VOXCPM_URL: ""
     depends_on:
