@@ -24,8 +24,7 @@ _DIST_NAME = {
 _PROVIDED_ELSEWHERE = {"torch", "numpy", "pyarrow", "starlette", "pandas", "sentence_transformers", "transformers", "PIL", "anyio"}
 # repo 內的 contracts 套件，由 /contracts 掛載提供。
 _LOCAL_PACKAGES = {"openvman_contracts"}
-# 已知沒裝：knowledge/converters.py 的 PDF 轉換用 PyMuPDF（AGPL），是否引入待產品決定。
-_KNOWN_UNDECLARED = {"fitz"}
+_KNOWN_UNDECLARED: set[str] = set()
 
 
 def _declared() -> set[str]:

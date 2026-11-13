@@ -286,10 +286,10 @@ def qa_table_csv_bytes(path: Path, file_bytes: bytes) -> bytes | None:
 
 def _convert_pdf(path: Path) -> str:
     """Extract text from each PDF page via PyMuPDF, joined by blank lines."""
-    import fitz
+    import pymupdf
 
     pages: list[str] = []
-    with fitz.open(path) as document:
+    with pymupdf.open(path) as document:
         for page in document:
             # get_text() with no args returns the page's plain text; the stub
             # types it as a union, so coerce to str before stripping.

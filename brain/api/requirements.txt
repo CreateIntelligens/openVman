@@ -9,6 +9,8 @@ openai>=1.0.0,<4
 google-genai>=2.34,<3
 httpx>=0.28,<1
 openpyxl>=3.1.0
+# knowledge/converters.py 的 PDF 轉文字；授權為 AGPL，2026-11-13 決定引入。
+pymupdf>=2.1,<3
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
