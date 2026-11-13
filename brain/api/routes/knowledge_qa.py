@@ -187,6 +187,14 @@ def _merged_target_content(target_file: Path, new_items: list[dict[str, Any]]) -
     return "\n\n".join([existing_text, *blocks] if existing_text else blocks)
 
 
+@router.get("/questions")
+def list_all_questions_route(project_id: str = "default") -> dict[str, Any]:
+    """Every quick Q&A question in one list, with categories and states (see knowledge/qa_questions.py)."""
+    from knowledge.qa_questions import list_all_questions
+
+    return list_all_questions(project_id)
+
+
 @router.get("/nodes")
 def list_qa_nodes_route(project_id: str = "default") -> list[dict[str, Any]]:
     return get_node_tree(project_id)

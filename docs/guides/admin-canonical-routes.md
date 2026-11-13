@@ -30,7 +30,7 @@
 | 頁面 | 預設子頁（省略子路徑） | 其他固定子路徑 |
 |------|------------------------|----------------|
 | 語音 | 聲音試聽：`/admin/voice` | 語音辨識：`/admin/voice/asr` |
-| 知識庫 | 文件：`/admin/knowledge` | 圖譜：`/admin/knowledge/graph` |
+| 知識庫 | 文件：`/admin/knowledge` | 所有題目：`/admin/knowledge/questions`；圖譜：`/admin/knowledge/graph` |
 | 虛擬人 | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
 | 專案與權限 | 專案：`/admin/access` | 帳號：`/admin/access/accounts`（正式建立）、`/admin/access/accounts/temporary`（臨時建立）、`/admin/access/accounts/manage`（編輯／管理）；API 金鑰：`/admin/access/api-keys`；權限圖譜：`/admin/access/graph`；網站嵌入金鑰：`/admin/access/embed-keys` |

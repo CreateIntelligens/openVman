@@ -3,6 +3,7 @@ import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuar
 import StatusAlert from "../components/StatusAlert";
 import BatchActionBar from "../components/kb/BatchActionBar";
 import GraphView from "../components/kb/GraphView";
+import QuestionsView from "../components/kb/questions/QuestionsView";
 import KnowledgeContentPane from "../components/kb/KnowledgeContentPane";
 import KnowledgeHome from "../components/kb/KnowledgeHome";
 import KnowledgeModals from "../components/kb/KnowledgeModals";
@@ -38,7 +39,7 @@ import { errorMessage } from "../utils/errorMessage";
 import { formatUploadSize } from "../utils/uploadLimits";
 import { removeScoped, writeScoped } from "../utils/scopedStorage";
 
-const KNOWLEDGE_TABS = ["documents", "graph"] as const;
+const KNOWLEDGE_TABS = ["documents", "questions", "graph"] as const;
 type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number];
 
 /** 拖題目排序、把文件拖進分類，都會讓那個分類的編輯器重新載入。 */
@@ -352,6 +353,33 @@ export default function KnowledgeBase() {
     [clearQaSelection, handleTreeSelect],
   );
 
+  // 「所有題目」點一題：照一般切換的規則先問未存的修改，再回到文件分頁打開分類、捲到那一題。
+  const handleOpenQuestionCategory = useCallback(
+    (nodeId: string, question: string) => {
+      requestNavigation(() => {
+        clearStaleError();
+        revealQaNode(nodeId);
+        selectQaNode(nodeId);
+        setQaFocusRequest({ question });
+        setActiveTab("documents");
+      });
+    },
+    [clearStaleError, requestNavigation, revealQaNode, selectQaNode, setActiveTab],
+  );
+
+  const handleOpenQuestionDocument = useCallback(
+    (path: string) => {
+      requestNavigation(() => {
+        clearStaleError();
+        clearQaSelection();
+        closeNoteComposer();
+        handleTreeSelect({ type: "file", path });
+        setActiveTab("documents");
+      });
+    },
+    [clearQaSelection, clearStaleError, closeNoteComposer, handleTreeSelect, requestNavigation, setActiveTab],
+  );
+
   const handleViewImportedQaNode = useCallback(
     (nodeId: string) => {
       revealQaNode(nodeId);
@@ -539,6 +567,12 @@ export default function KnowledgeBase() {
       >
         {activeTab === "graph" ? (
           <GraphView />
+        ) : activeTab === "questions" ? (
+          <QuestionsView
+            projectId={projectId}
+            onOpenCategory={handleOpenQuestionCategory}
+            onOpenDocument={handleOpenQuestionDocument}
+          />
         ) : (
           <>
             <div className="flex min-h-0 flex-1 overflow-hidden">

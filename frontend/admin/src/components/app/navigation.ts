@@ -100,7 +100,7 @@ const tabsByPathSegment = Object.fromEntries(
  */
 export const adminSubViews: Partial<Record<Tab, readonly string[]>> = {
   Voice: ["tts", "asr"],
-  KnowledgeBase: ["documents", "graph"],
+  KnowledgeBase: ["documents", "questions", "graph"],
   Avatar: ["characters", "backgrounds"],
   Memory: ["browse", "add"],
   Access: [

@@ -1575,7 +1575,32 @@ describe("KnowledgeBase merged tree", () => {
 });
 
 
+vi.mock("../components/kb/questions/QuestionsView", () => ({
+  default: (props: { onOpenCategory: (id: string, q: string) => void; onOpenDocument: (path: string) => void }) => (
+    <div>
+      <button type="button" onClick={() => props.onOpenCategory("svc", "營業時間？")}>開分類</button>
+      <button type="button" onClick={() => props.onOpenDocument("knowledge/qa/faq.csv")}>開文件</button>
+    </div>
+  ),
+}));
+
 describe("KnowledgeBase route views", () => {
+  it("opens a question's category from the all-questions tab through the unsaved-changes guard", () => {
+    navigationMocks.currentSubView = "questions";
+    render(<KnowledgeBase />);
+    expect(screen.getByRole("tab", { name: "所有題目" }).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "開分類" }));
+
+    expect(guardMocks.requestNavigation).toHaveBeenCalled();
+    expect(knowledgeBaseMocks.closeFileView).toHaveBeenCalled();
+    expect(navigationMocks.navigateTo).toHaveBeenCalledWith("KnowledgeBase", "documents");
+
+    fireEvent.click(screen.getByRole("button", { name: "開文件" }));
+    expect(knowledgeBaseMocks.handleTreeSelect).toHaveBeenCalledWith({ type: "file", path: "knowledge/qa/faq.csv" });
+    navigationMocks.currentSubView = undefined;
+  });
+
   it("navigates the graph tab through the shared router", () => {
     render(<KnowledgeBase />);
     fireEvent.click(screen.getByRole("tab", { name: "圖譜" }));

@@ -8,6 +8,7 @@ import LanguageRoutesButton from "./LanguageRoutesButton";
 
 const KNOWLEDGE_TABS = [
   { id: "documents", label: "文件" },
+  { id: "questions", label: "所有題目" },
   { id: "graph", label: "圖譜" },
 ] as const;
 
@@ -15,8 +16,8 @@ const KNOWLEDGE_TABS = [
 const COMPACT_BUTTON = "max-sm:px-2";
 
 interface KnowledgeHeaderProps {
-  activeTab: "documents" | "graph";
-  setActiveTab: (tab: "documents" | "graph") => void;
+  activeTab: "documents" | "questions" | "graph";
+  setActiveTab: (tab: "documents" | "questions" | "graph") => void;
   documentCount: number;
   /** 第一次載入完之前不知道有幾份，不要先寫出一個錯的數字。 */
   documentsLoaded: boolean;

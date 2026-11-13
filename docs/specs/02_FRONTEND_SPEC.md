@@ -395,11 +395,19 @@ Live 模式的行為（`useAvatarTransport.ts`、`useAvatarChat.ts`）：
 
 文件狀態為「可被搜尋」「處理中」「已停用」「不會被搜尋」，由文件清單的 `enabled`、`is_indexed`、`is_indexable` 算出（`documentStatusLabel`）。樹上只標需要留意的三種，正常文件不顯示；文件檢視一律寫出。有文件處理中時定期重抓清單，間隔從 3 秒逐步拉長到 15 秒，5 分鐘沒有變動就停止。
 
-#### 12.4 知識圖譜視圖
+#### 12.4 所有題目
+
+知識庫的「所有題目」分頁（`/admin/knowledge/questions`，`components/kb/questions/QuestionsView.tsx`）讀 Brain 的 `GET /knowledge/qa/questions`，把快速問答的題目攤成一張清單，只能查看。每次打開分頁都重新讀取，剛在分類裡存的修改會反映出來。
+
+* 篩選：語言、分類（含子分類）、狀態（在選單上、題目設為隱藏、所在分類被隱藏、不在選單上、沒有答案、有圖片、有連結、文件已停用）、來源（檔名、「自己輸入」、「只在選單上」），加題目與答案的關鍵字搜尋。篩選與搜尋作用在全部題目；選項旁的題數照其他篩選算，不含自己這一項。一次畫 100 列，其餘按「再顯示」。
+* 點一列：經過未儲存修改的確認後回到「文件」分頁，打開該題第一個分類（樹上順序）並捲到那一題；分類標籤各自可點。不在任何分類的題目打開它的來源文件。
+* 寬螢幕是有欄位標題的表格，窄螢幕同一份資料改成上下堆疊的卡片，欄位名稱寫在值前面。
+
+#### 12.5 知識圖譜視圖
 
 知識庫的「圖譜」分頁（`/admin/knowledge/graph`，`components/kb/GraphView.tsx`）呼叫 Brain 的 `/graph/status`、`/graph/summary`，可觸發 `/graph/rebuild`，並以 iframe 嵌入 `/graph/html` 的互動式圖形，呈現實體與關聯。圖譜資料的產生方式見 `03_BRAIN_SPEC.md`。
 
-#### 12.5 對話控制台
+#### 12.6 對話控制台
 
 `/admin/chat` 提供與 Brain 互動的控制台：
 
@@ -411,13 +419,13 @@ Live 模式的行為（`useAvatarTransport.ts`、`useAvatarChat.ts`）：
 * 錯誤訊息：`api/common.ts` 的 `parseErrorMessage` 優先使用後端說明；沒有說明、回應是 HTML 錯誤頁或欄位驗證錯誤時，依狀態碼（`statusMessage`）或欄位名稱說明，連不上伺服器時說明是網路問題。
 * 角色切換、載入歷史 session、建立新對話由 `NavigationContext` 統一管理，`AppSidebar`、`ChatSidebar` 與各頁共享同一份狀態。
 
-#### 12.6 帳號 API 金鑰
+#### 12.7 帳號 API 金鑰
 
 `/admin/access/api-keys`（「專案與權限」頁的 API 金鑰分頁）提供帳號 API key 的建立、列表與撤銷。桌面頂列、手機導覽及「專案與權限」頁皆有入口，沿用既有後台准入規則；正式一般帳號只管理自己的 key，root／admin 可選擇其管理範圍內的正式帳號，代發的權限上限由 Backend 驗證。
 
 建立表單包含名稱、到期時間（預設 90 天）與不設期限選項。完整 key 只在建立成功後顯示一次並可複製，關閉提示或離開頁面即清除，不寫入瀏覽器儲存空間或網址。列表顯示期限、撤銷狀態、最近驗證時間與請求次數；撤銷須確認。用量頁可依 `api_key` 主體與 key ID 篩選。契約與串接範例見 [帳號 API 金鑰指南](../guides/account-api-keys.md)。
 
-#### 12.7 語音頁
+#### 12.8 語音頁
 
 「語音」頁（`/admin/voice`）分為聲音試聽與「語音辨識」（`/admin/voice/asr`）兩個分頁。帳號授權與個人引擎選單由 Backend 註冊並使用共用的引擎名稱。語音辨識分頁包含：
 
@@ -428,13 +436,13 @@ Live 模式的行為（`useAvatarTransport.ts`、`useAvatarChat.ts`）：
 
 後台 Chat 維持批次錄音，沒有串流輸入。
 
-#### 12.8 虛擬人頁與浮動助理
+#### 12.9 虛擬人頁與浮動助理
 
 * 虛擬人頁（`/admin/avatar`）只有「人物」與「背景」兩個分頁；虛擬人（Persona）的綁定選單只列 2D 人物。
 * 版面：角色、背景與影片轉換表單在 `md` 以下單欄、全寬控制項，`md` 起橫向排列並允許換列。素材網格預設單欄，`lg`／`xl`／`2xl` 分別為 2／3／4 欄（`repeat(n, minmax(0, 1fr))`）；長名稱與工作進度可斷行，檔名截斷，操作按鈕文字維持單行。
 * 每頁右下角的浮動助理（`MascotWidget`）固定載入 `frontend/app/public/vendor/ai-avatar-bot/widget.html` 的內建 Live2D 角色 Haru（`buildMascotWidgetSrc` 只帶 `model` 與 `fit`），沒有切換選單，也不向後端取清單。可收合、可拖曳，收合後 iframe 留在 DOM 只隱藏。對話與即時語音的回覆音訊經 analyser 量音量，以 `mouth`／`mouth-stop` 訊息驅動嘴型；widget 送回 `close` 時收合並停止所有播放中的語音。widget 只接受 `model`、`fit` 參數與 `mouth`／`mouth-stop` 訊息。
 
-#### 12.9 導覽與共用樣式
+#### 12.10 導覽與共用樣式
 
 * 側欄分四組（畫面顯示「互動」「知識」「角色」「系統」）。`AppSidebar` 與手機 `MobileNavDrawer` 共用 `TabGroup`、`useNavigationGroups`，各組可個別收合。畫面與無障礙名稱用 `tabGroups` 的 `title`；`label`（`Workspace`／`Knowledge`／`Character`／`System`）是收合狀態的儲存鍵，改名會讓使用者存的狀態失效。首次只開啟目前群組，偏好以帳號範圍保存；載入與路由切換時展開目前頁面的群組。群組按鈕具 `aria-expanded`／`aria-controls`，收合的項目不進入鍵盤焦點順序。
 * 合併分頁頁面：「專案與權限」（`/admin/access`）與「系統狀態」（`/admin/system`）以 `PageTabsShell` 呈現第一層底線分頁，分頁狀態綁在網址子路徑；「帳號」分頁內的第二層改用分段控制。分頁可見性與直連擋法共用 `navigation.ts` 的 `requiredRouteAccess()`。

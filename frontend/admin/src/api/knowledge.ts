@@ -482,3 +482,48 @@ export function rebuildGraph() {
 export function graphHtmlUrl(): string {
   return projectUrl(knowledgePath("/graph/html"));
 }
+
+/** 「所有題目」清單的一個分類：照樹上的順序，path 是從第一層到自己的名稱。 */
+export interface QaCategorySummary {
+  node_id: string;
+  label: string;
+  path: string[];
+  parent_id: string | null;
+  /** 自己或上層被隱藏，前台看不到。 */
+  hidden: boolean;
+}
+
+/** 「所有題目」的一題。掛在多個分類也只有一列，category_ids 照樹上的順序。 */
+export interface QaQuestionRow {
+  id: string;
+  question: string;
+  answer: string;
+  image: string;
+  url: string;
+  language: KnowledgeLanguage | null;
+  source: {
+    kind: "file" | "manual" | "menu_only";
+    /** 來源文件的路徑；只在選單上的題目是空字串。畫面上只顯示 label。 */
+    path: string;
+    label: string;
+  };
+  category_ids: string[];
+  /** 掛著的分類全部被隱藏（含上層）。 */
+  category_hidden: boolean;
+  /** 文件裡把這題設為不顯示。 */
+  hidden_in_file: boolean;
+  /** 不在任何分類：detached 是刻意拿下來的，never 是從沒掛上。 */
+  off_menu: "detached" | "never" | null;
+  no_answer: boolean;
+  document_enabled: boolean;
+}
+
+export interface QaAllQuestions {
+  categories: QaCategorySummary[];
+  questions: QaQuestionRow[];
+}
+
+/** Every quick Q&A question of a project in one list (read-only). */
+export function fetchAllQuestions(projectId: string = getActiveProjectId()) {
+  return get<QaAllQuestions>(knowledgePath("/qa/questions"), { project_id: projectId });
+}

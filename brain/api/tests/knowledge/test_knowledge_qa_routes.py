@@ -1387,3 +1387,20 @@ def test_ingest_lists_every_conflict_inside_the_source(client, tmp_path):
     assert response.status_code == 400
     detail = response.json()["detail"]
     assert "甲" in detail and "乙" in detail and "丙" not in detail
+
+
+def test_the_all_questions_route_lists_every_question(client):
+    resp = client.post(
+        "/brain/knowledge/qa/nodes",
+        json={"node_id": "faq", "label": "常見問題"},
+    )
+    assert resp.status_code == 200
+    assert client.post("/brain/knowledge/qa/nodes/faq/entries", json={"question": "選單題"}).status_code == 200
+
+    resp = client.get("/brain/knowledge/qa/questions", params={"project_id": "default"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [category["label"] for category in body["categories"]] == ["常見問題"]
+    assert [row["question"] for row in body["questions"]] == ["選單題"]
+    assert body["questions"][0]["source"]["kind"] == "menu_only"

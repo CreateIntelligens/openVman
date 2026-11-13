@@ -1,4 +1,4 @@
-import type { KnowledgeCommitFileResult } from "../../api";
+import type { KnowledgeCommitFileResult, KnowledgeLanguage } from "../../api";
 import { isImportItemActive, type ImportItem } from "../../hooks/useKnowledgeImport";
 import type { QaNode } from "../../hooks/useQaNodes";
 import {
@@ -49,15 +49,10 @@ function qaPlacement(result: KnowledgeCommitFileResult, nodesTree: QaNode[]) {
   return { nodeId: node?.node_id, text: `${place}${count}` };
 }
 
-// 和 Brain 的 qa_import_review.LANGUAGE_NAMES 同一份寫法：分類名稱用該語言自己的寫法。
-const ROW_LANGUAGE_NAMES: Record<string, string> = {
-  zh: "中文", en: "English", es: "Español", ja: "日本語", ko: "한국어", nan: "台語",
-};
-
 function languageSplitNote(result: KnowledgeCommitFileResult | undefined): string {
   const counts = Object.entries(result?.languages ?? {});
   if (counts.length < 2) return "";
-  const parts = counts.map(([code, count]) => `${ROW_LANGUAGE_NAMES[code] ?? code} ${count} 題`);
+  const parts = counts.map(([code, count]) => `${KNOWLEDGE_LANGUAGE_LABELS[code as KnowledgeLanguage] ?? code} ${count} 題`);
   return `。表裡有不同語言，已依語言分開放：${parts.join("、")}`;
 }
 
