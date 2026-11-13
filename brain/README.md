@@ -304,7 +304,9 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 只有一份型錄時，工具說明、參數與系統提示和單一型錄時代一字不差（`tests/knowledge/fixtures/product_tool_single_catalog.json` 鎖住）。兩份以上時參數多一個必填的 `catalog`（各資料夾名稱的 enum），說明分段列出每份型錄的標題、款數與欄位，`field` 的 enum 是所有欄位的聯集；呼叫時照所選型錄驗證，沒給 `catalog`、給了不存在的名稱或用了別份型錄的欄位，都回中文錯誤。系統提示的範圍句列出所有型錄標題。兩份型錄同時存在時的回答品質還沒有實測過。
 
-把既有的 `knowledge/products/` 搬成商品線資料夾，用 `knowledge/folder_move.py` 的 `move_knowledge_folder("knowledge/products", "knowledge/products/<商品線>", project_id)`：檔案一次改名（含 `_catalog.yaml` 這類不在文件列表裡的檔案），`.doc_meta.json` 寫一次，向量表與全文索引只重建一次（`rename_many_document_records`，不重新 embedding）。逐檔搬移每份都會重建一次整張表。資料夾裡有掛在快速問答的文件時拒絕搬移。圖譜的來源路徑要等下一次圖譜重建才會更新。
+把既有的 `knowledge/products/` 搬成商品線資料夾，用 `knowledge/folder_move.py` 的 `move_knowledge_folder("knowledge/products", "knowledge/products/<商品線>", project_id)`：檔案一次改名（含 `_catalog.yaml` 這類不在文件列表裡的檔案），`.doc_meta.json` 寫一次，向量表與全文索引只重建一次（`rename_many_document_records`，不重新 embedding）。逐檔搬移每份都會重建一次整張表。資料夾裡有掛在快速問答的文件時拒絕搬移。
+
+搬檔（單一文件搬移與 `move_knowledge_folder`）時，圖譜快取一併換成新路徑（`knowledge/graph.py` 的 `rename_graph_sources`）：`graph_index_state.json` 的指紋、`graphify-out/fragments/` 的抽取結果，以及現有 `graph.json`／`extract.json` 裡的來源路徑。內容沒變，下一次重建不會把搬過的文件重新交給 LLM 抽取，重建前搜尋結果也對得上圖譜節點。
 
 參數是結構化的 `scenarios[]`，每個情境有 `name`、`conditions[]`（`{field, op, value}`，全部成立才算符合）、`sort[]`（`{field, direction}`，`direction` 為 `asc`／`desc`）與選填的 `limit`。運算子 `eq ne lt lte gt gte in contains`；`value` 一律是字串，依欄位型別轉成數字，`in` 用逗號分隔（例如 `"1,3"`）。「A 或 B」在同一欄位用 `in`，跨欄位或不同需求（例如兩個現場）拆成不同情境。`field` 以該專案的欄位做 enum。每個情境回傳：
 

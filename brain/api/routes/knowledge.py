@@ -25,6 +25,7 @@ from knowledge.graph import (
     load_project_status,
     load_project_summary,
     rebuild_project_graph,
+    rename_graph_sources,
 )
 from knowledge.indexer import (
     has_stale_documents,
@@ -114,6 +115,8 @@ async def _reindex_worker(project_id: str, state: dict[str, Any]) -> None:
 async def _background_rename_document(source_path: str, target_path: str, project_id: str) -> None:
     try:
         await asyncio.to_thread(rename_document_records, source_path, target_path, project_id)
+        # 圖譜快取跟著換路徑，下一次重建才不會把搬過的文件重新交給 LLM 抽取。
+        await asyncio.to_thread(rename_graph_sources, {source_path: target_path}, project_id)
     except Exception as exc:
         log_exception("knowledge_rename_auto_error", exc, project_id=project_id)
         return

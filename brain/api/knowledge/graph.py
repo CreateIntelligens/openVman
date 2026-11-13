@@ -214,6 +214,47 @@ def _fragment_cache_path(project_id: str, rel_path: str) -> Path:
     return _graph_dir(project_id) / "fragments" / safe_name
 
 
+def rename_graph_sources(renames: dict[str, str], project_id: str = "default") -> int:
+    """Carry the graph cache over to moved documents, so the next rebuild skips the LLM.
+
+    圖譜的快取以文件路徑為鍵（graph_index_state.json 的指紋、fragments/ 的抽取結果），
+    搬檔不改內容，路徑換掉就能沿用；不換的話下一次重建會把搬過的文件整批重新交給 LLM 抽取。
+    現有的 graph.json／extract.json 也一併換路徑，搜尋結果在重建前就對得上圖譜節點。
+    回傳搬過去的快取筆數。
+    """
+    if not renames:
+        return 0
+    checkpoint = _graph_checkpoint_path(project_id)
+    moved = 0
+    if checkpoint.exists():
+        state = json.loads(checkpoint.read_text(encoding="utf-8"))
+        documents = state.get("documents", {})
+        for old, new in renames.items():
+            if old in documents:
+                documents[new] = documents.pop(old)
+                moved += 1
+        checkpoint.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _swap(text: str, old: str, new: str) -> str:
+        quoted_new = json.dumps(new, ensure_ascii=False)
+        return text.replace(json.dumps(old, ensure_ascii=False), quoted_new).replace(json.dumps(old), quoted_new)
+
+    for old, new in renames.items():
+        old_fragment, new_fragment = _fragment_cache_path(project_id, old), _fragment_cache_path(project_id, new)
+        if old_fragment.exists():
+            new_fragment.parent.mkdir(parents=True, exist_ok=True)
+            new_fragment.write_text(_swap(old_fragment.read_text(encoding="utf-8"), old, new), encoding="utf-8")
+            old_fragment.unlink()
+    for name in ("graph.json", "extract.json"):
+        path = _graph_dir(project_id) / name
+        if path.exists():
+            text = path.read_text(encoding="utf-8")
+            for old, new in renames.items():
+                text = _swap(text, old, new)
+            path.write_text(text, encoding="utf-8")
+    return moved
+
+
 class _GraphItemSource:
     def __init__(self, project_id: str, store: CheckpointStore) -> None:
         self.project_id = project_id

@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from knowledge.doc_meta import move_many_document_meta
+from knowledge.graph import rename_graph_sources
 from knowledge.indexer import rename_many_document_records
 from knowledge.knowledge_admin import qa_document_lock
 from knowledge.workspace import ensure_workspace_scaffold
@@ -32,8 +33,8 @@ def move_knowledge_folder(source_dir: str, target_dir: str, project_id: str = "d
     Returns ``{old_path: new_path}`` for every file moved. The target may sit inside the source
     (``products`` → ``products/<商品線>``). Refuses folders outside ``knowledge/``, a target that
     exists, and folders holding quick Q&A documents (their
-    paths are recorded on the Q&A tree). The graph keeps the old source paths until the next graph
-    rebuild, so callers should schedule one.
+    paths are recorded on the Q&A tree). The graph cache follows the files, so the next graph
+    rebuild does not send them back to the LLM.
     """
     from knowledge.qa_nodes import referenced_source_paths
 
@@ -63,4 +64,5 @@ def move_knowledge_folder(source_dir: str, target_dir: str, project_id: str = "d
         staging.rename(target)
         move_many_document_meta(renames, project_id)
     rename_many_document_records(renames, project_id)
+    rename_graph_sources(renames, project_id)
     return renames

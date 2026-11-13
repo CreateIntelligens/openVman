@@ -7,7 +7,7 @@ from pathlib import Path
 
 import knowledge.workspace
 import pytest
-from knowledge import indexer
+from knowledge import graph, indexer
 from knowledge.doc_meta import load_doc_meta, upsert_document_meta
 from knowledge.folder_move import move_knowledge_folder
 
@@ -40,6 +40,9 @@ def workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setattr(indexer, "ensure_fts_index", lambda *_a, **_k: None)
     monkeypatch.setattr(indexer, "_load_index_state", lambda _p: state)
     monkeypatch.setattr(indexer, "_save_index_state", lambda docs, _p: state.update(documents=docs))
+    # 圖譜檔放在測試的暫存目錄，不能寫到真的專案。
+    monkeypatch.setattr(graph, "get_workspace_root", lambda project_id="default": root)
+    monkeypatch.setattr(graph, "_graph_checkpoint_path", lambda _p: tmp_path / "graph_index_state.json")
     return root, tables, state
 
 
@@ -100,3 +103,42 @@ def test_a_folder_with_quick_qa_documents_is_refused(workspace, monkeypatch):
     monkeypatch.setattr(qa_nodes, "referenced_source_paths", lambda _p: {"knowledge/products/B.md"})
     with pytest.raises(ValueError, match="快速問答"):
         move_knowledge_folder("knowledge/products", "knowledge/catalogs/EVAK")
+
+
+def test_the_graph_cache_follows_the_moved_files(workspace, tmp_path):
+    root, _tables, _state = workspace
+    checkpoint = tmp_path / "graph_index_state.json"
+    checkpoint.write_text(json.dumps({"documents": {"knowledge/products/A.md": "fa", "knowledge/other.md": "fo"}}))
+    graph_dir = root / "graphify-out"
+    (graph_dir / "fragments").mkdir(parents=True)
+    node = {"nodes": [{"id": "a", "source_file": "knowledge/products/A.md"}]}
+    (graph_dir / "fragments" / "knowledge_products_A.md.json").write_text(json.dumps(node))
+    (graph_dir / "graph.json").write_text(json.dumps({"nodes": [{"source_file": "knowledge/products/A.md"},
+                                                               {"source_file": "knowledge/products/AB.md"}]}))
+
+    move_knowledge_folder("knowledge/products", "knowledge/products/EVAK沉水泵浦")
+
+    new = "knowledge/products/EVAK沉水泵浦/A.md"
+    assert json.loads(checkpoint.read_text())["documents"] == {new: "fa", "knowledge/other.md": "fo"}
+    fragment = graph_dir / "fragments" / "knowledge_products_EVAK沉水泵浦_A.md.json"
+    assert json.loads(fragment.read_text())["nodes"][0]["source_file"] == new
+    assert not (graph_dir / "fragments" / "knowledge_products_A.md.json").exists()
+    sources = [n["source_file"] for n in json.loads((graph_dir / "graph.json").read_text())["nodes"]]
+    # 只換完整路徑：AB.md 不是 A.md，不能被前綴替換改到。
+    assert sources == [new, "knowledge/products/AB.md"]
+
+
+def test_a_rebuild_after_the_move_has_nothing_to_send_to_the_llm(workspace, tmp_path, monkeypatch):
+    from infra.pipeline import CheckpointStore
+    from knowledge.indexer import fingerprint_document
+
+    root, _tables, _state = workspace
+    a = root / "knowledge" / "products" / "A.md"
+    checkpoint = tmp_path / "graph_index_state.json"
+    checkpoint.write_text(json.dumps({"documents": {"knowledge/products/A.md": fingerprint_document(a)}}))
+
+    move_knowledge_folder("knowledge/products", "knowledge/products/EVAK沉水泵浦")
+
+    done = CheckpointStore(checkpoint).load()
+    moved = root / "knowledge" / "products" / "EVAK沉水泵浦" / "A.md"
+    assert done["knowledge/products/EVAK沉水泵浦/A.md"] == fingerprint_document(moved)
