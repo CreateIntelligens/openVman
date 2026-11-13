@@ -332,14 +332,14 @@ async def internal_asr_judge(payload: InternalAsrJudgeRequest):
 )
 async def internal_audio_language(request: Request, project_id: str = "default"):
     from core.gemini_credentials import project_model_scope
-    from memory.language_detect import detect_audio_language
+    from memory.audio_language_decision import detect_audio_language_async
 
     wav = await request.body()
     if not wav:
         raise HTTPException(status_code=400, detail="empty audio")
     try:
         with project_model_scope(project_id, kind="audio_language"):
-            language = await asyncio.to_thread(detect_audio_language, wav)
+            language = await detect_audio_language_async(wav)
     except Exception as exc:  # noqa: BLE001 - 判斷失敗不能讓 ASR 失敗
         logger.warning(json.dumps({"event": "audio_language_failed", "error_type": type(exc).__name__}))
         return {"language": None}

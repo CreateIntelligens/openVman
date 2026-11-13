@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 import importlib
 import json
 import sys
@@ -975,7 +976,11 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
         update_session_message_language=lambda mid, lang, pid: languages.append((mid, lang, pid)),
     )
     heard: list[bytes] = []
-    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language", lambda wav: heard.append(wav) or "nan")
+    async def hear_as(language, wav, **_kwargs):
+        heard.append(wav)
+        return language
+
+    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language_async", functools.partial(hear_as, "nan"))
 
     session = module.GeminiLiveSession(
         relay_session_id="relay-tw",
@@ -999,7 +1004,7 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
     # 英西看轉錄文字就分得出來，不送去聽；判斷不是台語也不覆寫。
     await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
     await session._handle_input_transcription({"text": "Which pump do you recommend?"})
-    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language", lambda wav: heard.append(wav) or "zh")
+    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language_async", functools.partial(hear_as, "zh"))
     await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
     await session._handle_input_transcription({"text": "請問急診在哪裡"})
     await _wait_for(lambda: len(heard) == 2)
@@ -1012,7 +1017,10 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
 async def test_live_skips_audio_language_without_taiwanese_route(monkeypatch):
     module, fake_config = _load_module()
     monkeypatch.setattr(module, "project_has_taiwanese_route", lambda pid: pid == "proj-hospital")
-    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language", lambda wav: pytest.fail("should not classify"))
+    async def never(wav, **_kwargs):
+        pytest.fail("should not classify")
+
+    monkeypatch.setattr(importlib.import_module("live.gemini_audio"), "detect_audio_language_async", never)
     _stub_memory()
 
     session = module.GeminiLiveSession(

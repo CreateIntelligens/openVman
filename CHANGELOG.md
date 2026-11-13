@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **[2026-11-13]** **台語判斷可以先問 Gemini Decisions（預設關閉）**：`AUDIO_LANGUAGE_DECISION_ENABLED=true` 時，`POST /brain/internal/audio-language` 與 Live 的台語判斷同時送出 Gemini Decisions（`gemini-decision-1`，一次問「是不是華語／英語／西語／日語／韓語」五題是非題）和原本的 `LIVE_AUDIO_LANGUAGE_ID_MODEL`。Decisions 有把握就直接回：華語 ≥ 0.8 或英西 ≥ 0.75 判為該語言，華語 ≤ 0.65 且英西日韓都 < 0.5 判為台語；其他情況（多半是日韓分數偏高，真人台語常被聽成韓語）或 Decisions 失敗、逾時（`AUDIO_LANGUAGE_DECISION_TIMEOUT_SECONDS`，預設 2 秒）時等原本的模型，最壞情況跟關閉時一樣。不直接問「是不是台語」：它把台灣腔、台灣情境也算進去，華語常給 0.4～0.6。50 句實測（真人台語連續劇 20 句、合成華語 10 句、合成英西日韓各 5 句）：Decisions 自己下判斷的句子零誤判，台語 12/20、華語 10/10、英西 10/10 不必等原本的模型（p50 約 0.4 秒，原本 1.8 秒），合併後台語 20/20（原本 19/20）。華語只有合成語音，帶台灣腔的真人華語未驗證，所以預設關閉。每句的分數與判定記在 log `audio_language_decision`，用量照 `audio_language` 記帳。實驗腳本見 `scripts/experiments/audio-language-decision/`。
+
 - **[2026-11-13]** **快速問答的分類點名稱就展開**：以前只有底下有子分類的才會展開，只有題目的分類要點小箭頭；現在點名稱就打開右邊的編輯畫面並展開，已經選著又開著的再點一次就收起。
 
 - **[2026-11-13]** **選型篩選的設定檔不出現在文件樹**：`knowledge/products/`（含底下各商品線資料夾）的 `_catalog.yaml` 不再由 `GET /knowledge/base/documents` 列出，後台的文件樹、文件數與批次全選都看不到；搜尋索引照舊。資料夾只剩這個設定檔時，刪除資料夾會說明裡面有選型設定、不能從後台刪，不會默默刪掉。

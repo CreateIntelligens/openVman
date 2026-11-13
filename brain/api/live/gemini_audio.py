@@ -8,10 +8,10 @@ import json
 import logging
 from typing import Any
 
+from memory.audio_language_decision import detect_audio_language_async
 from memory.language_detect import (
     DEFAULT_LANGUAGE,
     TAIWANESE,
-    detect_audio_language,
     detect_language,
 )
 
@@ -119,8 +119,8 @@ class GeminiLiveAudio:
                 session_id=context.session_id, persona_id=context.persona_id,
                 channel="live",
             ):
-                language = await asyncio.to_thread(
-                    detect_audio_language, pcm_to_wav(pcm, self._utterance_rate), **kwargs,
+                language = await detect_audio_language_async(
+                    pcm_to_wav(pcm, self._utterance_rate), **kwargs,
                 )
             if language == TAIWANESE:
                 from memory.memory import update_session_message_language

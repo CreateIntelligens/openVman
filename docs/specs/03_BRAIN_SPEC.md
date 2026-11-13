@@ -503,6 +503,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 * **Live 音訊**：分流含 `nan` 時，Live 每句使用者語音暫存最後 20 秒；轉錄是中文字的句子才在背景送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）聽是不是台語，判成 `nan` 才覆寫訊息語言；英西看轉錄文字即可。Live 的 `search_knowledge` 最多等這個結果 3 秒，台語就讓台語文件優先（沒有就用主要語言與其他語言的文件補）。Live 每個文字新回合會清除前一句的語音語言判定。
 * **Brain 端點** `POST /brain/internal/audio-language`：Backend 把音訊轉成 WAV 送來，Brain 以同一個模型判斷是否為台語（重複使用同一個 Gemini client，啟動時預熱）。
+* **Gemini Decisions 前置判斷**（`AUDIO_LANGUAGE_DECISION_ENABLED`，預設關閉）：這個端點與 Live 的台語判斷同時送出 Gemini Decisions 與上述模型。Decisions 一次問五題是非題「是不是華語／英語／西語／日語／韓語」，不直接問台語（它對台語的概念模糊，華語也常給 0.4～0.6）。華語 ≥ 0.8 或英西 ≥ 0.75 回該語言；華語 ≤ 0.65 且五題外語都 < 0.5 回 `nan`；其他情況（日韓分數偏高常是真人台語被聽成韓語）、失敗或逾時就等原本模型的答案。回傳格式不變，呼叫端不需要知道用了哪一個。
 * **請求帶入語言**：Backend 的 ASR 判成台語時，前台隨訊息送 `speech_language`（文字模式放 `metadata.speech_language`、Live 放 `user_speak.speech_language`），Brain 以它存訊息語言，並讓 `search_knowledge` 查台語文件。回答文字仍是華語。文字模式另可帶 `preferred_language: "nan"`（使用者選了台語），中文字句子同樣以台語文件優先（見第 18 節）。
 * **Backend 端行為**（細節見 `01_BACKEND_SPEC.md`）：
   - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，至少留一條）；語音請求帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。Backend 讀專案分流快取 30 秒；Brain 暫時查不到時沿用上次查到的設定，從沒查到過才當沒有分流。

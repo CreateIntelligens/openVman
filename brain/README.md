@@ -345,7 +345,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 只有一條分流時不分流。多條時文件不會被過濾，只排先後：使用者語言的文件優先，不足再以主要語言與其他語言補；候選窗逐次擴大，直到同語言結果足夠，或確定再擴大也不會改變結果為止。圖譜帶入的相關段落只保留命中段落有的語言。
 - 文件語言存在 `.doc_meta.json`，可由 `PATCH /brain/knowledge/document/meta` 指定（`zh|en|es|auto`）。
 - 使用者訊息語言先以規則即時判斷，看不出語言的短句（ok、型號）歸主要語言，hi、hola 這類只有一種語言會用的招呼照該語言；`JEV_LANGUAGE_ENABLED` 時再於背景由決策供應鏈校正存檔的標籤。
-- 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。
+- 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。`AUDIO_LANGUAGE_DECISION_ENABLED=true` 時（預設關閉），這個端點與 Live 的台語判斷會同時問 Gemini Decisions（`AUDIO_LANGUAGE_DECISION_MODEL`，預設 `gemini-decision-1`）：一次問「是不是華語／英語／西語／日語／韓語」五題是非題，華語 ≥ 0.8 或英西 ≥ 0.75 判為該語言，華語 ≤ 0.65 且五題外語都 < 0.5 判為台語，其餘情況、失敗或逾時（`AUDIO_LANGUAGE_DECISION_TIMEOUT_SECONDS`，預設 2 秒）等原本的模型。金鑰與用量歸屬沿用專案的 Gemini 金鑰；每句分數記在 log 事件 `audio_language_decision`。
 - 使用者選的語言（`POST /brain/chat` 選填 `preferred_language`，`zh|en|es|nan|ja|ko`，其他值回 422）：整合方讓使用者一開始選台語／華語／英文時帶入，只是參考、不鎖定。它取代主要語言當退路：看不出語言的短句與型號用它回答、存訊息語言標籤、決定檢索語言，並以 `user_preferred_language` 放進每輪決策的 evidence；使用者這句話看得出語言（英文句、中文句）或明講要哪種語言時仍照使用者，提示詞不會要求硬用選的語言。選 `nan` 時，中文字的句子（含看不出語言的短句）跟 ASR 聽出台語一樣以台語文件優先檢索、回答用繁體中文；看得出是其他語言的句子照那個語言。只作用在當次請求，不存進 session，每次請求都要帶。Live 沒有這個欄位。
 - 分流兩條以上時，system prompt（文字對話與 Live 都有）列出專案會說的語言（國語、台語、英文…），模型被問到會說什麼語言時照實回答（`core/prompt_templates.supported_languages_line`）；只有一條分流不寫，免得模型拒絕用其他語言回答。
 - 每輪 system prompt 結尾指定回答語言，並依 `reply_seconds`（預設 20 秒，0 為不限制，上限 120）換算成字數上限：中日韓每秒 4 字，其他語言每秒 1.5 個單字（`core/prompt_templates.reply_length_line`）。只靠提示詞，不截斷輸出。
@@ -483,7 +483,7 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 | 隱私 | `PRIVACY_FILTER_ENABLED`、`PRIVACY_CLEF_TIMEOUT_SECONDS`、`PRIVACY_MAX_INFLIGHT`、`PRIVACY_FILTER_BLOCK_CATEGORIES` |
 | 上傳 | `KNOWLEDGE_UPLOAD_MAX_BYTES`、`QA_IMAGE_MAX_BYTES`、`QA_IMAGE_MAX_SIDE_PX`（見「上傳限制」） |
 | 安全 | `MAX_INPUT_LENGTH`、`ENABLE_CONTENT_FILTER`、`BLOCK_PROMPT_INJECTION`、`REQUEST_RATE_LIMIT_PER_MINUTE`、`ALLOWED_CHANNELS` |
-| Live | `LIVE_GEMINI_MODEL`、`LIVE_GEMINI_TOOLS_ENABLED`、`LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`、`LIVE_AUDIO_LANGUAGE_ID_MODEL`、`LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS` |
+| Live | `LIVE_GEMINI_MODEL`、`LIVE_GEMINI_TOOLS_ENABLED`、`LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`、`LIVE_AUDIO_LANGUAGE_ID_MODEL`、`LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`、`AUDIO_LANGUAGE_DECISION_ENABLED`、`AUDIO_LANGUAGE_DECISION_MODEL`、`AUDIO_LANGUAGE_DECISION_TIMEOUT_SECONDS` |
 
 注意事項：
 

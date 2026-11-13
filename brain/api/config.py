@@ -102,6 +102,11 @@ class BrainSettings(BaseSettings):
     # 知識庫有台語文件的專案，Live 會把轉錄成中文字的句子另送這個模型聽是不是台語。
     # 13 句（台語 8、華英西 5）：3.5-flash-lite 台語 8/8、西語誤判 1，p50 1.4 s；3.5-flash 漏 1 句台語、2.3 s。
     live_audio_language_id_model: str = "gemini-3.5-flash-lite"
+    # 打開時，聽台語前先問 Gemini Decisions（約 0.4 s），有把握就直接回，
+    # 沒把握才等上面那個模型（約 1.8 s）。兩個同時送出，關掉就完全照舊。
+    audio_language_decision_enabled: bool = False
+    audio_language_decision_model: str = "gemini-decision-1"
+    audio_language_decision_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
     # 文字回合的預取（search_knowledge／web／memory）在送給模型前做完，這段時間使用者
     # 只能乾等；search_web 最長約 20 秒。知識庫查詢通常 1 秒內回來，超過的那項改由模型自己查。
     live_gemini_prefetch_timeout_seconds: float = Field(default=1.0, gt=0, le=10)
