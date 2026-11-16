@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **Avatar SDK 的 pushPcm 預設先緩衝 150 ms**：新增初始化選項 `audioLeadMs`（預設 150，0～2000）。每段話開頭先扣住這段時間的 PCM，再一起送進嘴型模型並開始播；以前照播放速度每 100 ms 送一包時，嘴型模型只拿到一小段音訊，嘴幾乎不張開，而且包與包之間的空檔會立刻清掉嘴型緩衝。佇列播完後再等 300 ms 沒有新音訊才結束說話，`speaking` 的 `start` 改在第一段音訊真正開始播時才派送。`audioLeadMs: 0` 完全維持舊行為；宿主已自行扣住開頭的請改設 0。
+
 - **[2026-11-16]** **Avatar SDK 的 silent 模式不再需要瀏覽器放行音訊**：`audioOutput: "silent"` 改用頁面時鐘排程每段音訊、以 OfflineAudioContext 解碼整段音檔，不建立 AudioContext；沒被使用者點過的視窗（kiosk 開機後、`window.open` 開出的視窗）也能 `pushPcm` 對嘴，不再丟 `AUTOPLAY_BLOCKED`。speaking 事件、`pushPcm`／`playAudio` 的 Promise 與嘴型時間軸不變；`speaker` 模式照舊。另外，嘴型用的 WebGL 畫布失效（`webglcontextlost`）時改為停止貼嘴型、只留人物影片，並以 `error` 事件 `WEBGL_CONTEXT_LOST` 通知，不再貼上半透明暗塊。
 
 - **[2026-11-16]** **Embed key 的人物清單只列讀得到的人物**：`GET /api/v1/characters` 帶 Embed key 時，全域公開人物也要在金鑰允許的人物內才列出。以前清單會列出所有全域公開人物，但 `/static/characters/*` 依金鑰白名單回 403，SDK 選到就讀不到素材。

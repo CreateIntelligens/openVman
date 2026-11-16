@@ -4,6 +4,10 @@ import type { OpenVmanAvatarAudioOutput } from "./types";
 
 const PCM_SAMPLE_RATE = 16000;
 const PCM_CHUNK_SAMPLES = 4096;
+export const DEFAULT_AUDIO_LEAD_MS = 150;
+// 照播放速度送 PCM 時，下一包常在上一包播完後才到；給這段寬限，不要每個空檔都
+// 清掉嘴型緩衝、結束說話。
+const IDLE_GRACE_MS = 300;
 
 interface ScheduledPlay {
   onended: (() => void) | null;
@@ -34,11 +38,19 @@ export class AvatarAudio {
   private settlers = new Set<() => void>();
   private sources = new Set<ScheduledPlay>();
   private speaking = false;
+  // pushPcm 一段話的開頭先扣住 leadMs，一次送進 runtime 再開始播：嘴型模型需要往後看
+  // 一段音訊，只有一小包時張不開嘴。
+  private held: Int16Array[] = [];
+  private leadTimer: number | null = null;
+  private idleTimer: number | null = null;
+  private speakingTimer: number | null = null;
+  private utteranceOpen = false;
 
   constructor(
     private readonly runtime: AvatarRuntime,
     private readonly onSpeakingChange: (speaking: boolean) => void,
     audioOutput: OpenVmanAvatarAudioOutput = "speaker",
+    private readonly leadMs: number = DEFAULT_AUDIO_LEAD_MS,
   ) {
     this.player = audioOutput === "silent" ? new ClockPlayer() : new WebAudioPlayer();
   }
@@ -109,7 +121,26 @@ export class AvatarAudio {
     if (this.destroyed || chunk.length === 0) return;
     await this.prepare();
     if (this.destroyed) return;
+    this.cancelIdle();
+    if (this.leadMs > 0 && (this.leadTimer !== null || !this.utteranceOpen)) {
+      this.held.push(chunk);
+      if (this.leadTimer === null) {
+        const generation = this.playbackGeneration;
+        this.leadTimer = window.setTimeout(() => {
+          this.leadTimer = null;
+          const held = this.held;
+          this.held = [];
+          if (generation !== this.playbackGeneration || this.destroyed) return;
+          for (const pending of held) this.startPcm(pending);
+        }, this.leadMs);
+      }
+      return;
+    }
+    this.startPcm(chunk);
+  }
 
+  private startPcm(chunk: Int16Array): void {
+    this.utteranceOpen = true;
     const samples = new Float32Array(chunk.length);
     for (let index = 0; index < chunk.length; index += 1) {
       samples[index] = chunk[index] < 0
@@ -136,8 +167,9 @@ export class AvatarAudio {
       listener?.();
     };
     try {
-      this.setSpeaking(true);
+      this.cancelIdle();
       const startTime = Math.max(this.player.now(), this.nextStartTime);
+      this.announceSpeakingAt(startTime);
       playback = this.player.play(buffer, startTime);
       this.sources.add(playback);
       playback.onended = finish;
@@ -158,6 +190,14 @@ export class AvatarAudio {
 
   interrupt(): void {
     this.playbackGeneration += 1;
+    this.held = [];
+    this.utteranceOpen = false;
+    for (const timer of [this.leadTimer, this.idleTimer, this.speakingTimer]) {
+      if (timer !== null) window.clearTimeout(timer);
+    }
+    this.leadTimer = null;
+    this.idleTimer = null;
+    this.speakingTimer = null;
     for (const source of this.sources) {
       source.onended = null;
       source.stop();
@@ -177,10 +217,39 @@ export class AvatarAudio {
   }
 
   private finishIfIdle(): void {
-    if (this.sources.size > 0) return;
-    this.runtime.clearAudio();
-    this.runtime.endSpeaking();
-    this.setSpeaking(false);
+    if (this.sources.size > 0 || this.idleTimer !== null) return;
+    const finish = (): void => {
+      this.idleTimer = null;
+      if (this.sources.size > 0 || this.leadTimer !== null) return;
+      this.utteranceOpen = false;
+      if (this.speakingTimer !== null) window.clearTimeout(this.speakingTimer);
+      this.speakingTimer = null;
+      this.runtime.clearAudio();
+      this.runtime.endSpeaking();
+      this.setSpeaking(false);
+    };
+    if (this.leadMs > 0) this.idleTimer = window.setTimeout(finish, IDLE_GRACE_MS);
+    else finish();
+  }
+
+  private cancelIdle(): void {
+    if (this.idleTimer === null) return;
+    window.clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+
+  // speaking start 在第一段音訊真正開始播的時間點才發，不是排上時間軸的當下。
+  private announceSpeakingAt(startTime: number): void {
+    if (this.speaking || this.speakingTimer !== null) return;
+    const delayMs = (startTime - this.player.now()) * 1000;
+    if (delayMs <= 5) {
+      this.setSpeaking(true);
+      return;
+    }
+    this.speakingTimer = window.setTimeout(() => {
+      this.speakingTimer = null;
+      this.setSpeaking(true);
+    }, delayMs);
   }
 
   private setSpeaking(speaking: boolean): void {

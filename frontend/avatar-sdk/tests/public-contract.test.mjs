@@ -338,7 +338,7 @@ test("rejects vendor DOM ID conflicts without overwriting the host", async () =>
 
 test("playAudio decodes host audio without calling an embed API", async () => {
   const { requests, runtimeCalls, sdk } = await loadSdk();
-  const avatar = await sdk.init({ characterId: "000" });
+  const avatar = await sdk.init({ audioLeadMs: 0, characterId: "000" });
   const states = [];
   avatar.on("speaking", (event) => states.push(event.state));
 
@@ -482,7 +482,7 @@ test("rejects init when the character video cannot start", async () => {
 
 test("pushPcm queues host chunks in order without backend requests", async () => {
   const { requests, runtimeCalls, sdk } = await loadSdk({ autoEnd: false });
-  const avatar = await sdk.init({ characterId: "000" });
+  const avatar = await sdk.init({ audioLeadMs: 0, characterId: "000" });
 
   await avatar.pushPcm(new Int16Array(1600));
   await avatar.pushPcm(new Int16Array(800));
@@ -496,7 +496,7 @@ test("idle rendering keeps the native frame until PCM playback begins", async ()
   const { document, runtimeCalls, sdk, setRenderingTime } = await loadSdk({
     autoEnd: false,
   });
-  const avatar = await sdk.init({ characterId: "000" });
+  const avatar = await sdk.init({ audioLeadMs: 0, characterId: "000" });
   const canvas = document.getElementById("canvas_video");
   const context = canvas.getContext("2d");
   canvas.width = 1080;

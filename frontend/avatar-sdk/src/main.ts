@@ -1,4 +1,4 @@
-import { AvatarAudio } from "./audio";
+import { AvatarAudio, DEFAULT_AUDIO_LEAD_MS } from "./audio";
 import { AvatarConversation } from "./chat";
 import { createAvatarDom, removeAvatarDom } from "./dom";
 import { OpenVmanAvatarError } from "./errors";
@@ -40,9 +40,21 @@ function containerId(container?: HTMLElement): string {
   return String(id);
 }
 
+function audioLeadMs(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_AUDIO_LEAD_MS;
+  if (!Number.isFinite(value) || value < 0 || value > 2000) {
+    throw new OpenVmanAvatarError(
+      "INVALID_OPTIONS",
+      "audioLeadMs must be a number of milliseconds between 0 and 2000.",
+    );
+  }
+  return value;
+}
+
 function signature(options: OpenVmanAvatarOptions): string {
   return JSON.stringify({
     assetsBaseUrl: options.assetsBaseUrl,
+    audioLeadMs: options.audioLeadMs,
     audioOutput: options.audioOutput ?? "speaker",
     characterId: options.characterId,
     container: containerId(options.container),
@@ -173,6 +185,7 @@ async function createInstance(
       });
     },
     options.audioOutput ?? "speaker",
+    audioLeadMs(options.audioLeadMs),
   );
 
   const runAudio = async (operation: () => Promise<void>): Promise<void> => {

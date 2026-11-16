@@ -63,6 +63,7 @@ const avatar = await OpenVmanAvatar.init({
 | `zIndex` | 否 | `2147483000` | 覆寫 root 的 stacking order。 |
 | `container` | 否 | `document.body` | 指定時改為填滿該容器，不使用 viewport 懸浮位置。 |
 | `assetsBaseUrl` | 否 | SDK origin 的 `/static/characters` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
+| `audioLeadMs` | 否 | `150` | `pushPcm` 每段話開頭先扣住的毫秒數（0～2000）：收滿這段時間的 PCM 再一起送進嘴型模型並開始播，照播放速度送 PCM 時嘴才張得開。這段期間 `speaking` 不會先發 `start`。設 `0` 則收到就播（舊行為）。宿主若已自己扣住開頭，請設 `0`，避免延遲疊加。 |
 | `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。`silent` 以頁面時鐘排程、不建立 AudioContext，沒被使用者點過的視窗（開機後的 kiosk、`window.open` 開出的視窗）也能對嘴，不會丟 `AUTOPLAY_BLOCKED`。 |
 | `embedKey` | 否 | 無 | 對話模式用的 embed key。設定後 `ask()` 會帶 `X-Embed-Key` 且不送 cookie；未設定則以同源 session cookie 呼叫。 |
 | `projectId` | 否 | 後端預設 | `ask()` 使用的專案 ID。使用 embed key 時必須與該金鑰綁定的專案一致，否則回 403。 |
@@ -209,7 +210,7 @@ for await (const chunk of pcmStream) {
 | 事件 | Payload | 說明 |
 |---|---|---|
 | `ready` | `{ type: "ready" }` | runtime 與角色已可用；在 init 完成後訂閱也會收到。 |
-| `speaking` | `{ type, state: "start" \| "stop" }` | 音訊播放狀態。 |
+| `speaking` | `{ type, state: "start" \| "stop" }` | 音訊播放狀態。`start` 在第一段音訊真正開始播時才派送；佇列播完後再等 300 ms 沒有新音訊才派送 `stop`（`audioLeadMs: 0` 時播完立即派送），照播放速度送 PCM 的空檔不會斷成好幾段。 |
 | `reply` | `{ type, text }` | 對話模式取得回覆文字，於語音合成前派送。 |
 | `error` | `{ type, code, message, retryAfterSeconds? }` | 音訊、資源、autoplay 或對話錯誤；`retryAfterSeconds` 只在 `RATE_LIMITED` 出現。 |
 | `destroyed` | `{ type: "destroyed" }` | instance 已清理。 |

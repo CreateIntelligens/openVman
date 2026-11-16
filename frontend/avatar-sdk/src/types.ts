@@ -17,6 +17,9 @@ export interface OpenVmanAvatarTtsOptions {
 
 export interface OpenVmanAvatarOptions {
   assetsBaseUrl?: string;
+  // pushPcm 每段話開頭先扣住的毫秒數（預設 150），讓嘴型模型拿到足夠的音訊；
+  // 0 表示收到就播。
+  audioLeadMs?: number;
   // 宿主自行播放音訊時，可用 silent 只驅動嘴型。
   audioOutput?: OpenVmanAvatarAudioOutput;
   characterId?: string;

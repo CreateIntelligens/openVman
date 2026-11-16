@@ -228,7 +228,7 @@ async function loadSdk({
       };
     },
     queueMicrotask,
-    performance: { now: () => 0 },
+    performance: { now: () => performance.now() },
     window: { clearTimeout, setTimeout },
   };
   if (withCryptoUuid) {
@@ -591,7 +591,7 @@ test("speech failures report SPEECH_FAILED after the reply event", async () => {
 test("a silent instance drives lip sync without asking the browser for audio", async () => {
   // 沒被點過的視窗也要能對嘴：silent 模式完全不建立 AudioContext。
   const { runtimeCalls, sdk } = await loadSdk({ audioBlocked: true });
-  const avatar = await sdk.init({ audioOutput: "silent", characterId: "000" });
+  const avatar = await sdk.init({ audioLeadMs: 0, audioOutput: "silent", characterId: "000" });
   const speaking = [];
   avatar.on("speaking", (event) => speaking.push(event.state));
 
@@ -800,4 +800,52 @@ test("a speech failure mid-stream still reports the reply before SPEECH_FAILED",
 
   await assert.rejects(avatar.ask("你好"), (error) => error.code === "SPEECH_FAILED");
   assert.deepEqual(events, ["reply", "SPEECH_FAILED"]);
+});
+
+test("pushPcm holds the start of an utterance so the mouth model sees enough audio", async () => {
+  const { runtimeCalls, sdk } = await loadSdk({ audioBlocked: true });
+  const avatar = await sdk.init({ audioOutput: "silent", characterId: "000" });
+  const speaking = [];
+  avatar.on("speaking", (event) => speaking.push(event.state));
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // 照播放速度每 100 ms 一包。
+  await avatar.pushPcm(new Int16Array(1600));
+  assert.equal(runtimeCalls.pushedAudio, 0, "first chunk is held for the lead");
+  assert.deepEqual(speaking, []);
+  await wait(100);
+  await avatar.pushPcm(new Int16Array(1600));
+  assert.equal(runtimeCalls.pushedAudio, 0);
+  await wait(80);
+  // 150 ms 到：兩包一起送進 runtime、開始播，這時才算開始說話。
+  assert.equal(runtimeCalls.pushedAudio, 2);
+  assert.deepEqual(speaking, ["start"]);
+
+  // 播完後的小空檔不結束說話、不清嘴型緩衝。
+  await wait(220);
+  const cleared = runtimeCalls.clearAudio;
+  await avatar.pushPcm(new Int16Array(1600));
+  assert.equal(runtimeCalls.pushedAudio, 3, "mid-utterance chunks play at once");
+  assert.equal(runtimeCalls.clearAudio, cleared);
+  assert.deepEqual(speaking, ["start"]);
+
+  await wait(500);
+  assert.deepEqual(speaking, ["start", "stop"]);
+});
+
+test("audioLeadMs 0 keeps playing chunks as soon as they arrive", async () => {
+  const { runtimeCalls, sdk } = await loadSdk({ audioBlocked: true });
+  const avatar = await sdk.init({ audioLeadMs: 0, audioOutput: "silent", characterId: "000" });
+
+  await avatar.pushPcm(new Int16Array(1600));
+
+  assert.equal(runtimeCalls.pushedAudio, 1);
+});
+
+test("an invalid audioLeadMs is rejected at init", async () => {
+  const { sdk } = await loadSdk();
+  await assert.rejects(
+    sdk.init({ audioLeadMs: -1, characterId: "000" }),
+    (error) => error.code === "INVALID_OPTIONS",
+  );
 });
