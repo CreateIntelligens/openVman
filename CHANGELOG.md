@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **對話服務預設改為 16 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 8 改為 16。隔離環境量測（`docs/plans/brain-100-concurrency.md`「每個 process 的容量」）每個對話 worker 約撐每秒 1～1.25 題，8 個在每秒 10 題時聽到第一句 p95 5.7 秒，16 個為 2.7～3.5 秒；每個 worker 約 0.4～0.5 GB，閒置不吃 CPU。
+
 - **[2026-11-16]** **Gemini TTS、Edge 不再先打文字正規化**：`/api/v1/tts/stream` 與 `/v1/audio/speech` 以前不分引擎，每句中文都先呼叫 `NORMALIZE_API_URL`（數字念成中文、轉簡體），實測每句 0.36～0.54 秒。現在只有 `TTS_NORMALIZE_PROVIDERS` 列出的引擎（預設 `indextts,indextts-nurse,voxcpm,cosyvoice`）才打；Gemini TTS、Edge 自己會念數字，只做去 markdown／表情符號的本地清理，送原文（不轉簡體）。沒指定引擎時可能落到自架引擎，照舊正規化。Gemini 串流失敗時直接回錯誤、不會改由自架引擎接手，所以不會有未正規化的文字送進自架引擎。
 
 - **[2026-11-16]** **Avatar SDK 的 pushPcm 預設先緩衝 150 ms**：新增初始化選項 `audioLeadMs`（預設 150，0～2000）。每段話開頭先扣住這段時間的 PCM，再一起送進嘴型模型並開始播；以前照播放速度每 100 ms 送一包時，嘴型模型只拿到一小段音訊，嘴幾乎不張開，而且包與包之間的空檔會立刻清掉嘴型緩衝。佇列播完後再等 300 ms 沒有新音訊才結束說話，`speaking` 的 `start` 改在第一段音訊真正開始播時才派送。`audioLeadMs: 0` 完全維持舊行為；宿主已自行扣住開頭的請改設 0。
