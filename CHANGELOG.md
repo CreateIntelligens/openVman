@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **dev 的 Backend 改成跟正式站一樣多 process**：以前 `ENV=dev` 一律用 `uvicorn --reload` 啟動，`--reload` 只能單一 process，所以就算 `BACKEND_WORKERS=4`，dev 也只有 1 個 process，限流、鎖、監控計數這類多 process 才會出的問題在 dev 測不到，壓測數字也偏低。現在 dev 照 `BACKEND_WORKERS`（預設 4）開 process、不自動重載，改 Backend 程式後要 `docker restart` 該容器；`BACKEND_WORKERS=1` 時維持自動重載。
+
 - **[2026-11-16]** **Brain 每個呼叫者的請求上限從每分鐘 90 調到 1,200**：上限是依呼叫者計算（每把 API key、Embed key、每個登入帳號各一份），一把 Embed key 常由整群 kiosk 共用，90（約每秒 1.5 題）只夠十幾台；1,200 約每秒 20 題，夠 100 台以上，仍擋得住失控的迴圈。`REQUEST_RATE_LIMIT_PER_MINUTE` 可覆寫。
 
 - **[2026-11-16]** **對話服務預設改為 16 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 8 改為 16。隔離環境量測（`docs/plans/brain-100-concurrency.md`「每個 process 的容量」）每個對話 worker 約撐每秒 1～1.25 題，8 個在每秒 10 題時聽到第一句 p95 5.7 秒，16 個為 2.7～3.5 秒；每個 worker 約 0.4～0.5 GB，閒置不吃 CPU。

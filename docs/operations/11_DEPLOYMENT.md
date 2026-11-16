@@ -141,7 +141,7 @@ PYTHON
 
 ### Backend 多 process
 
-Backend 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動，Compose 預設 4（`ENV=dev` 有 `--reload`，固定一個）。同一個 port 由系統分給各 process，不需要多個容器或改 nginx。每個 process 約 0.1～0.2 GB，尖峰約 1 核。
+Backend 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動，Compose 預設 4，dev 也一樣；`--reload` 只能單一 process，所以 `ENV=dev` 只在 `BACKEND_WORKERS=1` 時自動重載，多 process 時改程式要 `docker restart` Backend 容器。同一個 port 由系統分給各 process，不需要多個容器或改 nginx。每個 process 約 0.1～0.2 GB，尖峰約 1 核。
 
 | 狀態 | 多 process 時的作法 |
 |---|---|
@@ -320,6 +320,8 @@ build 對應服務。
 frontend、backend 與 Brain 原始碼 bind mounts、保留 frontend node_modules volumes、
 將 Admin build target 改回 `dev` 並移除正式 registry image 名稱，讓管理服務與 Backend
 使用 `ENV=dev`；`api-chat` 保留 `ENV=prod` 與多 worker，避免 reload 與 workers 衝突。
+Backend 在 dev 也照 `BACKEND_WORKERS`（預設 4）開多個 process、不自動重載，改 Backend
+程式後要 `docker restart` 該容器；想要自動重載就在 worktree 的 `.env` 寫 `BACKEND_WORKERS=1`。
 兩個 Brain 服務都掛同一份 worktree 資料與原始碼，同時把 dev container 的 Watchtower
 label 設為 `false`，避免同一台
 主機的正式 Watchtower 把本機開發 image 換回 Docker Hub 版本。
