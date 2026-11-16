@@ -63,6 +63,7 @@ from app.tts_stream_upstream import (
     _stream_failed,
 )
 from app.tts_text import prepare_tts_text_async
+from app.tts_text_cleaner import clean_for_tts
 from app.upstream_guard import (
     SKIPPED_BREAKER,
     TTS_BREAKER,
@@ -177,6 +178,21 @@ def _cache_scope(
     return ""
 
 
+async def spoken_text(text: str, provider: str, *, taiwanese: bool) -> str:
+    """Text the chosen engine will read; only engines that need it get normalized.
+
+    沒指定引擎（auto）時可能落到自架引擎，照舊正規化。
+    """
+    names = {
+        name.strip()
+        for name in get_tts_config().tts_normalize_providers.split(",")
+        if name.strip()
+    }
+    if provider and provider not in names:
+        return clean_for_tts(text) or ""
+    return (await prepare_tts_text_async(text, simplified=not taiwanese)) or ""
+
+
 @router.post("/v1/audio/speech", tags=["TTS"], summary="文字轉語音")
 async def create_speech(
     body: SpeechRequest,
@@ -216,9 +232,7 @@ async def create_speech(
     language = (body.speech_language or body.language).strip()
     locale = _tts_locale(provider, language)
     taiwanese = locale.lower().split("-")[0] == "nan"
-    cleaned_text = (await prepare_tts_text_async(
-        body.input, simplified=not taiwanese,
-    )) or ""
+    cleaned_text = await spoken_text(body.input, provider, taiwanese=taiwanese)
     request = SynthesizeRequest(
         text=cleaned_text,
         locale=locale,
@@ -639,9 +653,7 @@ async def tts_stream_endpoint(
     )
     locale = _tts_locale(provider, language)
     taiwanese = locale.lower().split("-")[0] == "nan"
-    cleaned = (await prepare_tts_text_async(
-        body.text.strip(), simplified=not taiwanese,
-    )) or ""
+    cleaned = await spoken_text(body.text.strip(), provider, taiwanese=taiwanese)
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
     # 整個 /tts/stream 共用一個期限：串流站花掉的時間，後面的整段合成鏈就少用這麼多。

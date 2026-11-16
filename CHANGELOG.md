@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **Gemini TTS、Edge 不再先打文字正規化**：`/api/v1/tts/stream` 與 `/v1/audio/speech` 以前不分引擎，每句中文都先呼叫 `NORMALIZE_API_URL`（數字念成中文、轉簡體），實測每句 0.36～0.54 秒。現在只有 `TTS_NORMALIZE_PROVIDERS` 列出的引擎（預設 `indextts,indextts-nurse,voxcpm,cosyvoice`）才打；Gemini TTS、Edge 自己會念數字，只做去 markdown／表情符號的本地清理，送原文（不轉簡體）。沒指定引擎時可能落到自架引擎，照舊正規化。Gemini 串流失敗時直接回錯誤、不會改由自架引擎接手，所以不會有未正規化的文字送進自架引擎。
+
 - **[2026-11-16]** **Avatar SDK 的 pushPcm 預設先緩衝 150 ms**：新增初始化選項 `audioLeadMs`（預設 150，0～2000）。每段話開頭先扣住這段時間的 PCM，再一起送進嘴型模型並開始播；以前照播放速度每 100 ms 送一包時，嘴型模型只拿到一小段音訊，嘴幾乎不張開，而且包與包之間的空檔會立刻清掉嘴型緩衝。佇列播完後再等 300 ms 沒有新音訊才結束說話，`speaking` 的 `start` 改在第一段音訊真正開始播時才派送。`audioLeadMs: 0` 完全維持舊行為；宿主已自行扣住開頭的請改設 0。
 
 - **[2026-11-16]** **Avatar SDK 的 silent 模式不再需要瀏覽器放行音訊**：`audioOutput: "silent"` 改用頁面時鐘排程每段音訊、以 OfflineAudioContext 解碼整段音檔，不建立 AudioContext；沒被使用者點過的視窗（kiosk 開機後、`window.open` 開出的視窗）也能 `pushPcm` 對嘴，不再丟 `AUTOPLAY_BLOCKED`。speaking 事件、`pushPcm`／`playAudio` 的 Promise 與嘴型時間軸不變；`speaker` 模式照舊。另外，嘴型用的 WebGL 畫布失效（`webglcontextlost`）時改為停止貼嘴型、只留人物影片，並以 `error` 事件 `WEBGL_CONTEXT_LOST` 通知，不再貼上半透明暗塊。
