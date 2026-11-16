@@ -120,3 +120,21 @@ test("idle lip-sync bypass preserves native idle frames and vendor speaking fram
   assert.equal(context.clearRect, originalClearRect);
   assert.equal(context.drawImage, originalDrawImage);
 });
+
+test("a lost lip-sync canvas leaves the native frame instead of a dark patch", () => {
+  let now = 0;
+  const { calls, canvas, context } = createFakeCanvas();
+  const bypass = installIdleLipSyncBypass(canvas, () => now);
+
+  bypass.beginSpeaking();
+  now = 1000;
+  bypass.suppressPatches();
+  calls.length = 0;
+  renderVendorFrame(context);
+
+  // 整張清除與人物影片照畫；嘴型的局部清除與貼圖都跳過。
+  assert.deepEqual(calls, [
+    `clearRect ${CANVAS_WIDTH}x${CANVAS_HEIGHT}`,
+    "drawImage 5 alpha=1",
+  ]);
+});

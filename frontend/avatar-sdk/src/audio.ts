@@ -5,33 +5,46 @@ import type { OpenVmanAvatarAudioOutput } from "./types";
 const PCM_SAMPLE_RATE = 16000;
 const PCM_CHUNK_SAMPLES = 4096;
 
+interface ScheduledPlay {
+  onended: (() => void) | null;
+  stop(): void;
+}
+
+/**
+ * Where scheduled audio is timed. speaker plays through Web Audio; silent
+ * keeps the same timeline on the page clock, so a window nobody has clicked
+ * can still drive lip sync (browsers suspend AudioContext until a gesture).
+ */
+interface AudioPlayer {
+  now(): number;
+  prepare(): Promise<void>;
+  decode(encoded: ArrayBuffer): Promise<AudioBuffer>;
+  pcmBuffer(samples: Float32Array<ArrayBuffer>): AudioBuffer | number;
+  play(buffer: AudioBuffer | number, startTime: number): ScheduledPlay;
+  close(): void;
+}
+
 export class AvatarAudio {
-  private context: AudioContext | null = null;
+  private readonly player: AudioPlayer;
   private destroyed = false;
-  private outputNode: AudioNode | null = null;
   private nextStartTime = 0;
   private playbackGeneration = 0;
   // 讓排隊中的片段依呼叫順序解碼、排上時間軸。
   private queueTail: Promise<void> = Promise.resolve();
   private settlers = new Set<() => void>();
-  private sources = new Set<AudioBufferSourceNode>();
+  private sources = new Set<ScheduledPlay>();
   private speaking = false;
 
   constructor(
     private readonly runtime: AvatarRuntime,
     private readonly onSpeakingChange: (speaking: boolean) => void,
-    private readonly audioOutput: OpenVmanAvatarAudioOutput = "speaker",
-  ) {}
+    audioOutput: OpenVmanAvatarAudioOutput = "speaker",
+  ) {
+    this.player = audioOutput === "silent" ? new ClockPlayer() : new WebAudioPlayer();
+  }
 
   async prepare(): Promise<void> {
-    const context = this.ensureContext();
-    if (context.state === "suspended") await context.resume();
-    if (context.state !== "running") {
-      throw new OpenVmanAvatarError(
-        "AUTOPLAY_BLOCKED",
-        "Audio playback requires a user gesture.",
-      );
-    }
+    await this.player.prepare();
   }
 
   async playAudio(source: Blob | ArrayBuffer): Promise<void> {
@@ -70,16 +83,15 @@ export class AvatarAudio {
     const stale = () =>
       generation !== this.playbackGeneration || this.destroyed;
     if (stale()) return null;
-    const context = this.ensureContext();
     await this.prepare();
     if (stale()) return null;
-    const decoded = await context.decodeAudioData(encoded);
+    const decoded = await this.player.decode(encoded);
     if (stale()) return null;
     this.runtime.beginSpeaking();
     for (const chunk of decodedAudioBufferToPcmChunks(decoded)) {
       this.runtime.pushAudio(chunk);
     }
-    return this.scheduleSource(context, decoded);
+    return this.scheduleSource(decoded, decoded.length / decoded.sampleRate);
   }
 
   private untilFinished(scheduled: ScheduledSource): Promise<void> {
@@ -98,45 +110,40 @@ export class AvatarAudio {
     await this.prepare();
     if (this.destroyed) return;
 
-    const context = this.ensureContext();
-    const buffer = context.createBuffer(1, chunk.length, PCM_SAMPLE_RATE);
     const samples = new Float32Array(chunk.length);
     for (let index = 0; index < chunk.length; index += 1) {
       samples[index] = chunk[index] < 0
         ? chunk[index] / 32768
         : chunk[index] / 32767;
     }
-    buffer.copyToChannel(samples, 0);
     this.runtime.beginSpeaking();
     this.runtime.pushAudio(chunk);
 
-    this.scheduleSource(context, buffer);
+    this.scheduleSource(this.player.pcmBuffer(samples), chunk.length / PCM_SAMPLE_RATE);
   }
 
   private scheduleSource(
-    context: AudioContext,
-    buffer: AudioBuffer,
+    buffer: AudioBuffer | number,
+    durationSeconds: number,
   ): ScheduledSource {
-    const playbackSource = context.createBufferSource();
-    this.sources.add(playbackSource);
-    playbackSource.buffer = buffer;
-    playbackSource.connect(this.ensureOutputNode(context));
     let listener: (() => void) | null = null;
     let finished = false;
+    let playback: ScheduledPlay | null = null;
     const finish = () => {
       finished = true;
-      this.sources.delete(playbackSource);
+      if (playback) this.sources.delete(playback);
       this.finishIfIdle();
       listener?.();
     };
-    playbackSource.onended = finish;
     try {
       this.setSpeaking(true);
-      const startTime = Math.max(context.currentTime, this.nextStartTime);
-      playbackSource.start(startTime);
-      this.nextStartTime = startTime + buffer.length / buffer.sampleRate;
+      const startTime = Math.max(this.player.now(), this.nextStartTime);
+      playback = this.player.play(buffer, startTime);
+      this.sources.add(playback);
+      playback.onended = finish;
+      this.nextStartTime = startTime + durationSeconds;
     } catch (error) {
-      this.sources.delete(playbackSource);
+      if (playback) this.sources.delete(playback);
       this.finishIfIdle();
       throw error;
     }
@@ -153,14 +160,10 @@ export class AvatarAudio {
     this.playbackGeneration += 1;
     for (const source of this.sources) {
       source.onended = null;
-      try {
-        source.stop();
-      } catch {
-        void 0;
-      }
+      source.stop();
     }
     this.sources.clear();
-    this.nextStartTime = this.context?.currentTime ?? 0;
+    this.nextStartTime = this.player.now();
     for (const settle of [...this.settlers]) settle();
     this.runtime.clearAudio();
     this.runtime.resetSpeaking();
@@ -170,38 +173,7 @@ export class AvatarAudio {
   destroy(): void {
     this.destroyed = true;
     this.interrupt();
-    void this.context?.close();
-    this.context = null;
-    this.outputNode = null;
-  }
-
-  // silent 模式仍讓 source 跑完整個排程（onended 才會觸發 speaking 結束），
-  // 只是經過 gain=0 不出聲；嘴型由 runtime 依 pushAudio 的節奏驅動。
-  private ensureOutputNode(context: AudioContext): AudioNode {
-    if (this.outputNode) return this.outputNode;
-    if (this.audioOutput === "silent") {
-      const mute = context.createGain();
-      mute.gain.value = 0;
-      mute.connect(context.destination);
-      this.outputNode = mute;
-    } else {
-      this.outputNode = context.destination;
-    }
-    return this.outputNode;
-  }
-
-  private ensureContext(): AudioContext {
-    const AudioContextConstructor = window.AudioContext
-      ?? (window as Window & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioContextConstructor) {
-      throw new OpenVmanAvatarError(
-        "AUTOPLAY_BLOCKED",
-        "This browser does not support Web Audio.",
-      );
-    }
-    this.context ??= new AudioContextConstructor({ sampleRate: PCM_SAMPLE_RATE });
-    return this.context;
+    this.player.close();
   }
 
   private finishIfIdle(): void {
@@ -220,6 +192,122 @@ export class AvatarAudio {
 
 interface ScheduledSource {
   onFinished: (listener: () => void) => void;
+}
+
+function audioContextConstructor(): typeof AudioContext {
+  const constructor = window.AudioContext
+    ?? (window as Window & { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!constructor) {
+    throw new OpenVmanAvatarError(
+      "AUTOPLAY_BLOCKED",
+      "This browser does not support Web Audio.",
+    );
+  }
+  return constructor;
+}
+
+class WebAudioPlayer implements AudioPlayer {
+  private context: AudioContext | null = null;
+
+  now(): number {
+    return this.context?.currentTime ?? 0;
+  }
+
+  async prepare(): Promise<void> {
+    const context = this.ensureContext();
+    if (context.state === "suspended") await context.resume();
+    if (context.state !== "running") {
+      throw new OpenVmanAvatarError(
+        "AUTOPLAY_BLOCKED",
+        "Audio playback requires a user gesture.",
+      );
+    }
+  }
+
+  decode(encoded: ArrayBuffer): Promise<AudioBuffer> {
+    return this.ensureContext().decodeAudioData(encoded);
+  }
+
+  pcmBuffer(samples: Float32Array<ArrayBuffer>): AudioBuffer {
+    const buffer = this.ensureContext().createBuffer(1, samples.length, PCM_SAMPLE_RATE);
+    buffer.copyToChannel(samples, 0);
+    return buffer;
+  }
+
+  play(buffer: AudioBuffer | number, startTime: number): ScheduledPlay {
+    const context = this.ensureContext();
+    const source = context.createBufferSource();
+    source.buffer = buffer as AudioBuffer;
+    source.connect(context.destination);
+    const scheduled: ScheduledPlay = {
+      onended: null,
+      stop: () => {
+        source.onended = null;
+        try {
+          source.stop();
+        } catch {
+          void 0;
+        }
+      },
+    };
+    source.onended = () => scheduled.onended?.();
+    source.start(startTime);
+    return scheduled;
+  }
+
+  close(): void {
+    void this.context?.close();
+    this.context = null;
+  }
+
+  private ensureContext(): AudioContext {
+    this.context ??= new (audioContextConstructor())({ sampleRate: PCM_SAMPLE_RATE });
+    return this.context;
+  }
+}
+
+/**
+ * silent 模式不出聲，只需要「這段什麼時候播完」；用頁面時鐘排程就好，不必向瀏覽器
+ * 要音訊權限。整段音檔（playAudio／ask）用 OfflineAudioContext 解碼，它不受自動播放
+ * 限制。時間軸跟 speaker 相同：一段接一段，從呼叫當下開始排。
+ */
+class ClockPlayer implements AudioPlayer {
+  now(): number {
+    return performance.now() / 1000;
+  }
+
+  async prepare(): Promise<void> {}
+
+  decode(encoded: ArrayBuffer): Promise<AudioBuffer> {
+    const Offline = window.OfflineAudioContext
+      ?? (window as Window & { webkitOfflineAudioContext?: typeof OfflineAudioContext })
+        .webkitOfflineAudioContext;
+    if (!Offline) {
+      throw new OpenVmanAvatarError(
+        "AUDIO_PLAYBACK_FAILED",
+        "This browser cannot decode audio without Web Audio.",
+      );
+    }
+    return new Offline(1, 1, PCM_SAMPLE_RATE).decodeAudioData(encoded);
+  }
+
+  pcmBuffer(samples: Float32Array<ArrayBuffer>): number {
+    return samples.length / PCM_SAMPLE_RATE;
+  }
+
+  play(buffer: AudioBuffer | number, startTime: number): ScheduledPlay {
+    const duration = typeof buffer === "number" ? buffer : buffer.length / buffer.sampleRate;
+    const scheduled: ScheduledPlay = {
+      onended: null,
+      stop: () => window.clearTimeout(timer),
+    };
+    const endsInMs = Math.max(0, (startTime + duration - this.now()) * 1000);
+    const timer = window.setTimeout(() => scheduled.onended?.(), endsInMs);
+    return scheduled;
+  }
+
+  close(): void {}
 }
 
 export function decodedAudioBufferToPcmChunks(

@@ -63,7 +63,7 @@ const avatar = await OpenVmanAvatar.init({
 | `zIndex` | 否 | `2147483000` | 覆寫 root 的 stacking order。 |
 | `container` | 否 | `document.body` | 指定時改為填滿該容器，不使用 viewport 懸浮位置。 |
 | `assetsBaseUrl` | 否 | SDK origin 的 `/static/characters` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
-| `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。 |
+| `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。`silent` 以頁面時鐘排程、不建立 AudioContext，沒被使用者點過的視窗（開機後的 kiosk、`window.open` 開出的視窗）也能對嘴，不會丟 `AUTOPLAY_BLOCKED`。 |
 | `embedKey` | 否 | 無 | 對話模式用的 embed key。設定後 `ask()` 會帶 `X-Embed-Key` 且不送 cookie；未設定則以同源 session cookie 呼叫。 |
 | `projectId` | 否 | 後端預設 | `ask()` 使用的專案 ID。使用 embed key 時必須與該金鑰綁定的專案一致，否則回 403。 |
 | `personaId` | 否 | 後端預設 | `ask()` 使用的人格 ID。 |
@@ -261,7 +261,8 @@ location /static/characters/ {
 | `DOM_CONFLICT` | 宿主頁已占用 vendor 固定 DOM ID。 |
 | `RESOURCE_LOAD_FAILED` | vendor JS、WASM 或角色資源載入失敗。 |
 | `AUDIO_PLAYBACK_FAILED` | 音訊讀取、解碼或播放失敗。 |
-| `AUTOPLAY_BLOCKED` | 瀏覽器要求先有 click／tap 等 user gesture。 |
+| `AUTOPLAY_BLOCKED` | 瀏覽器要求先有 click／tap 等 user gesture（只有 `audioOutput: "speaker"` 會發生）。 |
+| `WEBGL_CONTEXT_LOST` | 瀏覽器丟掉了嘴型用的 WebGL 畫布。人物影片照常播放、不再貼嘴型，直到重新載入頁面；這個錯誤只透過 `error` 事件通知，不會讓呼叫失敗。 |
 | `UNAUTHORIZED` | 對話請求回 401 或 403。 |
 | `RATE_LIMITED` | 對話請求回 429，可能帶 `retryAfterSeconds`。 |
 | `CHAT_FAILED` | 對話請求失敗或回應缺少 `reply`。 |

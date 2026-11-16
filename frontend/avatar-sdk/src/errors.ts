@@ -9,7 +9,8 @@ export type OpenVmanAvatarErrorCode =
   | "RESOURCE_LOAD_FAILED"
   | "RUNTIME_DISPOSED"
   | "SPEECH_FAILED"
-  | "UNAUTHORIZED";
+  | "UNAUTHORIZED"
+  | "WEBGL_CONTEXT_LOST";
 
 export class OpenVmanAvatarError extends Error {
   readonly code: OpenVmanAvatarErrorCode;

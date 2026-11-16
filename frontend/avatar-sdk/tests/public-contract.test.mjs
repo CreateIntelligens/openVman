@@ -47,11 +47,24 @@ async function loadSdk({
         );
       },
     };
+    const listeners = new Map();
     const element = {
       children: [],
       className: "",
       dataset: {},
       parent: null,
+      addEventListener(type, handler) {
+        const handlers = listeners.get(type) ?? new Set();
+        handlers.add(handler);
+        listeners.set(type, handlers);
+      },
+      removeEventListener(type, handler) {
+        listeners.get(type)?.delete(handler);
+      },
+      dispatchEvent(event) {
+        for (const handler of listeners.get(event.type) ?? []) handler(event);
+        return !event.defaultPrevented;
+      },
       style: { setProperty() {} },
       append(...children) {
         for (const child of children) {
@@ -572,7 +585,21 @@ test("supports a silent audio output for host-driven playback", async () => {
 
   assert.match(typesSource, /audioOutput\?: OpenVmanAvatarAudioOutput/);
   assert.match(typesSource, /"speaker" \| "silent"/);
-  assert.match(audioSource, /createGain\(\)/);
-  assert.match(audioSource, /gain\.value = 0/);
+  assert.match(audioSource, /audioOutput === "silent" \? new ClockPlayer\(\)/);
   assert.match(mainSource, /audioOutput: options\.audioOutput \?\? "speaker"/);
+});
+
+test("a lost WebGL lip-sync canvas reports an error and keeps the avatar alive", async () => {
+  const { document, sdk } = await loadSdk();
+  const avatar = await sdk.init({ characterId: "000" });
+  const errors = [];
+  avatar.on("error", (event) => errors.push(event.code));
+  const event = { defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, type: "webglcontextlost" };
+
+  document.getElementById("canvas_gl").dispatchEvent(event);
+
+  assert.deepEqual(errors, ["WEBGL_CONTEXT_LOST"]);
+  // 不 preventDefault 的話，瀏覽器不會再給這個畫布 context。
+  assert.equal(event.defaultPrevented, true);
+  avatar.destroy();
 });

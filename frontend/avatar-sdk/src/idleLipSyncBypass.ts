@@ -20,6 +20,8 @@ export interface IdleLipSyncBypass {
   endSpeaking(): void;
   resetSpeaking(): void;
   restore(): void;
+  // WebGL 嘴型畫布失效後，貼上去的只會是半透明暗塊；停用後只留人物影片本身。
+  suppressPatches(): void;
 }
 
 function isFullCanvasClear(
@@ -55,6 +57,7 @@ export function installIdleLipSyncBypass(
   let pendingClear: PendingClear | null = null;
   let speechStartedAt: number | null = null;
   let speechEndedAt: number | null = null;
+  let suppressed = false;
 
   const rawClearRect = (...args: ClearRectArgs): void => {
     originalClearRect.apply(context, args);
@@ -68,7 +71,7 @@ export function installIdleLipSyncBypass(
     pendingClear = null;
   };
   const patchAlpha = (): number => {
-    if (speechStartedAt === null) return 0;
+    if (suppressed || speechStartedAt === null) return 0;
 
     const currentTime = now();
     const fadeIn = Math.min(1, Math.max(0, (currentTime - speechStartedAt) / FADE_IN_MS));
@@ -140,6 +143,9 @@ export function installIdleLipSyncBypass(
     resetSpeaking(): void {
       speechStartedAt = null;
       speechEndedAt = null;
+    },
+    suppressPatches(): void {
+      suppressed = true;
     },
     restore(): void {
       flushPendingClear();

@@ -20,6 +20,7 @@ async function loadSdk({
   streamEvents,
   streamStatus = chatStatus,
   withCryptoUuid = true,
+  audioBlocked = false,
 } = {}) {
   const source = await readFile(bundleUrl, "utf8");
   const script = { src: "https://avatar.example/static/sdk/openvman-avatar-sdk.js" };
@@ -32,16 +33,31 @@ async function loadSdk({
     sourceStopped: 0,
     speakerOutput: 0,
     silentOutput: 0,
+    audioContexts: 0,
+    offlineDecodes: 0,
   };
   let finishChat;
   let stream = null;
   let context;
   const createElement = (tagName) => {
+    const listeners = new Map();
     const element = {
       children: [],
       className: "",
       dataset: {},
       parent: null,
+      addEventListener(type, handler) {
+        const handlers = listeners.get(type) ?? new Set();
+        handlers.add(handler);
+        listeners.set(type, handlers);
+      },
+      removeEventListener(type, handler) {
+        listeners.get(type)?.delete(handler);
+      },
+      dispatchEvent(event) {
+        for (const handler of listeners.get(event.type) ?? []) handler(event);
+        return !event.defaultPrevented;
+      },
       style: { setProperty() {} },
       append(...children) {
         for (const child of children) {
@@ -220,9 +236,11 @@ async function loadSdk({
   }
   context.window.AudioContext = class {
     constructor() {
+      runtimeCalls.audioContexts += 1;
       this.currentTime = 0;
       this.destination = { kind: "destination" };
-      this.state = "running";
+      // 沒被使用者點過的視窗：AudioContext 停在 suspended，resume 也沒用。
+      this.state = audioBlocked ? "suspended" : "running";
     }
     async close() {}
     createBuffer(_channels, length, sampleRate) {
@@ -263,7 +281,18 @@ async function loadSdk({
       };
     }
     async resume() {
-      this.state = "running";
+      if (!audioBlocked) this.state = "running";
+    }
+  };
+  context.window.OfflineAudioContext = class {
+    async decodeAudioData() {
+      runtimeCalls.offlineDecodes += 1;
+      return {
+        getChannelData: () => new Float32Array([0, 0.5, -0.5, 0]),
+        length: 4,
+        numberOfChannels: 1,
+        sampleRate: 16000,
+      };
     }
   };
   context.globalThis = context;
@@ -559,16 +588,33 @@ test("speech failures report SPEECH_FAILED after the reply event", async () => {
   assert.deepEqual(errors, ["SPEECH_FAILED"]);
 });
 
-test("a silent instance drives lip sync through the runtime without sound", async () => {
-  const { runtimeCalls, sdk } = await loadSdk();
+test("a silent instance drives lip sync without asking the browser for audio", async () => {
+  // 沒被點過的視窗也要能對嘴：silent 模式完全不建立 AudioContext。
+  const { runtimeCalls, sdk } = await loadSdk({ audioBlocked: true });
   const avatar = await sdk.init({ audioOutput: "silent", characterId: "000" });
+  const speaking = [];
+  avatar.on("speaking", (event) => speaking.push(event.state));
 
   const reply = await avatar.ask("你好");
+  await avatar.pushPcm(new Int16Array(1600));
+  await new Promise((resolve) => setTimeout(resolve, 150));
 
   assert.equal(reply, "你好，我是 openVman。");
   assert.ok(runtimeCalls.pushedAudio > 0);
-  assert.equal(runtimeCalls.silentOutput > 0, true);
+  assert.ok(runtimeCalls.offlineDecodes > 0);
+  assert.equal(runtimeCalls.audioContexts, 0);
   assert.equal(runtimeCalls.speakerOutput, 0);
+  assert.deepEqual(speaking, ["start", "stop", "start", "stop"]);
+});
+
+test("a speaker instance still reports a blocked browser", async () => {
+  const { sdk } = await loadSdk({ audioBlocked: true });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  await assert.rejects(
+    avatar.pushPcm(new Int16Array(1600)),
+    (error) => error.code === "AUTOPLAY_BLOCKED",
+  );
 });
 
 test("ask streams the reply and speaks the first sentence before done", async () => {

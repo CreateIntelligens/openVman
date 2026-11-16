@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **Avatar SDK 的 silent 模式不再需要瀏覽器放行音訊**：`audioOutput: "silent"` 改用頁面時鐘排程每段音訊、以 OfflineAudioContext 解碼整段音檔，不建立 AudioContext；沒被使用者點過的視窗（kiosk 開機後、`window.open` 開出的視窗）也能 `pushPcm` 對嘴，不再丟 `AUTOPLAY_BLOCKED`。speaking 事件、`pushPcm`／`playAudio` 的 Promise 與嘴型時間軸不變；`speaker` 模式照舊。另外，嘴型用的 WebGL 畫布失效（`webglcontextlost`）時改為停止貼嘴型、只留人物影片，並以 `error` 事件 `WEBGL_CONTEXT_LOST` 通知，不再貼上半透明暗塊。
+
 - **[2026-11-16]** **Embed key 的人物清單只列讀得到的人物**：`GET /api/v1/characters` 帶 Embed key 時，全域公開人物也要在金鑰允許的人物內才列出。以前清單會列出所有全域公開人物，但 `/static/characters/*` 依金鑰白名單回 403，SDK 選到就讀不到素材。
 
 - **[2026-11-13]** **Backend 預設開 4 個 process**：`backend` 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動（Compose 預設 4，直接執行預設 1）。多 process 下原本只在記憶體的狀態改成共用：解鎖密碼失敗次數、API key 與 embed key 每分鐘上限放 Redis（以前多 process 時上限等於乘上 process 數）；文字模式攝影機的事件狀態放 Redis（以前同一位訪客可能每個 process 各打一次招呼）；帳號資料庫啟動 migration 以檔案鎖依序執行（以前全新資料庫同時啟動，搶輸的 process 起不來，已用四個 process 同時初始化的測試重現）；素材包工作登錄角色加 Redis 鎖；`/metrics/prometheus` 改 prometheus_client 多 process 模式、`/metrics` 的計數與耗時跨 process 加總，事件清單加上 1,000 筆上限。`A2A_ENABLED` 搭配多 process 時啟動失敗。隔離環境（假 LLM、假 TTS、8 個對話 worker）主機較閒時每秒 20 題聽到第一句 14.2 → 2.2 秒；完整驗收流程與跨 process 檢查（`scripts/experiments/brain-worker-split/multiprocess_checks.py`）通過。

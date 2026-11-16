@@ -138,6 +138,23 @@ export class AvatarRuntime {
     this.idleLipSyncBypass?.resetSpeaking();
   }
 
+  /**
+   * Stops pasting the mouth when the WebGL mouth canvas loses its context.
+   * The closed runtime cannot rebuild its GL objects and only one runtime may
+   * exist per page, so lip sync stays off until the page reloads.
+   */
+  watchGlContext(onLost: () => void): () => void {
+    const canvas = document.getElementById("canvas_gl");
+    if (!canvas) return () => {};
+    const handleLost = (event: Event): void => {
+      event.preventDefault();
+      this.idleLipSyncBypass?.suppressPatches();
+      onLost();
+    };
+    canvas.addEventListener("webglcontextlost", handleLost);
+    return () => canvas.removeEventListener("webglcontextlost", handleLost);
+  }
+
   dispose(): void {
     this.idleLipSyncBypass?.resetSpeaking();
     this.idleLipSyncBypass?.restore();

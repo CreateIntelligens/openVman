@@ -157,6 +157,13 @@ async function createInstance(
   ): void => {
     for (const handler of handlers.get(type) ?? []) handler(event);
   };
+  const stopWatchingGl = runtime.watchGlContext(() => {
+    emit("error", {
+      code: "WEBGL_CONTEXT_LOST",
+      message: "The browser dropped the lip-sync canvas; lip sync is off until the page reloads.",
+      type: "error",
+    });
+  });
   const audio = new AvatarAudio(
     runtime,
     (speaking) => {
@@ -224,6 +231,7 @@ async function createInstance(
       runtimeDisposed = true;
       conversation.interrupt();
       audio.destroy();
+      stopWatchingGl();
       runtime.dispose();
       removeAvatarDom(dom);
       emit("destroyed", { type: "destroyed" });
