@@ -12,7 +12,7 @@ Backend (/api/v1/*)
        -> 專案資料    brain/data/projects/<project_id>/（workspace、LanceDB、sessions.db）
        -> Embedding gateway（compose 服務 embedding，:8009，或外部 EMBEDDING_SERVICE_URL）
        -> LLM providers（Gemini、OpenAI、Groq，依 fallback chain）
-       -> 決策供應鏈：Clef 主／備援、Jev、OpenAI Decisions
+       -> 決策供應鏈：Gemini Decisions、Clef 主／備援、Jev、OpenAI Decisions
        -> 外部工具：2md（搜尋／讀網頁）、David888 Wiki
        -> Redis（2md circuit 協調，選用）
 ```
@@ -63,7 +63,7 @@ Backend 的 `BRAIN_CHAT_URL` 只分流指定的 HTTP operation 與 Live WebSocke
 | `api/memory/` | embedding client、檢索與融合、session store、記憶治理、auto recall、dreaming、語言判斷、對話備份、ASR 定稿判斷 |
 | `api/tools/` | 工具註冊、執行、技能管理；內建工具在 `tools/builtin/` |
 | `api/live/` | Gemini Live：會話協調、WebSocket 傳輸、payload 編碼、工具執行 |
-| `api/privacy/` | 以 Clef 偵測使用者訊息中的個資與稽核 |
+| `api/privacy/` | 以決策服務偵測使用者訊息中的個資與稽核 |
 | `api/infra/` | LanceDB、專案路徑、用量帳本、錯誤紀錄 |
 | `api/routes/`、`api/internal_routes.py` | HTTP 與內部 WebSocket 路由 |
 | `api/safety/` | 內部驗證、guardrails、logging、metrics |
@@ -383,7 +383,7 @@ Noul positive 門檻為 0.7、negative 門檻為 0.1；choice confidence 至少 
 
 ### 前台決策 Debug
 
-虛擬人舞台的「決策 Debug」預設關閉，只有 admin／root 的正式登入看得到：Brain 只在 `X-OpenVMan-Role` 是 admin／root 且不是 embed／API 金鑰時才回傳判讀（HTTP 的 `decision_debug` 與 Live 的 `set_decision_debug` 都檢查，`safety/internal_auth.may_see_decision_debug`），展場用的一般與臨時帳號拿不到情緒機率與模型名稱。開啟後先顯示一行摘要（供應商・耗時・語氣），按「詳細」才展開；展開後會顯示真實供應商（Clef 主／備援、Jev、OpenAI 或 baseline）、耗時、14 個固定判讀項目、noul 成立機率、choice 信心度、是否達到採用門檻，以及實際套用策略。「挫折／不耐煩」對應現有 `frustrated` code；分類不確定時顯示棄權。
+虛擬人舞台的「決策 Debug」預設關閉，只有 admin／root 的正式登入看得到：Brain 只在 `X-OpenVMan-Role` 是 admin／root 且不是 embed／API 金鑰時才回傳判讀（HTTP 的 `decision_debug` 與 Live 的 `set_decision_debug` 都檢查，`safety/internal_auth.may_see_decision_debug`），展場用的一般與臨時帳號拿不到情緒機率與模型名稱。開啟後先顯示一行摘要（供應商・耗時・語氣），按「詳細」才展開；展開後會顯示真實供應商（Gemini、Clef 主／備援、Jev、OpenAI 或 baseline）、耗時、14 個固定判讀項目、noul 成立機率、choice 信心度、是否達到採用門檻，以及實際套用策略。「挫折／不耐煩」對應現有 `frustrated` code；分類不確定時顯示棄權。
 
 HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 true 時才在回應頂層加入 `decision_debug`。欄位是 `turn_id/status/provider/hop_id/model/elapsed_ms/signals/policy`，只含固定代碼與數值，不含原句、帳號、prompt、工具資料或自由文字理由。診斷在 delivery 暫存完成後加入回應，接受回覆時不保存。Live 使用 `set_decision_debug {enabled}` 開關及 `server_decision_debug {session_id, scope, diagnostics, client_turn_id?}` 事件；scope 是 `text` 或 `audio_retrieval_only`。Live 文字輸入的 `user_speak.turn_id` 會由 `client_turn_id` 回傳配對，原始音訊以 `user_transcription.decision_turn_id` 與 diagnostic turn ID 配對；前台拒絕舊回合事件。所有資料僅供當輪前台記憶體檢視，關閉面板、換專案／session 或開始新回合即清除。
 
@@ -401,7 +401,7 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 
 ## 隱私過濾
 
-`PRIVACY_FILTER_ENABLED`（預設關）設為 true 時，使用者每句話在背景問 Clef 有沒有個資（`privacy/detector.py`）：先問一題「有沒有任何個資」（約 0.11 秒），有才再問是哪幾類（姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有；總判斷說有、細項都沒過時記 `unclassified`）。只問 Clef（`decide(providers={"clef"})`），失敗也不退到 Jev 或 OpenAI：這兩家是外部服務，為了查個資把個資送出去正好相反。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
+`PRIVACY_FILTER_ENABLED`（預設關）設為 true 時，使用者每句話在背景問決策服務有沒有個資（`privacy/detector.py`）：先問一題「有沒有任何個資」（約 0.11 秒），有才再問是哪幾類（姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有；總判斷說有、細項都沒過時記 `unclassified`）。走跟當輪決策一樣的決策鏈（後台「模型供應商」的決策順序依序備援）。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
 
 ## 用量帳本
 

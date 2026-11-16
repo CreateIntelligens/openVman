@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 from time import monotonic
 
@@ -387,7 +388,8 @@ def test_provider_usage_tracks_hop_and_never_includes_decision_input(monkeypatch
 def test_runtime_order_and_provider_fallback_work_end_to_end_with_mocked_services(monkeypatch):
     providers = [
         {"id": hop_id, "provider": expected[0], "endpoint": expected[1],
-         "model": expected[2], "api_key": "", "credential_required": expected[3]}
+         "model": expected[2], "api_key": "g-key" if hop_id == "gemini" else "",
+         "credential_required": expected[3]}
         for hop_id, expected in router._EXPECTED_HOPS.items()
     ]
     runtime_config = {"order": list(router._DEFAULT_ORDER), "providers": providers}
@@ -398,6 +400,10 @@ def test_runtime_order_and_provider_fallback_work_end_to_end_with_mocked_service
             assert request.headers["X-Internal-Token"] == "internal-secret"
             return httpx.Response(200, json={"decision": runtime_config})
         attempts.append(str(request.url))
+        if request.url.host == "generativelanguage.googleapis.com":
+            assert request.headers["x-goog-api-key"] == "g-key"
+            assert "authorization" not in request.headers
+            return httpx.Response(503, json={"error": "unavailable"})
         if request.url.host == "clef.create360.ai":
             return httpx.Response(503, json={"detail": "unavailable"})
         if request.url.host == "clef.aiurl.tw":
@@ -420,8 +426,49 @@ def test_runtime_order_and_provider_fallback_work_end_to_end_with_mocked_service
 
     assert result.hop_id == "clef-backup"
     assert result.answers["q"]["noul"] == 0.91
-    assert [url.split("/")[2] for url in attempts] == ["clef.create360.ai", "clef.aiurl.tw"]
-    assert [event["raw"]["hop_id"] for event in usage] == ["clef-primary", "clef-backup"]
+    assert [url.split("/")[2] for url in attempts] == [
+        "generativelanguage.googleapis.com", "clef.create360.ai", "clef.aiurl.tw",
+    ]
+    assert [event["raw"]["hop_id"] for event in usage] == ["gemini", "clef-primary", "clef-backup"]
+
+
+def test_gemini_decisions_request_shape_and_usage(monkeypatch):
+    hop = router.DecisionProvider(
+        "gemini", "gemini", router._EXPECTED_HOPS["gemini"][1], "gemini-decision-1", "g-key", True,
+    )
+    seen = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        seen["headers"] = request.headers
+        return httpx.Response(200, json={
+            "answers": {"q": {"type": "noul", "noul": 0.8, "confidence": 0.8}},
+            "usage": {"total_tokens": 30, "total_input_tokens": 30, "total_output_tokens": 0},
+        })
+
+    monkeypatch.setattr(router, "_HTTP", httpx.Client(transport=httpx.MockTransport(handle)))
+    body = router._call_provider(hop, {"message": "你好"}, {"q": {"type": "noul"}}, timeout=1)
+
+    assert seen["headers"]["x-goog-api-key"] == "g-key"
+    assert seen["body"] == {
+        "model": "gemini-decision-1",
+        "input": [{"type": "text", "text": '{"message": "你好"}'}],
+        "questions": {"q": {"type": "noul"}},
+    }
+    assert router._parse_answers("gemini", body, {"q": {"type": "noul"}}) == {"q": {"type": "noul", "noul": 0.8}}
+    assert router._usage_int(body["usage"], "input_tokens") == 30
+
+
+def test_gemini_noul_criteria_are_folded_into_instructions():
+    questions = {
+        "has_pii": {"type": "noul", "instructions": "有沒有個資？", "criteria": {"true": "有", "false": "沒有"}},
+        "tone": {"type": "choice", "instructions": "語氣", "criteria": {"casual": "輕鬆", "formal": "正式"}},
+    }
+
+    mapped = router._gemini_questions(questions)
+
+    assert mapped["has_pii"] == {"type": "noul", "instructions": "有沒有個資？\n判斷標準：true: 有; false: 沒有"}
+    assert mapped["tone"] == questions["tone"]
 
 
 def test_failing_hop_is_tried_last_on_the_next_decision(monkeypatch):

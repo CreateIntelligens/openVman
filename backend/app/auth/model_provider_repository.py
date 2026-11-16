@@ -99,11 +99,11 @@ class ModelProviderRepository:
         if row is None:
             return None
         try:
-            settings = CategorySettings(
+            settings = _with_new_hops(category, CategorySettings(
                 tuple(json.loads(row["order_json"])),
                 tuple(json.loads(row["enabled_json"])),
                 dict(json.loads(row["models_json"])),
-            )
+            ))
             _validate(category, settings.order, settings.enabled, settings.models)
         except (TypeError, ValueError) as exc:
             raise InvalidModelProviderSettings(
@@ -269,6 +269,26 @@ def _category(category_id: str) -> ModelCategory:
     if category is None:
         raise InvalidModelProviderSettings("unknown model provider category")
     return category
+
+
+def _with_new_hops(category: ModelCategory, settings: CategorySettings) -> CategorySettings:
+    """Fit hops added to the catalog after these settings were saved.
+
+    新加的站放在它在目錄裡的位置、照它的預設決定開不開；存過的其他站順序與開關不動。
+    沒有這一步，目錄一加站，之前存過的設定就整份讀不出來。
+    """
+    saved = set(settings.order)
+    missing = [hop.id for hop in category.hops if hop.id not in saved]
+    if not missing or not saved <= set(category.hop_ids):
+        return settings
+    order = [hop_id for hop_id in category.hop_ids if hop_id in missing or hop_id in saved]
+    # 存過的站維持原本的相對順序，新站插在目錄位置。
+    saved_iter = iter(settings.order)
+    order = [hop_id if hop_id in missing else next(saved_iter) for hop_id in order]
+    enabled = settings.enabled + tuple(
+        hop.id for hop in category.hops if hop.id in missing and hop.enabled_by_default
+    )
+    return CategorySettings(tuple(order), enabled, settings.models)
 
 
 def _validate(

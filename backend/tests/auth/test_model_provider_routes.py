@@ -15,7 +15,7 @@ from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.config import TTSRouterConfig
 
 PATH = "/api/v1/settings/model-providers"
-DECISION_ORDER = ["clef-primary", "clef-backup", "jev", "openai"]
+DECISION_ORDER = ["gemini", "clef-primary", "clef-backup", "jev", "openai"]
 
 
 @pytest.fixture(autouse=True)
@@ -104,7 +104,7 @@ def test_root_reads_deployment_defaults_and_only_credential_metadata(tmp_path):
     chat = _category(payload, "chat_llm")
     assert decision["order"] == DECISION_ORDER
     # CPU 備援端點達不到每站時限，部署預設不啟用。
-    assert decision["enabled"] == ["clef-primary", "jev", "openai"]
+    assert decision["enabled"] == ["gemini", "clef-primary", "jev", "openai"]
     assert decision["configured"] is False
     # 主對話預設順序與模型來自 LLM_FALLBACK_CHAIN，沒列在鏈上的供應商預設停用。
     assert chat["order"] == ["gemini", "openai", "groq"]

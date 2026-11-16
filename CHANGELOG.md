@@ -4,11 +4,15 @@
 
 ### Added
 
+- **[2026-11-16]** **決策鏈新增 Gemini Decisions，預設排第一站**：每輪決策、記憶過濾、答不出來判斷、回答選圖、個資掃描都先問 Gemini Decisions（`gemini-decision-1`，`https://generativelanguage.googleapis.com/v1beta/decisions`），失敗或逾時再照後台順序往下（Clef 主／備援、Jev、OpenAI）。金鑰用後台「模型供應商」的 Gemini 金鑰（沒存過就用 `.env` 的 `GEMINI_API_KEY`），以 `x-goog-api-key` 送出；題目與答案格式與 System One 相同，請求改用 `input` 陣列。實測單次 0.35～0.52 秒，每站時限至少 1 秒。之前在後台存過決策順序的部署，讀設定時自動把新的站插在目錄位置（最前面）並照預設開啟，其他站順序與開關不變；要改回去在後台調順序或關掉它。
+
 - **[2026-11-13]** **「AI 整理排版」逐帳號開放**：AI 整理會用到 AI 額度，現在最高管理員與管理員一律可以用，其他帳號預設不能用，由管理員在帳號設定勾「可以用 AI 整理排版」開放（正式帳號、建立帳號、角色調整、臨時帳號批次都可以設）。沒有權限的帳號在「新增資料」只看到「直接放進知識庫」，文件頁也沒有「AI 整理排版」；Backend 同樣會擋：要求整理回 403 並寫明原因，匯入沒指定時照直接放進知識庫處理。帳號資料表新增 `ai_cleanup_access` 欄位（schema 27），既有帳號一律從關閉開始。
 
 - **[2026-11-13]** **知識庫「所有題目」清單**：快速問答以前只能一個分類一個分類看，現在新增「所有題目」分頁（`/admin/knowledge/questions`），把全部題目攤成一張清單，可依語言、分類（含子分類）、狀態（隱藏、分類被隱藏、不在選單上、沒有答案、有圖片或連結、文件已停用）、來源篩選並搜尋題目與答案，每個選項旁顯示題數。點一題回到文件分頁打開它的分類並捲到那一題。Brain 新增只讀的 `GET /knowledge/qa/questions`。
 
 ### Changed
+
+- **[2026-11-16]** **個資掃描改走整條決策鏈**：`PRIVACY_FILTER_ENABLED` 開啟時的個資偵測以前只問 Clef（`decide(providers={"clef"})`），不送 Jev、OpenAI 等外部服務；現在跟當輪決策一樣照後台設定的決策順序備援，Clef 不在或逾時時改問下一家。我們的資料沒有不能送外部服務的限制。逾時仍是 `PRIVACY_CLEF_TIMEOUT_SECONDS`（名稱不變），同時掃描上限、只偵測不改寫內容的行為都不變。
 
 - **[2026-11-16]** **只有 IndexTTS 會先打文字正規化**：`TTS_NORMALIZE_PROVIDERS` 預設從 `indextts,indextts-nurse,voxcpm,cosyvoice` 改為 `indextts,indextts-nurse`。VoxCPM、CosyVoice 改成跟 Gemini TTS、Edge 一樣只做本地清理（去 markdown／表情符號），送原文、不轉簡體。正規化服務會把每一句記下並排進它的審核佇列，我們的測試與壓測流量會一起灌進去，每句也多等 0.4～0.5 秒。沒指定引擎時可能落到 IndexTTS，照舊正規化。要恢復舊行為就在 `.env` 寫回原本的清單。
 

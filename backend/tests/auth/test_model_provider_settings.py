@@ -43,7 +43,7 @@ def test_order_enabled_and_models_round_trip_per_category(provider_settings):
     repository.update(
         {
             "decision": CategoryUpdate(
-                ("openai", "jev", "clef-backup", "clef-primary"), ("openai", "jev"),
+                ("openai", "jev", "clef-backup", "clef-primary", "gemini"), ("openai", "jev"),
             ),
             "chat_llm": CategoryUpdate(
                 ("groq", "gemini", "openai"), ("groq", "gemini"),
@@ -64,10 +64,10 @@ def test_order_enabled_and_models_round_trip_per_category(provider_settings):
 
 @pytest.mark.parametrize("change", [
     CategoryUpdate(("jev", "jev"), ("jev",)),
-    CategoryUpdate(("openai", "jev", "clef-backup", "clef-primary"), ("ghost",)),
+    CategoryUpdate(("openai", "jev", "clef-backup", "clef-primary", "gemini"), ("ghost",)),
     # 決策的模型跟端點綁死，不能從後台換。
     CategoryUpdate(
-        ("openai", "jev", "clef-backup", "clef-primary"), (), {"openai": "gpt-4.1"},
+        ("openai", "jev", "clef-backup", "clef-primary", "gemini"), (), {"openai": "gpt-4.1"},
     ),
 ])
 def test_decision_rejects_bad_hops_and_model_changes(provider_settings, change):
@@ -189,8 +189,9 @@ def test_migration_carries_decision_settings_and_keys_over(tmp_path):
 
     settings = repository.get_settings("decision")
     assert settings is not None
-    assert list(settings.order) == order
-    assert settings.enabled == ("jev",)
+    # 存的時候還沒有 Gemini Decisions：讀出來時它插在目錄位置（最前面）、照預設開啟。
+    assert list(settings.order) == ["gemini", *order]
+    assert settings.enabled == ("jev", "gemini")
     assert repository.get_credential("clef", env_default="") == "old-clef-key"
     with database.transaction() as connection:
         tables = {
@@ -200,3 +201,21 @@ def test_migration_carries_decision_settings_and_keys_over(tmp_path):
         }
     # 舊表保留，退回舊版程式時還讀得到升級當下的設定。
     assert {"decision_provider_settings", "decision_provider_secrets"} <= tables
+
+
+def test_settings_saved_before_a_new_hop_keep_their_order(provider_settings):
+    _, root, repository = provider_settings
+    with repository.database.transaction() as connection:
+        connection.execute(
+            "INSERT OR REPLACE INTO model_provider_settings "
+            "(category, order_json, enabled_json, models_json, updated_by, updated_at) "
+            "VALUES ('decision', ?, ?, '{}', ?, 'then')",
+            (json.dumps(["jev", "clef-primary", "clef-backup", "openai"]),
+             json.dumps(["clef-primary", "jev", "openai"]), root.id),
+        )
+
+    settings = repository.get_settings("decision")
+
+    assert settings is not None
+    assert settings.order == ("gemini", "jev", "clef-primary", "clef-backup", "openai")
+    assert settings.enabled == ("clef-primary", "jev", "openai", "gemini")

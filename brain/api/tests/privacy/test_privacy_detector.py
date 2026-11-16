@@ -36,7 +36,8 @@ def test_only_clef_is_asked_gate_then_categories(settings, monkeypatch: pytest.M
     assert detector.detect_pii("我叫王小明") == {"private_person": 1}
     assert [names for names, _ in calls] == [{"has_pii"}, set(detector.PII_QUESTIONS)]
     for _, kwargs in calls:
-        assert kwargs["providers"] == frozenset({"clef"})
+        # 跟其他決策一樣走整條決策鏈，不限定 Clef。
+        assert "providers" not in kwargs
         assert kwargs["purpose"] == "privacy"
         assert kwargs["timeout"] == 3.0
 

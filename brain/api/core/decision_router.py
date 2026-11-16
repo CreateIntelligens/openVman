@@ -25,10 +25,16 @@ _CONFIG_TIMEOUT_SECONDS = 0.5
 # 跨公網的供應商每站至少給這麼久（仍受整次請求的期限限制）。OpenAI Decisions 2026-10-08 起
 # 正式機 0 次成功、3 次在 0.6～1.5 秒逾時：握手加傳輸加首字就超過本機 Clef 用的每站時限。
 # Jev p90 325 ms，不需要另外放寬。
-_MIN_HOP_SECONDS: Final[dict[str, float]] = {"openai": 1.5}
+_MIN_HOP_SECONDS: Final[dict[str, float]] = {"openai": 1.5, "gemini": 1.0}
 _MAX_QUESTIONS = 32
 _MAX_DECISION_INPUT_BYTES = 64 * 1024
 _EXPECTED_HOPS: Final[dict[str, tuple[str, str, str, bool]]] = {
+    # Gemini Decisions 跟 System One 同一套題目與答案格式，只是請求用 input 陣列、金鑰放 header。
+    # 2026-11-16 實測單次 0.35～0.52 秒（台灣連 Google）。
+    "gemini": (
+        "gemini", "https://generativelanguage.googleapis.com/v1beta/decisions",
+        "gemini-decision-1", True,
+    ),
     "clef-primary": ("clef", "https://clef.create360.ai/v1/systemone", "clef-flash", False),
     "clef-backup": ("clef", "https://clef.aiurl.tw/v1/systemone", "clef-flash", False),
     "jev": ("jev", "https://api.typesafe.ai/v1/systemone", "jev-latest", True),
@@ -415,6 +421,13 @@ def _call_provider(
 ) -> dict[str, Any]:
     if hop.provider == "openai":
         payload = _openai_payload(hop, state, questions)
+    elif hop.provider == "gemini":
+        text = state if isinstance(state, str) or state is None else json.dumps(state, ensure_ascii=False)
+        payload = {
+            "model": hop.model,
+            "input": [{"type": "text", "text": text or ""}],
+            "questions": _gemini_questions(questions),
+        }
     else:
         payload = {
             "state": state,
@@ -422,7 +435,9 @@ def _call_provider(
             "questions": questions,
         }
     headers = {"Content-Type": "application/json"}
-    if hop.api_key:
+    if hop.api_key and hop.provider == "gemini":
+        headers["x-goog-api-key"] = hop.api_key
+    elif hop.api_key:
         headers["Authorization"] = f"Bearer {hop.api_key}"
     request: dict[str, Any] = {"json": payload, "headers": headers, "timeout": timeout}
     if cancel_event is not None:
@@ -433,6 +448,21 @@ def _call_provider(
     if not isinstance(body, dict):
         raise ValueError("provider response must be an object")
     return body
+
+
+def _gemini_questions(questions: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Gemini Decisions 的是非題不收 criteria（回 400），把判斷標準併進 instructions。"""
+    mapped: dict[str, dict[str, Any]] = {}
+    for name, question in questions.items():
+        if question["type"] == "noul" and question.get("criteria"):
+            item = {key: value for key, value in question.items() if key != "criteria"}
+            item["instructions"] = _instructions_with_criteria(
+                question.get("instructions") or name, question["criteria"],
+            )
+            mapped[name] = item
+        else:
+            mapped[name] = question
+    return mapped
 
 
 def _openai_payload(
@@ -666,7 +696,10 @@ def _record_hop(
 def _usage_int(usage: Any, key: str) -> int:
     if not isinstance(usage, dict):
         return 0
-    value = usage.get(key, 0)
+    value = usage.get(key)
+    if value is None and key == "input_tokens":
+        # Gemini Decisions 只回 total_input_tokens。
+        value = usage.get("total_input_tokens")
     return value if isinstance(value, int) and value >= 0 else 0
 
 

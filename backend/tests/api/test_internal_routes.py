@@ -95,7 +95,7 @@ def test_internal_model_provider_route_requires_token_and_returns_enabled_hops(t
     actor = runtime.users.create_root(username="ai360", password_hash="hash")
     runtime.model_providers.update(
         {"decision": CategoryUpdate(
-            ("openai", "jev", "clef-backup", "clef-primary"),
+            ("openai", "jev", "clef-backup", "clef-primary", "gemini"),
             ("openai", "clef-primary"),
         )},
         credentials={"openai": "openai-secret"},

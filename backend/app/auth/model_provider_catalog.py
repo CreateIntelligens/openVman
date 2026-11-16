@@ -67,6 +67,11 @@ DECISION: Final = ModelCategory(
     model_editable=False,
     hops=(
         ProviderHop(
+            "gemini", "gemini", "Gemini Decisions",
+            "https://generativelanguage.googleapis.com/v1beta/decisions",
+            "gemini-decision-1", True,
+        ),
+        ProviderHop(
             "clef-primary", "clef", "Clef 主端點",
             "https://clef.create360.ai/v1/systemone", "clef-flash", False,
         ),

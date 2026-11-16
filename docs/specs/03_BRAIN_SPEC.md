@@ -25,7 +25,7 @@
 | 文件解析 | Gateway（pdf-inspector + Docling + AnyDoc）與 Brain 內建轉換 | 見第 4.1 節 |
 | 路由層 | Fallback chain + Key Pool | 金鑰冷卻、模型與 provider 切換、有界跳轉 |
 | 外部工具 | 2md、David888 Wiki | 網路搜尋與讀網頁、發布報告 |
-| 決策供應鏈 | Clef（主／備援）、Jev（TypeSafe）、OpenAI Decisions | 本地規則不確定時執行 typed decision；管理者可調整供應商順序 |
+| 決策供應鏈 | Gemini Decisions（預設第一站）、Clef（主／備援）、Jev（TypeSafe）、OpenAI Decisions | 本地規則不確定時執行 typed decision；管理者可調整供應商順序 |
 | Redis | 選用 | 只用於多 worker 共用 2md circuit 狀態 |
 
 #### 2.1 Embedding gateway（EmbeddingGemma 2）
@@ -549,7 +549,7 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 * 工具與檢索結果一律視為不可信資料（`trust_boundary: untrusted_reference_data`）。
 
 **16.3 個資偵測**
-* `PRIVACY_FILTER_ENABLED`（預設關）設為 true 時，使用者每句話在背景問 Clef 有沒有個資（`privacy/detector.py`）：先問一題「有沒有任何個資」（約 0.11 秒），有才再問是哪幾類（姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有；總判斷說有、細項都沒過時記 `unclassified`）。只問 Clef（`decide(providers={"clef"})`），失敗也不退到 Jev 或 OpenAI：這兩家是外部服務，為了查個資把個資送出去正好相反。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
+* `PRIVACY_FILTER_ENABLED`（預設關）設為 true 時，使用者每句話在背景問決策服務有沒有個資（`privacy/detector.py`）：先問一題「有沒有任何個資」（約 0.11 秒），有才再問是哪幾類（姓名、電話、身分證／病歷／卡號等識別號碼、住址、Email、出生日期、密碼或驗證碼，每類一題 noul，機率 ≥ 0.5 算有；總判斷說有、細項都沒過時記 `unclassified`）。走跟當輪決策一樣的決策鏈（後台「模型供應商」的決策順序依序備援）。只偵測、不修改送出的內容，也不掃工具結果與模型回覆；結果寫入稽核事件，並存到該則使用者訊息的 `privacy_warning` 中繼資料，回應以 `pii_pending` 表示掃描尚未完成。同時在掃的超過 `PRIVACY_MAX_INFLIGHT`（預設 2）就跳過該句，逾時 `PRIVACY_CLEF_TIMEOUT_SECONDS`（預設 3 秒）或失敗都當作沒掃，不影響對話；決策斷路器把這個用途記為 `privacy`。命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。
 
 **16.4 對話限制**
 * 單 Session 最大對話輪次：`MAX_SESSION_ROUNDS`（預設 100），達上限回 400。

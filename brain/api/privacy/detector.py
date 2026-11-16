@@ -1,4 +1,4 @@
-"""Ask Clef which kinds of personal data a message contains.
+"""Ask the decision chain which kinds of personal data a message contains.
 
 2026-10-13 以 52 句虛構中文句子比較：OpenAI Privacy Filter（CPU）抓到 19/25、
 每句 3–4 秒，漏掉「民國75年3月14日」「我爸周文雄」與信用卡、健保卡號；Clef
@@ -6,8 +6,11 @@
 位置，所以這裡只偵測、不遮罩——原本也沒有遮罩。
 
 先問一題「有沒有任何個資」，有才問是哪幾類：一次 7 題要 0.85 秒，總判斷一題
-約 0.11 秒，同一批 52 句也是 25/25、誤報 0/27，而大部分訊息沒有個資。只問 Clef：Jev 與 OpenAI 是外部
-服務，為了查個資把個資送出去正好相反。
+約 0.11 秒，同一批 52 句也是 25/25、誤報 0/27，而大部分訊息沒有個資。
+
+走跟當輪決策一樣的決策鏈（後台設定的順序，Clef、Jev、OpenAI）。以前只問 Clef、不送外部
+服務；2026-11-16 確認我們的資料沒有不能送外部的限制，改成跟其他決策一樣，Clef 不在時
+（例如壓測環境）也掃得到。
 """
 
 from __future__ import annotations
@@ -115,7 +118,7 @@ def detect_pii(text: str) -> dict[str, int] | None:
             return {}
         found = _found(_ask(text, _QUESTIONS))
     except Exception as exc:  # noqa: BLE001 - 偵測失敗不影響對話
-        logger.warning("[privacy] Clef PII check failed: %s", exc)
+        logger.warning("[privacy] PII check failed: %s", exc)
         return None
     finally:
         slot.release()
@@ -129,7 +132,6 @@ def _ask(text: str, questions: dict[str, dict[str, object]]):
         questions,
         timeout=get_settings().privacy_clef_timeout_seconds,
         purpose="privacy",
-        providers=frozenset({"clef"}),
     )
 
 
