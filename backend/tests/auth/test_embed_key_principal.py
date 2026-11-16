@@ -536,3 +536,35 @@ def test_character_list_shows_the_key_projects_own_characters(embed_env, tmp_pat
 
     assert [c["char_id"] for c in anonymous] == []
     assert [c["char_id"] for c in embedded] == ["proj-own"]
+
+
+def test_character_list_hides_public_characters_the_key_cannot_load(embed_env, tmp_path):
+    # 全域公開人物不在金鑰白名單時，素材路徑回 403；清單也不能列出它。
+    from app.auth.models import ResourceType, ResourceVisibility
+
+    _module, client, key, runtime = embed_env
+    for char_id, visibility, owner in (
+        ("public-allowed", ResourceVisibility.SYSTEM_PUBLIC, None),
+        ("public-other", ResourceVisibility.SYSTEM_PUBLIC, None),
+        ("proj-own", ResourceVisibility.PROJECT, "default"),
+    ):
+        char_dir = tmp_path / "characters" / char_id
+        char_dir.mkdir(parents=True, exist_ok=True)
+        (char_dir / "01.webm").write_bytes(b"webm")
+        (char_dir / "combined_data.json.gz").write_bytes(b"\x1f\x8bdata")
+        runtime.resources.register(
+            resource_type=ResourceType.AVATAR_CHARACTER,
+            resource_id=char_id,
+            owner_user_id=None,
+            visibility=visibility,
+            owner_project_id=owner,
+        )
+    runtime.embed_keys.update(key.key_id, allowed_character_ids=["public-allowed", "proj-own"])
+
+    anonymous = client.get("/api/v1/characters").json()["characters"]
+    embedded = client.get("/api/v1/characters", headers=_headers(key.key_id)).json()["characters"]
+    blocked = client.get("/static/characters/public-other/01.webm", headers=_headers(key.key_id))
+
+    assert sorted(c["char_id"] for c in anonymous) == ["public-allowed", "public-other"]
+    assert sorted(c["char_id"] for c in embedded) == ["proj-own", "public-allowed"]
+    assert blocked.status_code == 403

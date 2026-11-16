@@ -242,7 +242,7 @@ location /static/characters/ {
 | `/static/sdk/openvman-avatar-sdk.js` | IIFE SDK。 |
 | `/static/sdk/runtime/OpenVmanAvatarRuntime.js` | 內部 runtime 公開別名。 |
 | `/static/sdk/runtime/OpenVmanAvatarRuntime.wasm` | 內部 WASM 公開別名。 |
-| `/api/v1/characters` | 可用角色清單（唯讀）。不帶憑證只列全域公開的人物；帶 `X-Embed-Key` 時另外列出金鑰綁定專案的專屬與指派人物（限金鑰允許的人物）。 |
+| `/api/v1/characters` | 可用角色清單（唯讀）。不帶憑證只列全域公開的人物；帶 `X-Embed-Key` 時只列金鑰允許的人物：全域公開人物加上金鑰綁定專案的專屬與指派人物，列出的人物素材都讀得到。 |
 | `/static/characters/<characterId>/combined_data.json.gz` | 角色驅動資料。專案專屬人物要帶 `X-Embed-Key`。 |
 | `/static/characters/<characterId>/01.webm` | 透明角色影片。專案專屬人物要帶 `X-Embed-Key`。 |
 | `/api/v1/chat` | 對話模式的回答端點（需 embed key 或 session）。 |

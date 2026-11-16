@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **Embed key 的人物清單只列讀得到的人物**：`GET /api/v1/characters` 帶 Embed key 時，全域公開人物也要在金鑰允許的人物內才列出。以前清單會列出所有全域公開人物，但 `/static/characters/*` 依金鑰白名單回 403，SDK 選到就讀不到素材。
+
 - **[2026-11-13]** **Backend 預設開 4 個 process**：`backend` 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動（Compose 預設 4，直接執行預設 1）。多 process 下原本只在記憶體的狀態改成共用：解鎖密碼失敗次數、API key 與 embed key 每分鐘上限放 Redis（以前多 process 時上限等於乘上 process 數）；文字模式攝影機的事件狀態放 Redis（以前同一位訪客可能每個 process 各打一次招呼）；帳號資料庫啟動 migration 以檔案鎖依序執行（以前全新資料庫同時啟動，搶輸的 process 起不來，已用四個 process 同時初始化的測試重現）；素材包工作登錄角色加 Redis 鎖；`/metrics/prometheus` 改 prometheus_client 多 process 模式、`/metrics` 的計數與耗時跨 process 加總，事件清單加上 1,000 筆上限。`A2A_ENABLED` 搭配多 process 時啟動失敗。隔離環境（假 LLM、假 TTS、8 個對話 worker）主機較閒時每秒 20 題聽到第一句 14.2 → 2.2 秒；完整驗收流程與跨 process 檢查（`scripts/experiments/brain-worker-split/multiprocess_checks.py`）通過。
 
 - **[2026-11-13]** **對話服務預設改為 8 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 4 改為 8（每個約 0.3 GB）。隔離環境假 LLM 實測，瞬間 100 人第一句 5.4 → 3.8 秒、瞬間 200 人 9.7 → 6.6 秒，每秒 20 題 p95 5.4 → 1.7 秒；結果見 `docs/plans/brain-100-concurrency.md`。已有 `.env` 寫明 `BRAIN_WORKERS` 的部署照舊。

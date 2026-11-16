@@ -74,7 +74,11 @@ async def list_public_characters(
     # 自己專案的人物。middleware 已驗過金鑰（含來源與路徑），這裡只讀結果。
     current = getattr(request.state, "current_account", None)
     if isinstance(current, CurrentAccount) and current.embed_key is not None:
-        visible_ids |= _embed_project_character_ids(runtime, current.embed_key)
+        key = current.embed_key
+        visible_ids |= _embed_project_character_ids(runtime, key)
+        # 全域公開的人物也要過金鑰的人物白名單：素材路徑會照白名單擋，清單列出
+        # 讀不到素材的人物，SDK 選了就是一片 403。
+        visible_ids = {char_id for char_id in visible_ids if key.allows_character(char_id)}
     return {
         "characters": [
             character
