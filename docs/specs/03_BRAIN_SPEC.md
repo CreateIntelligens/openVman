@@ -545,7 +545,7 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 * 長度限制：單輪 `message` 最多 `MAX_INPUT_LENGTH`（預設 500）字，超過直接回 400，不截斷。
 * Prompt injection：`ENABLE_CONTENT_FILTER` 與 `BLOCK_PROMPT_INJECTION` 皆開啟時，對對話與新增記憶以規則比對覆寫系統指令、要求揭露隱藏 prompt、繞過安全限制與越獄角色等模式，命中即回 400。
 * Channel 必須在 `ALLOWED_CHANNELS`（預設 `web,api,kiosk,admin,system`）；`persona_id`、`session_id` 須符合識別字格式。
-* 限流：同一 action、專案、呼叫者與 channel 每分鐘最多 `REQUEST_RATE_LIMIT_PER_MINUTE`（預設 90）次，超過回 429、`LLM_OVERLOAD` 與 `Retry-After`。呼叫者是 Backend 驗證後傳來的 `X-Principal-Type`／`X-Principal-Id`（每把 API key、Embed key、每個登入帳號各自計），沒有時才用 client IP；Brain 只收 Backend 的請求，只看 IP 等於整個專案共用。
+* 限流：同一 action、專案、呼叫者與 channel 每分鐘最多 `REQUEST_RATE_LIMIT_PER_MINUTE`（預設 1200）次，超過回 429、`LLM_OVERLOAD` 與 `Retry-After`。呼叫者是 Backend 驗證後傳來的 `X-Principal-Type`／`X-Principal-Id`（每把 API key、Embed key、每個登入帳號各自計），沒有時才用 client IP；Brain 只收 Backend 的請求，只看 IP 等於整個專案共用。
 * 工具與檢索結果一律視為不可信資料（`trust_boundary: untrusted_reference_data`）。
 
 **16.3 個資偵測**
@@ -638,7 +638,7 @@ ASR_FINAL_JUDGE_ENABLED=true
 MAX_INPUT_LENGTH=500             # 單輪輸入最大字數
 ENABLE_CONTENT_FILTER=true
 BLOCK_PROMPT_INJECTION=true
-REQUEST_RATE_LIMIT_PER_MINUTE=90
+REQUEST_RATE_LIMIT_PER_MINUTE=1200
 ALLOWED_CHANNELS=web,api,kiosk,admin,system
 PRIVACY_FILTER_ENABLED=false
 

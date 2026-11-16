@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **Brain 每個呼叫者的請求上限從每分鐘 90 調到 1,200**：上限是依呼叫者計算（每把 API key、Embed key、每個登入帳號各一份），一把 Embed key 常由整群 kiosk 共用，90（約每秒 1.5 題）只夠十幾台；1,200 約每秒 20 題，夠 100 台以上，仍擋得住失控的迴圈。`REQUEST_RATE_LIMIT_PER_MINUTE` 可覆寫。
+
 - **[2026-11-16]** **對話服務預設改為 16 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 8 改為 16。隔離環境量測（`docs/plans/brain-100-concurrency.md`「每個 process 的容量」）每個對話 worker 約撐每秒 1～1.25 題，8 個在每秒 10 題時聽到第一句 p95 5.7 秒，16 個為 2.7～3.5 秒；每個 worker 約 0.4～0.5 GB，閒置不吃 CPU。
 
 - **[2026-11-16]** **Gemini TTS、Edge 不再先打文字正規化**：`/api/v1/tts/stream` 與 `/v1/audio/speech` 以前不分引擎，每句中文都先呼叫 `NORMALIZE_API_URL`（數字念成中文、轉簡體），實測每句 0.36～0.54 秒。現在只有 `TTS_NORMALIZE_PROVIDERS` 列出的引擎（預設 `indextts,indextts-nurse,voxcpm,cosyvoice`）才打；Gemini TTS、Edge 自己會念數字，只做去 markdown／表情符號的本地清理，送原文（不轉簡體）。沒指定引擎時可能落到自架引擎，照舊正規化。Gemini 串流失敗時直接回錯誤、不會改由自架引擎接手，所以不會有未正規化的文字送進自架引擎。

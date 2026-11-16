@@ -344,7 +344,9 @@ class BrainSettings(BaseSettings):
         validation_alias="KNOWLEDGE_UPLOAD_MAX_BYTES",
     )
     enable_content_filter: bool = True
-    request_rate_limit_per_minute: int = 90
+    # 每個呼叫者（每把 API key、Embed key、每個帳號）每分鐘上限。一把 Embed key 常由整群
+    # kiosk 共用，90 只夠約 15 台；1,200 約為每秒 20 題，夠 100 台以上。
+    request_rate_limit_per_minute: int = 1200
     block_prompt_injection: bool = True
     allowed_channels: str = "web,api,kiosk,admin,system"
 
