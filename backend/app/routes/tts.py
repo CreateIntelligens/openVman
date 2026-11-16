@@ -25,7 +25,7 @@ from app.auth.models import (
 )
 from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.runtime import get_auth_runtime
-from app.config import get_tts_config
+from app.config import TTSRouterConfig, get_tts_config
 from app.observability import record_fallback_hop
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
@@ -183,11 +183,11 @@ async def spoken_text(text: str, provider: str, *, taiwanese: bool) -> str:
 
     沒指定引擎（auto）時可能落到自架引擎，照舊正規化。
     """
-    names = {
-        name.strip()
-        for name in get_tts_config().tts_normalize_providers.split(",")
-        if name.strip()
-    }
+    raw = getattr(
+        get_tts_config(), "tts_normalize_providers",
+        TTSRouterConfig.model_fields["tts_normalize_providers"].default,
+    )
+    names = {name.strip() for name in raw.split(",") if name.strip()}
     if provider and provider not in names:
         return clean_for_tts(text) or ""
     return (await prepare_tts_text_async(text, simplified=not taiwanese)) or ""

@@ -1,4 +1,4 @@
-"""Only engines that cannot read digits get the remote normalization call."""
+"""Only IndexTTS gets the remote normalization call by default."""
 
 from __future__ import annotations
 
@@ -11,8 +11,10 @@ from app.routes import tts as tts_routes
 @pytest.mark.parametrize(("provider", "normalized"), [
     ("gemini-tts", False),
     ("edge-tts", False),
+    ("voxcpm", False),
+    ("cosyvoice", False),
     ("indextts", True),
-    ("voxcpm", True),
+    ("indextts-nurse", True),
     ("", True),
 ])
 async def test_only_listed_engines_are_normalized(monkeypatch, provider, normalized):

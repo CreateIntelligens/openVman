@@ -2394,7 +2394,8 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
     assert response.status_code == 200
     assert opened["voice"] == ""
     assert opened["locale"] == "nan"
-    assert opened["simplified"] is False
+    # VoxCPM 不再打遠端正規化，台語原文直接送（也就不會被轉成簡體）。
+    assert "simplified" not in opened
 
     # 打字、快速問答、講華語沒有 speech_language：照使用者選的 TTS，走一般授權。
     authorized: list[str] = []

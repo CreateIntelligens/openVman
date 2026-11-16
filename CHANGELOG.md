@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **[2026-11-16]** **只有 IndexTTS 會先打文字正規化**：`TTS_NORMALIZE_PROVIDERS` 預設從 `indextts,indextts-nurse,voxcpm,cosyvoice` 改為 `indextts,indextts-nurse`。VoxCPM、CosyVoice 改成跟 Gemini TTS、Edge 一樣只做本地清理（去 markdown／表情符號），送原文、不轉簡體。正規化服務會把每一句記下並排進它的審核佇列，我們的測試與壓測流量會一起灌進去，每句也多等 0.4～0.5 秒。沒指定引擎時可能落到 IndexTTS，照舊正規化。要恢復舊行為就在 `.env` 寫回原本的清單。
+
 - **[2026-11-16]** **dev 的 Backend 改成跟正式站一樣多 process**：以前 `ENV=dev` 一律用 `uvicorn --reload` 啟動，`--reload` 只能單一 process，所以就算 `BACKEND_WORKERS=4`，dev 也只有 1 個 process，限流、鎖、監控計數這類多 process 才會出的問題在 dev 測不到，壓測數字也偏低。現在 dev 照 `BACKEND_WORKERS`（預設 4）開 process、不自動重載，改 Backend 程式後要 `docker restart` 該容器；`BACKEND_WORKERS=1` 時維持自動重載。
 
 - **[2026-11-16]** **Brain 每個呼叫者的請求上限從每分鐘 90 調到 1,200**：上限是依呼叫者計算（每把 API key、Embed key、每個登入帳號各一份），一把 Embed key 常由整群 kiosk 共用，90（約每秒 1.5 題）只夠十幾台；1,200 約每秒 20 題，夠 100 台以上，仍擋得住失控的迴圈。`REQUEST_RATE_LIMIT_PER_MINUTE` 可覆寫。

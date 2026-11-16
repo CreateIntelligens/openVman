@@ -281,10 +281,10 @@ class TTSRouterConfig(BaseSettings):
 
     # --- TTS Cache ---
     tts_cache_enabled: bool = Field(default=True, validation_alias="TTS_CACHE_ENABLED")
-    # 送 TTS 前要先打 NORMALIZE_API_URL（數字念成中文、轉簡體）的引擎。自架模型念不好
-    # 數字；Gemini TTS、Edge 自己會念，多打一趟每句白等 0.4～0.5 秒。
+    # 送 TTS 前要先打 NORMALIZE_API_URL（數字念成中文、轉簡體）的引擎。只剩 IndexTTS：
+    # 每句多等 0.4～0.5 秒，而且那邊會把每一句記下來排進審核佇列，測試流量會灌進去。
     tts_normalize_providers: str = Field(
-        default="indextts,indextts-nurse,voxcpm,cosyvoice",
+        default="indextts,indextts-nurse",
         validation_alias="TTS_NORMALIZE_PROVIDERS",
     )
     tts_cache_ttl_seconds: int = Field(default=86400, validation_alias="TTS_CACHE_TTL_SECONDS")
