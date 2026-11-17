@@ -268,7 +268,7 @@ class VoxCPMAdapter:
             # 2026-10-14 起 GB10 節點可直接輸出 16 kHz WAV，省掉我們這端 48k→16k 的重採樣。
             form_data["sample_rate"] = str(sample_rate)
         try:
-            return await self._send_stream(form_data)
+            return await self._send_stream_retrying_busy(form_data)
         except VoxCPMHTTPError as exc:
             # 還沒更新的節點不認得 sample_rate 會回 422：拿掉再要一次 48k，由呼叫端轉換。
             # 只在錯誤點名 sample_rate 時才重送；其他 422（文字、聲音不對）重送也一樣錯。
@@ -280,7 +280,31 @@ class VoxCPMAdapter:
                 raise
             logger.info("voxcpm rejected sample_rate=%s; falling back to 48 kHz", sample_rate)
             form_data.pop("sample_rate", None)
-            return await self._send_stream(form_data)
+            return await self._send_stream_retrying_busy(form_data)
+
+    async def _send_stream_retrying_busy(self, form_data: dict[str, str]) -> AsyncIterator[bytes]:
+        """Retry a few times when the node says it is full (429 with queue=reject).
+
+        滿載常常只差一句：隔 TTS_VOXCPM_BUSY_RETRY_SECONDS 再試，最多
+        TTS_VOXCPM_BUSY_RETRIES 次；下一次重試會超過首音上限就不試，交給呼叫端換下一家。
+        """
+        cfg = self._config
+        retries = int(getattr(cfg, "tts_voxcpm_busy_retries", 0))
+        delay = float(getattr(cfg, "tts_voxcpm_busy_retry_seconds", 0.5))
+        deadline = monotonic() + knob(cfg, "tts_stream_first_byte_seconds")
+        attempt = 0
+        while True:
+            try:
+                return await self._send_stream(form_data)
+            except VoxCPMHTTPError as exc:
+                if exc.status_code != 429 or attempt >= retries:
+                    raise
+                # 這次重試的等待加上節點回應要在首音上限內，留 1 秒給下一家。
+                if monotonic() + delay + 1.0 > deadline:
+                    raise
+                attempt += 1
+                logger.info("voxcpm busy (429); retry %d/%d in %.1fs", attempt, retries, delay)
+                await asyncio.sleep(delay)
 
     async def _send_stream(self, form_data: dict[str, str]) -> AsyncIterator[bytes]:
         """Open the stream and wait for the first audio chunk before returning.

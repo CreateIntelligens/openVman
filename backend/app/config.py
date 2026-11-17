@@ -128,6 +128,12 @@ class TTSRouterConfig(BaseSettings):
         pattern="^(wait|reject)$",
         validation_alias="TTS_VOXCPM_STREAM_QUEUE",
     )
+    # reject 回 429 時先隔一下再試幾次：常常只是滿了一點點，一句合成完就有空位，
+    # 馬上換 Edge 會連聲音都換掉。總等待仍受首音上限（TTS_STREAM_FIRST_BYTE_SECONDS）管。
+    tts_voxcpm_busy_retries: int = Field(default=2, ge=0, le=10, validation_alias="TTS_VOXCPM_BUSY_RETRIES")
+    tts_voxcpm_busy_retry_seconds: float = Field(
+        default=0.5, ge=0, le=5, validation_alias="TTS_VOXCPM_BUSY_RETRY_SECONDS",
+    )
     # 逗號分隔的 voice_id 黑名單。上游的聲音清單不是我們維護的，這裡把不想
     # 出現在選單裡的濾掉；預設排除 barbet-hung-yi-lee（另一套固定語者模型，
     # 不是 VoxCPM2 的 zero-shot 克隆，行為與其餘聲音不一致）。

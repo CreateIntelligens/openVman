@@ -501,3 +501,82 @@ class TestStreamQueuePolicy:
     def test_whole_sentence_synthesis_keeps_the_server_default(self):
         adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
         assert "queue" not in adapter._build_payload(SynthesizeRequest(text="你好"))
+
+
+class TestBusyRetry:
+    """reject 回 429 時先等一下重試，常常只差一句就有空位，不要馬上換掉聲音。"""
+
+    def _adapter(self, **overrides):
+        return VoxCPMAdapter(TTSRouterConfig(
+            _env_file=None, tts_voxcpm_url=_VOXCPM_URL,
+            tts_voxcpm_busy_retry_seconds=0, **overrides,
+        ))
+
+    @pytest.mark.asyncio
+    async def test_busy_then_free_succeeds_without_switching_engine(self, monkeypatch):
+        adapter = self._adapter()
+        attempts = []
+
+        async def fake_send(form):
+            attempts.append(form)
+            if len(attempts) < 3:
+                raise VoxCPMHTTPError(429, "busy")
+            return "stream"
+
+        monkeypatch.setattr(adapter, "_send_stream", fake_send)
+        assert await adapter._send_stream_retrying_busy({"queue": "reject"}) == "stream"
+        assert len(attempts) == 3
+
+    @pytest.mark.asyncio
+    async def test_gives_up_after_the_configured_retries(self, monkeypatch):
+        adapter = self._adapter(tts_voxcpm_busy_retries=2)
+        attempts = []
+
+        async def fake_send(form):
+            attempts.append(form)
+            raise VoxCPMHTTPError(429, "busy")
+
+        monkeypatch.setattr(adapter, "_send_stream", fake_send)
+        with pytest.raises(VoxCPMHTTPError):
+            await adapter._send_stream_retrying_busy({})
+        assert len(attempts) == 3
+
+    @pytest.mark.asyncio
+    async def test_other_errors_are_not_retried(self, monkeypatch):
+        adapter = self._adapter()
+        attempts = []
+
+        async def fake_send(form):
+            attempts.append(form)
+            raise VoxCPMHTTPError(503, "down")
+
+        monkeypatch.setattr(adapter, "_send_stream", fake_send)
+        with pytest.raises(VoxCPMHTTPError):
+            await adapter._send_stream_retrying_busy({})
+        assert len(attempts) == 1
+
+    @pytest.mark.asyncio
+    async def test_retries_stop_before_the_first_audio_deadline(self, monkeypatch):
+        adapter = VoxCPMAdapter(TTSRouterConfig(
+            _env_file=None, tts_voxcpm_url=_VOXCPM_URL,
+            tts_voxcpm_busy_retries=10, tts_voxcpm_busy_retry_seconds=3,
+            tts_stream_first_byte_seconds=5,
+        ))
+        attempts = []
+
+        async def fake_send(form):
+            attempts.append(form)
+            raise VoxCPMHTTPError(429, "busy")
+
+        clock = [100.0]
+
+        async def fake_sleep(seconds):
+            clock[0] += seconds
+
+        monkeypatch.setattr(adapter, "_send_stream", fake_send)
+        monkeypatch.setattr("app.providers.voxcpm_adapter.asyncio.sleep", fake_sleep)
+        monkeypatch.setattr("app.providers.voxcpm_adapter.monotonic", lambda: clock[0])
+        with pytest.raises(VoxCPMHTTPError):
+            await adapter._send_stream_retrying_busy({})
+        # 3 秒等待＋1 秒保留：5 秒上限內只能再試一次。
+        assert len(attempts) == 2
