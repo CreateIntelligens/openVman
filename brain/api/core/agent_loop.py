@@ -271,6 +271,23 @@ def _should_prefetch_knowledge(
     )
 
 
+def _say_knowledge_already_searched(working_messages: list[dict[str, Any]]) -> None:
+    """Make the system prompt agree with the flow when the server ran search_knowledge itself.
+
+    改寫的句子跟原句放在一起（prompt_templates、product_tools 的 ALREADY_SEARCHED_REWRITES）。
+    """
+    from core.prompt_templates import ALREADY_SEARCHED_REWRITES
+    from tools.builtin.product_tools import ALREADY_SEARCHED_REWRITES as PRODUCT_REWRITES
+
+    for message in working_messages:
+        if message.get("role") != "system" or not isinstance(message.get("content"), str):
+            continue
+        content = message["content"]
+        for before, after in (*ALREADY_SEARCHED_REWRITES, *PRODUCT_REWRITES):
+            content = content.replace(before, after)
+        message["content"] = content
+
+
 def _prefetched_knowledge_turn(arguments: dict[str, Any]) -> LLMReply:
     """The planned search_knowledge read as a finished call the model sees in the conversation."""
     return LLMReply(
@@ -423,6 +440,12 @@ def _run_tool_phase(
             "chat_agent_setup", outcome="ok",
             elapsed_ms=(time.monotonic() - setup_started) * 1000,
         )
+        if prefetch and not any(
+            tool.get("function", {}).get("name") == KNOWLEDGE_SEARCH_TOOL for tool in later_tools
+        ):
+            # 這一輪還給 search_knowledge 時（CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH 關掉）
+            # 模型可以合理補查，就不能叫它別查。
+            _say_knowledge_already_searched(working_messages)
         if prefetch:
             with timed_node("chat_prefetch_knowledge"):
                 _append_tool_turns(
@@ -722,5 +745,10 @@ def _drop_unoffered_calls(
     if len(kept) == len(turn.tool_calls):
         return turn, []
     dropped = sorted({call.name for call in turn.tool_calls if call.name not in offered})
-    logger.warning("model called tools not offered this round: %s — dropped", dropped)
+    # 記參數才分得出是照提示重叫同一句，還是模型想換查詢（拆題、改寫）。
+    arguments = [
+        f"{call.name}({str(call.arguments)[:160]})"
+        for call in turn.tool_calls if call.name not in offered
+    ]
+    logger.warning("model called tools not offered this round: %s — dropped %s", dropped, arguments)
     return replace(turn, tool_calls=kept), dropped

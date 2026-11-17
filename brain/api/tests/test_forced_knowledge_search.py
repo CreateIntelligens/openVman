@@ -929,6 +929,48 @@ class TestKnowledgePrefetch:
         assert first[-1]["role"] == "tool" and "EUBL 揚程 12 m" in first[-1]["content"]
         assert [(s["name"], s["round"]) for s in result.tool_steps] == [("search_knowledge", 0)]
 
+    def test_system_prompt_stops_asking_for_the_search_the_server_already_ran(self, monkeypatch):
+        """系統提示寫「第一輪 search_knowledge 一定要叫」時，先查過的那一輪要改成「已經查好」。
+
+        沒改時模型照提示再叫一次，被丟掉後整段重送；正式站 18 輪有 13 輪多等一次 LLM。
+        """
+        from core.prompt_templates import DEFAULT_ANSWER_RULES, DEFAULT_TOOL_INSTRUCTIONS
+
+        system = DEFAULT_TOOL_INSTRUCTIONS + "\n" + DEFAULT_ANSWER_RULES + "\n當輪檢索提示：當輪需要專案知識，請先使用 search_knowledge。"
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [al.LLMReply(content="最大揚程 12 m", tool_calls=[], model="m1")],
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": "EUBL 揚程多少？"},
+            ],
+            force_knowledge_search=True,
+        )
+
+        sent = seen[0][0]["content"]
+        assert "search_knowledge 一定要叫" not in sent
+        assert "必須先呼叫此工具再回答" not in sent
+        assert "先呼叫 search_knowledge / search_memory 再回答" not in sent
+        assert "請先使用 search_knowledge" not in sent
+        assert "已經查好" in sent
+        assert len(calls) == 1
+
+    def test_system_prompt_is_left_alone_when_the_model_searches_itself(self, monkeypatch):
+        from core.prompt_templates import DEFAULT_TOOL_INSTRUCTIONS
+
+        agent_loop, result, calls, executed, seen = self._run(
+            monkeypatch,
+            replies=lambda al: [al.LLMReply(content="最大揚程 12 m", tool_calls=[], model="m1")],
+            messages=[
+                {"role": "system", "content": DEFAULT_TOOL_INSTRUCTIONS},
+                {"role": "user", "content": "EUBL 揚程多少？"},
+            ],
+            prefetch=False,
+            force_knowledge_search=True,
+        )
+
+        assert seen[0][0]["content"] == DEFAULT_TOOL_INSTRUCTIONS
+
     @pytest.mark.parametrize("prefetch", [True, False])
     def test_uncertain_or_disabled_keeps_the_forced_tool_round(self, monkeypatch, prefetch):
         """沒開一律先查時，needs_knowledge 為 None（或先查關閉）維持強制工具那一輪。"""

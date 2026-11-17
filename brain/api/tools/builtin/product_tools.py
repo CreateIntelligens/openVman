@@ -141,6 +141,12 @@ _PROMPT_LINE = (
     "回答列出的產品以 filter_products 的 matches 為準，search_knowledge 的片段常不完整，"
     "不能只憑片段列款式或說其他款沒有資料。"
 )
+# 伺服器先查好知識庫的回合（agent_loop 的 prefetch）把上面那句改成只叫 filter_products。
+ALREADY_SEARCHED_REWRITES: tuple[tuple[str, str], ...] = (
+    ("第一輪必須同時呼叫 filter_products 與 "
+     "search_knowledge（對話裡已經有這一句的 search_knowledge 結果時只叫 filter_products）",
+     "第一輪必須呼叫 filter_products（知識庫已經用這一句查好，結果在對話裡，不要再叫 search_knowledge）"),
+)
 # 規格表常常只收了一部分產品（鶴記只有 EDW、EUB-M），沒講範圍時模型把 matches 當成全部，
 # 跨系列的選型題只列規格表裡的款式，還說「共 N 款」。
 _SCOPE_LINE = (
