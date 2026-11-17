@@ -120,6 +120,14 @@ class TTSRouterConfig(BaseSettings):
         default=10,
         validation_alias="TTS_VOXCPM_INFERENCE_TIMESTEPS",
     )
+    # 即時串流遇到 VoxCPM 滿載時要不要排隊。排隊時首音常要等 10 秒以上（2026-11-17 壓測
+    # 中位數 12 秒），等滿首音逾時才換下一家，白等；reject 時沒空位就立刻回 429，直接換下一家。
+    # VoxCPM360 不帶這個參數時照舊排隊，只影響我們自己。整段合成（非串流）不帶。
+    tts_voxcpm_stream_queue: str = Field(
+        default="reject",
+        pattern="^(wait|reject)$",
+        validation_alias="TTS_VOXCPM_STREAM_QUEUE",
+    )
     # 逗號分隔的 voice_id 黑名單。上游的聲音清單不是我們維護的，這裡把不想
     # 出現在選單裡的濾掉；預設排除 barbet-hung-yi-lee（另一套固定語者模型，
     # 不是 VoxCPM2 的 zero-shot 克隆，行為與其餘聲音不一致）。

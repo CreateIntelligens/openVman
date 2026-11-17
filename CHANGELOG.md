@@ -12,6 +12,8 @@
 
 ### Changed
 
+- **[2026-11-17]** **即時串流遇到 VoxCPM 滿載時不再排隊白等**：`/api/v1/tts/stream` 打 VoxCPM 時帶 `queue=reject`（`TTS_VOXCPM_STREAM_QUEUE`，預設 `reject`，設 `wait` 恢復舊行為）。節點同時處理數滿時立刻回 429，Backend 直接換下一家，不再排隊十幾秒、等滿首音逾時才換。VoxCPM360 從 c7a0a47 起支援 `queue`（正式節點已更新）；舊版節點不認得這個表單欄位，照舊排隊。整段合成（`/v1/audio/speech`）不帶，照節點預設排隊。
+
 - **[2026-11-16]** **個資掃描改走整條決策鏈**：`PRIVACY_FILTER_ENABLED` 開啟時的個資偵測以前只問 Clef（`decide(providers={"clef"})`），不送 Jev、OpenAI 等外部服務；現在跟當輪決策一樣照後台設定的決策順序備援，Clef 不在或逾時時改問下一家。我們的資料沒有不能送外部服務的限制。逾時仍是 `PRIVACY_CLEF_TIMEOUT_SECONDS`（名稱不變），同時掃描上限、只偵測不改寫內容的行為都不變。
 
 - **[2026-11-16]** **只有 IndexTTS 會先打文字正規化**：`TTS_NORMALIZE_PROVIDERS` 預設從 `indextts,indextts-nurse,voxcpm,cosyvoice` 改為 `indextts,indextts-nurse`。VoxCPM、CosyVoice 改成跟 Gemini TTS、Edge 一樣只做本地清理（去 markdown／表情符號），送原文、不轉簡體。正規化服務會把每一句記下並排進它的審核佇列，我們的測試與壓測流量會一起灌進去，每句也多等 0.4～0.5 秒。沒指定引擎時可能落到 IndexTTS，照舊正規化。要恢復舊行為就在 `.env` 寫回原本的清單。

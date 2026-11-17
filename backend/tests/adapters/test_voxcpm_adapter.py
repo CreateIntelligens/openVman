@@ -482,3 +482,22 @@ def test_voxcpm_adapter_sends_model_id_only_when_chosen(monkeypatch):
 
     adapter.synthesize(SynthesizeRequest(text="你好", model_id="lora::vh387-hayley-mix"))
     assert mock_post.call_args.kwargs["json"]["model_id"] == "lora::vh387-hayley-mix"
+
+
+class TestStreamQueuePolicy:
+    """即時串流遇到滿載就換下一家，不在 VoxCPM 排隊白等首音逾時。"""
+
+    def test_stream_asks_voxcpm_not_to_queue_by_default(self):
+        adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+        form = adapter._build_stream_form(SynthesizeRequest(text="你好"))
+        assert form["queue"] == "reject"
+
+    def test_config_can_restore_queueing(self):
+        adapter = VoxCPMAdapter(TTSRouterConfig(
+            _env_file=None, tts_voxcpm_url=_VOXCPM_URL, tts_voxcpm_stream_queue="wait",
+        ))
+        assert adapter._build_stream_form(SynthesizeRequest(text="你好"))["queue"] == "wait"
+
+    def test_whole_sentence_synthesis_keeps_the_server_default(self):
+        adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+        assert "queue" not in adapter._build_payload(SynthesizeRequest(text="你好"))

@@ -182,6 +182,7 @@ class VoxCPMAdapter:
             # 對「參考音」降噪，內建 preset 已是乾淨錄音，開了只多一次模型載入。
             "denoise": "false",
             "speed": "1.0",
+            "queue": self._config.tts_voxcpm_stream_queue,
         }
 
     def synthesize(self, request: SynthesizeRequest) -> NormalizedTTSResult:
