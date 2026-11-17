@@ -95,3 +95,36 @@ def test_corrupt_credentials_fails_closed(tmp_path: Path):
 
     store_file.write_text("{corrupt json", encoding="utf-8")
     assert store.load("https://a2a.david888.com", "ai360") is None
+
+
+def test_load_handles_concurrent_unlink_without_raising(tmp_path: Path, monkeypatch):
+    store_file = tmp_path / "credentials.json"
+    enc_key = "test-secret"
+    hub_url = "https://a2a.david888.com"
+    hub_key = "ai360"
+    store = A2ACredentialStore(store_file, enc_key)
+    store.save(
+        A2ACredentials(
+            agentId="agent-12345",
+            agentToken="token-secret-abc",
+            circleId=hub_key,
+            hubUrl=hub_url,
+            hubKeyFingerprint=compute_key_fingerprint(hub_key, enc_key),
+        )
+    )
+
+    # Even if another process unlinks the path between open() and fstat(), descriptor load succeeds.
+    orig_fstat = os.fstat
+
+    def unlink_before_fstat(fd: int):
+        if store_file.exists():
+            store_file.unlink()
+        return orig_fstat(fd)
+
+    monkeypatch.setattr(os, "fstat", unlink_before_fstat)
+    loaded = store.load(hub_url, hub_key)
+    assert loaded is not None and loaded.agent_token == "token-secret-abc"
+
+    # Subsequent load after unlink returns None cleanly without FileNotFoundError.
+    monkeypatch.undo()
+    assert store.load(hub_url, hub_key) is None

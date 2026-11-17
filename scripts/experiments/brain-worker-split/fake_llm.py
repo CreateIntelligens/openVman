@@ -10,12 +10,31 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 
 app = FastAPI()
-counts = {"requests": 0, "streams": 0}
+counts = {"requests": 0, "streams": 0, "held_requests": 0}
+hold_state: dict[str, object] = {"remaining": 0, "event": asyncio.Event()}
+hold_state["event"].set()  # type: ignore[attr-defined]
 
 
 @app.get("/stats")
 async def stats():
     return counts
+
+
+@app.post("/control/hold_chat")
+async def control_hold_chat(request: Request):
+    body = await request.json() if (await request.body()) else {}
+    hold_state["remaining"] = int(body.get("count", 2))
+    hold_state["event"] = asyncio.Event()
+    return {"holding": True, "count": hold_state["remaining"]}
+
+
+@app.post("/control/release_chat")
+async def control_release_chat():
+    hold_state["remaining"] = 0
+    ev = hold_state["event"]
+    if isinstance(ev, asyncio.Event):
+        ev.set()
+    return {"released": True}
 
 
 @app.get("/v1/models")
@@ -27,6 +46,12 @@ async def models():
 async def completion(request: Request):
     body = await request.json()
     counts["requests"] += 1
+    if int(hold_state["remaining"]) > 0:
+        hold_state["remaining"] = int(hold_state["remaining"]) - 1
+        counts["held_requests"] += 1
+        ev = hold_state["event"]
+        if isinstance(ev, asyncio.Event):
+            await ev.wait()
     latest_user = next((message.get("content", "") for message in reversed(body.get("messages", [])) if message.get("role") == "user"), "")
     tools = body.get("tools", [])
     has_skill = any("worker_probe" in tool.get("function", {}).get("name", "") for tool in tools)

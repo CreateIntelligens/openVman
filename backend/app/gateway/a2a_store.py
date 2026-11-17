@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import stat
 from typing import Any
+import uuid
 
 from cryptography.fernet import Fernet
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -84,12 +85,18 @@ class A2ACredentialStore:
 
     def load(self, expected_hub_url: str, current_hub_key: str) -> A2ACredentials | None:
         """Load credentials from disk, verify Hub URL, fingerprint, and decrypt agent token."""
-        if not self.filepath.exists():
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as fh:
+                file_mode = stat.S_IMODE(os.fstat(fh.fileno()).st_mode)
+                content = fh.read()
+        except FileNotFoundError:
             logger.debug("A2A credentials file does not exist: %s", self.filepath)
+            return None
+        except OSError as e:
+            logger.warning("Failed to read A2A credentials file at %s: %s", self.filepath, e)
             return None
 
         try:
-            content = self.filepath.read_text(encoding="utf-8")
             data = json.loads(content)
         except Exception as e:
             logger.warning("Corrupt A2A credentials file at %s: %s", self.filepath, e)
@@ -98,7 +105,7 @@ class A2ACredentialStore:
             logger.warning("A2A credentials file must contain a JSON object")
             return None
 
-        if stat.S_IMODE(self.filepath.stat().st_mode) != 0o600:
+        if file_mode != 0o600:
             logger.warning("A2A credentials file has unsafe permissions")
             return None
 
@@ -160,7 +167,7 @@ class A2ACredentialStore:
     def save(self, creds: A2ACredentials) -> None:
         """Encrypt token, atomically write credentials with mode 0600."""
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = self.filepath.with_suffix(f".tmp.{os.getpid()}")
+        temp_path = self.filepath.with_suffix(f".tmp.{os.getpid()}.{uuid.uuid4().hex[:8]}")
 
         fernet = _get_fernet(self.encryption_key)
         encrypted_token = fernet.encrypt(creds.agent_token.encode("utf-8")).decode("utf-8")
@@ -179,12 +186,14 @@ class A2ACredentialStore:
         content = json.dumps(payload, indent=2)
 
         try:
-            # Create file with 0600 permissions
+            # Create file with 0600 permissions before atomic rename
             fd = os.open(str(temp_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as f:
+                os.fchmod(f.fileno(), 0o600)
                 f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
             temp_path.replace(self.filepath)
-            os.chmod(self.filepath, 0o600)
             logger.info("Saved encrypted A2A credentials to %s for agent %s", self.filepath, creds.agent_id)
         except Exception as exc:
             logger.error("Failed to write A2A credentials to %s: %s", self.filepath, exc)

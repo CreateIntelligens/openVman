@@ -4,7 +4,7 @@ import json
 import httpx
 import pytest
 
-from app.gateway.a2a_client import A2AClient
+from app.gateway.a2a_client import A2AClient, A2ARateLimitError, A2ARateLimiter
 from app.gateway.a2a_store import A2ACredentials, compute_key_hash
 
 
@@ -122,3 +122,73 @@ async def test_a2a_client_list_peers():
         peers = await client.list_peers(state="online")
         assert len(peers) == 1
         assert peers[0]["displayName"] == "OpenClaw"
+
+
+class _FakeSlidingWindowRedis:
+    """In-memory stand-in executing the exact sliding-window semantics of _REDIS_WINDOW_SCRIPT."""
+
+    def __init__(self):
+        self.sets: dict[str, dict[str, float]] = {}
+
+    async def eval(self, _script, _numkeys, key, now, window, limit, member):
+        moment = float(now)
+        window_s = float(window)
+        max_calls = int(limit)
+        bucket = self.sets.setdefault(key, {})
+        for k, score in list(bucket.items()):
+            if score <= moment - window_s:
+                del bucket[k]
+        if len(bucket) >= max_calls:
+            oldest = min(bucket.values())
+            return str(oldest).encode("utf-8")
+        bucket[str(member)] = moment
+        return b""
+
+    async def delete(self, key):
+        self.sets.pop(key, None)
+
+
+@pytest.mark.asyncio
+async def test_a2a_rate_limiter_single_process_and_reset(monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "app.gateway.a2a_client.get_tts_config",
+        lambda: SimpleNamespace(backend_workers=1),
+    )
+    limiter = A2ARateLimiter(max_calls=2, window_seconds=60.0)
+    await limiter.acquire()
+    await limiter.acquire()
+    with pytest.raises(A2ARateLimitError) as exc_info:
+        await limiter.acquire()
+    assert exc_info.value.retry_after >= 1
+    await limiter.reset()
+    await limiter.acquire()
+
+
+@pytest.mark.asyncio
+async def test_a2a_rate_limiter_shared_redis_across_workers():
+    shared_redis = _FakeSlidingWindowRedis()
+    w1 = A2ARateLimiter(max_calls=3, window_seconds=60.0, redis_client=shared_redis, key="hub-a")
+    w2 = A2ARateLimiter(max_calls=3, window_seconds=60.0, redis_client=shared_redis, key="hub-a")
+
+    assert await w1.check(now=1000.0) == 0
+    assert await w2.check(now=1001.0) == 0
+    assert await w1.check(now=1002.0) == 0
+    # 4th call from another worker hits shared cap and returns retry_after > 0
+    retry_after = await w2.check(now=1003.0)
+    assert retry_after > 0
+    # Once oldest expires (1000 + 60 = 1060), slot frees up
+    assert await w2.check(now=1060.5) == 0
+
+
+@pytest.mark.asyncio
+async def test_a2a_rate_limiter_redis_outage_falls_back_to_local():
+    class _BrokenRedis:
+        async def eval(self, *args, **kwargs):
+            raise ConnectionError("redis down")
+
+    limiter = A2ARateLimiter(max_calls=2, window_seconds=60.0, redis_client=_BrokenRedis(), key="hub-a")
+    assert await limiter.check(now=10.0) == 0
+    assert await limiter.check(now=11.0) == 0
+    assert await limiter.check(now=12.0) > 0

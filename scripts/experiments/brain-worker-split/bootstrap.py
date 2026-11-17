@@ -78,6 +78,10 @@ if __name__ == "__main__":
                 shutil.rmtree(path, ignore_errors=True)
                 os.makedirs(path)
                 os.environ[name] = path
-        os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200", "--workers", workers])
+        cmd = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200", "--workers", workers]
+        hc_timeout = os.environ.get("UVICORN_TIMEOUT_WORKER_HEALTHCHECK", "").strip()
+        if hc_timeout:
+            cmd.extend(["--timeout-worker-healthcheck", hc_timeout])
+        os.execvp("uvicorn", cmd)
     else:
         raise SystemExit("expected brain or backend")

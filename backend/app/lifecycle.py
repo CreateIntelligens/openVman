@@ -81,13 +81,6 @@ def _purge_revoked_api_keys(runtime: AuthRuntime) -> None:
 
 
 
-def check_process_model(cfg) -> None:
-    """Refuse settings that only work in a single Backend process."""
-    if cfg.a2a_enabled and getattr(cfg, "backend_workers", 1) > 1:
-        # A2A 的 peers／tasks 端點只有拿到 leader 租約的 process 能回，其他 process
-        # 一律 503；多 process 下約四分之三的呼叫會失敗，寧可啟動就擋下。
-        raise RuntimeError("A2A_ENABLED requires BACKEND_WORKERS=1")
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     runtime = get_auth_runtime()
@@ -98,11 +91,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     _purge_revoked_api_keys(runtime)
     await sync_system_resources(runtime, get_tts_config())
     cfg = get_tts_config()
-    check_process_model(cfg)
     a2a_daemon = get_a2a_bridge_daemon() if cfg.a2a_enabled else None
     if a2a_daemon:
         a2a_daemon.start()
-    cfg = get_tts_config()
     edge_probe = (
         asyncio.create_task(
             run_edge_tts_probe_loop(cfg.edge_tts_probe_interval_seconds),

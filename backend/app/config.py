@@ -606,6 +606,12 @@ class TTSRouterConfig(BaseSettings):
         ge=5,
         validation_alias="A2A_LEADER_LEASE_TTL_SECONDS",
     )
+    a2a_brain_timeout_seconds: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=600.0,
+        validation_alias="A2A_BRAIN_TIMEOUT_SECONDS",
+    )
     a2a_queue_db_path: str = Field(
         default="/data/a2a/work.db",
         validation_alias="A2A_QUEUE_DB_PATH",

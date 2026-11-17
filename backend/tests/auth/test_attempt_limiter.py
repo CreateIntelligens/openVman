@@ -98,14 +98,3 @@ def test_single_process_keeps_the_in_memory_limiter():
     assert isinstance(_limiter(config, "password"), FailedAttemptLimiter)
     config.backend_workers = 4
     assert isinstance(_limiter(config, "password"), RedisAttemptLimiter)
-
-
-def test_a2a_refuses_multiple_backend_processes():
-    import pytest
-
-    from app.lifecycle import check_process_model
-
-    check_process_model(SimpleNamespace(a2a_enabled=True, backend_workers=1))
-    check_process_model(SimpleNamespace(a2a_enabled=False, backend_workers=4))
-    with pytest.raises(RuntimeError, match="BACKEND_WORKERS=1"):
-        check_process_model(SimpleNamespace(a2a_enabled=True, backend_workers=4))

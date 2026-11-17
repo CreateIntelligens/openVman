@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.config import get_tts_config
@@ -132,6 +132,7 @@ async def internal_model_provider_configuration(
 
 @router.get("/api/v1/internal/a2a/peers")
 async def internal_a2a_peers(
+    response: Response,
     state: str | None = None,
     x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
 ) -> dict[str, Any]:
@@ -140,20 +141,30 @@ async def internal_a2a_peers(
     if not cfg.a2a_enabled:
         return {"peers": [], "enabled": False}
 
-    from app.gateway.a2a_bridge import get_a2a_bridge_daemon
-    daemon = get_a2a_bridge_daemon()
-    if not daemon.is_leader or not daemon.client:
-        raise HTTPException(status_code=503, detail="A2A bridge is not the active leader")
-    if not daemon.client:
-        raise HTTPException(status_code=503, detail="A2A client not initialized")
+    from app.gateway.a2a_bridge import A2ACredentialsUnavailableError, get_a2a_bridge_daemon
 
-    peers = await daemon.client.list_peers(state=state)
-    return {"peers": peers, "total": len(peers), "enabled": True}
+    daemon = get_a2a_bridge_daemon()
+    worker_headers = {"X-OpenVMan-Worker-ID": daemon.worker_id}
+    try:
+        peers = await daemon.call_outbound(lambda c: c.list_peers(state=state))
+    except A2ACredentialsUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc), headers=worker_headers) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Hub peers query failed: {exc}", headers=worker_headers) from exc
+    response.headers["X-OpenVMan-Worker-ID"] = daemon.worker_id
+    return {
+        "peers": peers,
+        "total": len(peers),
+        "enabled": True,
+        "worker_id": daemon.worker_id,
+        "is_leader": daemon.is_leader,
+    }
 
 
 @router.post("/api/v1/internal/a2a/tasks")
 async def internal_a2a_send_task(
     payload: InternalA2ASendTaskRequest,
+    response: Response,
     x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
 ) -> dict[str, Any]:
     _check_internal_auth(x_internal_token)
@@ -164,25 +175,41 @@ async def internal_a2a_send_task(
     if payload.hop_count > cfg.a2a_max_delegation_hops:
         raise HTTPException(status_code=400, detail="Delegation hop limit exceeded")
 
-    from app.gateway.a2a_bridge import get_a2a_bridge_daemon
-    daemon = get_a2a_bridge_daemon()
-    if not daemon.is_leader or not daemon.client:
-        raise HTTPException(status_code=503, detail="A2A bridge is not the active leader")
+    from app.gateway.a2a_bridge import A2ACredentialsUnavailableError, get_a2a_bridge_daemon
+    from app.gateway.a2a_client import A2ARateLimitError
 
+    daemon = get_a2a_bridge_daemon()
+    worker_headers = {"X-OpenVMan-Worker-ID": daemon.worker_id}
     try:
-        res = await daemon.client.send_task(
-            target_agent_id=payload.target_agent_id,
-            message=payload.message,
-            context_id=payload.context_id,
+        res = await daemon.call_outbound(
+            lambda c: c.send_task(
+                target_agent_id=payload.target_agent_id,
+                message=payload.message,
+                context_id=payload.context_id,
+            )
         )
-        return {"success": True, "target": payload.target_agent_id, "result": res}
+        response.headers["X-OpenVMan-Worker-ID"] = daemon.worker_id
+        return {
+            "success": True,
+            "target": payload.target_agent_id,
+            "result": res,
+        }
+    except A2ACredentialsUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc), headers=worker_headers) from exc
+    except A2ARateLimitError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": str(exc.retry_after), **worker_headers},
+        ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Hub dispatch failed: {exc}")
+        raise HTTPException(status_code=502, detail=f"Hub dispatch failed: {exc}", headers=worker_headers) from exc
 
 
 @router.post("/api/v1/internal/a2a/groups/messages")
 async def internal_a2a_broadcast_group(
     payload: InternalA2ABroadcastGroupRequest,
+    response: Response,
     x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
 ) -> dict[str, Any]:
     _check_internal_auth(x_internal_token)
@@ -192,16 +219,31 @@ async def internal_a2a_broadcast_group(
     if not cfg.a2a_allow_group_broadcast:
         raise HTTPException(status_code=403, detail="A2A group broadcast is disabled")
 
-    from app.gateway.a2a_bridge import get_a2a_bridge_daemon
-    daemon = get_a2a_bridge_daemon()
-    if not daemon.is_leader or not daemon.client:
-        raise HTTPException(status_code=503, detail="A2A bridge is not the active leader")
+    from app.gateway.a2a_bridge import A2ACredentialsUnavailableError, get_a2a_bridge_daemon
+    from app.gateway.a2a_client import A2ARateLimitError
 
+    daemon = get_a2a_bridge_daemon()
+    worker_headers = {"X-OpenVMan-Worker-ID": daemon.worker_id}
     try:
-        res = await daemon.client.broadcast_group(
-            group_id=payload.group_id,
-            message=payload.message,
+        res = await daemon.call_outbound(
+            lambda c: c.broadcast_group(
+                group_id=payload.group_id,
+                message=payload.message,
+            )
         )
-        return {"success": True, "groupId": payload.group_id, "result": res}
+        response.headers["X-OpenVMan-Worker-ID"] = daemon.worker_id
+        return {
+            "success": True,
+            "groupId": payload.group_id,
+            "result": res,
+        }
+    except A2ACredentialsUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc), headers=worker_headers) from exc
+    except A2ARateLimitError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": str(exc.retry_after), **worker_headers},
+        ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Group broadcast failed: {exc}")
+        raise HTTPException(status_code=502, detail=f"Group broadcast failed: {exc}", headers=worker_headers) from exc

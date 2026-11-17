@@ -145,7 +145,8 @@ Backend 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動，Compose 預設
 
 | 狀態 | 多 process 時的作法 |
 |---|---|
-| 解鎖密碼失敗次數、API key 每分鐘上限、embed key 每分鐘上限 | 放 Redis（sorted set；embed 以 Lua 一次完成檢查與記錄）；Redis 失敗時退回各 process 自己計數 |
+| 解鎖密碼失敗次數、API key 每分鐘上限、embed key 每分鐘上限、A2A 送出每分鐘上限 | 放 Redis（sorted set；embed 與 A2A 送出以 Lua 一次完成檢查與記錄）；Redis 失敗時退回各 process 自己計數 |
+| A2A 收送（`A2A_ENABLED=true`） | 只有取得 Redis leader 租約的 process 會連 SSE、註冊／換發憑證並執行佇列 worker；`BACKEND_WORKERS` 大於 1 時連不上 Redis 一律不自認 leader，續約短暫失敗在本機租約到期時間扣除安全邊際前保留領導權（到期後 `is_leader` 與 SSE 迴圈立即讓出、不再重連），以 `SET NX` 重取租約時保留自身活動中 `_active_event_ids` 任務不中斷、只重排其餘 `PROCESSING` 列（若重排寫庫失敗則記旗標補做）。佇列在 `processing_owner` 綁定處理者（完成／抑制／退回皆檢查持有者）並於送出前寫入 `reply_message`／`reply_task_id`（已存回覆者在交接後直接重送不重呼 Brain，尚未完成 Brain 者重排後重新呼叫；重排時會寫入 `first_failed_at`，凡超過 10 分鐘總期限、`created_at` 逾期或無 `first_failed_at` 但 `attempts >= 5` 者標為 `FAILED`；leader 每 30 秒掃描並回收無本機活動任務的孤兒 `PROCESSING` 列；`stop()` 以 250ms SQLite `busy_timeout` 在 8 秒總時限內等進行中回覆送出後才放租約；Brain 呼叫依 `A2A_BRAIN_TIMEOUT_SECONDS` 固定帶讀取逾時，遇本機限流或 Hub HTTP 429 每次重試仍受共用限流管理、不扣減 `attempts` 並依上限 60 秒之 `max(Retry-After, 2^attempts)` 寫入 `next_retry_at`，5xx／網路／換憑證後仍 401 採指數退避上限 60 秒並共用 10 分鐘總期限）。三個送出端點（peers、tasks、groups/messages）各 process 皆可服務，回應標頭帶 `X-OpenVMan-Worker-ID`（僅 `/peers` 本文另外帶 `worker_id` 與 `is_leader`）；憑證依 `.stat()` 變化重讀（開檔後以 `os.fstat` 驗證 `0600`），僅 401／403 換憑證重試那一次以明確參數跳過限流額度 |
 | 文字模式攝影機（`/api/v1/vision/describe`、`/reset`）的事件連續幀數與判讀中鎖 | 放 Redis，同一個 session 的幀落在不同 process 也只觸發一次 |
 | 帳號資料庫啟動 migration | 以資料庫旁的 `.init.lock` 檔案鎖讓各 process 依序執行 |
 | 素材包工作完成後登錄角色 | Redis 鎖，只有一個 process 會登錄 |
@@ -154,7 +155,7 @@ Backend 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動，Compose 預設
 
 仍各 process 各自一份、可接受的：上游斷路器（同一個壞掉的節點每個 process 各要兩次失敗才跳過）、詞表與語言分流的短期快取、上游健康探測與 Edge 探測（每個 process 都跑，負載很小）、啟動時的引擎與資源同步（冪等）。WebSocket（Live、串流 ASR、攝影機）一條連線固定在同一個 process。
 
-`A2A_ENABLED=true` 只能搭配 `BACKEND_WORKERS=1`：A2A 端點只有持有 leader 租約的 process 能回，多 process 時 Backend 會直接啟動失敗。回退或排查時在 `.env` 寫 `BACKEND_WORKERS=1`，再 `docker compose up -d --no-deps backend gateway-worker`（只 restart 不會套用 env）。
+`A2A_ENABLED=true` 可直接搭配多 process 運作。若要回退或排查單一 process 模式，在 `.env` 寫 `BACKEND_WORKERS=1`，再 `docker compose up -d --no-deps backend gateway-worker`（只 restart 不會套用 env）。
 
 ### 3. 建立 ROOT 帳號
 

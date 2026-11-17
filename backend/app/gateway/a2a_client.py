@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
+import copy
+import inspect
 import logging
 import time
 from typing import Any
@@ -11,7 +13,9 @@ import uuid
 
 import httpx
 
+from app.config import get_tts_config
 from app.gateway.a2a_store import A2ACredentials, compute_key_fingerprint
+from app.gateway.redis_pool import get_redis
 
 logger = logging.getLogger("backend.gateway.a2a_client")
 
@@ -19,30 +23,119 @@ MAX_PAYLOAD_BYTES = 1024 * 1024  # 1 MiB
 MAX_TASKS_PER_MINUTE = 60
 MAX_CONCURRENCY = 4
 
+# 檢查與記錄要在 Redis 裡一次做完，多個 process 同時送出才不會一起放行。
+_REDIS_WINDOW_SCRIPT = """
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', tonumber(ARGV[1]) - tonumber(ARGV[2]))
+if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[3]) then
+  local oldest = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
+  return tostring(oldest[2])
+end
+redis.call('ZADD', KEYS[1], ARGV[1], ARGV[4])
+redis.call('EXPIRE', KEYS[1], math.ceil(tonumber(ARGV[2])) + 1)
+return ''
+"""
+
+
+class A2ARateLimitError(RuntimeError):
+    """Raised when outgoing A2A tasks exceed the per-minute sliding window."""
+
+    def __init__(self, retry_after: int, max_calls: int = MAX_TASKS_PER_MINUTE):
+        self.retry_after = max(1, int(retry_after))
+        self.max_calls = max_calls
+        super().__init__(
+            f"A2A rate limit exceeded ({max_calls}/min); retry after {self.retry_after}s"
+        )
+
 
 class A2ARateLimiter:
-    """Sliding-window rate limiter for outgoing Hub operations."""
+    """Sliding-window rate limiter for outgoing Hub operations (shared via Redis when multi-process)."""
 
-    def __init__(self, max_calls: int = MAX_TASKS_PER_MINUTE, window_seconds: float = 60.0):
+    def __init__(
+        self,
+        max_calls: int = MAX_TASKS_PER_MINUTE,
+        window_seconds: float = 60.0,
+        *,
+        redis_client: Any = None,
+        key: str = "default",
+    ):
         self.max_calls = max_calls
         self.window_seconds = window_seconds
+        self._redis = redis_client
+        self.key = key
         self._timestamps: deque[float] = deque()
         self._lock = asyncio.Lock()
 
-    async def acquire(self) -> None:
+    def _check_local(self, *, now: float | None = None) -> int:
+        moment = now if now is not None else time.monotonic()
+        while self._timestamps and self._timestamps[0] <= moment - self.window_seconds:
+            self._timestamps.popleft()
+        if len(self._timestamps) >= self.max_calls:
+            return max(1, int(self.window_seconds - (moment - self._timestamps[0])) + 1)
+        self._timestamps.append(moment)
+        return 0
+
+    async def check(self, *, now: float | None = None) -> int:
+        """Record an outgoing call and return 0, or return seconds until a slot frees."""
+        use_redis = (
+            self._redis is not None
+            or getattr(get_tts_config(), "backend_workers", 1) > 1
+        )
+        if use_redis:
+            client = self._redis
+            if client is None:
+                client = await get_redis()
+            if client is not None:
+                moment = now if now is not None else time.time()
+                try:
+                    res = client.eval(
+                        _REDIS_WINDOW_SCRIPT,
+                        1,
+                        f"vman:a2a-rate:{self.key}",
+                        moment,
+                        self.window_seconds,
+                        self.max_calls,
+                        f"{moment:.6f}:{uuid.uuid4().hex}",
+                    )
+                    if inspect.isawaitable(res):
+                        res = await asyncio.wait_for(res, timeout=2.0)
+                    if isinstance(res, bytes):
+                        res = res.decode("utf-8", errors="replace")
+                    if not res:
+                        return 0
+                    return max(1, int(self.window_seconds - (moment - float(res))) + 1)
+                except Exception as exc:
+                    logger.warning(
+                        "Redis A2A rate limiter failed (%s); falling back to in-process limiter",
+                        exc,
+                    )
         async with self._lock:
-            now = time.monotonic()
-            while self._timestamps and self._timestamps[0] <= now - self.window_seconds:
-                self._timestamps.popleft()
-            if len(self._timestamps) >= self.max_calls:
-                wait_time = self.window_seconds - (now - self._timestamps[0])
-                if wait_time > 0:
-                    logger.warning("A2A rate limit reached (%d/min); waiting %.2fs", self.max_calls, wait_time)
-                    await asyncio.sleep(wait_time)
-                    now = time.monotonic()
-                    while self._timestamps and self._timestamps[0] <= now - self.window_seconds:
-                        self._timestamps.popleft()
-            self._timestamps.append(time.monotonic())
+            return self._check_local(now=now)
+
+    async def acquire(self, *, skip: bool = False) -> None:
+        if skip:
+            return
+        retry_after = await self.check()
+        if retry_after > 0:
+            logger.warning(
+                "A2A rate limit reached (%d/min); retry after %ds",
+                self.max_calls,
+                retry_after,
+            )
+            raise A2ARateLimitError(retry_after, max_calls=self.max_calls)
+
+    async def reset(self) -> None:
+        async with self._lock:
+            self._timestamps.clear()
+        client = self._redis
+        if client is None and getattr(get_tts_config(), "backend_workers", 1) > 1:
+            client = await get_redis()
+        if client is not None:
+            try:
+                res = client.delete(f"vman:a2a-rate:{self.key}")
+                if inspect.isawaitable(res):
+                    await asyncio.wait_for(res, timeout=2.0)
+            except Exception:
+                pass
 
 
 class A2AClient:
@@ -58,6 +151,7 @@ class A2AClient:
         max_concurrency: int = MAX_CONCURRENCY,
         max_tasks_per_minute: int = MAX_TASKS_PER_MINUTE,
         max_payload_bytes: int = MAX_PAYLOAD_BYTES,
+        rate_limiter: A2ARateLimiter | None = None,
     ):
         self.hub_url = hub_url.rstrip("/")
         self.hub_key = hub_key
@@ -66,8 +160,21 @@ class A2AClient:
         self._external_client = http_client
         self._client: httpx.AsyncClient | None = http_client
         self.max_payload_bytes = max_payload_bytes
-        self._rate_limiter = A2ARateLimiter(max_calls=max_tasks_per_minute)
+        rate_key = compute_key_fingerprint(
+            f"{self.hub_url}:{(self.hub_key or '').strip() or 'public'}"
+        )
+        self._rate_limiter = rate_limiter or A2ARateLimiter(
+            max_calls=max_tasks_per_minute,
+            key=rate_key,
+        )
         self._concurrency_sem = asyncio.Semaphore(max_concurrency)
+        self._skip_rate_limit = False
+
+    def for_retry(self) -> A2AClient:
+        """Return a shallow client view that skips rate-limit deduction for a single 401/403 retry."""
+        clone = copy.copy(self)
+        clone._skip_rate_limit = True
+        return clone
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -163,13 +270,16 @@ class A2AClient:
         context_id: str | None = None,
         task_id: str | None = None,
         idempotency_key: str | None = None,
+        *,
+        skip_rate_limit: bool = False,
     ) -> dict[str, Any]:
         """Dispatch a task message with payload validation and rate limiting."""
         encoded_len = len(message.encode("utf-8"))
         if encoded_len > self.max_payload_bytes:
             raise ValueError(f"Payload size {encoded_len} bytes exceeds maximum limit {self.max_payload_bytes} bytes")
 
-        await self._rate_limiter.acquire()
+        headers = self._auth_headers()
+        await self._rate_limiter.acquire(skip=skip_rate_limit or self._skip_rate_limit)
         async with self._concurrency_sem:
             client = await self._get_client()
             url = f"{self.hub_url}/hub/v1/agents/{target_agent_id}/tasks"
@@ -179,33 +289,41 @@ class A2AClient:
                 "idempotencyKey": idempotency_key or str(uuid.uuid4()),
                 "message": message,
             }
-            resp = await client.post(url, json=payload, headers=self._auth_headers())
+            resp = await client.post(url, json=payload, headers=headers)
             resp.raise_for_status()
             return resp.json()
 
     async def list_peers(self, state: str | None = None) -> list[dict[str, Any]]:
         """List discoverable peers in the same private circle."""
+        headers = self._auth_headers()
         client = await self._get_client()
         url = f"{self.hub_url}/hub/v1/agents"
         params = {}
         if state and state != "all":
             params["state"] = state
-        resp = await client.get(url, params=params, headers=self._auth_headers())
+        resp = await client.get(url, params=params, headers=headers)
         resp.raise_for_status()
         data = resp.json()
         return data.get("agents", data) if isinstance(data, dict) else data
 
-    async def broadcast_group(self, group_id: str, message: str) -> dict[str, Any]:
+    async def broadcast_group(
+        self,
+        group_id: str,
+        message: str,
+        *,
+        skip_rate_limit: bool = False,
+    ) -> dict[str, Any]:
         """Broadcast a message to an active group with size check."""
         encoded_len = len(message.encode("utf-8"))
         if encoded_len > self.max_payload_bytes:
             raise ValueError(f"Payload size {encoded_len} exceeds maximum limit {MAX_PAYLOAD_BYTES}")
 
-        await self._rate_limiter.acquire()
+        headers = self._auth_headers()
+        await self._rate_limiter.acquire(skip=skip_rate_limit or self._skip_rate_limit)
         async with self._concurrency_sem:
             client = await self._get_client()
             url = f"{self.hub_url}/hub/v1/groups/{group_id}/messages"
             payload = {"message": message}
-            resp = await client.post(url, json=payload, headers=self._auth_headers())
+            resp = await client.post(url, json=payload, headers=headers)
             resp.raise_for_status()
             return resp.json()

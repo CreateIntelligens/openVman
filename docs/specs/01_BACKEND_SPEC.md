@@ -217,7 +217,7 @@ Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/health` 探
 | `ASR_CHAIN_FACTOR`／`ASR_CHAIN_MAX_SECONDS` | 1.5／180 | 同 TTS；前端批次辨識的保險時間跟著這個上限 |
 | `ASR_FFMPEG_BASE_SECONDS`／`ASR_FFMPEG_PER_AUDIO_SECOND` | 15／0.2 | 原本固定 60 秒；短句轉檔不到一秒，5 分鐘音檔仍有 75 秒 |
 | `BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS` | 2 | Brain 在同一個 docker 網路，原本 10 秒。只管連線；等連線池空位固定 30 秒，連線池上限 1,000 條（每段對話串流佔一條，直到回答結束） |
-| `BACKEND_WORKERS` | 4（Compose） | Backend 的 uvicorn process 數；直接執行時預設 1。大於 1 時登入／API key／embed 限流與文字模式攝影機狀態改放 Redis，監控計數跨 process 加總；`A2A_ENABLED` 只能搭配 1，否則啟動失敗。見部署文件「Backend 多 process」 |
+| `BACKEND_WORKERS` | 4（Compose） | Backend 的 uvicorn process 數；直接執行時預設 1。大於 1 時登入／API key／embed／A2A 送出限流與文字模式攝影機狀態改放 Redis，監控計數跨 process 加總；A2A 收進來與憑證換發由單一 Redis leader 執行（續約短暫失敗在本機租約到期時間扣除安全邊際前保留領導權、SSE 與 `is_leader` 統一檢查到期、`SET NX` 重取租約不中斷自身活動中 `_active_event_ids` 任務只重排其餘列且失敗可重試、leader 每 30 秒回收無本機任務的孤兒 `PROCESSING` 列、佇列完成／抑制／失敗退回皆檢查 `processing_owner`、重排寫入 `first_failed_at` 並將逾時或無 `first_failed_at` 但 `attempts >= 5` 的舊列標為 `FAILED`、Hub HTTP 429 重試仍受本機限流且以 `max(Retry-After, 2^attempts)` 上限 60 秒延後、5xx／網路與未預期例外採指數退避上限 60 秒並與 429 共用 10 分鐘 `first_failed_at` 總期限、已寫入 `reply_message`／`reply_task_id` 者交接重送不重呼 Brain、Brain 呼叫依 `A2A_BRAIN_TIMEOUT_SECONDS` 帶讀取逾時、`stop()` 用 250ms `busy_timeout` 壓在 < 8 秒），送出端點跨 process 共用加密憑證（依 `.stat()` 懶載入、`os.fstat` 驗 `0600`）與限流（僅 401／403 換憑證重試不重扣額度，回應帶 `X-OpenVMan-Worker-ID` 標頭，僅 `/peers` 本文另帶 `worker_id`）。見部署文件「Backend 多 process」 |
 | `BRAIN_PROXY_READ_TIMEOUT_SECONDS` | 120 | 兩個 chunk 之間的上限；LLM 跑工具時句子之間會停很久，維持原值 |
 | `UPSTREAM_BREAKER_FAILURES`／`UPSTREAM_BREAKER_COOLDOWN_SECONDS` | 2／60 | 同 Brain `provider_health`：逾時或 5xx 連續兩次冷卻一分鐘 |
 | `UPSTREAM_PROBE_INTERVAL_SECONDS`／`UPSTREAM_PROBE_TIMEOUT_SECONDS` | 10／1.5 | 背景健康探測的週期與單次上限；0 表示不探測 |

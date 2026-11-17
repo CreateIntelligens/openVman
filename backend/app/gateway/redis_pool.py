@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover
 
 _redis: aioredis.Redis | None = None  # type: ignore[name-defined]
 _redis_failed: bool = False
-_RETRY_AFTER: float = 30.0
+_RETRY_AFTER: float = 2.0
 _last_failure: float = 0.0
 
 
@@ -33,7 +33,12 @@ async def get_redis() -> aioredis.Redis | None:  # type: ignore[name-defined]
         _redis_failed = False
     cfg = get_tts_config()
     try:
-        _redis = aioredis.from_url(cfg.redis_url, decode_responses=False)
+        _redis = aioredis.from_url(
+            cfg.redis_url,
+            decode_responses=False,
+            socket_timeout=2.0,
+            socket_connect_timeout=2.0,
+        )
         await _redis.ping()
         logger.info("redis connected url=%s", cfg.redis_url)
         return _redis
