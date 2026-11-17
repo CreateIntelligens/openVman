@@ -72,6 +72,8 @@
 
 ### Fixed
 
+- **[2026-11-17]** **一批人同時講完時對話不再因「database is locked」丟失**：16 個對話 worker 同時寫 `sessions.db` 時，SQLite 的等鎖不保證先來先拿，原本 5 秒的上限會讓排在後面的寫入失敗，整輪回答丟掉；真實 LLM 壓測時同時 32 輪曾出現。等鎖上限改為 30 秒（每筆寫入都很短，實測同時 128 輪 0 失敗、最久等約 1.3 秒）。對話紀錄寫入失敗也不再回 502 `LLM_OVERLOAD`（會讓人去查模型），改回 503 `INTERNAL_ERROR`，錯誤紀錄記為 `storage_failure`。
+
 - **[2026-11-13]** **Brain 匯入 PDF 可以用了**：PDF 轉文字靠 PyMuPDF，但它從未列在 `brain/api/requirements.txt`、image 裡沒裝，知識庫匯入 PDF 一直失敗。現在加入 `pymupdf>=2.1,<3`（授權為 AGPL），改用新版的 `import pymupdf`，並新增 PDF 轉文字的測試。
 
 - **[2026-11-12]** **Brain 重建後缺 httpx 而無法啟動**：`brain/api/requirements.txt` 只寫 `google-genai>=0.3.0`，CI 重建時解到 google-genai 3.2，新版不再依賴 httpx，而 Brain 直接 `import httpx` 卻沒有自己列，正式站 Brain 自 17:16 起持續重啟。現在明列 `httpx`、`networkx`，google-genai 限制在 3 以下、openai 在 4 以下；新增測試檢查 Brain 直接匯入的第三方套件都有寫進 requirements。

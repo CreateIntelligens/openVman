@@ -20,7 +20,7 @@
 | 向量資料庫 | **LanceDB**（嵌入式） | 每個專案一個資料目錄，含向量表與 FTS 索引 |
 | Embedding 模型 | **google/embeddinggemma-2** | 768 維 Dense，由獨立的 embedding gateway 推論；全文檢索由 LanceDB FTS 負責 |
 | LLM | Gemini / OpenAI / Groq | 一律以 OpenAI 相容 API 呼叫，依 `LLM_FALLBACK_CHAIN` 路由（第 8 節） |
-| 短期記憶 | SQLite（專案的 `sessions.db`） | Session、訊息與待確認回合 |
+| 短期記憶 | SQLite（專案的 `sessions.db`，WAL、寫入等鎖上限 30 秒） | Session、訊息與待確認回合；對話紀錄寫不進去時回 503 `INTERNAL_ERROR`，不標成 `LLM_OVERLOAD` |
 | 知識庫格式 | Markdown + Raw | 原始檔留在 `raw/`，Markdown 是可編輯的 canonical form |
 | 文件解析 | Gateway（pdf-inspector + Docling + AnyDoc）與 Brain 內建轉換 | 見第 4.1 節 |
 | 路由層 | Fallback chain + Key Pool | 金鑰冷卻、模型與 provider 切換、有界跳轉 |

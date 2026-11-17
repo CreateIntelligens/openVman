@@ -83,3 +83,19 @@ def test_bad_requests_still_get_400_and_are_now_logged(
     assert observed["metrics"] == [("guardrail_blocks_total", {"action": "chat"})]
     assert observed["failures"][0][1] == "validation"
     assert [event for event, _, _ in observed["log_exception"]] == ["chat_rejected"]
+
+
+def test_session_storage_failure_is_not_reported_as_llm_overload(
+    request_with_trace: SimpleNamespace, observed: dict[str, list],
+) -> None:
+    import sqlite3
+
+    with pytest.raises(HTTPException) as info:
+        chat_route._handle_generation_error(
+            sqlite3.OperationalError("database is locked"), "chat", request_with_trace,
+        )
+
+    assert info.value.status_code == 503
+    assert info.value.detail["error_code"] == "INTERNAL_ERROR"
+    assert info.value.detail["retry_after_ms"] == 3000
+    assert observed["failures"] == [("chat", "storage_failure", "database is locked")]

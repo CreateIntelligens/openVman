@@ -836,7 +836,10 @@ class SessionStore:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        conn.execute("PRAGMA busy_timeout=5000")
+        # 一批人同時講完時，16 個 worker 的寫入會排隊搶鎖；SQLite 的等待不保證先來先拿，
+        # 5 秒時排在後面的寫入會被餓到失敗（2026-11-17 實測同時 128 輪約 4% 失敗，
+        # 改 30 秒後 0 失敗、最久等約 1.3 秒）。每筆寫入都很短，寧可多等不要丟對話。
+        conn.execute("PRAGMA busy_timeout=30000")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA foreign_keys = ON")

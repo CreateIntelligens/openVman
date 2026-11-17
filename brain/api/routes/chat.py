@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sqlite3
 import threading
 import time
 from collections.abc import AsyncIterator, Callable
@@ -146,6 +147,13 @@ def _handle_generation_error(exc: Exception, action: str, request: Request) -> N
         get_metrics_store().increment("guardrail_blocks_total", action=action)
         record_generation_failure(action, "validation", str(exc))
         raise HTTPException(status_code=400, detail=build_exception_protocol_error(exc)) from exc
+
+    # 對話紀錄寫不進去不是模型的問題：標成 LLM_OVERLOAD 會讓人去查 LLM。
+    if isinstance(exc, sqlite3.Error):
+        log_exception(f"{action}_storage_error", exc, trace_id=trace_id)
+        record_generation_failure(action, "storage_failure", str(exc))
+        error_payload = build_protocol_error("INTERNAL_ERROR", "對話紀錄暫時無法寫入", retry_after_ms=3000)
+        raise HTTPException(status_code=503, detail=error_payload) from exc
 
     log_exception(f"{action}_error", exc, trace_id=trace_id)
     record_generation_failure(action, "llm_failure", str(exc))
