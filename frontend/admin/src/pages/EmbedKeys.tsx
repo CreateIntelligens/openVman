@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
   createEmbedKey,
@@ -78,9 +78,37 @@ export default function EmbedKeys() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<PageStatus>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const formErrorRef = useRef<HTMLParagraphElement>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (!modalOpen) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    dialog.querySelector<HTMLInputElement>("#embed-key-label")?.focus();
+    return () => {
+      if (typeof dialog.close === "function") {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+      previousFocus?.focus();
+    };
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (formError) formErrorRef.current?.focus();
+  }, [formError]);
+
+  const reload = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       setKeys(await listEmbedKeys());
     } catch (error) {
@@ -89,7 +117,7 @@ export default function EmbedKeys() {
         message: errorMessage(error, "無法取得 網站嵌入金鑰列表"),
       });
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
@@ -116,18 +144,21 @@ export default function EmbedKeys() {
   }
 
   function openCreateModal() {
+    setFormError(null);
     setEditingKeyId(null);
     setForm({ ...EMPTY_FORM, projectId: projects[0]?.project_id ?? "default" });
     setModalOpen(true);
   }
 
   function openEditModal(key: EmbedKey) {
+    setFormError(null);
     setEditingKeyId(key.key_id);
     setForm(formFromKey(key));
     setModalOpen(true);
   }
 
   function updateForm(changes: Partial<KeyFormState>): void {
+    if (submitting) return;
     setForm((current) => ({ ...current, ...changes }));
   }
 
@@ -147,12 +178,16 @@ export default function EmbedKeys() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
     const origins = parseDelimitedList(form.origins);
     if (origins.length === 0) {
-      setStatus({ type: "error", message: "至少需要一個允許的來源網域。" });
+      setFormError("至少需要一個允許的來源網域。");
+      // 訊息相同時 React 不會再次觸發 effect，仍需把焦點帶回提示。
+      formErrorRef.current?.focus();
       return;
     }
     setSubmitting(true);
+    setFormError(null);
     setStatus(null);
 
     const shared = {
@@ -167,22 +202,27 @@ export default function EmbedKeys() {
       daily_request_quota: form.dailyRequestQuota,
     };
 
-    const succeeded = await runAction(async () => {
+    try {
       if (editingKeyId) {
         await updateEmbedKey(editingKeyId, shared);
       } else {
         await createEmbedKey({ ...shared, project_id: form.projectId });
       }
-    }, editingKeyId ? "更新 網站嵌入金鑰失敗" : "建立 網站嵌入金鑰失敗");
-
-    setSubmitting(false);
-    if (succeeded) {
+      // 保留原本的操作按鈕，讓儲存關閉後仍可還原焦點。
+      await reload(false);
       setModalOpen(false);
       setEditingKeyId(null);
       setStatus({
         type: "success",
         message: editingKeyId ? "已更新 網站嵌入金鑰。" : "已建立 網站嵌入金鑰。",
       });
+    } catch (error) {
+      setFormError(errorMessage(
+        error,
+        editingKeyId ? "更新 網站嵌入金鑰失敗" : "建立 網站嵌入金鑰失敗",
+      ));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -324,178 +364,218 @@ export default function EmbedKeys() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <dialog
+          ref={dialogRef}
+          {...{ closedby: submitting ? "none" : "closerequest" }}
+          aria-labelledby="embed-key-form-title"
+          onCancel={(event) => {
+            event.preventDefault();
+            if (!submitting) setModalOpen(false);
+          }}
+          onClose={() => {
+            const dialog = dialogRef.current;
+            if (submitting && dialog?.isConnected) {
+              // 不支援 closedby 或瀏覽器強制關閉時，保留這份送出中的表單。
+              if (!dialog.open) {
+                if (typeof dialog.showModal === "function") {
+                  dialog.showModal();
+                } else {
+                  dialog.setAttribute("open", "");
+                }
+              }
+            } else {
+              setModalOpen(false);
+            }
+          }}
+          className="m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-3xl border border-border bg-surface p-6 text-content shadow-lg backdrop:overscroll-contain backdrop:bg-black/40 dark:bg-surface-sunken"
+        >
           <form
             onSubmit={handleSubmit}
+            aria-busy={submitting}
             aria-label={editingKeyId ? "編輯 網站嵌入金鑰" : "建立 網站嵌入金鑰"}
-            className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-border bg-surface p-6 shadow-lg dark:bg-surface-sunken"
           >
-            <h3 className="card-title">
+            <h3 id="embed-key-form-title" className="card-title">
               {editingKeyId ? "編輯 網站嵌入金鑰" : "建立 網站嵌入金鑰"}
             </h3>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass} htmlFor="embed-key-label">
-                  名稱
-                </label>
-                <input
-                  id="embed-key-label"
-                  type="text"
-                  value={form.label}
-                  onChange={(event) => updateForm({ label: event.target.value })}
-                  placeholder="例：合作夥伴官網"
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass} htmlFor="embed-key-project">
-                  專案
-                </label>
-                {editingKeyId ? (
-                  <p className="px-1 py-3 text-sm text-content-muted">
-                    {projectLabel(form.projectId)}（建立後不可變更）
-                  </p>
-                ) : (
-                  <Select
-                    ariaLabel="專案"
-                    value={form.projectId}
-                    onChange={(value) => updateForm({ projectId: value })}
-                    options={projects.map((project) => ({
-                      value: project.project_id,
-                      label: project.label,
-                    }))}
-                    placeholder="選擇專案"
-                  />
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className={labelClass} htmlFor="embed-key-origins">
-                允許的來源網域（每行一個，需含 scheme，不可使用 *）
-              </label>
-              <textarea
-                id="embed-key-origins"
-                value={form.origins}
-                onChange={(event) => updateForm({ origins: event.target.value })}
-                rows={3}
-                placeholder="https://partner.example"
-                className={inputClass}
-              />
-            </div>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass} htmlFor="embed-key-character">
-                  預設角色
-                </label>
-                <input
-                  id="embed-key-character"
-                  type="text"
-                  value={form.defaultCharacterId}
-                  onChange={(event) => updateForm({
-                    defaultCharacterId: event.target.value,
-                  })}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass} htmlFor="embed-key-extra-characters">
-                  額外允許角色（逗號分隔）
-                </label>
-                <input
-                  id="embed-key-extra-characters"
-                  type="text"
-                  value={form.allowedCharacterIds}
-                  onChange={(event) => updateForm({
-                    allowedCharacterIds: event.target.value,
-                  })}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass} htmlFor="embed-key-persona">
-                  預設 Persona
-                </label>
-                <input
-                  id="embed-key-persona"
-                  type="text"
-                  value={form.defaultPersonaId}
-                  onChange={(event) => updateForm({
-                    defaultPersonaId: event.target.value,
-                  })}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass} htmlFor="embed-key-provider">
-                  預設 TTS Provider
-                </label>
-                <input
-                  id="embed-key-provider"
-                  type="text"
-                  value={form.defaultTtsProvider}
-                  onChange={(event) => updateForm({
-                    defaultTtsProvider: event.target.value,
-                  })}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass} htmlFor="embed-key-voice">
-                  預設語音
-                </label>
-                <input
-                  id="embed-key-voice"
-                  type="text"
-                  value={form.defaultTtsVoice}
-                  onChange={(event) => updateForm({
-                    defaultTtsVoice: event.target.value,
-                  })}
-                  className={inputClass}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <fieldset disabled={submitting} className="min-w-0">
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className={labelClass} htmlFor="embed-key-rate">
-                    每分鐘上限
+                  <label className={labelClass} htmlFor="embed-key-label">
+                    名稱
                   </label>
                   <input
-                    id="embed-key-rate"
-                    type="number"
-                    min={1}
-                    value={form.rateLimitPerMinute}
+                    id="embed-key-label"
+                    type="text"
+                    value={form.label}
+                    onChange={(event) => updateForm({ label: event.target.value })}
+                    placeholder="例：合作夥伴官網"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="embed-key-project">
+                    專案
+                  </label>
+                  {editingKeyId ? (
+                    <p className="px-1 py-3 text-sm text-content-muted">
+                      {projectLabel(form.projectId)}（建立後不可變更）
+                    </p>
+                  ) : (
+                    <Select
+                      ariaLabel="專案"
+                      disabled={submitting}
+                      value={form.projectId}
+                      onChange={(value) => updateForm({ projectId: value })}
+                      options={projects.map((project) => ({
+                        value: project.project_id,
+                        label: project.label,
+                      }))}
+                      placeholder="選擇專案"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className={labelClass} htmlFor="embed-key-origins">
+                  允許的來源網域（每行一個，需含 scheme，不可使用 *）
+                </label>
+                <textarea
+                  id="embed-key-origins"
+                  value={form.origins}
+                  onChange={(event) => updateForm({ origins: event.target.value })}
+                  rows={3}
+                  placeholder="https://partner.example"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass} htmlFor="embed-key-character">
+                    預設角色
+                  </label>
+                  <input
+                    id="embed-key-character"
+                    type="text"
+                    value={form.defaultCharacterId}
                     onChange={(event) => updateForm({
-                      rateLimitPerMinute: Number(event.target.value),
+                      defaultCharacterId: event.target.value,
                     })}
                     className={inputClass}
                   />
                 </div>
                 <div>
-                  <label className={labelClass} htmlFor="embed-key-quota">
-                    每日上限
+                  <label className={labelClass} htmlFor="embed-key-extra-characters">
+                    額外允許角色（逗號分隔）
                   </label>
                   <input
-                    id="embed-key-quota"
-                    type="number"
-                    min={1}
-                    value={form.dailyRequestQuota}
+                    id="embed-key-extra-characters"
+                    type="text"
+                    value={form.allowedCharacterIds}
                     onChange={(event) => updateForm({
-                      dailyRequestQuota: Number(event.target.value),
+                      allowedCharacterIds: event.target.value,
                     })}
                     className={inputClass}
                   />
                 </div>
+                <div>
+                  <label className={labelClass} htmlFor="embed-key-persona">
+                    預設 Persona
+                  </label>
+                  <input
+                    id="embed-key-persona"
+                    type="text"
+                    value={form.defaultPersonaId}
+                    onChange={(event) => updateForm({
+                      defaultPersonaId: event.target.value,
+                    })}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="embed-key-provider">
+                    預設 TTS Provider
+                  </label>
+                  <input
+                    id="embed-key-provider"
+                    type="text"
+                    value={form.defaultTtsProvider}
+                    onChange={(event) => updateForm({
+                      defaultTtsProvider: event.target.value,
+                    })}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="embed-key-voice">
+                    預設語音
+                  </label>
+                  <input
+                    id="embed-key-voice"
+                    type="text"
+                    value={form.defaultTtsVoice}
+                    onChange={(event) => updateForm({
+                      defaultTtsVoice: event.target.value,
+                    })}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass} htmlFor="embed-key-rate">
+                      每分鐘上限
+                    </label>
+                    <input
+                      id="embed-key-rate"
+                      type="number"
+                      min={1}
+                      value={form.rateLimitPerMinute}
+                      onChange={(event) => updateForm({
+                        rateLimitPerMinute: Number(event.target.value),
+                      })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass} htmlFor="embed-key-quota">
+                      每日上限
+                    </label>
+                    <input
+                      id="embed-key-quota"
+                      type="number"
+                      min={1}
+                      value={form.dailyRequestQuota}
+                      onChange={(event) => updateForm({
+                        dailyRequestQuota: Number(event.target.value),
+                      })}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+
+            </fieldset>
+
+            {formError && (
+              <p
+                ref={formErrorRef}
+                role="alert"
+                tabIndex={-1}
+                className="mt-4 rounded-xl border border-danger/20 bg-danger/10 p-4 text-sm text-danger"
+              >
+                {formError}
+              </p>
+            )}
 
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => setModalOpen(false)}
-                className="rounded-xl border border-border px-4 py-2 text-sm text-content-muted transition-all hover:text-content"
+                className="rounded-xl border border-border px-4 py-2 text-sm text-content-muted transition-all hover:text-content disabled:opacity-50"
               >
                 取消
               </button>
@@ -504,11 +584,13 @@ export default function EmbedKeys() {
                 disabled={submitting}
                 className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-all hover:bg-primary/90 disabled:opacity-50"
               >
-                {editingKeyId ? "儲存" : "建立"}
+                {submitting
+                  ? (editingKeyId ? "儲存中…" : "建立中…")
+                  : (editingKeyId ? "儲存" : "建立")}
               </button>
             </div>
           </form>
-        </div>
+        </dialog>
       )}
 
       <ConfirmModal

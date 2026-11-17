@@ -126,7 +126,7 @@
           :disabled="!canSend"
           :aria-describedby="feedbackMessage ? 'chat-composer-feedback' : undefined"
           @input="feedbackMessage = ''"
-          @keydown.enter="handleSend"
+          @keydown.enter="handleComposerEnter"
           @focus="handleComposerFocus"
           @blur="emit('composing', false)"
         />
@@ -270,6 +270,13 @@ const visibleMessages = computed(() => {
   if (lastUserIdx === -1) return props.messages.slice(-1)
   return props.messages.slice(lastUserIdx)
 })
+
+function handleComposerEnter(event: KeyboardEvent): void {
+  // Safari 的組字確認可能已清掉 isComposing，仍會以 229 回報這次按鍵。
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  handleSend()
+}
 
 function handleSend(): void {
   const text = inputText.value.trim()

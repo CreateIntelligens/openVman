@@ -381,6 +381,7 @@ function handleDialogClick(event: MouseEvent): void {
                 <span class="field-card__label">知識庫</span>
                 <CustomSelect
                   v-model="draftProjectId"
+                  aria-label="知識庫"
                   :options="projectOptions"
                   :disabled="projectDisabled"
                   @change="handleProjectDraftChange"
@@ -391,6 +392,7 @@ function handleDialogClick(event: MouseEvent): void {
                 <span class="field-card__label">個性</span>
                 <CustomSelect
                   v-model="draftPersonaId"
+                  aria-label="個性"
                   :options="personaOptions"
                   :disabled="personaDisabled"
                 />
@@ -402,6 +404,7 @@ function handleDialogClick(event: MouseEvent): void {
                 <span class="field-card__label">人物</span>
                 <CustomSelect
                   v-model="draftCharacterValue"
+                  aria-label="人物"
                   :options="characterOptions"
                 />
               </div>
@@ -410,6 +413,7 @@ function handleDialogClick(event: MouseEvent): void {
                 <span class="field-card__label">聲音</span>
                 <CustomSelect
                   v-model="draftTtsVoice"
+                  aria-label="聲音"
                   :options="ttsVoiceOptions"
                   :disabled="disabled"
                 />
@@ -490,6 +494,7 @@ function handleDialogClick(event: MouseEvent): void {
                   <span class="field-card__label">語音引擎</span>
                   <CustomSelect
                     v-model="draftTtsProvider"
+                    aria-label="語音引擎"
                     :options="ttsProviderOptions"
                     :disabled="disabled"
                     @change="handleTtsProviderDraftChange"
@@ -502,6 +507,7 @@ function handleDialogClick(event: MouseEvent): void {
                   <span class="field-card__label">語音辨識</span>
                   <CustomSelect
                     v-model="draftAsrProvider"
+                    aria-label="語音辨識"
                     :options="asrProviderOptions"
                     :disabled="disabled"
                   />

@@ -3,7 +3,11 @@ export const SKILL_EDITOR_TABS = ["skill.yaml", "main.py"] as const;
 export type SkillEditorTab = (typeof SKILL_EDITOR_TABS)[number];
 
 export function filesChanged(currentFiles: Record<string, string>, originalFiles: Record<string, string>): boolean {
-  return Object.keys(originalFiles).some((key) => currentFiles[key] !== originalFiles[key]);
+  const fileNames = new Set([
+    ...Object.keys(originalFiles),
+    ...Object.keys(currentFiles),
+  ]);
+  return [...fileNames].some((key) => currentFiles[key] !== originalFiles[key]);
 }
 
 export function getSkillIdFromToolName(toolName: string): string {

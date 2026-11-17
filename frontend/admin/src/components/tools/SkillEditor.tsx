@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchSkillFiles, updateSkillFiles } from "../../api";
+import { useUnsavedChanges } from "../../context/NavigationGuardContext";
 import { useLocalStorageState } from "../../hooks/useLocalStorageState";
 import StatusAlert from "../StatusAlert";
 import { filesChanged, SKILL_EDITOR_TABS, type SkillEditorTab } from "./helpers";
@@ -21,9 +22,15 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [originalFiles, setOriginalFiles] = useState<Record<string, string>>({});
+  const dirty = filesChanged(files, originalFiles);
+
+  useUnsavedChanges(
+    `skill-editor:${scope ?? "shared"}:${projectId ?? ""}:${skillId}`,
+    dirty,
+    `技能 ${skillId}`,
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -32,7 +39,6 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
       .then((data) => {
         setFiles(data.files);
         setOriginalFiles(data.files);
-        setDirty(false);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
@@ -41,7 +47,6 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
   const handleChange = (content: string) => {
     const nextFiles = { ...files, [activeTab]: content };
     setFiles(nextFiles);
-    setDirty(filesChanged(nextFiles, originalFiles));
   };
 
   const handleSave = () => {
@@ -50,7 +55,6 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
     updateSkillFiles(skillId, files, { scope, project_id: projectId })
       .then(() => {
         setOriginalFiles({ ...files });
-        setDirty(false);
         onSaved();
       })
       .catch((e) => setError(String(e)))
@@ -114,6 +118,7 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
         <div className="flex items-center justify-center py-16 text-content-subtle text-sm">載入檔案中...</div>
       ) : (
         <textarea
+          aria-label={`${skillId} ${activeTab} 內容`}
           value={files[activeTab] ?? ""}
           onChange={(e) => handleChange(e.target.value)}
           spellCheck={false}
