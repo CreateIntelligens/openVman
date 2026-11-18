@@ -128,20 +128,9 @@ bash frontend/app/scripts/install-hciot-motion-pilot.sh
 
 腳本在 `avatar-pipeline` 容器內產生中立底片，經現有 `POST /api/v1/avatar` 登錄受保護的人物、複製動作包，並以既有 assignments／policy API 更新指定專案。Cookie 寫入請求帶同源 Origin，不繞過認證。帳密不寫入檔案。原政策備份留在 `/data/avatar-jobs/hciot-vman-install/<project_id>-policy-before.json`；重跑保留第一份備份。同名人物若屬於其他專案，安裝會停止。
 
-試用版使用獨立本機映像；只對 avatar 容器關閉 watchtower 換版，避免尚未推送的程式被遠端舊映像覆蓋。其他服務維持原設定。一次只跑一個 build，完成後才啟動：
+前台程式照一般流程部署：推上 main 後由 CI 建映像、watchtower 換版，不在正式機另外 build 或關閉 watchtower。
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.avatar-motion-pilot.yml build avatar
-docker compose -f docker-compose.yml -f docker-compose.avatar-motion-pilot.yml up -d --no-build --no-deps avatar
-```
-
-回到原前台映像及原 watchtower 設定：
-
-```bash
-docker compose -f docker-compose.yml up -d --no-build --no-deps avatar
-```
-
-映像還原後，已登錄的新人物仍可用中立底片展示。若也要還原專案預設人物，經 policy API 套回上述備份，並保留其他同仁後來更新的政策欄位；人物正在使用時不要刪除資源或素材。
+要還原專案預設人物時，經 policy API 套回上述備份，並保留其他同仁後來更新的政策欄位；人物正在使用時不要刪除資源或素材。
 
 ### 正式對話 E2E
 
