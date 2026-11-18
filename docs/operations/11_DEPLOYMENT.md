@@ -93,13 +93,13 @@ false。正式多 worker 部署必須保留 Redis，讓單一 leader 持有 A2A 
 
 ### Brain 對話與管理分流
 
-`api` 與 `api-chat` 使用同一個 Brain image、相同 `/data` 資料與專案資產。`api` 固定 `BRAIN_ROLE=admin`、`BRAIN_WORKERS=1`，保留管理、排程與對話路由；`api-chat` 使用 `BRAIN_ROLE=chat`，`BRAIN_WORKERS` 預設 4，只提供對話相關端點，不執行匯入管理、Dreaming、對話備份或記憶維護排程。chat 依賴 admin 健康後啟動，Backend 與 gateway-worker 再等待兩者健康；`api-chat` 不保留 GPU，也不開放額外 host port。
+`api` 與 `api-chat` 使用同一個 Brain image、相同 `/data` 資料與專案資產。`api` 固定 `BRAIN_ROLE=admin`、`BRAIN_WORKERS=1`，保留管理、排程與對話路由；`api-chat` 使用 `BRAIN_ROLE=chat`，`BRAIN_WORKERS` 預設 16，只提供對話相關端點，不執行匯入管理、Dreaming、對話備份或記憶維護排程。chat 依賴 admin 健康後啟動，Backend 與 gateway-worker 再等待兩者健康；`api-chat` 不保留 GPU，也不開放額外 host port。
 
 | 設定 | 行為 |
 |---|---|
 | `BRAIN_CHAT_URL` 未定義 | Compose 注入 `http://api-chat:8100`；直接執行 Backend 則沿用 `BRAIN_URL` |
 | `BRAIN_CHAT_URL=` | Backend 與 gateway-worker 全部回到 `BRAIN_URL`（預設 `http://api:8100`） |
-| `BRAIN_WORKERS=16` | 對話服務 16 workers（每個約 0.4～0.5 GB，每秒 1 題約 1 核）；不會增加 admin worker 數 |
+| `BRAIN_WORKERS=16` | 對話服務 16 workers（每個約 0.3～0.4 GB；鶴記真實資料每題約 0.3 核·秒）；不會增加 admin worker 數。換機器時的配法見下方「依流量配 worker 數」 |
 | `BRAIN_THREAD_POOL_SIZE=0` | 保留 Python executor 預設值；調整前先壓測 |
 | `BRAIN_COORDINATION_DIR=/data/.coordination` | Compose 強制兩個 Brain 服務使用同一目錄，跨程序共用限流與 PII 併發額度 |
 
@@ -138,6 +138,33 @@ PYTHON
 ```
 
 還原前先停止所有會寫入該資料庫的服務，包括 `api`、`api-chat` 與 Backend／gateway-worker；不要在資料庫仍使用舊 WAL 時覆蓋主檔。Auth DB 與 `.env` 的加密 secret 必須同時保留，規則見本節前段。
+
+### 依流量配 worker 數
+
+`BRAIN_WORKERS`、`BACKEND_WORKERS` 寫在部署機的 `.env`，改完執行 `docker compose up -d api-chat backend` 才會生效（只 `restart` 不會重讀環境變數）。100 台裝置每台每 10 秒問一題約等於每秒 10 題。
+
+2026-11-17 隔離環境實測（鶴記真實資料、決策走 Jev、LLM 首句 0.8 秒與 TTS 首段 0.3 秒用假服務、Backend 4 processes），聽到第一句中位數／p95（秒）與 Brain 對話服務記憶體高峰：
+
+| Brain workers | 每秒 10 題 | 每秒 20 題 | 記憶體 |
+|---|---|---|---|
+| 4 | 2.88／4.73 | 20.03／25.94（排隊） | 1.8～2.3 GB |
+| 8 | 1.99／2.86 | 6.23／9.38（排隊） | 2.9～3.8 GB |
+| 16 | 2.03／3.24 | 2.32／3.89 | 4.7～5.7 GB |
+
+- 每個 worker 約撐每秒 1.2 題；配法約為「尖峰每秒題數 ÷ 1.2」，最少 8。每秒 10 題用 8～16，每秒 20 題要 16。
+
+依裝置數對照（假設每台裝置尖峰時每 10 秒問一題；一般對話節奏每 15～30 秒一題，同樣設定可撐更多台）：
+
+| 同時使用的裝置 | 約每秒題數 | `BRAIN_WORKERS` | Brain 記憶體 | `BACKEND_WORKERS` | 依據 |
+|---|---|---|---|---|---|
+| 50 台以下 | 5 | 8 | 約 3 GB | 2 | 8 workers 每秒 10 題仍正常，推得 |
+| 100 台 | 10 | 8～16 | 3～5 GB | 2 | 實測 8 與 16 都正常（聽到第一句 p95 約 3 秒） |
+| 200 台 | 20 | 16 | 約 6 GB | 2～4 | 實測 16 正常、8 開始排隊 |
+| 300 台 | 30 | 24 以上 | 約 8～9 GB | 4 | 推算；16 workers 在每秒 30 題時 p95 跳到約 6 秒，CPU 約 10～14 核，主機需更多核 |
+
+表中延遲不含真實 LLM 與 TTS 的時間；全部接真實服務時，正式站每秒 10 題聽到第一句約 4.4 秒，一次一題約 3.9 秒，差距主要在外部服務。
+- 上游越慢（真實 LLM、決策）每題佔住 worker 越久，同樣題數要多配一些；CPU 不是瓶頸（每秒 20 題平均約 7 核）。
+- Backend 每個 process 約撐每秒 10 題以上（每秒 50 題時 4 個接近滿載）；100 台以內 2 個就夠，預設 4 留餘裕。
 
 ### Backend 多 process
 
