@@ -83,6 +83,8 @@
 
 ### Security
 
+- **[2026-11-18]** **Brain 的 internal 路由不再經 catch-all 直通**：`/api/v1/internal/*`（斷路器重置、金鑰指紋、模型設定刷新）沒有對應的 Backend 路由時，catch-all 會帶著 internal token 轉給 Brain，任何登入帳號都能呼叫；對外入口的 nginx 原本就擋下這個前綴，但容器網路內仍可直達。現在 catch-all 一律回 404，後台改用 Backend 自己的路由呼叫這些功能。
+
 - **[2026-11-18]** **Backend 轉給 Brain 的路徑與授權時看到的不一致**：代理層對解碼過一次的路徑做所有授權判斷，轉送時卻原樣接進網址，Brain 會再解碼一次。網址裡經過特別編碼的路徑因此能避開專案授權、Backend 專屬路由（備份、用量、檔案上傳）與共用技能限制，讀寫沒有授權的專案資料；編碼過的 `?`／`#` 也能讓 Brain 收到另一組 query。另外驗證中介層與代理以重組後的網址判斷公開路徑，同樣可能把非公開路徑當成公開。Dev 已重現跨專案讀取。現在轉送前重新編碼路徑，Brain 收到的就是授權過的同一個字串；`?`、`#`、`%` 以字面送達（例如含 `#` 的對話 ID 不再 404）；query 用授權時解析的同一份原文；公開路徑判斷改看 ASGI 的原始路徑。以真的 uvicorn 與假 Brain 驗證 Brain 實際收到的路徑。
 
 - **[2026-11-18]** **Backend 授權一個專案，Brain 卻在另一個專案執行**：Backend 只從 query 與帶 JSON `Content-Type` 的 body 找 `project_id`，Brain 卻還會讀沒有 `Content-Type` 的 JSON body、空的或重複的 `project_id`（空值落到預設專案、重複取最後一個）、`message.project_id`，以及呼叫端自帶的 `X-Brain-Project` 標頭。有某個專案權限的帳號或 Embed key 因此能讀寫、對話於沒有授權的專案（含預設專案）；dev 已重現讀到別的專案的知識文件。現在代理先在大小上限內讀完 body，從所有來源找專案，空白、重複或不一致回 422；授權後轉給 Brain 的 query、JSON body 與可信標頭都只帶授權過的專案 ID，呼叫端的 `X-Brain-*` 標頭不再轉送，Brain 對話信封優先採用可信標頭。另外：先讀 body 再授權，超大的 JSON body 直接 413，不會為了找專案整個讀進記憶體；公開的 `/api/v1/health` 只接受讀取，其他方法要登入；Brain 的技能清單與「重新載入」也用正規化後的專案 ID。

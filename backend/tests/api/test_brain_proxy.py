@@ -375,6 +375,18 @@ def test_catchall_proxy_blocks_backups_prefix() -> None:
         assert response.status_code == 404
 
 
+def test_catchall_proxy_blocks_brain_internal_routes() -> None:
+    """Brain 的 internal 路由只給 Backend 自己的路由呼叫；catch-all 帶 internal token 直通等於開放給所有登入帳號。"""
+    import asyncio
+
+    from app.brain_proxy import proxy_to_brain
+
+    request = _request_with_headers([])
+    for path in ("internal/provider-health", "internal/provider-health/reset", "internal/model-providers/refresh"):
+        response = asyncio.run(proxy_to_brain(request, path, current=None))
+        assert response.status_code == 404
+
+
 def test_readable_but_not_editable_project_says_403(monkeypatch) -> None:
     # 2026-10-14：一般帳號刪對話回 404，串接方以為對話不存在；看得到的專案改成明說沒權限。
     from datetime import datetime, timezone

@@ -179,6 +179,9 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _BACKEND_OWNED_PREFIXES = (
     # 備份限 ROOT，由 routes/admin.py 轉發；catch-all 不得讓一般帳號直通。
     "backups",
+    # Brain 的 internal 路由（斷路器重置、金鑰指紋、設定刷新）只給 Backend 自己的
+    # 路由在伺服器端呼叫；catch-all 帶著 internal token 直通會讓任何登入帳號碰到。
+    "internal",
     "knowledge/raw/upload",
     "knowledge/upload",
     "usage",
