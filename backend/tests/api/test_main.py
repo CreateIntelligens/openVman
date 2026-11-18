@@ -501,6 +501,8 @@ def test_tts_providers_lists_googles_gemini_voices_when_the_relay_is_set(monkeyp
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
         tts_gemini_url="http://nurse.5gao.ai:8206",
+        # 型錄跟 adapter 同一條規則：沒有共用金鑰時，路線要是轉接才列得出來。
+        tts_gemini_route="relay",
         tts_voxcpm_url="",
         tts_cosyvoice_url="",
         edge_tts_enabled=False,

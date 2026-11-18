@@ -362,3 +362,71 @@ def test_only_root_can_switch_the_gemini_tts_route(tmp_path, role):
 
     assert response.status_code == 403
     assert runtime.settings.get("tts_gemini_route") is None
+
+
+def test_direct_cannot_be_chosen_without_a_shared_gemini_key(tmp_path):
+    runtime = _runtime(
+        tmp_path, GEMINI_API_KEY="", tts_gemini_url="http://relay.invalid:8206",
+        tts_gemini_route="relay",
+    )
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+
+    response = client.put(PATH, json={"tts_gemini_route": "direct"}, headers=headers)
+
+    assert response.status_code == 422
+    assert "金鑰" in response.json()["detail"]
+    assert runtime.settings.get("tts_gemini_route") is None
+
+
+def test_route_is_checked_against_the_keys_after_the_same_save(tmp_path):
+    runtime = _runtime(tmp_path, GEMINI_API_KEY="", tts_gemini_url="")
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+
+    # 同一次存檔清掉金鑰又選直連：存完就不能用，整筆拒絕。
+    cleared = client.put(
+        PATH, json={"tts_gemini_route": "direct", "credentials": {"gemini": "   "}},
+        headers=headers,
+    )
+    assert cleared.status_code == 422
+    # 同一次存檔填入金鑰再選直連：存完可以用。
+    saved = client.put(
+        PATH,
+        json={"tts_gemini_route": "direct", "credentials": {"gemini": "new-gemini-key"}},
+        headers=headers,
+    )
+    assert saved.status_code == 200
+    assert runtime.settings.get("tts_gemini_route") == "direct"
+    removed = client.put(
+        PATH, json={"tts_gemini_route": "direct", "clear_credentials": ["gemini"]},
+        headers=headers,
+    )
+    assert removed.status_code == 422
+    assert runtime.model_providers.get_credential("gemini", env_default="") == "new-gemini-key"
+
+
+def test_keys_and_route_are_saved_in_one_transaction(tmp_path):
+    """路線寫入失敗時，同一次存檔的金鑰也不能生效。"""
+    import sqlite3
+
+    runtime = _runtime(tmp_path, tts_gemini_url="http://relay.invalid:8206")
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+    with runtime.database.transaction(write=True) as connection:
+        connection.execute(
+            "CREATE TRIGGER refuse_route BEFORE INSERT ON system_settings"
+            " WHEN NEW.key = 'tts_gemini_route'"
+            " BEGIN SELECT RAISE(ABORT, 'route write refused'); END",
+        )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        client.put(
+            PATH,
+            json={"tts_gemini_route": "relay", "credentials": {"gemini": "new-gemini-key"}},
+            headers=headers,
+        )
+
+    status = runtime.model_providers.get_credential_status("gemini", env_default="env-gemini-key")
+    assert status.source == "environment"
+    assert runtime.settings.get("tts_gemini_route") is None

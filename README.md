@@ -86,7 +86,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 - 模型路由：主對話依序嘗試 Gemini、OpenAI、Groq 中啟用的供應商；後台沒存過設定時照 `LLM_PROVIDER`／`LLM_FALLBACK_CHAIN`。
 - 決策輔助：本地 Guard Agent 規則先判；規則無法判斷時依後台順序呼叫 Gemini Decisions、Clef 主／備援、Jev、OpenAI Decisions（預設 Gemini 優先）。
 - 模型供應商：ROOT 在後台「System → 模型供應商」調整主對話與決策的順序、啟用狀態、主對話模型名稱，以及各家 API key（加密存放，每家一把、各類共用），約 10 秒內生效。
-- Gemini 語音路線：同一頁的「Gemini 語音」分頁選擇直連 Google（用本系統的 Gemini 金鑰，費用算在這把金鑰）或經轉接服務（`TTS_GEMINI_URL`），Backend 各 worker 約 3 秒內生效、不用重開；沒存過照 `TTS_GEMINI_ROUTE`（預設直連）。兩條路線用同一組 30 個 Google 預設聲音，切換不影響可選的聲音。專案綁了自己的 Gemini 金鑰時一律用它直連。
+- Gemini 語音路線：同一頁的「Gemini 語音」分頁選擇直連 Google（用本系統的 Gemini 金鑰，費用算在這把金鑰）或經轉接服務（`TTS_GEMINI_URL`），Backend 各 worker 約 3 秒內生效、不用重開；沒存過照 `TTS_GEMINI_ROUTE`（預設直連）。存檔後跑不動的路線不能存（沒有共用 Gemini 金鑰不能選直連、沒設 `TTS_GEMINI_URL` 不能選轉接）。兩條路線用同一組 30 個 Google 預設聲音，切換不影響可選的聲音。專案綁了自己的 Gemini 金鑰時一律用它直連。
 - 專案專屬 Gemini 金鑰：ROOT 可在專案設定替正式專案綁定自己的 Gemini 金鑰（加密存放，後台只顯示名稱與遮罩），該專案的 Gemini 對話、TTS 與 Live 都改用它；金鑰失效時不會改借共用金鑰，用量依專案分開記。沒綁定的專案照共用設定。
 - 前台決策 Debug：admin／root 的正式登入可在虛擬人舞台開啟當輪判讀面板（一般、臨時帳號與 embed 金鑰看不到，伺服器端也不回傳），預設只顯示一行摘要（供應商・耗時・語氣），按「詳細」才展開情緒／語氣、檢索、語言及信心度；預設關閉，診斷不持久化。
 - 每輪決策：文字回合以一個 batch 評估檢索來源、多語言、回覆語言與當輪語氣；全部決策服務失效時沿用既有對話流程。門檻、資料邊界與 Live 限制見 [Brain 文件](brain/README.md#每輪對話決策)。

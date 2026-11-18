@@ -76,6 +76,18 @@ def fetch_document(
     return body
 
 
+class _Load:
+    """One in-flight load that other threads can wait on."""
+
+    __slots__ = ("done", "error", "retry", "value")
+
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.value: Any = _MISSING
+        self.error: BaseException | None = None
+        self.retry = False
+
+
 class RefreshingValue(Generic[T]):
     """Reload a value at most every ``ttl`` seconds, keeping the last good one on failure.
 
@@ -87,7 +99,7 @@ class RefreshingValue(Generic[T]):
     def __init__(self, ttl: float = REFRESH_SECONDS) -> None:
         self.ttl = ttl
         self._lock = threading.Lock()
-        self._load_lock = threading.Lock()
+        self._loading: _Load | None = None
         self._value: Any = _MISSING
         self._loaded_at = 0.0
 
@@ -97,29 +109,64 @@ class RefreshingValue(Generic[T]):
         *,
         propagate: tuple[type[BaseException], ...] = (),
         default: Any = _MISSING,
+        wait_timeout: float | None = None,
     ) -> T:
         """Return a fresh or cached value.
 
         ``propagate`` errors skip the cache. When nothing has loaded yet a
         failure is re-raised, unless ``default`` is given: that value is then
         cached for one interval so a down Backend is not retried on every call.
+
+        Threads waiting for the same first load share its result or failure.
+        ``wait_timeout`` bounds that wait; ``TimeoutError`` is raised when it
+        runs out.
         """
-        with self._lock:
-            stale = self._value
-            if stale is not _MISSING and monotonic() - self._loaded_at < self.ttl:
-                return stale
-        if stale is not _MISSING:
-            if not self._load_lock.acquire(blocking=False):
-                return stale
-        else:
-            self._load_lock.acquire()
-        try:
+        deadline = None if wait_timeout is None else monotonic() + max(0.0, wait_timeout)
+        while True:
             with self._lock:
-                if self._value is not _MISSING and monotonic() - self._loaded_at < self.ttl:
-                    return self._value
-            return self._load(load, propagate, default)
+                stale = self._value
+                if stale is not _MISSING and monotonic() - self._loaded_at < self.ttl:
+                    return stale
+                pending = self._loading
+                owner = pending is None
+                if owner:
+                    pending = self._loading = _Load()
+            assert pending is not None
+            if owner:
+                return self._run_load(pending, load, propagate, default)
+            if stale is not _MISSING:
+                return stale
+            remaining = None if deadline is None else deadline - monotonic()
+            if (remaining is not None and remaining <= 0) or not pending.done.wait(remaining):
+                raise TimeoutError("timed out waiting for the value to load")
+            if pending.error is not None:
+                raise pending.error
+            if not pending.retry:
+                return pending.value
+            # 載入者的錯誤是它自己的（例如它的請求被取消），等待者要自己重新載入。
+
+    def _run_load(
+        self,
+        pending: _Load,
+        load: Callable[[], T],
+        propagate: tuple[type[BaseException], ...],
+        default: Any,
+    ) -> T:
+        try:
+            value = self._load(load, propagate, default)
+        except propagate:
+            pending.retry = True
+            raise
+        except BaseException as exc:
+            pending.error = exc
+            raise
+        else:
+            pending.value = value
+            return value
         finally:
-            self._load_lock.release()
+            with self._lock:
+                self._loading = None
+            pending.done.set()
 
     def _load(
         self,

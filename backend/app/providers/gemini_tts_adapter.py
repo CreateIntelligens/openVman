@@ -9,15 +9,12 @@ from time import monotonic
 
 import httpx
 
-from app.auth.gemini_tts_route import gemini_route
+from app.auth.gemini_tts_route import gemini_route, gemini_route_usable
 from app.auth.project_gemini_credentials import (
     GeminiCredential,
     resolve_gemini_credential,
 )
-from app.auth.settings_repository import (
-    TTS_GEMINI_ROUTE_DIRECT,
-    TTS_GEMINI_ROUTE_RELAY,
-)
+from app.auth.settings_repository import TTS_GEMINI_ROUTE_DIRECT
 from app.config import TTSRouterConfig
 from app.providers import project_gemini_tts
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
@@ -65,8 +62,21 @@ def shared_gemini_credential(runtime=None) -> GeminiCredential | None:
 
 
 def gemini_tts_usable(cfg, runtime=None) -> bool:
-    """Either route can run: a relay URL is set, or the shared key exists."""
+    """Either route can run: a relay URL is set, or the shared key exists.
+
+    登錄聲音資源用這條寬鬆的規則：專案綁了自己的金鑰時一律直連，不論後台選哪條
+    路線都要選得到 Google 的聲音。
+    """
     return bool(cfg.tts_gemini_url) or shared_gemini_credential(runtime) is not None
+
+
+def gemini_tts_route_usable(cfg, runtime=None) -> bool:
+    """The route chosen in the Admin can run (same rule as the adapter)."""
+    return gemini_route_usable(
+        gemini_route(cfg, runtime),
+        relay_url=cfg.tts_gemini_url or "",
+        has_shared_key=lambda: shared_gemini_credential(runtime) is not None,
+    )
 
 
 class GeminiTTSAdapter:
@@ -102,9 +112,7 @@ class GeminiTTSAdapter:
 
     @property
     def enabled(self) -> bool:
-        if self.route == TTS_GEMINI_ROUTE_RELAY:
-            return bool(self._url)
-        return shared_gemini_credential() is not None
+        return gemini_tts_route_usable(self._config)
 
     def enabled_for(self, request: SynthesizeRequest) -> bool:
         return self.enabled or self._project_credential(request) is not None

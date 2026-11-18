@@ -391,10 +391,54 @@ def test_save_uploaded_document_can_target_persona_knowledge_directory(
 
 
 @pytest.mark.parametrize("persona_id", [".", "..", "...", ".hidden", "-x", "_x"])
-def test_persona_ids_must_start_with_a_letter_or_digit(persona_id):
+def test_new_persona_ids_must_start_with_a_letter_or_digit(monkeypatch, tmp_path, persona_id):
+    root = _configure_workspace(monkeypatch, tmp_path)
     personas = _import("personas.personas")
+    (root / "personas" / "alice").mkdir(parents=True, exist_ok=True)
+    (root / "personas" / "alice" / "SOUL.md").write_text("# Alice", encoding="utf-8")
     with pytest.raises(ValueError):
-        personas.normalize_persona_id(persona_id)
+        personas.create_persona_scaffold(persona_id, "", "default")
+    with pytest.raises(ValueError):
+        personas.clone_persona_scaffold("alice", persona_id, "default")
+
+
+@pytest.mark.parametrize("persona_id", [".", "..", "a/b", "../x", ""])
+def test_dot_and_nested_persona_ids_are_refused_everywhere(persona_id):
+    personas = _import("personas.personas")
+    if persona_id:
+        with pytest.raises(ValueError):
+            personas.normalize_persona_id(persona_id)
+    with pytest.raises(ValueError):
+        personas.delete_persona_scaffold(persona_id or "..", "default")
+
+
+@pytest.mark.parametrize("legacy_id", ["_sales", "-night", ".draft"])
+def test_legacy_persona_ids_still_list_read_and_delete(monkeypatch, tmp_path, legacy_id):
+    """舊版允許非英數開頭的 ID；已存在的人設要列得出來、讀得到、刪得掉。"""
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+    legacy = root / "personas" / legacy_id
+    legacy.mkdir(parents=True, exist_ok=True)
+    (legacy / "SOUL.md").write_text("# Legacy", encoding="utf-8")
+    (root / "personas" / "valid").mkdir(parents=True, exist_ok=True)
+    (root / "personas" / "valid" / "SOUL.md").write_text("# Valid", encoding="utf-8")
+
+    listed = [item["persona_id"] for item in personas.list_personas("default")]
+    assert legacy_id in listed and "valid" in listed
+    assert personas.resolve_core_document_paths(legacy_id, "default")["soul"] == legacy / "SOUL.md"
+
+    assert personas.delete_persona_scaffold(legacy_id, "default")["status"] == "ok"
+    assert not legacy.exists()
+
+
+def test_listing_skips_folder_names_that_are_not_persona_ids(monkeypatch, tmp_path):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+    odd = root / "personas" / "有 空白"
+    odd.mkdir(parents=True, exist_ok=True)
+    (odd / "SOUL.md").write_text("# Odd", encoding="utf-8")
+
+    assert [item["persona_id"] for item in personas.list_personas("default")] == ["default"]
 
 
 def test_deleting_a_dot_persona_leaves_the_workspace_alone(monkeypatch, tmp_path):

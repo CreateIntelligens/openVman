@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from ._repository_base import now_iso
+from ._repository_base import now_iso, write_transaction
 from .database import AuthDatabase
 from .repository_errors import RepositoryError
 
@@ -88,15 +88,25 @@ class SystemSettingsRepository:
         except KeyError as exc:
             raise UnknownSettingError(f"unknown setting: {key}") from exc
 
-    def set(self, key: str, value: str, *, actor_id: str) -> str:
-        """Store an override after checking it against the key's allowed set."""
+    def set(
+        self,
+        key: str,
+        value: str,
+        *,
+        actor_id: str,
+        connection: sqlite3.Connection | None = None,
+    ) -> str:
+        """Store an override after checking it against the key's allowed set.
+
+        Pass *connection* to write inside the caller's transaction.
+        """
         allowed = self.allowed_values(key)
         if value not in allowed:
             raise InvalidSettingValueError(
                 f"{key} must be one of: {', '.join(sorted(allowed))}"
             )
         now = now_iso()
-        with self.database.transaction(write=True) as connection:
+        with write_transaction(self.database, connection) as connection:
             connection.execute(
                 """
                 INSERT INTO system_settings(key, value, updated_by, updated_at)

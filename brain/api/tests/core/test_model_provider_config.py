@@ -132,3 +132,99 @@ def test_a_stale_value_is_served_while_one_thread_refreshes(monkeypatch):
     release.set()
     refresher.join()
     assert value.get(lambda: "should not load") == "new"
+
+
+def _ask_concurrently(count, ask):
+    import threading
+
+    gate = threading.Barrier(count)
+    outcomes = []
+
+    def run():
+        gate.wait()
+        try:
+            outcomes.append(("ok", ask()))
+        except Exception as exc:  # noqa: BLE001 - the outcome is the assertion
+            outcomes.append(("error", type(exc).__name__))
+
+    threads = [threading.Thread(target=run) for _ in range(count)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(5)
+    return outcomes
+
+
+def test_cold_load_failure_is_shared_with_threads_already_waiting():
+    """沒有快取時第一次載入失敗，同時在等的請求拿同一個失敗，不再逐一重打 Backend。"""
+    import time
+
+    value = config.RefreshingValue(ttl=60)
+    loads = []
+
+    def offline():
+        loads.append(1)
+        time.sleep(0.3)
+        raise ConnectionError("backend offline")
+
+    outcomes = _ask_concurrently(6, lambda: value.get(offline))
+
+    assert loads == [1]
+    assert outcomes == [("error", "ConnectionError")] * 6
+    # 失敗不會被快取：之後的請求重新載入。
+    assert value.get(lambda: "back") == "back"
+
+
+def test_waiters_do_not_inherit_a_propagated_error():
+    """propagate 的錯誤屬於載入的那個請求（例如它被取消），等待者要自己載入。"""
+    import threading
+    import time
+
+    class Cancelled(RuntimeError):
+        pass
+
+    value = config.RefreshingValue(ttl=60)
+    started = threading.Event()
+
+    def cancelled():
+        started.set()
+        time.sleep(0.2)
+        raise Cancelled
+
+    outcome = []
+    loader = threading.Thread(
+        target=lambda: outcome.append(
+            pytest.raises(Cancelled, value.get, cancelled, propagate=(Cancelled,)),
+        ),
+    )
+    loader.start()
+    assert started.wait(2)
+    assert value.get(lambda: "mine", propagate=(Cancelled,)) == "mine"
+    loader.join(2)
+
+
+def test_waiting_for_a_cold_load_respects_the_wait_timeout():
+    import threading
+    import time
+
+    value = config.RefreshingValue(ttl=60)
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow():
+        started.set()
+        release.wait(5)
+        return "late"
+
+    loader = threading.Thread(target=lambda: value.get(slow))
+    loader.start()
+    try:
+        assert started.wait(2)
+        began = time.monotonic()
+        with pytest.raises(TimeoutError):
+            value.get(lambda: pytest.fail("must wait, not load"), wait_timeout=0.1)
+        assert time.monotonic() - began < 1
+    finally:
+        release.set()
+        loader.join(2)
+    assert value.get(lambda: pytest.fail("cached")) == "late"

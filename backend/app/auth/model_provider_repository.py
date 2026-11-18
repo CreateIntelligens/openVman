@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from ._repository_base import now_iso
+from ._repository_base import now_iso, write_transaction
 from .database import AuthDatabase
 from .model_provider_catalog import CATEGORIES, CREDENTIAL_IDS, ModelCategory
 
@@ -119,7 +119,9 @@ class ModelProviderRepository:
         credentials: Mapping[str, str],
         reset_credentials: tuple[str, ...] | list[str] = (),
         actor_id: str,
+        connection: sqlite3.Connection | None = None,
     ) -> None:
+        """Save categories and keys; pass *connection* to join the caller's transaction."""
         for category_id, change in categories.items():
             _validate(_category(category_id), change.order, change.enabled, change.models)
         reset_category_ids = tuple(reset_categories)
@@ -141,7 +143,7 @@ class ModelProviderRepository:
         if set(reset) & set(encrypted):
             raise InvalidModelProviderSettings("credential cannot be updated and reset together")
         now = now_iso()
-        with self.database.transaction(write=True) as connection:
+        with write_transaction(self.database, connection) as connection:
             for category_id, change in categories.items():
                 connection.execute(
                     """

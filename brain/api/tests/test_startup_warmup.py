@@ -346,3 +346,50 @@ async def test_warmup_fetches_model_settings_once_per_worker(monkeypatch):
     await startup.warmup_resources("chat")
 
     assert fetched == ["decision", "chat_llm", "default", "proj-a"]
+
+
+@pytest.mark.asyncio
+async def test_audio_language_first_step_failure_still_releases_readiness(monkeypatch):
+    """第一步（台語判斷預熱）在 import 階段就拋錯，readiness 也不能一直停在 pending。"""
+    startup = _load_startup()
+    warmed: list[str] = []
+
+    def broken(*_args, **_kwargs):
+        raise ImportError("google.genai")
+
+    monkeypatch.setattr(startup, "_warmup_audio_language", broken)
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default"])
+    monkeypatch.setattr(startup, "get_embedder", lambda: None)
+    monkeypatch.setattr(startup, "_warmup_retrieval_path", lambda project_id: warmed.append(project_id))
+    monkeypatch.setattr(startup, "load_product_catalogs", lambda project_id: [])
+    monkeypatch.setattr(startup, "_warmup_model_settings", lambda project_ids: None)
+
+    await startup.warmup_resources("chat")
+
+    assert warmup_state.is_warmup_done() is True
+    assert warmed == ["default"]
+
+
+@pytest.mark.asyncio
+async def test_optional_warmup_steps_share_a_time_budget(monkeypatch):
+    """選用預熱（模型設定、型錄、LLM 套件）卡住時，不能無限期延後 readiness。"""
+    import asyncio
+    import threading
+
+    startup = _load_startup()
+    release = threading.Event()
+    warmed: list[str] = []
+    monkeypatch.setattr(startup, "_OPTIONAL_WARMUP_BUDGET_S", 0.2, raising=False)
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default", "proj-a"])
+    monkeypatch.setattr(startup, "get_embedder", lambda: None)
+    monkeypatch.setattr(startup, "_warmup_retrieval_path", lambda project_id: warmed.append(project_id))
+    monkeypatch.setattr(startup, "_warmup_model_settings", lambda project_ids: release.wait(5))
+    monkeypatch.setattr(startup, "load_product_catalogs", lambda project_id: release.wait(5))
+    try:
+        await asyncio.wait_for(startup.warmup_resources("chat"), timeout=2)
+    finally:
+        release.set()
+
+    assert warmup_state.is_warmup_done() is True
+    # 必要的檢索預熱照樣每個專案都做。
+    assert warmed == ["default", "proj-a"]

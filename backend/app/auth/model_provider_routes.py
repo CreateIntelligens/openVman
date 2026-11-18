@@ -14,6 +14,7 @@ from .dependencies import CurrentAccount, require_root
 from .gemini_tts_route import (
     clear_gemini_route_cache,
     gemini_route,
+    gemini_route_usable,
     saved_gemini_route,
 )
 from .model_provider_catalog import (
@@ -244,6 +245,43 @@ def _tts_gemini_view(runtime: AuthRuntime) -> dict[str, Any]:
     }
 
 
+def _shared_gemini_key_after_save(
+    runtime: AuthRuntime, body: UpdateModelProviderSettings,
+) -> bool:
+    """Whether the shared Gemini key is set once this same save is applied."""
+    if "gemini" in body.credentials:
+        return bool(body.credentials["gemini"].strip())
+    if "gemini" in body.clear_credentials:
+        return False
+    if "gemini" in body.use_environment_credentials:
+        return bool(environment_credential(runtime.config, "gemini"))
+    return resolve_gemini_credential(None, runtime).configured
+
+
+def _require_usable_gemini_route(
+    runtime: AuthRuntime, body: UpdateModelProviderSettings,
+) -> None:
+    """Refuse a route that could not synthesize right after this save."""
+    route = body.tts_gemini_route or ""
+    if gemini_route_usable(
+        route,
+        relay_url=runtime.config.tts_gemini_url,
+        has_shared_key=lambda: _shared_gemini_key_after_save(runtime, body),
+    ):
+        return
+    if route == TTS_GEMINI_ROUTE_RELAY:
+        detail = (
+            "還沒設定轉接服務的網址（TTS_GEMINI_URL），所以不能選「經轉接服務」。"
+            "請改選「直連 Google」，或請系統管理員在部署設定加上網址。"
+        )
+    else:
+        detail = (
+            "直連 Google 需要共用的 Gemini 金鑰，目前沒有。"
+            "請在這一頁填入 Gemini 金鑰後再選直連，或改選「經轉接服務」。"
+        )
+    raise HTTPException(status_code=422, detail=detail)
+
+
 @router.get("")
 def get_model_provider_settings(
     _actor: CurrentAccount = Depends(require_root),
@@ -271,8 +309,8 @@ def update_model_provider_settings(
     actions = (set(body.credentials), set(body.clear_credentials), reset_credentials)
     if actions[0] & actions[1] or actions[0] & actions[2] or actions[1] & actions[2]:
         raise HTTPException(status_code=422, detail="credential has conflicting update actions")
-    if body.tts_gemini_route == TTS_GEMINI_ROUTE_RELAY and not runtime.config.tts_gemini_url.strip():
-        raise HTTPException(status_code=422, detail="TTS_GEMINI_URL is not configured")
+    if body.tts_gemini_route is not None:
+        _require_usable_gemini_route(runtime, body)
     credentials = dict(body.credentials)
     credentials.update({credential_id: "" for credential_id in body.clear_credentials})
     changes = {
@@ -284,21 +322,28 @@ def update_model_provider_settings(
         for category_id, change in body.categories.items()
     }
     try:
-        runtime.model_providers.update(
-            changes,
-            reset_categories=body.reset_categories,
-            credentials=credentials,
-            reset_credentials=body.use_environment_credentials,
-            actor_id=actor.user.id,
-        )
+        # 模型、金鑰、語音路線與稽核紀錄同一個交易：任一步失敗就全部不生效。
+        with runtime.database.transaction(write=True) as connection:
+            runtime.model_providers.update(
+                changes,
+                reset_categories=body.reset_categories,
+                credentials=credentials,
+                reset_credentials=body.use_environment_credentials,
+                actor_id=actor.user.id,
+                connection=connection,
+            )
+            if body.tts_gemini_route is not None:
+                runtime.settings.set(
+                    TTS_GEMINI_ROUTE_KEY, body.tts_gemini_route,
+                    actor_id=actor.user.id, connection=connection,
+                )
     except InvalidModelProviderSettings as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="model credential encryption is unavailable") from exc
     if body.tts_gemini_route is not None:
-        runtime.settings.set(TTS_GEMINI_ROUTE_KEY, body.tts_gemini_route, actor_id=actor.user.id)
-        # 這個 worker 立刻生效；其他 worker 等短快取過期。
-        clear_gemini_route_cache()
+        # 提交之後才更新快取：這個 worker 立刻生效；其他 worker 等短快取過期。
+        clear_gemini_route_cache(body.tts_gemini_route)
     # Brain 每 10 秒才重讀一次設定；存完主動叫它清快取，改完馬上到前台測就看得到。
     refreshed = _brain_post(runtime, "/brain/internal/model-providers/refresh") is not None
     return {**_admin_view(runtime), "runtime_refreshed": refreshed}

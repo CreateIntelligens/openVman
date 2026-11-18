@@ -209,3 +209,101 @@ def test_forked_child_gets_its_own_writer(tmp_path: Path):
     with sqlite3.connect(path) as connection:
         models = {row[0] for row in connection.execute("SELECT model FROM usage_events")}
     assert models == {"parent", "child"}
+
+
+def _models(path: Path) -> list[str]:
+    with sqlite3.connect(path) as connection:
+        return [row[0] for row in connection.execute("SELECT model FROM usage_events ORDER BY id")]
+
+
+def test_invalid_number_is_rejected_before_it_can_poison_the_batch(ledger, monkeypatch):
+    """NaN 綁進 SQLite 會變 NULL、違反 NOT NULL；不能讓整批有效事件跟著被丟掉。"""
+    monkeypatch.setattr(usage_ledger, "_FLUSH_INTERVAL_S", 30.0)
+    assert _record("before") is not None
+    poisoned = usage_ledger.record_usage_event(
+        provider="jev", model="nan", usage=LLMUsage(1, 2, 3), units=float("nan"),
+    )
+    huge = usage_ledger.record_usage_event(
+        provider="jev", model="huge", usage=LLMUsage(2**70, 0, 2**70),
+    )
+    assert _record("after") is not None
+
+    assert poisoned is None and huge is None
+    assert usage_ledger.flush_usage_events(timeout=5)
+    assert _models(ledger) == ["before", "after"]
+
+
+def test_a_bad_row_is_isolated_and_flush_reports_the_loss(ledger, monkeypatch):
+    """驗證漏掉的壞資料也只丟那一筆：其餘照寫，flush 要回報沒有全部寫進去。"""
+    monkeypatch.setattr(usage_ledger, "_FLUSH_INTERVAL_S", 30.0)
+    monkeypatch.setattr(usage_ledger, "_RETRY_BACKOFF_INITIAL_S", 0.0)
+    good = _record("good-1")
+    assert good is not None
+    bad = {**good, "model": "bad", "units": None}
+    assert usage_ledger._WRITER.enqueue(ledger, bad)
+    assert _record("good-2") is not None
+
+    assert usage_ledger.flush_usage_events(timeout=5) is False
+    assert _models(ledger) == ["good-1", "good-2"]
+    # 之後的 flush 只看自己等的那幾筆，不會一直回報舊的遺失。
+    assert _record("good-3") is not None
+    assert usage_ledger.flush_usage_events(timeout=5) is True
+
+
+def test_flush_wakes_a_writer_sleeping_in_backoff(ledger, monkeypatch):
+    """停機 flush 要能叫醒退避中的寫入執行緒：鎖一放開就寫，不等退避睡完。"""
+    monkeypatch.setattr(usage_ledger, "_WRITER_BUSY_TIMEOUT_MS", 10)
+    monkeypatch.setattr(usage_ledger, "_RETRY_BACKOFF_INITIAL_S", 30.0)
+    monkeypatch.setattr(usage_ledger, "_RETRY_BACKOFF_MAX_S", 30.0)
+    blocker = _hold_write_lock(ledger)
+    try:
+        assert _record("shutdown") is not None
+        assert usage_ledger.flush_usage_events(timeout=0.3) is False
+    finally:
+        blocker.execute("ROLLBACK")
+        blocker.close()
+
+    started = time.monotonic()
+    assert usage_ledger.flush_usage_events(timeout=2) is True
+    assert time.monotonic() - started < 2
+    assert _models(ledger) == ["shutdown"]
+
+
+def test_shutdown_shares_one_deadline_and_stops_the_writer(ledger, monkeypatch):
+    monkeypatch.setattr(usage_ledger, "_WRITER_BUSY_TIMEOUT_MS", 10)
+    monkeypatch.setattr(usage_ledger, "_RETRY_BACKOFF_INITIAL_S", 30.0)
+    monkeypatch.setattr(usage_ledger, "_RETRY_BACKOFF_MAX_S", 30.0)
+    blocker = _hold_write_lock(ledger)
+    try:
+        assert _record("locked") is not None
+        started = time.monotonic()
+        assert usage_ledger.shutdown_usage_writer(timeout=0.5) is False
+        elapsed = time.monotonic() - started
+    finally:
+        blocker.execute("ROLLBACK")
+        blocker.close()
+
+    assert elapsed < 1.5
+    thread = usage_ledger._WRITER.thread
+    assert thread is None or not thread.is_alive()
+
+
+def test_caller_mutations_do_not_change_the_ledger(ledger, monkeypatch):
+    monkeypatch.setattr(usage_ledger, "_FLUSH_INTERVAL_S", 30.0)
+    event = _record("original")
+    assert event is not None
+    event["model"] = "changed-after-return"
+    assert usage_ledger.flush_usage_events(timeout=5)
+    assert _models(ledger) == ["original"]
+
+
+def test_newest_events_are_listed_by_time_not_commit_order(ledger):
+    with sqlite3.connect(ledger) as connection:
+        connection.execute(
+            "INSERT INTO usage_events (created_at, model) VALUES"
+            " ('2026-11-18T10:00:02.000+00:00', 'later'),"
+            " ('2026-11-18T10:00:01.000+00:00', 'earlier')",
+        )
+    assert [event["model"] for event in usage_ledger.list_usage_events()] == [
+        "later", "earlier",
+    ]

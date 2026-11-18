@@ -304,6 +304,8 @@ def _provider_configuration(
         return _CONFIG.get(
             lambda: _fetch_provider_configuration(timeout=timeout, cancel_event=cancel_event),
             propagate=(DecisionProviderCancelled,),
+            # 別的請求正在冷啟載入時，這題只等自己的期限。
+            wait_timeout=timeout,
         )
     except DecisionProviderCancelled:
         raise

@@ -18,6 +18,47 @@ from app.upstream_guard import knob, HopTimeout
 GOOGLE_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 SAMPLE_RATE = 24000
 
+# 上游錯誤本文可能回顯請求內容（含金鑰），所以只保留這兩份清單裡認得的代碼，
+# 其餘一律丟掉，不進例外訊息也不進 log。
+_GOOGLE_STATUSES = frozenset({
+    "ABORTED", "CANCELLED", "DEADLINE_EXCEEDED", "FAILED_PRECONDITION",
+    "INTERNAL", "INVALID_ARGUMENT", "NOT_FOUND", "OUT_OF_RANGE",
+    "PERMISSION_DENIED", "RESOURCE_EXHAUSTED", "UNAUTHENTICATED",
+    "UNAVAILABLE", "UNIMPLEMENTED", "UNKNOWN",
+})
+#: Google 對壞掉的金鑰回 400 INVALID_ARGUMENT，要看 ErrorInfo.reason 才分得出是認證問題。
+GOOGLE_AUTH_REASONS = frozenset({
+    "API_KEY_INVALID", "API_KEY_SERVICE_BLOCKED", "SERVICE_DISABLED",
+})
+_ERROR_BODY_LIMIT = 64 * 1024
+
+
+class GoogleTTSError(RuntimeError):
+    """Google answered with an error; keeps only the status and a known error code."""
+
+    def __init__(self, status_code: int, error_type: str = "") -> None:
+        self.status_code = status_code
+        self.error_type = error_type
+        detail = f" {error_type}" if error_type else ""
+        super().__init__(f"Gemini TTS failed (HTTP {status_code}{detail})")
+
+
+def google_error_type(body: bytes) -> str:
+    """The ErrorInfo reason or gRPC status name from an error body, if recognized."""
+    try:
+        error = json.loads(body[:_ERROR_BODY_LIMIT]).get("error")
+    except (ValueError, AttributeError, UnicodeDecodeError):
+        return ""
+    if not isinstance(error, dict):
+        return ""
+    details = error.get("details")
+    for detail in details if isinstance(details, list) else ():
+        reason = detail.get("reason") if isinstance(detail, dict) else None
+        if reason in GOOGLE_AUTH_REASONS:
+            return reason
+    status = error.get("status")
+    return status if status in _GOOGLE_STATUSES else ""
+
 
 def request_payload(request: SynthesizeRequest) -> dict:
     return {
@@ -74,9 +115,7 @@ def synthesize(
         # 傳輸錯誤的訊息與 traceback 可能帶出請求內容；from None 斷開鏈結，金鑰不進 log。
         raise RuntimeError("Gemini TTS request failed") from None
     if response.status_code >= 400:
-        raise RuntimeError(
-            f"Gemini TTS failed (HTTP {response.status_code})",
-        )
+        raise GoogleTTSError(response.status_code, google_error_type(response.content))
     pcm = b"".join(audio_chunks(response.json()))
     if not pcm:
         raise RuntimeError("Gemini TTS returned no audio")
@@ -172,9 +211,14 @@ async def open_stream(
         except httpx.HTTPError:
             raise RuntimeError("Gemini TTS request failed") from None
         if response.status_code >= 400:
-            raise RuntimeError(
-                f"Gemini TTS failed (HTTP {response.status_code})",
-            )
+            error_type = ""
+            try:
+                remaining = max(0.05, first_byte - (monotonic() - started))
+                async with asyncio.timeout(remaining):
+                    error_type = google_error_type(await response.aread())
+            except (TimeoutError, httpx.HTTPError):
+                pass
+            raise GoogleTTSError(response.status_code, error_type)
 
         async def audio() -> AsyncIterator[bytes]:
             event: list[str] = []

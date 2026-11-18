@@ -150,9 +150,22 @@ def classify_edge_tts_error(exc: Exception) -> str:
 
 
 def classify_gemini_error(exc: Exception) -> str:
-    """Classify an error from Gemini TTS Console."""
+    """Classify an error from Gemini TTS: the relay, or Google called directly."""
     from app.providers.gemini_tts_adapter import GeminiTTSHTTPError
+    from app.providers.project_gemini_tts import GOOGLE_AUTH_REASONS, GoogleTTSError
 
+    if timeout := classify_timeout(exc):
+        return timeout
+    if isinstance(exc, GoogleTTSError):
+        if exc.status_code in (401, 403) or exc.error_type in GOOGLE_AUTH_REASONS:
+            return REASON_AUTH_ERROR
+        if exc.status_code == 429:
+            return REASON_RATE_LIMITED
+        if exc.status_code in (400, 422):
+            return REASON_BAD_REQUEST
+        if exc.status_code >= 500:
+            return REASON_PROVIDER_UNAVAILABLE
+        return REASON_UNKNOWN
     return _classify_http_provider_error(exc, GeminiTTSHTTPError)
 
 

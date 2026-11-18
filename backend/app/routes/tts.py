@@ -18,6 +18,7 @@ from app import language_routes as language_routes_mod
 from app import voice_policy
 from app.auth import voice_access
 from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.gemini_tts_route import gemini_route
 from app.auth.models import (
     AccountRole,
     ProjectPolicyRecord,
@@ -25,12 +26,19 @@ from app.auth.models import (
 )
 from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.runtime import get_auth_runtime
+from app.auth.settings_repository import TTS_GEMINI_ROUTE_DIRECT
 from app.config import TTSRouterConfig, get_tts_config
 from app.observability import record_fallback_hop
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
 from app.providers.edge_tts_adapter import EDGE_TTS_HOST
-from app.providers.error_mapping import classify_voxcpm_error
+from app.providers.error_mapping import (
+    REASON_PROVIDER_UNAVAILABLE,
+    REASON_RATE_LIMITED,
+    REASON_TIMEOUT,
+    classify_gemini_error,
+    classify_voxcpm_error,
+)
 from app.providers.gemini_tts_adapter import (
     GEMINI_PROVIDER_NAME,
     GEMINI_STREAM_CONTENT_TYPE,
@@ -133,6 +141,20 @@ def _tts_failure(exc: BaseException, *, status_code: int = 502) -> JSONResponse:
         status_code=status_code,
         content={"error": "tts_unavailable", "message": "語音合成暫時無法使用，請稍後再試"},
     )
+
+
+def _direct_failure_status(exc: BaseException) -> int:
+    """HTTP status for a failed direct Google stream before any audio was sent.
+
+    Google 的 401／403 是本系統金鑰的問題，原樣回給前端會被當成使用者沒登入或沒權限，
+    所以跟其他我們這邊的問題一樣回 502；限流回 429 讓呼叫端稍後再試，上游故障回 503。
+    """
+    reason = classify_gemini_error(exc)  # type: ignore[arg-type]
+    return {
+        REASON_RATE_LIMITED: 429,
+        REASON_PROVIDER_UNAVAILABLE: 503,
+        REASON_TIMEOUT: 504,
+    }.get(reason, 502)
 
 
 # 與 OpenAI /v1/audio/speech 相同上限；文字清理與合成時間都隨長度增加，不設上限一個請求就能拖住服務。
@@ -260,16 +282,23 @@ async def create_speech(
             )
         if model_id:
             cache_scope += f"|model:{model_id}"
-        if project_id and provider in ("", "auto", "gemini-tts"):
-            credential = resolve_gemini_credential(project_id, runtime)
-            if credential.source == "project" or provider == "gemini-tts":
-                fingerprint = hashlib.sha256(
-                    credential.api_key.encode("utf-8"),
-                ).hexdigest()[:12]
-                cache_scope += (
-                    f"|project:{project_id}:gemini:"
-                    f"{credential.credential_id}:{fingerprint}"
-                )
+        if provider in ("", "auto", "gemini-tts"):
+            project_key = False
+            if project_id:
+                credential = resolve_gemini_credential(project_id, runtime)
+                project_key = credential.source == "project"
+                if project_key or provider == "gemini-tts":
+                    fingerprint = hashlib.sha256(
+                        credential.api_key.encode("utf-8"),
+                    ).hexdigest()[:12]
+                    cache_scope += (
+                        f"|project:{project_id}:gemini:"
+                        f"{credential.credential_id}:{fingerprint}"
+                    )
+            # 後台切換路線後不能命中另一條路線合成（或備援）的音檔。專案自己的金鑰
+            # 一律直連，跟後台選哪條無關。
+            route = TTS_GEMINI_ROUTE_DIRECT if project_key else gemini_route(cfg)
+            cache_scope += f"|gemini-route:{route}"
         cache_key = make_cache_key(
             cleaned_text,
             voice,
@@ -697,8 +726,9 @@ async def tts_stream_endpoint(
                 _stream_failed(GEMINI_PROVIDER_NAME, gemini_host, exc, started, "")
                 return _tts_failure(exc, status_code=exc.status_code)
             except RuntimeError as exc:
-                _stream_failed(GEMINI_PROVIDER_NAME, gemini_host, exc, started, "")
-                return _tts_failure(exc)
+                reason = classify_gemini_error(exc)
+                _stream_failed(GEMINI_PROVIDER_NAME, gemini_host, exc, started, reason)
+                return _tts_failure(exc, status_code=_direct_failure_status(exc))
             _meter_stream(GEMINI_PROVIDER_NAME)
             return _stream_audio(
                 _guarded(stream, GEMINI_PROVIDER_NAME, gemini_host, started=started),

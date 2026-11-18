@@ -570,3 +570,32 @@ def test_provider_filter_without_matching_hop_fails_fast(monkeypatch):
             "state", {"q": {"type": "noul"}}, timeout=1, purpose="privacy-test",
             providers=frozenset({"clef"}),
         )
+
+
+def test_configuration_wait_is_bounded_by_the_request_timeout(monkeypatch):
+    """另一個請求還在冷啟載入設定時，這個請求只等自己的期限。"""
+    import threading
+    import time
+
+    router.clear_provider_configuration_cache()
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow(**_):
+        started.set()
+        release.wait(5)
+        return _config([_hop("openai")])
+
+    monkeypatch.setattr(router, "_fetch_provider_configuration", slow)
+    loader = threading.Thread(target=lambda: router._provider_configuration(timeout=5))
+    loader.start()
+    try:
+        assert started.wait(2)
+        began = time.monotonic()
+        with pytest.raises(router.DecisionProviderError):
+            router._provider_configuration(timeout=0.1)
+        assert time.monotonic() - began < 1
+    finally:
+        release.set()
+        loader.join(2)
+    router.clear_provider_configuration_cache()

@@ -31,7 +31,7 @@ Edge nginx 對 `/brain/` 一律回 404。除了 `GET /brain/health` 與 `GET /br
 `startup.lifespan` 依序：
 
 1. 建立預設專案（`DEFAULT_PROJECT_ID`，未設定時為 `default`）的 workspace scaffold，執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`，舊資料搬進預設專案）。
-2. 背景預熱：先預熱台語語音判斷的 Gemini client（Backend 跟著一起重啟、暫時拿不到金鑰時，每 2 秒重試，最多約 10 秒），再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning。
+2. 背景預熱：先預熱台語語音判斷的 Gemini client（Backend 跟著一起重啟、暫時拿不到金鑰時，每 2 秒重試，最多約 10 秒），再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning，readiness 照樣放行；載入 LLM 套件、取模型設定、解析型錄這些選用步驟合計最多等 30 秒，逾時就略過。
 3. `DREAMING_ENABLED` 時啟動 dreaming 排程；啟動每日對話備份排程。
 
 Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符時，Brain fail closed，不會在 API process 內自行改用其他 provider。
@@ -407,7 +407,7 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 
 `brain/data/usage.db` 是跨專案共用的 append-only SQLite 帳本，由 Brain 單一擁有。每筆事件記錄 provider、model、延遲、token 數，以及 `user_id`、`principal_type`、`principal_id`、`project_id`、`session_id`、`trace_id` 與 `kind`。
 
-寫入不在回覆路徑上等 SQLite：`record_usage_event` 只把事件排進本 process 的佇列，由一條背景執行緒以常駐連線批次寫入（每 0.5 秒或滿 100 筆一個交易）。資料庫被其他 worker 鎖住時保留整批退避重試；佇列滿 10,000 筆才丟新事件並記 warning。停機時在 lifespan 結束前寫完佇列（最多等 5 秒，寫不完記 error；uvicorn 收到 SIGTERM 不會跑 `atexit`，所以以 lifespan 為準），同一 process 的查詢也會先寫完再讀；process 被強制終止時最多遺失最後約 0.5 秒的用量。寫入連線定期做 PASSIVE checkpoint，並以 `journal_size_limit` 限制 `usage.db-wal` 的大小。
+寫入不在回覆路徑上等 SQLite：`record_usage_event` 只把事件排進本 process 的佇列，由一條背景執行緒以常駐連線批次寫入（每 0.5 秒或滿 100 筆一個交易）。資料庫被其他 worker 鎖住時保留整批退避重試；佇列滿 10,000 筆才丟新事件並記 warning。數字存不進 SQLite 的事件（NaN、Infinity、超出 64 位元的 token 數）在入列前就拒絕；整批因其他原因寫不進去時逐筆重寫，只丟壞掉的那幾筆，`flush_usage_events()` 有事件沒寫進去就回 False。停機時在 lifespan 結束前以 `shutdown_usage_writer()` 寫完佇列（叫醒退避中的寫入執行緒，等鎖、重試與結束共用 5 秒期限，寫不完記 error；uvicorn 收到 SIGTERM 不會跑 `atexit`，所以以 lifespan 為準），同一 process 的查詢也會先寫完再讀；process 被強制終止時最多遺失最後約 0.5 秒的用量。寫入連線定期做 PASSIVE checkpoint，並以 `journal_size_limit` 限制 `usage.db-wal` 的大小。多 process 只支援各自啟動（spawn）的 worker，帳本初始化進行中 `fork` 出來的子 process 不支援。事件清單依 `created_at` 由新到舊排序。
 
 由帳號 API key 發起時，Backend 保留擁有者 `user_id`，另注入 `principal_type=api_key`、`principal_id=<key_id>`；同帳號的多把 key 可分別查詢用量。完整 key 不會傳入 Brain 或帳本，驗證與撤銷由 Backend 負責，見 [整合指南](../docs/guides/account-api-keys.md)。
 
@@ -426,7 +426,7 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 | `GET /brain/usage/events` | 依帳號、專案、session、trace、類型與時間區間查事件 |
 
 三支查詢都另收可重複的 `project_ids`，只算列出的專案；Backend 用它把受限管理員限制在範圍內。帶了但全是空值時一筆都不回，不會變成不篩選。
-| `POST /brain/usage/events` | 其他服務寫入非 LLM 用量；必填 `provider`、`unit_type`、`units`，歸屬欄位由呼叫端帶入；排入寫入佇列即回 201，佇列已滿回 500 |
+| `POST /brain/usage/events` | 其他服務寫入非 LLM 用量；必填 `provider`、`unit_type`、`units`，歸屬欄位由呼叫端帶入；排入寫入佇列即回 201，數字不是有限值或超出範圍回 400，佇列已滿回 500 |
 
 帳本以 UTC 儲存，查詢區間為 `since <= created_at < until`。瀏覽器與外部客戶端改用 Backend 的 `/api/v1/usage/*`。
 

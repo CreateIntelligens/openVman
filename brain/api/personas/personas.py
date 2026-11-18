@@ -21,14 +21,26 @@ PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
 }
 PERSONA_CORE_KEYS = frozenset(PERSONA_CORE_KEYS_TO_FILES.keys())
 PERSONA_CORE_FILENAMES = frozenset(PERSONA_CORE_KEYS_TO_FILES.values())
-# 開頭必須是英數字：「.」「..」會變成目前或上一層資料夾，刪除人設時等於刪掉整個工作區。
-_PERSONA_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+# 不含斜線，所以一定是 personas/ 底下的一層；「.」「..」另外擋，它們會變成目前或
+# 上一層資料夾，刪除人設時等於刪掉整個工作區。舊版建立的 _sales、.draft 這類名稱仍可讀寫。
+_PERSONA_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
+# 新建的人設要英數開頭；既有的舊名稱不受這條限制。
+_NEW_PERSONA_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+_DOT_SEGMENTS = frozenset({".", ".."})
 
 
 def normalize_persona_id(persona_id: str | None) -> str:
     text = (persona_id or "").strip() or "default"
-    if not _PERSONA_ID_RE.match(text):
+    if not _PERSONA_ID_RE.fullmatch(text) or text in _DOT_SEGMENTS:
         raise ValueError("persona_id 格式不合法")
+    return text
+
+
+def validate_new_persona_id(persona_id: str | None) -> str:
+    """Normalize an id for a persona about to be created (stricter than reads)."""
+    text = normalize_persona_id(persona_id)
+    if not _NEW_PERSONA_ID_RE.fullmatch(text):
+        raise ValueError("persona_id 必須以英文字母或數字開頭")
     return text
 
 
@@ -65,7 +77,11 @@ def list_personas(project_id: str = "default") -> list[dict[str, Any]]:
         soul_path = path / "SOUL.md"
         if not soul_path.exists():
             continue
-        persona_id = normalize_persona_id(path.name)
+        try:
+            persona_id = normalize_persona_id(path.name)
+        except ValueError:
+            # 手動放進來的資料夾名稱不合規則就略過，不能讓整份清單失敗。
+            continue
         personas.append(
             _build_persona_summary(
                 persona_id,
@@ -78,7 +94,7 @@ def list_personas(project_id: str = "default") -> list[dict[str, Any]]:
 
 
 def create_persona_scaffold(persona_id: str, label: str = "", project_id: str = "default") -> dict[str, Any]:
-    normalized = normalize_persona_id(_require_text(persona_id, "persona_id"))
+    normalized = validate_new_persona_id(_require_text(persona_id, "persona_id"))
     if normalized == "default":
         raise ValueError("default persona 已存在，無法重建")
 
@@ -136,7 +152,7 @@ def clone_persona_scaffold(
     project_id: str = "default",
 ) -> dict[str, Any]:
     source_paths = resolve_core_document_paths(source_persona_id, project_id)
-    target_id = normalize_persona_id(
+    target_id = validate_new_persona_id(
         _require_text(target_persona_id, "target_persona_id")
     )
     if target_id == "default":

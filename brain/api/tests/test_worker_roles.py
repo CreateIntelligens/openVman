@@ -91,7 +91,7 @@ async def test_lifespan_only_starts_management_work_for_admin(monkeypatch, role)
     monkeypatch.setattr(backup, "start_backup_scheduler", backups)
     monkeypatch.setattr(maintenance, "start_maintenance_scheduler", maintain)
     flush_usage = Mock(return_value=True)
-    monkeypatch.setattr(startup, "flush_usage_events", flush_usage)
+    monkeypatch.setattr(startup, "shutdown_usage_writer", flush_usage)
     app = FastAPI()
     app.state.brain_role = role
     async with startup.lifespan(app):

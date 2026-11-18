@@ -201,3 +201,18 @@ def test_timeseries_rejects_invalid_timezone(client, report_timezone):
     )
     assert response.status_code == 400
     assert "timezone" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [("units", "NaN"), ("latency_ms", "Infinity"), ("input_tokens", str(2**70))],
+)
+def test_event_with_unstorable_numbers_is_rejected(client: TestClient, field, value):
+    headers = {
+        "X-Internal-Token": "test-internal-token",
+        "Content-Type": "application/json",
+    }
+    body = '{"provider": "edge-tts", "unit_type": "chars", "units": 3, "%s": %s}' % (field, value)
+    response = client.post("/brain/usage/events", content=body, headers=headers)
+    assert response.status_code == 400
+    assert usage_ledger.list_usage_events() == []

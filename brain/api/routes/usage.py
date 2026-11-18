@@ -16,6 +16,8 @@ from infra.usage_ledger import (
     UNIT_TOKENS,
     list_usage_events,
     record_usage_event,
+    storable_float,
+    storable_int,
     summarize_usage,
     timeseries_usage,
 )
@@ -161,8 +163,15 @@ class UsageEventIn(BaseModel):
 async def create_usage_event(payload: UsageEventIn) -> dict[str, Any]:
     if not payload.provider.strip():
         raise HTTPException(status_code=400, detail="provider 不可為空")
+    if not storable_float(payload.units) or not storable_float(payload.latency_ms):
+        raise HTTPException(status_code=400, detail="units 與 latency_ms 必須是有限的數字")
     if payload.units < 0:
         raise HTTPException(status_code=400, detail="units 不可為負數")
+    if not all(
+        storable_int(value)
+        for value in (payload.input_tokens, payload.output_tokens, payload.total_tokens)
+    ):
+        raise HTTPException(status_code=400, detail="token 數超出可記錄的範圍")
 
     scope = UsageScope(
         kind=payload.kind,

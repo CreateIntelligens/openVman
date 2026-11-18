@@ -20,7 +20,7 @@ from app.providers.gemini_tts_adapter import (
     GEMINI_DEFAULT_VOICE,
     GEMINI_PREBUILT_VOICES,
     GEMINI_PROVIDER_NAME,
-    gemini_tts_usable,
+    gemini_tts_route_usable,
 )
 from app.providers.indextts_adapter import (
     INDEXTTS_NURSE_PROVIDER_NAME,
@@ -393,7 +393,8 @@ async def build_tts_provider_catalog(cfg: Any) -> list[dict]:
             "voices": [cfg.tts_aws_polly_voice_id],
         })
 
-    if gemini_tts_usable(cfg):
+    # 跟 adapter 同一條規則：目前選的路線跑不動，就不列出來讓人選了之後才失敗。
+    if gemini_tts_route_usable(cfg):
         providers.append({
             "id": GEMINI_PROVIDER_NAME,
             "name": "Gemini TTS",

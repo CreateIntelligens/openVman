@@ -5,6 +5,7 @@ from __future__ import annotations
 import atexit
 import json
 import logging
+import math
 import os
 import sqlite3
 import threading
@@ -219,6 +220,25 @@ def _is_busy_error(exc: BaseException) -> bool:
     return "locked" in message or "busy" in message
 
 
+def _is_row_error(exc: BaseException) -> bool:
+    """這一批裡某筆資料本身寫不進去（約束、型別、整數超出範圍），重試也一樣。"""
+    return isinstance(
+        exc,
+        (
+            sqlite3.IntegrityError,
+            sqlite3.InterfaceError,
+            sqlite3.ProgrammingError,
+            OverflowError,
+            TypeError,
+            ValueError,
+        ),
+    )
+
+
+class _DeadlinePassed(Exception):
+    """停機期限到了還拿不到寫鎖。"""
+
+
 @dataclass
 class _Pending:
     seq: int
@@ -229,11 +249,17 @@ class _Pending:
 @dataclass
 class _UsageWriter:
     cond: threading.Condition = field(default_factory=threading.Condition)
+    #: 退避等待用 Event 而不是 time.sleep：flush／停機要能把它叫醒。
+    wake: threading.Event = field(default_factory=threading.Event)
     queue: deque[_Pending] = field(default_factory=deque)
     enqueued: int = 0
     done: int = 0
+    #: 處理完但沒寫進去的事件序號；flush 只看自己等的那段範圍。
+    lost: deque[int] = field(default_factory=lambda: deque(maxlen=_QUEUE_CAP))
     flush_requested: bool = False
     stopping: bool = False
+    #: 停機期限：等寫鎖、最後一次重試與寫入執行緒結束都以它為準。
+    deadline: float | None = None
     overflowing: bool = False
     dropped: int = 0
     thread: threading.Thread | None = None
@@ -254,20 +280,22 @@ class _UsageWriter:
                     )
                 return False
             self.enqueued += 1
-            self.queue.append(_Pending(self.enqueued, path, event))
+            # 存一份快照：呼叫端拿到的 dict 之後被改，不能改到帳本。
+            self.queue.append(_Pending(self.enqueued, path, dict(event)))
             # 第一筆叫醒閒置中的寫入執行緒開始計時；滿一批則立刻寫。
             if len(self.queue) == 1 or len(self.queue) >= _BATCH_SIZE:
                 self.cond.notify_all()
             started = self._ensure_thread()
         if not started:
             # 直譯器關閉中不能再開執行緒；這時已沒有回覆在等，直接同步寫掉。
-            self._drain_inline()
+            self._drain_inline(time.monotonic() + _SHUTDOWN_FLUSH_TIMEOUT_S)
         return True
 
     def _ensure_thread(self) -> bool:
         if self.thread is not None and self.thread.is_alive():
             return True
         self.stopping = False
+        self.deadline = None
         thread = threading.Thread(
             target=self._run, name="usage-ledger-writer", daemon=True,
         )
@@ -278,42 +306,68 @@ class _UsageWriter:
         self.thread = thread
         return True
 
+    def _committed(self, baseline: int, target: int) -> bool:
+        """呼叫端等的那段（baseline, target] 都處理完、而且一筆都沒丟。"""
+        return self.done >= target and not any(
+            baseline < seq <= target for seq in self.lost
+        )
+
     def flush(self, timeout: float) -> bool:
-        """等到呼叫前排進來的事件都寫完（或放棄）為止；逾時回 False。"""
+        """等到呼叫前排進來的事件都寫完為止。
+
+        逾時，或其中有事件寫不進去（被丟掉）時回 False。
+        """
         deadline = time.monotonic() + max(0.0, timeout)
         with self.cond:
             target = self.enqueued
+            baseline = self.done
             if self.done >= target:
-                return True
+                return self._committed(baseline, target)
             if self._ensure_thread():
                 self.flush_requested = True
                 self.cond.notify_all()
+                # 寫入執行緒可能正在退避；叫醒它立刻重試。
+                self.wake.set()
                 while self.done < target:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         return False
                     self.cond.wait(remaining)
-                return True
-        self._drain_inline()
+                return self._committed(baseline, target)
+        self._drain_inline(deadline)
         with self.cond:
-            return self.done >= target
+            return self._committed(baseline, target)
 
-    def shutdown(self, timeout: float) -> None:
-        flushed = self.flush(timeout)
+    def shutdown(self, timeout: float) -> bool:
+        """寫完排隊中的事件並停下寫入執行緒，全部寫進去才回 True。
+
+        等寫鎖、最後一次重試與執行緒結束共用同一個期限。
+        """
+        deadline = time.monotonic() + max(0.0, timeout)
         with self.cond:
+            target = self.enqueued
+            baseline = self.done
             self.stopping = True
-            unwritten = self.enqueued - self.done
+            self.deadline = deadline
             self.cond.notify_all()
             thread = self.thread
-        if not flushed and unwritten:
+        self.wake.set()
+        if thread is None or not thread.is_alive():
+            self._drain_inline(deadline)
+        else:
+            # 最後一次嘗試的等鎖時間也以期限為上限，給它一點時間收尾。
+            thread.join(timeout=max(0.0, deadline - time.monotonic()) + 0.2)
+        with self.cond:
+            committed = self._committed(baseline, target)
+            unwritten = self.enqueued - self.done
+        if not committed:
             logger.error(
-                "usage ledger exiting with %d unwritten events (database stayed locked)",
+                "usage ledger exiting with unwritten events (%d still queued)",
                 unwritten,
             )
-        if thread is not None:
-            thread.join(timeout=1.0)
         if thread is None or not thread.is_alive():
             self.close_connection()
+        return committed
 
     def close_connection(self) -> None:
         with self.cond:
@@ -346,9 +400,10 @@ class _UsageWriter:
                 self.flush_requested = False
             return batch
 
-    def _mark_done(self, batch: list[_Pending]) -> None:
+    def _mark_done(self, batch: list[_Pending], lost: list[int]) -> None:
         with self.cond:
             self.done = max(self.done, batch[-1].seq)
+            self.lost.extend(lost)
             if self.overflowing and len(self.queue) < _QUEUE_CAP // 2:
                 logger.warning(
                     "usage ledger queue drained; %d events were dropped while full",
@@ -364,27 +419,33 @@ class _UsageWriter:
                 batch = self._take_batch()
                 if batch is None:
                     return
-                self._write_batch(batch)
-                self._mark_done(batch)
+                lost = self._write_batch(batch)
+                self._mark_done(batch, lost)
             except Exception:  # pragma: no cover - the writer must never die
                 logger.exception("usage ledger writer loop error")
-                time.sleep(_RETRY_BACKOFF_MAX_S)
+                self.wake.wait(_RETRY_BACKOFF_MAX_S)
+                self.wake.clear()
 
-    def _drain_inline(self) -> None:
+    def _drain_inline(self, deadline: float) -> None:
         while True:
             with self.cond:
                 if not self.queue:
                     return
                 batch = [self.queue.popleft() for _ in range(len(self.queue))]
-            self._write_batch(batch, inline=True)
-            self._mark_done(batch)
+            lost = self._write_batch(batch, deadline=deadline)
+            self._mark_done(batch, lost)
 
-    def _write_batch(self, batch: list[_Pending], *, inline: bool = False) -> None:
-        groups: dict[Path, list[dict[str, Any]]] = {}
+    def _write_batch(
+        self, batch: list[_Pending], *, deadline: float | None = None,
+    ) -> list[int]:
+        """Write the batch; return the sequence numbers that were dropped."""
+        groups: dict[Path, list[_Pending]] = {}
         for item in batch:
-            groups.setdefault(item.path, []).append(item.event)
-        for path, events in groups.items():
-            self._write_group(path, events, inline=inline)
+            groups.setdefault(item.path, []).append(item)
+        lost: list[int] = []
+        for path, items in groups.items():
+            lost.extend(self._write_group(path, items, deadline=deadline))
+        return lost
 
     def _connection(self, path: Path) -> sqlite3.Connection:
         with self.cond:
@@ -402,8 +463,48 @@ class _UsageWriter:
         return conn
 
     def _write_group(
-        self, path: Path, events: list[dict[str, Any]], *, inline: bool,
-    ) -> None:
+        self, path: Path, items: list[_Pending], *, deadline: float | None,
+    ) -> list[int]:
+        try:
+            error = self._insert(
+                path, [item.event for item in items],
+                attempts=_MAX_NON_BUSY_ATTEMPTS, deadline=deadline,
+            )
+        except _DeadlinePassed:
+            logger.error(
+                "usage ledger dropped %d events at shutdown: database stayed locked",
+                len(items),
+            )
+            return [item.seq for item in items]
+        if error is None:
+            return []
+        # 整批失敗不代表每筆都壞：逐筆再寫一次，有效的照樣進帳本，只丟寫不進去的。
+        lost: list[int] = []
+        for index, item in enumerate(items):
+            try:
+                if self._insert(path, [item.event], attempts=1, deadline=deadline):
+                    lost.append(item.seq)
+            except _DeadlinePassed:
+                lost.extend(pending.seq for pending in items[index:])
+                break
+        logger.warning(
+            "usage ledger write failed, dropped %d of %d events: %s",
+            len(lost), len(items), error,
+        )
+        return lost
+
+    def _insert(
+        self,
+        path: Path,
+        events: list[dict[str, Any]],
+        *,
+        attempts: int,
+        deadline: float | None,
+    ) -> Exception | None:
+        """Insert *events* in one transaction; return the error that made it give up.
+
+        鎖住只是暫時的，退避後重試、不算次數；停機時改等到期限為止。
+        """
         columns = list(events[0])
         sql = (
             f"INSERT INTO usage_events ({', '.join(columns)}) "
@@ -412,9 +513,17 @@ class _UsageWriter:
         backoff = _RETRY_BACKOFF_INITIAL_S
         failures = 0
         while True:
-            conn: sqlite3.Connection | None = None
+            limit = deadline if deadline is not None else self.deadline
+            busy_ms = _WRITER_BUSY_TIMEOUT_MS
+            if limit is not None:
+                remaining = limit - time.monotonic()
+                if remaining <= 0:
+                    raise _DeadlinePassed
+                # 停機時交給 SQLite 自己等鎖：鎖一放開就拿到，不必等下一輪退避。
+                busy_ms = max(1, int(remaining * 1000))
             try:
                 conn = self._connection(path)
+                conn.execute(f"PRAGMA busy_timeout={busy_ms}")
                 conn.execute("BEGIN IMMEDIATE")
                 try:
                     conn.executemany(sql, events)
@@ -424,31 +533,24 @@ class _UsageWriter:
                         conn.execute("ROLLBACK")
                     raise
                 self._maybe_checkpoint(conn)
-                return
+                return None
             except Exception as exc:
                 if _is_busy_error(exc):
-                    # 鎖住只是暫時的：保留這批、退避重試，不丟紀錄。關閉中且
-                    # 已過關閉期限的情況交給 shutdown() 記錄未寫筆數。
-                    if inline or self.stopping:
-                        if failures >= _MAX_NON_BUSY_ATTEMPTS:
-                            logger.error(
-                                "usage ledger dropped %d events at shutdown: %s",
-                                len(events), exc,
-                            )
-                            return
-                        failures += 1
                     logger.debug("usage ledger busy, retrying %d events", len(events))
                 else:
                     failures += 1
+                    if _is_row_error(exc):
+                        return exc
                     self.close_connection()
-                    if failures >= _MAX_NON_BUSY_ATTEMPTS:
-                        logger.warning(
-                            "usage ledger write failed, dropped %d events: %s",
-                            len(events), exc,
-                        )
-                        return
-                time.sleep(backoff)
-                backoff = min(backoff * 2, _RETRY_BACKOFF_MAX_S)
+                    if failures >= attempts:
+                        return exc
+            wait = backoff
+            limit = deadline if deadline is not None else self.deadline
+            if limit is not None:
+                wait = min(wait, max(0.0, limit - time.monotonic()))
+            self.wake.wait(wait)
+            self.wake.clear()
+            backoff = min(backoff * 2, _RETRY_BACKOFF_MAX_S)
 
     def _maybe_checkpoint(self, conn: sqlite3.Connection) -> None:
         now = time.monotonic()
@@ -484,14 +586,18 @@ if hasattr(os, "register_at_fork"):
 def flush_usage_events(timeout: float = _SHUTDOWN_FLUSH_TIMEOUT_S) -> bool:
     """Block until this process's queued usage events are committed.
 
-    Returns False when *timeout* elapses first (e.g. the database stayed locked).
+    Returns False when *timeout* elapses first (e.g. the database stayed locked)
+    or when any of those events could not be stored and was dropped.
     """
     return _WRITER.flush(timeout)
 
 
-def shutdown_usage_writer(timeout: float = _SHUTDOWN_FLUSH_TIMEOUT_S) -> None:
-    """Flush pending events and stop the writer thread (process exit)."""
-    _WRITER.shutdown(timeout)
+def shutdown_usage_writer(timeout: float = _SHUTDOWN_FLUSH_TIMEOUT_S) -> bool:
+    """Write pending events and stop the writer thread within one deadline.
+
+    Returns True only when every event queued before the call was committed.
+    """
+    return _WRITER.shutdown(timeout)
 
 
 atexit.register(shutdown_usage_writer)
@@ -499,6 +605,27 @@ atexit.register(shutdown_usage_writer)
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+_SQLITE_INT_MIN = -(2**63)
+_SQLITE_INT_MAX = 2**63 - 1
+
+
+def storable_int(value: Any) -> bool:
+    """SQLite INTEGER 存得下（64 位元有號整數）。"""
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and _SQLITE_INT_MIN <= value <= _SQLITE_INT_MAX
+    )
+
+
+def storable_float(value: Any) -> bool:
+    """有限的數字。NaN 綁進 SQLite 會變成 NULL，撞上 NOT NULL 讓整批交易失敗。"""
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
 
 
 def record_usage_event(
@@ -520,6 +647,18 @@ def record_usage_event(
     """
     scope = scope if scope is not None else current_usage_scope()
     counts = (usage or LLMUsage()).as_dict()
+    if not (
+        all(storable_int(value) for value in counts.values())
+        and storable_float(units)
+        and storable_float(latency_ms)
+    ):
+        # 入列前就擋掉：寫入時才失敗會連同同一批的其他事件一起回滾。
+        logger.warning(
+            "usage ledger rejected an event with unstorable numbers provider=%s model=%s",
+            provider,
+            model,
+        )
+        return None
     event: dict[str, Any] = {
         "created_at": _now_iso(),
         "kind": kind or (scope.kind if scope else "background"),
@@ -783,7 +922,10 @@ def list_usage_events(*, limit: int = 100, **filters: Any) -> list[dict[str, Any
     params["limit"] = max(1, min(int(limit), 1000))
     with _read_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM usage_events{where} ORDER BY id DESC LIMIT :limit", params,
+            # 多個 worker 各自批次寫入，id 是提交順序而不是發生順序。
+            f"SELECT * FROM usage_events{where}"
+            " ORDER BY created_at DESC, id DESC LIMIT :limit",
+            params,
         ).fetchall()
     events: list[dict[str, Any]] = []
     for row in rows:

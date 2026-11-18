@@ -318,16 +318,18 @@ def _resource_config(**overrides) -> TTSRouterConfig:
     )
 
 
-@pytest.mark.parametrize("url,shared,route,registered", [
-    ("", SHARED, "direct", True),
-    ("", SHARED, "relay", True),
-    (RELAY, NO_SHARED, "direct", True),
-    (RELAY, NO_SHARED, "relay", True),
-    ("", NO_SHARED, "direct", False),
+@pytest.mark.parametrize("url,shared,route,registered,listed", [
+    ("", SHARED, "direct", True, True),
+    ("", SHARED, "relay", True, False),
+    (RELAY, NO_SHARED, "direct", True, False),
+    (RELAY, NO_SHARED, "relay", True, True),
+    ("", NO_SHARED, "direct", False, False),
 ])
-def test_google_voices_are_registered_whenever_either_route_can_run(
-    monkeypatch, url, shared, route, registered,
+def test_voices_register_on_either_route_but_the_catalog_follows_the_adapter(
+    monkeypatch, url, shared, route, registered, listed,
 ):
+    """登錄聲音看任一路線（專案自己的金鑰永遠直連，要選得到聲音）；
+    聲音目錄則跟 adapter 用同一條規則：目前的路線跑不動就不列 Gemini。"""
     _keys(monkeypatch, shared=shared)
     _save_route(route)
     runtime = get_auth_runtime()
@@ -339,12 +341,12 @@ def test_google_voices_are_registered_whenever_either_route_can_run(
     expected = set(gemini_tts_adapter.GEMINI_PREBUILT_VOICES) if registered else set()
     assert _registered(runtime) == expected
     gemini = [p for p in catalog if p["id"] == "gemini-tts"]
-    if registered:
+    assert bool(gemini) is listed
+    assert gemini_tts_adapter.GeminiTTSAdapter(cfg).enabled is listed
+    if listed:
         assert len(gemini_tts_adapter.GEMINI_PREBUILT_VOICES) == 30
-        assert set(gemini[0]["voices"]) == expected
+        assert set(gemini[0]["voices"]) == set(gemini_tts_adapter.GEMINI_PREBUILT_VOICES)
         assert gemini[0]["default_voice"] == "Kore"
-    else:
-        assert gemini == []
 
 
 @pytest.mark.parametrize("route", ["direct", "relay"])
@@ -356,3 +358,118 @@ def test_relay_is_probed_whenever_its_url_is_set(monkeypatch, route):
 
     assert with_relay.count("gemini-tts") == 1
     assert "gemini-tts" not in without
+
+
+# --- route cache -----------------------------------------------------------
+
+
+def test_a_failed_settings_read_keeps_the_last_saved_route(monkeypatch):
+    """讀設定失敗不等於沒設定：沿用上次讀到的路線，不能改走部署預設、改用部署金鑰。"""
+    now = [1000.0]
+    monkeypatch.setattr(gemini_tts_route, "monotonic", lambda: now[0])
+    answers = iter(["relay", OSError("database is locked"), "relay"])
+
+    def read(_runtime):
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(gemini_tts_route, "_read", read)
+    seen = []
+    for _ in range(3):
+        seen.append(gemini_tts_route.gemini_route(_config()))
+        now[0] += gemini_tts_route.ROUTE_CACHE_SECONDS + 1
+
+    assert seen == ["relay", "relay", "relay"]
+
+
+def test_a_read_that_started_before_a_save_cannot_cache_the_old_route(monkeypatch):
+    import threading
+
+    reading = threading.Event()
+    release = threading.Event()
+    stored = ["relay"]
+
+    def read(_runtime):
+        value = stored[0]
+        if not reading.is_set():
+            reading.set()
+            release.wait(5)
+        return value
+
+    monkeypatch.setattr(gemini_tts_route, "_read", read)
+    first: list[str | None] = []
+    reader = threading.Thread(target=lambda: first.append(gemini_tts_route.saved_gemini_route()))
+    reader.start()
+    assert reading.wait(5)
+    # 存檔：資料庫換成 direct，再清這個 worker 的快取。
+    stored[0] = "direct"
+    gemini_tts_route.clear_gemini_route_cache()
+    release.set()
+    reader.join(5)
+
+    assert first == ["relay"]
+    assert gemini_tts_route.saved_gemini_route() == "direct"
+
+
+def test_speech_cache_key_changes_with_the_gemini_route(monkeypatch):
+    """切換路線後，/v1/audio/speech 不能回切換前那條路線合成（或備援）的快取音檔。"""
+    from types import SimpleNamespace
+
+    from app.auth.models import AccountRole
+    from app.providers.base import NormalizedTTSResult
+    from app.routes import tts
+
+    store: dict[str, object] = {}
+    synthesized: list[str] = []
+
+    async def cache_get(key):
+        return store.get(key)
+
+    async def cache_put(key, entry, _ttl):
+        store[key] = entry
+
+    async def plan(*_args, **_kwargs):
+        return SimpleNamespace(provider="gemini-tts", voice="Kore", partners=())
+
+    async def spoken(text, *_args, **_kwargs):
+        return text
+
+    class Service:
+        def synthesize(self, request, **_kwargs):
+            route = gemini_tts_route.gemini_route(_config())
+            synthesized.append(route)
+            return SimpleNamespace(
+                result=NormalizedTTSResult(
+                    audio_bytes=route.encode(), content_type="audio/wav",
+                    sample_rate=24000, provider="gemini-tts",
+                    route_kind="provider", route_target="gemini-tts", latency_ms=1.0,
+                ),
+                fallback=False, fallback_reason="",
+            )
+
+    _keys(monkeypatch)
+    monkeypatch.setattr(tts, "get_tts_config", lambda: _config(tts_cache_enabled=True))
+    monkeypatch.setattr(tts, "cache_get", cache_get)
+    monkeypatch.setattr(tts, "cache_put", cache_put)
+    monkeypatch.setattr(tts, "plan_tts_voice", plan)
+    monkeypatch.setattr(tts, "spoken_text", spoken)
+    monkeypatch.setattr(tts, "_get_service", lambda: Service())
+    monkeypatch.setattr(tts.voice_policy, "request_policy", lambda *_a: (None, None))
+    monkeypatch.setattr(tts.voice_access, "tts_fallback_voice", lambda *_a, **_k: None)
+    current = SimpleNamespace(
+        embed_key=None, api_key=None,
+        user=SimpleNamespace(id="u1", role=AccountRole.ROOT, username="ai360"),
+    )
+
+    async def speak() -> bytes:
+        response = await tts.create_speech(tts.SpeechRequest(input="你好"), current)
+        await asyncio.sleep(0)  # cache_put 是背景 task
+        return response.body
+
+    _save_route("direct")
+    assert asyncio.run(speak()) == b"direct"
+    _save_route("relay")
+    assert asyncio.run(speak()) == b"relay"
+    assert synthesized == ["direct", "relay"]

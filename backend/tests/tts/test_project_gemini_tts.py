@@ -258,3 +258,63 @@ async def test_trailing_sse_error_after_audio_is_not_silently_accepted(monkeypat
         _ = [chunk async for chunk in stream]
     assert clients[0].is_closed
     assert upstream.closed
+
+
+def google_error(status, google_status, reason=""):
+    error = {"code": status, "message": f"echo {KEY}", "status": google_status}
+    if reason:
+        error["details"] = [{"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": reason}]
+    return json.dumps({"error": error})
+
+
+_GOOGLE_FAILURES = [
+    (400, "INVALID_ARGUMENT", "", "bad_request"),
+    (400, "INVALID_ARGUMENT", "API_KEY_INVALID", "auth_error"),
+    (401, "UNAUTHENTICATED", "", "auth_error"),
+    (403, "PERMISSION_DENIED", "", "auth_error"),
+    (429, "RESOURCE_EXHAUSTED", "", "rate_limited"),
+    (503, "UNAVAILABLE", "", "provider_unavailable"),
+]
+
+
+@pytest.mark.parametrize("status,google_status,reason,expected", _GOOGLE_FAILURES)
+def test_direct_sync_failures_keep_a_sanitized_status_for_classification(
+    status, google_status, reason, expected,
+):
+    from app.providers.error_mapping import classify_gemini_error
+
+    def reject(_upstream):
+        return httpx.Response(status, content=google_error(status, google_status, reason))
+
+    with httpx.Client(transport=httpx.MockTransport(reject)) as client:
+        with pytest.raises(RuntimeError) as error:
+            project_gemini_tts.synthesize(request(), credential(), "tts-model", client)
+    assert classify_gemini_error(error.value) == expected
+    assert error.value.status_code == status
+    assert KEY not in str(error.value) and KEY not in repr(error.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status,google_status,reason,expected", _GOOGLE_FAILURES)
+async def test_direct_stream_failures_keep_a_sanitized_status_for_classification(
+    monkeypatch, status, google_status, reason, expected,
+):
+    from app.providers.error_mapping import classify_gemini_error
+
+    _, clients, _ = mock_stream(monkeypatch, google_error(status, google_status, reason), status)
+    with pytest.raises(RuntimeError) as error:
+        await project_gemini_tts.open_stream(request(), credential(), "tts-model")
+    assert classify_gemini_error(error.value) == expected
+    assert KEY not in str(error.value) and KEY not in repr(error.value)
+    assert clients[0].is_closed
+
+
+@pytest.mark.parametrize("status,expected", [
+    (400, 502), (401, 502), (403, 502), (429, 429), (500, 503), (503, 503),
+])
+def test_direct_stream_setup_failures_map_to_our_own_http_status(status, expected):
+    """Google 的 401/403 是我們的金鑰問題，不能原樣回給前端當成使用者沒登入。"""
+    from app.routes import tts
+
+    exc = project_gemini_tts.GoogleTTSError(status, "")
+    assert tts._direct_failure_status(exc) == expected

@@ -305,7 +305,7 @@ def test_timeseries_rejects_unsupported_report_timezone(ledger, report_timezone)
 
 
 def test_ledger_write_failure_does_not_raise(ledger, monkeypatch):
-    """寫入失敗由背景執行緒吸收：呼叫端拿得到事件，之後的事件照常寫進去。"""
+    """寫入失敗由背景執行緒吸收：呼叫端拿得到事件，flush 回報沒寫進去，之後的事件照常寫。"""
     real_connect = ledger._connect
 
     def broken(*args, **kwargs):
@@ -315,7 +315,7 @@ def test_ledger_write_failure_does_not_raise(ledger, monkeypatch):
     monkeypatch.setattr(ledger, "_connect", broken)
     event = ledger.record_usage_event(provider="g", model="lost", usage=LLMUsage(1, 1, 2))
     assert event is not None and event["model"] == "lost"
-    assert ledger.flush_usage_events(timeout=5)
+    assert ledger.flush_usage_events(timeout=5) is False
 
     monkeypatch.setattr(ledger, "_connect", real_connect)
     ledger.record_usage_event(provider="g", model="kept", usage=LLMUsage(1, 1, 2))

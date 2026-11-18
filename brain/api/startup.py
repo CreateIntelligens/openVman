@@ -16,7 +16,7 @@ from config import get_settings
 from infra.db import ensure_tables, get_db
 from infra.project_admin import list_projects
 from infra.shared_budgets import shared_request_budget
-from infra.usage_ledger import flush_usage_events
+from infra.usage_ledger import shutdown_usage_writer
 from knowledge.product_catalog import load_product_catalogs
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import get_embedder
@@ -29,6 +29,9 @@ logger = logging.getLogger("brain")
 # 等 Backend 重啟最多約 10 秒；之後各專案的預熱只試一次，Backend 真的掛了不拖慢啟動。
 _AUDIO_WARMUP_ATTEMPTS = 6
 _AUDIO_WARMUP_RETRY_SECONDS = 2.0
+# 選用預熱（LLM 套件、模型設定、型錄）合計最多等這麼久。Backend 或型錄卡住時
+# 第一題自己會再取，不值得讓 readiness 一直停在 pending。
+_OPTIONAL_WARMUP_BUDGET_S = 30.0
 
 
 def _warmup_project_ids() -> list[str]:
@@ -158,16 +161,41 @@ def _warmup_model_settings(project_ids: list[str]) -> None:
             logger.warning("模型設定預熱失敗 %s: %s", name, type(exc).__name__)
 
 
+async def _optional_warmup(deadline: float, name: str, step, *args) -> None:
+    """跑一個選用預熱步驟，所有選用步驟共用同一個期限；失敗或逾時都只記 log。
+
+    逾時後執行緒仍在背景跑完（執行緒無法中途取消），只是不再擋 readiness。
+    """
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        logger.warning("預熱略過 %s：選用預熱時間已用完", name)
+        return
+    try:
+        await asyncio.wait_for(asyncio.to_thread(step, *args), remaining)
+    except asyncio.TimeoutError:
+        logger.warning("預熱逾時 %s（不影響啟動）", name)
+    except Exception as exc:  # noqa: BLE001 - 選用預熱失敗不擋啟動
+        logger.warning("預熱失敗 %s（不影響啟動）: %s", name, type(exc).__name__)
+
+
 async def warmup_resources(role: str | None = None) -> None:
     """背景預熱 remote embedding 與資料路徑。"""
     role = role or get_settings().brain_role
     logger.info("背景預熱開始...")
-    # 最先做：部署後第一句台語可能在其他預熱跑完前就到。
-    await asyncio.to_thread(_warmup_audio_language, "default", _AUDIO_WARMUP_ATTEMPTS)
     try:
-        await asyncio.to_thread(_warmup_llm_modules)
+        try:
+            # 最先做：部署後第一句台語可能在其他預熱跑完前就到。
+            await asyncio.to_thread(
+                _warmup_audio_language, "default", _AUDIO_WARMUP_ATTEMPTS,
+            )
+        except Exception as exc:  # noqa: BLE001 - 預熱失敗只是第一句慢，不擋啟動
+            logger.warning("台語判斷預熱失敗（不影響啟動）: %s", type(exc).__name__)
+        optional_deadline = time.monotonic() + _OPTIONAL_WARMUP_BUDGET_S
+        await _optional_warmup(optional_deadline, "llm_modules", _warmup_llm_modules)
         project_ids = _warmup_project_ids()
-        await asyncio.to_thread(_warmup_model_settings, project_ids)
+        await _optional_warmup(
+            optional_deadline, "model_settings", _warmup_model_settings, project_ids,
+        )
         await asyncio.to_thread(get_embedder)
         for project_id in project_ids:
             if project_id != "default":
@@ -177,7 +205,10 @@ async def warmup_resources(role: str | None = None) -> None:
                 await asyncio.to_thread(ensure_tables, project_id)
             # _warmup_retrieval_path 內部已逐表吞掉預熱失敗、不會 raise。
             await asyncio.to_thread(_warmup_retrieval_path, project_id)
-            await asyncio.to_thread(_warmup_product_catalogs, project_id)
+            await _optional_warmup(
+                optional_deadline, f"product_catalogs:{project_id}",
+                _warmup_product_catalogs, project_id,
+            )
         if role == "admin":
             await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
     except Exception as exc:
@@ -251,6 +282,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ))
         # 用量是背景批次寫入；正常停機／重新部署前把排隊中的寫完。uvicorn 收到
         # SIGTERM 時會在 serve() 結束後用預設處理再送一次訊號，process 直接結束、
-        # 不會跑 atexit，所以這裡是停機時唯一可靠的寫入點。
-        if not await asyncio.to_thread(flush_usage_events):
+        # 不會跑 atexit，所以這裡是停機時唯一可靠的寫入點。用 shutdown 而不是
+        # flush：它會叫醒退避中的寫入執行緒，等鎖、重試與結束共用同一個期限。
+        if not await asyncio.to_thread(shutdown_usage_writer):
             logger.error("usage ledger: pending events not written before shutdown")

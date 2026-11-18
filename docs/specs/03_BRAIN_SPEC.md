@@ -443,7 +443,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 ### 12. 多角色切換 (Multi-Persona)
 
-請求以 `persona_id`（預設 `default`，英數字、點、底線、連字號，1–64 字元）切換虛擬人角色：
+請求以 `persona_id`（預設 `default`，英數字、點、底線、連字號，1–64 字元，不可是 `.` 或 `..`，一定是 `personas/` 底下的一層）切換虛擬人角色。建立與複製時的新 ID 另外必須以英文字母或數字開頭；舊版建立的 `_sales`、`-night`、`.draft` 這類名稱照常列出、使用與刪除，資料夾名稱不合規則的直接略過、不讓清單失敗：
 
 * 每個 persona 的覆寫檔放在 `workspace/personas/<persona_id>/`；`SOUL.md`、`AGENTS.md`、`TOOLS.md`、`MEMORY.md`、`IDENTITY.md` 有同名檔時優先於 workspace 根目錄，沒有就用根目錄的版本。`.learnings/` 為專案共用。
 * 每日日誌依 persona 分目錄（`memory/<persona_id>/`）；長期記憶檢索依記錄 `metadata.persona_id` 過濾（空值或 `global` 為共用）。
@@ -535,7 +535,8 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 * 對外查詢由 Backend `/api/v1/usage/*` 套用帳號範圍：正式管理員可指定 `user_id`，其餘帳號一律由 Backend 覆寫成自己的帳號 ID。
 * 時間戳以 UTC 儲存，`since` 包含起點、`until` 不包含終點。Admin 將台北日期轉成 UTC 邊界；timeseries 以 `report_timezone=UTC|Asia/Taipei`（預設 UTC）決定 `hour`／`day`／`month` 的分桶日期，回傳同名欄位，非法值回傳 400。台北報表的篩選、趨勢分桶與事件顯示必須使用相同時區，詳見 Backend 規格第 17 節。
 * 串流呼叫預設送出 `stream_options.include_usage=true`；若相容 provider 不支援，可用 `LLM_STREAM_INCLUDE_USAGE=false` 關閉。provider 沒有回傳 usage 時仍保留零值事件與 `usage_missing` 標記，且 ledger 寫入失敗不得中斷使用者請求。
-* 寫入不得阻塞回覆路徑：`record_usage_event` 只排入本 process 的佇列並立即返回，由每個 process 一條背景執行緒、一條常駐 SQLite 連線批次寫入（每 0.5 秒或滿 100 筆一個交易）。寫鎖被其他 worker 占用時保留整批退避重試；佇列上限 10,000 筆，超過才丟棄新事件（`POST /brain/usage/events` 回 500）。lifespan 結束時先寫完佇列，最多等 5 秒，寫不完記 error（uvicorn 收到 SIGTERM 會直接結束 process、不跑 `atexit`，`atexit` 只是其他結束方式的補強）；同一 process 的查詢先寫完再讀，讀取用各自的短連線。寫入連線定期做 PASSIVE checkpoint 並設 `journal_size_limit`，避免 `usage.db-wal` 持續成長。
+* 寫入不得阻塞回覆路徑：`record_usage_event` 只排入本 process 的佇列並立即返回，由每個 process 一條背景執行緒、一條常駐 SQLite 連線批次寫入（每 0.5 秒或滿 100 筆一個交易）。寫鎖被其他 worker 占用時保留整批退避重試；佇列上限 10,000 筆，超過才丟棄新事件（`POST /brain/usage/events` 回 500）。token 數超出 SQLite 64 位元整數、`units` 或 `latency_ms` 不是有限數字（NaN、Infinity）的事件在入列前就拒絕（`record_usage_event` 回 None、`POST /brain/usage/events` 回 400）；整批寫入因鎖以外的原因失敗時改逐筆重寫，只丟寫不進去的那幾筆，`flush_usage_events()` 只在呼叫前排隊的事件全部寫進去時才回 True。佇列保存事件的副本，呼叫端改動拿回的 dict 不影響帳本。lifespan 結束時呼叫 `shutdown_usage_writer()`：叫醒退避中的寫入執行緒，等寫鎖、最後一次重試與執行緒結束共用同一個 5 秒期限，寫不完記 error（uvicorn 收到 SIGTERM 會直接結束 process、不跑 `atexit`，`atexit` 只是其他結束方式的補強）；同一 process 的查詢先寫完再讀，讀取用各自的短連線。寫入連線定期做 PASSIVE checkpoint 並設 `journal_size_limit`，避免 `usage.db-wal` 持續成長。多 process 只支援各自啟動（spawn）的 worker：帳本初始化進行中 `fork` 出來的子 process 可能永遠等在繼承來的路徑鎖上。
+* `GET /brain/usage/events` 依 `created_at` 由新到舊排序（同時間再依 `id`）；各 worker 批次提交，`id` 是寫入順序而不是發生順序。
 
 ### 16. 安全防護 (Guardrails)
 
@@ -707,7 +708,7 @@ Content-Type: application/json
 ### 19. 程式入口與 Live 模組邊界 (Entry Points & Module Boundaries)
 
 * `brain/api/main.py` 只組裝 FastAPI app、路由與 middleware；啟動、預熱與排程器生命週期在 `startup.py`，HTTP tracing／metrics／logging 在 `safety/server_http.py`。HTTP 路由依資源拆在 `routes/`（`chat`、`knowledge`、`knowledge_qa`、`sessions`、`memory`、`personas`、`projects`、`tools`、`search`、`usage`、`backups`、`workspace`、`protocol`、`health`），內部端點與 Live WebSocket 在 `internal_routes.py`。
-* **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 背景預熱（先預熱台語判斷的 Gemini client，Backend 暫時連不上時每 2 秒重試、最多約 10 秒，再對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索；預熱失敗只記 warning，不擋 readiness）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
+* **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 背景預熱（先預熱台語判斷的 Gemini client，Backend 暫時連不上時每 2 秒重試、最多約 10 秒，再對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索；預熱失敗只記 warning，不擋 readiness；載入 LLM 套件、取模型設定與解析型錄這幾個選用步驟合計最多等 30 秒，超過就略過，readiness 不再被它們無限期延後）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
 * **Gemini Live**：`live/gemini_live.py` 的 `GeminiLiveSession` 負責連線、收訊、重連與保活，並把事件分派給三個各自持有狀態的元件：`gemini_turns.py` 的 `GeminiLiveTurns` 持有回合版本、決策與預取結果，負責每輪決策、預取（查什麼由 `core/turn_reads.py` 決定）與工具呼叫；`gemini_audio.py` 的 `GeminiLiveAudio` 持有語句暫存、台語判定與音訊秒數，負責輸出音訊與用量；`gemini_transcripts.py` 的 `GeminiLiveTranscripts` 持有串流中的回覆，負責轉錄與回覆的持久化。三者共用的身分、設定與事件送出由 `gemini_context.py` 的 `LiveSessionContext` 在建構時傳入；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 的系統指令由 IDENTITY、SOUL、近期對話、記憶、工具使用規則與預設語言（第 14.3 節）組成；宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選），`save_memory` 同樣只在使用者明確要求時執行。上下行音訊以秒數記入用量帳本。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
 * 根目錄 `tests/test_entry_boundaries.py` 禁止 inline 業務處理回到入口檔，並檢查自有正式程式碼每檔不超過 1000 實體行。
 
