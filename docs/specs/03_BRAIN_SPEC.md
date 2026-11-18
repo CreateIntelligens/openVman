@@ -237,7 +237,7 @@ results = search_records(
 大腦不把 `message` 直接丟給 LLM，而是先經過 message pipeline（`protocol/message_envelope.py`、`core/pipeline.py`、`safety/guardrails.py`）：
 
 1. **Normalize**：`build_message_envelope()` 把請求正規化成 `MessageEnvelope`（`content` + `RequestContext`），再轉成 `BrainMessage`。`message_type`（即 role）限 `system / user / assistant / tool / control` 五類。
-2. **Enrich**：補上 `trace_id`（request state、body 或自動產生）、`session_id`、`channel`（body 或 `X-Brain-Channel`，預設 `web`）、`locale`（body 或 `Accept-Language`，預設 `zh-TW`）、`persona_id`、`project_id`（body 或 `X-Brain-Project`）、`client_ip` 與 `metadata`。
+2. **Enrich**：補上 `trace_id`（request state、body 或自動產生）、`session_id`、`channel`（body 或 `X-Brain-Channel`，預設 `web`；經 Backend 的請求不會帶這個標頭）、`locale`（body 或 `Accept-Language`，預設 `zh-TW`）、`persona_id`、`project_id`（優先用 Backend 的可信標頭 `X-OpenVMan-Project-ID`，沒有時才用 body 或 `message.project_id`；`X-Brain-Project` 不再採用）、`client_ip` 與 `metadata`。
 3. **Guard**：檢查訊息不可為空、長度不超過 `MAX_INPUT_LENGTH`、channel 與識別字格式、限流、prompt injection 與 session 限制（第 16 節）；不通過時回 400。
 4. **Route**：`route_message()` 依 role 決定路徑（第 9.1 節）。
 5. **Assemble**：最後一步才組裝 LLM prompt（第 7 節）。
@@ -413,7 +413,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 * **檔案**：`skill.yaml` 定義 `id`、`name`、`description`、`version` 與 `tools[]`（各含 `name`、`description`、`parameters` JSON Schema）；`main.py` 實作與 `tools[]` 同名的 Python 函式。
 * **命名空間**：共用技能的工具註冊為 `<skill_id>:<tool>`（例如 `weather:get_weather`），專案技能為 `proj:<project_id>:<skill_id>:<tool>`，同 id 可並存。
 * **動態註冊**：`tools/skill_manager.py` 與 `tools/tool_registry.py` 在執行期同步，透過 Admin API 新增、修改、啟用／停用、刪除或重新載入的技能，下一次請求即生效，無需重啟 Brain。管理端點：`GET /brain/tools`、`POST /brain/skills`、`PATCH /brain/skills/{id}/toggle`、`GET/PUT /brain/skills/{id}/files`、`DELETE /brain/skills/{id}`、`POST /brain/skills/reload`。
-* **安全**：技能檔案 API 不能上傳或替換 `main.py`；正式環境的技能原始碼應唯讀並經 code review。
+* **安全**：技能 ID 只收 `^[A-Za-z_][A-Za-z0-9_]{0,63}$`（建立與所有 `/brain/skills/{id}` 路由），技能目錄必須落在目標資料夾內；建立時 `skill.yaml` 以 `yaml.safe_dump` 產生，`main.py` 範本只放技能 ID，名稱與說明不進程式碼。技能路由（含 `GET /brain/tools`、`POST /brain/skills/reload`）的 `project_id` 以 `normalize_project_id` 正規化，拒絕 `.`、`..`。`PUT …/files` 先在記憶體驗證 `skill.yaml`（YAML 合法、是 mapping、`tools` 格式正確、`id` 不能改），不合格回 400 且不動磁碟。技能檔案 API 不能上傳或替換 `main.py`；正式環境的技能原始碼應唯讀並經 code review。經 Backend 對外時，共用技能在後台唯讀：改檔案、刪除、建立一律拒絕（內容改 repo 再部署），啟用／停用只限 ROOT，沒寫 `scope` 也當共用技能處理；專案技能需要該專案的編輯權（見 `01_BACKEND_SPEC.md`）。
 * **內建技能**：`graphify`（`graphify:run`，執行 graphify CLI 的 query／path／explain／add 等子命令）、`weather`、`joke`、`a2a`（經 Backend internal facade 呼叫，Backend 的 `A2A_ENABLED` 預設關閉）。
 
 ### 11. 記憶治理 (Memory Governance)

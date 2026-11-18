@@ -36,6 +36,7 @@ from .skill import (
     SkillRef,
     SkillScope,
     SkillToolDefinition,
+    is_valid_skill_id,
 )
 
 if TYPE_CHECKING:
@@ -44,33 +45,52 @@ if TYPE_CHECKING:
 SKILL_FILE_NAMES = ("skill.yaml", "main.py")
 ALLOWED_SKILL_FILES = frozenset(SKILL_FILE_NAMES)
 
-_SKILL_YAML_TEMPLATE = """\
-id: {skill_id}
-name: {name}
-description: {description}
-version: "0.1.0"
-tools:
-  - name: {skill_id}_action
-    description: "{name} action"
-    parameters:
-      type: object
-      properties:
-        query:
-          type: string
-          description: "Input query"
-      required:
-        - query
-"""
-
+# 新技能的 main.py 只放驗證過的技能 ID；名稱與說明是使用者輸入，只進 skill.yaml，
+# 而且一律經 yaml.safe_dump，不能拼進會被執行的程式碼。
 _MAIN_PY_TEMPLATE = '''\
-"""Skill: {name}"""
+"""Skill created from the admin. Replace this placeholder with the real logic."""
 
 
 def {skill_id}_action(args: dict) -> dict:
-    """TODO: implement {name} logic."""
     query = args.get("query", "")
     return {{"result": f"echo: {{query}}"}}
 '''
+
+
+def _skill_yaml(skill_id: str, name: str, description: str) -> str:
+    return yaml.safe_dump(
+        {
+            "id": skill_id,
+            "name": name,
+            "description": description,
+            "version": "0.1.0",
+            "tools": [
+                {
+                    "name": f"{skill_id}_action",
+                    "description": f"{name} action",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Input query"},
+                        },
+                        "required": ["query"],
+                    },
+                },
+            ],
+        },
+        allow_unicode=True,
+        sort_keys=False,
+    )
+
+
+def _child_dir(parent: Path, skill_id: str) -> Path:
+    """Return ``parent/skill_id``, refusing IDs that would leave ``parent``."""
+    if not is_valid_skill_id(skill_id):
+        raise ValueError(f"Invalid skill id: {skill_id!r}")
+    child = (parent / skill_id).resolve()
+    if child.parent != parent.resolve():
+        raise ValueError(f"Invalid skill id: {skill_id!r}")
+    return child
 
 
 def _synchronized(method):
@@ -129,7 +149,7 @@ class SkillManager:
         target_dir = self._target_dir(scope, project_id)
         if target_dir is None:
             return None
-        return target_dir / skill_id
+        return _child_dir(target_dir, skill_id)
 
     # ------------------------------------------------------------------
     # Discovery & Loading
@@ -230,18 +250,30 @@ class SkillManager:
 
     def _read_manifest(self, manifest_path: Path) -> SkillManifest:
         with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest_data = yaml.safe_load(f)
+            return self._parse_manifest(f.read(), str(manifest_path))
+
+    def _parse_manifest(self, text: str, source: str) -> SkillManifest:
+        try:
+            manifest_data = yaml.safe_load(text)
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Invalid skill manifest YAML: {source}: {exc}") from exc
+        if not isinstance(manifest_data, dict):
+            raise ValueError(f"Skill manifest must be a mapping: {source}")
 
         skill_id = manifest_data.get("id")
         if not skill_id:
-            raise ValueError(f"Skill manifest missing 'id': {manifest_path}")
+            raise ValueError(f"Skill manifest missing 'id': {source}")
 
+        try:
+            tools = self._build_tool_definitions(manifest_data.get("tools", []))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid tools in skill manifest: {source}: {exc}") from exc
         return SkillManifest(
             id=skill_id,
             name=manifest_data.get("name", skill_id),
             description=manifest_data.get("description", ""),
             version=manifest_data.get("version", "0.1.0"),
-            tools=self._build_tool_definitions(manifest_data.get("tools", [])),
+            tools=tools,
             config_schema=manifest_data.get("config_schema", {}),
         )
 
@@ -445,15 +477,12 @@ class SkillManager:
         if concrete_ref.resolve_key() in self.skills:
             raise ValueError(f"Skill already exists in this scope: {ref.skill_id}")
 
+        skill_dir = _child_dir(target_dir, ref.skill_id)
         target_dir.mkdir(parents=True, exist_ok=True)
-        skill_dir = target_dir / ref.skill_id
         skill_dir.mkdir(parents=True, exist_ok=True)
 
-        yaml_content = _SKILL_YAML_TEMPLATE.format(skill_id=ref.skill_id, name=name, description=description)
-        atomic_write_text(skill_dir / "skill.yaml", yaml_content)
-
-        py_content = _MAIN_PY_TEMPLATE.format(skill_id=ref.skill_id, name=name)
-        atomic_write_text(skill_dir / "main.py", py_content)
+        atomic_write_text(skill_dir / "skill.yaml", _skill_yaml(ref.skill_id, name, description))
+        atomic_write_text(skill_dir / "main.py", _MAIN_PY_TEMPLATE.format(skill_id=ref.skill_id))
 
         self._load_skill(skill_dir, scope=scope, project_id=ref.project_id)
         self._signature = self._disk_signature()
@@ -501,6 +530,7 @@ class SkillManager:
     ) -> Skill:
         skill = self._require_skill(ref)
         skill_dir = Path(skill.path)
+        # 先全部驗過再寫：寫到一半才發現錯，磁碟上會留下壞掉的技能，之後每次載入都失敗。
         for fname, content in files.items():
             if fname not in ALLOWED_SKILL_FILES:
                 raise ValueError(f"Cannot update file: {fname}")
@@ -509,6 +539,14 @@ class SkillManager:
                 # project user to replace Python source is equivalent to
                 # granting arbitrary code execution in that process.
                 raise ValueError("main.py is operator-managed and cannot be updated via the API")
+            if fname == "skill.yaml":
+                manifest = self._parse_manifest(content, "skill.yaml")
+                # 改 id 等於冒用（或覆蓋）另一個技能的工具名稱；技能 ID 由目錄決定。
+                if manifest.id != skill.manifest.id:
+                    raise ValueError(
+                        f"skill.yaml id must stay {skill.manifest.id!r}, got {manifest.id!r}",
+                    )
+        for fname, content in files.items():
             atomic_write_text(skill_dir / fname, content)
 
         return self._reload_single(

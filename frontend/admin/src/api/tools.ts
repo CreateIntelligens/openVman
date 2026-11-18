@@ -1,9 +1,9 @@
 import {
   apiUrl,
   fetchJson,
+  getActiveProjectId,
   post,
   projectUrl,
-  request,
   skillPath,
   type QueryParams,
   SKILLS_PATH,
@@ -33,11 +33,14 @@ export interface SkillScope {
   project_id?: string;
 }
 
+// 範圍一律明寫：Brain 沒收到 scope 時會先找專案技能、找不到才落到共用的。
+// 共用技能也要帶目前專案，後端靠它確認這個帳號看得到哪個專案。
 function scopeParams(scope?: SkillScope): QueryParams {
-  if (!scope?.scope) return {};
-  const params: QueryParams = { scope: scope.scope };
-  if (scope.project_id) params.project_id = scope.project_id;
-  return params;
+  const skillScope = scope?.scope ?? "shared";
+  const projectId = skillScope === "project" && scope?.project_id
+    ? scope.project_id
+    : getActiveProjectId();
+  return { scope: skillScope, project_id: projectId };
 }
 
 export function skillKey(skill: { id: string; scope?: SkillScope["scope"]; project_id?: string | null }): string {
@@ -65,22 +68,22 @@ export async function fetchTools(): Promise<ToolsData> {
 }
 
 export function toggleSkill(skillId: string, scope?: SkillScope) {
-  return request<SkillToggleResponse>(
-    "PATCH",
+  return fetchJson<SkillToggleResponse>(
     apiUrl(skillPath(skillId, "/toggle"), scopeParams(scope)),
+    { method: "PATCH" },
   );
 }
 
+// 共用技能要改 repo 再部署，後台只建立專案技能。
 export function createSkill(
   skillId: string,
   name: string,
   description = "",
-  scope: "shared" | "project" = "shared",
-  projectId?: string,
+  projectId: string = getActiveProjectId(),
 ) {
   return post<{ status: string; skill_id: string; name: string; scope: string }>(
     SKILLS_PATH,
-    { skill_id: skillId, name, description, scope, project_id: projectId },
+    { skill_id: skillId, name, description, scope: "project", project_id: projectId },
   );
 }
 
@@ -106,15 +109,19 @@ export function updateSkillFiles(
 }
 
 export function deleteSkill(skillId: string, scope?: SkillScope) {
-  return request<{ status: string; skill_id: string }>(
-    "DELETE",
+  return fetchJson<{ status: string; skill_id: string }>(
     apiUrl(skillPath(skillId), scopeParams(scope)),
+    { method: "DELETE" },
   );
 }
 
 export function reloadAllSkills() {
-  return post<{ status: string; skills_count: number; skills: string[] }>(
-    skillPath(undefined, "/reload"),
-    {},
+  return fetchJson<{ status: string; skills_count: number; skills: string[] }>(
+    projectUrl(skillPath(undefined, "/reload")),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    },
   );
 }

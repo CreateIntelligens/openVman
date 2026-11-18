@@ -2,26 +2,29 @@ import { useState } from "react";
 import { createSkill } from "../../api";
 import { useProject } from "../../context/ProjectContext";
 import StatusAlert from "../StatusAlert";
-import { nameToId } from "./helpers";
+import { isValidSkillId, nameToId } from "./helpers";
 
 interface CreateSkillFormProps {
   onCreated: () => void;
 }
 
+// 共用技能要改 repo 再部署，後台只建立目前專案的技能。
 export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
   const { projectId } = useProject();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [idOverride, setIdOverride] = useState("");
   const [description, setDescription] = useState("");
-  const [scope, setScope] = useState<"shared" | "project">("project");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
   const trimmedName = name.trim();
   const trimmedDescription = description.trim();
   const derivedId = idOverride || nameToId(name);
-  const canCreate = Boolean(derivedId && trimmedName);
+  const idValid = isValidSkillId(derivedId);
+  const canCreate = Boolean(idValid && trimmedName);
+  // 中文名稱轉不出 ID、或轉出來以數字開頭時，直接請使用者自己填。
+  const showIdInput = idOverride !== "" || Boolean(trimmedName && !idValid);
 
   const reset = () => {
     setName("");
@@ -38,8 +41,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
       derivedId,
       trimmedName,
       trimmedDescription,
-      scope,
-      scope === "project" ? projectId : undefined,
+      projectId,
     )
       .then(() => {
         reset();
@@ -79,28 +81,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
 
       {error && <StatusAlert type="error" message={error} />}
 
-      <div>
-        <label className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1">範圍</label>
-        <div className="flex gap-2">
-          {([
-            { value: "project", label: `專案（${projectId}）` },
-            { value: "shared", label: "共用" },
-          ] as const).map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setScope(option.value)}
-              className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border transition-colors ${
-                scope === option.value
-                  ? "bg-primary/10 border-primary/40 text-primary"
-                  : "bg-surface-raised dark:bg-surface-overlay/60 border-border text-content-muted"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <p className="text-xs text-content-muted">建立在目前專案（{projectId}），只有這個專案會用到。</p>
 
       <div>
         <label className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1">名稱</label>
@@ -110,7 +91,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
           placeholder="我的技能"
           className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-overlay/60 border border-border rounded-lg text-sm text-content placeholder-content-subtle outline-none focus:border-primary/40"
         />
-        {name.trim() && (
+        {name.trim() && idValid && (
           <p className="text-[0.625rem] text-content-subtle mt-1 font-mono">
             ID: {derivedId}
             {!idOverride && (
@@ -122,15 +103,26 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
         )}
       </div>
 
-      {idOverride !== "" && (
+      {showIdInput && (
         <div>
-          <label className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1">技能 ID</label>
+          <label
+            htmlFor="create-skill-id"
+            className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1"
+          >
+            技能 ID
+          </label>
           <input
+            id="create-skill-id"
             value={idOverride}
             onChange={(e) => setIdOverride(e.target.value)}
             placeholder="my_skill"
             className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-overlay/60 border border-border rounded-lg text-sm text-content placeholder-content-subtle outline-none focus:border-primary/40"
           />
+          {!idValid && (
+            <p className="text-xs text-content-muted mt-1">
+              技能 ID 只能用英文字母、數字與底線，而且不能以數字開頭，例如 my_skill。
+            </p>
+          )}
         </div>
       )}
 

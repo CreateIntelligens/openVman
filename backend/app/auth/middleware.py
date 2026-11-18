@@ -83,9 +83,8 @@ class FailClosedAuthMiddleware(BaseHTTPMiddleware):
         # 401／429 也要帶，否則瀏覽器擋掉回應，前端讀不到狀態碼。
         if api_cors and "access-control-allow-origin" not in response.headers:
             response.headers.update(api_cors_headers(origin))
-        if request.url.path == "/api/v1/api-keys" or request.url.path.startswith(
-            "/api/v1/api-keys/"
-        ):
+        path = request.scope["path"]
+        if path == "/api/v1/api-keys" or path.startswith("/api/v1/api-keys/"):
             response.headers["Cache-Control"] = "no-store"
         return response
 
@@ -106,12 +105,14 @@ class FailClosedAuthMiddleware(BaseHTTPMiddleware):
             not carries_embed_key
             and request.method.upper() == "OPTIONS"
             and request.headers.get("access-control-request-method")
-            and is_preflight_target(request.url.path)
+            and is_preflight_target(request.scope["path"])
             and _origin_allowed_by_any_key(runtime, origin)
         ):
             return Response(status_code=204, headers=cors_headers(origin))
 
-        if not carries_embed_key and is_auth_bypass_path(request.url.path):
+        # 路由與代理都看 ASGI 的 path；request.url.path 由字串重組再切開，路徑裡
+        # 解碼出的 ? 會把 /api/v1/health%3F/... 截成公開的 /api/v1/health。
+        if not carries_embed_key and is_auth_bypass_path(request.scope["path"]):
             return await call_next(request)
 
         try:

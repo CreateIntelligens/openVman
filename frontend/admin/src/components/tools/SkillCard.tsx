@@ -4,6 +4,10 @@ interface SkillCardProps {
   skill: SkillInfo;
   isEditing: boolean;
   isToggling: boolean;
+  /** false 時只能檢視：編輯改成檢視、不顯示刪除。 */
+  canEdit?: boolean;
+  /** false 時開關停用，只顯示目前狀態。 */
+  canToggle?: boolean;
   onToggle: (skill: SkillInfo) => void;
   onEdit: (skillId: string) => void;
   onDelete: (skill: SkillInfo) => void;
@@ -13,6 +17,8 @@ export default function SkillCard({
   skill,
   isEditing,
   isToggling,
+  canEdit = true,
+  canToggle = true,
   onToggle,
   onEdit,
   onDelete,
@@ -46,9 +52,12 @@ export default function SkillCard({
 
         <button
           onClick={() => onToggle(skill)}
-          disabled={isToggling}
-          title={skill.enabled ? "停用技能" : "啟用技能"}
-          className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+          disabled={isToggling || !canToggle}
+          role="switch"
+          aria-checked={skill.enabled}
+          aria-label={`${skill.name}${skill.enabled ? "已啟用" : "已停用"}`}
+          title={canToggle ? (skill.enabled ? "停用技能" : "啟用技能") : undefined}
+          className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
             skill.enabled ? "bg-emerald-500" : "bg-border-strong"
           }`}
         >
@@ -94,18 +103,22 @@ export default function SkillCard({
                 : "text-content-muted hover:text-primary border-border hover:border-primary/30"
             }`}
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">edit</span>
-            編輯
+            <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">
+              {canEdit ? "edit" : "visibility"}
+            </span>
+            {canEdit ? "編輯" : "檢視"}
           </button>
-          <button
-            type="button"
-            onClick={() => onDelete(skill)}
-            className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-content-muted hover:text-danger border border-border hover:border-danger/30 rounded-lg transition-colors"
-            aria-label={`刪除 ${skill.name}`}
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">delete</span>
-            刪除
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => onDelete(skill)}
+              className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-content-muted hover:text-danger border border-border hover:border-danger/30 rounded-lg transition-colors"
+              aria-label={`刪除 ${skill.name}`}
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">delete</span>
+              刪除
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ from fastapi import Request
 from safety.internal_auth import (
     PRINCIPAL_ID_HEADER,
     PRINCIPAL_TYPE_HEADER,
+    PROJECT_ID_HEADER,
     USER_ID_HEADER,
 )
 
@@ -87,9 +88,11 @@ def build_message_envelope(
         persona_id=read_text(body, "persona_id")
         or read_text(message_payload, "persona_id")
         or "default",
-        project_id=read_text(body, "project_id")
+        # Backend 授權過的專案放在可信標頭，優先於呼叫端自己寫的；
+        # 沒有標頭（內部呼叫、舊版 Backend）才退回 body。
+        project_id=read_text(dict(request.headers), PROJECT_ID_HEADER.lower())
+        or read_text(body, "project_id")
         or read_text(message_payload, "project_id")
-        or read_text(dict(request.headers), "x-brain-project")
         or "default",
         client_ip=request.client.host if request.client else "",
         metadata=merge_metadata(body.get("metadata"), message_payload.get("metadata")),

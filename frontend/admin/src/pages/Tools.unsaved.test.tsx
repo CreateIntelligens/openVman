@@ -12,6 +12,10 @@ vi.mock("../context/ProjectContext", () => ({
   useProject: () => ({ projectId: "test-project" }),
 }));
 
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: { role: "root" } }),
+}));
+
 vi.mock("../api", () => ({
   createSkill: vi.fn(),
   deleteSkill: vi.fn(),
@@ -23,7 +27,9 @@ vi.mock("../api", () => ({
       name: id,
       description: "測試技能",
       version: "1",
-      scope: "shared",
+      // 共用技能在後台唯讀，草稿保護只會發生在專案技能。
+      scope: "project",
+      project_id: "test-project",
       enabled: true,
       tools: [],
       warnings: [],
@@ -34,7 +40,7 @@ vi.mock("../api", () => ({
     files: { "skill.yaml": `name: ${id}`, "main.py": "pass" },
   })),
   reloadAllSkills: vi.fn(),
-  skillKey: (skill: { id: string }) => `shared:${skill.id}`,
+  skillKey: (skill: { id: string }) => `project:test-project:${skill.id}`,
   toggleSkill: vi.fn(),
   updateSkillFiles: vi.fn().mockResolvedValue({ status: "ok" }),
 }));
@@ -112,19 +118,30 @@ describe("Tools draft protection", () => {
   it("protects a draft in a new file absent from the original response", async () => {
     vi.mocked(fetchSkillFiles).mockResolvedValueOnce({
       skill_id: "alpha",
-      files: { "skill.yaml": "name: alpha" },
+      files: { "main.py": "pass" },
     });
     renderPage();
-    await editAlpha();
-    fireEvent.change(screen.getByRole("textbox", { name: "alpha skill.yaml 內容" }), {
-      target: { value: "name: alpha" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "main.py" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "alpha main.py 內容" }), {
-      target: { value: "print('hello')" },
-    });
+    fireEvent.click((await screen.findAllByRole("button", { name: "編輯" }))[0]);
+    const editor = await screen.findByRole("textbox", { name: "alpha skill.yaml 內容" });
+    fireEvent.change(editor, { target: { value: "name: alpha" } });
     fireEvent.click(screen.getByRole("button", { name: /關閉/ }));
     expect(screen.getByText("尚有未儲存的變更")).toBeTruthy();
+  });
+
+  // Brain 收到 main.py 就整包拒絕；以前整包送出，連只改 skill.yaml 都存不了。
+  it("saves only the changed files and never main.py", async () => {
+    renderPage();
+    await editAlpha();
+    fireEvent.click(screen.getByRole("button", { name: "main.py" }));
+    const code = screen.getByRole("textbox", { name: "alpha main.py 內容" }) as HTMLTextAreaElement;
+    expect(code.readOnly).toBe(true);
+    expect(screen.getByText(/main\.py）不能在這裡修改/)).toBeTruthy();
+    fireEvent.change(code, { target: { value: "print('pwned')" } });
+    expect(code.value).toBe("pass");
+
+    fireEvent.click(screen.getByRole("button", { name: /儲存並重載/ }));
+    await waitFor(() => expect(updateSkillFiles).toHaveBeenCalledOnce());
+    expect(vi.mocked(updateSkillFiles).mock.calls[0][1]).toEqual({ "skill.yaml": "未儲存的草稿" });
   });
 
   it("blocks editing and saving when the skill files fail to load", async () => {

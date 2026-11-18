@@ -12,6 +12,7 @@ import { PageHeader } from "../components/app/PageHeader";
 import StatusAlert from "../components/StatusAlert";
 import ConfirmModal from "../components/ConfirmModal";
 import CreateSkillForm from "../components/tools/CreateSkillForm";
+import { useAuth } from "../context/AuthContext";
 import { useNavigationGuard } from "../context/NavigationGuardContext";
 import SkillCard from "../components/tools/SkillCard";
 import SkillEditor from "../components/tools/SkillEditor";
@@ -26,6 +27,10 @@ interface SkillSectionProps {
   loading: boolean;
   hasError: boolean;
   emptyMessage: string;
+  /** 顯示在標題下的說明，例如共用技能為什麼只能檢視。 */
+  readOnlyNotice?: string;
+  canEdit: boolean;
+  canToggle: boolean;
   onToggle: (skill: SkillInfo) => void;
   onEdit: (key: string) => void;
   onDelete: (skill: SkillInfo) => void;
@@ -41,6 +46,9 @@ function SkillSection({
   loading,
   hasError,
   emptyMessage,
+  readOnlyNotice,
+  canEdit,
+  canToggle,
   onToggle,
   onEdit,
   onDelete,
@@ -53,6 +61,9 @@ function SkillSection({
         {title}
         <span className="text-xs font-mono text-content-subtle">({skills.length})</span>
       </h2>
+      {readOnlyNotice && (
+        <p className="text-sm text-content-muted mb-4">{readOnlyNotice}</p>
+      )}
       {skills.length === 0 && !loading && !hasError && (
         <p className="text-sm text-content-subtle mb-4">{emptyMessage}</p>
       )}
@@ -65,6 +76,8 @@ function SkillSection({
               skill={skill}
               isEditing={editingSkillId === key}
               isToggling={togglingIds.has(key)}
+              canEdit={canEdit}
+              canToggle={canToggle}
               onToggle={onToggle}
               onEdit={() => onEdit(key)}
               onDelete={onDelete}
@@ -77,8 +90,14 @@ function SkillSection({
   );
 }
 
+// 正式環境的共用技能目錄是唯讀掛載，內容只能改 repo 再部署；後台只留給最高管理員開關。
+const SHARED_NOTICE_ROOT = "共用技能會套用到所有專案。內容要更新系統才能修改，這裡只能查看，以及啟用或停用。";
+const SHARED_NOTICE = "共用技能會套用到所有專案。內容要更新系統才能修改，這裡只能查看；要啟用或停用請找最高管理員。";
+
 export default function Tools() {
   const { requestNavigation } = useNavigationGuard();
+  const { account } = useAuth();
+  const canToggleShared = account?.role === "root";
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [skillTools, setSkillTools] = useState<ToolInfo[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -209,6 +228,8 @@ export default function Tools() {
           loading={loading}
           hasError={!!error}
           emptyMessage="此專案尚無專屬技能。"
+          canEdit
+          canToggle
           onToggle={handleToggle}
           onEdit={toggleEdit}
           onDelete={setDeleteTarget}
@@ -225,6 +246,9 @@ export default function Tools() {
           loading={loading}
           hasError={!!error}
           emptyMessage="尚未載入任何共用技能。"
+          readOnlyNotice={canToggleShared ? SHARED_NOTICE_ROOT : SHARED_NOTICE}
+          canEdit={false}
+          canToggle={canToggleShared}
           onToggle={handleToggle}
           onEdit={toggleEdit}
           onDelete={setDeleteTarget}
@@ -237,6 +261,7 @@ export default function Tools() {
               skillId={editingSkill.id}
               scope={editingSkill.scope}
               projectId={editingSkill.project_id ?? undefined}
+              readOnly={editingSkill.scope !== "project"}
               onClose={() => requestNavigation(() => setEditingSkillId(null))}
               onSaved={load}
             />

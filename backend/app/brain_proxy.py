@@ -8,6 +8,7 @@ import json
 import logging
 from time import monotonic
 from typing import Any, TypeVar
+from urllib.parse import parse_qsl, quote, urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -38,6 +39,11 @@ from app.client_disconnect import wait_for_client_disconnect
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
 from app.project_ids import canonical_project_id
+from app.skill_write_guard import (
+    is_skill_toggle,
+    is_skill_write,
+    skill_request_refusal,
+)
 from app.upstream_guard import (
     ERROR,
     OK,
@@ -140,6 +146,7 @@ _HOP_BY_HOP = frozenset({
 _SERVER_GENERATED_HEADERS = frozenset({"date", "server"})
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 _OPENVMAN_HEADER_PREFIX = "x-openvman-"
+_BRAIN_HEADER_PREFIX = "x-brain-"
 _USER_ID_HEADER = "X-OpenVMan-User-ID"
 _USER_ROLE_HEADER = "X-OpenVMan-Role"
 _PROJECT_ID_HEADER = "X-OpenVMan-Project-ID"
@@ -312,6 +319,9 @@ def _filter_external_request_headers(
         and key.lower() not in _END_USER_AUTH_HEADERS
         and key.lower() != _INTERNAL_TOKEN_HEADER.lower()
         and not key.lower().startswith(_OPENVMAN_HEADER_PREFIX)
+        # Brain 會把 X-Brain-Project／X-Brain-Channel 當成專案與通道的備援來源；
+        # 專案只能由這一層授權後決定，呼叫端帶的一律不轉。
+        and not key.lower().startswith(_BRAIN_HEADER_PREFIX)
         # 主體標頭只由這一層產生；照抄上游帶進來的那份等於讓呼叫端
         # 自稱是任意 embed key。
         and key.lower() not in _PRINCIPAL_HEADERS
@@ -326,28 +336,79 @@ def _resolved_project_id(request: Request) -> str | None:
     return project_id or None
 
 
-async def _request_project_id(request: Request) -> str | None:
+def _json_object(body: bytes) -> dict[str, Any] | None:
+    """The body as Brain's FastAPI would see it: JSON whatever the Content-Type says."""
+    if not body.strip():
+        return None
+    try:
+        payload = json.loads(body)
+    except (UnicodeDecodeError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _project_id_holders(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    # Brain 讀 body 最上層的 project_id；對話信封另外會讀 message.project_id。
+    holders = [payload]
+    message = payload.get("message")
+    if isinstance(message, dict):
+        holders.append(message)
+    return holders
+
+
+def _request_project_id(request: Request, body: bytes) -> str | None:
+    """The single project the request names, from the query and the JSON body.
+
+    Brain 讀 query 時取最後一個值、空字串會落到預設專案；body 沒有 Content-Type
+    也照 JSON 解析。這裡任何一個來源跟其他來源不同、或 query 給了空值，都當成
+    請求格式錯誤，不猜呼叫端要哪一個。
+    """
     candidates: list[str] = []
-    query_project_id = canonical_project_id(request.query_params.get("project_id"))
-    if query_project_id:
+    for value in request.query_params.getlist("project_id"):
+        query_project_id = canonical_project_id(value)
+        if not query_project_id:
+            raise _InvalidProjectId("project_id must not be empty")
         candidates.append(query_project_id)
 
-    content_type = request.headers.get("content-type", "").casefold()
-    if "application/json" in content_type:
-        try:
-            payload = await request.json()
-        except (UnicodeDecodeError, ValueError):
-            payload = None
-        if isinstance(payload, dict):
-            body_project_id = payload.get("project_id")
-            if isinstance(body_project_id, str) and body_project_id.strip():
-                candidates.append(canonical_project_id(body_project_id))
+    payload = _json_object(body)
+    for holder in _project_id_holders(payload) if payload is not None else []:
+        body_project_id = holder.get("project_id")
+        if body_project_id is None or body_project_id == "":
+            # 空值在轉送時會被換成授權的專案，不必擋。
+            continue
+        if not isinstance(body_project_id, str) or not canonical_project_id(body_project_id):
+            raise _InvalidProjectId("project_id must be a non-empty string")
+        candidates.append(canonical_project_id(body_project_id))
 
     if not candidates:
         return None
     if len(set(candidates)) != 1:
         raise _InvalidProjectId("project_id in query and body must match")
     return candidates[0]
+
+
+def _bind_project(request: Request, body: bytes, project_id: str) -> tuple[str, bytes]:
+    """Rewrite the forwarded query and JSON body to name only the authorized project.
+
+    授權用的是 ``project_id``；Brain 各路由從 query、body 或對話信封自己讀專案，
+    沒寫時退回預設專案。轉送前把每個位置都寫成同一個值，Brain 就不會用到
+    沒授權的專案。
+    """
+    pairs = [
+        (key, value)
+        for key, value in parse_qsl(_raw_query(request), keep_blank_values=True)
+        if key != "project_id"
+    ]
+    pairs.append(("project_id", project_id))
+    query = urlencode(pairs, quote_via=quote)
+
+    payload = _json_object(body)
+    if payload is None:
+        return query, body
+    for holder in _project_id_holders(payload):
+        if holder is payload or "project_id" in holder:
+            holder["project_id"] = project_id
+    return query, json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
 
 def _requires_project_context(path: str) -> bool:
@@ -381,6 +442,7 @@ async def _authorize_project_context(
     path: str,
     current: CurrentAccount | None,
     explicit_project_id: str | None,
+    body: bytes = b"",
 ) -> str | None:
     if current is None or not _requires_project_context(path):
         return explicit_project_id
@@ -390,14 +452,14 @@ async def _authorize_project_context(
         # project_id 一律 403，不能靜默改用金鑰的專案。
         enforce_project_binding(
             current.embed_key,
-            await _request_project_id(request) or "",
+            _request_project_id(request, body) or "",
         )
         # 金鑰可能在 default 拔掉前就綁了 "default"，一樣換成預設專案的正式 ID。
         embed_project_id = canonical_project_id(current.embed_key.project_id)
         request.state.resolved_project_id = embed_project_id
         return embed_project_id
 
-    supplied_project_id = await _request_project_id(request)
+    supplied_project_id = _request_project_id(request, body)
     if explicit_project_id is not None:
         explicit_project_id = canonical_project_id(explicit_project_id) or None
     resolved_project_id = explicit_project_id or supplied_project_id
@@ -488,8 +550,23 @@ def _brain_base_url(path: str, method: str) -> str:
     return cfg.brain_url.rstrip("/")
 
 
+def _raw_query(request: Request) -> str:
+    """The query string exactly as authorization parsed it (``request.query_params``).
+
+    ``request.url.query`` is re-split from a rebuilt URL, so a decoded ``?`` or ``#``
+    in the path would make it differ from what was authorized.
+    """
+    return request.scope.get("query_string", b"").decode("latin-1")
+
+
 def _target_url(path: str, query: str, method: str = "GET") -> str:
-    target_url = f"{_brain_base_url(path, method)}{_INTERNAL_BRAIN_PREFIX}/{path}"
+    # path 是解碼過一次、拿來做所有授權判斷的那一份。原樣接進網址的話，殘留的
+    # %xx（例如 %73kills）、? 與 # 會被 Brain 再解讀一次，變成另一條路徑或另一組
+    # query；重新編碼後 Brain 解碼一次，拿到的就是這裡授權的同一個字串。
+    target_url = (
+        f"{_brain_base_url(path, method)}{_INTERNAL_BRAIN_PREFIX}/"
+        f"{quote(path, safe='/')}"
+    )
     if query:
         return f"{target_url}?{query}"
     return target_url
@@ -577,12 +654,19 @@ async def proxy_to_brain(
         for prefix in _BACKEND_OWNED_PREFIXES
     ):
         return JSONResponse(status_code=404, content={"detail": "Resource not found"})
+    # 先讀 body（受大小上限保護）：授權要看 body 裡的 project_id，不能為了授權
+    # 先把整個 body 不設上限地讀進記憶體。
+    try:
+        body = await _read_capped_body(request, get_tts_config().brain_proxy_max_body_bytes)
+    except _BodyTooLarge as exc:
+        return JSONResponse(status_code=413, content={"detail": str(exc)})
     try:
         project_id = await _authorize_project_context(
             request,
             path,
             current,
             project_id,
+            body,
         )
     except ResourceNotFoundError:
         return JSONResponse(
@@ -597,12 +681,18 @@ async def proxy_to_brain(
         project_id=project_id,
     )
     try:
-        body = await _read_capped_body(request, get_tts_config().brain_proxy_max_body_bytes)
         body = guard_ai_cleanup(normalized_path, request.method, body, current)
-    except _BodyTooLarge as exc:
-        return JSONResponse(status_code=413, content={"detail": str(exc)})
     except AiCleanupRefused as exc:
         return JSONResponse(status_code=403, content={"detail": str(exc)})
+    # 範圍可能只寫在 body，要讀完 body 才判斷得了。
+    refusal = skill_request_refusal(
+        request, normalized_path, body, current, project_id,
+    )
+    if refusal is not None:
+        return refusal
+    query = _raw_query(request)
+    if current is not None and project_id and _requires_project_context(path):
+        query, body = _bind_project(request, body, project_id)
     client = _http.get()
     started = monotonic()
 
@@ -618,7 +708,7 @@ async def proxy_to_brain(
             client.send(
                 client.build_request(
                     method=request.method,
-                    url=_target_url(path, request.url.query, request.method),
+                    url=_target_url(path, query, request.method),
                     headers=headers,
                     content=body,
                 ),
@@ -734,11 +824,19 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
 
 
 def _request_brain_path(request: Request) -> str:
-    return request.url.path.removeprefix(f"{_PUBLIC_API_PREFIX}/").lstrip("/")
+    # 用 ASGI 的 path 而非 request.url.path：後者由字串重組再切開，解碼出的 ? 會
+    # 把路徑截斷，授權與轉送看到的就不是同一條路徑。
+    return request.scope["path"].removeprefix(f"{_PUBLIC_API_PREFIX}/").lstrip("/")
 
 
 def _catchall_current_account(request: Request) -> CurrentAccount | None:
-    if request.url.path in _PUBLIC_BRAIN_PATHS:
+    # 跟 FailClosedAuthMiddleware 一樣看 ASGI 的 path：request.url.path 由字串重組
+    # 再切開，路徑裡解碼出的 ? 會把它截成看起來像公開路徑的樣子。
+    if (
+        request.scope["path"] in _PUBLIC_BRAIN_PATHS
+        # 公開的只有讀取；POST 之類若也免登入，會帶著內部 token 打到 Brain。
+        and request.method.upper() in _SAFE_METHODS
+    ):
         return None
     existing = getattr(request.state, "current_account", None)
     if isinstance(existing, CurrentAccount):
@@ -761,6 +859,16 @@ def _documented_responses(route_def: dict[str, Any]) -> dict[int | str, dict[str
         brain_path
     ):
         responses.update(_PROJECT_CONTEXT_RESPONSES)
+    method = route_def["methods"][0]
+    if is_skill_write(brain_path.strip("/"), method):
+        # 沒寫 scope=project 的請求一律視為共用技能。
+        responses[403] = {
+            "description": (
+                "共用技能只有 ROOT 能啟用或停用"
+                if is_skill_toggle(brain_path.strip("/"), method)
+                else "共用技能在後台唯讀，改檔案、刪除、建立一律拒絕"
+            ),
+        }
     return responses
 
 

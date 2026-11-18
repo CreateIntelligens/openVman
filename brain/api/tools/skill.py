@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 SkillScope = Literal["shared", "project"]
+
+# 技能 ID 會變成目錄名稱與 Python 函式名稱（``<id>_action``），只收合法識別字，
+# 不能帶路徑字元。Backend 的 ``app.skill_write_guard.SKILL_ID_PATTERN`` 與此相同。
+SKILL_ID_PATTERN = r"^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+_SKILL_ID_RE = re.compile(SKILL_ID_PATTERN)
+
+
+def is_valid_skill_id(skill_id: str) -> bool:
+    return bool(_SKILL_ID_RE.fullmatch(skill_id))
 
 
 @dataclass(frozen=True, slots=True)

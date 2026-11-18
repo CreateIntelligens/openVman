@@ -98,7 +98,7 @@ def _authenticate_embed_key(
     authorize_embed_request(
         record,
         method=connection.scope.get("method", "GET"),
-        path=connection.url.path,
+        path=connection.scope["path"],
         origin=connection.headers.get("origin", ""),
         repository=runtime.embed_keys,
     )

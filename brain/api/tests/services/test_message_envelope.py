@@ -229,3 +229,27 @@ def test_brain_message_metadata_is_defensive_copy():
 
     brain_msg.metadata["key"] = "modified"
     assert original_metadata["key"] == "original"
+
+
+def test_trusted_project_header_wins_over_body_and_client_headers():
+    # 2026-11-18：body 沒寫專案時會退回呼叫端自帶的 X-Brain-Project，授權在 A、對話跑在 B。
+    mod = _module()
+    request = _fake_request(headers={
+        "x-openvman-project-id": "authorized",
+        "x-brain-project": "other",
+    })
+
+    envelope = mod.build_message_envelope(
+        request, {"content": "hi", "project_id": "other", "message": {"project_id": "other"}},
+    )
+
+    assert envelope.context.project_id == "authorized"
+
+
+def test_client_project_header_is_not_a_fallback():
+    mod = _module()
+    request = _fake_request(headers={"x-brain-project": "other"})
+
+    envelope = mod.build_message_envelope(request, {"content": "hi"})
+
+    assert envelope.context.project_id == "default"

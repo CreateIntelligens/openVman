@@ -65,6 +65,12 @@ Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 
 
 **看得到但不能改的專案回 403**：Brain 代理路徑需要專案編輯權（刪對話、改知識庫等）而帳號只有讀取授權時回 403；看不到的專案仍回 404，不洩漏存在與否。
 
+**共用技能在後台唯讀，只有 ROOT 能開關**：共用技能套用到所有專案，正式環境的 `brain/skills` 是唯讀掛載，內容只能改 repo 再部署。`/api/v1/skills` 底下會寫入的請求（`PUT …/files`、`PATCH …/toggle`、`DELETE`、`POST /api/v1/skills`）除了專案編輯權，還要明確指向專案範圍才照專案規則放行：query 只能有一個 `scope=project`；建立技能看 body，必須是 JSON 物件且 `"scope": "project"`（不論 `Content-Type`，因為 Brain 沒帶也照 JSON 解析），body 的 `project_id` 必須與授權的專案相同，否則 422。其餘（沒寫、寫錯、重複的範圍）一律當成共用技能：Brain 沒收到範圍時建立預設共用、其他路由在專案沒有同名技能時會落到共用技能。共用技能的改檔案、刪除、建立對所有人（含 ROOT）回 403；`PATCH …/toggle` 只放行 ROOT 帳號（session 或 ROOT 的 API key），其他帳號與 Embed key 回 403。`POST /api/v1/skills/reload` 只重讀磁碟、不改內容，維持專案編輯權。讀取（`GET …/files`）照專案讀取權，共用技能也要帶 `project_id`。技能 ID（路徑第二段與建立時 body 的 `skill_id`）必須符合 `^[A-Za-z_][A-Za-z0-9_]{0,63}$`，否則 422，與 Brain 相同。判斷在 `app/skill_write_guard.py` 的 `skill_request_refusal`，`app/brain_proxy.py` 於讀完 body（受大小上限保護）之後、送往 Brain 之前呼叫。
+
+**轉送的路徑與 query 必須與授權看到的一致**：所有授權判斷都用解碼過一次的路徑；轉給 Brain 前以 `urllib.parse.quote(path, safe="/")` 重新編碼，Brain 解碼一次後拿到同一個字串，殘留的 `%xx`、`?`、`#` 都是字面字元，不會變成另一條路徑或另一組 query。`.`、`..` 片段仍回 404（httpx 會先把它們正規化掉）。query 取 ASGI `query_string` 原文（與 `request.query_params` 同一份）。具名路由的 Brain 路徑、`FailClosedAuthMiddleware` 的公開路徑判斷、catch-all 是否需要登入、Embed key 的路徑檢查，都看 ASGI 的 `path`，不用由字串重組再切開的 `request.url.path`。`tests/api/test_brain_proxy_wire.py` 以真的 uvicorn 跑 Backend 與假 Brain，檢查 Brain 實際收到的路徑。
+
+**授權的專案就是 Brain 用的專案**：代理先讀 body（受 `BRAIN_PROXY_MAX_BODY_BYTES` 上限保護，超過回 413），再決定專案。專案來源包括 query 的每一個 `project_id`、body 最上層與 `message` 裡的 `project_id`；body 不論 `Content-Type`，只要是 JSON 物件就解析（Brain 也是）。query 的 `project_id` 空白或多個值不一致、body 的 `project_id` 不是字串、或各來源不一致，一律 422。授權後，需要專案的路徑轉給 Brain 時只帶授權過的正規化專案 ID：query 的 `project_id` 全部換成這一個，JSON body 最上層一律寫入（`message` 裡有寫的也覆蓋），並放在可信標頭 `X-OpenVMan-Project-ID`。呼叫端的 `X-Brain-*` 標頭一律不轉（Brain 曾把 `X-Brain-Project` 當專案備援）。Embed key 用同一個值檢查綁定。公開的 `/api/v1/health` 只放行 GET／HEAD／OPTIONS，其他方法要登入。
+
 ### 2. 連線與 Session 管理 (Session Management)
 伺服器必須在記憶體中維護一個 Session Map，管理所有活躍的機台連線。
 ```javascript

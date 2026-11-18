@@ -3,17 +3,32 @@ import { fetchSkillFiles, updateSkillFiles } from "../../api";
 import { useUnsavedChanges } from "../../context/NavigationGuardContext";
 import { useLocalStorageState } from "../../hooks/useLocalStorageState";
 import StatusAlert from "../StatusAlert";
-import { filesChanged, SKILL_EDITOR_TABS, type SkillEditorTab } from "./helpers";
+import {
+  changedFiles,
+  filesChanged,
+  isLockedSkillFile,
+  SKILL_EDITOR_TABS,
+  type SkillEditorTab,
+} from "./helpers";
 
 interface SkillEditorProps {
   skillId: string;
   scope?: "shared" | "project";
   projectId?: string;
+  /** 只能看不能改，例如共用技能（內容要更新系統才能改）。 */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function SkillEditor({ skillId, scope, projectId, onClose, onSaved }: SkillEditorProps) {
+export default function SkillEditor({
+  skillId,
+  scope,
+  projectId,
+  readOnly = false,
+  onClose,
+  onSaved,
+}: SkillEditorProps) {
   const [files, setFiles] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useLocalStorageState<SkillEditorTab>(
     "admin.tools.skill_editor_tab",
@@ -49,8 +64,10 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
       .finally(() => setLoading(false));
   }, [skillId, scope, projectId]);
 
+  const tabLocked = readOnly || isLockedSkillFile(activeTab);
+
   const handleChange = (content: string) => {
-    if (!loaded) return;
+    if (!loaded || tabLocked) return;
     const nextFiles = { ...files, [activeTab]: content };
     setFiles(nextFiles);
   };
@@ -59,7 +76,8 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
     if (!loaded || saving) return;
     setSaving(true);
     setError("");
-    updateSkillFiles(skillId, files, { scope, project_id: projectId })
+    // 只送改過的檔案：Brain 收到 main.py 一律拒絕，整包送會連 skill.yaml 都存不了。
+    updateSkillFiles(skillId, changedFiles(files, originalFiles), { scope, project_id: projectId })
       .then(() => {
         setOriginalFiles({ ...files });
         onSaved();
@@ -72,8 +90,10 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
     <div className="bg-surface dark:bg-surface-sunken/60 border border-primary/10 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-border">
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary">edit_note</span>
-          <span className="font-bold text-sm">編輯：{skillId}</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-primary">
+            {readOnly ? "visibility" : "edit_note"}
+          </span>
+          <span className="font-bold text-sm">{readOnly ? "檢視" : "編輯"}：{skillId}</span>
           {dirty && (
             <span className="px-2 py-0.5 text-[0.625rem] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded uppercase">
               未儲存
@@ -81,14 +101,16 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving || !loaded || !dirty}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-sm">save</span>
-            {saving ? "儲存中..." : "儲存並重載"}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={handleSave}
+              disabled={saving || !loaded || !dirty}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-sm">save</span>
+              {saving ? "儲存中..." : "儲存並重載"}
+            </button>
+          )}
           <button
             onClick={onClose}
             // 儲存送出後一定會寫進伺服器，這時跳「捨棄並離開」會誤導；等儲存結束再關。
@@ -123,6 +145,14 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
         ))}
       </div>
 
+      {loaded && tabLocked && (
+        <p className="px-5 pt-3 text-xs text-content-muted">
+          {readOnly
+            ? "共用技能會套用到所有專案，內容要更新系統才能修改，這裡只能查看。"
+            : "程式碼（main.py）不能在這裡修改，需要請工程人員在伺服器上更新。"}
+        </p>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-16 text-content-subtle text-sm">載入檔案中...</div>
       ) : !loaded ? (
@@ -134,6 +164,7 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
           aria-label={`${skillId} ${activeTab} 內容`}
           value={files[activeTab] ?? ""}
           onChange={(e) => handleChange(e.target.value)}
+          readOnly={tabLocked}
           spellCheck={false}
           className="w-full h-[25rem] p-5 bg-transparent text-content text-xs leading-5 font-mono resize-y outline-none border-none"
           style={{ tabSize: 2 }}

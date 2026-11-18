@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from infra.project_context import normalize_project_id
 from protocol.schemas import SkillCreateRequest, SkillFilesUpdateRequest
 from safety.internal_auth import require_internal_token
-from tools.skill import SkillRef, SkillScope
+from tools.skill import SkillRef, SkillScope, is_valid_skill_id
 from tools.skill_manager import get_skill_manager
 from tools.tool_registry import (
     activate_project_sync,
@@ -23,9 +24,25 @@ def _skill_deps(project_id: str = "default") -> tuple[Any, Any]:
     return activate_project_sync(project_id), get_skill_manager()
 
 
+def _normalized_project_id(project_id: str | None) -> str | None:
+    # Backend 用正規化後（去空白、default 換成預設專案）的 ID 授權；技能目錄必須用
+    # 同一個 ID，否則授權的是一個專案、寫入的是另一個目錄。
+    if not project_id:
+        return None
+    try:
+        normalized = normalize_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # 格式規則允許點，「.」「..」會讓專案技能目錄指到專案資料夾外面。
+    if normalized in {".", ".."}:
+        raise HTTPException(status_code=400, detail="invalid project_id")
+    return normalized
+
+
 def _parse_scope(scope: str | None, project_id: str | None) -> tuple[SkillScope | None, str | None]:
     if scope not in (None, "shared", "project"):
         raise HTTPException(status_code=400, detail=f"invalid scope: {scope}")
+    project_id = _normalized_project_id(project_id)
     if scope == "project" and not project_id:
         raise HTTPException(status_code=400, detail="project scope requires project_id")
     return scope, project_id  # type: ignore[return-value]
@@ -36,12 +53,15 @@ def skill_ref(
     scope: str | None = Query(None),
     project_id: str | None = Query(None),
 ) -> SkillRef:
+    if not is_valid_skill_id(skill_id):
+        raise HTTPException(status_code=422, detail=f"invalid skill id: {skill_id!r}")
     parsed_scope, parsed_project_id = _parse_scope(scope, project_id)
     return SkillRef(skill_id=skill_id, scope=parsed_scope, project_id=parsed_project_id)
 
 
 @router.get("/tools", summary="列出工具與技能")
 async def list_tools(project_id: str = Query("default")):
+    project_id = _normalized_project_id(project_id) or _normalized_project_id("default")
     registry, manager = _skill_deps(project_id)
     all_tools = registry.list_tools()
 
@@ -157,6 +177,7 @@ async def delete_skill(ref: SkillRef = Depends(skill_ref)):
 
 @router.post("/skills/reload", summary="重新載入所有技能")
 async def reload_all_skills(project_id: str = Query("default")):
+    project_id = _normalized_project_id(project_id) or _normalized_project_id("default")
     registry, manager = _skill_deps(project_id)
     skills = manager.reload_all(registry, project_id=project_id)
     invalidate_skill_tools_sync()

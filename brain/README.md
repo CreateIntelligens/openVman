@@ -291,7 +291,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 停用的網路與 Wiki 工具不會註冊給 HTTP Chat，也不會宣告給 Gemini Live。修改開關後需重啟 Brain。天氣等即時資訊走 `search_web`，沒有另設 API。
 
-技能（skills）放在 `brain/skills/<id>/`（共用）或 `brain/data/projects/<project_id>/skills/<id>/`（專案），各含 `skill.yaml` 與 `main.py`，工具動態註冊。技能檔案 API 不能上傳或替換 `main.py`，正式環境的技能原始碼應唯讀並經 code review。內建技能有 `graphify`、`weather`、`joke` 與 `a2a`；`a2a` 經 Backend internal facade 呼叫，Backend 的 `A2A_ENABLED` 預設關閉，正式環境未啟用。
+技能（skills）放在 `brain/skills/<id>/`（共用）或 `brain/data/projects/<project_id>/skills/<id>/`（專案），各含 `skill.yaml` 與 `main.py`，工具動態註冊。技能 ID 只收英文字母、數字與底線且不能以數字開頭（會變成目錄與函式名稱）；技能檔案 API 不能上傳或替換 `main.py`，正式環境的技能原始碼應唯讀並經 code review。共用技能在後台唯讀，內容改 repo 再部署；經 Backend 只有最高管理員（ROOT）能啟用／停用共用技能，改檔案、刪除、建立一律拒絕。專案技能需要該專案的編輯權。內建技能有 `graphify`、`weather`、`joke` 與 `a2a`；`a2a` 經 Backend internal facade 呼叫，Backend 的 `A2A_ENABLED` 預設關閉，正式環境未啟用。
 
 ### 產品規格篩選（`filter_products`）
 

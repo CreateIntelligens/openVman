@@ -3,6 +3,7 @@
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from tools.skill import SKILL_ID_PATTERN
 
 
 class ProjectCreateRequest(BaseModel):
@@ -257,7 +258,11 @@ class KnowledgeRawCommitRequest(BaseModel):
 
 
 class SkillCreateRequest(BaseModel):
-    skill_id: str = Field(..., min_length=1, description="Unique skill identifier")
+    skill_id: str = Field(
+        ...,
+        pattern=SKILL_ID_PATTERN,
+        description="Unique skill identifier: letters, digits and underscores, not starting with a digit",
+    )
     name: str = Field(..., min_length=1, description="Display name")
     description: str = Field("", description="Skill description")
     scope: str = Field("shared", description="'shared' or 'project'")
