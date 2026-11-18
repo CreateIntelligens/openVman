@@ -300,3 +300,32 @@ async def test_audio_language_warmup_runs_before_retrieval_warmup(monkeypatch):
     await startup.warmup_resources()
 
     assert order[:2] == ["audio", "embedder"]
+
+
+@pytest.mark.asyncio
+async def test_warmup_loads_llm_modules_before_the_first_question(monkeypatch):
+    # 第一題才 import google-genai，每個 worker 要多花一到兩秒 CPU；換版後同時進來的那批題目會一起變慢。
+    import sys
+
+    startup = _load_startup()
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: [])
+    monkeypatch.setattr(startup, "get_embedder", lambda: None)
+    monkeypatch.delitem(sys.modules, "core.models_config", raising=False)
+
+    await startup.warmup_resources("chat")
+
+    assert "core.models_config" in sys.modules
+
+
+@pytest.mark.asyncio
+async def test_warmup_parses_each_projects_product_catalogs(monkeypatch):
+    startup = _load_startup()
+    loaded: list[str] = []
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default", "proj-catalog"])
+    monkeypatch.setattr(startup, "get_embedder", lambda: None)
+    monkeypatch.setattr(startup, "_warmup_retrieval_path", lambda project_id: None)
+    monkeypatch.setattr(startup, "load_product_catalogs", lambda project_id: loaded.append(project_id) or [])
+
+    await startup.warmup_resources("chat")
+
+    assert loaded == ["default", "proj-catalog"]

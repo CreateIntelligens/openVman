@@ -16,6 +16,7 @@ from config import get_settings
 from infra.db import ensure_tables, get_db
 from infra.project_admin import list_projects
 from infra.shared_budgets import shared_request_budget
+from knowledge.product_catalog import load_product_catalogs
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from memory.memory_governance import maybe_run_memory_maintenance
@@ -120,6 +121,24 @@ def _warmup_audio_language(project_id: str = "default", attempts: int = 1) -> No
             logger.warning("台語判斷預熱失敗（不影響啟動）: %s", type(exc).__name__)
 
 
+def _warmup_llm_modules() -> None:
+    """先載入 LLM 相關套件：google-genai 第一次 import 要一到兩秒 CPU。
+
+    原本在第一題組 fallback chain 時才載入，每個 worker 都在第一批題目上付這筆錢；
+    換版後馬上同時進來 100 題時，所有 worker 一起 import，回覆會整批慢好幾秒。
+    """
+    import core.models_config  # noqa: F401  （連帶載入 google.genai）
+    import openai.resources.chat  # noqa: F401
+
+
+def _warmup_product_catalogs(project_id: str) -> None:
+    """先解析型錄：第一題才讀上百份產品筆記，會跟同時進來的題目搶 CPU。"""
+    try:
+        load_product_catalogs(project_id)
+    except Exception as exc:  # 型錄壞掉時第一題照樣會回報錯在哪，預熱不擋啟動
+        logger.warning("型錄預熱失敗 project=%s: %s", project_id, type(exc).__name__)
+
+
 async def warmup_resources(role: str | None = None) -> None:
     """背景預熱 remote embedding 與資料路徑。"""
     role = role or get_settings().brain_role
@@ -127,6 +146,7 @@ async def warmup_resources(role: str | None = None) -> None:
     # 最先做：部署後第一句台語可能在其他預熱跑完前就到。
     await asyncio.to_thread(_warmup_audio_language, "default", _AUDIO_WARMUP_ATTEMPTS)
     try:
+        await asyncio.to_thread(_warmup_llm_modules)
         project_ids = _warmup_project_ids()
         await asyncio.to_thread(get_embedder)
         for project_id in project_ids:
@@ -137,6 +157,7 @@ async def warmup_resources(role: str | None = None) -> None:
                 await asyncio.to_thread(ensure_tables, project_id)
             # _warmup_retrieval_path 內部已逐表吞掉預熱失敗、不會 raise。
             await asyncio.to_thread(_warmup_retrieval_path, project_id)
+            await asyncio.to_thread(_warmup_product_catalogs, project_id)
         if role == "admin":
             await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
     except Exception as exc:

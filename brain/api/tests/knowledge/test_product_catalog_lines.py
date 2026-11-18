@@ -208,3 +208,33 @@ def test_removing_a_line_drops_only_that_catalog(root):
     (fans / "_catalog.yaml").unlink()
 
     assert [catalog.name for catalog in load_product_catalogs("drop-line")] == ["泵浦"]
+
+
+def test_threads_reading_at_the_same_time_parse_once(root, monkeypatch):
+    import threading
+
+    _line(root, "風扇", FANS, {"F1.md": {"model": "F1", "blade_cm": 30}})
+    monkeypatch.setattr(product_catalog, "_RECHECK_SECONDS", 60.0)
+    parses = []
+    real_parse = product_catalog._parse_catalog
+    gate = threading.Barrier(4)
+
+    def slow_parse(*args):
+        parses.append(1)
+        return real_parse(*args)
+
+    monkeypatch.setattr(product_catalog, "_parse_catalog", slow_parse)
+    results = []
+
+    def read():
+        gate.wait()
+        results.append(load_product_catalogs("together"))
+
+    threads = [threading.Thread(target=read) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(parses) == 1
+    assert len(results) == 4

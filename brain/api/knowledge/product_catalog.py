@@ -39,6 +39,9 @@ _catalog_cache: dict[tuple[str, str], tuple[tuple[object, ...], ProductCatalog]]
 _RECHECK_SECONDS = 1.0
 _recently_checked: dict[str, tuple[float, list[ProductCatalog]]] = {}
 _recently_checked_lock = threading.Lock()
+# 同一個 worker 裡好幾個執行緒同時第一次讀型錄時，只讓一個去解析，其他等結果；
+# 不然每個執行緒都把上百份筆記讀一遍、解析一遍。
+_project_locks: dict[str, threading.Lock] = {}
 
 
 class CatalogError(ValueError):
@@ -180,11 +183,17 @@ def load_product_catalogs(project_id: str) -> list[ProductCatalog]:
     """
     with _recently_checked_lock:
         recent = _recently_checked.get(project_id)
+        project_lock = _project_locks.setdefault(project_id, threading.Lock())
     if recent is not None and monotonic() - recent[0] < _RECHECK_SECONDS:
         return list(recent[1])
-    catalogs = _load_product_catalogs(project_id)
-    with _recently_checked_lock:
-        _recently_checked[project_id] = (monotonic(), catalogs)
+    with project_lock:
+        with _recently_checked_lock:
+            recent = _recently_checked.get(project_id)
+        if recent is not None and monotonic() - recent[0] < _RECHECK_SECONDS:
+            return list(recent[1])
+        catalogs = _load_product_catalogs(project_id)
+        with _recently_checked_lock:
+            _recently_checked[project_id] = (monotonic(), catalogs)
     return list(catalogs)
 
 
