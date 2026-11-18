@@ -12,6 +12,7 @@ import { PageHeader } from "../components/app/PageHeader";
 import StatusAlert from "../components/StatusAlert";
 import ConfirmModal from "../components/ConfirmModal";
 import CreateSkillForm from "../components/tools/CreateSkillForm";
+import { useNavigationGuard } from "../context/NavigationGuardContext";
 import SkillCard from "../components/tools/SkillCard";
 import SkillEditor from "../components/tools/SkillEditor";
 import ToolTable from "../components/tools/ToolTable";
@@ -77,6 +78,7 @@ function SkillSection({
 }
 
 export default function Tools() {
+  const { requestNavigation } = useNavigationGuard();
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [skillTools, setSkillTools] = useState<ToolInfo[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -171,8 +173,10 @@ export default function Tools() {
     [skills, editingSkillId],
   );
 
-  const toggleEdit = (key: string) =>
-    setEditingSkillId((current) => (current === key ? null : key));
+  const toggleEdit = (key: string) => {
+    const nextKey = editingSkillId === key ? null : key;
+    requestNavigation(() => setEditingSkillId(nextKey));
+  };
 
   return (
     <div className="page-scroll">
@@ -233,7 +237,7 @@ export default function Tools() {
               skillId={editingSkill.id}
               scope={editingSkill.scope}
               projectId={editingSkill.project_id ?? undefined}
-              onClose={() => setEditingSkillId(null)}
+              onClose={() => requestNavigation(() => setEditingSkillId(null))}
               onSaved={load}
             />
           </section>

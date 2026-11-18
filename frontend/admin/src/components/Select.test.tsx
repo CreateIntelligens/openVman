@@ -97,4 +97,22 @@ describe("Select", () => {
     fireEvent.keyDown(trigger, { key: "Tab" });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
+
+  it("keeps Escape inside the open listbox so an enclosing dialog stays open", () => {
+    const onParentKeyDown = vi.fn();
+    render(
+      <div onKeyDown={onParentKeyDown}>
+        <Select ariaLabel="專案" value="alpha" options={options} onChange={vi.fn()} />
+      </div>,
+    );
+    const combobox = screen.getByRole("combobox", { name: "專案" });
+    fireEvent.click(combobox);
+
+    expect(fireEvent.keyDown(combobox, { key: "Escape" })).toBe(false);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(onParentKeyDown).not.toHaveBeenCalled();
+
+    expect(fireEvent.keyDown(combobox, { key: "Escape" })).toBe(true);
+    expect(onParentKeyDown).toHaveBeenCalledOnce();
+  });
 });

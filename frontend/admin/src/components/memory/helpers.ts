@@ -2,8 +2,11 @@ export const PAGE_WINDOW_SIZE = 7;
 
 export function getVisiblePageNumber(index: number, currentPage: number, totalPages: number): number {
   if (totalPages <= PAGE_WINDOW_SIZE) return index + 1;
-  if (currentPage <= 4) return index + 1;
-  return Math.min(currentPage - 3 + index, totalPages);
+  const firstPage = Math.max(
+    1,
+    Math.min(currentPage - 3, totalPages - PAGE_WINDOW_SIZE + 1),
+  );
+  return firstPage + index;
 }
 
 export function parseMetadataJson(raw: string): Record<string, string> {

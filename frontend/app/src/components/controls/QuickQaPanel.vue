@@ -1,4 +1,5 @@
 <template>
+  <Teleport defer to=".app-shell" :disabled="!isCompactViewport">
   <Transition name="slide-up">
     <div
       v-if="open"
@@ -64,10 +65,11 @@
       </div>
     </div>
   </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { apiFetch } from "../../api/http";
 import { quickQaCopy, quickQaLanguage, visibleNodes } from "./quickQaText";
 
@@ -108,6 +110,16 @@ const emit = defineEmits<{
   close: [];
   "select-question": [message: string, sourcePath?: string, answerText?: string, question?: string];
 }>();
+
+const isCompactViewport = ref(false);
+let compactViewport: MediaQueryList | undefined;
+let navigationReset: ReturnType<typeof setTimeout> | undefined;
+let projectVersion = 0;
+let nodesRequestVersion = 0;
+
+function updateCompactViewport(): void {
+  isCompactViewport.value = compactViewport?.matches ?? false;
+}
 
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -186,53 +198,70 @@ function getErrorMessage(err: unknown): string {
 }
 
 async function fetchNodes(): Promise<void> {
-  if (!props.projectId) return;
+  const projectId = props.projectId;
+  if (!projectId) return;
+  const version = projectVersion;
+  const requestVersion = ++nodesRequestVersion;
+  const isCurrent = () => version === projectVersion
+    && projectId === props.projectId
+    && requestVersion === nodesRequestVersion;
   loading.value = true;
   error.value = null;
   try {
-    const res = await apiFetch(`/api/v1/knowledge/qa/nodes?project_id=${encodeURIComponent(props.projectId)}`);
+    const res = await apiFetch(`/api/v1/knowledge/qa/nodes?project_id=${encodeURIComponent(projectId)}`);
     if (!res.ok) throw new Error(copy.value.loadFailed);
     const data = await res.json();
-    nodes.value = data ?? [];
+    if (isCurrent()) nodes.value = data ?? [];
   } catch (err) {
+    if (!isCurrent()) return;
     error.value = getErrorMessage(err);
     nodes.value = [];
   } finally {
-    loading.value = false;
+    if (isCurrent()) loading.value = false;
   }
 }
 
 watch(
   () => props.projectId,
   () => {
+    // 關閉時也要失效；否則重開會沿用上一個專案的題目與答案。
+    projectVersion += 1;
+    nodesRequestVersion += 1;
     resetNavigation();
+    nodes.value = [];
+    mergedQaCache.value = {};
+    error.value = null;
+    loading.value = false;
     if (props.open) {
       void fetchNodes();
     }
-  }
+  },
+  { flush: "sync" }
 );
 
 watch(
   () => props.open,
   (isOpen) => {
+    clearTimeout(navigationReset);
     if (isOpen) {
       if (nodes.value.length === 0) {
         void fetchNodes();
       }
     } else {
-      setTimeout(() => {
-        resetNavigation();
-      }, 300);
+      navigationReset = setTimeout(resetNavigation, 300);
     }
   }
 );
 
 watch(currentNode, async (newNode) => {
   if (!newNode) return;
+  const projectId = props.projectId;
+  const version = projectVersion;
   try {
-    const res = await apiFetch(`/api/v1/knowledge/qa/nodes/${encodeURIComponent(newNode.node_id)}/merged?project_id=${encodeURIComponent(props.projectId)}`);
+    const res = await apiFetch(`/api/v1/knowledge/qa/nodes/${encodeURIComponent(newNode.node_id)}/merged?project_id=${encodeURIComponent(projectId)}`);
     if (res.ok) {
       const items = await res.json() as MergedQaItem[];
+      if (version !== projectVersion || projectId !== props.projectId) return;
       for (const item of items) {
         mergedQaCache.value[item.q] = item;
       }
@@ -243,9 +272,20 @@ watch(currentNode, async (newNode) => {
 }, { immediate: true });
 
 onMounted(() => {
+  // 手機舞台很矮，且沉浸模式有獨立 stacking context；移到外層才能完整操作。
+  compactViewport = window.matchMedia("(max-width: 48rem), (max-height: 36rem)");
+  updateCompactViewport();
+  compactViewport.addEventListener("change", updateCompactViewport);
   if (props.open) {
     void fetchNodes();
   }
+});
+
+onBeforeUnmount(() => {
+  projectVersion += 1;
+  nodesRequestVersion += 1;
+  clearTimeout(navigationReset);
+  compactViewport?.removeEventListener("change", updateCompactViewport);
 });
 </script>
 
@@ -358,6 +398,7 @@ onMounted(() => {
 
 .panel-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 1.25rem 1.5rem;
 }
@@ -464,6 +505,30 @@ onMounted(() => {
 .slide-up-leave-to {
   transform: translateY(105%);
   opacity: 0.9;
+}
+
+@media (max-width: 48rem), (max-height: 36rem) {
+  .quick-qa-panel {
+    position: fixed;
+    top: max(0.75rem, env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: max(0.75rem, env(safe-area-inset-left));
+    height: auto;
+  }
+
+  .panel-header {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .panel-header__left {
+    min-width: 0;
+  }
+
+  .panel-body {
+    padding: 0.75rem;
+  }
 }
 
 @keyframes spin {

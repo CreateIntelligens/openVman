@@ -106,3 +106,20 @@ test("choosing a project applies it so the other menus load that project's lists
   }
   assert.doesNotMatch(source, /projectPreviewChange/);
 });
+
+test("every custom select has an accessible name matching its visible field", () => {
+  const expectedNames = {
+    draftProjectId: "知識庫",
+    draftPersonaId: "個性",
+    draftCharacterValue: "人物",
+    draftTtsVoice: "聲音",
+    draftTtsProvider: "語音引擎",
+    draftAsrProvider: "語音辨識",
+  };
+  const selects = [...source.matchAll(/<CustomSelect\s+([\s\S]*?)\/>/g)];
+  assert.equal(selects.length, Object.keys(expectedNames).length);
+  for (const [, attributes] of selects) {
+    const model = attributes.match(/v-model="([^"]+)"/)[1];
+    assert.equal(attributes.match(/aria-label="([^"]+)"/)?.[1], expectedNames[model], model);
+  }
+});

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchSkillFiles, updateSkillFiles } from "../../api";
+import { useUnsavedChanges } from "../../context/NavigationGuardContext";
 import { useLocalStorageState } from "../../hooks/useLocalStorageState";
 import StatusAlert from "../StatusAlert";
 import { filesChanged, SKILL_EDITOR_TABS, type SkillEditorTab } from "./helpers";
@@ -21,36 +22,45 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
+  // 檔案沒載入成功就不能編輯或儲存：儲存會整包覆寫，送出空白底稿等於清掉伺服器上的技能。
+  const [loaded, setLoaded] = useState(false);
   const [originalFiles, setOriginalFiles] = useState<Record<string, string>>({});
+  const dirty = loaded && filesChanged(files, originalFiles);
+
+  useUnsavedChanges(
+    `skill-editor:${scope ?? "shared"}:${projectId ?? ""}:${skillId}`,
+    dirty,
+    `技能 ${skillId}`,
+  );
 
   useEffect(() => {
     setLoading(true);
+    setLoaded(false);
     setError("");
     fetchSkillFiles(skillId, { scope, project_id: projectId })
       .then((data) => {
         setFiles(data.files);
         setOriginalFiles(data.files);
-        setDirty(false);
+        setLoaded(true);
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(`無法載入技能檔案，請關閉後再試一次。${String(e)}`))
       .finally(() => setLoading(false));
   }, [skillId, scope, projectId]);
 
   const handleChange = (content: string) => {
+    if (!loaded) return;
     const nextFiles = { ...files, [activeTab]: content };
     setFiles(nextFiles);
-    setDirty(filesChanged(nextFiles, originalFiles));
   };
 
   const handleSave = () => {
+    if (!loaded || saving) return;
     setSaving(true);
     setError("");
     updateSkillFiles(skillId, files, { scope, project_id: projectId })
       .then(() => {
         setOriginalFiles({ ...files });
-        setDirty(false);
         onSaved();
       })
       .catch((e) => setError(String(e)))
@@ -72,7 +82,7 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
         <div className="flex items-center gap-2">
           <button
             onClick={handleSave}
-            disabled={saving || !dirty}
+            disabled={saving || !loaded || !dirty}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-sm">save</span>
@@ -80,10 +90,12 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
           </button>
           <button
             onClick={onClose}
-            className="flex items-center gap-1 px-3 py-1.5 border border-border text-content-muted hover:text-content hover:border-border-strong rounded-lg text-xs transition-colors"
+            // 儲存送出後一定會寫進伺服器，這時跳「捨棄並離開」會誤導；等儲存結束再關。
+            disabled={saving}
+            className="flex items-center gap-1 px-3 py-1.5 border border-border text-content-muted hover:text-content hover:border-border-strong rounded-lg text-xs transition-colors disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-sm">close</span>
-            關閉
+            {saving ? "儲存完才能關閉" : "關閉"}
           </button>
         </div>
       </div>
@@ -112,8 +124,13 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-content-subtle text-sm">載入檔案中...</div>
+      ) : !loaded ? (
+        <div className="flex items-center justify-center py-16 text-content-subtle text-sm">
+          檔案沒有載入，無法編輯。
+        </div>
       ) : (
         <textarea
+          aria-label={`${skillId} ${activeTab} 內容`}
           value={files[activeTab] ?? ""}
           onChange={(e) => handleChange(e.target.value)}
           spellCheck={false}
