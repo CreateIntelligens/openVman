@@ -512,9 +512,13 @@ class TestBusyRetry:
             tts_voxcpm_busy_retry_seconds=0, **overrides,
         ))
 
+    def test_does_not_retry_by_default(self):
+        adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+        assert adapter._config.tts_voxcpm_busy_retries == 0
+
     @pytest.mark.asyncio
     async def test_busy_then_free_succeeds_without_switching_engine(self, monkeypatch):
-        adapter = self._adapter()
+        adapter = self._adapter(tts_voxcpm_busy_retries=2)
         attempts = []
 
         async def fake_send(form):
@@ -543,7 +547,7 @@ class TestBusyRetry:
 
     @pytest.mark.asyncio
     async def test_other_errors_are_not_retried(self, monkeypatch):
-        adapter = self._adapter()
+        adapter = self._adapter(tts_voxcpm_busy_retries=2)
         attempts = []
 
         async def fake_send(form):

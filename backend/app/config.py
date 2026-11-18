@@ -128,9 +128,9 @@ class TTSRouterConfig(BaseSettings):
         pattern="^(wait|reject)$",
         validation_alias="TTS_VOXCPM_STREAM_QUEUE",
     )
-    # reject 回 429 時先隔一下再試幾次：常常只是滿了一點點，一句合成完就有空位，
-    # 馬上換 Edge 會連聲音都換掉。總等待仍受首音上限（TTS_STREAM_FIRST_BYTE_SECONDS）管。
-    tts_voxcpm_busy_retries: int = Field(default=2, ge=0, le=10, validation_alias="TTS_VOXCPM_BUSY_RETRIES")
+    # reject 回 429 時隔一下再試幾次。2026-11-17 實測單台 VoxCPM 每秒只消化約 2 句，重試 2 次
+    # 只多保住 2～3 句、延遲卻多約 1 秒，所以預設不重試；節點變多、常「只差一點」時再調高。
+    tts_voxcpm_busy_retries: int = Field(default=0, ge=0, le=10, validation_alias="TTS_VOXCPM_BUSY_RETRIES")
     tts_voxcpm_busy_retry_seconds: float = Field(
         default=0.5, ge=0, le=5, validation_alias="TTS_VOXCPM_BUSY_RETRY_SECONDS",
     )
