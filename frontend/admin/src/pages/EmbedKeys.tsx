@@ -107,15 +107,17 @@ export default function EmbedKeys() {
     if (formError) formErrorRef.current?.focus();
   }, [formError]);
 
-  const reload = useCallback(async (showLoading = true) => {
+  const reload = useCallback(async (showLoading = true): Promise<boolean> => {
     if (showLoading) setLoading(true);
     try {
       setKeys(await listEmbedKeys());
+      return true;
     } catch (error) {
       setStatus({
         type: "error",
         message: errorMessage(error, "無法取得 網站嵌入金鑰列表"),
       });
+      return false;
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -209,13 +211,21 @@ export default function EmbedKeys() {
         await createEmbedKey({ ...shared, project_id: form.projectId });
       }
       // 保留原本的操作按鈕，讓儲存關閉後仍可還原焦點。
-      await reload(false);
+      const refreshed = await reload(false);
       setModalOpen(false);
       setEditingKeyId(null);
-      setStatus({
-        type: "success",
-        message: editingKeyId ? "已更新 網站嵌入金鑰。" : "已建立 網站嵌入金鑰。",
-      });
+      // 金鑰已經存進去了，表單照樣關；清單沒刷新成功要講清楚，免得使用者以為沒存到又送一次。
+      setStatus(refreshed
+        ? {
+          type: "success",
+          message: editingKeyId ? "已更新 網站嵌入金鑰。" : "已建立 網站嵌入金鑰。",
+        }
+        : {
+          type: "error",
+          message: editingKeyId
+            ? "已更新 網站嵌入金鑰，但清單刷新失敗，請重新整理頁面。"
+            : "已建立 網站嵌入金鑰，但清單刷新失敗，請重新整理頁面。",
+        });
     } catch (error) {
       setFormError(errorMessage(
         error,

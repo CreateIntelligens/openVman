@@ -127,6 +127,42 @@ describe("Tools draft protection", () => {
     expect(screen.getByText("尚有未儲存的變更")).toBeTruthy();
   });
 
+  it("blocks editing and saving when the skill files fail to load", async () => {
+    vi.mocked(fetchSkillFiles).mockRejectedValueOnce(new Error("讀取失敗"));
+    const onNavigate = renderPage();
+    fireEvent.click((await screen.findAllByRole("button", { name: "編輯" }))[0]);
+
+    expect(await screen.findByText(/無法載入技能檔案/)).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "alpha skill.yaml 內容" })).toBeNull();
+    const save = screen.getByRole("button", { name: /儲存並重載/ }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(updateSkillFiles).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "切換頁面" }));
+    expect(onNavigate).toHaveBeenCalledOnce();
+  });
+
+  it("does not offer to discard a draft while its save is still running", async () => {
+    let finishSave!: () => void;
+    vi.mocked(updateSkillFiles).mockImplementationOnce(() => new Promise((resolve) => {
+      finishSave = () => resolve({ status: "ok", skill_id: "alpha", enabled: true });
+    }));
+    renderPage();
+    await editAlpha();
+    fireEvent.click(screen.getByRole("button", { name: /儲存並重載/ }));
+
+    const close = screen.getByRole("button", { name: /儲存完才能關閉/ }) as HTMLButtonElement;
+    expect(close.disabled).toBe(true);
+    fireEvent.click(close);
+    expect(screen.queryByRole("dialog", { name: "尚有未儲存的變更" })).toBeNull();
+
+    finishSave();
+    await waitFor(() => expect(screen.queryByText("未儲存")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: /關閉/ }));
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "alpha skill.yaml 內容" })).toBeNull());
+    expect(screen.queryByRole("dialog", { name: "尚有未儲存的變更" })).toBeNull();
+  });
+
   it("keeps protecting edits made while an earlier save is pending", async () => {
     let finishSave!: () => void;
     vi.mocked(updateSkillFiles).mockImplementationOnce(() => new Promise((resolve) => {

@@ -274,6 +274,46 @@ describe("EmbedKeys", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("closes the form but reports a failed list refresh after saving", async () => {
+    render(<EmbedKeys />);
+    await screen.findByText("ovk_aaaaaaaaaaaaaaaaaaaaaaaa");
+    api.listEmbedKeys.mockRejectedValueOnce(new Error("後端掛了"));
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯" }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+
+    expect(await screen.findByText("已更新 網站嵌入金鑰，但清單刷新失敗，請重新整理頁面。")).toBeTruthy();
+    expect(api.updateEmbedKey).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText("已更新 網站嵌入金鑰。")).toBeNull();
+  });
+
+  it("keeps the form open when Escape only closes the project list", async () => {
+    render(<EmbedKeys />);
+    await screen.findByText("ovk_aaaaaaaaaaaaaaaaaaaaaaaa");
+    fireEvent.click(screen.getByRole("button", { name: "建立金鑰" }));
+    const dialog = screen.getByRole("dialog", { name: "建立 網站嵌入金鑰" });
+    fireEvent.change(within(dialog).getByLabelText("名稱"), { target: { value: "草稿" } });
+    // jsdom 不會把 Esc 轉成 cancel；照瀏覽器的行為，keydown 派送完沒被擋下才送出關閉要求。
+    const pressEscape = (target: HTMLElement) => {
+      if (fireEvent.keyDown(target, { key: "Escape" })) {
+        fireEvent(dialog, new Event("cancel", { cancelable: true }));
+      }
+    };
+    const project = within(dialog).getByRole("combobox", { name: "專案" });
+    fireEvent.click(project);
+    expect(within(dialog).getByRole("listbox")).toBeTruthy();
+
+    pressEscape(project);
+
+    expect(within(dialog).queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect((within(dialog).getByLabelText("名稱") as HTMLInputElement).value).toBe("草稿");
+
+    pressEscape(project);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("disables a key from the row action", async () => {
     render(<EmbedKeys />);
     await screen.findByText("ovk_aaaaaaaaaaaaaaaaaaaaaaaa");

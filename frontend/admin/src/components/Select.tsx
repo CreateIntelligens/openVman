@@ -140,7 +140,12 @@ export default function Select({
       e.preventDefault();
       if (open) setFocusedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Escape") {
-      setOpen(false);
+      // 清單開著時 Esc 只關清單；不擋的話外層原生 dialog 會一起收到關閉要求，整份表單跟著消失。
+      if (open) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+      }
     } else if (e.key === "Home" || e.key === "End") {
       e.preventDefault();
       if (!open) openDropdown();
