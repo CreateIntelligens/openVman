@@ -25,6 +25,7 @@ SHARED_SKILL_READ_ONLY = (
     "最高管理員可以啟用或停用"
 )
 SHARED_SKILL_TOGGLE_ROOT_ONLY = "共用技能會套用到所有專案，只有最高管理員可以啟用或停用"
+SHARED_SKILL_SCOPE_REQUIRED = "啟用或停用共用技能時要指定 scope=shared（只能一個）"
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
@@ -82,6 +83,10 @@ def _shared_skill_refusal(
         and current.embed_key is None
         and current.user.role is AccountRole.ROOT
     ):
+        # 沒寫或重複的 scope 在這裡被當成共用放行，Brain 卻會先找同名的專案技能、
+        # 或取最後一個值；放行的對象必須跟 Brain 實際切換的是同一個。
+        if request.query_params.getlist("scope") != ["shared"]:
+            return _refuse(status.HTTP_422_UNPROCESSABLE_ENTITY, SHARED_SKILL_SCOPE_REQUIRED)
         return None
     return _refuse(status.HTTP_403_FORBIDDEN, SHARED_SKILL_TOGGLE_ROOT_ONLY)
 

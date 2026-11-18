@@ -21,7 +21,8 @@ PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
 }
 PERSONA_CORE_KEYS = frozenset(PERSONA_CORE_KEYS_TO_FILES.keys())
 PERSONA_CORE_FILENAMES = frozenset(PERSONA_CORE_KEYS_TO_FILES.values())
-_PERSONA_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+# 開頭必須是英數字：「.」「..」會變成目前或上一層資料夾，刪除人設時等於刪掉整個工作區。
+_PERSONA_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 def normalize_persona_id(persona_id: str | None) -> str:
@@ -117,6 +118,10 @@ def delete_persona_scaffold(persona_id: str, project_id: str = "default") -> dic
     persona_dir = get_persona_directory(normalized, project_id)
     if not persona_dir.exists():
         raise ValueError("persona 不存在")
+    personas_root = (workspace.get_workspace_root(project_id) / "personas").resolve()
+    # 再確認一次真的是 personas 底下的一層資料夾（擋 symlink 或日後規則放寬），才整個刪掉。
+    if persona_dir.resolve().parent != personas_root:
+        raise ValueError("persona_id 格式不合法")
 
     shutil.rmtree(persona_dir)
     return {

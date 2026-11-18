@@ -388,3 +388,49 @@ def test_save_uploaded_document_can_target_persona_knowledge_directory(
 
     assert document["path"] == "personas/doctor/knowledge/faq.md"
     assert document["is_indexable"] is True
+
+
+@pytest.mark.parametrize("persona_id", [".", "..", "...", ".hidden", "-x", "_x"])
+def test_persona_ids_must_start_with_a_letter_or_digit(persona_id):
+    personas = _import("personas.personas")
+    with pytest.raises(ValueError):
+        personas.normalize_persona_id(persona_id)
+
+
+def test_deleting_a_dot_persona_leaves_the_workspace_alone(monkeypatch, tmp_path):
+    # 「..」曾被當成人設 ID：刪除時路徑指到工作區本身，shutil.rmtree 把整個專案的檔案刪光。
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+    (root / "personas" / "alice").mkdir(parents=True, exist_ok=True)
+    (root / "knowledge").mkdir(parents=True, exist_ok=True)
+    (root / "knowledge" / "doc.md").write_text("keep", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        personas.delete_persona_scaffold("..", "default")
+
+    assert (root / "knowledge" / "doc.md").read_text(encoding="utf-8") == "keep"
+    assert (root / "personas" / "alice").is_dir()
+
+
+def test_deleting_a_persona_symlinked_outside_is_refused(monkeypatch, tmp_path):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+    outside = tmp_path / "outside" / "inner"
+    outside.mkdir(parents=True)
+    (outside / "keep.md").write_text("keep", encoding="utf-8")
+    (root / "personas").mkdir(parents=True, exist_ok=True)
+    (root / "personas" / "linked").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError):
+        personas.delete_persona_scaffold("linked", "default")
+
+    assert (outside / "keep.md").exists()
+
+
+def test_a_normal_persona_is_still_deleted(monkeypatch, tmp_path):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+    (root / "personas" / "shan").mkdir(parents=True, exist_ok=True)
+
+    assert personas.delete_persona_scaffold("shan", "default")["status"] == "ok"
+    assert not (root / "personas" / "shan").exists()

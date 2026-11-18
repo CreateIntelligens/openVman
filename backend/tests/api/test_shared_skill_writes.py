@@ -160,13 +160,19 @@ def test_non_root_cannot_toggle_shared_skills(case: str, role: AccountRole) -> N
 
 
 @pytest.mark.parametrize("case", sorted(_SHARED_TOGGLES))
-def test_root_can_toggle_shared_skills(case: str) -> None:
+def test_root_toggles_only_with_one_explicit_shared_scope(case: str) -> None:
+    # 沒寫或重複的 scope 會被當成共用放行，但 Brain 會先找同名專案技能、或取最後一個值：
+    # 放行的對象跟實際切換的可能不是同一個，所以 ROOT 也要明寫 scope=shared。
     method, url, kwargs = _SHARED_TOGGLES[case]
     with _proxy(_account(AccountRole.ROOT)) as (client, upstream):
         response = client.request(method, url, **kwargs)
 
-    assert response.status_code == 200
-    upstream.send.assert_awaited_once()
+    if case == "toggle":
+        assert response.status_code == 200
+        upstream.send.assert_awaited_once()
+    else:
+        assert response.status_code == 422
+        upstream.send.assert_not_awaited()
 
 
 def test_embed_key_cannot_write_shared_skills_even_for_a_root_owner() -> None:
