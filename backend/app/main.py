@@ -28,6 +28,7 @@ from app.http_metrics import http_metrics_middleware
 from app.internal_routes import router as internal_router
 from app.lifecycle import lifespan
 from app.openapi import BackendOpenAPI
+from app.project_body_limit import ProjectBodyLimitMiddleware
 from app.project_routes import router as project_router
 from app.routes import admin as admin_routes
 from app.routes import asr as asr_routes
@@ -45,6 +46,7 @@ from app.upstream_guard import RequestIdMiddleware
 
 configure_server_logging()
 app = FastAPI(title="openVman Backend", lifespan=lifespan)
+app.add_middleware(ProjectBodyLimitMiddleware)
 app.add_middleware(FailClosedAuthMiddleware)
 app.middleware("http")(http_metrics_middleware)
 app.middleware("http")(record_request_origin)

@@ -339,12 +339,19 @@ def _resolved_project_id(request: Request) -> str | None:
     return project_id or None
 
 
+def _reject_repeated_project_id(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    # json.loads 遇到重複的鍵只留最後一個；專案 ID 寫兩次就是請求本身有歧義，不替呼叫端挑。
+    if sum(1 for key, _ in pairs if key == "project_id") > 1:
+        raise _InvalidProjectId("project_id must appear only once")
+    return dict(pairs)
+
+
 def _json_object(body: bytes) -> dict[str, Any] | None:
     """The body as Brain's FastAPI would see it: JSON whatever the Content-Type says."""
     if not body.strip():
         return None
     try:
-        payload = json.loads(body)
+        payload = json.loads(body, object_pairs_hook=_reject_repeated_project_id)
     except (UnicodeDecodeError, ValueError):
         return None
     return payload if isinstance(payload, dict) else None
@@ -367,7 +374,10 @@ def _request_project_id(request: Request, body: bytes) -> str | None:
     請求格式錯誤，不猜呼叫端要哪一個。
     """
     candidates: list[str] = []
-    for value in request.query_params.getlist("project_id"):
+    query_values = request.query_params.getlist("project_id")
+    if len(query_values) > 1:
+        raise _InvalidProjectId("project_id must appear only once")
+    for value in query_values:
         query_project_id = canonical_project_id(value)
         if not query_project_id:
             raise _InvalidProjectId("project_id must not be empty")
@@ -411,7 +421,8 @@ def _bind_project(request: Request, body: bytes, project_id: str) -> tuple[str, 
     for holder in _project_id_holders(payload):
         if holder is payload or "project_id" in holder:
             holder["project_id"] = project_id
-    return query, json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    # 用 \\u 跳脫輸出：使用者內容可能含沒配對的 UTF-16 代理字元，直接編成 UTF-8 會丟例外變成 500。
+    return query, json.dumps(payload).encode("utf-8")
 
 
 def _requires_project_context(path: str) -> bool:

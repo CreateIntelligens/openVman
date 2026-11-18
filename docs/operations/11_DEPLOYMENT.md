@@ -183,6 +183,21 @@ PYTHON
 - 關掉決策（不走 Jev）反而較慢：模型拿到完整工具清單，約六成題目會多呼叫一次查知識庫，多一輪 LLM。
 - 數字來自與其他服務共用的主機（30 vCPU），正式規格建議在專用機器上重測。
 
+#### 主機參考規格：1 秒內同時 100 題
+
+以上面的實測換算，LLM、決策與 TTS 都用外部服務（不在這台主機上）時：
+
+| 項目 | 建議 | 依據 |
+|---|---|---|
+| CPU | 24 vCPU（最少 16） | Brain 12～16 核、Backend 3～4 核，其餘給 nginx、Redis、監控與系統 |
+| 記憶體 | 32 GB | Brain 24 workers 尖峰 8.5～10 GB、Backend 約 0.7 GB、embedding 服務約 3.3 GB，其餘給系統與檔案快取 |
+| GPU | 一張 8～16 GB（例如 RTX A4000） | 只跑 embedding；1 秒 100 題時查詢 p95 在 0.4 秒內 |
+| 硬碟 | SSD，500 GB 以上 | 向量資料庫、對話紀錄與日誌以隨機讀寫為主 |
+
+- 換算：Brain 每題約 0.3 核·秒、Backend 約 0.09 核·秒；每 4 核 Brain 約接 1 秒 25 題，`BRAIN_WORKERS` 配到與 Brain 可用核數相近即可。
+- 實測主機是 Xeon Silver 4114（2.2 GHz）虛擬機，新一代伺服器 CPU 每核較快，同樣負載實際所需核數會較少；這份規格偏保守。
+- 自架 TTS（VoxCPM、IndexTTS）或 VLM 時另外需要 GPU，不含在上表。
+
 ### Backend 多 process
 
 Backend 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動，Compose 預設 4，dev 也一樣；`--reload` 只能單一 process，所以 `ENV=dev` 只在 `BACKEND_WORKERS=1` 時自動重載，多 process 時改程式要 `docker restart` Backend 容器。同一個 port 由系統分給各 process，不需要多個容器或改 nginx。每個 process 約 0.1～0.2 GB，尖峰約 1 核。

@@ -243,6 +243,14 @@ def test_encoded_question_mark_does_not_make_a_path_public(wire) -> None:
         ),
         # 重複的 project_id：Brain 取最後一個。
         ("GET", f"/api/v1/knowledge/document?project_id={_OWN}&project_id={_PROJECT}&path=SOUL.md", {}),
+        # 同一個值寫兩次也算歧義，不替呼叫端挑。
+        ("GET", f"/api/v1/knowledge/document?project_id={_OWN}&project_id={_OWN}&path=SOUL.md", {}),
+        # JSON 裡重複的鍵：json.loads 只留最後一個。
+        (
+            "PUT",
+            f"/api/v1/knowledge/document?project_id={_OWN}",
+            {"body": '{"project_id": "%s", "project_id": "%s", "path": "SOUL.md", "content": "x"}' % (_OWN, _OWN)},
+        ),
         # 對話信封會讀 message.project_id。
         (
             "POST",
@@ -311,3 +319,18 @@ def test_public_health_is_read_only(wire) -> None:
 
     assert status == 401
     assert brain.received == []
+
+
+def test_unpaired_surrogates_in_the_body_do_not_crash_the_proxy(wire) -> None:
+    # 使用者內容可能含沒配對的 UTF-16 代理字元；重組 JSON 時不能變成 500。
+    brain, send = wire
+
+    status = send(
+        "PUT",
+        f"/api/v1/knowledge/document?project_id={_OWN}",
+        token="user",
+        body='{"path": "SOUL.md", "content": "a\\ud800b"}',
+    )
+
+    assert status == 200
+    assert json.loads(brain.bodies[0])["content"] == "a\ud800b"
