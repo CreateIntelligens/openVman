@@ -234,3 +234,21 @@ def fresh_project_model_settings():
     clear()
     yield
     clear()
+
+
+@pytest.fixture(autouse=True)
+def recheck_product_catalogs_every_call(monkeypatch):
+    """Tests edit catalog files and read them back at once; production rechecks at most once a second."""
+    module = sys.modules.get("knowledge.product_catalog")
+    if module is not None:
+        module._recently_checked.clear()
+        monkeypatch.setattr(module, "_RECHECK_SECONDS", 0.0)
+
+
+@pytest.fixture(autouse=True)
+def rebuild_workspace_scaffold_every_call(monkeypatch):
+    """Tests remove workspace folders and expect the next call to recreate them."""
+    module = sys.modules.get("knowledge.workspace")
+    if module is not None:
+        module._scaffolded_at.clear()
+        monkeypatch.setattr(module, "_SCAFFOLD_RECHECK_SECONDS", 0.0)

@@ -62,6 +62,9 @@ from tools.context import (
 from tools.tool_registry import get_tool_registry
 
 _pii_writeback_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-writeback")
+# 記憶寫回要等當天日誌檔的跨 process 檔案鎖；放進預設執行緒池會跟對話本身的
+# to_thread 搶位子。一個 process 一條就夠，反正同一個檔案一次也只能一個人寫。
+_memory_write_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="memory-writeback")
 
 logger = logging.getLogger(__name__)
 
@@ -246,12 +249,9 @@ def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> N
         except Exception as exc:  # noqa: BLE001
             logger.warning("background memory write failed project=%s: %s", project_id, exc)
 
-    try:
-        loop = asyncio.get_running_loop()
-        loop.run_in_executor(None, _work)
-    except RuntimeError:
-        # No running loop (sync test path); execute inline.
-        _work()
+    # finalize 在執行緒裡跑，這裡通常沒有 event loop；不能拿「有沒有 loop」判斷要不要同步寫，
+    # 一律交給背景執行緒，回覆才不用等當天日誌檔的鎖。
+    _memory_write_executor.submit(_work)
 
 
 def _scan_user_pii(message: str, trace_id: str) -> dict[str, Any] | None:

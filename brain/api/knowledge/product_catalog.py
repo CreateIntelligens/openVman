@@ -12,9 +12,11 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from math import isfinite
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 import yaml
@@ -32,6 +34,11 @@ LEGACY_CATALOG_NAME = "products"
 # 是純 CPU 工作：鶴記 118 篇約 0.15 秒，多人同時問就排隊。檔案沒變就不重新解析；
 # 以型錄資料夾為單位，一條商品線改了不會讓其他商品線重新解析。
 _catalog_cache: dict[tuple[str, str], tuple[tuple[object, ...], ProductCatalog]] = {}
+# 每題會讀型錄兩三次（組提示詞、組工具清單、篩選），每次都要掃整個資料夾比對檔案；
+# 同一秒內就沿用剛確認過的結果，後台改了型錄最慢 1 秒後生效。
+_RECHECK_SECONDS = 1.0
+_recently_checked: dict[str, tuple[float, list[ProductCatalog]]] = {}
+_recently_checked_lock = threading.Lock()
 
 
 class CatalogError(ValueError):
@@ -141,12 +148,15 @@ def _catalog_directories(root: Path) -> list[tuple[str, Path]]:
 
 def _catalog_files(directory: Path, suffixes: set[str]) -> list[Path]:
     """Files that belong to the catalog in ``directory``, leaving out other catalog folders inside it."""
+    candidates = [path for path in sorted(directory.rglob("*")) if path.is_file()]
+    # 舊版面的 products/ 底下也有商品線資料夾；那些筆記屬於商品線自己的型錄。
+    # 每題都會跑到這裡，先一次找出巢狀型錄資料夾，不要每個檔案再往上逐層 stat。
+    nested = {path.parent for path in candidates if path.name == CATALOG_FILENAME and path.parent != directory}
     files = []
-    for path in sorted(directory.rglob("*")):
-        if path.suffix not in suffixes or not path.is_file():
+    for path in candidates:
+        if path.suffix not in suffixes:
             continue
-        # 舊版面的 products/ 底下也有商品線資料夾；那些筆記屬於商品線自己的型錄。
-        if any((parent / CATALOG_FILENAME).is_file() for parent in path.parents if directory in parent.parents):
+        if nested and any(parent in nested for parent in path.parents):
             continue
         files.append(path)
     return files
@@ -168,6 +178,17 @@ def load_product_catalogs(project_id: str) -> list[ProductCatalog]:
     Raises :class:`CatalogError` naming the folder when one catalog is broken. The results are
     shared between callers while the files are unchanged: treat them as read-only.
     """
+    with _recently_checked_lock:
+        recent = _recently_checked.get(project_id)
+    if recent is not None and monotonic() - recent[0] < _RECHECK_SECONDS:
+        return list(recent[1])
+    catalogs = _load_product_catalogs(project_id)
+    with _recently_checked_lock:
+        _recently_checked[project_id] = (monotonic(), catalogs)
+    return list(catalogs)
+
+
+def _load_product_catalogs(project_id: str) -> list[ProductCatalog]:
     root = get_workspace_root(project_id)
     directories = _catalog_directories(root)
     for key in [key for key in _catalog_cache if key[0] == project_id]:

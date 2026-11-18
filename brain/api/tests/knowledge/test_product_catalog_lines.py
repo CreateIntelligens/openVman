@@ -107,6 +107,40 @@ def test_legacy_and_line_folders_are_separate_catalogs(root):
     assert [product.values["model"] for product in fans.products] == ["F1"]
 
 
+def test_notes_deep_inside_a_line_folder_stay_with_that_line(root):
+    _line(root, None, CATALOG, PRODUCTS)
+    fans = _line(root, "風扇", FANS, {"F1.md": {"model": "F1", "blade_cm": 30}})
+    (fans / "舊款").mkdir()
+    (fans / "舊款" / "F0.md").write_text(_note({"model": "F0", "blade_cm": 20}), encoding="utf-8")
+
+    legacy, fans_catalog = load_product_catalogs("deep")
+
+    assert len(legacy.products) == len(PRODUCTS)
+    assert sorted(product.values["model"] for product in fans_catalog.products) == ["F0", "F1"]
+
+
+def test_reads_within_a_second_reuse_the_last_check(root, monkeypatch):
+    _line(root, "風扇", FANS, {"F1.md": {"model": "F1", "blade_cm": 30}})
+    monkeypatch.setattr(product_catalog, "_RECHECK_SECONDS", 60.0)
+    clock = [100.0]
+    monkeypatch.setattr(product_catalog, "monotonic", lambda: clock[0])
+    scans = []
+    real_scan = product_catalog._catalog_files
+    monkeypatch.setattr(product_catalog, "_catalog_files", lambda *a: scans.append(1) or real_scan(*a))
+
+    first = load_product_catalogs("recheck")
+    scans_after_first = len(scans)
+    _line(root, "風扇", FANS, {"F2.md": {"model": "F2", "blade_cm": 40}})
+    second = load_product_catalogs("recheck")
+
+    assert len(scans) == scans_after_first
+    assert [p.values["model"] for p in second[0].products] == [p.values["model"] for p in first[0].products]
+
+    clock[0] += 61
+    third = load_product_catalogs("recheck")
+    assert sorted(p.values["model"] for p in third[0].products) == ["F1", "F2"]
+
+
 def test_several_catalogs_need_a_choice(root):
     _line(root, "泵浦", CATALOG, PRODUCTS)
     _line(root, "風扇", FANS, {"F1.md": {"model": "F1", "blade_cm": 30}})

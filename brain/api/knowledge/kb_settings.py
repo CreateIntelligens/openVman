@@ -26,15 +26,32 @@ def _path(project_id: str):
     return ensure_workspace_scaffold(project_id) / KB_SETTINGS_FILENAME
 
 
+# 每題都會讀；檔案被寫過時修改時間、大小或 inode 會變，沒變就用上次的結果。
+_settings_cache: dict[Any, tuple[tuple[int, int, int], dict[str, Any]]] = {}
+
+
 def load_kb_settings(project_id: str = "default") -> dict[str, Any]:
+    path = _path(project_id)
     try:
-        raw = json.loads(_path(project_id).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        raw = {}
-    return {
-        "language_routes": _normalize_routes(raw.get("language_routes")),
-        "reply_seconds": _normalize_seconds(raw.get("reply_seconds")),
-    }
+        stat = path.stat()
+        signature = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+    except OSError:
+        signature = None
+    cached = _settings_cache.get(path)
+    if signature is not None and cached is not None and cached[0] == signature:
+        settings = cached[1]
+    else:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            raw = {}
+        settings = {
+            "language_routes": _normalize_routes(raw.get("language_routes")),
+            "reply_seconds": _normalize_seconds(raw.get("reply_seconds")),
+        }
+        if signature is not None:
+            _settings_cache[path] = (signature, settings)
+    return {**settings, "language_routes": list(settings["language_routes"])}
 
 
 def save_kb_settings(

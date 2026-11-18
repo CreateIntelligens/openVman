@@ -379,3 +379,84 @@ def test_chat_request_deadline_answers_504(chat_route, monkeypatch) -> None:
     assert caught.value.detail["error_code"] == "GATEWAY_TIMEOUT"
     assert seen.get("cancelled") is True
     assert [name for name, _ in observed["events"]] == ["chat_deadline_exceeded"]
+
+
+def test_a_slow_finalize_does_not_freeze_other_chats_on_the_worker(chat_route, monkeypatch) -> None:
+    # 寫 sessions.db 可能要等別的 worker 放鎖；那段時間同一個 worker 上其他人的句子要照常送出。
+    module, observed = chat_route
+    entered = threading.Event()
+    release = threading.Event()
+    slow_finished = threading.Event()
+    real_finalize = module.finalize_generation
+
+    def finalize(context, reply, tool_steps, response_time_s, *, media=None):
+        if reply == "慢的。":
+            entered.set()
+            release.wait(3)
+            slow_finished.set()
+        return real_finalize(context, reply, tool_steps, response_time_s, media=media)
+
+    monkeypatch.setattr(module, "finalize_generation", finalize)
+
+    def generate(context, text_listener=None):
+        reply = "慢的。" if not entered.is_set() else "快的。"
+        text_listener.attempt_started()
+        text_listener.text_delta(reply)
+        return SimpleNamespace(reply=reply, tool_steps=[])
+
+    monkeypatch.setattr(module, "execute_generation", generate)
+
+    async def run() -> tuple[list[tuple[str, Any]], bool]:
+        slow = asyncio.create_task(_collect(await module.chat_stream(_Request(), _payload())))
+        while not entered.is_set():
+            await asyncio.sleep(0.01)
+        fast = await asyncio.wait_for(_collect(await module.chat_stream(_Request(), _payload())), timeout=2)
+        fast_beat_slow = not slow_finished.is_set()
+        release.set()
+        await slow
+        return fast, fast_beat_slow
+
+    fast, fast_beat_slow = asyncio.run(run())
+
+    assert [name for name, _ in fast] == ["sentence", "done"]
+    assert fast[0][1]["text"] == "快的。"
+    assert fast_beat_slow
+
+
+def _slow_finalize(module, seconds: float):
+    real_finalize = module.finalize_generation
+
+    def finalize(context, reply, tool_steps, response_time_s, *, media=None):
+        time.sleep(seconds)
+        return real_finalize(context, reply, tool_steps, response_time_s, media=media)
+
+    return finalize
+
+
+def test_a_turn_already_being_saved_is_not_answered_with_504(chat_route, monkeypatch) -> None:
+    # 開始寫紀錄後才到期：紀錄一定會寫完，回 504 會讓用戶端以為沒成功、再問一次。
+    module, observed = chat_route
+    monkeypatch.setattr(module, "execute_generation", _streaming_generation(["好。"], "好。", []))
+    monkeypatch.setattr(module, "_response_deadline_seconds", lambda: 0.3)
+    monkeypatch.setattr(module, "finalize_generation", _slow_finalize(module, 0.6))
+
+    payload = asyncio.run(module.chat(_Request(), _payload()))
+
+    assert payload["reply"] == "好。"
+    assert observed["finalize"] == ["好。"]
+    assert "chat_deadline_exceeded" not in [name for name, _ in observed["events"]]
+
+
+def test_a_stream_already_being_saved_still_ends_with_done(chat_route, monkeypatch) -> None:
+    module, observed = chat_route
+    monkeypatch.setattr(module, "execute_generation", _streaming_generation(["好。"], "好。", []))
+    monkeypatch.setattr(module, "_response_deadline_seconds", lambda: 0.3)
+    monkeypatch.setattr(module, "finalize_generation", _slow_finalize(module, 0.6))
+
+    async def run() -> list[tuple[str, Any]]:
+        return await _collect(await module.chat_stream(_Request(), _payload()))
+
+    events = asyncio.run(run())
+
+    assert [name for name, _ in events] == ["sentence", "done"]
+    assert "chat_deadline_exceeded" not in [name for name, _ in observed["events"]]

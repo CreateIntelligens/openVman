@@ -22,6 +22,19 @@ REFRESH_SECONDS: Final = 10.0
 
 T = TypeVar("T")
 _MISSING: Any = object()
+_HTTP_LOCK = threading.Lock()
+_HTTP: httpx.Client | None = None
+
+
+def _shared_get(*args: Any, **kwargs: Any) -> httpx.Response:
+    # 每次 httpx.get 都會新建 client、重新載入 CA 憑證；設定一過期，
+    # 同時進來的每一題都各讀一次，所以整個 process 共用同一個 client。
+    global _HTTP
+    with _HTTP_LOCK:
+        if _HTTP is None:
+            _HTTP = httpx.Client()
+        client = _HTTP
+    return client.get(*args, **kwargs)
 
 
 class ModelProviderConfigUnavailable(RuntimeError):
@@ -32,7 +45,7 @@ def fetch_section(
     section: str,
     *,
     timeout: float,
-    get: Callable[..., httpx.Response] = httpx.get,
+    get: Callable[..., httpx.Response] = _shared_get,
     **request: Any,
 ) -> Any:
     body = fetch_document(timeout=timeout, get=get, **request)
@@ -44,7 +57,7 @@ def fetch_section(
 def fetch_document(
     *,
     timeout: float,
-    get: Callable[..., httpx.Response] = httpx.get,
+    get: Callable[..., httpx.Response] = _shared_get,
     **request: Any,
 ) -> dict[str, Any]:
     cfg = get_settings()

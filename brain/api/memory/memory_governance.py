@@ -276,12 +276,67 @@ def _resolve_daily_file(persona_id: str, day: str, project_id: str = "default") 
     return memory_dir / f"{day}.md"
 
 
+@dataclass
+class _DailyFileScan:
+    inode: int
+    offset: int
+    fingerprints: set[str]
+    has_summary_section: bool
+    # 上次讀到位置前的最後一段；檔案被刪掉重建時 inode 可能剛好重用，內容對不上就從頭掃。
+    tail: bytes = b""
+
+
+# 每題都會寫一次當天的日誌檔，檔案一天下來越長越大；每次都整份讀進來比對，
+# 同時 100 題時會在同一把檔案鎖上排很久，連帶卡住回覆路徑上的 archive_session_turn。
+# 只能在持有檔案鎖時呼叫：鎖內不會有人寫到一半，從上次讀到的位置往後讀就夠。
+_daily_scans: dict[Path, _DailyFileScan] = {}
+_DAILY_SCANS_KEPT = 64
+_TAIL_BYTES = 64
+_FINGERPRINT_RE = re.compile(r"fingerprint: ([0-9a-f]{12})")
+
+
+def _scan_daily_file(path: Path) -> _DailyFileScan | None:
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        _daily_scans.pop(path, None)
+        return None
+    scan = _daily_scans.pop(path, None)
+    if scan is not None and (
+        scan.inode != stat.st_ino or stat.st_size < scan.offset or not _same_tail(path, scan)
+    ):
+        scan = None
+    if scan is None:
+        scan = _DailyFileScan(stat.st_ino, 0, set(), False)
+    if stat.st_size > scan.offset:
+        with path.open("rb") as handle:
+            handle.seek(scan.offset)
+            added = handle.read()
+        text = added.decode("utf-8-sig" if scan.offset == 0 else "utf-8", errors="replace")
+        scan.fingerprints.update(_FINGERPRINT_RE.findall(text))
+        scan.has_summary_section = scan.has_summary_section or _SUMMARY_SECTION_HEADER in text
+        scan.offset += len(added)
+        scan.tail = (scan.tail + added)[-_TAIL_BYTES:]
+    # 每天每個角色一個檔案，舊日期不會再被讀；只留最近用到的幾個。
+    _daily_scans[path] = scan
+    while len(_daily_scans) > _DAILY_SCANS_KEPT:
+        _daily_scans.pop(next(iter(_daily_scans)))
+    return scan
+
+
+def _same_tail(path: Path, scan: _DailyFileScan) -> bool:
+    if not scan.tail:
+        return True
+    with path.open("rb") as handle:
+        handle.seek(scan.offset - len(scan.tail))
+        return handle.read(len(scan.tail)) == scan.tail
+
+
 def _daily_file_has_fingerprint(path: Path, fingerprint: str) -> bool:
     """Check if a daily file already contains a summary with the given fingerprint."""
-    if not path.exists():
-        return False
-    content = path.read_text(encoding="utf-8-sig")
-    return f"fingerprint: {fingerprint[:12]}" in content
+    with file_lock(path):
+        scan = _scan_daily_file(path)
+    return scan is not None and fingerprint[:12] in scan.fingerprints
 
 
 def _format_summary_block(
@@ -321,15 +376,11 @@ def _append_summary_block(path: Path, block: str) -> None:
             )
             return
 
-        content = path.read_text(encoding="utf-8-sig")
-        if _SUMMARY_SECTION_HEADER in content:
-            # Append after existing summary section
-            content = content.rstrip() + "\n\n" + block + "\n"
-        else:
-            # Add summary section at end
-            content = content.rstrip() + "\n\n" + _SUMMARY_SECTION_HEADER + "\n\n" + block + "\n"
-
-        path.write_text(content, encoding="utf-8")
+        scan = _scan_daily_file(path)
+        # 只往後接，不整份重寫：重寫要先清空檔案，中途當掉會丟掉當天的日誌。
+        header = "" if scan is not None and scan.has_summary_section else f"\n{_SUMMARY_SECTION_HEADER}\n"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{header}\n{block}\n")
 
 
 _DATE_STEM_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

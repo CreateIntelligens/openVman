@@ -102,7 +102,7 @@ def deduplicate(
     """
     seen_keys: set[Any] = set()
     kept: list[dict[str, Any]] = []
-    kept_vectors: list[Any] = []
+    kept_units: list[np.ndarray] = []
     resolve_key = key_fn or _default_key
 
     for record in records:
@@ -111,24 +111,45 @@ def deduplicate(
             continue
 
         vector = record.get(vector_field)
-        if vector is not None and _is_near_duplicate(vector, kept_vectors, similarity_threshold):
+        unit = _unit_vector(vector) if vector is not None else None
+        if unit is not None and _is_near_duplicate(unit, kept_units, similarity_threshold):
             continue
 
         if key is not None:
             seen_keys.add(key)
-        if vector is not None:
-            kept_vectors.append(vector)
+        # 零向量或空向量跟誰比都是 0，本來就不會擋掉後面的筆，不必留著比。
+        if unit is not None:
+            kept_units.append(unit)
         kept.append(record)
 
     return kept
 
 
+def _unit_vector(vector: Any) -> np.ndarray | None:
+    try:
+        array = np.asarray(vector, dtype=np.float32).ravel()
+    except (TypeError, ValueError):
+        return None
+    if array.size == 0:
+        return None
+    norm = np.linalg.norm(array)
+    # 含 NaN／inf 的向量跟誰比都不會「相似」，跟零向量一樣不留著比，免得把 max 變成 NaN。
+    if norm == 0 or not np.isfinite(norm):
+        return None
+    return array / norm
+
+
 def _is_near_duplicate(
-    vector: Any,
-    kept_vectors: list[Any],
+    unit: np.ndarray,
+    kept_units: list[np.ndarray],
     threshold: float,
 ) -> bool:
-    return any(cosine_similarity(vector, kept) >= threshold for kept in kept_vectors)
+    # 每題的檢索結果都要互相比一次；一筆一筆算 norm 在同時 100 題時很吃 CPU，
+    # 改成先正規化、一次跟所有已保留的向量做矩陣乘法。長度不同的照舊視為不相似。
+    same_length = [kept for kept in kept_units if kept.size == unit.size]
+    if not same_length:
+        return False
+    return bool(np.max(np.stack(same_length) @ unit) >= threshold)
 
 
 def cosine_similarity(vec_a: Any, vec_b: Any) -> float:

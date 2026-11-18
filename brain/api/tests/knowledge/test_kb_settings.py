@@ -89,3 +89,18 @@ def test_concurrent_readers_never_see_partial_settings(kb):
             process.join(5)
     assert process.exitcode == 0
     assert observed
+
+
+def test_reads_reuse_the_parsed_file_until_it_is_saved_again(kb, monkeypatch):
+    kb.save_kb_settings("p", language_routes=["en"])
+    parsed = []
+    real_loads = kb.json.loads
+    monkeypatch.setattr(kb.json, "loads", lambda text: parsed.append(1) or real_loads(text))
+
+    kb.load_kb_settings("p")
+    kb.load_kb_settings("p")["language_routes"].append("mutated")
+    assert kb.load_kb_settings("p")["language_routes"] == ["en"]
+    assert len(parsed) == 1
+
+    kb.save_kb_settings("p", language_routes=["nan", "zh"])
+    assert kb.load_kb_settings("p")["language_routes"] == ["nan", "zh"]

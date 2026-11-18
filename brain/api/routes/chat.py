@@ -251,6 +251,9 @@ class _ChatRun:
     context: Any = None
     scope: UsageScope | None = None
     deadline_exceeded: bool = False
+    # 開始寫紀錄之後就不再算逾時：紀錄一定會寫完，這時回 504 會讓用戶端以為沒成功。
+    persisting: bool = False
+    deadline: asyncio.Timeout | None = None
 
 
 async def _to_thread_timed(
@@ -325,6 +328,9 @@ async def _generate_chat_response(
             raise_if_cancelled("reply_media", tool_steps=len(result.tool_steps))
             media = await asyncio.to_thread(reply_media, context, result.tool_steps)
         raise_if_cancelled("persist", tool_steps=len(result.tool_steps))
+        run.persisting = True
+        if run.deadline is not None:
+            run.deadline.reschedule(None)
         response_time_s = round(time.monotonic() - run.started, 2)
         if payload.turn_id is not None:
             response = await asyncio.to_thread(
@@ -332,7 +338,10 @@ async def _generate_chat_response(
                 result.reply, result.tool_steps, response_time_s, media,
             )
         else:
-            response = finalize_generation(
+            # 寫 sessions.db 可能要等別的 worker 放鎖（最久 30 秒）；直接在 event loop 上做，
+            # 這個 worker 上其他對話的句子全都送不出去，一批人同時問時會一起卡好幾秒。
+            response = await asyncio.to_thread(
+                finalize_generation,
                 context, result.reply, result.tool_steps, response_time_s,
                 media=media,
             )
@@ -366,6 +375,7 @@ async def chat(request: Request, payload: ChatRequest):
     watcher = asyncio.create_task(_cancel_on_disconnect(request, cancel_event))
     deadline_s = _response_deadline_seconds()
     deadline = asyncio.timeout(deadline_s)
+    run.deadline = deadline
     try:
         try:
             async with deadline:
@@ -453,8 +463,12 @@ async def _stream_chat_events(request: Request, payload: ChatRequest) -> AsyncIt
     try:
         while True:
             try:
-                item = await asyncio.wait_for(queue.get(), timeout=max(0.0, deadline_at - loop.time()))
+                remaining = None if run.persisting else max(0.0, deadline_at - loop.time())
+                item = await asyncio.wait_for(queue.get(), timeout=remaining)
             except TimeoutError:
+                if run.persisting:
+                    # 等待開始時還沒寫紀錄，到期時已經在寫了：照樣等 done。
+                    continue
                 run.deadline_exceeded = True
                 cancel_event.set()
                 _log_deadline_exceeded(request, payload, run, deadline_s)

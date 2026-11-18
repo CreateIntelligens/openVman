@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from time import monotonic
 
 from infra.file_lock import file_lock
 from infra.project_context import resolve_project_context
@@ -153,9 +154,24 @@ def get_core_documents(project_id: str = "default") -> dict[str, Path]:
     return {key: ws / filename for key, filename in _CORE_DOCUMENT_KEYS.items()}
 
 
+# 每題要讀好幾個設定檔，每次都會走到這裡做十幾次 mkdir／exists；
+# 剛確認過且根目錄還在，就不再逐一檢查。專案被刪掉時根目錄消失，下一次照常重建。
+_SCAFFOLD_RECHECK_SECONDS = 5.0
+_scaffolded_at: dict[Path, float] = {}
+
+
 def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     """Ensure the workspace root, core docs, and support directories exist."""
     ws = get_workspace_root(project_id)
+    checked = _scaffolded_at.get(ws)
+    if checked is not None and monotonic() - checked < _SCAFFOLD_RECHECK_SECONDS and ws.is_dir():
+        return ws
+    _build_workspace_scaffold(ws)
+    _scaffolded_at[ws] = monotonic()
+    return ws
+
+
+def _build_workspace_scaffold(ws: Path) -> None:
     ws.mkdir(parents=True, exist_ok=True)
     for subdir in (
         "memory",
@@ -179,8 +195,6 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
             with file_lock(path):
                 if not path.exists():
                     path.write_text(template, encoding="utf-8")
-
-    return ws
 
 
 def _migrate_learnings_layout(ws: Path) -> None:

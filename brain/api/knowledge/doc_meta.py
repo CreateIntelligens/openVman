@@ -225,12 +225,28 @@ def move_many_document_meta(renames: dict[str, str], project_id: str = "default"
         save_doc_meta(metadata, project_id)
 
 
+# 每題都會問哪些文件停用；文件多時解析整份 metadata 不便宜。
+# 檔案只要被寫過，修改時間、大小或 inode 就會變，用它判斷要不要重讀。
+_disabled_cache: dict[Path, tuple[tuple[int, int, int], frozenset[str]]] = {}
+
+
 def list_disabled_document_paths(project_id: str = "default") -> set[str]:
-    return {
+    path = get_doc_meta_path(project_id)
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return set()
+    signature = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+    cached = _disabled_cache.get(path)
+    if cached is not None and cached[0] == signature:
+        return set(cached[1])
+    disabled = frozenset(
         relative_path
         for relative_path, value in load_doc_meta(project_id).items()
         if _resolved_entry(value)["enabled"] is False
-    }
+    )
+    _disabled_cache[path] = (signature, disabled)
+    return set(disabled)
 
 
 def _normalize_entry(value: dict[str, Any]) -> dict[str, Any]:
