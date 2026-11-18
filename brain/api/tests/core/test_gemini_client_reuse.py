@@ -7,7 +7,7 @@ import types
 
 import pytest
 
-from core import llm_client
+from core import gemini_client, llm_client
 
 
 @pytest.fixture
@@ -23,9 +23,9 @@ def fake_genai(monkeypatch):
     google.genai = types.SimpleNamespace(Client=Client)
     monkeypatch.setitem(sys.modules, "google", google)
     monkeypatch.setattr(llm_client, "current_model_project", lambda *a: None)
-    llm_client._GEMINI_CLIENT_CACHE.clear()
+    gemini_client.clear_gemini_clients()
     yield built
-    llm_client._GEMINI_CLIENT_CACHE.clear()
+    gemini_client.clear_gemini_clients()
 
 
 def _use_key(monkeypatch, key: str) -> None:

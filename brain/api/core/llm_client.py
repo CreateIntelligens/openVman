@@ -19,6 +19,7 @@ from core.fallback_chain import (
     has_admin_api_key,
     health_id,
 )
+from core.gemini_client import gemini_client_for_key
 from core.gemini_credentials import current_model_project, resolve_gemini_credential
 from core.generation_cancel import (
     GenerationCancelled,
@@ -58,8 +59,6 @@ from safety.observability import (
 _CLIENT_CACHE_MAX = 32
 _SYNC_CLIENT_CACHE: "OrderedDict[tuple[str, str | None], OpenAI]" = OrderedDict()
 _SYNC_CLIENT_CACHE_LOCK = Lock()
-_GEMINI_CLIENT_CACHE: "OrderedDict[str, Any]" = OrderedDict()
-_GEMINI_CLIENT_CACHE_LOCK = Lock()
 
 
 def _get_sync_client(api_key: str, base_url: str | None) -> OpenAI:
@@ -505,24 +504,7 @@ def _get_gemini_client() -> Any:
         resolve_gemini_credential(project_id).api_key if project_id is not None
         else get_settings().resolve_api_key_for_provider("gemini")
     )
-    if not gemini_key:
-        return None
-    # 每題都會走到這裡；genai.Client 建構時要載入 CA 憑證建兩個 SSL context，
-    # 同時 100 題時光這一步就佔掉 Brain 約兩成 CPU，所以同一把金鑰共用一個。
-    with _GEMINI_CLIENT_CACHE_LOCK:
-        client = _GEMINI_CLIENT_CACHE.get(gemini_key)
-        if client is not None:
-            _GEMINI_CLIENT_CACHE.move_to_end(gemini_key)
-            return client
-        try:
-            from google import genai
-            client = genai.Client(api_key=gemini_key)
-        except Exception:
-            return None
-        _GEMINI_CLIENT_CACHE[gemini_key] = client
-        if len(_GEMINI_CLIENT_CACHE) > _CLIENT_CACHE_MAX:
-            _GEMINI_CLIENT_CACHE.popitem(last=False)
-        return client
+    return gemini_client_for_key(gemini_key) if gemini_key else None
 
 
 def _resolve_chain_or_routes(
