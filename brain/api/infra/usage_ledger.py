@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
+import os
 import sqlite3
+import threading
+import time
+from collections import deque
+from collections.abc import Iterator
+from contextlib import closing, contextmanager, suppress
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from threading import Lock
 from typing import Any
 
 from core.usage import LLMUsage, UsageScope, current_usage_scope
@@ -16,7 +23,7 @@ from infra.project_context import get_data_root
 
 logger = logging.getLogger("brain.usage")
 
-_LOCK = Lock()
+_INIT_LOCK = threading.Lock()
 _INITIALIZED: set[str] = set()
 _DB_PATH_OVERRIDE: Path | None = None
 
@@ -122,26 +129,372 @@ def get_usage_db_path() -> Path:
 def set_usage_db_path(path: Path | None) -> None:
     """Override the ledger location (tests only)."""
     global _DB_PATH_OVERRIDE
+    # 排隊中的事件已綁定舊路徑；先寫完並關掉常駐連線，才不會殘留到下一個路徑。
+    flush_usage_events(timeout=_SHUTDOWN_FLUSH_TIMEOUT_S)
+    _WRITER.close_connection()
     _DB_PATH_OVERRIDE = path
-    _INITIALIZED.clear()
+    with _INIT_LOCK:
+        _INITIALIZED.clear()
 
 
-def _connect() -> sqlite3.Connection:
-    path = get_usage_db_path()
+def _connect(
+    path: Path | None = None,
+    *,
+    busy_timeout_ms: int = 5000,
+    autocommit: bool = False,
+) -> sqlite3.Connection:
+    path = path if path is not None else get_usage_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, check_same_thread=False)
-    conn.execute("PRAGMA busy_timeout=5000")
+    conn = sqlite3.connect(
+        path,
+        check_same_thread=False,
+        isolation_level=None if autocommit else "",
+    )
+    conn.execute(f"PRAGMA busy_timeout={int(busy_timeout_ms)}")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.row_factory = sqlite3.Row
     key = str(path)
     if key not in _INITIALIZED:
-        with file_lock(path):
+        with _INIT_LOCK, file_lock(path):
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(_SCHEMA)
             _add_missing_columns(conn)
             conn.execute(_PRINCIPAL_INDEX)
-        _INITIALIZED.add(key)
+            if not autocommit:
+                conn.commit()
+            _INITIALIZED.add(key)
     return conn
+
+
+@contextmanager
+def _read_connection() -> Iterator[sqlite3.Connection]:
+    """讀取前先把本 process 排隊中的事件寫完，同一 process 先寫後讀才一致。
+
+    讀取用自己的短連線、不碰寫入執行緒；等不到（別的 process 長時間鎖住）
+    就照讀，寧可少算剛發生的幾筆也不要卡住查詢。
+    """
+    flush_usage_events(timeout=_READ_FLUSH_TIMEOUT_S)
+    with closing(_connect()) as conn:
+        yield conn
+
+
+# ---------------------------------------------------------------------------
+# 背景寫入
+#
+# 回覆路徑上每次決策、每次 LLM 呼叫都會記一筆用量。十幾個 worker process
+# 共用同一個 usage.db，同步寫入時每筆都要搶 SQLite 寫鎖，一秒湧進上百題時
+# 每筆最多等 busy_timeout，決策被拖到十秒，等不到的紀錄還直接丟掉。
+# 改成每個 process 一條背景執行緒、一條常駐連線，批次寫入；呼叫端只排隊。
+# ---------------------------------------------------------------------------
+
+#: 累積到這麼多筆就立刻寫，不等滿一個間隔。
+_BATCH_SIZE = 100
+#: 單一交易最多寫幾筆。
+_MAX_BATCH = 500
+#: 第一筆排隊後最多等多久就寫。
+_FLUSH_INTERVAL_S = 0.5
+#: 佇列上限。SQLite 長時間鎖住時，超過的事件直接丟棄並記一次 log。
+_QUEUE_CAP = 10_000
+#: 寫入連線每次嘗試的 busy 等待；等不到就退避重試，不會卡住呼叫端。
+_WRITER_BUSY_TIMEOUT_MS = 1000
+_RETRY_BACKOFF_INITIAL_S = 0.05
+_RETRY_BACKOFF_MAX_S = 2.0
+#: 非鎖定類錯誤（磁碟、權限、schema）重試幾次後放棄該批。
+_MAX_NON_BUSY_ATTEMPTS = 3
+#: 常駐連線不會在關閉時順手 checkpoint，所以定期做 PASSIVE checkpoint，
+#: 並限制 WAL 檔在 checkpoint 後縮回的大小。
+_CHECKPOINT_INTERVAL_S = 30.0
+_JOURNAL_SIZE_LIMIT_BYTES = 4 * 1024 * 1024
+_READ_FLUSH_TIMEOUT_S = 2.0
+_SHUTDOWN_FLUSH_TIMEOUT_S = 5.0
+
+
+def _is_busy_error(exc: BaseException) -> bool:
+    if not isinstance(exc, sqlite3.OperationalError):
+        return False
+    code = getattr(exc, "sqlite_errorcode", None)
+    if code is not None and code & 0xFF in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+        return True
+    message = str(exc).lower()
+    return "locked" in message or "busy" in message
+
+
+@dataclass
+class _Pending:
+    seq: int
+    path: Path
+    event: dict[str, Any]
+
+
+@dataclass
+class _UsageWriter:
+    cond: threading.Condition = field(default_factory=threading.Condition)
+    queue: deque[_Pending] = field(default_factory=deque)
+    enqueued: int = 0
+    done: int = 0
+    flush_requested: bool = False
+    stopping: bool = False
+    overflowing: bool = False
+    dropped: int = 0
+    thread: threading.Thread | None = None
+    conn: sqlite3.Connection | None = None
+    conn_path: Path | None = None
+    last_checkpoint: float = 0.0
+
+    def enqueue(self, path: Path, event: dict[str, Any]) -> bool:
+        with self.cond:
+            if len(self.queue) >= _QUEUE_CAP:
+                self.dropped += 1
+                if not self.overflowing:
+                    self.overflowing = True
+                    logger.warning(
+                        "usage ledger queue full (%d events); dropping new events"
+                        " until the writer catches up",
+                        _QUEUE_CAP,
+                    )
+                return False
+            self.enqueued += 1
+            self.queue.append(_Pending(self.enqueued, path, event))
+            # 第一筆叫醒閒置中的寫入執行緒開始計時；滿一批則立刻寫。
+            if len(self.queue) == 1 or len(self.queue) >= _BATCH_SIZE:
+                self.cond.notify_all()
+            started = self._ensure_thread()
+        if not started:
+            # 直譯器關閉中不能再開執行緒；這時已沒有回覆在等，直接同步寫掉。
+            self._drain_inline()
+        return True
+
+    def _ensure_thread(self) -> bool:
+        if self.thread is not None and self.thread.is_alive():
+            return True
+        self.stopping = False
+        thread = threading.Thread(
+            target=self._run, name="usage-ledger-writer", daemon=True,
+        )
+        try:
+            thread.start()
+        except RuntimeError:
+            return False
+        self.thread = thread
+        return True
+
+    def flush(self, timeout: float) -> bool:
+        """等到呼叫前排進來的事件都寫完（或放棄）為止；逾時回 False。"""
+        deadline = time.monotonic() + max(0.0, timeout)
+        with self.cond:
+            target = self.enqueued
+            if self.done >= target:
+                return True
+            if self._ensure_thread():
+                self.flush_requested = True
+                self.cond.notify_all()
+                while self.done < target:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        return False
+                    self.cond.wait(remaining)
+                return True
+        self._drain_inline()
+        with self.cond:
+            return self.done >= target
+
+    def shutdown(self, timeout: float) -> None:
+        flushed = self.flush(timeout)
+        with self.cond:
+            self.stopping = True
+            unwritten = self.enqueued - self.done
+            self.cond.notify_all()
+            thread = self.thread
+        if not flushed and unwritten:
+            logger.error(
+                "usage ledger exiting with %d unwritten events (database stayed locked)",
+                unwritten,
+            )
+        if thread is not None:
+            thread.join(timeout=1.0)
+        if thread is None or not thread.is_alive():
+            self.close_connection()
+
+    def close_connection(self) -> None:
+        with self.cond:
+            conn, self.conn, self.conn_path = self.conn, None, None
+        if conn is not None:
+            try:
+                conn.close()
+            except sqlite3.Error:  # pragma: no cover - best effort
+                pass
+
+    def _take_batch(self) -> list[_Pending] | None:
+        with self.cond:
+            while not self.queue and not self.stopping:
+                self.cond.wait()
+            if not self.queue:
+                return None
+            deadline = time.monotonic() + _FLUSH_INTERVAL_S
+            while (
+                len(self.queue) < _BATCH_SIZE
+                and not self.flush_requested
+                and not self.stopping
+            ):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self.cond.wait(remaining)
+            count = min(len(self.queue), _MAX_BATCH)
+            batch = [self.queue.popleft() for _ in range(count)]
+            if not self.queue:
+                self.flush_requested = False
+            return batch
+
+    def _mark_done(self, batch: list[_Pending]) -> None:
+        with self.cond:
+            self.done = max(self.done, batch[-1].seq)
+            if self.overflowing and len(self.queue) < _QUEUE_CAP // 2:
+                logger.warning(
+                    "usage ledger queue drained; %d events were dropped while full",
+                    self.dropped,
+                )
+                self.overflowing = False
+                self.dropped = 0
+            self.cond.notify_all()
+
+    def _run(self) -> None:
+        while True:
+            try:
+                batch = self._take_batch()
+                if batch is None:
+                    return
+                self._write_batch(batch)
+                self._mark_done(batch)
+            except Exception:  # pragma: no cover - the writer must never die
+                logger.exception("usage ledger writer loop error")
+                time.sleep(_RETRY_BACKOFF_MAX_S)
+
+    def _drain_inline(self) -> None:
+        while True:
+            with self.cond:
+                if not self.queue:
+                    return
+                batch = [self.queue.popleft() for _ in range(len(self.queue))]
+            self._write_batch(batch, inline=True)
+            self._mark_done(batch)
+
+    def _write_batch(self, batch: list[_Pending], *, inline: bool = False) -> None:
+        groups: dict[Path, list[dict[str, Any]]] = {}
+        for item in batch:
+            groups.setdefault(item.path, []).append(item.event)
+        for path, events in groups.items():
+            self._write_group(path, events, inline=inline)
+
+    def _connection(self, path: Path) -> sqlite3.Connection:
+        with self.cond:
+            if self.conn is not None and self.conn_path == path:
+                return self.conn
+        self.close_connection()
+        conn = _connect(
+            path, busy_timeout_ms=_WRITER_BUSY_TIMEOUT_MS, autocommit=True,
+        )
+        conn.execute("PRAGMA wal_autocheckpoint=1000")
+        conn.execute(f"PRAGMA journal_size_limit={_JOURNAL_SIZE_LIMIT_BYTES}")
+        with self.cond:
+            self.conn, self.conn_path = conn, path
+        self.last_checkpoint = time.monotonic()
+        return conn
+
+    def _write_group(
+        self, path: Path, events: list[dict[str, Any]], *, inline: bool,
+    ) -> None:
+        columns = list(events[0])
+        sql = (
+            f"INSERT INTO usage_events ({', '.join(columns)}) "
+            f"VALUES ({', '.join(':' + name for name in columns)})"
+        )
+        backoff = _RETRY_BACKOFF_INITIAL_S
+        failures = 0
+        while True:
+            conn: sqlite3.Connection | None = None
+            try:
+                conn = self._connection(path)
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    conn.executemany(sql, events)
+                    conn.execute("COMMIT")
+                except BaseException:
+                    with suppress(sqlite3.Error):
+                        conn.execute("ROLLBACK")
+                    raise
+                self._maybe_checkpoint(conn)
+                return
+            except Exception as exc:
+                if _is_busy_error(exc):
+                    # 鎖住只是暫時的：保留這批、退避重試，不丟紀錄。關閉中且
+                    # 已過關閉期限的情況交給 shutdown() 記錄未寫筆數。
+                    if inline or self.stopping:
+                        if failures >= _MAX_NON_BUSY_ATTEMPTS:
+                            logger.error(
+                                "usage ledger dropped %d events at shutdown: %s",
+                                len(events), exc,
+                            )
+                            return
+                        failures += 1
+                    logger.debug("usage ledger busy, retrying %d events", len(events))
+                else:
+                    failures += 1
+                    self.close_connection()
+                    if failures >= _MAX_NON_BUSY_ATTEMPTS:
+                        logger.warning(
+                            "usage ledger write failed, dropped %d events: %s",
+                            len(events), exc,
+                        )
+                        return
+                time.sleep(backoff)
+                backoff = min(backoff * 2, _RETRY_BACKOFF_MAX_S)
+
+    def _maybe_checkpoint(self, conn: sqlite3.Connection) -> None:
+        now = time.monotonic()
+        if now - self.last_checkpoint < _CHECKPOINT_INTERVAL_S:
+            return
+        self.last_checkpoint = now
+        try:
+            conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        except sqlite3.Error as exc:
+            logger.debug("usage ledger checkpoint skipped: %s", exc)
+
+
+_WRITER = _UsageWriter()
+_FORK_ORPHANS: list[_UsageWriter] = []
+
+
+def _reset_after_fork() -> None:
+    """fork 出來的子 process 沒有寫入執行緒，繼承來的連線也不能沿用。
+
+    舊物件留著不關：在子 process 關掉父 process 開的 SQLite 連線並不安全。
+    """
+    global _INIT_LOCK, _WRITER
+    _FORK_ORPHANS.append(_WRITER)
+    _WRITER = _UsageWriter()
+    # fork 當下若別的執行緒正在建表，繼承來的鎖會永遠是鎖住的。
+    _INIT_LOCK = threading.Lock()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_after_fork)
+
+
+def flush_usage_events(timeout: float = _SHUTDOWN_FLUSH_TIMEOUT_S) -> bool:
+    """Block until this process's queued usage events are committed.
+
+    Returns False when *timeout* elapses first (e.g. the database stayed locked).
+    """
+    return _WRITER.flush(timeout)
+
+
+def shutdown_usage_writer(timeout: float = _SHUTDOWN_FLUSH_TIMEOUT_S) -> None:
+    """Flush pending events and stop the writer thread (process exit)."""
+    _WRITER.shutdown(timeout)
+
+
+atexit.register(shutdown_usage_writer)
 
 
 def _now_iso() -> str:
@@ -160,9 +513,10 @@ def record_usage_event(
     unit_type: str = UNIT_TOKENS,
     units: float = 0.0,
 ) -> dict[str, Any] | None:
-    """Persist one usage event and mirror it into the active scope.
+    """Queue one usage event for the ledger and mirror it into the active scope.
 
-    Never raises: a ledger failure must not fail the user's request.
+    Never raises and never waits on SQLite: a background writer commits the
+    event. Returns None only when the event could not be queued (queue full).
     """
     scope = scope if scope is not None else current_usage_scope()
     counts = (usage or LLMUsage()).as_dict()
@@ -187,19 +541,16 @@ def record_usage_event(
         "raw": json.dumps(raw, ensure_ascii=False) if raw else None,
     }
     try:
-        with _LOCK, _connect() as conn:
-            columns = ", ".join(event)
-            placeholders = ", ".join(f":{name}" for name in event)
-            conn.execute(
-                f"INSERT INTO usage_events ({columns}) VALUES ({placeholders})", event,
-            )
+        queued = _WRITER.enqueue(get_usage_db_path(), event)
     except Exception as exc:
         logger.warning(
-            "usage ledger write failed provider=%s model=%s: %s",
+            "usage ledger enqueue failed provider=%s model=%s: %s",
             provider,
             model,
             exc,
         )
+        return None
+    if not queued:
         return None
     if scope is not None:
         scope.collected.append({**event, **_timeline_offsets(scope, latency_ms)})
@@ -281,7 +632,7 @@ def summarize_usage(*, group_by: str = "model", **filters: Any) -> dict[str, Any
         + [f"SUM({column}) AS {column}" for column in _TOKEN_COLUMNS]
         + [_UNIT_SUM_SQL]
     )
-    with _LOCK, _connect() as conn:
+    with _read_connection() as conn:
         groups = [
             dict(row)
             for row in conn.execute(
@@ -344,7 +695,7 @@ def timeseries_usage(
     )
     params["report_offset"] = _REPORT_TIMEZONE_OFFSETS[report_timezone]
 
-    with _LOCK, _connect() as conn:
+    with _read_connection() as conn:
         if columns is None:
             rows = [
                 dict(row)
@@ -430,7 +781,7 @@ def timeseries_usage(
 def list_usage_events(*, limit: int = 100, **filters: Any) -> list[dict[str, Any]]:
     where, params = _build_filters(**filters)
     params["limit"] = max(1, min(int(limit), 1000))
-    with _LOCK, _connect() as conn:
+    with _read_connection() as conn:
         rows = conn.execute(
             f"SELECT * FROM usage_events{where} ORDER BY id DESC LIMIT :limit", params,
         ).fetchall()
@@ -449,7 +800,7 @@ def list_usage_events(*, limit: int = 100, **filters: Any) -> list[dict[str, Any
 def count_usage_events_since(*, provider: str, kind: str, since: str) -> int:
     """Count events for one provider/kind; failures count as 0 so callers fail open."""
     try:
-        with _LOCK, _connect() as conn:
+        with _read_connection() as conn:
             row = conn.execute(
                 "SELECT COUNT(*) FROM usage_events"
                 " WHERE provider = ? AND kind = ? AND created_at >= ?",

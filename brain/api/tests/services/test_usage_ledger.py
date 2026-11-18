@@ -305,8 +305,21 @@ def test_timeseries_rejects_unsupported_report_timezone(ledger, report_timezone)
 
 
 def test_ledger_write_failure_does_not_raise(ledger, monkeypatch):
-    monkeypatch.setattr(ledger, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("disk")))
-    assert ledger.record_usage_event(provider="g", model="m", usage=LLMUsage(1, 1, 2)) is None
+    """寫入失敗由背景執行緒吸收：呼叫端拿得到事件，之後的事件照常寫進去。"""
+    real_connect = ledger._connect
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("disk")
+
+    monkeypatch.setattr(ledger, "_RETRY_BACKOFF_INITIAL_S", 0.0)
+    monkeypatch.setattr(ledger, "_connect", broken)
+    event = ledger.record_usage_event(provider="g", model="lost", usage=LLMUsage(1, 1, 2))
+    assert event is not None and event["model"] == "lost"
+    assert ledger.flush_usage_events(timeout=5)
+
+    monkeypatch.setattr(ledger, "_connect", real_connect)
+    ledger.record_usage_event(provider="g", model="kept", usage=LLMUsage(1, 1, 2))
+    assert [row["model"] for row in ledger.list_usage_events()] == ["kept"]
 
 
 def test_embed_principal_lands_in_the_ledger_row(ledger):

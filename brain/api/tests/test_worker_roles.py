@@ -90,11 +90,16 @@ async def test_lifespan_only_starts_management_work_for_admin(monkeypatch, role)
     monkeypatch.setattr(dreaming, "start_dreaming_scheduler", dream)
     monkeypatch.setattr(backup, "start_backup_scheduler", backups)
     monkeypatch.setattr(maintenance, "start_maintenance_scheduler", maintain)
+    flush_usage = Mock(return_value=True)
+    monkeypatch.setattr(startup, "flush_usage_events", flush_usage)
     app = FastAPI()
     app.state.brain_role = role
     async with startup.lifespan(app):
         await asyncio.sleep(0)
         assert warmup.await_args.args == (role,)
+        flush_usage.assert_not_called()
+    # 用量在背景批次寫入；uvicorn 收 SIGTERM 不跑 atexit，停機只能靠這裡寫完。
+    flush_usage.assert_called_once_with()
     expected = 1 if role == "admin" else 0
     assert scaffold.call_count == database.call_count == expected
     assert migration.run_migration.call_count == expected

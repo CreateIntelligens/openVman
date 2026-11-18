@@ -16,6 +16,7 @@ from config import get_settings
 from infra.db import ensure_tables, get_db
 from infra.project_admin import list_projects
 from infra.shared_budgets import shared_request_budget
+from infra.usage_ledger import flush_usage_events
 from knowledge.product_catalog import load_product_catalogs
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import get_embedder
@@ -248,3 +249,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "memory_maintenance_task",
             )
         ))
+        # 用量是背景批次寫入；正常停機／重新部署前把排隊中的寫完。uvicorn 收到
+        # SIGTERM 時會在 serve() 結束後用預設處理再送一次訊號，process 直接結束、
+        # 不會跑 atexit，所以這裡是停機時唯一可靠的寫入點。
+        if not await asyncio.to_thread(flush_usage_events):
+            logger.error("usage ledger: pending events not written before shutdown")

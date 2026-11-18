@@ -407,6 +407,8 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 
 `brain/data/usage.db` 是跨專案共用的 append-only SQLite 帳本，由 Brain 單一擁有。每筆事件記錄 provider、model、延遲、token 數，以及 `user_id`、`principal_type`、`principal_id`、`project_id`、`session_id`、`trace_id` 與 `kind`。
 
+寫入不在回覆路徑上等 SQLite：`record_usage_event` 只把事件排進本 process 的佇列，由一條背景執行緒以常駐連線批次寫入（每 0.5 秒或滿 100 筆一個交易）。資料庫被其他 worker 鎖住時保留整批退避重試；佇列滿 10,000 筆才丟新事件並記 warning。停機時在 lifespan 結束前寫完佇列（最多等 5 秒，寫不完記 error；uvicorn 收到 SIGTERM 不會跑 `atexit`，所以以 lifespan 為準），同一 process 的查詢也會先寫完再讀；process 被強制終止時最多遺失最後約 0.5 秒的用量。寫入連線定期做 PASSIVE checkpoint，並以 `journal_size_limit` 限制 `usage.db-wal` 的大小。
+
 由帳號 API key 發起時，Backend 保留擁有者 `user_id`，另注入 `principal_type=api_key`、`principal_id=<key_id>`；同帳號的多把 key 可分別查詢用量。完整 key 不會傳入 Brain 或帳本，驗證與撤銷由 Backend 負責，見 [整合指南](../docs/guides/account-api-keys.md)。
 
 | `unit_type` | 來源 | `units` 的意義 |
@@ -424,7 +426,7 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 | `GET /brain/usage/events` | 依帳號、專案、session、trace、類型與時間區間查事件 |
 
 三支查詢都另收可重複的 `project_ids`，只算列出的專案；Backend 用它把受限管理員限制在範圍內。帶了但全是空值時一筆都不回，不會變成不篩選。
-| `POST /brain/usage/events` | 其他服務寫入非 LLM 用量；必填 `provider`、`unit_type`、`units`，歸屬欄位由呼叫端帶入；成功回 201 |
+| `POST /brain/usage/events` | 其他服務寫入非 LLM 用量；必填 `provider`、`unit_type`、`units`，歸屬欄位由呼叫端帶入；排入寫入佇列即回 201，佇列已滿回 500 |
 
 帳本以 UTC 儲存，查詢區間為 `since <= created_at < until`。瀏覽器與外部客戶端改用 Backend 的 `/api/v1/usage/*`。
 

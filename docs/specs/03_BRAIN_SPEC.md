@@ -531,10 +531,11 @@ Brain 將每次 LLM 與決策供應商呼叫的 token 數、provider、model、�
 | `seconds` | Gemini Live、Backend 的 ASR | 音訊秒數 |
 
 * `POST /brain/chat` 回應包含該次 request scope 的 `usage` 彙總。
-* 內部查詢介面為 `GET /brain/usage/summary`、`GET /brain/usage/timeseries` 與 `GET /brain/usage/events`；其他服務以 `POST /brain/usage/events` 寫入非 LLM 用量（必填 `provider`、`unit_type`、`units`，成功回 201）。皆須驗證 `X-Internal-Token`。不同 `unit_type` 要分開加總。
+* 內部查詢介面為 `GET /brain/usage/summary`、`GET /brain/usage/timeseries` 與 `GET /brain/usage/events`；其他服務以 `POST /brain/usage/events` 寫入非 LLM 用量（必填 `provider`、`unit_type`、`units`，排入寫入佇列即回 201）。皆須驗證 `X-Internal-Token`。不同 `unit_type` 要分開加總。
 * 對外查詢由 Backend `/api/v1/usage/*` 套用帳號範圍：正式管理員可指定 `user_id`，其餘帳號一律由 Backend 覆寫成自己的帳號 ID。
 * 時間戳以 UTC 儲存，`since` 包含起點、`until` 不包含終點。Admin 將台北日期轉成 UTC 邊界；timeseries 以 `report_timezone=UTC|Asia/Taipei`（預設 UTC）決定 `hour`／`day`／`month` 的分桶日期，回傳同名欄位，非法值回傳 400。台北報表的篩選、趨勢分桶與事件顯示必須使用相同時區，詳見 Backend 規格第 17 節。
 * 串流呼叫預設送出 `stream_options.include_usage=true`；若相容 provider 不支援，可用 `LLM_STREAM_INCLUDE_USAGE=false` 關閉。provider 沒有回傳 usage 時仍保留零值事件與 `usage_missing` 標記，且 ledger 寫入失敗不得中斷使用者請求。
+* 寫入不得阻塞回覆路徑：`record_usage_event` 只排入本 process 的佇列並立即返回，由每個 process 一條背景執行緒、一條常駐 SQLite 連線批次寫入（每 0.5 秒或滿 100 筆一個交易）。寫鎖被其他 worker 占用時保留整批退避重試；佇列上限 10,000 筆，超過才丟棄新事件（`POST /brain/usage/events` 回 500）。lifespan 結束時先寫完佇列，最多等 5 秒，寫不完記 error（uvicorn 收到 SIGTERM 會直接結束 process、不跑 `atexit`，`atexit` 只是其他結束方式的補強）；同一 process 的查詢先寫完再讀，讀取用各自的短連線。寫入連線定期做 PASSIVE checkpoint 並設 `journal_size_limit`，避免 `usage.db-wal` 持續成長。
 
 ### 16. 安全防護 (Guardrails)
 

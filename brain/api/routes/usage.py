@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -41,7 +42,8 @@ async def usage_summary(
     until: str = "",
 ) -> dict[str, Any]:
     try:
-        return summarize_usage(
+        return await asyncio.to_thread(
+            summarize_usage,
             group_by=group_by,
             user_id=user_id,
             principal_type=principal_type,
@@ -74,7 +76,8 @@ async def usage_timeseries(
     until: str = "",
 ) -> dict[str, Any]:
     try:
-        return timeseries_usage(
+        return await asyncio.to_thread(
+            timeseries_usage,
             bucket=bucket,
             report_timezone=report_timezone,
             group_by=group_by,
@@ -107,7 +110,9 @@ async def usage_events(
     since: str = "",
     until: str = "",
 ) -> dict[str, Any]:
-    events = list_usage_events(
+    # 讀取前會先等本 process 排隊中的用量寫完，不能在事件迴圈上等。
+    events = await asyncio.to_thread(
+        list_usage_events,
         limit=limit,
         user_id=user_id,
         principal_type=principal_type,
