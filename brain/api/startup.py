@@ -139,6 +139,24 @@ def _warmup_product_catalogs(project_id: str) -> None:
         logger.warning("型錄預熱失敗 project=%s: %s", project_id, type(exc).__name__)
 
 
+def _warmup_model_settings(project_ids: list[str]) -> None:
+    """先向 Backend 取一次模型與決策設定，第一批題目就不用各自去拿。"""
+    from core.decision_router import _provider_configuration
+    from core.fallback_chain import _admin_chat
+    from core.gemini_credentials import resolve_gemini_credential
+
+    loaders = [
+        ("decision", lambda: _provider_configuration(timeout=3.0)),
+        ("chat_llm", _admin_chat),
+        *((f"gemini_credential:{pid}", lambda pid=pid: resolve_gemini_credential(pid)) for pid in project_ids),
+    ]
+    for name, load in loaders:
+        try:
+            load()
+        except Exception as exc:  # 取不到時第一題照常自己取，預熱不擋啟動
+            logger.warning("模型設定預熱失敗 %s: %s", name, type(exc).__name__)
+
+
 async def warmup_resources(role: str | None = None) -> None:
     """背景預熱 remote embedding 與資料路徑。"""
     role = role or get_settings().brain_role
@@ -148,6 +166,7 @@ async def warmup_resources(role: str | None = None) -> None:
     try:
         await asyncio.to_thread(_warmup_llm_modules)
         project_ids = _warmup_project_ids()
+        await asyncio.to_thread(_warmup_model_settings, project_ids)
         await asyncio.to_thread(get_embedder)
         for project_id in project_ids:
             if project_id != "default":

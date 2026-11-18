@@ -329,3 +329,20 @@ async def test_warmup_parses_each_projects_product_catalogs(monkeypatch):
     await startup.warmup_resources("chat")
 
     assert loaded == ["default", "proj-catalog"]
+
+
+@pytest.mark.asyncio
+async def test_warmup_fetches_model_settings_once_per_worker(monkeypatch):
+    startup = _load_startup()
+    fetched: list[str] = []
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default", "proj-a"])
+    monkeypatch.setattr(startup, "get_embedder", lambda: None)
+    monkeypatch.setattr(startup, "_warmup_retrieval_path", lambda project_id: None)
+    monkeypatch.setattr(startup, "load_product_catalogs", lambda project_id: [])
+    monkeypatch.setattr("core.decision_router._provider_configuration", lambda timeout: fetched.append("decision"))
+    monkeypatch.setattr("core.fallback_chain._admin_chat", lambda: fetched.append("chat_llm"))
+    monkeypatch.setattr("core.gemini_credentials.resolve_gemini_credential", lambda pid: fetched.append(pid))
+
+    await startup.warmup_resources("chat")
+
+    assert fetched == ["decision", "chat_llm", "default", "proj-a"]

@@ -77,11 +77,17 @@ def fetch_document(
 
 
 class RefreshingValue(Generic[T]):
-    """Reload a value at most every ``ttl`` seconds, keeping the last good one on failure."""
+    """Reload a value at most every ``ttl`` seconds, keeping the last good one on failure.
+
+    同時有很多執行緒要這個值時只讓一個去載入：還沒有值就等它載完；已經有舊值就
+    直接回舊值，不等更新。不然 worker 剛啟動、或每次過期時，同一批題目的每個
+    執行緒都各自打一次 Backend，同時 100 題時決策要多等好幾秒。
+    """
 
     def __init__(self, ttl: float = REFRESH_SECONDS) -> None:
         self.ttl = ttl
         self._lock = threading.Lock()
+        self._load_lock = threading.Lock()
         self._value: Any = _MISSING
         self._loaded_at = 0.0
 
@@ -99,8 +105,28 @@ class RefreshingValue(Generic[T]):
         cached for one interval so a down Backend is not retried on every call.
         """
         with self._lock:
-            if self._value is not _MISSING and monotonic() - self._loaded_at < self.ttl:
-                return self._value
+            stale = self._value
+            if stale is not _MISSING and monotonic() - self._loaded_at < self.ttl:
+                return stale
+        if stale is not _MISSING:
+            if not self._load_lock.acquire(blocking=False):
+                return stale
+        else:
+            self._load_lock.acquire()
+        try:
+            with self._lock:
+                if self._value is not _MISSING and monotonic() - self._loaded_at < self.ttl:
+                    return self._value
+            return self._load(load, propagate, default)
+        finally:
+            self._load_lock.release()
+
+    def _load(
+        self,
+        load: Callable[[], T],
+        propagate: tuple[type[BaseException], ...],
+        default: Any,
+    ) -> T:
         try:
             value = load()
         except propagate:

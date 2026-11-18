@@ -75,3 +75,60 @@ def test_propagated_errors_bypass_the_cached_value():
 
     with pytest.raises(Cancelled):
         value.get(cancelled, propagate=(Cancelled,))
+
+
+def test_threads_asking_at_once_load_only_once():
+    import threading
+    import time
+
+    value = config.RefreshingValue(ttl=60)
+    loads = []
+    gate = threading.Barrier(20)
+
+    def load():
+        loads.append(1)
+        time.sleep(0.2)
+        return "doc"
+
+    results = []
+
+    def ask():
+        gate.wait()
+        results.append(value.get(load))
+
+    threads = [threading.Thread(target=ask) for _ in range(20)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert loads == [1]
+    assert results == ["doc"] * 20
+
+
+def test_a_stale_value_is_served_while_one_thread_refreshes(monkeypatch):
+    import threading
+
+    clock = [100.0]
+    monkeypatch.setattr(config, "monotonic", lambda: clock[0])
+    value = config.RefreshingValue(ttl=10)
+    assert value.get(lambda: "old") == "old"
+    clock[0] += 11
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_load():
+        started.set()
+        release.wait(2)
+        return "new"
+
+    refresher = threading.Thread(target=lambda: value.get(slow_load))
+    refresher.start()
+    assert started.wait(2)
+
+    assert value.get(lambda: "should not load") == "old"
+
+    release.set()
+    refresher.join()
+    assert value.get(lambda: "should not load") == "new"
