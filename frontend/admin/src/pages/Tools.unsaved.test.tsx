@@ -180,4 +180,40 @@ describe("Tools draft protection", () => {
     expect(onNavigate).not.toHaveBeenCalled();
     expect(screen.getByText("尚有未儲存的變更")).toBeTruthy();
   });
+
+  it("switches skills after a pending save succeeds without asking to discard", async () => {
+    let finishSave!: () => void;
+    vi.mocked(updateSkillFiles).mockImplementationOnce(() => new Promise((resolve) => {
+      finishSave = () => resolve({ status: "ok", skill_id: "alpha", enabled: true });
+    }));
+    renderPage();
+    await editAlpha();
+    fireEvent.click(screen.getByRole("button", { name: /儲存並重載/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "編輯" })[1]);
+    expect(screen.queryByRole("dialog", { name: "尚有未儲存的變更" })).toBeNull();
+    expect(fetchSkillFiles).not.toHaveBeenCalledWith("beta", expect.anything());
+
+    finishSave();
+    expect(await screen.findByRole("textbox", { name: "beta skill.yaml 內容" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "尚有未儲存的變更" })).toBeNull();
+  });
+
+  it("asks before leaving when a pending save fails", async () => {
+    let failSave!: () => void;
+    vi.mocked(updateSkillFiles).mockImplementationOnce(() => new Promise((_, reject) => {
+      failSave = () => reject(new Error("寫入失敗"));
+    }));
+    const onNavigate = renderPage();
+    const editor = await editAlpha();
+    fireEvent.click(screen.getByRole("button", { name: /儲存並重載/ }));
+    fireEvent.click(screen.getByRole("button", { name: "切換頁面" }));
+    expect(screen.queryByRole("dialog", { name: "尚有未儲存的變更" })).toBeNull();
+
+    failSave();
+    expect(await screen.findByRole("dialog", { name: "尚有未儲存的變更" })).toBeTruthy();
+    expect(onNavigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(editor.value).toBe("未儲存的草稿");
+    expect(screen.getByText(/寫入失敗/)).toBeTruthy();
+  });
 });

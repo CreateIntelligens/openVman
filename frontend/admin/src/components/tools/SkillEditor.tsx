@@ -32,6 +32,7 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
     `skill-editor:${scope ?? "shared"}:${projectId ?? ""}:${skillId}`,
     dirty,
     `技能 ${skillId}`,
+    saving,
   );
 
   useEffect(() => {

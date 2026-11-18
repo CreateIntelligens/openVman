@@ -14,6 +14,7 @@ import ConfirmModal from "../components/ConfirmModal";
 interface DirtySource {
   dirty: boolean;
   label: string;
+  saving: boolean;
 }
 
 interface NavigationGuardContextType {
@@ -22,6 +23,7 @@ interface NavigationGuardContextType {
     id: string,
     dirty: boolean,
     label: string,
+    saving?: boolean,
   ) => () => void;
   requestNavigation: (action: () => void) => boolean;
 }
@@ -33,11 +35,17 @@ const NavigationGuardContext = createContext<
 export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   const sourcesRef = useRef(new Map<string, DirtySource>());
   const pendingActionRef = useRef<(() => void) | null>(null);
+  const afterSaveActionRef = useRef<(() => void) | null>(null);
   const [dirtyVersion, setDirtyVersion] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const hasUnsavedChanges = useMemo(
     () => [...sourcesRef.current.values()].some((source) => source.dirty),
+    [dirtyVersion],
+  );
+
+  const isSaving = useMemo(
+    () => [...sourcesRef.current.values()].some((source) => source.saving),
     [dirtyVersion],
   );
 
@@ -53,8 +61,8 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   );
 
   const registerDirtySource = useCallback(
-    (id: string, dirty: boolean, label: string) => {
-      sourcesRef.current.set(id, { dirty, label });
+    (id: string, dirty: boolean, label: string, saving = false) => {
+      sourcesRef.current.set(id, { dirty, label, saving });
       setDirtyVersion((version) => version + 1);
 
       return () => {
@@ -68,6 +76,13 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
 
   const requestNavigation = useCallback(
     (action: () => void) => {
+      // 儲存已送出，內容一定會寫進伺服器，問「捨棄並離開」會誤導；
+      // 先記下這個動作，等儲存結束再決定要直接走還是照常詢問。
+      if (isSaving) {
+        afterSaveActionRef.current = action;
+        return false;
+      }
+
       if (!hasUnsavedChanges) {
         action();
         return true;
@@ -77,8 +92,21 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
       setConfirmOpen(true);
       return false;
     },
-    [hasUnsavedChanges],
+    [hasUnsavedChanges, isSaving],
   );
+
+  useEffect(() => {
+    const action = afterSaveActionRef.current;
+    if (!action || isSaving) return;
+    afterSaveActionRef.current = null;
+    // 存成功就直接走；存失敗或儲存期間又改了內容，才是真的有未儲存的東西要問。
+    if (!hasUnsavedChanges) {
+      action();
+      return;
+    }
+    pendingActionRef.current = action;
+    setConfirmOpen(true);
+  }, [hasUnsavedChanges, isSaving]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) {
@@ -147,11 +175,12 @@ export function useUnsavedChanges(
   id: string,
   dirty: boolean,
   label: string,
+  saving = false,
 ) {
   const { registerDirtySource } = useNavigationGuard();
 
   useEffect(
-    () => registerDirtySource(id, dirty, label),
-    [dirty, id, label, registerDirtySource],
+    () => registerDirtySource(id, dirty, label, saving),
+    [dirty, id, label, saving, registerDirtySource],
   );
 }
