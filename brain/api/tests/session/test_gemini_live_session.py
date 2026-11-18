@@ -29,8 +29,19 @@ _LIVE_MODULES = (
 )
 
 
+# 收集測試時先拿到真的設定類別；之後 _load_module 會把 sys.modules["config"] 換成替身。
+_REAL_SETTINGS = importlib.import_module("config").BrainSettings
+
+
+class _FakeConfig(types.SimpleNamespace):
+    """測試指定的設定之外，其他照真實預設值：單獨跑這個檔時，別的模組會第一次在替身底下讀設定。"""
+
+    def __getattr__(self, name):
+        return getattr(_REAL_SETTINGS(), name)
+
+
 def _load_module():
-    fake_config = types.SimpleNamespace(
+    fake_config = _FakeConfig(
         gemini_api_key="test-key",
         live_gemini_model="gemini-3.8-live",
         live_gemini_system_instruction="",
@@ -46,11 +57,13 @@ def _load_module():
         BrainSettings=object,
         get_settings=lambda: fake_config,
     )
+    # infra.db 在模組層 import encode_text；單獨跑這個檔時它第一次就在這個替身底下載入。
     sys.modules["memory.embedder"] = types.SimpleNamespace(
         encode_query_with_fallback=lambda *args, **kwargs: types.SimpleNamespace(
             version="gemma",
             vector=[0.1, 0.2],
-        )
+        ),
+        encode_text=lambda *args, **kwargs: [0.1, 0.2],
     )
     sys.modules["memory.retrieval"] = types.SimpleNamespace(
         search_records=lambda *args, **kwargs: [{"text": "result"}]
