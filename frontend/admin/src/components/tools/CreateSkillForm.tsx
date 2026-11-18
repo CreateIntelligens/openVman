@@ -14,21 +14,26 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [idOverride, setIdOverride] = useState("");
+  // 使用者動過 ID 就一直顯示輸入欄，即使清空也不換回名稱推出來的 ID，免得欄位消失、ID 被偷偷改回去。
+  const [editingId, setEditingId] = useState(false);
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
   const trimmedName = name.trim();
   const trimmedDescription = description.trim();
-  const derivedId = idOverride || nameToId(name);
+  const nameDerivedId = nameToId(name);
+  // 中文名稱轉不出 ID、或轉出來以數字開頭時，直接請使用者自己填。
+  const needsManualId = Boolean(trimmedName) && !isValidSkillId(nameDerivedId);
+  const showIdInput = editingId || needsManualId;
+  const derivedId = showIdInput ? idOverride : nameDerivedId;
   const idValid = isValidSkillId(derivedId);
   const canCreate = Boolean(idValid && trimmedName);
-  // 中文名稱轉不出 ID、或轉出來以數字開頭時，直接請使用者自己填。
-  const showIdInput = idOverride !== "" || Boolean(trimmedName && !idValid);
 
   const reset = () => {
     setName("");
     setIdOverride("");
+    setEditingId(false);
     setDescription("");
     setError("");
   };
@@ -91,14 +96,18 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
           placeholder="我的技能"
           className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-overlay/60 border border-border rounded-lg text-sm text-content placeholder-content-subtle outline-none focus:border-primary/40"
         />
-        {name.trim() && idValid && (
+        {trimmedName && !showIdInput && (
           <p className="text-[0.625rem] text-content-subtle mt-1 font-mono">
             ID: {derivedId}
-            {!idOverride && (
-              <button onClick={() => setIdOverride(derivedId)} className="ml-2 text-primary hover:underline">
-                編輯
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setIdOverride(nameDerivedId);
+                setEditingId(true);
+              }}
+              className="ml-2 text-primary hover:underline"
+            >
+              編輯
+            </button>
           </p>
         )}
       </div>
@@ -114,7 +123,10 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
           <input
             id="create-skill-id"
             value={idOverride}
-            onChange={(e) => setIdOverride(e.target.value)}
+            onChange={(e) => {
+              setIdOverride(e.target.value);
+              setEditingId(true);
+            }}
             placeholder="my_skill"
             className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-overlay/60 border border-border rounded-lg text-sm text-content placeholder-content-subtle outline-none focus:border-primary/40"
           />
