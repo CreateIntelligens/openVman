@@ -9,14 +9,16 @@ from app.providers.gemini_tts_adapter import GeminiTTSAdapter, GeminiTTSHTTPErro
 
 
 def test_gemini_adapter_disabled_by_default():
-    config = TTSRouterConfig(_env_file=None, tts_gemini_url="")
+    config = TTSRouterConfig(_env_file=None, tts_gemini_url="", tts_gemini_route="relay")
     adapter = GeminiTTSAdapter(config)
     assert adapter.enabled is False
     assert adapter.provider_name == "gemini-tts"
 
 
 def test_gemini_adapter_synthesis_success(monkeypatch):
-    config = TTSRouterConfig(_env_file=None, tts_gemini_url="http://localhost:8206")
+    config = TTSRouterConfig(
+        _env_file=None, tts_gemini_url="http://localhost:8206", tts_gemini_route="relay",
+    )
     adapter = GeminiTTSAdapter(config)
 
     mock_response = httpx.Response(
@@ -45,7 +47,9 @@ def test_gemini_adapter_synthesis_success(monkeypatch):
 
 
 def test_gemini_adapter_synthesis_http_error(monkeypatch):
-    config = TTSRouterConfig(_env_file=None, tts_gemini_url="http://localhost:8206")
+    config = TTSRouterConfig(
+        _env_file=None, tts_gemini_url="http://localhost:8206", tts_gemini_route="relay",
+    )
     adapter = GeminiTTSAdapter(config)
 
     mock_response = httpx.Response(status_code=400, text="Unknown voice")

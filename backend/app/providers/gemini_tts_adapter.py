@@ -1,4 +1,4 @@
-"""Gemini TTS Console adapter for TTS routing."""
+"""Gemini TTS for the routing chain: straight to Google, or through the relay."""
 
 from __future__ import annotations
 
@@ -9,7 +9,15 @@ from time import monotonic
 
 import httpx
 
-from app.auth.project_gemini_credentials import resolve_gemini_credential
+from app.auth.gemini_tts_route import gemini_route
+from app.auth.project_gemini_credentials import (
+    GeminiCredential,
+    resolve_gemini_credential,
+)
+from app.auth.settings_repository import (
+    TTS_GEMINI_ROUTE_DIRECT,
+    TTS_GEMINI_ROUTE_RELAY,
+)
 from app.config import TTSRouterConfig
 from app.providers import project_gemini_tts
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
@@ -30,24 +38,63 @@ GEMINI_STREAM_SAMPLE_RATE = 24000
 GEMINI_STREAM_CONTENT_TYPE = "audio/l16;rate=24000;channels=1"
 GEMINI_DEFAULT_VOICE = "Kore"
 GEMINI_PROVIDER_NAME = "gemini-tts"
+GEMINI_DIRECT_HOST = host_of(project_gemini_tts.GOOGLE_API_BASE)
+# Google 的預設聲音。直連與轉接服務用的是同一組名稱，所以聲音清單固定在這裡，
+# 切換路線時能選的聲音不會變。
+GEMINI_PREBUILT_VOICES = (
+    "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede",
+    "Autonoe", "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome",
+    "Fenrir", "Gacrux", "Iapetus", "Kore", "Laomedeia", "Leda", "Orus",
+    "Puck", "Pulcherrima", "Rasalgethi", "Sadachbia", "Sadaltager",
+    "Schedar", "Sulafat", "Umbriel", "Vindemiatrix", "Zephyr",
+    "Zubenelgenubi",
+)
+
+
+def shared_gemini_credential(runtime=None) -> GeminiCredential | None:
+    """The deployment's own Gemini key (Admin or GEMINI_API_KEY), or None."""
+    try:
+        credential = (
+            resolve_gemini_credential(None) if runtime is None
+            else resolve_gemini_credential(None, runtime)
+        )
+    except Exception as exc:  # noqa: BLE001 - 讀不到金鑰就當沒有，直連不列入可用
+        logger.warning("shared gemini credential unavailable: %s", exc)
+        return None
+    return credential if credential.configured else None
+
+
+def gemini_tts_usable(cfg, runtime=None) -> bool:
+    """Either route can run: a relay URL is set, or the shared key exists."""
+    return bool(cfg.tts_gemini_url) or shared_gemini_credential(runtime) is not None
 
 
 class GeminiTTSAdapter:
-    """Synthesize speech via Gemini TTS Console (HTTP) and return a NormalizedTTSResult."""
+    """Synthesize Gemini speech by the route chosen in the Admin.
+
+    專案綁了自己的金鑰時一律直連 Google；其餘看路線：direct 用本系統的共用金鑰
+    直連，relay 經 TTS_GEMINI_URL 的轉接服務。
+    """
 
     def __init__(self, config: TTSRouterConfig) -> None:
         self._config = config
         base = config.tts_gemini_url.rstrip("/") if config.tts_gemini_url else ""
         self._url = f"{base}/api/tts" if base else ""
         self._default_voice = GEMINI_DEFAULT_VOICE
-        self._host = host_of(base)
+        self._relay_host = host_of(base)
         self._client = httpx.Client(
             timeout=tts_http_timeout(config, knob(config, "tts_node_max_seconds")),
         )
 
     @property
+    def route(self) -> str:
+        return gemini_route(self._config)
+
+    @property
     def host(self) -> str:
-        return self._host
+        if self.route == TTS_GEMINI_ROUTE_DIRECT:
+            return GEMINI_DIRECT_HOST
+        return self._relay_host
 
     @property
     def provider_name(self) -> str:
@@ -55,7 +102,9 @@ class GeminiTTSAdapter:
 
     @property
     def enabled(self) -> bool:
-        return bool(self._url)
+        if self.route == TTS_GEMINI_ROUTE_RELAY:
+            return bool(self._url)
+        return shared_gemini_credential() is not None
 
     def enabled_for(self, request: SynthesizeRequest) -> bool:
         return self.enabled or self._project_credential(request) is not None
@@ -82,6 +131,21 @@ class GeminiTTSAdapter:
         credential = resolve_gemini_credential(str(project_id))
         return credential if credential.source == "project" else None
 
+    def _google_credential(self, request: SynthesizeRequest):
+        """The key to call Google with, or None to use the relay.
+
+        專案自己的金鑰優先（兩條路線都一樣）；direct 沒有專案金鑰就用共用金鑰。
+        """
+        if self.route != TTS_GEMINI_ROUTE_DIRECT:
+            return self._project_credential(request)
+        project_id = request.usage_scope.get("project_id")
+        credential = resolve_gemini_credential(
+            str(project_id) if project_id else None,
+        )
+        if credential.source == "project" or credential.configured:
+            return credential
+        raise RuntimeError("Gemini TTS key is not configured")
+
     async def open_stream(
         self, request: SynthesizeRequest,
     ) -> AsyncIterator[bytes]:
@@ -92,7 +156,7 @@ class GeminiTTSAdapter:
         StreamingResponse（也就是送出 200 headers）之前就捕捉到錯誤，
         避免「headers 已送出、body 迭代中途才發現是 502」的中斷。
         """
-        credential = self._project_credential(request)
+        credential = self._google_credential(request)
         if credential is not None:
             return await project_gemini_tts.open_stream(
                 request, credential, self._config.tts_gemini_model,
@@ -146,11 +210,12 @@ class GeminiTTSAdapter:
         return _iter_and_close()
 
     def synthesize(self, request: SynthesizeRequest) -> NormalizedTTSResult:
-        """POST to /api/tts on the Gemini TTS Console server."""
-        credential = self._project_credential(request)
+        """Synthesize with Google directly, or POST to the relay's /api/tts."""
+        credential = self._google_credential(request)
         if credential is not None:
             return project_gemini_tts.synthesize(
                 request, credential, self._config.tts_gemini_model, self._client,
+                timeout=tts_request_timeout(self._config, request),
             )
         if not self._url:
             raise RuntimeError("Gemini TTS URL is not configured")

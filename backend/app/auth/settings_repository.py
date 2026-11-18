@@ -46,9 +46,17 @@ TAIWANESE_ASR_PROVIDERS = SERVER_ASR_PROVIDERS - {"gemini-live-batch"}
 # 外部服務，不一定想開放給每個人）。空集合代表不開放使用者自選。
 ASR_USER_CHOICES_KEY = "asr_user_choices"
 
+# Gemini 語音走哪條路：direct＝用本系統的 Gemini 金鑰直接呼叫 Google，
+# relay＝經 TTS_GEMINI_URL 的轉接服務。沒存過就照部署的 TTS_GEMINI_ROUTE。
+TTS_GEMINI_ROUTE_KEY = "tts_gemini_route"
+TTS_GEMINI_ROUTE_DIRECT = "direct"
+TTS_GEMINI_ROUTE_RELAY = "relay"
+TTS_GEMINI_ROUTES = frozenset({TTS_GEMINI_ROUTE_DIRECT, TTS_GEMINI_ROUTE_RELAY})
+
 _ASR_PROVIDERS = SERVER_ASR_PROVIDERS | STREAM_ASR_PROVIDERS | {BROWSER_ASR_PROVIDER}
 _ALLOWED_VALUES: dict[str, frozenset[str]] = {
     ASR_USER_CHOICES_KEY: _ASR_PROVIDERS,
+    TTS_GEMINI_ROUTE_KEY: TTS_GEMINI_ROUTES,
 }
 
 
@@ -193,6 +201,10 @@ __all__ = [
     "SERVER_ASR_PROVIDERS",
     "TAIWANESE_ASR_PROVIDERS",
     "STREAM_ASR_PROVIDERS",
+    "TTS_GEMINI_ROUTES",
+    "TTS_GEMINI_ROUTE_DIRECT",
+    "TTS_GEMINI_ROUTE_KEY",
+    "TTS_GEMINI_ROUTE_RELAY",
     "InvalidSettingValueError",
     "SystemSettingsRepository",
     "UnknownSettingError",

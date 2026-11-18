@@ -16,7 +16,12 @@ from app.providers.cosyvoice_adapter import (
     COSYVOICE_DEFAULT_VOICE,
     COSYVOICE_PROVIDER_NAME,
 )
-from app.providers.gemini_tts_adapter import GEMINI_DEFAULT_VOICE, GEMINI_PROVIDER_NAME
+from app.providers.gemini_tts_adapter import (
+    GEMINI_DEFAULT_VOICE,
+    GEMINI_PREBUILT_VOICES,
+    GEMINI_PROVIDER_NAME,
+    gemini_tts_usable,
+)
 from app.providers.indextts_adapter import (
     INDEXTTS_NURSE_PROVIDER_NAME,
     INDEXTTS_NURSE_VOICE_PREFIX,
@@ -141,10 +146,6 @@ async def fetch_indextts_nurse_voices(base_url: str) -> list[str]:
     return await fetch_provider_voices(
         base_url, "/audio/voices", INDEXTTS_NURSE_PROVIDER_NAME,
     )
-
-
-async def fetch_gemini_voices(base_url: str) -> list[str]:
-    return await fetch_provider_voices(base_url, "/api/voices", "gemini")
 
 
 def excluded_voices(cfg: Any, config_attr: str) -> frozenset[str]:
@@ -392,18 +393,16 @@ async def build_tts_provider_catalog(cfg: Any) -> list[dict]:
             "voices": [cfg.tts_aws_polly_voice_id],
         })
 
-    if cfg.tts_gemini_url:
-        fetched_voices = await fetch_gemini_voices(cfg.tts_gemini_url)
-        if fetched_voices:
-            providers.append({
-                "id": GEMINI_PROVIDER_NAME,
-                "name": "Gemini TTS",
-                "default_voice": GEMINI_DEFAULT_VOICE,
-                "voices": prepend_default_voice(
-                    fetched_voices,
-                    GEMINI_DEFAULT_VOICE,
-                ),
-            })
+    if gemini_tts_usable(cfg):
+        providers.append({
+            "id": GEMINI_PROVIDER_NAME,
+            "name": "Gemini TTS",
+            "default_voice": GEMINI_DEFAULT_VOICE,
+            "voices": prepend_default_voice(
+                list(GEMINI_PREBUILT_VOICES),
+                GEMINI_DEFAULT_VOICE,
+            ),
+        })
 
     if cfg.edge_tts_enabled:
         voices = list(EDGE_TTS_VOICES)

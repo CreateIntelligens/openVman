@@ -34,7 +34,7 @@
 | 虛擬人 | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
 | 專案與權限 | 專案：`/admin/access` | 帳號：`/admin/access/accounts`（正式建立）、`/admin/access/accounts/temporary`（臨時建立）、`/admin/access/accounts/manage`（編輯／管理）；API 金鑰：`/admin/access/api-keys`；權限圖譜：`/admin/access/graph`；網站嵌入金鑰：`/admin/access/embed-keys` |
-| 模型供應商 | 主對話模型：`/admin/model-providers` | 決策模型：`/admin/model-providers/decision`；API 金鑰：`/admin/model-providers/keys` |
+| 模型供應商 | 主對話模型：`/admin/model-providers` | 決策模型：`/admin/model-providers/decision`；Gemini 語音：`/admin/model-providers/voice`；API 金鑰：`/admin/model-providers/keys` |
 | 系統狀態 | 健康：`/admin/system` | 監控（Grafana）：`/admin/system/monitoring` |
 
 子路徑最多兩層，只有「專案與權限 → 帳號」用到第二層；合法組合集中在 `adminSubViews`，其他組合（例如 `/admin/access/graph/extra`）解析為無效路由。已拿掉的小助理分頁 `/admin/avatar/mascots` 也一樣，不轉址。

@@ -127,6 +127,7 @@ describe("model-provider administration route", () => {
     expect(parseAdminRoute("/admin/decision-providers")).toBeNull();
     expect(parseAdminRoute("/admin/model-providers/keys")).toEqual({ tab: "ModelProviders", subView: "keys" });
     expect(parseAdminRoute("/admin/model-providers/decision")).toEqual({ tab: "ModelProviders", subView: "decision" });
+    expect(parseAdminRoute("/admin/model-providers/voice")).toEqual({ tab: "ModelProviders", subView: "voice" });
     expect(isTabVisible(tab!, "root")).toBe(true);
     expect(isTabVisible(tab!, "admin")).toBe(false);
     expect(isTabVisible(tab!, "user")).toBe(false);

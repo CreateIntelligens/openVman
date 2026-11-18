@@ -33,18 +33,19 @@ def brain_health(monkeypatch):
 
 
 def _runtime(tmp_path, **overrides) -> AuthRuntime:
-    return build_auth_runtime(TTSRouterConfig(
-        _env_file=None,
-        env="dev",
-        session_jwt_secret="test-only-session-secret-for-tests-32",
-        model_provider_encryption_secret="provider-encryption-secret-for-test-32-bytes",
-        auth_database_path=str(tmp_path / "accounts.db"),
-        typesafe_api_key="env-jev-key",
-        openai_api_key="env-openai-key",
-        gemini_api_key="env-gemini-key",
-        llm_fallback_chain="gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini",
-        **overrides,
-    ))
+    values = {
+        "_env_file": None,
+        "env": "dev",
+        "session_jwt_secret": "test-only-session-secret-for-tests-32",
+        "model_provider_encryption_secret": "provider-encryption-secret-for-test-32-bytes",
+        "auth_database_path": str(tmp_path / "accounts.db"),
+        "typesafe_api_key": "env-jev-key",
+        "openai_api_key": "env-openai-key",
+        "GEMINI_API_KEY": "env-gemini-key",
+        "llm_fallback_chain": "gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini",
+    }
+    values.update(overrides)
+    return build_auth_runtime(TTSRouterConfig(**values))
 
 
 def _client(runtime: AuthRuntime) -> TestClient:
@@ -304,3 +305,60 @@ def test_root_can_reset_one_hop_breaker_through_brain(tmp_path, monkeypatch):
     assert client.post(f"{PATH}/health/reset", headers=root, json={"category": "vision"}).status_code == 422
     monkeypatch.setattr(model_provider_routes, "_brain_post", lambda *_a, **_k: None)
     assert client.post(f"{PATH}/health/reset", headers=root, json={}).status_code == 503
+
+
+def test_root_switches_the_gemini_tts_route_and_it_is_kept(tmp_path):
+    runtime = _runtime(tmp_path, tts_gemini_url="http://relay.invalid:8206")
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+
+    before = client.get(PATH, headers=headers).json()["tts_gemini"]
+    assert before == {
+        "route": "direct", "saved": False, "default_route": "direct",
+        "relay_configured": True, "direct_available": True,
+    }
+
+    response = client.put(PATH, json={"tts_gemini_route": "relay"}, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["tts_gemini"]["route"] == "relay"
+    assert response.json()["tts_gemini"]["saved"] is True
+    assert runtime.settings.get("tts_gemini_route") == "relay"
+    # 其他類別沒帶就不動。
+    assert _category(response.json(), "chat_llm")["configured"] is False
+    assert client.get(PATH, headers=headers).json()["tts_gemini"]["route"] == "relay"
+
+
+def test_gemini_tts_route_reports_which_options_can_run(tmp_path):
+    runtime = _runtime(tmp_path, GEMINI_API_KEY="", tts_gemini_route="relay")
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+
+    view = client.get(PATH, headers=headers).json()["tts_gemini"]
+
+    assert view == {
+        "route": "relay", "saved": False, "default_route": "relay",
+        "relay_configured": False, "direct_available": False,
+    }
+
+
+def test_relay_cannot_be_chosen_without_a_relay_url(tmp_path):
+    runtime = _runtime(tmp_path)
+    client = _client(runtime)
+    headers = _login(client, runtime, AccountRole.ROOT)
+
+    for body in ({"tts_gemini_route": "relay"}, {"tts_gemini_route": "google"}):
+        assert client.put(PATH, json=body, headers=headers).status_code == 422
+    assert runtime.settings.get("tts_gemini_route") is None
+
+
+@pytest.mark.parametrize("role", [AccountRole.ADMIN, AccountRole.USER])
+def test_only_root_can_switch_the_gemini_tts_route(tmp_path, role):
+    runtime = _runtime(tmp_path, tts_gemini_url="http://relay.invalid:8206")
+    client = _client(runtime)
+    headers = _login(client, runtime, role)
+
+    response = client.put(PATH, json={"tts_gemini_route": "relay"}, headers=headers)
+
+    assert response.status_code == 403
+    assert runtime.settings.get("tts_gemini_route") is None

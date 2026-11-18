@@ -1,4 +1,4 @@
-"""Use a project's Gemini key directly; the shared TTS console owns its key."""
+"""Call Google's Gemini TTS with a project's own key or the deployment's shared key."""
 
 from __future__ import annotations
 
@@ -51,32 +51,35 @@ def event_chunks(data: str) -> list[bytes]:
     try:
         payload = json.loads(data)
     except ValueError:
-        raise RuntimeError("Project Gemini TTS stream failed") from None
+        raise RuntimeError("Gemini TTS stream failed") from None
     if not isinstance(payload, dict) or "error" in payload:
-        raise RuntimeError("Project Gemini TTS stream failed")
+        raise RuntimeError("Gemini TTS stream failed")
     return audio_chunks(payload)
 
 
 def synthesize(
     request: SynthesizeRequest, credential, model: str, client: httpx.Client,
+    *, timeout: httpx.Timeout | None = None,
 ) -> NormalizedTTSResult:
     started = monotonic()
+    extra = {"timeout": timeout} if timeout is not None else {}
     try:
         response = client.post(
             f"{GOOGLE_API_BASE}/{model}:generateContent",
             headers={"x-goog-api-key": credential.api_key},
             json=request_payload(request),
+            **extra,
         )
     except httpx.HTTPError:
         # 傳輸錯誤的訊息與 traceback 可能帶出請求內容；from None 斷開鏈結，金鑰不進 log。
-        raise RuntimeError("Project Gemini TTS request failed") from None
+        raise RuntimeError("Gemini TTS request failed") from None
     if response.status_code >= 400:
         raise RuntimeError(
-            f"Project Gemini TTS failed (HTTP {response.status_code})",
+            f"Gemini TTS failed (HTTP {response.status_code})",
         )
     pcm = b"".join(audio_chunks(response.json()))
     if not pcm:
-        raise RuntimeError("Project Gemini TTS returned no audio")
+        raise RuntimeError("Gemini TTS returned no audio")
     wav = io.BytesIO()
     with wave.open(wav, "wb") as output:
         output.setnchannels(1)
@@ -163,14 +166,14 @@ async def open_stream(
             async with asyncio.timeout(first_byte):
                 response = await client.send(upstream, stream=True)
         except TimeoutError:
-            raise RuntimeError("Project Gemini TTS timed out") from HopTimeout(
+            raise RuntimeError("Gemini TTS timed out") from HopTimeout(
                 "first_byte", first_byte, "gemini-tts",
             )
         except httpx.HTTPError:
-            raise RuntimeError("Project Gemini TTS request failed") from None
+            raise RuntimeError("Gemini TTS request failed") from None
         if response.status_code >= 400:
             raise RuntimeError(
-                f"Project Gemini TTS failed (HTTP {response.status_code})",
+                f"Gemini TTS failed (HTTP {response.status_code})",
             )
 
         async def audio() -> AsyncIterator[bytes]:
@@ -187,7 +190,7 @@ async def open_stream(
                         for chunk in event_chunks(data):
                             yield chunk
             except httpx.HTTPError:
-                raise RuntimeError("Project Gemini TTS stream failed") from None
+                raise RuntimeError("Gemini TTS stream failed") from None
             if event and "\n".join(event) != "[DONE]":
                 for chunk in event_chunks("\n".join(event)):
                     yield chunk
@@ -198,11 +201,11 @@ async def open_stream(
             async with asyncio.timeout(remaining):
                 first = await anext(chunks, None)
         except TimeoutError:
-            raise RuntimeError("Project Gemini TTS timed out") from HopTimeout(
+            raise RuntimeError("Gemini TTS timed out") from HopTimeout(
                 "first_byte", first_byte, "gemini-tts",
             )
         if not first:
-            raise RuntimeError("Project Gemini TTS returned no audio")
+            raise RuntimeError("Gemini TTS returned no audio")
     except BaseException:
         if chunks is not None:
             await chunks.aclose()

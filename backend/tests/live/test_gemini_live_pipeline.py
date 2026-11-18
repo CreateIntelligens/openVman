@@ -68,7 +68,7 @@ async def test_gemini_live_pipeline_emits_audio_chunks_from_server_content():
     session = Session(client_id="client-1")
     cfg = types.SimpleNamespace(
 
-        gemini_api_key="test-key",
+        GEMINI_API_KEY="test-key",
         live_gemini_model="gemini-3.8-live",
         live_gemini_system_instruction="",
         live_gemini_output_audio_transcription=True,
@@ -126,7 +126,7 @@ async def test_gemini_live_pipeline_executes_search_tool_calls_and_returns_tool_
     session = Session(client_id="client-2")
     cfg = types.SimpleNamespace(
 
-        gemini_api_key="test-key",
+        GEMINI_API_KEY="test-key",
         live_gemini_model="gemini-3.8-live",
         live_gemini_system_instruction="",
         live_gemini_output_audio_transcription=True,

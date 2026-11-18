@@ -12,6 +12,8 @@
 
 ### Changed
 
+- **[2026-11-18]** **Gemini 語音預設改為直連 Google，可在後台切換**：沒有綁專案金鑰的請求，以前一律經 `TTS_GEMINI_URL` 的轉接服務合成；現在預設用本系統的 Gemini 金鑰（後台 API 金鑰或 `GEMINI_API_KEY`）直接呼叫 Google，費用算在這把金鑰。ROOT 可在「模型供應商 → Gemini 語音」（`/admin/model-providers/voice`）改成經轉接服務，Backend 各 worker 約 3 秒內生效、不用重開；沒有 Gemini 金鑰時不能選直連，沒設 `TTS_GEMINI_URL` 時不能選轉接。沒在後台存過時照新的 `TTS_GEMINI_ROUTE`（`direct`／`relay`，預設 `direct`，其他值啟動時報錯）。專案綁了自己的金鑰時照舊一律用它直連。Gemini 聲音改為固定的 30 個 Google 預設聲音（不再向轉接服務查 `/api/voices`），任一條路線可用就登錄，切換路線不影響可選的聲音；有設 `TTS_GEMINI_URL` 就照舊背景探測。直連的整段合成也改用每站的時限，失敗訊息不再寫成「Project」。`PUT /api/v1/settings/model-providers` 新增選填欄位 `tts_gemini_route`，`GET` 回應新增 `tts_gemini`。
+
 - **[2026-11-18]** **部署文件補上主機參考規格**：`docs/operations/11_DEPLOYMENT.md` 依實測換算「1 秒內同時 100 題」需要的 CPU、記憶體、GPU 與硬碟，並說明每核可接的題數與量測主機的限制。
 
 - **[2026-11-18]** **Brain 每題 CPU 減少約一半**：1 秒內同時進來 100 題時，Brain 每題約用 0.3 核秒（原約 0.45～0.75）。同一把 Gemini 金鑰共用一個 client，不再每題重建 SSL context；向 Backend 讀模型設定改用共用連線；商品型錄同一秒內沿用上次確認的結果（後台改型錄最慢 1 秒生效），掃描時不再逐檔逐層檢查巢狀型錄；停用文件清單與知識庫設定在檔案沒變時不重新解析；workspace 目錄 5 秒內確認過就不再逐一 mkdir；檢索去重改用矩陣運算。隔離環境（鶴記真實資料、LLM／TTS 用假服務）量到聽到第一句中位數約快 0.8 秒。

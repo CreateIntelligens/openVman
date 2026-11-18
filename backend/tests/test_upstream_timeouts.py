@@ -188,8 +188,12 @@ class _EdgeStub:
 
 
 def _service(cfg):
+    from app.auth.runtime import get_auth_runtime
     from app.service import TTSRouterService
 
+    # 正式環境啟動時就建好 auth runtime；這裡先建，第一次查 Gemini 路線才不會把
+    # 建資料庫的時間算進鏈的期限。
+    get_auth_runtime()
     service = TTSRouterService(cfg)
     edge = _EdgeStub()
     service._edge.synthesize = edge  # type: ignore[method-assign]
@@ -241,7 +245,7 @@ def test_chain_deadline_is_honoured_when_hop_budgets_sum_past_it():
     with hang_server() as index, hang_server() as cosy:
         service, edge = _service(_tts_config(
             TTS_INDEXTTS_URL=index.url, TTS_COSYVOICE_URL=f"{cosy.url}/v1",
-            TTS_GEMINI_URL=index.url,
+            TTS_GEMINI_URL=index.url, TTS_GEMINI_ROUTE="relay",
         ))
         started = time.monotonic()
         output = service.synthesize(SynthesizeRequest(text="你好"))

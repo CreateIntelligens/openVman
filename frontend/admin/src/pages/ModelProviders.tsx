@@ -9,6 +9,8 @@ import {
   fetchModelProviderSettings,
   resetModelProviderHealth,
   saveModelProviderSettings,
+  type GeminiTtsRoute,
+  type GeminiTtsRouteSettings,
   type HopHealth,
   type ModelCategory,
   type ModelProviderSettings,
@@ -57,10 +59,40 @@ function healthLabel(health: HopHealth): string | null {
 }
 
 // 網址子頁 → 頁面內容；第一個是預設（/admin/model-providers）。
-const PAGE_TABS = ["chat", "decision", "keys"] as const;
+const PAGE_TABS = ["chat", "decision", "voice", "keys"] as const;
 type PageTab = (typeof PAGE_TABS)[number];
-const TAB_CATEGORY: Record<PageTab, string | null> = { chat: "chat_llm", decision: "decision", keys: null };
-const TAB_LABELS: Record<PageTab, string> = { chat: "主對話模型", decision: "決策模型", keys: "API 金鑰" };
+const TAB_CATEGORY: Record<PageTab, string | null> = {
+  chat: "chat_llm", decision: "decision", voice: null, keys: null,
+};
+const TAB_LABELS: Record<PageTab, string> = {
+  chat: "主對話模型", decision: "決策模型", voice: "Gemini 語音", keys: "API 金鑰",
+};
+
+const ROUTE_OPTIONS: { id: GeminiTtsRoute; label: string; detail: string }[] = [
+  {
+    id: "direct",
+    label: "直連 Google",
+    detail: "用本系統的 Gemini 金鑰，費用算在這把金鑰。",
+  },
+  {
+    id: "relay",
+    label: "經轉接服務",
+    detail: "由另一台轉接服務代為呼叫 Google（伺服器設定的 TTS_GEMINI_URL）。",
+  },
+];
+
+const ROUTE_LABELS: Record<GeminiTtsRoute, string> = { direct: "直連 Google", relay: "經轉接服務" };
+
+/** 這個選項為什麼不能選；可以選時回 null。 */
+function routeBlocked(route: GeminiTtsRoute, status: GeminiTtsRouteSettings): string | null {
+  if (route === "direct" && !status.direct_available) {
+    return "目前不能選：還沒有 Gemini 金鑰。請先到「API 金鑰」分頁填入。";
+  }
+  if (route === "relay" && !status.relay_configured) {
+    return "目前不能選：伺服器沒有設定轉接服務。";
+  }
+  return null;
+}
 
 type PageNotice = { type: "success" | "error"; message: string } | null;
 
@@ -106,6 +138,8 @@ export default function ModelProviders() {
   const [clearKeys, setClearKeys] = useState<Set<string>>(new Set());
   const [useEnvironmentKeys, setUseEnvironmentKeys] = useState<Set<string>>(new Set());
   const [resetCategories, setResetCategories] = useState<Set<string>>(new Set());
+  // 使用者在「Gemini 語音」分頁選的路線；null＝沒動。
+  const [routeDraft, setRouteDraft] = useState<GeminiTtsRoute | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const saveBarRef = useRef<HTMLDivElement>(null);
@@ -120,6 +154,7 @@ export default function ModelProviders() {
     setClearKeys(new Set());
     setUseEnvironmentKeys(new Set());
     setResetCategories(new Set());
+    setRouteDraft(null);
   }, []);
 
   const load = useCallback(async () => {
@@ -182,6 +217,7 @@ export default function ModelProviders() {
         const draft = drafts[category.id];
         return draft && !resetCategories.has(category.id) && draftChanged(draft, category);
       });
+      const routeChanged = routeDraft !== null && routeDraft !== settings?.tts_gemini.route;
       const result = await saveModelProviderSettings({
         categories: Object.fromEntries(
           changed.map((category) => {
@@ -197,6 +233,7 @@ export default function ModelProviders() {
         credentials,
         clear_credentials: [...clearKeys],
         use_environment_credentials: [...useEnvironmentKeys],
+        ...(routeChanged && routeDraft ? { tts_gemini_route: routeDraft } : {}),
       });
       apply(result);
       setNotice({
@@ -268,6 +305,9 @@ export default function ModelProviders() {
   }
 
   function tabHasPendingChanges(tab: PageTab): boolean {
+    if (tab === "voice") {
+      return routeDraft !== null && routeDraft !== settings?.tts_gemini.route;
+    }
     const categoryId = TAB_CATEGORY[tab];
     if (categoryId === null) {
       return clearKeys.size > 0 || useEnvironmentKeys.size > 0
@@ -482,6 +522,58 @@ export default function ModelProviders() {
                 </section>
               );
             })}
+
+            {activeTab === "voice" && settings.tts_gemini && (
+              <section
+                data-testid="gemini-tts-route"
+                className="rounded-xl border border-border bg-surface-raised p-5 md:p-6"
+              >
+                <fieldset>
+                  <legend className="text-base font-semibold text-content">Gemini 語音怎麼連線</legend>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-content-muted">
+                    選了 Gemini 聲音的對話，用這裡選的方式產生語音。存檔後幾秒內生效，不用重開。
+                    專案自己填了 Gemini 金鑰的，一律用專案的金鑰直連 Google，不受這裡影響。
+                  </p>
+                  {!settings.tts_gemini.saved && (
+                    <p className="mt-1 text-xs text-content-subtle">
+                      尚未在後台儲存過，目前照伺服器設定：{ROUTE_LABELS[settings.tts_gemini.default_route]}。
+                    </p>
+                  )}
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    {ROUTE_OPTIONS.map((option) => {
+                      const blocked = routeBlocked(option.id, settings.tts_gemini);
+                      const selected = (routeDraft ?? settings.tts_gemini.route) === option.id;
+                      return (
+                        <label
+                          key={option.id}
+                          data-testid={`gemini-tts-route-${option.id}`}
+                          className={`flex gap-3 rounded-lg border p-4 transition-colors ${
+                            selected ? "border-primary bg-primary/5" : "border-border"
+                          } ${blocked ? "cursor-not-allowed opacity-65" : "cursor-pointer hover:bg-surface-sunken"}`}
+                        >
+                          <input
+                            type="radio"
+                            name="gemini-tts-route"
+                            value={option.id}
+                            checked={selected}
+                            disabled={Boolean(blocked) || busy}
+                            onChange={() => setRouteDraft(option.id)}
+                            className="mt-1 size-4 shrink-0 accent-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-medium text-content">{option.label}</span>
+                            <span className="mt-1 block text-sm leading-6 text-content-muted">{option.detail}</span>
+                            {blocked && (
+                              <span className="mt-1 block text-xs leading-5 text-danger">{blocked}</span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              </section>
+            )}
 
             {activeTab === "keys" && <section className="rounded-xl border border-border bg-surface-raised p-5 md:p-6">
               <div>

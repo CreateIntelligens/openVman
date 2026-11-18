@@ -46,6 +46,7 @@ def pytest_collection_modifyitems(
 @pytest.fixture(autouse=True)
 def _clear_auth_and_config_caches(tmp_path_factory):
     from unittest.mock import patch
+    from app.auth.gemini_tts_route import clear_gemini_route_cache
     from app.auth.runtime import get_auth_runtime
     from app.config import get_tts_config
 
@@ -63,14 +64,20 @@ def _clear_auth_and_config_caches(tmp_path_factory):
             "VISION_CLEF_URL": "",
             "TTS_HANJI_CONVERT_URL": "",
             "TTS_HANJI_CONVERT_ENABLED": "false",
+            # 共用的 Gemini 金鑰（環境變數或 backend/.env）會讓 Gemini 語音直連變成
+            # 可用，測試就會真的打 Google。要測的自己帶：用 GEMINI_API_KEY= 傳，
+            # 以欄位名稱 gemini_api_key= 傳會被這裡的環境變數蓋掉。
+            "GEMINI_API_KEY": "",
         },
         clear=False,
     ):
         get_tts_config.cache_clear()
         get_auth_runtime.cache_clear()
+        clear_gemini_route_cache()
         yield
         get_tts_config.cache_clear()
         get_auth_runtime.cache_clear()
+        clear_gemini_route_cache()
 
 # ---------------------------------------------------------------------------
 # Stub heavy external dependencies that are not installed in test env

@@ -112,7 +112,7 @@ export const adminSubViews: Partial<Record<Tab, readonly string[]>> = {
     "graph",
     "embed-keys",
   ],
-  ModelProviders: ["chat", "decision", "keys"],
+  ModelProviders: ["chat", "decision", "voice", "keys"],
   SystemStatus: ["health", "monitoring"],
 };
 

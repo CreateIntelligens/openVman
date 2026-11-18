@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from .dependencies import CurrentAccount, require_root
+from .gemini_tts_route import (
+    clear_gemini_route_cache,
+    gemini_route,
+    saved_gemini_route,
+)
 from .model_provider_catalog import (
     CATEGORIES,
     CHAT_LLM,
@@ -29,6 +34,7 @@ from .model_provider_repository import (
 )
 from .project_gemini_credentials import GeminiCredential, resolve_gemini_credential
 from .runtime import AuthRuntime, get_auth_runtime
+from .settings_repository import TTS_GEMINI_ROUTE_KEY, TTS_GEMINI_ROUTE_RELAY
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +63,8 @@ class UpdateModelProviderSettings(_StrictModel):
     credentials: dict[str, str] = Field(default_factory=dict)
     clear_credentials: list[str] = Field(default_factory=list)
     use_environment_credentials: list[str] = Field(default_factory=list)
+    # 沒帶＝不改。Backend 每個 worker 幾秒內讀到，不用重開。
+    tts_gemini_route: Literal["direct", "relay"] | None = None
 
 
 def _effective(runtime: AuthRuntime, category: ModelCategory) -> tuple[CategorySettings, bool]:
@@ -218,7 +226,22 @@ def _admin_view(runtime: AuthRuntime) -> dict[str, Any]:
             "enabled": list(settings.enabled),
             "providers": providers,
         })
-    return {"credentials": credentials, "categories": categories}
+    return {
+        "credentials": credentials,
+        "categories": categories,
+        "tts_gemini": _tts_gemini_view(runtime),
+    }
+
+
+def _tts_gemini_view(runtime: AuthRuntime) -> dict[str, Any]:
+    config = runtime.config
+    return {
+        "route": gemini_route(config, runtime),
+        "saved": saved_gemini_route(runtime) is not None,
+        "default_route": config.tts_gemini_route,
+        "relay_configured": bool(config.tts_gemini_url.strip()),
+        "direct_available": resolve_gemini_credential(None, runtime).configured,
+    }
 
 
 @router.get("")
@@ -248,6 +271,8 @@ def update_model_provider_settings(
     actions = (set(body.credentials), set(body.clear_credentials), reset_credentials)
     if actions[0] & actions[1] or actions[0] & actions[2] or actions[1] & actions[2]:
         raise HTTPException(status_code=422, detail="credential has conflicting update actions")
+    if body.tts_gemini_route == TTS_GEMINI_ROUTE_RELAY and not runtime.config.tts_gemini_url.strip():
+        raise HTTPException(status_code=422, detail="TTS_GEMINI_URL is not configured")
     credentials = dict(body.credentials)
     credentials.update({credential_id: "" for credential_id in body.clear_credentials})
     changes = {
@@ -270,6 +295,10 @@ def update_model_provider_settings(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="model credential encryption is unavailable") from exc
+    if body.tts_gemini_route is not None:
+        runtime.settings.set(TTS_GEMINI_ROUTE_KEY, body.tts_gemini_route, actor_id=actor.user.id)
+        # 這個 worker 立刻生效；其他 worker 等短快取過期。
+        clear_gemini_route_cache()
     # Brain 每 10 秒才重讀一次設定；存完主動叫它清快取，改完馬上到前台測就看得到。
     refreshed = _brain_post(runtime, "/brain/internal/model-providers/refresh") is not None
     return {**_admin_view(runtime), "runtime_refreshed": refreshed}

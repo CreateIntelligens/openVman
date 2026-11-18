@@ -40,6 +40,7 @@ def _make_config(
         tts_gcp_sample_rate=24000,
         edge_tts_enabled=edge_enabled,
         tts_gemini_url=gemini_url,
+        tts_gemini_route="relay",
         tts_voxcpm_url=voxcpm_url,
     )
 

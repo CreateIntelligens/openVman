@@ -13,7 +13,11 @@ from typing import Any
 from app.auth.models import ResourceType
 from app.auth.runtime import AuthRuntime
 from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
-from app.providers.gemini_tts_adapter import GEMINI_PROVIDER_NAME
+from app.providers.gemini_tts_adapter import (
+    GEMINI_PREBUILT_VOICES,
+    GEMINI_PROVIDER_NAME,
+    gemini_tts_usable,
+)
 from app.providers.indextts_adapter import (
     INDEXTTS_NURSE_PROVIDER_NAME,
     indextts_nurse_url,
@@ -24,7 +28,6 @@ from app.providers.voice_catalog import (
     EDGE_TTS_VOICES,
     excluded_voices,
     fetch_cosyvoice_voices,
-    fetch_gemini_voices,
     fetch_indextts_nurse_voices,
     fetch_indextts_voices,
     fetch_voxcpm_voices,
@@ -174,17 +177,18 @@ async def sync_system_resources(runtime: AuthRuntime, cfg: Any) -> None:
         except Exception as exc:
             logger.warning("failed to sync indextts-nurse voices: %s", exc)
 
-    if cfg.tts_gemini_url:
-        try:
-            gemini_voices = await fetch_gemini_voices(cfg.tts_gemini_url)
-            for voice_id in gemini_voices:
+    # 直連與轉接用同一組 Google 聲音；任一條路線能用就登錄，後台切換路線時
+    # 聲音不會出現或消失。
+    try:
+        if gemini_tts_usable(cfg, runtime):
+            for voice_id in GEMINI_PREBUILT_VOICES:
                 runtime.resources.upsert_system_resource(
                     resource_type=ResourceType.CUSTOM_VOICE,
                     resource_id=voice_id,
                     metadata={"provider": GEMINI_PROVIDER_NAME, "label": voice_id},
                 )
-        except Exception as exc:
-            logger.warning("failed to sync gemini voices: %s", exc)
+    except Exception as exc:
+        logger.warning("failed to register gemini voices: %s", exc)
 
     if cfg.tts_voxcpm_url:
         try:

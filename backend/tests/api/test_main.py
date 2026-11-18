@@ -491,28 +491,10 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
     assert ids == ["auto", "edge-tts"]
 
 
-def test_tts_providers_includes_gemini_when_configured(monkeypatch):
+def test_tts_providers_lists_googles_gemini_voices_when_the_relay_is_set(monkeypatch):
+    from app.providers.gemini_tts_adapter import GEMINI_PREBUILT_VOICES
+
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
-
-    class FakeClient:
-        def get(self):
-            class FakeAsyncClient:
-                async def get(self, url: str, timeout=None, follow_redirects=None):
-                    class FakeResponse:
-                        def raise_for_status(self):
-                            pass
-
-                        def json(self):
-                            return {"voices": [{"name": "Zephyr"}, {"name": "Kore"}]}
-
-                    return FakeResponse()
-
-            return FakeAsyncClient()
-
-        async def close(self):
-            pass
-
-    monkeypatch.setattr("app.providers.voice_catalog._http", FakeClient())
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
         document_max_upload_bytes=1024,
         tts_indextts_url="",
@@ -524,13 +506,14 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
         edge_tts_enabled=False,
     ))
 
+    # 直連與轉接用同一組 Google 聲音，不再向轉接服務查清單。
     assert _get_tts_provider_payload(module) == [
         {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
         {
             "id": "gemini-tts",
             "name": "Gemini TTS",
             "default_voice": "Kore",
-            "voices": ["Zephyr", "Kore"],
+            "voices": list(GEMINI_PREBUILT_VOICES),
         },
     ]
 

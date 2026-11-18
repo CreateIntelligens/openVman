@@ -51,6 +51,10 @@ const settings = (): ModelProviderSettings => ({
       ],
     },
   ],
+  tts_gemini: {
+    route: "direct", saved: false, default_route: "direct",
+    relay_configured: true, direct_available: true,
+  },
 });
 
 function render(element: ReactElement) {
@@ -67,7 +71,7 @@ function render(element: ReactElement) {
   return renderComponent(<RouteHarness />);
 }
 
-async function openTab(name: "主對話模型" | "決策模型" | "API 金鑰") {
+async function openTab(name: "主對話模型" | "決策模型" | "Gemini 語音" | "API 金鑰") {
   fireEvent.click(await screen.findByRole("tab", { name: new RegExp(name) }));
 }
 
@@ -290,5 +294,60 @@ describe("ModelProviders", () => {
     await waitFor(() => expect(resetModelProviderHealth).toHaveBeenCalledWith({ category: "chat_llm", hop: "gemini" }));
     await waitFor(() => expect(within(screen.getByTestId("provider-chat_llm-gemini")).queryByRole("status")).toBeNull());
     expect((within(screen.getByTestId("provider-chat_llm-openai")).getByLabelText("啟用 主對話模型 OpenAI") as HTMLInputElement).checked).toBe(true);
+  });
+  it("switches Gemini voice to the relay and saves only that change", async () => {
+    render(<ModelProviders />);
+
+    await openTab("Gemini 語音");
+    const section = await screen.findByTestId("gemini-tts-route");
+    expect(within(section).getByText(/目前照伺服器設定：直連 Google/)).toBeTruthy();
+    const direct = within(section).getByRole("radio", { name: /直連 Google/ }) as HTMLInputElement;
+    const relay = within(section).getByRole("radio", { name: /經轉接服務/ }) as HTMLInputElement;
+    expect(direct.checked).toBe(true);
+    expect(relay.disabled).toBe(false);
+
+    fireEvent.click(relay);
+    expect(relay.checked).toBe(true);
+    expect(screen.getByRole("tab", { name: /Gemini 語音/ }).querySelector("[aria-label='有未儲存的修改']")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "儲存設定" }));
+
+    await waitFor(() => expect(saveModelProviderSettings).toHaveBeenCalled());
+    const body = vi.mocked(saveModelProviderSettings).mock.calls[0][0];
+    expect(body.tts_gemini_route).toBe("relay");
+    expect(body.categories).toEqual({});
+  });
+
+  it("does not send the Gemini voice route when it was not changed", async () => {
+    render(<ModelProviders />);
+
+    await openTab("Gemini 語音");
+    const section = await screen.findByTestId("gemini-tts-route");
+    fireEvent.click(within(section).getByRole("radio", { name: /經轉接服務/ }));
+    fireEvent.click(within(section).getByRole("radio", { name: /直連 Google/ }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存設定" }));
+
+    await waitFor(() => expect(saveModelProviderSettings).toHaveBeenCalled());
+    expect(vi.mocked(saveModelProviderSettings).mock.calls[0][0]).not.toHaveProperty("tts_gemini_route");
+  });
+
+  it("explains why a Gemini voice option cannot be chosen", async () => {
+    vi.mocked(fetchModelProviderSettings).mockResolvedValue({
+      ...settings(),
+      tts_gemini: {
+        route: "relay", saved: true, default_route: "direct",
+        relay_configured: false, direct_available: false,
+      },
+    });
+    render(<ModelProviders />);
+
+    await openTab("Gemini 語音");
+    const section = await screen.findByTestId("gemini-tts-route");
+    const direct = within(section).getByRole("radio", { name: /直連 Google/ }) as HTMLInputElement;
+    const relay = within(section).getByRole("radio", { name: /經轉接服務/ }) as HTMLInputElement;
+    expect(direct.disabled).toBe(true);
+    expect(relay.disabled).toBe(true);
+    expect(within(section).getByText(/還沒有 Gemini 金鑰/)).toBeTruthy();
+    expect(within(section).getByText(/伺服器沒有設定轉接服務/)).toBeTruthy();
+    expect(within(section).queryByText(/尚未在後台儲存過/)).toBeNull();
   });
 });

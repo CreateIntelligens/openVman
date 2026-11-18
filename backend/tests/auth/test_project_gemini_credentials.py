@@ -38,7 +38,7 @@ def context(tmp_path, monkeypatch):
         session_jwt_secret="test-session-secret-with-at-least-32-bytes",
         model_provider_encryption_secret="test-provider-secret-with-at-least-32-bytes",
         auth_database_path=str(tmp_path / "accounts.db"),
-        gemini_api_key="environment-shared-key",
+        GEMINI_API_KEY="environment-shared-key",
     ))
     root = runtime.users.create_root(username="ai360", password_hash="hash")
     for project in ("project-a", "project-b"):

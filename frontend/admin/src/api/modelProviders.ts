@@ -47,9 +47,24 @@ export interface ModelCategory {
   providers: ProviderHop[];
 }
 
+// Gemini 語音的路線：direct＝用本系統的 Gemini 金鑰直連 Google，relay＝經轉接服務。
+export type GeminiTtsRoute = "direct" | "relay";
+
+export interface GeminiTtsRouteSettings {
+  route: GeminiTtsRoute;
+  /** false＝還沒在後台存過，照伺服器的 TTS_GEMINI_ROUTE。 */
+  saved: boolean;
+  default_route: GeminiTtsRoute;
+  /** 伺服器有沒有設定轉接服務（TTS_GEMINI_URL）。 */
+  relay_configured: boolean;
+  /** 本系統有沒有 Gemini 金鑰可以直連。 */
+  direct_available: boolean;
+}
+
 export interface ModelProviderSettings {
   credentials: ProviderCredential[];
   categories: ModelCategory[];
+  tts_gemini: GeminiTtsRouteSettings;
   /** 只有存檔回應帶：Brain 是否已經立即重讀設定（否則 10 秒內生效）。 */
   runtime_refreshed?: boolean;
 }
@@ -67,6 +82,8 @@ export interface UpdateModelProviderSettings {
   credentials?: Record<string, string>;
   clear_credentials?: string[];
   use_environment_credentials?: string[];
+  /** 沒帶就不改。 */
+  tts_gemini_route?: GeminiTtsRoute;
 }
 
 export async function fetchModelProviderSettings(): Promise<ModelProviderSettings> {
