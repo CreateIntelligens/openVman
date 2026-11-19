@@ -12,6 +12,8 @@
 
 ### Changed
 
+- **[2026-11-19]** **admin 與 avatar 容器的 nginx 升到 1.31.9，修補 2026-11 的 nginx 漏洞**：1.9.5～1.31.8 受 HTTP/2 flow control 記憶體破壞（CVE-2026-123007，不需登入）、HTTP/2 UAF（CVE-2026-123633）、resolver UAF（CVE-2026-123634）、TLS 1.3 讀 body 無限迴圈（CVE-2026-118899）影響，修正版為 1.31.9+／1.30.7+。兩個映像的 runner 由 `nginx:1.31.8-alpine` 換成 `nginx:1.31.9-alpine`；admin 的 dev stage 把 Alpine 套件釘在 `nginx>=1.30.7-r0`，也讓舊的建置快取失效。HTTP/2 照舊開啟。主機 nginx 已是 1.31.9。
+
 - **[2026-11-18]** **Gemini 語音預設改為直連 Google，可在後台切換**：沒有綁專案金鑰的請求，以前一律經 `TTS_GEMINI_URL` 的轉接服務合成；現在預設用本系統的 Gemini 金鑰（後台 API 金鑰或 `GEMINI_API_KEY`）直接呼叫 Google，費用算在這把金鑰。ROOT 可在「模型供應商 → Gemini 語音」（`/admin/model-providers/voice`）改成經轉接服務，Backend 各 worker 約 3 秒內生效、不用重開；沒有 Gemini 金鑰時不能選直連，沒設 `TTS_GEMINI_URL` 時不能選轉接。沒在後台存過時照新的 `TTS_GEMINI_ROUTE`（`direct`／`relay`，預設 `direct`，其他值啟動時報錯）。專案綁了自己的金鑰時照舊一律用它直連。Gemini 聲音改為固定的 30 個 Google 預設聲音（不再向轉接服務查 `/api/voices`），任一條路線可用就登錄，切換路線不影響可選的聲音；有設 `TTS_GEMINI_URL` 就照舊背景探測。直連的整段合成也改用每站的時限，失敗訊息不再寫成「Project」。`PUT /api/v1/settings/model-providers` 新增選填欄位 `tts_gemini_route`，`GET` 回應新增 `tts_gemini`。
 
 - **[2026-11-18]** **部署文件補上主機參考規格**：`docs/operations/11_DEPLOYMENT.md` 依實測換算「1 秒內同時 100 題」需要的 CPU、記憶體、GPU 與硬碟，並說明每核可接的題數與量測主機的限制。
