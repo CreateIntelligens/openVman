@@ -51,6 +51,8 @@ def _user_from_row(row: sqlite3.Row) -> UserRecord:
         kiosk=bool(row["kiosk"]),
         ai_cleanup_access=bool(row["ai_cleanup_access"]),
         last_login_at=row["last_login_at"],
+        vendor_name=row["vendor_name"],
+        account_management_access=bool(row["account_management_access"]),
     )
 
 
@@ -89,6 +91,8 @@ def _grant_from_row(row: sqlite3.Row) -> ResourceGrantRecord:
         resource_id=row["resource_id"],
         granted_by=row["granted_by"],
         created_at=row["created_at"],
+        edit_knowledge=bool(row["edit_knowledge"]),
+        edit_settings=bool(row["edit_settings"]),
     )
 
 

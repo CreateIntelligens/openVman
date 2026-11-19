@@ -58,7 +58,11 @@ def _seed_retired_engine(env) -> None:
     with env.database.transaction(write=True) as connection:
         for grantee in (env.user.id, env.admin.id):
             connection.execute(
-                "INSERT INTO resource_grants VALUES (?, 'asr_engine', ?, ?, ?)",
+                """
+                INSERT INTO resource_grants (
+                    grantee_user_id, resource_type, resource_id, granted_by, created_at
+                ) VALUES (?, 'asr_engine', ?, ?, ?)
+                """,
                 (grantee, "xiaomi", env.root.id, _NOW),
             )
         connection.execute(

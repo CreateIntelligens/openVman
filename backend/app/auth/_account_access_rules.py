@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from ._admin_scope_rules import _load_admin_scope, _voice_provider_of
-from .models import AccountRole, ResourceType
+from .models import AccountRole, AdminScope, ProjectWritePermissions, ResourceType, UserRecord
+from .policy import AccountPolicyError
 from .repository_errors import InvalidResourceGrantError
 
 
@@ -137,16 +138,44 @@ def _persist_account_access(
     normalized_defaults: tuple[str, ...],
     now: str,
     clear_existing: bool = False,
+    project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
+    legacy_project_edit: bool = False,
 ) -> None:
     _ensure_grants_within_granter_scope(
         connection,
         granted_by=granted_by,
         normalized_grants=normalized_grants,
     )
+    account = connection.execute(
+        "SELECT vendor_name FROM users WHERE id = ?", (user_id,),
+    ).fetchone()
+    vendor_name = account["vendor_name"]
+    projects = {rid for kind, rid in normalized_grants if kind is ResourceType.PROJECT}
+    if project_permissions is not None and set(project_permissions) - projects:
+        raise InvalidResourceGrantError(
+            "project write permissions require a selected project"
+        )
+    explicit = project_permissions is not None
+    prior_writes = {}
+    if not explicit and clear_existing:
+        prior_writes = {
+            row["resource_id"]: ProjectWritePermissions(
+                bool(row["edit_knowledge"]), bool(row["edit_settings"])
+            )
+            for row in connection.execute(
+                """
+                SELECT resource_id, edit_knowledge, edit_settings FROM resource_grants
+                WHERE grantee_user_id = ? AND resource_type = 'project'
+                  AND project_writes_explicit = 1
+                """,
+                (user_id,),
+            )
+        }
+    write_flags = {}
     for resource_type, resource_id in normalized_grants:
         resource = connection.execute(
             """
-            SELECT 1 FROM resources
+            SELECT vendor_name FROM resources
             WHERE resource_type = ? AND resource_id = ?
             """,
             (resource_type.value, resource_id),
@@ -156,6 +185,23 @@ def _persist_account_access(
                 "resource is not registered: "
                 f"{resource_type.value}/{resource_id}"
             )
+        if resource_type is not ResourceType.PROJECT:
+            continue
+        if vendor_name and resource["vendor_name"] != vendor_name:
+            raise InvalidResourceGrantError("帳號與專案的所屬廠商必須相同")
+        if explicit:
+            writes = project_permissions.get(resource_id, ProjectWritePermissions())
+            if vendor_name and writes.edit_settings:
+                raise InvalidResourceGrantError("廠商帳號不可取得其他設定的編輯權限")
+        else:
+            legacy = legacy_project_edit and not vendor_name
+            writes = prior_writes.get(resource_id, ProjectWritePermissions(legacy, legacy))
+            if vendor_name and writes.edit_settings:
+                writes = ProjectWritePermissions(edit_knowledge=writes.edit_knowledge)
+        write_flags[resource_id] = (
+            writes.edit_knowledge, writes.edit_settings,
+            explicit or resource_id in prior_writes,
+        )
 
     if clear_existing:
         connection.execute(
@@ -167,8 +213,8 @@ def _persist_account_access(
         """
         INSERT INTO resource_grants(
             grantee_user_id, resource_type, resource_id,
-            granted_by, created_at
-        ) VALUES (?, ?, ?, ?, ?)
+            granted_by, created_at, edit_knowledge, edit_settings, project_writes_explicit
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -177,10 +223,16 @@ def _persist_account_access(
                 resource_id,
                 granted_by,
                 now,
+                *(
+                    write_flags[resource_id]
+                    if resource_type is ResourceType.PROJECT
+                    else (False, False, False)
+                ),
             )
             for resource_type, resource_id in normalized_grants
         ],
     )
+
     project_id = normalized_defaults[0]
     character_id = normalized_defaults[1]
     voice_id = normalized_defaults[3]
@@ -217,4 +269,38 @@ def _persist_account_access(
             mascot_id,
             background_id,
         ),
+    )
+
+
+def ensure_vendor_target_within_scope(
+    connection: sqlite3.Connection,
+    actor: UserRecord,
+    target: UserRecord,
+) -> None:
+    if actor.role is AccountRole.ROOT or not target.vendor_name:
+        return
+    scope = _load_admin_scope(connection, actor.id)
+    if not vendor_target_within_scope(connection, scope, target.id):
+        raise AccountPolicyError("target resources exceed administrator access")
+
+
+def vendor_target_within_scope(
+    connection: sqlite3.Connection,
+    scope: AdminScope,
+    user_id: str,
+) -> bool:
+    if not scope.scoped:
+        return True
+    rows = connection.execute(
+        """
+        SELECT resource_type, resource_id FROM resource_grants WHERE grantee_user_id = ?
+        UNION
+        SELECT resource_type, resource_id FROM resources WHERE owner_user_id = ?
+        """,
+        (user_id, user_id),
+    )
+    # 重設密碼可取得該帳號的操作能力，仍須遵守管理員的資源上限。
+    return all(
+        scope.allows(ResourceType(row["resource_type"]), row["resource_id"])
+        for row in rows
     )

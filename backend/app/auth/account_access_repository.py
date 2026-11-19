@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from ._account_access_rules import (
     _normalize_account_access,
     _persist_account_access,
+    ensure_vendor_target_within_scope,
 )
 from ._account_records import (
     _append_auth_audit,
@@ -21,6 +22,7 @@ from .database import AuthDatabase
 from .models import (
     AccountDefaultsRecord,
     AccountType,
+    ProjectWritePermissions,
     ResourceGrantRecord,
     ResourceType,
 )
@@ -48,6 +50,7 @@ class AccountAccessRepository:
         admin_portal_access: bool = False,
         kiosk: bool | None = None,
         ai_cleanup_access: bool | None = None,
+        project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
     ) -> tuple[tuple[ResourceGrantRecord, ...], AccountDefaultsRecord]:
         normalized_grants, normalized_defaults = _normalize_account_access(
             grants,
@@ -68,7 +71,10 @@ class AccountAccessRepository:
             ).fetchone()
             if target is None:
                 raise UserNotFoundError("account does not exist")
-            ensure_can_manage_account(_user_from_row(actor), _user_from_row(target))
+            actor_record = _user_from_row(actor)
+            target_record = _user_from_row(target)
+            ensure_can_manage_account(actor_record, target_record)
+            ensure_vendor_target_within_scope(connection, actor_record, target_record)
             if target["account_type"] != AccountType.FORMAL.value:
                 raise InvalidResourceGrantError(
                     "temporary account grants are managed by their batch"
@@ -82,6 +88,8 @@ class AccountAccessRepository:
                 normalized_defaults=normalized_defaults,
                 now=now,
                 clear_existing=True,
+                project_permissions=project_permissions,
+                legacy_project_edit=admin_portal_access,
             )
             connection.execute(
                 """

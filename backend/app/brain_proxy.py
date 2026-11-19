@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Awaitable
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable
+from posixpath import normpath
 from time import monotonic
 from typing import Any, TypeVar
 from urllib.parse import parse_qsl, quote, urlencode
@@ -65,7 +66,6 @@ _PUBLIC_API_PREFIX = "/api/v1"
 _INTERNAL_BRAIN_PREFIX = "/brain"
 _TAG_BRAIN_SYSTEM = ["Brain"]
 _TAG_TOOLS = ["Brain / Tools & Skills"]
-_TAG_PROJECTS = ["Brain / Projects"]
 _TAG_PERSONAS = ["Brain / Personas"]
 _TAG_CHAT = ["Brain / Chat"]
 _TAG_SEARCH = ["Brain / Search & Embeddings"]
@@ -86,10 +86,6 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/skills/{{skill_id}}/files", "methods": ["PUT"], "tags": _TAG_TOOLS, "summary": "Update Skill Files"},
     {"path": f"{_PUBLIC_API_PREFIX}/skills/{{skill_id}}", "methods": ["DELETE"], "tags": _TAG_TOOLS, "summary": "Delete Skill"},
     {"path": f"{_PUBLIC_API_PREFIX}/skills/reload", "methods": ["POST"], "tags": _TAG_TOOLS, "summary": "Reload Skills"},
-    {"path": f"{_PUBLIC_API_PREFIX}/projects", "methods": ["GET"], "tags": _TAG_PROJECTS, "summary": "List Projects"},
-    {"path": f"{_PUBLIC_API_PREFIX}/projects", "methods": ["POST"], "tags": _TAG_PROJECTS, "summary": "Create Project"},
-    {"path": f"{_PUBLIC_API_PREFIX}/projects", "methods": ["DELETE"], "tags": _TAG_PROJECTS, "summary": "Delete Project"},
-    {"path": f"{_PUBLIC_API_PREFIX}/projects/{{project_id}}", "methods": ["GET"], "tags": _TAG_PROJECTS, "summary": "Get Project"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["GET"], "tags": _TAG_PERSONAS, "summary": "List Personas"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Create Persona"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["DELETE"], "tags": _TAG_PERSONAS, "summary": "Delete Persona"},
@@ -150,6 +146,7 @@ _BRAIN_HEADER_PREFIX = "x-brain-"
 _USER_ID_HEADER = "X-OpenVMan-User-ID"
 _USER_ROLE_HEADER = "X-OpenVMan-Role"
 _PROJECT_ID_HEADER = "X-OpenVMan-Project-ID"
+_PROJECT_WRITES_HEADER = "X-OpenVMan-Project-Writes"
 _PRINCIPAL_TYPE_HEADER = "X-Principal-Type"
 _PRINCIPAL_ID_HEADER = "X-Principal-Id"
 _PRINCIPAL_HEADERS = frozenset(
@@ -435,20 +432,55 @@ def _requires_project_context(path: str) -> bool:
 
 def _project_access(path: str, method: str) -> ResourceAccess:
     normalized = path.strip("/")
-    # 對話清單會攤開整個專案所有人的對話 ID 與內容摘要；前台介面用不到，
-    # 只給能進後台的帳號（編輯權）。單一對話的歷史仍要知道 session_id 才讀得到。
-    if normalized in {"sessions", "sessions/export"}:
-        return ResourceAccess.EDIT
     if method.upper() in _SAFE_METHODS:
         return ResourceAccess.READ
     project_area = normalized.partition("/")[0]
-    if project_area in {"knowledge", "personas", "skills", "tools", "dreaming"}:
-        return ResourceAccess.EDIT
-    if project_area == "sessions":
-        return ResourceAccess.EDIT
-    if project_area == "memories":
-        return ResourceAccess.EDIT
+    if project_area in {"knowledge", "personas"}:
+        return ResourceAccess.EDIT_KNOWLEDGE
+    if project_area in {"dreaming", "memories", "sessions", "skills", "tools"}:
+        return ResourceAccess.EDIT_SETTINGS
     return ResourceAccess.READ
+
+
+_WORKSPACE_WRITES = frozenset({
+    "knowledge/document", "knowledge/document/meta", "knowledge/directory", "knowledge/move",
+    "knowledge/renormalize", "knowledge/renormalize/preview", "knowledge/renormalize/apply",
+})
+_PERSONA_DOCUMENTS = frozenset({"SOUL.md", "IDENTITY.md", "AGENTS.md", "TOOLS.md"})
+_PROJECT_WRITES = (ResourceAccess.EDIT_KNOWLEDGE, ResourceAccess.EDIT_SETTINGS)
+
+
+def _workspace_access(path: str) -> ResourceAccess:
+    # Brain 再依實際解析到的檔案比對可信的寫入權限，避免符號連結跨越權限。
+    parts = normpath(path.strip()).split("/")
+    if (
+        parts[0] in {"knowledge", "raw"}
+        or (len(parts) == 1 and parts[0] in _PERSONA_DOCUMENTS)
+        or (
+            parts[0] == "personas"
+            and (len(parts) <= 2 or (len(parts) == 3 and parts[-1] in _PERSONA_DOCUMENTS))
+        )
+    ):
+        return ResourceAccess.EDIT_KNOWLEDGE
+    return ResourceAccess.EDIT_SETTINGS
+
+
+def _workspace_project_writes(
+    request: Request, path: str, body: bytes,
+) -> tuple[ResourceAccess, ...]:
+    if request.method == "DELETE":
+        fields = [request.query_params.get("path")]
+    else:
+        payload = _json_object(body) or {}
+        fields = (
+            [payload.get("source_path"), payload.get("target_path")]
+            if path == "knowledge/move"
+            else [payload.get("path")]
+        )
+    required = {_workspace_access(field) for field in fields if isinstance(field, str)}
+    return tuple(access for access in _PROJECT_WRITES if access in required) or (
+        ResourceAccess.EDIT_KNOWLEDGE,
+    )
 
 
 async def _authorize_project_context(
@@ -490,30 +522,43 @@ async def _authorize_project_context(
 
     runtime = get_auth_runtime()
     access = _project_access(path, request.method)
-    try:
+    normalized_path = path.strip("/")
+    workspace_write = access is ResourceAccess.EDIT_KNOWLEDGE and normalized_path in _WORKSPACE_WRITES
+    required = (
+        _workspace_project_writes(request, normalized_path, body)
+        if workspace_write else (access,)
+    )
+
+    def resolve(permission: ResourceAccess) -> None:
         resolve_resource(
-            runtime.resources,
-            current.user,
-            ResourceType.PROJECT,
-            resolved_project_id,
-            access=access,
+            runtime.resources, current.user, ResourceType.PROJECT,
+            resolved_project_id, access=permission,
         )
+
+    try:
+        for permission in required:
+            resolve(permission)
     except ResourceNotFoundError:
         # 看得到專案、只是不能改（例如一般帳號刪對話、改知識庫）就明說 403；
         # 回 404 會讓串接方以為專案或對話不存在。看不到的專案照舊 404，不洩漏存在與否。
-        if access is not ResourceAccess.EDIT:
+        if access is ResourceAccess.READ:
             raise
-        resolve_resource(
-            runtime.resources,
-            current.user,
-            ResourceType.PROJECT,
-            resolved_project_id,
-            access=ResourceAccess.READ,
-        )
+        resolve(ResourceAccess.READ)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account cannot modify this project",
         ) from None
+    if workspace_write:
+        allowed = list(required)
+        for permission in _PROJECT_WRITES:
+            if permission in required:
+                continue
+            try:
+                resolve(permission)
+            except ResourceNotFoundError:
+                continue
+            allowed.append(permission)
+        request.state.project_writes = ",".join(permission.value for permission in allowed)
     request.state.resolved_project_id = resolved_project_id
     return resolved_project_id
 
@@ -694,6 +739,8 @@ async def proxy_to_brain(
         current=current,
         project_id=project_id,
     )
+    if project_writes := getattr(request.state, "project_writes", None):
+        headers[_PROJECT_WRITES_HEADER] = project_writes
     try:
         body = guard_ai_cleanup(normalized_path, request.method, body, current)
     except AiCleanupRefused as exc:
@@ -918,4 +965,6 @@ async def brain_proxy(
     path: str,
     _current: CurrentAccount | None = Depends(_catchall_current_account),
 ) -> Response:
+    if path.strip("/").partition("/")[0] == "projects":
+        return JSONResponse(status_code=404, content={"detail": "Resource not found"})
     return await _proxy_to_brain(request, path)

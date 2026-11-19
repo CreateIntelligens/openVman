@@ -53,10 +53,18 @@ def _resource(
     )
 
 
-def _resources(record: ResourceRecord, *, granted: bool = True) -> MagicMock:
+def _resources(
+    record: ResourceRecord,
+    *,
+    granted: bool = True,
+    project_writes: frozenset[str] = frozenset({"edit_knowledge", "edit_settings"}),
+) -> MagicMock:
     resources = MagicMock()
     resources.get.return_value = record
-    resources.has_grant.return_value = granted
+    resources.has_grant.side_effect = (
+        lambda *_args, project_write=None: granted
+        and (project_write is None or project_write in project_writes)
+    )
     return resources
 
 
@@ -64,8 +72,10 @@ def _resources(record: ResourceRecord, *, granted: bool = True) -> MagicMock:
     "account_type",
     [AccountType.FORMAL, AccountType.TEMPORARY],
 )
+@pytest.mark.parametrize("access", [ResourceAccess.EDIT_KNOWLEDGE, ResourceAccess.EDIT_SETTINGS])
 def test_portal_user_can_edit_a_granted_project(
     account_type: AccountType,
+    access: ResourceAccess,
 ) -> None:
     project = _resource()
 
@@ -74,29 +84,29 @@ def test_portal_user_can_edit_a_granted_project(
         _user(portal_access=True, account_type=account_type),
         ResourceType.PROJECT,
         project.resource_id,
-        access=ResourceAccess.EDIT,
+        access=access,
     )
 
     assert resolved is project
 
 
 @pytest.mark.parametrize(
-    ("portal_access", "granted"),
-    [(False, True), (True, False)],
+    ("project_writes", "granted"),
+    [(frozenset(), True), (frozenset({"edit_knowledge"}), False)],
 )
-def test_project_edit_requires_portal_access_and_grant(
-    portal_access: bool,
+def test_project_edit_requires_matching_grant(
+    project_writes: frozenset[str],
     granted: bool,
 ) -> None:
     project = _resource()
 
     with pytest.raises(ResourceNotFoundError):
         resolve_resource(
-            _resources(project, granted=granted),
-            _user(portal_access=portal_access),
+            _resources(project, granted=granted, project_writes=project_writes),
+            _user(portal_access=True),
             ResourceType.PROJECT,
             project.resource_id,
-            access=ResourceAccess.EDIT,
+            access=ResourceAccess.EDIT_KNOWLEDGE,
         )
 
 
@@ -109,5 +119,5 @@ def test_portal_access_does_not_allow_global_resource_mutation() -> None:
             _user(portal_access=True),
             ResourceType.CUSTOM_VOICE,
             voice.resource_id,
-            access=ResourceAccess.EDIT,
+            access=ResourceAccess.EDIT_KNOWLEDGE,
         )

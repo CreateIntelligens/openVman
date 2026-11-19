@@ -91,7 +91,7 @@ def env(monkeypatch):
     )
     runtime.account_access.set_asr_provider(owner.id, "breeze")
     _key_id, token = runtime.api_keys.create(
-        actor_id=owner.id, user_id=owner.id, label="kiosk",
+        actor_id=root.id, user_id=owner.id, label="kiosk",
     )
 
     app = FastAPI()

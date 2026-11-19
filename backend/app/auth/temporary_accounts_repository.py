@@ -233,6 +233,7 @@ class TemporaryAccountRepository:
                         normalized_grants=normalized_grants,
                         normalized_defaults=normalized_defaults,
                         now=now,
+                        legacy_project_edit=admin_portal_access,
                         clear_existing=False,
                     )
                 _append_auth_audit(
@@ -488,6 +489,15 @@ class TemporaryAccountRepository:
                 )
                 """,
                 (int(enabled), int(enabled), now, batch_id),
+            )
+            connection.execute(
+                """
+                UPDATE resource_grants SET edit_knowledge = ?, edit_settings = ?
+                WHERE resource_type = 'project' AND grantee_user_id IN (
+                    SELECT user_id FROM temporary_credentials WHERE batch_id = ?
+                )
+                """,
+                (enabled, enabled, batch_id),
             )
             _append_auth_audit(
                 connection,

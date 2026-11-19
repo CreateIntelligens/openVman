@@ -16,13 +16,15 @@ from .models import (
     is_at_least_admin,
 )
 from .resource_repository import ResourceRepository
+from .policy import is_vendor_account
 
 _RESOURCE_NOT_FOUND = "Resource not found"
 
 
 class ResourceAccess(StrEnum):
     READ = "read"
-    EDIT = "edit"
+    EDIT_KNOWLEDGE = "edit_knowledge"
+    EDIT_SETTINGS = "edit_settings"
     MUTATE = "mutate"
 
 
@@ -86,18 +88,24 @@ def resolve_resource(
         # 超出 ROOT 指派範圍的資源，對這個 admin 而言等同不存在——與其他
         # 越權情境回報一致，不洩漏「存在但不給你」這件事。
         raise ResourceNotFoundError
-    if record.owner_user_id == account.id:
+    vendor_project = resource_type is ResourceType.PROJECT and is_vendor_account(account)
+    if vendor_project and record.vendor_name != account.vendor_name:
+        raise ResourceNotFoundError
+    if not vendor_project and record.owner_user_id == account.id:
         return record
-    grant_allows_access = access is ResourceAccess.READ or (
-        access is ResourceAccess.EDIT
-        and resource_type is ResourceType.PROJECT
-        and account.admin_portal_access
-    )
-    if (
-        grant_allows_access
-        and resources.has_grant(account.id, resource_type, resource_id)
+    if access is ResourceAccess.READ and resources.has_grant(
+        account.id, resource_type, resource_id,
     ):
         return record
+    if resource_type is ResourceType.PROJECT:
+        if access is ResourceAccess.EDIT_KNOWLEDGE and resources.has_grant(
+            account.id, resource_type, resource_id, project_write="edit_knowledge",
+        ):
+            return record
+        if access is ResourceAccess.EDIT_SETTINGS and not vendor_project and resources.has_grant(
+            account.id, resource_type, resource_id, project_write="edit_settings",
+        ):
+            return record
     raise ResourceNotFoundError
 
 
@@ -116,7 +124,8 @@ def list_accessible_resources(
             allowed = scope.resource_ids(resource_type)
             return [record for record in records if record.resource_id in allowed]
         return records
-    return resources.list_accessible(
-        account.id,
-        resource_type=resource_type,
-    )
+    if resource_type is ResourceType.PROJECT and is_vendor_account(account):
+        return resources.list_accessible(
+            account.id, resource_type=resource_type, vendor_name=account.vendor_name,
+        )
+    return resources.list_accessible(account.id, resource_type=resource_type)

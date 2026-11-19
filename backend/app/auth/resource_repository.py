@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from typing import Literal
 
 from ._repository_base import now_iso
 from .database import AuthDatabase
@@ -20,6 +21,7 @@ def _resource_from_row(row: sqlite3.Row) -> ResourceRecord:
         created_at=row["created_at"],
         metadata_json=row["metadata_json"],
         owner_project_id=row["owner_project_id"] if "owner_project_id" in row.keys() else None,
+        vendor_name=row["vendor_name"],
     )
 
 
@@ -36,6 +38,7 @@ class ResourceRepository:
         owner_user_id: str | None,
         metadata: dict[str, object] | None = None,
         owner_project_id: str | None = None,
+        vendor_name: str | None = None,
     ) -> ResourceRecord:
         normalized_id = resource_id.strip()
         if not normalized_id:
@@ -53,8 +56,8 @@ class ResourceRepository:
                     """
                     INSERT INTO resources(
                         resource_type, resource_id, owner_user_id, visibility,
-                        created_at, metadata_json, owner_project_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        created_at, metadata_json, owner_project_id, vendor_name
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         resource_type.value,
@@ -66,6 +69,7 @@ class ResourceRepository:
                             metadata or {}, separators=(",", ":"), sort_keys=True
                         ),
                         owner_project_id,
+                        (vendor_name or "").strip() or None,
                     ),
                 )
         except sqlite3.IntegrityError as exc:
@@ -77,6 +81,16 @@ class ResourceRepository:
         if record is None:
             raise RepositoryError("registered resource could not be reloaded")
         return record
+
+    def set_project_vendor(self, project_id: str, vendor_name: str | None) -> bool:
+        with self.database.transaction(write=True) as connection:
+            return bool(connection.execute(
+                """
+                UPDATE resources SET vendor_name = ?
+                WHERE resource_type = 'project' AND resource_id = ?
+                """,
+                ((vendor_name or "").strip() or None, project_id),
+            ).rowcount)
 
     def upsert_system_resource(
         self,
@@ -192,6 +206,7 @@ class ResourceRepository:
         user_id: str,
         *,
         resource_type: ResourceType,
+        vendor_name: str | None = None,
     ) -> list[ResourceRecord]:
         with self.database.transaction() as connection:
             rows = connection.execute(
@@ -203,13 +218,12 @@ class ResourceRepository:
                    AND resource_grants.resource_id = resources.resource_id
                    AND resource_grants.grantee_user_id = ?
                 WHERE resources.resource_type = ?
-                  AND (
-                      resources.owner_user_id = ?
-                      OR resource_grants.grantee_user_id IS NOT NULL
-                  )
+                  AND (resource_grants.grantee_user_id IS NOT NULL
+                       OR (? IS NULL AND resources.owner_user_id = ?))
+                  AND (? IS NULL OR resources.vendor_name = ?)
                 ORDER BY resources.resource_id
                 """,
-                (user_id, resource_type.value, user_id),
+                (user_id, resource_type.value, vendor_name, user_id, vendor_name, vendor_name),
             ).fetchall()
         return [_resource_from_row(row) for row in rows]
 
@@ -218,18 +232,20 @@ class ResourceRepository:
         grantee_user_id: str,
         resource_type: ResourceType,
         resource_id: str,
+        *,
+        project_write: Literal["edit_knowledge", "edit_settings"] | None = None,
     ) -> bool:
         with self.database.transaction() as connection:
             row = connection.execute(
                 """
-                SELECT 1 FROM resource_grants
+                SELECT edit_knowledge, edit_settings FROM resource_grants
                 WHERE grantee_user_id = ?
                   AND resource_type = ?
                   AND resource_id = ?
                 """,
                 (grantee_user_id, resource_type.value, resource_id),
             ).fetchone()
-        return row is not None
+        return row is not None and (project_write is None or bool(row[project_write]))
 
     def count_private_by_owner(self, owner_user_id: str) -> dict[str, int]:
         with self.database.transaction() as connection:

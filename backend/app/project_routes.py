@@ -17,7 +17,13 @@ from app.auth.dependencies import (
     require_admin,
     require_root,
 )
-from app.auth.models import ProjectPolicyRecord, ResourceType, ResourceVisibility
+from app.auth.models import (
+    ProjectPolicyRecord,
+    ResourceRecord,
+    ResourceType,
+    ResourceVisibility,
+)
+from app.auth.policy import is_vendor_account
 from app.auth.project_resources import (
     effective_project_default,
     effective_project_resources,
@@ -34,6 +40,7 @@ from app.auth.resources import (
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
+from app.auth.routes import VendorAffiliationRequest, VendorName
 from app.brain_proxy import proxy_to_brain
 from app.utils.log_safe import log_safe
 
@@ -50,6 +57,7 @@ class _StrictModel(BaseModel):
 
 class ProjectCreateRequest(_StrictModel):
     label: str = Field(min_length=1)
+    vendor_name: VendorName | None = None
 
     @field_validator("label")
     @classmethod
@@ -76,9 +84,9 @@ def _resolve_project(
     project_id: str,
     *,
     access: ResourceAccess,
-) -> None:
+) -> ResourceRecord:
     try:
-        resolve_resource(
+        return resolve_resource(
             runtime.resources,
             current.user,
             ResourceType.PROJECT,
@@ -102,6 +110,25 @@ def _json_object(response: Response) -> dict[str, Any] | None:
 
 def _is_success(response: Response) -> bool:
     return 200 <= response.status_code < 300
+
+
+_VENDOR_PROJECT_FIELDS = frozenset({
+    "project_id", "label", "persona_count", "document_count", "is_default",
+})
+
+
+def _project_summary(
+    payload: dict[str, Any],
+    record: ResourceRecord,
+    current: CurrentAccount,
+) -> dict[str, Any]:
+    if is_vendor_account(current.user):
+        summary = {key: value for key, value in payload.items() if key in _VENDOR_PROJECT_FIELDS}
+    else:
+        summary = dict(payload)
+    if record.vendor_name is not None:
+        summary["vendor_name"] = record.vendor_name
+    return summary
 
 
 def _replacement_request(
@@ -163,6 +190,10 @@ async def list_projects(
         current=current,
     )
     if not _is_success(response):
+        if is_vendor_account(current.user):
+            return JSONResponse(
+                status_code=response.status_code, content={"detail": "無法取得專案資料"},
+            )
         return response
 
     payload = _json_object(response)
@@ -173,8 +204,8 @@ async def list_projects(
             content={"detail": "Invalid project service response"},
         )
 
-    accessible_ids = {
-        resource.resource_id
+    accessible = {
+        resource.resource_id: resource
         for resource in list_accessible_resources(
             runtime.resources,
             current.user,
@@ -182,27 +213,35 @@ async def list_projects(
         )
     }
     projects = [
-        project
+        _project_summary(project, accessible[project["project_id"]], current)
         for project in payload["projects"]
         if isinstance(project, dict)
         and isinstance(project.get("project_id"), str)
-        and project["project_id"] in accessible_ids
+        and project["project_id"] in accessible
     ]
     return JSONResponse(
         status_code=response.status_code,
-        content={**payload, "projects": projects, "project_count": len(projects)},
+        content={
+            **({} if is_vendor_account(current.user) else payload),
+            "projects": projects, "project_count": len(projects),
+        },
     )
 
 
 @router.post("/api/v1/projects", summary="Create Project")
 async def create_project(
-    _body: ProjectCreateRequest,
+    body: ProjectCreateRequest,
     request: Request,
     current: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> Response:
+    brain_request = request
+    if "vendor_name" in body.model_fields_set:
+        brain_request = _replacement_request(
+            request, method="POST", payload={"label": body.label},
+        )
     response = await proxy_to_brain(
-        request,
+        brain_request,
         _PROJECT_PATH,
         current=current,
     )
@@ -219,12 +258,13 @@ async def create_project(
         )
 
     try:
-        runtime.resources.register(
+        record = runtime.resources.register(
             resource_type=ResourceType.PROJECT,
             resource_id=project_id,
             owner_user_id=current.user.id,
             visibility=ResourceVisibility.PRIVATE,
             metadata={"label": payload.get("label", "")},
+            vendor_name=body.vendor_name,
         )
     except Exception as exc:
         compensated = await _compensate_project_creation(
@@ -247,7 +287,12 @@ async def create_project(
             status_code=response_status,
             content={"detail": "Project ownership registration failed"},
         )
-    return response
+    if record.vendor_name is None:
+        return response
+    return JSONResponse(
+        status_code=response.status_code,
+        content=_project_summary(payload, record, current),
+    )
 
 
 @router.delete("/api/v1/projects", summary="Delete Project")
@@ -299,18 +344,47 @@ async def get_project(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> Response:
-    _resolve_project(
+    record = _resolve_project(
         runtime,
         current,
         project_id,
         access=ResourceAccess.READ,
     )
-    return await proxy_to_brain(
+    response = await proxy_to_brain(
         request,
         f"projects/{project_id}",
         current=current,
         project_id=project_id,
     )
+    if not _is_success(response):
+        if is_vendor_account(current.user):
+            return JSONResponse(
+                status_code=response.status_code, content={"detail": "無法取得專案資料"},
+            )
+        return response
+    if record.vendor_name is None and not is_vendor_account(current.user):
+        return response
+    payload = _json_object(response)
+    if payload is None:
+        return JSONResponse(status_code=502, content={"detail": "Invalid project service response"})
+    return JSONResponse(
+        status_code=response.status_code,
+        content=_project_summary(payload, record, current),
+    )
+
+
+@router.patch("/api/v1/projects/{project_id}/vendor", summary="Set Project Vendor")
+def set_project_vendor(
+    project_id: str,
+    body: VendorAffiliationRequest,
+    current: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> dict[str, str | None]:
+    _resolve_project(runtime, current, project_id, access=ResourceAccess.MUTATE)
+    vendor_name = body.vendor_name or None
+    if not runtime.resources.set_project_vendor(project_id, vendor_name):
+        raise _resource_not_found()
+    return {"project_id": project_id, "vendor_name": vendor_name}
 
 
 class ProjectPolicyPayload(_StrictModel):
@@ -376,7 +450,7 @@ def get_project_policy(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> ProjectPolicyProfile:
     """能編輯專案內容的人都能看；改設定只有管理者。"""
-    _resolve_project(runtime, current, project_id, access=ResourceAccess.EDIT)
+    _resolve_project(runtime, current, project_id, access=ResourceAccess.EDIT_SETTINGS)
     return ProjectPolicyProfile.from_record(runtime.project_policies.get(project_id))
 
 

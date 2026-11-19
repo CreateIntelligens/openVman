@@ -423,7 +423,12 @@ def test_role_promotion_and_demotion_update_access_and_sessions_atomically(
     )
     assert demoted.status_code == 200
     assert demoted.json()["role"] == "user"
-    assert demoted.json()["grants"] == access["grants"]
+    assert demoted.json()["grants"] == {
+        **access["grants"],
+        "project_permissions": {
+            "project-a": {"edit_knowledge": False, "edit_settings": False},
+        },
+    }
     assert demoted.json()["defaults"] == access["defaults"]
     assert client.get("/api/v1/auth/me", headers=old_admin_headers).status_code == 401
 

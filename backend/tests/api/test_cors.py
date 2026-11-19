@@ -31,8 +31,9 @@ def cors_env(monkeypatch):
     runtime = get_auth_runtime()
     original = runtime.config
     _set_origins(runtime, PARTNER)
+    root = runtime.users.create_root(username="ai360", password_hash="unused")
     user = runtime.users.get_by_username("test-user")
-    record, secret = runtime.api_keys.create(actor_id=user.id, user_id=user.id, label="partner")
+    record, secret = runtime.api_keys.create(actor_id=root.id, user_id=user.id, label="partner")
     client = TestClient(module.app, raise_server_exceptions=False)
     yield client, runtime, record, secret
     object.__setattr__(runtime, "config", original)

@@ -80,7 +80,7 @@ def _require_project_edit(
             current.user,
             ResourceType.PROJECT,
             project_id,
-            access=ResourceAccess.EDIT,
+            access=ResourceAccess.EDIT_KNOWLEDGE,
         )
     except ResourceNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Resource not found") from exc
@@ -724,14 +724,14 @@ async def ingest_youtube_transcript(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> JSONResponse:
     """擷取 YouTube 字幕，可選存入知識庫。"""
+    if req.save_to_knowledge:
+        _require_project_edit(runtime, current, req.project_id)
     result = await _fetch_youtube_transcript(req.url)
     if isinstance(result, JSONResponse):
         return result
 
     if not req.save_to_knowledge:
         return JSONResponse(content=result)
-
-    _require_project_edit(runtime, current, req.project_id)
 
     filename = f"{result['title']}.md"
     markdown_bytes = f"# {result['title']}\n\n{result['content']}".encode("utf-8")

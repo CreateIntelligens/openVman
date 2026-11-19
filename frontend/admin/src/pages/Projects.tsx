@@ -6,6 +6,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import ProjectGeminiCredentialDialog from "../components/projects/ProjectGeminiCredentialDialog";
 import ProjectPolicyDialog from "../components/projects/ProjectPolicyDialog";
 import StatusAlert from "../components/StatusAlert";
+import VendorNameDialog from "../components/VendorNameDialog";
 import { useAuth } from "../context/AuthContext";
 import { useProjectsAdmin } from "../hooks/useProjectsAdmin";
 
@@ -20,18 +21,22 @@ export default function Projects() {
     deletingId,
     handleCreate,
     handleDelete,
+    handleSetVendor,
     lastCreatedId,
     loadProjects,
     loading,
     newProjectLabel,
+    newProjectVendor,
     projects,
     setDeleteTargetId,
     setNewProjectLabel,
+    setNewProjectVendor,
     setStatus,
     status,
   } = useProjectsAdmin();
   const [policyTarget, setPolicyTarget] = useState<ProjectSummary | null>(null);
   const [geminiTarget, setGeminiTarget] = useState<ProjectSummary | null>(null);
+  const [vendorTarget, setVendorTarget] = useState<ProjectSummary | null>(null);
 
   return (
     <div className="page-scroll">
@@ -56,30 +61,44 @@ export default function Projects() {
               新增專案
             </p>
             <h3 className="card-title mt-2">建立新專案</h3>
-            <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
+            <form
+              className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreate();
+              }}
+            >
               <div className="flex-1">
-                <label className="mb-1 block text-xs text-content-muted">專案名稱</label>
+                <label htmlFor="new-project-name" className="mb-1 block text-xs text-content-muted">專案名稱</label>
                 <input
+                  id="new-project-name"
                   type="text"
                   value={newProjectLabel}
                   onChange={(e) => setNewProjectLabel(e.target.value)}
                   placeholder="例：門市客服"
                   className="w-full rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-content placeholder:text-content-subtle focus:border-primary/40 focus:outline-none shadow-sm dark:shadow-none transition-all"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      void handleCreate();
-                    }
-                  }}
+                  disabled={creating}
                 />
               </div>
+              <label className="flex-1 text-xs text-content-muted">
+                所屬廠商
+                <input
+                  className="input mt-1"
+                  value={newProjectVendor}
+                  onChange={(event) => setNewProjectVendor(event.target.value)}
+                  placeholder="留白代表內部專案"
+                  maxLength={120}
+                  disabled={creating}
+                />
+              </label>
               <button
-                onClick={handleCreate}
+                type="submit"
                 disabled={!canCreateProject}
                 className="rounded-xl bg-primary px-6 py-3 font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 {creating ? "建立中…" : "建立專案"}
               </button>
-            </div>
+            </form>
             {lastCreatedId && (
               <p className="mt-3 text-xs text-content-muted">
                 自動產生的 ID：<code className="rounded bg-border dark:bg-surface-overlay px-1.5 py-0.5 font-mono text-primary">{lastCreatedId}</code>
@@ -88,7 +107,7 @@ export default function Projects() {
           </section>
         ) : (
           <p className="rounded-2xl border border-border bg-surface-sunken px-5 py-4 text-sm text-content-muted">
-            你可以編輯下方已授權專案的內容；專案建立與刪除由管理員處理。
+            你可以查看下方已授權的專案。專案建立與刪除由管理員處理。
           </p>
         )}
 
@@ -124,6 +143,7 @@ export default function Projects() {
                     <p className="mt-1 text-xs text-content-subtle font-mono">
                       {project.project_id}
                     </p>
+                    <p className="mt-1 text-xs text-content-muted">所屬廠商：{project.vendor_name || "內部"}</p>
                   </div>
                   {project.project_id === "default" && (
                     <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-xs font-bold text-primary">
@@ -145,6 +165,13 @@ export default function Projects() {
 
                 {canManageProjects && (
                   <div className="mt-auto flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setVendorTarget(project)}
+                      className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
+                    >
+                      設定所屬廠商
+                    </button>
                     <button
                       type="button"
                       onClick={() => setPolicyTarget(project)}
@@ -203,6 +230,15 @@ export default function Projects() {
           projectId={geminiTarget.project_id}
           projectLabel={geminiTarget.label || geminiTarget.project_id}
           onClose={() => setGeminiTarget(null)}
+        />
+      )}
+
+      {canManageProjects && vendorTarget && (
+        <VendorNameDialog
+          targetLabel={vendorTarget.label || vendorTarget.project_id}
+          vendorName={vendorTarget.vendor_name}
+          onClose={() => setVendorTarget(null)}
+          onSave={(name) => handleSetVendor(vendorTarget.project_id, name)}
         />
       )}
 

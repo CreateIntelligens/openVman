@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from typing import Any
+from typing import Annotated, Any
 
 
 from fastapi import (
@@ -11,6 +11,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Response,
     UploadFile,
@@ -181,6 +182,47 @@ def _document_path(path: str, project_id: str) -> str:
     return resolved.relative_to(ensure_workspace_scaffold(project_id).resolve()).as_posix()
 
 
+ProjectWrites = Annotated[
+    str, Header(alias="X-OpenVMan-Project-Writes", include_in_schema=False)
+]
+_PERSONA_DOCUMENTS = frozenset({"SOUL.md", "IDENTITY.md", "AGENTS.md", "TOOLS.md"})
+
+
+def _require_workspace_write(granted: str, *paths: str) -> None:
+    # 沒有能力標頭的舊 Backend／內部呼叫仍由既有 internal token 管理。
+    if not granted:
+        return
+    permissions = granted.split(",")
+    for path in paths:
+        parts = path.split("/")
+        knowledge = (
+            parts[0] in {"knowledge", "raw"}
+            or (len(parts) == 1 and parts[0] in _PERSONA_DOCUMENTS)
+            or (
+                parts[0] == "personas"
+                and (len(parts) <= 2 or (len(parts) == 3 and parts[-1] in _PERSONA_DOCUMENTS))
+            )
+        )
+        required = "edit_knowledge" if knowledge else "edit_settings"
+        if required not in permissions:
+            raise HTTPException(status_code=403, detail="沒有修改此工作區路徑的權限")
+
+
+def _require_directory_write(granted: str, path: str, project_id: str) -> None:
+    if granted:
+        root = get_workspace_root(project_id).resolve()
+        target = (root / path.strip()).resolve()
+        _require_workspace_write(granted, target.relative_to(root).as_posix())
+
+
+def _check_workspace_document_write(
+    granted: str, path: str, project_id: str,
+) -> str:
+    relative = _document_path(path, project_id)
+    _require_workspace_write(granted, relative)
+    return relative
+
+
 def _content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
@@ -197,14 +239,18 @@ async def get_knowledge_document_route(path: str, project_id: str = "default"):
 
 
 @router.put("/knowledge/document", summary="儲存知識文件")
-async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
+async def save_knowledge_document_route(
+    payload: KnowledgeDocumentPutRequest, project_writes: ProjectWrites = "",
+):
     # 問答存檔會改同一份檔案，兩邊都進同一把鎖；帶了 base_hash 時，載入後被改過就拒絕，
     # 否則開著的舊全文會蓋掉別處剛存的內容。
     def _save() -> dict[str, Any]:
         from knowledge.qa_nodes import is_qa_document, sync_entries_for_source
 
         with qa_document_lock:
-            path = _document_path(payload.path, payload.project_id)
+            path = _check_workspace_document_write(
+                project_writes, payload.path, payload.project_id,
+            )
             if payload.base_hash:
                 try:
                     current = read_workspace_document(path, payload.project_id).get("content", "")
@@ -255,10 +301,15 @@ async def put_knowledge_settings_route(payload: KnowledgeSettingsPutRequest):
 
 
 @router.patch("/knowledge/document/meta", summary="更新文件中繼屬性")
-async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatchRequest):
+async def patch_knowledge_document_meta_route(
+    payload: KnowledgeDocumentMetaPatchRequest, project_writes: ProjectWrites = "",
+):
     try:
+        path = _check_workspace_document_write(
+            project_writes, payload.path, payload.project_id,
+        )
         document = update_workspace_document_meta(
-            _document_path(payload.path, payload.project_id),
+            path,
             payload.project_id,
             enabled=payload.enabled,
             source_type=payload.source_type,
@@ -281,12 +332,14 @@ async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatc
 
 
 @router.delete("/knowledge/document", summary="刪除知識文件")
-async def delete_knowledge_document_route(path: str, project_id: str = "default"):
+async def delete_knowledge_document_route(
+    path: str, project_id: str = "default", project_writes: ProjectWrites = "",
+):
     def _delete() -> None:
         from knowledge.qa_nodes import is_qa_document, remove_entries_for_source
 
         with qa_document_lock:
-            relative = _document_path(path, project_id)
+            relative = _check_workspace_document_write(project_writes, path, project_id)
             if is_qa_document(relative, project_id):
                 remove_entries_for_source(relative, project_id)
             try:
@@ -302,13 +355,16 @@ async def delete_knowledge_document_route(path: str, project_id: str = "default"
 
 
 @router.post("/knowledge/move", summary="移動/重新命名知識文件")
-async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
+async def move_knowledge_document_route(
+    payload: KnowledgeDocumentMoveRequest, project_writes: ProjectWrites = "",
+):
     def _move() -> tuple[str, str, dict[str, Any]]:
         from knowledge.qa_nodes import is_qa_document, rename_source_path_in_nodes
 
         with qa_document_lock:
             source = _document_path(payload.source_path, payload.project_id)
             target = _document_path(payload.target_path, payload.project_id)
+            _require_workspace_write(project_writes, source, target)
             is_qa = is_qa_document(source, payload.project_id)
             try:
                 document = move_workspace_document(source, target, payload.project_id)
@@ -326,16 +382,22 @@ async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
 
 
 @router.post("/knowledge/directory", summary="建立資料夾")
-async def create_knowledge_directory_route(payload: KnowledgeDocumentPutRequest):
+async def create_knowledge_directory_route(
+    payload: KnowledgeDocumentPutRequest, project_writes: ProjectWrites = "",
+):
     try:
+        _require_directory_write(project_writes, payload.path, payload.project_id)
         return create_workspace_directory(payload.path, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/knowledge/directory", summary="刪除資料夾")
-async def delete_knowledge_directory_route(path: str, project_id: str = "default"):
+async def delete_knowledge_directory_route(
+    path: str, project_id: str = "default", project_writes: ProjectWrites = "",
+):
     try:
+        _require_directory_write(project_writes, path, project_id)
         return delete_workspace_directory(path, project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -378,14 +440,17 @@ async def upload_knowledge_raw_documents_route(
 
 @router.post("/knowledge/renormalize/preview", summary="預覽既有知識文件整理結果")
 async def preview_renormalize_knowledge_document_route(
-    payload: KnowledgeDocumentActionRequest,
+    payload: KnowledgeDocumentActionRequest, project_writes: ProjectWrites = "",
 ):
     pid = payload.project_id
     _assert_not_qa_document(payload.path, pid)
     try:
+        path = _check_workspace_document_write(project_writes, payload.path, pid)
         document = await asyncio.to_thread(
-            preview_workspace_document_normalization, payload.path, pid
+            preview_workspace_document_normalization, path, pid
         )
+    except HTTPException:
+        raise
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -398,14 +463,17 @@ async def preview_renormalize_knowledge_document_route(
 
 @router.post("/knowledge/renormalize/apply", summary="套用預覽整理結果並重建索引與圖譜")
 async def apply_renormalize_knowledge_document_route(
-    payload: KnowledgeDocumentPutRequest,
+    payload: KnowledgeDocumentPutRequest, project_writes: ProjectWrites = "",
 ):
     pid = payload.project_id
     _assert_not_qa_document(payload.path, pid)
     try:
+        path = _check_workspace_document_write(project_writes, payload.path, pid)
         document = await asyncio.to_thread(
-            apply_workspace_document_normalization, payload.path, payload.content, pid
+            apply_workspace_document_normalization, path, payload.content, pid
         )
+    except HTTPException:
+        raise
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -427,16 +495,21 @@ async def apply_renormalize_knowledge_document_route(
 
 
 @router.post("/knowledge/renormalize", summary="重新整理既有知識文件並重建索引與圖譜")
-async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionRequest):
+async def renormalize_knowledge_document_route(
+    payload: KnowledgeDocumentActionRequest, project_writes: ProjectWrites = "",
+):
     """Re-run LLM normalization over an existing knowledge/ document (in place),
     then reindex and rebuild the graph so the cleaned content re-enters RAG.
     """
     pid = payload.project_id
     _assert_not_qa_document(payload.path, pid)
     try:
+        path = _check_workspace_document_write(project_writes, payload.path, pid)
         document = await asyncio.to_thread(
-            renormalize_workspace_document, payload.path, pid
+            renormalize_workspace_document, path, pid
         )
+    except HTTPException:
+        raise
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

@@ -51,6 +51,7 @@ from app.auth.models import (
     ResourceType,
     is_at_least_admin,
 )
+from app.auth.policy import is_vendor_account
 from app.auth.project_gemini_credentials import resolve_gemini_credential
 from app.auth.project_resources import effective_project_resources
 from app.auth.runtime import get_auth_runtime
@@ -398,6 +399,10 @@ async def asr_stream(websocket: WebSocket) -> None:
 
     project_id = websocket.query_params.get("project_id", "")
     policy = _project_policy(current, project_id)
+    if project_id and policy is None and is_vendor_account(current.user):
+        await websocket.send_json({"type": "error", "code": "not_allowed"})
+        await websocket.close(code=1008)
+        return
     engine = _engine_for(
         current,
         websocket.query_params.get("engine"),

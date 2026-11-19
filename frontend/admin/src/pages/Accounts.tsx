@@ -6,6 +6,8 @@ import {
   listAccounts,
   revokeAccountSessions,
   setAccountDisabled,
+  setAccountManagementAccess,
+  setAccountVendor,
   updateAdminScope,
   type Account,
   type AdminScopeResources,
@@ -13,6 +15,7 @@ import {
 } from "../api/auth";
 import AccountAccessFields, {
   useAccountAccessForm,
+  withProjectPermissions,
 } from "../components/accounts/AccountAccessFields";
 import AccountPasswordResetDialog from "../components/accounts/AccountPasswordResetDialog";
 import AccountRoleDialog from "../components/accounts/AccountRoleDialog";
@@ -27,9 +30,11 @@ import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import SegmentedControl from "../components/SegmentedControl";
+import VendorNameDialog from "../components/VendorNameDialog";
 import { useAuth } from "../context/AuthContext";
 import { useNavigationGuard } from "../context/NavigationGuardContext";
 import { useAdminSubView } from "../hooks/useAdminSubView";
+import { canManageVendorAccounts, isVendorUser } from "../utils/accountPermissions";
 
 // 「專案與權限 → 帳號」分頁內的第二層：建立（正式／臨時）與編輯／管理。
 const ACCOUNT_VIEWS = [
@@ -52,7 +57,7 @@ function ownedResourceCount(account: Account): number {
 function grantedResourceCount(account: Account): number {
   if (!account.grants) return 0;
   return Object.values(account.grants).reduce(
-    (total, resourceIds) => total + resourceIds.length,
+    (total, resourceIds) => total + (Array.isArray(resourceIds) ? resourceIds.length : 0),
     0,
   );
 }
@@ -83,6 +88,7 @@ export default function Accounts() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [vendorName, setVendorName] = useState("");
   const [role, setRole] = useState<AssignableAccountRole>("user");
   const [view, setView] = useAdminSubView("Access", "accounts", ACCOUNT_VIEWS);
   const mainTab = view === "accounts/manage" ? "manage" : "create";
@@ -108,12 +114,16 @@ export default function Accounts() {
   const [passwordResetAccount, setPasswordResetAccount] = useState<Account | null>(
     null,
   );
+  const [vendorTarget, setVendorTarget] = useState<Account | null>(null);
   // 清理帳號時要先看最久沒人用的；預設維持後端的帳號名稱順序。
   const [sortMode, setSortMode] = useState<"name" | "idle">("name");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const accessForm = useAccountAccessForm("formal-account-create");
+  const vendorManager = canManageVendorAccounts(currentAccount);
+  const canCreateVendor = vendorManager && role === "user";
+  const newVendorName = canCreateVendor ? vendorName.trim() : "";
+  const accessForm = useAccountAccessForm("formal-account-create", undefined, true, newVendorName);
   // 建立管理員時一起設資源上限，不必建完再從更多選單找。
   const [newAdminScoped, setNewAdminScoped] = useState(false);
   const [newAdminScope, setNewAdminScope] = useState<AdminScopeResources>(EMPTY_SCOPE_RESOURCES);
@@ -170,7 +180,12 @@ export default function Accounts() {
         username: createdUsername,
         password,
         role,
-        ...(accessForm.complete ? { access: accessForm.access } : {}),
+        ...(newVendorName && { vendor_name: newVendorName }),
+        ...(accessForm.complete ? {
+          access: role === "user"
+            ? withProjectPermissions(accessForm.access, newVendorName)
+            : accessForm.access,
+        } : {}),
       });
       if (role === "admin" && newAdminScoped) {
         // 帳號已經建好；上限寫失敗要講清楚，不能讓人以為沒建成功。
@@ -182,6 +197,7 @@ export default function Accounts() {
       }
       setUsername("");
       setPassword("");
+      setVendorName("");
       setRole("user");
       setNewAdminScoped(false);
       setNewAdminScope(EMPTY_SCOPE_RESOURCES);
@@ -336,6 +352,19 @@ export default function Accounts() {
                         <option value="admin">管理員</option>
                       </select>
                     </label>
+                    {canCreateVendor && (
+                      <label className="text-sm font-medium">
+                        所屬廠商
+                        <input
+                          className="input mt-2"
+                          value={vendorName}
+                          onChange={(event) => setVendorName(event.target.value)}
+                          maxLength={120}
+                          disabled={submitting}
+                        />
+                        <span className="mt-1 block text-xs text-content-muted">留白代表內部帳號。填寫後只可選同廠商的專案。</span>
+                      </label>
+                    )}
                   </div>
 
                   {role === "user" ? (
@@ -351,7 +380,7 @@ export default function Accounts() {
                           {accessForm.error}
                         </div>
                       )}
-                      <AccountAccessFields form={accessForm} />
+                      <AccountAccessFields form={accessForm} allowProjectWrites />
                     </section>
                   ) : (
                     <>
@@ -465,14 +494,14 @@ export default function Accounts() {
                   const isFormal = (
                     account.kind ?? account.account_type ?? "formal"
                   ) === "formal";
-                  // 與後端 ensure_can_manage_account 對齊：ROOT 管所有人，
-                  // admin 管自己直接建立的帳號（含自己開出來的 admin）。
-                  // 列表看得到整棵子樹，但只有直屬下一層動得了。
+                  // 廠商帳號管理旗標另外開放跨建立者重設密碼和停用。
+                  const vendorUser = isVendorUser(account);
                   const canManage = !isSelf && isFormal && (
                     isRoot
                       ? account.role !== "root"
-                      : account.created_by === currentAccount?.id
+                      : account.created_by === currentAccount?.id && (!vendorUser || vendorManager)
                   );
+                  const canManageVendor = vendorManager && vendorUser;
                   const resourceCount = ownedResourceCount(account);
                   const grantCount = grantedResourceCount(account);
                   const editingAccess = editingAccountId === account.id;
@@ -493,6 +522,7 @@ export default function Accounts() {
                                 目前帳號
                               </span>
                             )}
+                            {account.account_management_access && <span className="chip">可管理廠商帳號</span>}
                             {account.disabled && (
                               <span className="chip border-danger/30 text-danger">
                                 已停用
@@ -514,6 +544,7 @@ export default function Accounts() {
                             )}
                           </div>
                           <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-content-subtle">
+                            {account.role === "user" && <span>所屬廠商：{account.vendor_name || "內部"}</span>}
                             <span>
                               {account.last_login_at ? (
                                 <>
@@ -552,18 +583,20 @@ export default function Accounts() {
                             {resourceCount > 0 && <span>私有資源 {resourceCount} 項</span>}
                           </p>
                         </div>
-                        {canManage && (
+                        {(canManage || canManageVendor) && (
                           <div className="flex items-center gap-2 self-start sm:self-auto">
-                            <button
-                              className={editingAccess ? "btn btn-primary" : "btn btn-ghost"}
-                              type="button"
-                              aria-expanded={editingAccess}
-                              onClick={() => switchEditingAccount(
-                                editingAccess ? null : account.id,
-                              )}
-                            >
-                              資源權限
-                            </button>
+                            {canManage && (
+                              <button
+                                className={editingAccess ? "btn btn-primary" : "btn btn-ghost"}
+                                type="button"
+                                aria-expanded={editingAccess}
+                                onClick={() => switchEditingAccount(
+                                  editingAccess ? null : account.id,
+                                )}
+                              >
+                                資源權限
+                              </button>
+                            )}
                             <ActionMenu
                               label={account.username}
                               groups={[
@@ -581,34 +614,43 @@ export default function Accounts() {
                                         ),
                                       }]
                                       : []),
-                                    ...(isRoot
-                                      ? [
-                                        {
-                                          id: "role",
-                                          label: "變更角色",
-                                          onSelect: () => setRoleChangeAccount(account),
-                                        },
-                                        {
-                                          id: "password",
-                                          label: "重設密碼",
-                                          onSelect: () => setPasswordResetAccount(account),
-                                        },
-                                      ]
-                                      : []),
+                                    ...(isRoot && !vendorUser ? [{
+                                      id: "role",
+                                      label: "變更角色",
+                                      onSelect: () => setRoleChangeAccount(account),
+                                    }] : []),
+                                    ...(isRoot && account.role === "user" ? [{
+                                      id: "vendor",
+                                      label: "設定所屬廠商",
+                                      onSelect: () => setVendorTarget(account),
+                                    }] : []),
+                                    ...(isRoot && account.role === "admin" ? [{
+                                      id: "account-management",
+                                      label: account.account_management_access ? "取消廠商帳號管理權" : "開放廠商帳號管理權",
+                                      onSelect: () => void runAction(
+                                        () => setAccountManagementAccess(account.id, !account.account_management_access),
+                                        "儲存廠商帳號管理權失敗",
+                                      ),
+                                    }] : []),
+                                    ...(isRoot || canManageVendor ? [{
+                                      id: "password",
+                                      label: "重設密碼",
+                                      onSelect: () => setPasswordResetAccount(account),
+                                    }] : []),
                                   ],
                                 },
                                 {
                                   id: "danger",
                                   label: "安全與危險",
                                   items: [
-                                    {
+                                    ...(canManage ? [{
                                       id: "revoke",
                                       label: "登出所有裝置",
                                       onSelect: () => void runAction(
                                         () => revokeAccountSessions(account.id),
                                         "撤銷登入階段失敗",
                                       ),
-                                    },
+                                    }] : []),
                                     {
                                       id: "disable",
                                       label: account.disabled ? "啟用" : "停用",
@@ -617,7 +659,7 @@ export default function Accounts() {
                                         account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
                                       ),
                                     },
-                                    {
+                                    ...(canManage ? [{
                                       id: "delete",
                                       label: "刪除",
                                       danger: true,
@@ -634,7 +676,7 @@ export default function Accounts() {
                                           "刪除帳號失敗",
                                         );
                                       },
-                                    },
+                                    }] : []),
                                   ],
                                 },
                               ]}
@@ -695,6 +737,16 @@ export default function Accounts() {
           onSaved={(updated) => {
             replaceAccount(updated);
             setPasswordResetAccount(null);
+          }}
+        />
+      )}
+      {vendorTarget && (
+        <VendorNameDialog
+          targetLabel={vendorTarget.username}
+          vendorName={vendorTarget.vendor_name}
+          onClose={() => setVendorTarget(null)}
+          onSave={async (name) => {
+            replaceAccount(await setAccountVendor(vendorTarget.id, name));
           }}
         />
       )}

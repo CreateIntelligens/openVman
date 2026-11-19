@@ -7,6 +7,7 @@ from fastapi.openapi.utils import get_openapi
 
 from app.brain_proxy import router as brain_router
 from app.openapi import _merge_brain_openapi, _with_account_authentication
+from app.project_routes import router as project_router
 
 
 def test_auth_contract_distinguishes_session_management_and_embed_routes():
@@ -63,6 +64,7 @@ def test_auth_annotation_preserves_domain_responses():
 
 def _brain_proxy_schema() -> dict:
     app = FastAPI()
+    app.include_router(project_router)
     app.include_router(brain_router)
     return get_openapi(title="t", version="1", routes=app.routes)
 

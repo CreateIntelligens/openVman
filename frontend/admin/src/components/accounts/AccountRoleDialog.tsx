@@ -5,6 +5,7 @@ import { useModalDismiss } from "../useModalDismiss";
 import { errorMessage } from "../../utils/errorMessage";
 import AccountAccessFields, {
   useAccountAccessForm,
+  withProjectPermissions,
 } from "./AccountAccessFields";
 
 interface AccountRoleDialogProps {
@@ -68,7 +69,7 @@ export default function AccountRoleDialog({
     try {
       const updated = await updateAccountRole(account.id, {
         role: nextRole,
-        ...(demoting ? { access: accessForm.access } : {}),
+        ...(demoting ? { access: withProjectPermissions(accessForm.access) } : {}),
       });
       onSaved(updated);
     } catch (reason) {
@@ -140,7 +141,7 @@ export default function AccountRoleDialog({
 
           {demoting && (
             <div className="mt-5">
-              <AccountAccessFields form={accessForm} />
+              <AccountAccessFields form={accessForm} allowProjectWrites />
             </div>
           )}
 

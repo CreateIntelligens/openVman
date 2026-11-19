@@ -1,6 +1,6 @@
 import type { AccountAccessOption, AccountResourceGrants } from "../../api/auth";
 
-export type GrantType = keyof AccountResourceGrants;
+export type GrantType = Exclude<keyof AccountResourceGrants, "project_permissions">;
 
 /** 一張授權清單裡的一個區段：人物依擁有的專案、聲音依引擎。 */
 export interface AccessSection<T extends AccountAccessOption = AccountAccessOption> {

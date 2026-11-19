@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   fetchAccountAccessOptions,
@@ -7,6 +7,7 @@ import {
   type AccountAccessOption,
   type AccountAccessOptions,
   type AccountRole,
+  type ProjectWritePermissions,
 } from "../../api/auth";
 import { groupAccessOptions, providerLabel, type GrantType } from "./accountAccessGroups";
 import GroupedChecklist from "./GroupedChecklist";
@@ -98,6 +99,72 @@ function initialDefault(current: string | undefined, selected: string[]): string
   return current && selected.includes(current) ? current : selected[0] ?? "";
 }
 
+function selectedProjectPermissions(
+  permissions: Record<string, ProjectWritePermissions> | undefined,
+  projects: string[],
+) {
+  if (!permissions) return {};
+  const selected = new Set(projects);
+  return {
+    project_permissions: Object.fromEntries(
+      Object.entries(permissions).filter(([id]) => selected.has(id)),
+    ),
+  };
+}
+
+function limitProjectSelection(
+  access: AccountAccessInput,
+  projects: string[],
+): AccountAccessInput {
+  return {
+    ...access,
+    grants: {
+      ...access.grants,
+      projects,
+      ...selectedProjectPermissions(access.grants.project_permissions, projects),
+    },
+    defaults: {
+      ...access.defaults,
+      project_id: initialDefault(access.defaults.project_id, projects),
+    },
+  };
+}
+
+function projectPermissions(
+  access: AccountAccessInput,
+  projectId: string,
+  vendorName: string | null | undefined,
+): ProjectWritePermissions {
+  const permissions = access.grants.project_permissions;
+  if (permissions) {
+    const grant = permissions[projectId];
+    return {
+      edit_knowledge: grant?.edit_knowledge ?? false,
+      edit_settings: !vendorName && (grant?.edit_settings ?? false),
+    };
+  }
+  return { edit_knowledge: false, edit_settings: false };
+}
+
+export function withProjectPermissions(
+  access: AccountAccessInput,
+  vendorName?: string | null,
+  legacyWrite = false,
+): AccountAccessInput {
+  return {
+    ...access,
+    grants: {
+      ...access.grants,
+      project_permissions: Object.fromEntries(access.grants.projects.map((id) => [
+        id,
+        legacyWrite && !access.grants.project_permissions
+          ? { edit_knowledge: true, edit_settings: true }
+          : projectPermissions(access, id, vendorName),
+      ])),
+    },
+  };
+}
+
 export function accessFromOptions(
   options: AccountAccessOptions,
   current?: AccountAccessInput,
@@ -142,6 +209,7 @@ export function accessFromOptions(
   return {
     grants: {
       projects,
+      ...selectedProjectPermissions(current?.grants.project_permissions, projects),
       avatar_characters: characters,
       custom_voices: voices,
       avatar_mascots: mascots,
@@ -170,12 +238,25 @@ export function useAccountAccessForm(
   initialAccess?: AccountAccessInput,
   /** 呼叫端還不需要授權欄位時跳過抓取（例如提升為管理員不會用到）。 */
   enabled = true,
+  vendorName?: string | null,
 ) {
-  const [options, setOptions] = useState<AccountAccessOptions | null>(null);
-  const [access, setAccess] = useState<AccountAccessInput>(EMPTY_ACCESS);
+  const [loadedOptions, setOptions] = useState<AccountAccessOptions | null>(null);
+  const [savedAccess, setAccess] = useState<AccountAccessInput>(EMPTY_ACCESS);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const options = useMemo(() => loadedOptions && vendorName ? {
+    ...loadedOptions,
+    projects: loadedOptions.projects.filter((option) => option.vendor_name === vendorName),
+  } : loadedOptions, [loadedOptions, vendorName]);
+  const access = useMemo(() => {
+    if (!vendorName || !options) return savedAccess;
+    const allowed = new Set(options.projects.map((project) => project.id));
+    return limitProjectSelection(
+      savedAccess,
+      savedAccess.grants.projects.filter((projectId) => allowed.has(projectId)),
+    );
+  }, [options, savedAccess, vendorName]);
 
   useEffect(() => {
     if (!enabled) {
@@ -222,6 +303,26 @@ export function useAccountAccessForm(
     setAccess((current) => ({ ...current, ai_cleanup_access: enabled }));
   }
 
+  function setProjectPermission(
+    projectId: string,
+    permission: keyof ProjectWritePermissions,
+    enabled: boolean,
+  ) {
+    setAccess((current) => ({
+      ...current,
+      grants: {
+        ...current.grants,
+        project_permissions: Object.fromEntries(current.grants.projects.map((id) => [
+          id,
+          {
+            ...projectPermissions(current, id, vendorName),
+            ...(id === projectId && { [permission]: enabled }),
+          },
+        ])),
+      },
+    }));
+  }
+
   function setDefault(grantType: GrantType, value: string) {
     setAccess((current) => {
       switch (grantType) {
@@ -266,7 +367,9 @@ export function useAccountAccessForm(
 
   function toggle(grantType: GrantType, id: string) {
     setAccess((current) => {
-      const selected = current.grants[grantType] ?? [];
+      const selected = grantType === "projects"
+        ? access.grants.projects
+        : current.grants[grantType] ?? [];
       const next = selected.includes(id)
         ? selected.filter((item) => item !== id)
         : [...selected, id];
@@ -284,15 +387,11 @@ export function useAccountAccessForm(
     grantType: GrantType,
     next: string[],
   ): AccountAccessInput {
+    if (grantType === "projects") return limitProjectSelection(current, next);
     {
       const nextDefaults = { ...current.defaults };
 
       switch (grantType) {
-        case "projects":
-          if (!next.includes(current.defaults.project_id)) {
-            nextDefaults.project_id = next[0] ?? "";
-          }
-          break;
         case "avatar_characters":
           if (!next.includes(current.defaults.character_id)) {
             nextDefaults.character_id = next[0] ?? "";
@@ -365,6 +464,8 @@ export function useAccountAccessForm(
     setAdminPortalAccess,
     setKiosk,
     setAiCleanupAccess,
+    setProjectPermission,
+    vendorName,
     setDefault,
     toggle,
     setSelection,
@@ -397,10 +498,12 @@ function defaultOptionValue(
 export default function AccountAccessFields({
   form,
   role,
+  allowProjectWrites = false,
 }: {
   form: AccountAccessForm;
   /** 帳號角色；管理員與 ROOT 不受授權清單限制，畫面要講明白，不能讓人以為存了會生效。 */
   role?: AccountRole;
+  allowProjectWrites?: boolean;
 }) {
   const unrestricted = role !== undefined && isAtLeastAdmin(role);
   return (
@@ -427,7 +530,9 @@ export default function AccountAccessFields({
           <span>
             <span className="block text-sm font-semibold">允許進入管理後台</span>
             <span className="mt-1 block text-xs leading-5 text-content-muted">
-              預設不允許；開啟後可檢視並編輯下方授權的專案，但不會取得帳號管理或專案建立／刪除權限。
+              {allowProjectWrites
+                ? "預設不允許；開啟後可檢視並編輯下方授權的專案，能修改的項目由專案權限決定。"
+                : "預設不允許；開啟後可檢視並編輯下方授權的專案，但不會取得帳號管理或專案建立／刪除權限。"}
             </span>
           </span>
         </label>
@@ -471,7 +576,12 @@ export default function AccountAccessFields({
       </label>
       <div className="grid grid-cols-1 gap-0 md:grid-cols-2 xl:grid-cols-3">
         {GROUPS.map((group) => (
-          <AccessGroup key={group.grantType} form={form} {...group} />
+          <AccessGroup
+            key={group.grantType}
+            form={form}
+            allowProjectWrites={allowProjectWrites && !unrestricted}
+            {...group}
+          />
         ))}
       </div>
     </div>
@@ -494,12 +604,14 @@ function AccessGroup({
   extraGrantType,
   title,
   description,
+  allowProjectWrites,
 }: {
   form: AccountAccessForm;
   grantType: GrantType;
   extraGrantType?: GrantType;
   title: string;
   description: string;
+  allowProjectWrites: boolean;
 }) {
   const grantTypes: GrantType[] = extraGrantType
     ? [grantType, extraGrantType]
@@ -573,6 +685,37 @@ function AccessGroup({
         ) : null}
         titleSuffix={(option) => GRANT_SUFFIX[option.grantType] ? ` · ${GRANT_SUFFIX[option.grantType]}` : ""}
       />
+      {grantType === "projects" && allowProjectWrites && selectedOptions.length > 0 && (
+        <div className="mt-4 space-y-3">
+          <p className="text-xs text-content-muted">勾選的專案可以查看。要開放修改，請再勾選下方項目。</p>
+          {selectedOptions.map((option) => {
+            const permissions = projectPermissions(form.access, option.id, form.vendorName);
+            return (
+              <fieldset key={option.id} className="space-y-2 rounded-lg border border-border px-3 pb-3">
+                <legend className="px-1 text-sm font-medium">{option.label}</legend>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={permissions.edit_knowledge}
+                    onChange={(event) => form.setProjectPermission(option.id, "edit_knowledge", event.target.checked)}
+                  />
+                  改知識庫與人設
+                </label>
+                {!form.vendorName && (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={permissions.edit_settings}
+                      onChange={(event) => form.setProjectPermission(option.id, "edit_settings", event.target.checked)}
+                    />
+                    改其他設定
+                  </label>
+                )}
+              </fieldset>
+            );
+          })}
+        </div>
+      )}
       {grantTypes.filter((type) => type !== "asr_engines").map((type) => {
         // 辨識引擎沒有帳號層級的預設（沒選過的人用部署設定），不畫下拉免得讓人以為有。
         const typeOptions = selectedOptions.filter((o) => o.grantType === type);

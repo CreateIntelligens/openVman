@@ -251,7 +251,7 @@ def test_account_list_reports_last_login_and_api_key_use(
     )
     assert login.status_code == 200
     _, secret = runtime.api_keys.create(
-        actor_id=user.id, user_id=user.id, label="service",
+        actor_id=admin.id, user_id=user.id, label="service",
     )
     _, used = runtime.api_keys.authenticate(secret)
 
@@ -273,9 +273,9 @@ def test_account_list_reports_last_login_and_api_key_use(
 
 
 def test_api_key_last_use_counts_revoked_keys(runtime: AuthRuntime):
-    _, user = _accounts(runtime)
+    admin, user = _accounts(runtime)
     record, secret = runtime.api_keys.create(
-        actor_id=user.id, user_id=user.id, label="old",
+        actor_id=admin.id, user_id=user.id, label="old",
     )
     _, used = runtime.api_keys.authenticate(secret)
     runtime.api_keys.revoke(actor_id=user.id, key_id=record.key_id)

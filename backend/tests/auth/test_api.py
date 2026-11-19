@@ -123,6 +123,8 @@ def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
         "admin_portal_access": True,
         "kiosk": False,
         "ai_cleanup_access": True,
+        "vendor_name": None,
+        "account_management_access": False,
     }
     assert login["token"]
 
@@ -374,7 +376,12 @@ def test_admin_creates_formal_account_with_access_atomically(client, runtime):
     )
 
     assert created.status_code == 201
-    assert created.json()["grants"] == access["grants"]
+    assert created.json()["grants"] == {
+        **access["grants"],
+        "project_permissions": {
+            "project-a": {"edit_knowledge": True, "edit_settings": True},
+        },
+    }
     assert created.json()["defaults"] == access["defaults"]
     assert created.json()["admin_portal_access"] is True
 
@@ -502,7 +509,12 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
         json=first_access,
     )
     assert updated.status_code == 200
-    assert updated.json()["grants"] == first_access["grants"]
+    assert updated.json()["grants"] == {
+        **first_access["grants"],
+        "project_permissions": {
+            "project-a": {"edit_knowledge": False, "edit_settings": False},
+        },
+    }
     assert updated.json()["defaults"] == first_access["defaults"]
     assert {
         record.resource_id
@@ -544,7 +556,12 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
         json=second_access,
     )
     assert replaced.status_code == 200
-    assert replaced.json()["grants"] == second_access["grants"]
+    assert replaced.json()["grants"] == {
+        **second_access["grants"],
+        "project_permissions": {
+            "project-b": {"edit_knowledge": False, "edit_settings": False},
+        },
+    }
     with pytest.raises(ResourceNotFoundError):
         resolve_resource(
             runtime.resources,

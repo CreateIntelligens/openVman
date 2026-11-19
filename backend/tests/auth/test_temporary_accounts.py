@@ -486,7 +486,7 @@ def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
         connection.execute(
             "ALTER TABLE temporary_credentials DROP COLUMN password_ciphertext",
         )
-        connection.execute("DELETE FROM schema_migrations WHERE version >= 5")
+        connection.execute("DELETE FROM schema_migrations WHERE version IN (5, 6, 10)")
 
     runtime.database.initialize()
 
@@ -510,8 +510,7 @@ def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
     assert all(row["username"].startswith("tmp-") for row in rows)
     assert all(row["username"] != row["code_locator"] for row in rows)
     assert all(row["username_normalized"] != row["code_locator"] for row in rows)
-    # 測試刻意移除舊的遷移紀錄再重跑，所以會補回 v6 與後續 migration。
-    # 不寫死完整清單：那會讓每一個新 migration 都弄壞這個與它無關的測試。
+    # 只重跑這個案例回退的帳號名稱清理與密文欄位遷移。
     applied = [row["version"] for row in versions]
     assert applied == sorted(applied)
     assert 5 not in applied, "被移除的 v5 不該補回來"

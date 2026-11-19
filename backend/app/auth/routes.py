@@ -6,9 +6,10 @@ import json
 import re
 from datetime import datetime, timezone
 from math import ceil
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_serializer
 
 from app.config import get_tts_config
 
@@ -25,6 +26,7 @@ from .models import (
     AccountRole,
     AccountType,
     AdminScope,
+    ProjectWritePermissions,
     ResourceGrantRecord,
     ResourceRecord,
     ResourceType,
@@ -34,7 +36,7 @@ from .models import (
     has_ai_cleanup_access,
 )
 from .passwords import PasswordValidationError, hash_password, verify_password
-from .policy import AccountPolicyError
+from .policy import AccountPolicyError, can_manage_vendor_accounts, is_vendor_account
 from .repository_errors import (
     AccountEnabledError,
     InvalidResourceGrantError,
@@ -79,6 +81,13 @@ class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+VendorName = Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)]
+
+
+class VendorAffiliationRequest(_StrictModel):
+    vendor_name: VendorName | None
+
+
 class AccountDefaultsProfile(_StrictModel):
     project_id: str
     character_id: str
@@ -113,11 +122,14 @@ class AccountResourceGrantsView(_StrictModel):
     avatar_mascots: list[str] = Field(default_factory=list)
     avatar_backgrounds: list[str] = Field(default_factory=list)
     asr_engines: list[str] = Field(default_factory=list)
+    project_permissions: dict[str, ProjectWritePermissions] | None = None
 
     @classmethod
     def from_records(
         cls,
         records: tuple[ResourceGrantRecord, ...],
+        *,
+        vendor_account: bool = False,
     ) -> "AccountResourceGrantsView":
         values: dict[ResourceType, list[str]] = {
             ResourceType.PROJECT: [],
@@ -137,6 +149,12 @@ class AccountResourceGrantsView(_StrictModel):
             avatar_mascots=values[ResourceType.AVATAR_MASCOT],
             avatar_backgrounds=values[ResourceType.AVATAR_BACKGROUND],
             asr_engines=values[ResourceType.ASR_ENGINE],
+            project_permissions={
+                record.resource_id: ProjectWritePermissions(
+                    record.edit_knowledge, record.edit_settings and not vendor_account,
+                )
+                for record in records if record.resource_type is ResourceType.PROJECT
+            },
         )
 
 
@@ -207,6 +225,17 @@ class AccountProfile(_StrictModel):
     kiosk: bool
     # 生效值：管理員以上一律為真。後台據此決定要不要顯示「AI 整理排版」。
     ai_cleanup_access: bool = False
+    vendor_name: str | None = None
+    account_management_access: bool = False
+
+    @model_serializer(mode="wrap")
+    def _serialize_profile(self, serialize):
+        result = serialize(self)
+        if self.role is AccountRole.USER:
+            result.pop("account_management_access", None)
+            if self.vendor_name and not isinstance(self, AdminAccountProfile):
+                result.pop("created_by", None)
+        return result
 
     @classmethod
     def from_record(
@@ -246,6 +275,8 @@ class AccountProfile(_StrictModel):
             admin_portal_access=has_admin_portal_access(user),
             kiosk=user.kiosk,
             ai_cleanup_access=has_ai_cleanup_access(user),
+            vendor_name=user.vendor_name,
+            account_management_access=user.account_management_access,
             defaults=(
                 AccountDefaultsProfile.from_record(defaults)
                 if defaults is not None
@@ -268,11 +299,15 @@ class AdminAccountProfile(AccountProfile):
         runtime: AuthRuntime,
     ) -> AdminAccountProfile:
         grant_records = runtime.account_access.list_grants(user.id)
+        profile = AccountProfile.from_record(user, runtime=runtime).model_dump()
+        profile["created_by"] = user.created_by
         return cls(
-            **AccountProfile.from_record(user, runtime=runtime).model_dump(),
+            **profile,
             resource_counts=runtime.resources.count_private_by_owner(user.id),
             grants=(
-                AccountResourceGrantsView.from_records(grant_records)
+                AccountResourceGrantsView.from_records(
+                    grant_records, vendor_account=is_vendor_account(user),
+                )
                 if grant_records
                 else None
             ),
@@ -328,6 +363,11 @@ class CreateAccountRequest(_StrictModel):
     password: str
     role: AccountRole = AccountRole.USER
     access: UpdateAccountAccessRequest | None = None
+    vendor_name: VendorName | None = None
+
+
+class SetAccountManagementAccessRequest(_StrictModel):
+    enabled: bool
 
 
 class ChangeAccountRoleRequest(_StrictModel):
@@ -345,6 +385,7 @@ class AccountAccessOption(_StrictModel):
     provider: str | None = None
     owner_project_id: str | None = None
     visibility: str = "global"
+    vendor_name: str | None = None
 
 
 class AccountAccessOptions(_StrictModel):
@@ -685,7 +726,10 @@ def list_accounts(
         users = runtime.users.list_visible_subtree(
             admin.user.id,
             account_type=AccountType.FORMAL,
+            include_vendors=can_manage_vendor_accounts(admin.user),
         )
+        if not can_manage_vendor_accounts(admin.user):
+            users = [user for user in users if not is_vendor_account(user)]
     return [AdminAccountProfile.from_record(user, runtime) for user in users]
 
 
@@ -712,6 +756,7 @@ def _resource_option(record: ResourceRecord) -> AccountAccessOption:
         ),
         owner_project_id=record.owner_project_id,
         visibility=record.visibility,
+        vendor_name=record.vendor_name,
     )
 
 
@@ -794,6 +839,7 @@ def update_account_access(
             admin_portal_access=body.admin_portal_access,
             kiosk=body.kiosk,
             ai_cleanup_access=body.ai_cleanup_access,
+            project_permissions=body.grants.project_permissions,
         )
     except UserNotFoundError as exc:
         raise HTTPException(
@@ -834,6 +880,8 @@ def create_account(
             admin_portal_access=bool(access and access.admin_portal_access),
             kiosk=bool(access and access.kiosk),
             ai_cleanup_access=bool(access and access.ai_cleanup_access),
+            vendor_name=body.vendor_name,
+            project_permissions=access.grants.project_permissions if access else None,
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -841,6 +889,42 @@ def create_account(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except UsernameConflictError as exc:
         raise HTTPException(status_code=409, detail="Username already exists") from exc
+    return AdminAccountProfile.from_record(user, runtime)
+
+
+@users_router.patch("/{user_id}/vendor", response_model=AdminAccountProfile)
+def set_account_vendor(
+    user_id: str,
+    body: VendorAffiliationRequest,
+    root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AdminAccountProfile:
+    try:
+        user = runtime.users.set_vendor_affiliation(
+            actor_id=root.user.id, user_id=user_id, vendor_name=body.vendor_name,
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return AdminAccountProfile.from_record(user, runtime)
+
+
+@users_router.patch("/{user_id}/account-management", response_model=AdminAccountProfile)
+def set_account_management_access(
+    user_id: str,
+    body: SetAccountManagementAccessRequest,
+    root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AdminAccountProfile:
+    try:
+        user = runtime.users.set_account_management_access(
+            actor_id=root.user.id, user_id=user_id, enabled=body.enabled,
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return AdminAccountProfile.from_record(user, runtime)
 
 
@@ -927,6 +1011,7 @@ def change_account_role(
             admin_portal_access=bool(access and access.admin_portal_access),
             kiosk=access.kiosk if access is not None else None,
             ai_cleanup_access=access.ai_cleanup_access if access is not None else None,
+            project_permissions=access.grants.project_permissions if access else None,
         )
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc
@@ -944,12 +1029,12 @@ def change_account_role(
 def reset_account_password(
     user_id: str,
     body: ResetAccountPasswordRequest,
-    root: CurrentAccount = Depends(require_root),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> AdminAccountProfile:
     try:
         user = runtime.users.reset_password(
-            actor_id=root.user.id,
+            actor_id=admin.user.id,
             user_id=user_id,
             password_hash=hash_password(body.password),
         )

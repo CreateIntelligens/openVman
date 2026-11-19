@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from uuid import uuid4
 
 from ._account_access_rules import (
     _normalize_account_access,
     _persist_account_access,
+    ensure_vendor_target_within_scope,
+    vendor_target_within_scope,
 )
 from ._account_records import (
     _ADMIN_OR_ABOVE_PLACEHOLDERS,
@@ -19,7 +21,7 @@ from ._account_records import (
     _user_from_row,
     normalize_username,
 )
-from ._admin_scope_rules import _inherit_admin_scope
+from ._admin_scope_rules import _inherit_admin_scope, _load_admin_scope
 from ._repository_base import now_iso
 from .database import AuthDatabase
 from .models import (
@@ -27,12 +29,14 @@ from .models import (
     ROOT_USERNAME,
     AccountRole,
     AccountType,
+    ProjectWritePermissions,
     ResourceType,
     UserRecord,
     is_at_least_admin,
 )
 from .policy import (
     AccountPolicyError,
+    can_manage_vendor_accounts,
     ensure_account_manager,
     ensure_can_change_role,
     ensure_can_create_role,
@@ -69,9 +73,16 @@ class UserRepository:
         admin_portal_access: bool = False,
         kiosk: bool = False,
         ai_cleanup_access: bool = False,
+        vendor_name: str | None = None,
+        project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
     ) -> UserRecord:
         if role is AccountRole.ROOT:
             raise AccountPolicyError("ROOT accounts cannot be created")
+        vendor_name = (vendor_name or "").strip() or None
+        if vendor_name and (role is not AccountRole.USER or account_type is not AccountType.FORMAL):
+            raise AccountPolicyError("vendor affiliation requires a formal user")
+        if vendor_name and created_by is None:
+            raise AccountPolicyError("vendor account management access required")
         if (grants is None) != (defaults is None):
             raise InvalidResourceGrantError(
                 "account grants and defaults must be provided together"
@@ -100,6 +111,8 @@ class UserRepository:
                         raise UserNotFoundError("creator account does not exist")
                     creator_record = _user_from_row(creator)
                     ensure_can_create_role(creator_record, role)
+                    if vendor_name and not can_manage_vendor_accounts(creator_record):
+                        raise AccountPolicyError("vendor account management access required")
                     if (
                         normalized_access is not None
                         and is_at_least_admin(role)
@@ -114,8 +127,8 @@ class UserRepository:
                         id, username, username_normalized, password_hash, role,
                         account_type, disabled, token_version, created_at,
                         updated_at, created_by, admin_portal_access, kiosk,
-                        ai_cleanup_access
-                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)
+                        ai_cleanup_access, vendor_name
+                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
@@ -130,6 +143,7 @@ class UserRepository:
                         int(admin_portal_access),
                         int(kiosk),
                         int(ai_cleanup_access),
+                        vendor_name,
                     ),
                 )
                 if normalized_access is not None:
@@ -141,7 +155,8 @@ class UserRepository:
                         normalized_grants=normalized_grants,
                         normalized_defaults=normalized_defaults,
                         now=now,
-                        clear_existing=False,
+                        project_permissions=project_permissions,
+                        legacy_project_edit=admin_portal_access,
                     )
                 if is_at_least_admin(role) and created_by is not None:
                     # 受限 admin 開出來的 admin 必須在同一筆交易裡繼承上層的
@@ -165,6 +180,7 @@ class UserRepository:
                             "kiosk": kiosk,
                             "ai_cleanup_access": ai_cleanup_access,
                             "role": role.value,
+                            "vendor_name": vendor_name,
                         },
                         now=now,
                     )
@@ -271,6 +287,7 @@ class UserRepository:
         actor_id: str,
         *,
         account_type: AccountType | None = None,
+        include_vendors: bool = False,
     ) -> list[UserRecord]:
         """List the accounts an administrator may see, plus their own row.
 
@@ -286,15 +303,24 @@ class UserRepository:
                 JOIN subtree ON users.created_by = subtree.id
             )
             SELECT users.* FROM users
-            JOIN subtree ON users.id = subtree.id
+            WHERE (users.id IN (SELECT id FROM subtree)
+                OR (? AND users.role = 'user' AND users.account_type = 'formal'
+                    AND users.vendor_name IS NOT NULL))
         """
-        params: list[object] = [actor_id]
+        params: list[object] = [actor_id, include_vendors]
         if account_type is not None:
-            query += " WHERE users.account_type = ?"
+            query += " AND users.account_type = ?"
             params.append(account_type.value)
         query += " ORDER BY users.username_normalized, users.id"
         with self.database.transaction() as connection:
             rows = connection.execute(query, tuple(params)).fetchall()
+            if include_vendors:
+                scope = _load_admin_scope(connection, actor_id)
+                rows = [
+                    row for row in rows
+                    if row["vendor_name"] is None
+                    or vendor_target_within_scope(connection, scope, row["id"])
+                ]
         return [_user_from_row(row) for row in rows]
 
     def has_admin(self) -> bool:
@@ -315,7 +341,8 @@ class UserRepository:
     ) -> UserRecord:
         with self.database.transaction(write=True) as connection:
             actor, target = _load_actor_and_target(connection, actor_id, user_id)
-            ensure_can_manage_account(actor, target)
+            ensure_can_manage_account(actor, target, cross_creator_vendor=True)
+            ensure_vendor_target_within_scope(connection, actor, target)
             if disabled and actor_id == user_id:
                 raise SelfProtectionError("administrator cannot disable itself")
             if (
@@ -356,6 +383,75 @@ class UserRepository:
             raise RepositoryError("updated account could not be reloaded")
         return user
 
+    def set_vendor_affiliation(
+        self, *, actor_id: str, user_id: str, vendor_name: str | None,
+    ) -> UserRecord:
+        vendor_name = (vendor_name or "").strip() or None
+        with self.database.transaction(write=True) as connection:
+            actor, target = _load_actor_and_target(connection, actor_id, user_id)
+            ensure_account_manager(actor)
+            if actor.role is not AccountRole.ROOT:
+                raise AccountPolicyError("only ROOT can change vendor affiliation")
+            if target.role is not AccountRole.USER or target.account_type is not AccountType.FORMAL:
+                raise AccountPolicyError("vendor affiliation requires a formal user")
+            if target.vendor_name == vendor_name:
+                return target
+            now = now_iso()
+            connection.execute(
+                """
+                UPDATE users SET vendor_name = ?, updated_at = ?,
+                    token_version = token_version + 1 WHERE id = ?
+                """,
+                (vendor_name, now, user_id),
+            )
+            # 換了廠商，舊的帳號金鑰是照原歸屬代發的；token_version 只讓登入失效，金鑰要另外撤銷。
+            connection.execute(
+                "UPDATE account_api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
+                (now, user_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="account_vendor_updated",
+                actor_user_id=actor_id,
+                target_user_id=user_id,
+                metadata={"vendor_name": vendor_name},
+                now=now,
+            )
+        return self._reload_user(user_id)
+
+    def set_account_management_access(
+        self, *, actor_id: str, user_id: str, enabled: bool,
+    ) -> UserRecord:
+        with self.database.transaction(write=True) as connection:
+            actor, target = _load_actor_and_target(connection, actor_id, user_id)
+            ensure_account_manager(actor)
+            if actor.role is not AccountRole.ROOT:
+                raise AccountPolicyError("only ROOT can grant account management access")
+            if target.role is not AccountRole.ADMIN or target.account_type is not AccountType.FORMAL:
+                raise AccountPolicyError("account management access requires a formal administrator")
+            if target.account_management_access == enabled:
+                return target
+            now = now_iso()
+            connection.execute(
+                "UPDATE users SET account_management_access = ?, updated_at = ? WHERE id = ?",
+                (enabled, now, user_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="account_management_access_updated",
+                actor_user_id=actor_id,
+                target_user_id=user_id,
+                metadata={"enabled": enabled},
+                now=now,
+            )
+        return self._reload_user(user_id)
+
+    def _reload_user(self, user_id: str) -> UserRecord:
+        user = self.get_by_id(user_id)
+        if user is None:
+            raise RepositoryError("updated account could not be reloaded")
+        return user
+
     def record_login(self, user_id: str, *, now: datetime) -> None:
         """Stamp a successful sign-in without touching updated_at or the audit log.
 
@@ -377,6 +473,7 @@ class UserRepository:
         with self.database.transaction(write=True) as connection:
             actor, target = _load_actor_and_target(connection, actor_id, user_id)
             ensure_can_manage_account(actor, target)
+            ensure_vendor_target_within_scope(connection, actor, target)
             now = now_iso()
             connection.execute(
                 """
@@ -402,6 +499,7 @@ class UserRepository:
         with self.database.transaction(write=True) as connection:
             actor, target = _load_actor_and_target(connection, actor_id, user_id)
             ensure_can_manage_account(actor, target)
+            ensure_vendor_target_within_scope(connection, actor, target)
             if actor_id == user_id:
                 raise SelfProtectionError("administrator cannot delete itself")
             if not target.disabled:
@@ -446,6 +544,7 @@ class UserRepository:
         admin_portal_access: bool = False,
         kiosk: bool | None = None,
         ai_cleanup_access: bool | None = None,
+        project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
     ) -> UserRecord:
         if (grants is None) != (defaults is None):
             raise InvalidResourceGrantError(
@@ -480,6 +579,8 @@ class UserRepository:
                     normalized_defaults=normalized_defaults,
                     now=now,
                     clear_existing=True,
+                    project_permissions=project_permissions,
+                    legacy_project_edit=admin_portal_access,
                 )
             else:
                 connection.execute(
@@ -493,7 +594,7 @@ class UserRepository:
             connection.execute(
                 """
                 UPDATE users
-                SET role = ?, admin_portal_access = ?,
+                SET role = ?, admin_portal_access = ?, account_management_access = 0,
                     token_version = token_version + 1, updated_at = ?
                 WHERE id = ?
                 """,
@@ -544,6 +645,7 @@ class UserRepository:
         with self.database.transaction(write=True) as connection:
             actor, target = _load_actor_and_target(connection, actor_id, user_id)
             ensure_can_reset_password(actor, target)
+            ensure_vendor_target_within_scope(connection, actor, target)
 
             now = now_iso()
             connection.execute(

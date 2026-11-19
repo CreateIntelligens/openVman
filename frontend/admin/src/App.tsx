@@ -45,6 +45,7 @@ import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { useNavigationGroups } from "./hooks/useNavigationGroups";
+import { canOpenAccountKeys, isVendorUser } from "./utils/accountPermissions";
 import { readScoped, removeScoped, writeScoped } from "./utils/scopedStorage";
 
 /** 寬螢幕預設展開側欄，要滑過才看得到字的話，第一次來的人不知道每顆圖示是什麼。 */
@@ -207,7 +208,7 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
-  if (!canAccessRoute(route, access)) {
+  if (!canAccessRoute(route, access) || (accessSection === "api-keys" && account && isVendorUser(account))) {
     return <ForbiddenState />;
   }
 
@@ -263,7 +264,7 @@ function AppContent() {
             onClose={closeMobileNav}
             onSelectTab={switchTab}
             access={access}
-            canManageApiKeys={(account!.kind ?? account!.account_type ?? "formal") === "formal"}
+            canManageApiKeys={canOpenAccountKeys(account)}
             onOpenApiKeys={() => switchTab("Access", "api-keys")}
             collapsedGroups={collapsedGroups}
             onToggleGroup={toggleGroup}

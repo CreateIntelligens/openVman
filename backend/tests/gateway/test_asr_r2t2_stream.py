@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.auth.models import AccountRole, ResourceType
+from app.auth.models import AccountRole, AccountType, ResourceType
 from app.gateway import asr_stream
 
 
@@ -87,7 +87,10 @@ def _environment(
     monkeypatch, *, stored="r2t2-live", grants=None, embed=False, routes=("zh",),
 ):
     account = SimpleNamespace(
-        user=SimpleNamespace(id="stream-test", role=AccountRole.ADMIN),
+        user=SimpleNamespace(
+            id="stream-test", role=AccountRole.ADMIN, account_type=AccountType.FORMAL,
+            vendor_name=None,
+        ),
         embed_key=SimpleNamespace(project_id="") if embed else None,
     )
     state = {

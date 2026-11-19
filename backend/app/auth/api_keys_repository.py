@@ -10,6 +10,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from ._account_access_rules import ensure_vendor_target_within_scope
 from ._account_records import (
     _append_auth_audit,
     _load_actor_and_target,
@@ -24,7 +25,7 @@ from .models import (
     ResourceType,
     UserRecord,
 )
-from .policy import AccountPolicyError, ensure_can_manage_account
+from .policy import AccountPolicyError, ensure_can_manage_account, is_vendor_account
 from .resource_repository import ResourceRepository
 from .resources import list_accessible_resources
 
@@ -64,7 +65,10 @@ def _authorize(
     if target.account_type is not AccountType.FORMAL:
         raise AccountPolicyError("API keys require a formal account")
     if actor.id != target.id:
-        ensure_can_manage_account(actor, target)
+        ensure_can_manage_account(actor, target, cross_creator_vendor=True)
+        ensure_vendor_target_within_scope(connection, actor, target)
+    elif is_vendor_account(target):
+        raise AccountPolicyError("vendor API keys are managed by an administrator")
     return target
 
 
@@ -128,6 +132,8 @@ class ApiKeyRepository:
             if target.disabled:
                 raise AccountPolicyError("API keys require an active account")
             actor, _ = _load_actor_and_target(connection, actor_id, user_id)
+            if actor.role is AccountRole.USER:
+                raise AccountPolicyError("administrator access required to issue API keys")
             _ensure_creation_ceiling(actor, target, self.database)
             connection.execute(
                 """

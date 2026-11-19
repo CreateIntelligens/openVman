@@ -168,7 +168,7 @@ def test_capabilities_share_live_scoped_lists_and_asr_settings(env, transport):
     headers = _headers(env)
     if transport == "api_key":
         _, secret = env.runtime.api_keys.create(
-            actor_id=env.user.id, user_id=env.user.id, label="integration",
+            actor_id=env.root.id, user_id=env.user.id, label="integration",
         )
         headers = {"Authorization": f"Bearer {secret}"}
     elif transport == "cookie":
@@ -284,7 +284,7 @@ def test_revoked_grants_disappear_without_reissuing_credential(env, transport):
     headers = _headers(env)
     if transport == "api_key":
         _, secret = env.runtime.api_keys.create(
-            actor_id=env.user.id, user_id=env.user.id, label="integration",
+            actor_id=env.root.id, user_id=env.user.id, label="integration",
         )
         headers = {"Authorization": f"Bearer {secret}"}
     assert env.client.get(_PATH, headers=headers).status_code == 200

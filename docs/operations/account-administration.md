@@ -16,10 +16,22 @@
 | 分組 | 動作 | 誰看得到 |
 |---|---|---|
 | 帳號設定 | 資源上限 | 可管理該帳號、且對象是 admin |
-| 帳號設定 | 變更角色、重設密碼 | 只有 ROOT |
+| 帳號設定 | 變更角色、設定所屬廠商、管理廠商帳號旗標 | ROOT，依對象角色顯示 |
+| 帳號設定 | 重設密碼 | ROOT，或有旗標且能管理該正式廠商一般帳號的管理員 |
 | 安全與危險 | 登出所有裝置、停用／啟用、刪除 | 可管理該帳號 |
 
-管不到的帳號（自己、ROOT、不是自己直接建立的帳號）整列沒有按鈕。刪除放在最後、紅字；帳號還沒停用或仍擁有私有資源時，刪除項目仍會列出但無法執行，並在項目下方寫明原因。選單可用 ↑／↓、Home／End 移動，Enter 執行，Esc 關閉並回到「⋯」按鈕，點選單外面也會關閉。
+管理員通常只能操作自己直接建立的帳號。有「管理廠商帳號」旗標的管理員，對其他人建立的正式廠商一般帳號也能重設密碼、停用、啟用及管理帳號 API 金鑰。刪除放在最後並標紅字。帳號還沒停用或仍擁有私有資源時，刪除項目仍會列出原因。選單可用 ↑／↓、Home／End 移動，Enter 執行，Esc 關閉並回到「⋯」按鈕，點選單外面也會關閉。
+
+### 設定所屬廠商與專案授權
+
+1. 在「專案與權限 → 專案」建立專案或開啟既有專案的「設定所屬廠商」。同一廠商的專案請填相同名稱。內部專案可留白。
+2. ROOT 或有「管理廠商帳號」旗標的管理員建立正式一般帳號時可填「所屬廠商」。既有正式一般帳號的歸屬由 ROOT 更新。歸屬變更時該帳號須重新登入，原本的帳號金鑰也須重新代發。
+3. 在正式帳號的資源權限勾選專案即授予讀取，再按需要勾選「改知識庫與人設」及「改其他設定」。廠商只能獲授名稱相同的專案，並可獨立開放知識庫與人設的編輯權。內部帳號依原有資源上限授權。
+4. 對話清單、單段歷史與匯出使用讀取權，刪除使用「改其他設定」。廠商帳號由專人代發與撤銷 API 金鑰。
+
+管理 API 使用 `vendor_name`。建立帳號可在 `POST /api/v1/users` 提供；ROOT 用 `PATCH /api/v1/users/{id}/vendor` 更新帳號歸屬、用 `PATCH /api/v1/users/{id}/account-management` 設定 `enabled`。建立專案可在 `POST /api/v1/projects` 提供；有權管理該專案的管理員可用 `PATCH /api/v1/projects/{id}/vendor` 更新。空白或 `null` 表示內部。正式帳號的專案寫入權放在 `access.grants.project_permissions`（更新授權時為 `grants.project_permissions`），以專案 ID 對應 `edit_knowledge`、`edit_settings`。專案仍須列在 `grants.projects`。
+
+Migration 28 加入所屬廠商、帳號管理旗標及兩項專案寫入權。既有歸屬預設空白，旗標預設關閉，原可編輯的授權補上兩項寫入權，唯讀授權保持唯讀。升級保留所有帳號、專案與授權紀錄，可重複執行。歸屬改動後，現有授權按新歸屬重新判定。
 
 帳號名稱旁的標籤：角色、「目前帳號」「已停用」「展示機台」，可管理的帳號另標「授權 N 項」或「未授權」；一般使用者被開放管理後台時標「可進後台」（同樣只在可管理的帳號上；admin 本來就能進，不另標）。
 
@@ -74,9 +86,9 @@ Backend 在轉給 Brain 前檢查（`backend/app/ai_cleanup_guard.py`），Brain
 正式帳號依序為 `ROOT > admin > user`，持久化值皆為小寫，只有介面將 `root` 顯示成 `ROOT`。
 
 - 唯一 ROOT 是正規化 username 符合程式常數 `ROOT_USERNAME` 的正式帳號；空白部署可透過 `AUTH_ROOT_USERNAME` 設定，資料庫已有 ROOT 後不可藉此改名。ROOT 繼承所有 admin 能力，並可建立及管理 admin／user／temporary。
-- admin 可管理 user／temporary 與專案生命週期，也可以建立 admin 並管理**自己直接建立**的帳號（含 admin），但不能對 ROOT 執行任何帳號管理操作，也不能管理自己的帳號。變更角色與重設密碼仍限定 ROOT。
+- admin 可管理內部直屬帳號與專案生命週期，也可建立 admin。ROOT 可變更角色、重設正式帳號密碼及設定管理旗標。受委派的專人可重設正式廠商一般帳號密碼，仍須遵守管理員資源上限。
 - user 與 temporary 沒有帳號管理或專案建立／刪除權限，資源存取仍依 ownership、grants 與 defaults 決定。
-- ROOT／admin 固定可進管理後台；user 與 temporary 只有在管理員明確開啟「允許進入管理後台」後才可進入，預設為不允許。這項權限不會提升帳號角色或擴大原有 grants，但會讓帳號可編輯已授權專案內的知識、Quick QA、Persona Prompt、記憶、專案 Skills 與 Tools（共用 Skills 會套用到所有專案，內容要改 repo 再部署，後台所有人都只能檢視，只有 ROOT 能啟用／停用），並可列出、匯出、刪除該專案的對話紀錄；沒有後台權限的帳號（例如展示機台、純 API 串接）列不出別人的對話。Avatar 的人物與背景對這類帳號是唯讀（可試用、看清單；上傳、從影片產生、改名、刪除都限 admin），「語音 → ASR」不顯示只給 admin 用的「比較辨識結果」。
+- ROOT／admin 固定可進管理後台。user 與 temporary 要開啟「允許進入管理後台」才可進入，預設關閉。正式帳號可另行指定兩種專案寫入權；臨時帳號沿用批次設定。共用技能仍由 repo 部署，只有 ROOT 能在後台啟用或停用。人物與背景的管理、語音辨識比較等操作仍採原有管理層級。
 - 管理 API 不允許建立第二個 ROOT，也不允許 rename、disable、delete 或 demote 既有 ROOT。
 
 管理後台登入同時支援正式帳號與臨時密碼，但使用 Admin 專用登入端點先檢查後台權限。未授權的臨時密碼會直接取得 403，不會啟動首次使用後的 72 小時計時。管理員可在正式帳號權限編輯器、臨時批次建立表單與既有臨時批次紀錄調整這項權限。
@@ -129,7 +141,7 @@ Schema migration 由 Backend 啟動流程管理。升級前應核對 migration�
 
 ## 密碼規則與 reset
 
-正式帳號只儲存 bcrypt hash，沒有讀取、還原或顯示既有正式帳號密碼的 API。ROOT 對下級正式帳號執行 password reset 時只能設定新密碼；成功 response 只回傳安全帳號 profile，並以 token-version 更新撤銷目標帳號的舊 session。
+正式帳號只儲存 bcrypt hash。ROOT 可設定下級正式帳號的新密碼。有帳號管理旗標的管理員可替授權範圍內的正式廠商一般帳號設定新密碼。成功時回傳帳號資料並更新 token version，撤銷目標帳號的舊 session。
 
 ROOT 自己變更密碼使用 `POST /api/auth/password`，提供 `current_password` 與 `new_password`。若 ROOT 無法登入，operator 必須進入 Backend 容器，透過不會輸出密碼的 recovery CLI 設定新值：
 
@@ -161,6 +173,6 @@ Migration 10 新增 nullable `temporary_credentials.password_ciphertext`。新�
 1. schema migration 已達目標程式版本要求，且 foreign-key check 為空。
 2. 只有符合 `ROOT_USERNAME` 的一列 ROOT，帳號與 owned-resource row count 未改變。
 3. 驗證登入與 session 撤銷行為；若首次建立 ROOT，立即更換初始密碼。
-4. admin 無法管理 ROOT、自身或非直屬帳號；可管理自己直接建立的 admin，但角色變更與密碼重設仍限定 ROOT。成功操作須產生 audit event。
+4. 驗證管理員的直屬帳號範圍，以及管理旗標對非直屬正式廠商帳號的重設密碼、啟停及代發金鑰。驗證角色調整及旗標授予只限 ROOT，並檢查成功操作的 audit event。
 
 若回退至不支援 ROOT 的舊版，不能只降版程式，因舊版 schema 不接受 `root`。必須停止 Backend、用 migration 前的完整 SQLite backup 取代資料庫，再啟動上一版程式。若需要手動轉回兩角色 schema，必須先在離線複本演練：將現有 ROOT 改回 admin、再次遞增 token version、以舊 constraint 重建 `users`，最後確認 row count 與 foreign keys；完成前不可對 live database 操作。

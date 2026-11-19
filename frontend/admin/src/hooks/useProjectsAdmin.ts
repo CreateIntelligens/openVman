@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { createProject, deleteProject, fetchProjects, type ProjectSummary } from "../api/projects";
+import { createProject, deleteProject, fetchProjects, setProjectVendor, type ProjectSummary } from "../api/projects";
 import { useProject } from "../context/ProjectContext";
 import { useStatusState } from "./useStatusState";
 
@@ -8,6 +8,7 @@ export function useProjectsAdmin() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [newProjectLabel, setNewProjectLabel] = useState("");
+  const [newProjectVendor, setNewProjectVendor] = useState("");
   const [lastCreatedId, setLastCreatedId] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState("");
@@ -49,8 +50,9 @@ export function useProjectsAdmin() {
     setLastCreatedId("");
 
     try {
-      const result = await createProject(trimmedNewProjectLabel);
+      const result = await createProject(trimmedNewProjectLabel, newProjectVendor.trim() || undefined);
       setNewProjectLabel("");
+      setNewProjectVendor("");
       setLastCreatedId(result.project_id);
       setStatus({
         type: "success",
@@ -62,7 +64,13 @@ export function useProjectsAdmin() {
     } finally {
       setCreating(false);
     }
-  }, [canCreateProject, refreshProjectList, setErrorStatus, trimmedNewProjectLabel]);
+  }, [canCreateProject, newProjectVendor, refreshProjectList, setErrorStatus, trimmedNewProjectLabel]);
+
+  async function handleSetVendor(projectId: string, vendorName: string | null) {
+    await setProjectVendor(projectId, vendorName);
+    setStatus({ type: "success", message: "已更新所屬廠商。" });
+    await refreshProjectList();
+  }
 
   const handleDelete = useCallback(async (projectId: string) => {
     setDeleteTargetId("");
@@ -94,13 +102,16 @@ export function useProjectsAdmin() {
     deletingId,
     handleCreate,
     handleDelete,
+    handleSetVendor,
     lastCreatedId,
     loadProjects,
     loading,
     newProjectLabel,
+    newProjectVendor,
     projects,
     setDeleteTargetId,
     setNewProjectLabel,
+    setNewProjectVendor,
     setStatus,
     status,
   };

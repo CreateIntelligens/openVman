@@ -9,6 +9,7 @@ import {
 import { useUnsavedChanges } from "../../context/NavigationGuardContext";
 import AccountAccessFields, {
   useAccountAccessForm,
+  withProjectPermissions,
 } from "./AccountAccessFields";
 
 interface FormalAccountAccessPanelProps {
@@ -26,6 +27,7 @@ export default function FormalAccountAccessPanel({
   onSaved,
   onCancel,
 }: FormalAccountAccessPanelProps) {
+  const canSetProjectWrites = account.role === "user";
   const initialAccess: AccountAccessInput | undefined = (
     account.grants && account.defaults
       ? {
@@ -38,7 +40,14 @@ export default function FormalAccountAccessPanel({
       }
       : undefined
   );
-  const accessForm = useAccountAccessForm(account.id, initialAccess);
+  const accessForm = useAccountAccessForm(
+    account.id,
+    initialAccess && canSetProjectWrites
+      ? withProjectPermissions(initialAccess, account.vendor_name, Boolean(!account.vendor_name && account.admin_portal_access))
+      : initialAccess,
+    true,
+    account.vendor_name,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 讀到資料後的快照；跟現在的表單不同就是「尚未儲存」，切帳號或離開頁面前會先問。
@@ -61,7 +70,12 @@ export default function FormalAccountAccessPanel({
     setSaving(true);
     setError(null);
     try {
-      const saved = await updateAccountAccess(account.id, accessForm.access);
+      const saved = await updateAccountAccess(
+        account.id,
+        canSetProjectWrites
+          ? withProjectPermissions(accessForm.access, account.vendor_name)
+          : accessForm.access,
+      );
       snapshot.current = serialized;
       onSaved(saved);
     } catch (reason) {
@@ -102,7 +116,7 @@ export default function FormalAccountAccessPanel({
       )}
 
       <div className="mt-4">
-        <AccountAccessFields form={accessForm} role={account.role} />
+        <AccountAccessFields form={accessForm} role={account.role} allowProjectWrites={canSetProjectWrites} />
       </div>
 
       <div className="mt-4 flex justify-end gap-2">

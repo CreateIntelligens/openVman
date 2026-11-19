@@ -98,6 +98,8 @@ class UserRecord:
     ai_cleanup_access: bool = False
     # None 表示升級後還沒登入過；只在登入成功時寫，不代表 API key 的使用。
     last_login_at: str | None = None
+    vendor_name: str | None = None
+    account_management_access: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +111,7 @@ class ResourceRecord:
     created_at: str
     metadata_json: str
     owner_project_id: str | None = None
+    vendor_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +132,14 @@ class ResourceGrantRecord:
     resource_id: str
     granted_by: str | None
     created_at: str
+    edit_knowledge: bool = False
+    edit_settings: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectWritePermissions:
+    edit_knowledge: bool = False
+    edit_settings: bool = False
 
 
 @dataclass(frozen=True, slots=True)

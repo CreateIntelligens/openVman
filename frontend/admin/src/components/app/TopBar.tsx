@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AccountProfile } from "../../api/auth";
 import type { CollapsedGroups } from "../../hooks/useNavigationGroups";
+import { canOpenAccountKeys } from "../../utils/accountPermissions";
 import TabGroup from "./TabGroup";
 import {
   allTabs,
@@ -182,7 +183,7 @@ export default function TopBar({
         )}
       </div>
 
-      {(account.kind ?? account.account_type ?? "formal") === "formal" && (
+      {canOpenAccountKeys(account) && (
         <button type="button" onClick={onOpenApiKeys} className="btn btn-ghost hidden h-9 shrink-0 px-3 md:inline-flex" aria-label="管理帳號 API 金鑰">API 金鑰</button>
       )}
 

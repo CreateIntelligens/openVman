@@ -482,21 +482,20 @@ def test_upload_cannot_bypass_limits_through_catchall(client, path):
 
 
 @pytest.mark.parametrize(
-    ("portal_access", "granted", "expected_status"),
+    ("edit_knowledge", "granted", "expected_status"),
     [(True, True, 200), (False, True, 404), (True, False, 404)],
 )
-def test_raw_upload_requires_portal_user_project_edit_access(
-    client, portal_access, granted, expected_status,
+def test_raw_upload_requires_knowledge_edit_grant(
+    client, edit_knowledge, granted, expected_status,
 ):
     from app.auth.models import AccountRole
     from app.auth.runtime import get_auth_runtime
 
     runtime = get_auth_runtime()
     user = runtime.users.create(
-        username="portal-user",
+        username="project-user",
         password_hash="unused",
         role=AccountRole.USER,
-        admin_portal_access=portal_access,
     )
     client.headers["Authorization"] = f"Bearer {runtime.tokens.issue(user)}"
     route_client = MagicMock()
@@ -504,9 +503,13 @@ def test_raw_upload_requires_portal_user_project_edit_access(
         return_value=_mock_brain_response({"status": "ok", "files": []}),
     )
     with (
-        patch.object(runtime.resources, "has_grant", return_value=granted),
+        patch.object(runtime.resources, "has_grant") as has_grant,
         patch("app.gateway.routes._brain_http.get", return_value=route_client),
     ):
+        has_grant.side_effect = (
+            lambda *_args, project_write=None: granted
+            and (project_write is None or project_write == "edit_knowledge" and edit_knowledge)
+        )
         response = client.post(
             "/api/v1/knowledge/raw/upload",
             data={"project_id": "default"},

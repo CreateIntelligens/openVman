@@ -221,6 +221,8 @@ def test_v3_migration_promotes_ai360_in_place_and_preserves_related_data(
         "kiosk": 0,
         "last_login_at": None,
         "ai_cleanup_access": 0,
+        "vendor_name": None,
+        "account_management_access": 0,
     }
     assert ai360["updated_at"] != "2025-02-02T00:00:00+00:00"
     assert [dict(row) for row in owned] == [
@@ -232,6 +234,7 @@ def test_v3_migration_promotes_ai360_in_place_and_preserves_related_data(
             "created_at": "2025-02-03T00:00:00+00:00",
             "metadata_json": "{}",
             "owner_project_id": None,
+            "vendor_name": None,
         }
     ]
     assert {(row["resource_type"], row["resource_id"]) for row in grants} == {
@@ -306,7 +309,7 @@ def test_root_migration_is_rerunnable_and_enforces_single_root(tmp_path: Path):
     # 只驗證遷移不重複、且按序套用；確切版本號會隨新遷移增加。
     assert applied == sorted(set(applied))
     assert applied[:4] == [1, 2, 3, 4]
-    assert applied[-1] == 27
+    assert 27 in applied
     assert "UNIQUE INDEX" in root_index["sql"]
     assert "WHERE role = 'root'" in root_index["sql"]
 

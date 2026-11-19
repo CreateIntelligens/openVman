@@ -173,6 +173,39 @@ class AuthDatabase:
         self._migrate_project_resource_scope()
         self._add_project_engine_order()
         self._add_ai_cleanup_access()
+        self._add_vendor_access()
+
+    def _add_vendor_access(self) -> None:
+        with self.transaction(write=True) as connection:
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = 28"
+            ).fetchone():
+                return
+            connection.execute("ALTER TABLE users ADD COLUMN vendor_name TEXT")
+            connection.execute(
+                """
+                ALTER TABLE users ADD COLUMN account_management_access
+                INTEGER NOT NULL DEFAULT 0 CHECK (account_management_access IN (0, 1))
+                """
+            )
+            connection.execute("ALTER TABLE resources ADD COLUMN vendor_name TEXT")
+            for column in ("edit_knowledge", "edit_settings", "project_writes_explicit"):
+                connection.execute(
+                    f"ALTER TABLE resource_grants ADD COLUMN {column} "
+                    f"INTEGER NOT NULL DEFAULT 0 CHECK ({column} IN (0, 1))"
+                )
+            connection.execute(
+                """
+                UPDATE resource_grants SET edit_knowledge = 1, edit_settings = 1
+                WHERE resource_type = 'project' AND grantee_user_id IN (
+                    SELECT id FROM users WHERE admin_portal_access = 1
+                )
+                """
+            )
+            connection.execute(
+                "INSERT INTO schema_migrations(version, details_json) VALUES (28, ?)",
+                (json.dumps({"name": "vendor_access"}),),
+            )
 
     def _add_ai_cleanup_access(self) -> None:
         """Add the per-account 「AI 整理排版」 flag, off for every existing account (schema 27)."""

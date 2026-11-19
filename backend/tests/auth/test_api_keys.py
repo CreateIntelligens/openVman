@@ -97,17 +97,18 @@ def _headers(runtime, user):
 
 
 def _issue(runtime, user, **overrides):
+    root = runtime.users.get_by_username("ai360")
     return runtime.api_keys.create(
-        actor_id=user.id, user_id=user.id, label="service", **overrides
+        actor_id=root.id, user_id=user.id, label="service", **overrides
     )
 
 
 def test_secret_once_only_digest_persisted_and_safe_audit(setup):
-    runtime, _, owner, client = setup
+    runtime, root, owner, client = setup
     response = client.post(
         "/api/v1/api-keys",
-        headers=_headers(runtime, owner),
-        json={"label": "service"},
+        headers=_headers(runtime, root),
+        json={"label": "service", "user_id": owner.id},
     )
     assert response.status_code == 201
     assert response.headers["cache-control"] == "no-store"
@@ -225,10 +226,10 @@ def test_invalid_credentials_fail_closed_without_counting(setup, failure):
 
 
 def test_purge_removes_only_keys_revoked_past_retention(setup):
-    runtime, _root, owner, _client = setup
-    old, _ = runtime.api_keys.create(actor_id=owner.id, user_id=owner.id, label="old")
-    recent, _ = runtime.api_keys.create(actor_id=owner.id, user_id=owner.id, label="recent")
-    runtime.api_keys.create(actor_id=owner.id, user_id=owner.id, label="active")
+    runtime, root, owner, _client = setup
+    old, _ = runtime.api_keys.create(actor_id=root.id, user_id=owner.id, label="old")
+    recent, _ = runtime.api_keys.create(actor_id=root.id, user_id=owner.id, label="recent")
+    runtime.api_keys.create(actor_id=root.id, user_id=owner.id, label="active")
     runtime.api_keys.revoke(actor_id=owner.id, key_id=old.key_id)
     runtime.api_keys.revoke(actor_id=owner.id, key_id=recent.key_id)
     stale = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
@@ -399,9 +400,10 @@ def test_account_management_hierarchy_and_formal_requirement(setup):
 def test_strict_creation_validation_and_noncacheable_errors(
     setup, payload, expected
 ):
-    runtime, _, owner, client = setup
+    runtime, root, owner, client = setup
     response = client.post(
-        "/api/v1/api-keys", headers=_headers(runtime, owner), json=payload
+        "/api/v1/api-keys", headers=_headers(runtime, root),
+        json={**payload, "user_id": owner.id},
     )
     assert response.status_code == expected
     assert response.headers["cache-control"] == "no-store"
@@ -556,8 +558,8 @@ def test_scoped_admin_cannot_impersonate_account_with_more_resources(setup):
 
 
 def test_cookie_management_requires_same_origin_and_no_url_credentials(setup):
-    runtime, _, owner, client = setup
-    client.cookies.set("openvman_session", runtime.tokens.issue(owner))
+    runtime, root, _, client = setup
+    client.cookies.set("openvman_session", runtime.tokens.issue(root))
     assert (
         client.post("/api/v1/api-keys", json={"label": "cookie"}).status_code
         == 403

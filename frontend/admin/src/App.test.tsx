@@ -248,6 +248,31 @@ describe("App tab mounting", () => {
     expect(window.location.pathname).toBe("/admin/access/api-keys");
   });
 
+  it("hides account key controls from vendors and denies direct entry", async () => {
+    vi.mocked(getCurrentAccount).mockResolvedValue({
+      id: "vendor-1",
+      username: "vendor",
+      role: "user",
+      kind: "formal",
+      vendor_name: "合作廠商",
+      disabled: false,
+      created_at: "2026-08-17T00:00:00Z",
+    });
+    window.history.replaceState(null, "", "/admin/access");
+    render(<App />);
+    await screen.findByTestId("tab-projects");
+    expect(screen.queryByRole("tab", { name: "API 金鑰" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "管理帳號 API 金鑰" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "開啟導覽" }));
+    expect(within(screen.getByRole("dialog", { name: "主要導覽" }))
+      .queryByRole("button", { name: "API 金鑰" })).toBeNull();
+
+    window.history.pushState(null, "", "/admin/access/api-keys");
+    fireEvent.popState(window);
+    expect(await screen.findByText("權限不足")).toBeTruthy();
+    expect(screen.queryByTestId("tab-api-keys")).toBeNull();
+  });
+
   it("uses the URL default project instead of a saved project for direct links", async () => {
     window.localStorage.setItem("brain-active-project", "saved");
     vi.mocked(fetchProjects).mockResolvedValue({ project_count: 2, projects: [

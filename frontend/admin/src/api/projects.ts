@@ -5,6 +5,7 @@ export interface ProjectSummary {
   label: string;
   document_count: number;
   persona_count: number;
+  vendor_name?: string | null;
   /** 部署的預設專案（DEFAULT_PROJECT_ID）；沒帶專案的請求落在這裡。 */
   is_default?: boolean;
 }
@@ -29,8 +30,19 @@ export async function fetchProjectInfo(projectId: string) {
   return fetchJson<ProjectSummary>(apiUrl(projectPath(projectId)));
 }
 
-export function createProject(label: string) {
-  return post<ProjectCreateResponse>(PROJECTS_PATH, { label });
+export function createProject(label: string, vendorName?: string) {
+  return post<ProjectCreateResponse>(PROJECTS_PATH, {
+    label,
+    ...(vendorName && { vendor_name: vendorName }),
+  });
+}
+
+export function setProjectVendor(projectId: string, vendorName: string | null) {
+  return jsonRequest<{ project_id: string; vendor_name: string | null }>(
+    "PATCH",
+    `${projectPath(projectId)}/vendor`,
+    { vendor_name: vendorName },
+  );
 }
 
 export function deleteProject(projectId: string) {

@@ -184,21 +184,19 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
     assert "/api/v1/sessions/export" in paths
 
 
-def test_project_content_writes_require_edit_access() -> None:
+def test_project_content_writes_require_the_matching_permission() -> None:
     from app.brain_proxy import _project_access
 
-    assert _project_access("knowledge/document", "PUT") is ResourceAccess.EDIT
-    assert _project_access("sessions", "GET") is ResourceAccess.EDIT
-    assert _project_access("sessions/export", "GET") is ResourceAccess.EDIT
+    assert _project_access("knowledge/document", "PUT") is ResourceAccess.EDIT_KNOWLEDGE
+    assert _project_access("personas", "POST") is ResourceAccess.EDIT_KNOWLEDGE
+    assert _project_access("skills/example", "DELETE") is ResourceAccess.EDIT_SETTINGS
+    assert _project_access("tools/example", "PATCH") is ResourceAccess.EDIT_SETTINGS
+    assert _project_access("memories/maintain", "POST") is ResourceAccess.EDIT_SETTINGS
+    assert _project_access("dreaming/run", "POST") is ResourceAccess.EDIT_SETTINGS
+    assert _project_access("sessions/s1", "DELETE") is ResourceAccess.EDIT_SETTINGS
+    assert _project_access("sessions", "GET") is ResourceAccess.READ
+    assert _project_access("sessions/export", "GET") is ResourceAccess.READ
     assert _project_access("chat/history", "GET") is ResourceAccess.READ
-    assert _project_access("personas", "POST") is ResourceAccess.EDIT
-    assert _project_access("skills/example", "DELETE") is ResourceAccess.EDIT
-    assert _project_access("tools/example", "PATCH") is ResourceAccess.EDIT
-    assert _project_access("memories/maintain", "POST") is ResourceAccess.EDIT
-    assert _project_access("dreaming/run", "POST") is ResourceAccess.EDIT
-    assert _project_access("sessions/export", "GET") is ResourceAccess.EDIT
-    assert _project_access("sessions/export", "POST") is ResourceAccess.EDIT
-    assert _project_access("sessions/s1", "DELETE") is ResourceAccess.EDIT
     assert _project_access("knowledge/document", "GET") is ResourceAccess.READ
     assert _project_access("chat/accept", "POST") is ResourceAccess.READ
 

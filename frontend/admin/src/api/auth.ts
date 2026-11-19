@@ -36,6 +36,8 @@ export interface AccountProfile {
   kiosk?: boolean;
   /** 可以用「AI 整理排版」的生效值：管理員以上一律為真。 */
   ai_cleanup_access?: boolean;
+  vendor_name?: string | null;
+  account_management_access?: boolean;
 }
 
 export interface Account extends AccountProfile {
@@ -94,6 +96,8 @@ function safeAccountProfile(account: AccountProfile): AccountProfile {
     admin_portal_access: account.admin_portal_access,
     kiosk: account.kiosk,
     ai_cleanup_access: account.ai_cleanup_access,
+    vendor_name: account.vendor_name,
+    account_management_access: account.account_management_access,
   };
 }
 
@@ -101,6 +105,7 @@ function safeAccount(account: Account): Account {
   const grants = account.grants
     ? {
       projects: [...account.grants.projects],
+      project_permissions: account.grants.project_permissions,
       avatar_characters: [...account.grants.avatar_characters],
       custom_voices: [...account.grants.custom_voices],
       avatar_mascots: account.grants.avatar_mascots
@@ -137,8 +142,14 @@ export interface AccountListResponse {
   users?: Account[];
 }
 
+export interface ProjectWritePermissions {
+  edit_knowledge: boolean;
+  edit_settings: boolean;
+}
+
 export interface AccountResourceGrants {
   projects: string[];
+  project_permissions?: Record<string, ProjectWritePermissions>;
   avatar_characters: string[];
   custom_voices: string[];
   avatar_mascots?: string[];
@@ -151,6 +162,7 @@ export interface AccountAccessOption {
   label: string;
   provider?: string | null;
   owner_project_id?: string | null;
+  vendor_name?: string | null;
   visibility?: "global" | "project";
   source?: "grant" | "project" | "assigned" | "orphan";
   in_project_scope?: boolean;
@@ -321,6 +333,7 @@ export async function createAccount(input: {
   username: string;
   password: string;
   role: AssignableAccountRole;
+  vendor_name?: string;
   access?: AccountAccessInput;
 }): Promise<Account> {
   const account = await fetchJson<Account>(apiUrl("/users"), {
@@ -380,6 +393,36 @@ export async function setAccountDisabled(
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ disabled }),
+    },
+  );
+  return safeAccount(account);
+}
+
+export async function setAccountVendor(
+  userId: string,
+  vendorName: string | null,
+): Promise<Account> {
+  const account = await fetchJson<Account>(
+    apiUrl(`${itemPath("/users", userId)}/vendor`),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vendor_name: vendorName }),
+    },
+  );
+  return safeAccount(account);
+}
+
+export async function setAccountManagementAccess(
+  userId: string,
+  enabled: boolean,
+): Promise<Account> {
+  const account = await fetchJson<Account>(
+    apiUrl(`${itemPath("/users", userId)}/account-management`),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
     },
   );
   return safeAccount(account);

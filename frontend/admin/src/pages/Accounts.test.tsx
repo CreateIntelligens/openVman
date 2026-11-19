@@ -20,6 +20,8 @@ import {
   resetAccountPassword,
   revokeAccountSessions,
   setAccountDisabled,
+  setAccountManagementAccess,
+  setAccountVendor,
   updateAccountRole,
   type Account,
 } from "../api/auth";
@@ -28,8 +30,8 @@ const authState = vi.hoisted(() => ({
   account: {
     id: "admin-a",
     username: "admin",
-    role: "admin" as "root" | "admin" | "user",
-  },
+    role: "admin",
+  } as { id: string; username: string; role: "root" | "admin" | "user"; account_management_access?: boolean },
 }));
 
 vi.mock("../api/auth", () => ({
@@ -41,6 +43,8 @@ vi.mock("../api/auth", () => ({
   resetAccountPassword: vi.fn(),
   revokeAccountSessions: vi.fn(),
   setAccountDisabled: vi.fn(),
+  setAccountManagementAccess: vi.fn(),
+  setAccountVendor: vi.fn(),
   updateAccountRole: vi.fn(),
   updateAccountAccess: vi.fn(),
   updateAdminScope: vi.fn(),
@@ -196,6 +200,7 @@ describe("Accounts", () => {
       access: {
         grants: {
           projects: ["project-a"],
+          project_permissions: { "project-a": { edit_knowledge: false, edit_settings: false } },
           avatar_characters: ["character-a"],
           custom_voices: ["voice-a"],
           avatar_mascots: [],
@@ -219,6 +224,63 @@ describe("Accounts", () => {
       expect(listAccounts).toHaveBeenCalledTimes(2);
       expect(fetchAccountAccessOptions).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it("keeps back-office entry and both project write permissions independent", async () => {
+    render(<Accounts />);
+    fireEvent.change(screen.getByLabelText("帳號"), { target: { value: "alice" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "correct horse battery staple" } });
+    fireEvent.click(await screen.findByRole("checkbox", { name: /允許進入管理後台/ }));
+
+    const knowledge = await screen.findByRole("checkbox", { name: "改知識庫與人設" });
+    const settings = screen.getByRole("checkbox", { name: "改其他設定" });
+    expect(knowledge).toHaveProperty("checked", false);
+    expect(settings).toHaveProperty("checked", false);
+    fireEvent.click(knowledge);
+    expect(settings).toHaveProperty("checked", false);
+    fireEvent.click(screen.getByRole("button", { name: "建立正式帳號" }));
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith(expect.objectContaining({
+      access: expect.objectContaining({
+        admin_portal_access: true,
+        grants: expect.objectContaining({
+          project_permissions: { "project-a": { edit_knowledge: true, edit_settings: false } },
+        }),
+      }),
+    })));
+  });
+
+  it("only offers matching projects when creating a vendor account", async () => {
+    authState.account.account_management_access = true;
+    const options = await fetchAccountAccessOptions();
+    vi.mocked(fetchAccountAccessOptions).mockResolvedValue({
+      ...options,
+      projects: [
+        { id: "project-a", label: "專案 A", vendor_name: "合作廠商甲" },
+        { id: "project-b", label: "專案 B", vendor_name: "合作廠商乙" },
+      ],
+    });
+    render(<Accounts />);
+    await screen.findByRole("checkbox", { name: /專案 A/ });
+    fireEvent.change(screen.getByLabelText("帳號"), { target: { value: "alice" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "correct horse battery staple" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /所屬廠商/ }), { target: { value: " 合作廠商乙 " } });
+    expect(screen.queryByRole("checkbox", { name: /專案 A/ })).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: /專案 B/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "改知識庫與人設" }));
+    expect(screen.queryByRole("checkbox", { name: "改其他設定" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "建立正式帳號" }));
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith(expect.objectContaining({
+      vendor_name: "合作廠商乙",
+      access: expect.objectContaining({
+        grants: expect.objectContaining({
+          projects: ["project-b"],
+          project_permissions: { "project-b": { edit_knowledge: true, edit_settings: false } },
+        }),
+        defaults: expect.objectContaining({ project_id: "project-b" }),
+      }),
+    })));
   });
 
   it("creates a kiosk account when the 展示機台 box is checked", async () => {
@@ -381,14 +443,61 @@ describe("Accounts", () => {
     expect(rowButtonLabels(adminRow)).toEqual(["資源權限", "更多動作：operator"]);
     expect(menuGroups(adminRow)).toEqual({
       // ROOT 才看得到的資源上限入口，只對管理員帳號出現。
-      帳號設定: ["資源上限", "變更角色", "重設密碼"],
+      帳號設定: ["資源上限", "變更角色", "開放廠商帳號管理權", "重設密碼"],
       安全與危險: ["登出所有裝置", "停用", "刪除"],
     });
     expect(rowButtonLabels(userRow)).toEqual(["資源權限", "更多動作：viewer"]);
     expect(menuGroups(userRow)).toEqual({
-      帳號設定: ["變更角色", "重設密碼"],
+      帳號設定: ["變更角色", "設定所屬廠商", "重設密碼"],
       安全與危險: ["登出所有裝置", "停用", "刪除"],
     });
+  });
+
+  it("lets ROOT set an account's vendor and enable delegated account management", async () => {
+    authState.account = { id: "root-a", username: "root", role: "root" };
+    const admin = formalAccount("admin-b", "operator", "admin");
+    const user = formalAccount("user-b", "viewer", "user");
+    vi.mocked(listAccounts).mockResolvedValue([admin, user]);
+    vi.mocked(setAccountManagementAccess).mockResolvedValue({ ...admin, account_management_access: true });
+    vi.mocked(setAccountVendor).mockResolvedValue({ ...user, vendor_name: "合作廠商甲" });
+
+    render(<Accounts />);
+    switchToManageTab();
+    await screen.findByText("viewer");
+    clickRowButton(rowByUsername("operator"), "開放廠商帳號管理權");
+    await waitFor(() => expect(setAccountManagementAccess).toHaveBeenCalledWith("admin-b", true));
+    clickRowButton(rowByUsername("viewer"), "設定所屬廠商");
+    const dialog = screen.getByRole("dialog", { name: "設定「viewer」的所屬廠商" });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "所屬廠商" }), {
+      target: { value: "  合作廠商甲  " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "儲存所屬廠商" }));
+    expect(await screen.findByText("所屬廠商：合作廠商甲")).toBeTruthy();
+    expect(setAccountVendor).toHaveBeenCalledWith("user-b", "合作廠商甲");
+  });
+
+  it("lets a delegated administrator reset or disable vendor accounts from another creator", async () => {
+    authState.account.account_management_access = true;
+    const vendor = { ...formalAccount("user-b", "vendor-user", "user", "other"), vendor_name: "合作廠商甲" };
+    const internal = formalAccount("user-c", "internal-user", "user", "other");
+    vi.mocked(listAccounts).mockResolvedValue([vendor, internal]);
+    vi.mocked(setAccountDisabled).mockResolvedValue({ ...vendor, disabled: true });
+
+    render(<Accounts />);
+    switchToManageTab();
+    await screen.findByText("vendor-user");
+    const vendorRow = rowByUsername("vendor-user");
+    expect(rowButtonLabels(rowByUsername("internal-user"))).toEqual([]);
+    expect(rowButtonLabels(vendorRow)).toEqual(["更多動作：vendor-user"]);
+    expect(menuGroups(vendorRow)).toEqual({
+      帳號設定: ["重設密碼"],
+      安全與危險: ["停用"],
+    });
+    clickRowButton(vendorRow, "重設密碼");
+    const dialog = screen.getByRole("dialog", { name: "重設 vendor-user 的密碼" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+    clickRowButton(vendorRow, "停用");
+    await waitFor(() => expect(setAccountDisabled).toHaveBeenCalledWith("user-b", true));
   });
 
   it("keeps ROOT-only controls away from administrators", async () => {
@@ -527,6 +636,7 @@ describe("Accounts", () => {
         access: {
           grants: {
             projects: ["project-a"],
+            project_permissions: { "project-a": { edit_knowledge: false, edit_settings: false } },
             avatar_characters: ["character-a"],
             custom_voices: ["voice-a"],
             avatar_mascots: [],

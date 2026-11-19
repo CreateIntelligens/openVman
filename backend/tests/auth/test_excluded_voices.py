@@ -43,7 +43,11 @@ def env(tmp_path: Path):
         )
         with database.transaction(write=True) as connection:
             connection.execute(
-                "INSERT INTO resource_grants VALUES (?, 'custom_voice', ?, ?, ?)",
+                """
+                INSERT INTO resource_grants (
+                    grantee_user_id, resource_type, resource_id, granted_by, created_at
+                ) VALUES (?, 'custom_voice', ?, ?, ?)
+                """,
                 (user.id, voice_id, root.id, _NOW),
             )
     return SimpleNamespace(

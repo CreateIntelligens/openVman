@@ -72,16 +72,6 @@ def _load_knowledge_routes_module():
         update_workspace_document_meta=lambda *args, **kwargs: {},
         qa_document_lock=threading.Lock(),
     )
-    _stub_module(
-        "safety.observability",
-        log_event=lambda *args, **kwargs: None,
-        log_exception=lambda *args, **kwargs: None,
-        record_circuit_state_change=lambda *args, **kwargs: None,
-        record_chain_exhausted=lambda *args, **kwargs: None,
-        record_fallback_hop=lambda *args, **kwargs: None,
-        record_route_attempt=lambda *args, **kwargs: None,
-    )
-
     return importlib.import_module("routes.knowledge")
 
 
@@ -122,6 +112,32 @@ def test_save_knowledge_document_route_schedules_background_reindex(monkeypatch)
     }
     assert scheduled["project_id"] == "default"
     assert "task" in scheduled
+
+
+def test_workspace_write_checks_resolved_document_path(monkeypatch, tmp_path):
+    knowledge_routes = _load_knowledge_routes_module()
+    from knowledge import qa_nodes, workspace
+
+    monkeypatch.setattr(workspace, "ensure_workspace_scaffold", lambda _project: tmp_path)
+    monkeypatch.setattr(qa_nodes, "is_qa_document", lambda *_args: False)
+    saved = _saved_calls(monkeypatch, knowledge_routes, "save_workspace_document")
+    (tmp_path / "knowledge").mkdir()
+    (tmp_path / "knowledge" / "linked.md").symlink_to(tmp_path / "MEMORY.md")
+    payload = knowledge_routes.KnowledgeDocumentPutRequest(
+        path="knowledge/linked.md", content="text", project_id="default",
+    )
+
+    with pytest.raises(HTTPException) as denied:
+        asyncio.run(knowledge_routes.save_knowledge_document_route(
+            payload, project_writes="edit_knowledge",
+        ))
+    assert denied.value.status_code == 403
+    assert saved == []
+
+    asyncio.run(knowledge_routes.save_knowledge_document_route(
+        payload, project_writes="edit_knowledge,edit_settings",
+    ))
+    assert saved[0][0][0] == "MEMORY.md"
 
 
 def test_create_note_route_passes_target_dir(monkeypatch):

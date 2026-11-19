@@ -150,6 +150,8 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 ## 知識索引與檢索
 
+工作區文件與整理 API 會檢查 Backend 傳入的專案寫入權限。移動與改存時使用工作區實際解析的路徑，分別驗證知識庫與人設、其他工作區設定的編輯權。權限表見 [Backend 規格](../docs/specs/01_BACKEND_SPEC.md#12-對外客服權限第-1-段)。
+
 索引（`knowledge/indexer.py`）：
 
 - 依 SHA-256 fingerprint 增量重建，只重算有變動的文件，並移除已刪除文件的段落。

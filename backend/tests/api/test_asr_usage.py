@@ -153,12 +153,13 @@ def test_real_bearer_keys_reach_asr_metering_and_revocation_stops_usage(asr_clie
     client, usage = asr_client
     client.app.dependency_overrides.clear()
     runtime = get_auth_runtime()
+    root = runtime.users.create_root(username="ai360", password_hash="unused")
     owner = runtime.users.create(
         username="service-owner", password_hash="unused", role=AccountRole.USER,
     )
     issued = [
         runtime.api_keys.create(
-            actor_id=owner.id, user_id=owner.id, label=f"service-{index}",
+            actor_id=root.id, user_id=owner.id, label=f"service-{index}",
         )
         for index in range(2)
     ]

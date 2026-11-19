@@ -162,6 +162,8 @@ describe("account API keys", () => {
     await screen.findByText("串接服務");
     expect(mocks.listAccounts).not.toHaveBeenCalled();
     expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.queryByRole("form", { name: "建立帳號 API 金鑰" })).toBeNull();
+    expect(screen.getByRole("button", { name: "撤銷 串接服務" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "返回帳號管理" })).toBeNull();
   });
 
@@ -185,5 +187,26 @@ describe("account API keys", () => {
     expect(screen.getByText("臨時帳號不能建立 API 金鑰。")).toBeTruthy();
     expect(mocks.listAccountApiKeys).not.toHaveBeenCalled();
     expect(mocks.listAccounts).not.toHaveBeenCalled();
+  });
+
+  it("lets a delegated administrator issue keys for another creator's vendor account", async () => {
+    mocks.account = { ...mocks.account, role: "admin", account_management_access: true };
+    mocks.listAccounts.mockResolvedValue([
+      { ...mocks.account, id: "vendor", username: "廠商", role: "user", created_by: "other", vendor_name: "合作廠商" },
+      { ...mocks.account, id: "internal", username: "內部", role: "user", created_by: "other" },
+    ]);
+    render(<ApiKeys />);
+    await screen.findByRole("option", { name: "廠商（user）" });
+    expect(screen.queryByRole("option", { name: "內部（user）" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("所屬帳號"), { target: { value: "vendor" } });
+    await createKey();
+    expect(mocks.createAccountApiKey).toHaveBeenCalledWith(expect.objectContaining({ user_id: "vendor" }));
+  });
+
+  it("does not fetch a vendor account's keys from the self-service page", () => {
+    mocks.account = { ...mocks.account, role: "user", vendor_name: "合作廠商" };
+    render(<ApiKeys />);
+    expect(screen.queryByRole("button", { name: "建立 API 金鑰" })).toBeNull();
+    expect(mocks.listAccountApiKeys).not.toHaveBeenCalled();
   });
 });

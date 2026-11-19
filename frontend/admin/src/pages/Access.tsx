@@ -10,6 +10,7 @@ import {
 } from "../components/app/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useNavigation } from "../context/NavigationContext";
+import { isVendorUser } from "../utils/accountPermissions";
 
 // 各分頁各自 lazy，權限圖譜的 d3-force 不會拖慢專案分頁。
 const sectionPages = {
@@ -24,7 +25,9 @@ export default function Access() {
   const { account } = useAuth();
   const { currentSubView, navigateTo } = useNavigation();
   const access: TabAccess = account?.role ?? "user";
-  const tabs = visibleAccessSections(access);
+  const tabs = visibleAccessSections(access).filter((tab) =>
+    tab.id !== "api-keys" || !account || !isVendorUser(account),
+  );
   const section = accessSectionOf(currentSubView);
   const current = tabs.find((item) => item.id === section);
   const SectionPage = sectionPages[section];

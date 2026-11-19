@@ -10,6 +10,11 @@ import { listAccounts, type Account } from "../api/auth";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
 import { useAuth } from "../context/AuthContext";
+import {
+  canManageVendorAccounts,
+  canOpenAccountKeys,
+  isVendorUser,
+} from "../utils/accountPermissions";
 
 const inputClass = "w-full rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm text-content focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50";
 
@@ -46,8 +51,10 @@ export default function ApiKeys() {
   const busyRef = useRef(false);
   const requestRef = useRef(0);
   const isFormal = account && (account.kind ?? account.account_type ?? "formal") === "formal";
+  const canOpenKeys = canOpenAccountKeys(account);
   const isAdmin = account?.role === "root" || account?.role === "admin";
   const owner = owners.find((item) => item.id === ownerId) ?? account;
+  const canCreate = isAdmin && (account.role === "root" || owner?.id === account.id || owner?.role === "user");
 
   const reload = useCallback(async () => {
     const request = ++requestRef.current;
@@ -63,33 +70,37 @@ export default function ApiKeys() {
   }, [ownerId]);
 
   useEffect(() => {
-    if (!isFormal) { setLoading(false); return; }
+    if (!canOpenKeys) { setLoading(false); return; }
     setKeys([]);
     setError(null);
     void reload();
     return () => { requestRef.current += 1; };
-  }, [isFormal, reload]);
+  }, [canOpenKeys, reload]);
 
   useEffect(() => {
-    if (!isFormal || !isAdmin || !account) return;
+    if (!canOpenKeys || !isAdmin || !account) return;
     let active = true;
     void listAccounts().then((items) => {
       if (!active) return;
       setOwners(items.filter((item) => (
         (item.kind ?? item.account_type ?? "formal") === "formal"
         && (item.id === account.id || (
-          account.role === "root" ? item.role !== "root" : item.created_by === account.id
+          account.role === "root" ? item.role !== "root" : (
+            isVendorUser(item)
+              ? canManageVendorAccounts(account)
+              : item.created_by === account.id
+          )
         ))
       )));
     }).catch(() => {
       if (active) setError("無法取得其他帳號；仍可管理自己的 API 金鑰。");
     });
     return () => { active = false; };
-  }, [account, isAdmin, isFormal]);
+  }, [account, isAdmin, canOpenKeys]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busyRef.current || secret) return;
+    if (!canCreate || busyRef.current || secret) return;
     const date = new Date(expiry);
     if (!label.trim()) { setError("請輸入金鑰名稱。"); return; }
     if (!noExpiry && (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now())) {
@@ -144,6 +155,9 @@ export default function ApiKeys() {
   if (!isFormal) {
     return <p className="p-6 text-content-muted">臨時帳號不能建立 API 金鑰。</p>;
   }
+  if (!canOpenKeys) {
+    return <p className="p-6 text-content-muted">如需 API 金鑰，請聯絡帳號管理人員。</p>;
+  }
 
   // 撤銷過的金鑰不能再用，只留作稽核紀錄，平常收起來才看得出哪幾把還有效。
   const revokedCount = keys.filter((key) => key.revoked_at).length;
@@ -193,7 +207,7 @@ export default function ApiKeys() {
               <button type="button" className="btn btn-ghost" onClick={() => { setSecret(null); setCopied(false); }}>我已保存，關閉</button>
             </div>
           </section>
-        ) : (
+        ) : canCreate ? (
           <form aria-label="建立帳號 API 金鑰" onSubmit={(event) => void create(event)} className="space-y-4 rounded-xl border border-border bg-surface p-5">
             <h2 className="card-title">建立金鑰</h2>
             <div>
@@ -235,6 +249,8 @@ export default function ApiKeys() {
               {busy ? "建立中…" : "建立 API 金鑰"}
             </button>
           </form>
+        ) : (
+          <p className="text-sm text-content-muted">如需新增 API 金鑰，請聯絡帳號管理人員。</p>
         )}
         <section aria-label="API 金鑰列表">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

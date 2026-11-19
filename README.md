@@ -69,12 +69,14 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 | 角色 | 角色管理 | 人設 |
 | | 虛擬人（`/admin/avatar`） | 2D 角色（可直接上傳素材包，或上傳說話影片、人像圖交給 `avatar-pipeline` 轉換、轉完自動建成角色）、背景。後台每頁右下角另有可收合、可拖曳的浮動助理，固定是內建的 Live2D Haru |
 | | 工具與技能 | Brain 工具與 skills 狀態 |
-| 系統 | 專案與權限（`/admin/access`） | 分頁：專案（建立與列出專案）；帳號（正式帳號列表可搜尋、建立管理員時可一併設登入預設值與資源上限、臨時帳號批次、資源與引擎授權（人物依擁有的專案、聲音依引擎分區段，可收合、整段勾選、搜尋與只看已選；管理員帳號會標明不受清單限制；未儲存就切換帳號或收合面板會先提示，搜尋時編輯中的那一列保留；管理員的資源上限也含語音辨識引擎）、展示機台旗標）；側欄切回任一頁都回到上次停的子分頁；API 金鑰（`/admin/access/api-keys`，可獨立設定期限、撤銷與查使用紀錄）；權限圖譜（`/admin/access/graph`，唯讀的帳號 ↔ 專案授權網路圖，可疊加人物、聲音、辨識引擎與臨時帳號圖層，並依專案、資源、角色、帳號類型與連線種類篩選）；網站嵌入金鑰（外部網站嵌入虛擬人用的金鑰）。一般帳號只看得到專案與 API 金鑰 |
+| 系統 | 專案與權限（`/admin/access`） | 分頁：專案（建立專案、設定所屬廠商）；帳號（正式帳號列表可搜尋、建立管理員時可一併設登入預設值與資源上限、臨時帳號批次、資源與引擎授權（人物依擁有的專案、聲音依引擎分區段，可收合、整段勾選、搜尋與只看已選；管理員帳號會標明不受清單限制；未儲存就切換帳號或收合面板會先提示，搜尋時編輯中的那一列保留；管理員的資源上限也含語音辨識引擎）、展示機台旗標）；側欄切回任一頁都回到上次停的子分頁；API 金鑰（`/admin/access/api-keys`，可獨立設定期限、撤銷與查使用紀錄）；權限圖譜（`/admin/access/graph`，唯讀的帳號 ↔ 專案授權網路圖，可疊加人物、聲音、辨識引擎與臨時帳號圖層，並依專案、資源、角色、帳號類型與連線種類篩選）；網站嵌入金鑰（外部網站嵌入虛擬人用的金鑰）。內部一般帳號可看專案及自己的既有金鑰，廠商帳號可看已授權專案 |
 | | 模型供應商 | 全站模型順序、金鑰與 Gemini 語音路線，僅 ROOT |
 | | 用量 | 依帳號、專案、session 彙總的模型與 token 用量 |
 | | 系統狀態（`/admin/system`） | 分頁：健康（服務健康檢查）、監控（Grafana 儀表板，`/admin/system/monitoring`） |
 
-可信任的後端程式可使用帳號 API key，以 `Authorization: Bearer ovk_<key_id>.<secret>` 呼叫 ASR、TTS、Chat 與其他應用 API；權限沿用所屬帳號，root／admin 不需各套獨立 API。完整 key 只在建立時顯示一次，資料庫只存雜湊；管理 key 仍需登入 session。操作、契約與 ASR 範例見 [API key 整合指南](docs/guides/account-api-keys.md)。
+可信任的後端程式可使用帳號 API key，以 `Authorization: Bearer ovk_<key_id>.<secret>` 呼叫 ASR、TTS、Chat 與其他應用 API。一般帳號的金鑰由有權管理的管理員代發，使用時沿用帳號當下的授權。完整金鑰只在建立時顯示一次，資料庫只存雜湊，管理仍需登入 session。操作、契約與 ASR 範例見 [API key 整合指南](docs/guides/account-api-keys.md)。
+
+正式帳號的專案授權可分別開啟「改知識庫與人設」與「改其他設定」。讀取授權包含查看、匯出對話紀錄，刪除需要「改其他設定」。廠商帳號須明確授權到所屬廠商相同的專案。最高管理員可指定專人管理正式廠商一般帳號。角色組合與操作方式見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md) 與 [帳號管理手冊](docs/operations/account-administration.md)。
 
 先以 `GET /api/v1/me/capabilities` 取得帳號已授權資源、ASR 模式／部署設定與預設值，再指定單次辨識 `provider`、串流連線 `engine` 或 TTS 聲音，不必改帳號偏好。`configured` 代表必要設定齊全，不保證上游健康；專案以原始 `project_id` 傳遞，`label` 只供顯示。可執行的 Python 標準庫 CLI 與音訊格式處理見 [串接快速開始](docs/guides/integration-quickstart.md) 及 [integration_client.py](scripts/integration_client.py)。
 
