@@ -25,6 +25,10 @@ vi.mock("../components/personas/PersonaEditor", () => ({
   default: () => <div data-testid="persona-editor" />,
 }));
 
+vi.mock("../components/personas/PersonaForm", () => ({
+  default: () => <div data-testid="persona-form" />,
+}));
+
 vi.mock("../components/personas/PersonaEmptyState", () => ({
   default: () => <div data-testid="persona-empty-state" />,
 }));

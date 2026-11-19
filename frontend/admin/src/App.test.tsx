@@ -266,7 +266,7 @@ describe("App tab mounting", () => {
     render(<App />);
     await screen.findByTestId("tab-chat");
 
-    const labels = ["對話測試", "對話紀錄", "知識庫", "人設"];
+    const labels = ["對話測試", "對話紀錄", "知識庫", "角色管理"];
     const linkLabels = (root: HTMLElement) =>
       within(root).getAllByRole("link", { hidden: true }).map((link) => link.getAttribute("title"));
     expect(linkLabels(screen.getByRole("complementary"))).toEqual(labels);

@@ -102,6 +102,10 @@ def env(monkeypatch):
         path = request.url.path
         if path == "/brain/personas/soul" and request.method == "GET":
             return httpx.Response(200, json={"content": "原始人設"})
+        if path == "/brain/personas/agents" and request.method == "GET":
+            return httpx.Response(200, json={"content": "原始工作規則"})
+        if path == "/brain/personas/guardrails" and request.method == "GET":
+            return httpx.Response(200, json={"content": "保護規則"})
         if path == "/brain/projects":
             if request.method == "POST":
                 data = json.loads(request.content)
@@ -183,6 +187,14 @@ def test_explicit_project_permissions_at_proxy_and_direct_routes(env, knowledge,
         ("PUT", "knowledge/document", {"path": "knowledge/a.md", "content": "a"}, knowledge),
         ("PUT", "knowledge/document", {"path": "SOUL.md", "content": "a"}, knowledge),
         ("PUT", "knowledge/document", {"path": "MEMORY.md", "content": "a"}, settings),
+        ("PUT", "knowledge/document", {"path": "GUARDRAILS.md", "content": "a"}, settings),
+        ("DELETE", "knowledge/document?path=GUARDRAILS.md", None, settings),
+        (
+            "POST", "knowledge/move",
+            {"source_path": "knowledge/a.md", "target_path": "GUARDRAILS.md"},
+            knowledge and settings,
+        ),
+        ("PUT", "personas/agents", {"persona_id": "default", "content": "a"}, knowledge),
         (
             "POST", "knowledge/renormalize/apply",
             {"path": "knowledge/a.md", "content": "a"}, knowledge,
@@ -337,6 +349,34 @@ def test_project_list_reports_current_account_feature_access(env, knowledge, set
     project, = response.json()["projects"]
     assert project["project_id"] == _PROJECT
     assert project["can_edit_features"] is expected
+
+
+@pytest.mark.parametrize(
+    ("knowledge", "settings", "vendor", "expected"),
+    [
+        (True, False, None, True),
+        (False, True, None, False),
+        (False, False, None, False),
+        (True, False, "甲商", True),
+        (False, False, "甲商", False),
+    ],
+    ids=["knowledge-editor", "settings-editor", "internal-reader", "vendor-editor", "vendor-reader"],
+)
+def test_project_list_reports_knowledge_edit_access_for_every_account(
+    env, knowledge, settings, vendor, expected,
+):
+    # 角色管理頁靠這個旗標決定欄位能不能改；內部唯讀帳號以前拿不到，畫面誤以為可編輯。
+    _assign_vendors(env)
+    created = env.create(
+        "persona-user", vendor_name=vendor, access=_access(knowledge=knowledge, settings=settings),
+    )
+    assert created.status_code == 201, created.text
+    project, = env.client.get(
+        "/api/v1/projects", headers=env.headers(created.json()["id"]),
+    ).json()["projects"]
+    assert project["can_edit_knowledge"] is expected
+    root_projects = env.client.get("/api/v1/projects", headers=env.headers(env.root.id)).json()["projects"]
+    assert all(item["can_edit_knowledge"] is True for item in root_projects)
 
 
 def test_user_cannot_mint_keys_admin_can_issue_and_revoke(env):
@@ -671,9 +711,60 @@ def test_vendor_soul_reads_and_writes_are_bound_to_project(env, vendor_accounts)
     assert len(env.received) == before
 
 
+def test_vendor_agents_reads_and_writes_are_bound_to_project(env, vendor_accounts):
+    route = "/api/v1/personas/agents"
+    editor = env.headers(vendor_accounts["vendor-editor"])
+    reader = env.headers(vendor_accounts["vendor-reader"])
+    for persona_id in ("default", "support"):
+        params = {"project_id": _PROJECT, "persona_id": persona_id}
+        response = env.client.get(route, params=params, headers=editor)
+        assert response.json() == {"content": "原始工作規則"}
+        request = env.received[-1]
+        assert request.url.path == "/brain/personas/agents"
+        assert request.headers["X-OpenVMan-Vendor"] == "1"
+        assert dict(request.url.params) == params
+        assert env.client.get(route, params=params, headers=reader).status_code == 200
+        data = {**params, "content": "新工作規則"}
+        assert env.client.put(route, json=data, headers=editor).json() == {"status": "ok"}
+        assert json.loads(env.received[-1].content) == data
+        assert env.client.put(route, json=data, headers=reader).status_code == 403
+    before = len(env.received)
+    for project in (_UNGRANTED, _OTHER):
+        params = {"project_id": project, "persona_id": "default"}
+        assert env.client.get(route, params=params, headers=editor).status_code == 404
+        assert env.client.put(route, json={**params, "content": "x"}, headers=editor).status_code == 404
+    assert len(env.received) == before
+
+
+@pytest.mark.parametrize("account", ["vendor-editor", "vendor-reader"])
+def test_vendor_reads_guardrails_but_cannot_change_them(env, vendor_accounts, account):
+    headers = env.headers(vendor_accounts[account])
+    route = "/api/v1/personas/guardrails"
+    response = env.client.get(route, params={"project_id": _PROJECT}, headers=headers)
+    assert response.json() == {"content": "保護規則"}
+    assert env.received[-1].url.path == "/brain/personas/guardrails"
+    before = len(env.received)
+    for method in ("PUT", "POST", "PATCH", "DELETE"):
+        response = env.client.request(
+            method, route, params={"project_id": _PROJECT},
+            json={"project_id": _PROJECT, "content": "改掉"}, headers=headers,
+        )
+        assert response.status_code == 403, (method, response.text)
+    for route, payload in (
+        ("knowledge/base/document", {"path": "GUARDRAILS.md", "content": "改掉"}),
+        ("knowledge/document", {"path": "GUARDRAILS.md", "content": "改掉"}),
+    ):
+        response = env.client.put(
+            f"/api/v1/{route}", json={"project_id": _PROJECT, **payload}, headers=headers,
+        )
+        assert response.status_code == 403, (route, response.text)
+    assert len(env.received) == before
+
+
 @pytest.mark.parametrize("path", [
-    "SOUL.md", "AGENTS.md", "TOOLS.md", "MEMORY.md", "IDENTITY.md",
-    ".learnings/LEARNINGS.md", "personas/support/AGENTS.md",
+    "SOUL.md", "AGENTS.md", "TOOLS.md", "MEMORY.md", "IDENTITY.md", "GUARDRAILS.md",
+    ".learnings/LEARNINGS.md", "personas/support/AGENTS.md", "knowledge/../GUARDRAILS.md",
+    "knowledge//../AGENTS.md", "Knowledge/a.md",
 ])
 def test_vendor_cannot_read_or_write_core_files_through_document_apis(env, vendor_accounts, path):
     headers = env.headers(vendor_accounts["vendor-editor"])

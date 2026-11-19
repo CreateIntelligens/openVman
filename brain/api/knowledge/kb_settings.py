@@ -89,11 +89,13 @@ def _update_settings(project_id: str, updates: dict[str, Any]) -> dict[str, Any]
 def save_kb_settings(
     project_id: str,
     *,
-    language_routes: list[str],
+    language_routes: list[str] | None = None,
     reply_seconds: int | None = None,
 ) -> dict[str, Any]:
-    """Save the settings; ``reply_seconds`` None keeps the stored value."""
-    updates = {"language_routes": _normalize_routes(language_routes)}
+    """Save the settings; a field left as None keeps its stored value."""
+    updates: dict[str, Any] = {}
+    if language_routes is not None:
+        updates["language_routes"] = _normalize_routes(language_routes)
     if reply_seconds is not None:
         updates["reply_seconds"] = _normalize_seconds(reply_seconds)
     return _update_settings(project_id, updates)

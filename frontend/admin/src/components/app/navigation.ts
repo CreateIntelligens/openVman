@@ -53,7 +53,6 @@ const VENDOR_TABS = new Set<Tab>(["KnowledgeBase", "Personas", "Chat", "Sessions
 
 export function tabLabel(tab: TabConfig, vendor = false): string {
   if (vendor && tab.key === "Chat") return "對話測試";
-  if (vendor && tab.key === "Personas") return "人設";
   return tab.label;
 }
 export type NavigationGroup = (typeof tabGroups)[number]["label"];

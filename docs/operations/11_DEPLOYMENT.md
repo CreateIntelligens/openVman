@@ -272,6 +272,8 @@ Watchtower 由同一份 compose 啟動，使用 Docker API `1.44`（相容 Docke
 急需上線時在主機上跑一次性的 watchtower（重啟常駐的 watchtower 不會立刻檢查，要等滿一個間隔）：
 `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock nickfedor/watchtower:1.24.0 --run-once --label-enable --cleanup`。
 
+升版到「知識索引不收符號連結與硬連結」這一版後，舊索引裡可能還有經由連結收進去的切片（例如 `knowledge/` 底下指向 `AGENTS.md` 的連結），直到該專案下次重建索引才會清掉。上線後對每個專案重建一次知識索引（`POST /api/v1/knowledge/reindex`，body 帶 `project_id`，需要「改知識庫與人設」），重建時不再列出的路徑會從索引移除。專案資料目錄不要用硬連結做快照或備份（例如 `cp -al`、`rsync --link-dest`）：連結數大於 1 的檔案會被當成別名，從知識索引略過（只在 Brain log 記 warning），整個知識庫可能因此查不到；請用一般複製或 LanceDB 備份。
+
 Watchtower **只更新既有 image**：服務增刪，或 ports、volumes、environment 等結構變更，
 仍需更新 repository 後重新執行上面的指令。
 

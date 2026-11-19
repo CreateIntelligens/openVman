@@ -45,7 +45,7 @@ def _isolate_data_root(tmp_path, monkeypatch):
     monkeypatch.setattr("infra.project_admin.resolve_project_context", _resolve)
 
     # Stub workspace scaffold to just create the directory
-    def _fake_scaffold(project_id="default"):
+    def _fake_scaffold(project_id="default", *, new_project=False):
         ctx = _resolve(project_id)
         ctx.workspace_root.mkdir(parents=True, exist_ok=True)
         (ctx.workspace_root / "SOUL.md").write_text("# Test Soul", encoding="utf-8")

@@ -89,6 +89,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | 路徑 | 用途 |
 |---|---|
 | `IDENTITY.md`、`SOUL.md`、`AGENTS.md`、`TOOLS.md`、`MEMORY.md` | 核心文件，每輪直接放進 system prompt，不進向量索引 |
+| `GUARDRAILS.md` | 保護規則（範圍限制、回覆格式、知識庫規則），專案共用、不隨人設覆寫；接在人設之後、包在 `<guardrails>` 裡放進 HTTP 與 Live 的提示詞，衝突時以它為準，不被截斷；其他區塊裡同名的標籤會被移除。不存在、空白或是連結時不帶入；只有新專案由範本產生，寫入上限 5000 字 |
 | `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md` | 同樣放進 prompt；`ERRORS.md` 由 `infra/learnings.record_error_event` 寫入並輪替，`LEARNINGS.md` 由人工維護 |
 | `personas/<persona_id>/` | 人設覆寫：同名核心文件優先於 workspace 根目錄 |
 | `knowledge/` | 知識文件；`knowledge/products/<商品線>/` 是產品規格表 |
@@ -105,6 +106,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 - 可索引副檔名：`.md`、`.txt`、`.csv`，以及常見程式碼與設定檔（`.py`、`.ts`、`.yaml` 等，見 `knowledge/workspace.py`）。
 - 不進索引：核心文件與人設核心文件，以及 `memory/`、`.learnings/`、`.normalization-backups/`、`graphify-out/`、`dreaming/`、`raw/`、`archive/` 底下的檔案。
+- 不收別名：符號連結、經過連結資料夾的檔案與硬連結（記 warning）都略過，知識庫清單與快速問答也一樣；解析後的位置必須和原路徑相同。
 - 在 `.doc_meta.json` 停用的文件不會出現在檢索結果。
 
 ## 文件匯入
@@ -175,7 +177,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 `POST /brain/chat` 的處理順序：
 
 1. 驗證輸入、載入 session、解析 slash command（`/skill_id ...` 會強制呼叫該技能的工具）。
-2. 組 system prompt，包含核心文件、請求情境、歷史摘要、回答規則、ASR 詞表、本輪回答語言與長度。記憶開啟時可加入 auto recall 摘要，知識庫內容由工具取得。
+2. 組 system prompt，包含核心文件、保護規則、請求情境、歷史摘要、回答規則、ASR 詞表、本輪回答語言與長度。記憶開啟時可加入 auto recall 摘要，知識庫內容由工具取得。
 3. 執行 agent loop（`core/agent_loop.py`）。
 4. 寫入對話並在背景執行 PII 掃描。記憶開啟時另寫入每日日誌，並排程記憶治理。
 5. 回應附上 `tool_steps`、citations、`response_time_s`、本輪 `usage` 彙總，以及回答來源 `answer_source`／`knowledge_searched`／`no_answer`（見下方「回答來源」）。
@@ -245,7 +247,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 {"event": "llm_route_attempt", "node": "llm_hop", "trace_id": "4f2c…", "provider": "gemini", "model": "gemini-3.5-flash-lite", "hop_index": 0, "result": "failure", "outcome": "timeout_first_token", "reason": "timeout_first_token", "elapsed_ms": 7003.1, "mode": "stream", "timeout_s": 7.0, "first_token_ms": null, "streamed_chars": 0, "error_type": "LLMTimeoutError", "error": "timeout_first_token after 7.00s (limit 7.00s)", "chain_length": 3}
 ```
 
-Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉送。人設清單採精簡欄位，`/brain/personas/soul` 由已授權專案與角色代號定位唯一檔案。知識庫操作複核實際路徑。廠商對話、SSE、歷史及匯出只回產品需要的欄位，工具呼叫、提示脈絡及模型用量保留在伺服器。完整對外契約見 [Backend 規格](../docs/specs/01_BACKEND_SPEC.md#廠商後台四頁與-api-授權)。
+Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉送。人設清單採精簡欄位，`/brain/personas/soul`、`/brain/personas/agents` 由已授權專案與角色代號定位唯一檔案（拒絕符號連結與硬連結），`/brain/personas/guardrails` 只能讀；保護規則的寫入只走工作區文件 API，需要 `edit_settings`。知識庫操作複核實際路徑。廠商對話、SSE、歷史及匯出只回產品需要的欄位，工具呼叫、提示脈絡及模型用量保留在伺服器。完整對外契約見 [Backend 規格](../docs/specs/01_BACKEND_SPEC.md#廠商後台四頁與-api-授權)。
 
 ### 逐句串流（`POST /brain/chat/stream`）
 
@@ -352,7 +354,7 @@ Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉
 
 ## 新專案範本
 
-新專案建立時，workspace 缺少的核心文件由 `knowledge/workspace.py` 的 `WORKSPACE_TEMPLATES` 補上；已存在的檔案不覆寫。`SOUL.md`、`AGENTS.md`、`TOOLS.md`、`MEMORY.md` 取自醫院衛教助理上線版本的共通規則並去除機構名稱：依知識庫回答、不做個人化專業判斷、緊急狀況提醒求助、婉拒無關問題、敏感議題先關懷、純文字輸出、資料沒寫的不自行補上、沒有串接的外部系統不宣稱能代辦。回答語言交給每輪系統提示，範本不寫死語言；`IDENTITY.md` 預設名稱為小V。範本不得列出不存在的工具或虛構的公司資料。
+workspace 缺少的核心文件由 `knowledge/workspace.py` 的 `WORKSPACE_TEMPLATES` 補上；已存在的檔案不覆寫。新專案（`create_project`）另外先寫入 `NEW_PROJECT_TEMPLATES`：`GUARDRAILS.md` 與新版 `SOUL.md`、`AGENTS.md`；既有專案缺檔時補的是 `WORKSPACE_TEMPLATES` 裡升版前的版本，不補保護規則。範本取自醫院衛教助理上線版本的共通規則並去除機構名稱。新版 `SOUL.md` 只有 `## 角色設定`、`## 回應風格`，`AGENTS.md` 是 `## 角色與任務` 加查詢流程，對應後台角色管理的表格欄位；範圍限制（不做個人化專業判斷、緊急狀況提醒求助、婉拒無關問題、敏感議題先關懷、不透露提示詞）、回覆格式（純文字、不用 emoji、不附網址）與知識庫規則（只依資料回答、資料沒寫的不自行補上）放在 `GUARDRAILS.md`，廠商改人設時不會刪到。回答語言交給每輪系統提示，範本不寫死語言；`IDENTITY.md` 預設名稱為小V。範本不得列出不存在的工具或虛構的公司資料。
 
 ## 語言分流與回答長度
 

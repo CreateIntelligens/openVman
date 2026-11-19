@@ -95,7 +95,7 @@ ROOT 可管理所有專案、授予帳號管理旗標及調整角色。此段以
 | 對話清單、單段歷史、匯出及對話測試 | 讀 |
 | 對話單筆與批次刪除 | 改其他設定 |
 
-內部帳號的共用工作區文件 API 依目標路徑判定，`knowledge/`、`raw/` 及人設的 `SOUL.md`、`IDENTITY.md`、`AGENTS.md`、`TOOLS.md` 使用「改知識庫與人設」。`MEMORY.md` 與其他工作區路徑使用「改其他設定」。移動時一併檢查來源與目的，Brain 以實際解析的路徑複核 Backend 授權。正式廠商帳號不得取得「改其他設定」。有資源上限的管理員只可列出與管理落在上限內的廠商帳號。
+內部帳號的共用工作區文件 API 依目標路徑判定，`knowledge/`、`raw/` 及人設的 `SOUL.md`、`IDENTITY.md`、`AGENTS.md`、`TOOLS.md` 使用「改知識庫與人設」。`MEMORY.md`、保護規則 `GUARDRAILS.md` 與其他工作區路徑使用「改其他設定」。移動時一併檢查來源與目的，Brain 以實際解析的路徑複核 Backend 授權。正式廠商帳號不得取得「改其他設定」。有資源上限的管理員只可列出與管理落在上限內的廠商帳號。
 
 #### 廠商後台四頁與 API 授權
 
@@ -104,16 +104,20 @@ ROOT 可管理所有專案、授予帳號管理旗標及調整角色。此段以
 | 頁面 | 網址 | 廠商可用範圍 |
 | --- | --- | --- |
 | 知識庫 | `/admin/knowledge` | 文件、快速回覆、所有題目、回答語言與長度。文件與匯入限該專案知識庫 |
-| 人設 | `/admin/personas` | 切換該專案既有人設，瀏覽或儲存 `SOUL.md` |
+| 角色管理 | `/admin/personas` | 切換該專案既有人設，以表格模式瀏覽或儲存「個性與說話方式」（`SOUL.md`）、「工作規則」（`AGENTS.md`）與回覆字數（即知識庫的回答長度）；頁面下方灰底唯讀顯示保護規則 |
 | 對話測試 | `/admin/chat` | 文字測試、快速問題及對話歷史 |
 | 對話紀錄 | `/admin/sessions` | 清單、單段歷史及匯出 |
 
 Backend 依憑證所屬帳號判斷廠商身分，登入 session 與代發 API 金鑰共用 HTTP 路由及方法允許清單。隱藏功能及通用工作區文件 API 回 403。允許的專案端點仍需查核專案讀取或寫入權，未獲授權的專案回 404。
 
 - 人設清單 `GET /api/v1/personas?project_id=…` 只回角色代號、名稱與預設狀態。`GET /api/v1/personas/soul?project_id=…&persona_id=…` 回 `{content}`，`PUT /api/v1/personas/soul` 接受 `{project_id, persona_id, content}`，成功回 `{status: "ok"}`。後者需「改知識庫與人設」。預設人設對應工作區根目錄 `SOUL.md`，其餘對應 `personas/<persona_id>/SOUL.md`。指定人設沒有自己的檔案時回 404。角色建立、複製、刪除及虛擬人綁定由內部人員處理。
+- `GET`／`PUT /api/v1/personas/agents` 的欄位與權限和 `soul` 相同，對應 `AGENTS.md`。角色有自己的 `SOUL.md` 但還沒有 `AGENTS.md` 時，讀取回 404、儲存會建立該角色自己的 `AGENTS.md`。
+- 保護規則 `GET /api/v1/personas/guardrails?project_id=…` 回 `{content, template, linked, max_chars, content_hash}`，只需讀取權，廠商編輯與唯讀都可讀。`content` 是專案目前的內容，沒設定或檔案是符號連結／硬連結時為空字串（`linked` 為 true，AI 也不採用）；`template` 是建議內容；`max_chars` 是寫入上限（5000 字）；`content_hash` 存檔時當 `base_hash` 帶回，別處改過就回 409。廠商沒有任何寫入保護規則的路由：`/personas/guardrails` 只有 GET，工作區文件 API 對廠商一律 403。內部帳號以 `PUT /api/v1/knowledge/document`（`path: "GUARDRAILS.md"`）修改，需要「改其他設定」，Brain 以實際路徑複核；超過 5000 字回 400，檔案是連結時回 409。
+- 人設 API（`soul`、`agents`）對廠商拒絕符號連結與硬連結；內部帳號照一般工作區規則解析，但解析後必須仍是角色的 `SOUL.md`／`AGENTS.md`（不能經由連結寫到保護規則或記憶）。沒有 `SOUL.md` 的孤立角色資料夾讀寫都回 404。
+- `PUT /api/v1/knowledge/settings` 的 `language_routes` 與 `reply_seconds` 都可省略，省略的欄位保留原值；角色管理頁只送 `reply_seconds`。
 - 知識庫檔案使用 `/api/v1/knowledge/base/document`（GET、PUT、DELETE）、`/base/document/meta`（PATCH）、`/base/directory`（POST、DELETE）及 `/base/move`（POST），沿用原文件操作的欄位。Backend 與 Brain 都拒絕前後帶空白的路徑。Backend 檢查路徑在 `knowledge/` 下，Brain 複核實際位置並拒絕符號連結與硬連結。清單、快速回覆、圖片、上傳與匯入也依專案及各自目錄限制。圖譜、重建索引、清理未用圖片及 AI 整理排版屬內部功能。
 - Backend 轉送前移除客戶端提供的 `X-OpenVMan-*`，以已驗證的帳號身分加上可信廠商標頭。Brain 路由仍以伺服器內部權杖驗證。
-- 專案摘要和明細提供目前帳號的 `can_edit_knowledge`，供人設頁決定可否編輯。所有寫入仍由 Backend 即時查核。
+- `GET /api/v1/projects` 對所有帳號（含內部帳號）回傳各專案的 `can_edit_knowledge` 與 `can_edit_features`，角色管理頁據此決定欄位與保護規則能不能改。所有寫入仍由 Backend 即時查核。
 
 `PATCH /api/v1/knowledge/features` 只接受布林開關 `memory_enabled`、`graph_enabled`，可只更新一項。Backend 先驗證目標專案及「改其他設定」權限，再自行產生 `X-OpenVMan-Project-Writes: edit_settings`，由 Brain 複核。廠商登入及代發金鑰都適用相同限制。`PUT /api/v1/knowledge/settings` 仍只更新語言分流與回答秒數。`GET /api/v1/projects` 的各專案摘要以 `can_edit_features` 反映當前帳號是否可更新開關。
 
@@ -123,14 +127,14 @@ Backend 依憑證所屬帳號判斷廠商身分，登入 session 與代發 API �
 | --- | --- |
 | 專案摘要與明細 | `project_root`、`has_session_db`、`has_lancedb` 等伺服器位置、儲存細節與其他廠商歸屬 |
 | 帳號與金鑰 | 密碼及雜湊、金鑰明文與雜湊、其他帳號、內部稽核、帳號管理旗標與委派關係 |
-| 人設、工作區、知識庫 | 屬於隱藏功能的檔案清單、路徑、內容與中繼資料，包含 `AGENTS.md`、`TOOLS.md`、`MEMORY.md`、`IDENTITY.md` 與 `.learnings/`，以及內部絕對路徑 |
+| 人設、工作區、知識庫 | 屬於隱藏功能的檔案清單、路徑、內容與中繼資料，包含 `TOOLS.md`、`MEMORY.md`、`IDENTITY.md` 與 `.learnings/`，以及內部絕對路徑（`AGENTS.md` 只經人設 API 提供，保護規則只提供內容） |
 | 對話、匯出、串流、設定與錯誤 | 系統提示詞、模型供應商憑證、內部位址、技術除錯資料、呼叫堆疊與隱藏功能的設定值 |
 
 - HTTP chat 與 SSE 只讓廠商使用 `search_knowledge` 和 `get_document`。後者使用與文件 API 相同的目錄、空白及連結檢查。即時對話只有 `search_knowledge`，廠商回合停用長期記憶檢索、外部網頁查詢與發布、技能、圖譜和 A2A 工具。
 - WebSocket 依握手驗證的帳號判斷廠商身分，先驗證 `client_init` 的專案授權，再附上 `X-OpenVMan-Vendor: 1` 連線至 Brain。Brain 轉送語音、文字、轉錄和停止音訊事件，省略搜尋引用與決策診斷事件，並將 `server_error` 轉成固定的對話失敗訊息。
 - 知識庫文件與 raw 上傳處理失敗時，保留 HTTP 狀態碼。廠商收到固定的上傳失敗或權限訊息，轉檔例外、上游網址與暫存路徑只供內部診斷。
 
-三個月對話查詢窗、軟刪除、人物設定版型與強制載入根目錄 `AGENTS.md` 另行交付。
+三個月對話查詢窗、軟刪除、歡迎詞與強制載入根目錄 `AGENTS.md` 另行交付。
 
 ### 2. 連線與 Session 管理 (Session Management)
 伺服器必須在記憶體中維護一個 Session Map，管理所有活躍的機台連線。

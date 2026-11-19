@@ -109,8 +109,15 @@ function getApiErrorMessage(payload: ApiErrorPayload, status: number) {
   return message || error || statusMessage(status);
 }
 
+/** API 回傳錯誤；`status` 讓呼叫端分辨「檔案還沒有」(404) 和其他失敗。 */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
 export async function parseJson<T>(res: Response): Promise<T> {
-  if (!res.ok) throw new Error(await parseErrorMessage(res));
+  if (!res.ok) throw new ApiError(await parseErrorMessage(res), res.status);
   return (await res.json()) as T;
 }
 

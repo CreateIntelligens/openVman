@@ -88,6 +88,7 @@
         ├── AGENTS.md                 # 任務分派與工作流程
         ├── TOOLS.md                  # 工具使用說明
         ├── MEMORY.md                 # 長期核心記憶（人工維護）
+        ├── GUARDRAILS.md             # 保護規則：範圍限制、回覆格式、知識庫規則（專案共用）
         ├── MEMORY_SUMMARIES.md       # 記憶治理產生的每日摘要
         ├── DREAMS.md                 # Dreaming 每輪的紀錄
         ├── ASR_PROMPT.md             # 選填的語音專有名詞詞表（第 14.5 節）
@@ -106,9 +107,11 @@
         └── .normalization-backups/   # AI 文件整理前的備份
 ```
 
-* **核心文件**：`IDENTITY.md`、`SOUL.md`、`MEMORY.md`、`AGENTS.md`、`TOOLS.md` 與 `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md` 每輪直接放進 system prompt（第 7 節），不進向量索引。
+* **核心文件**：`IDENTITY.md`、`SOUL.md`、`MEMORY.md`、`AGENTS.md`、`TOOLS.md`、`GUARDRAILS.md` 與 `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md` 每輪直接放進 system prompt（第 7 節），不進向量索引。
+* **保護規則**（`GUARDRAILS.md`）：每個專案一份，只放工作區根目錄，不隨人設覆寫。三段固定標題 `## 範圍限制`、`## 回覆格式`、`## 知識庫規則`。新專案由 `create_project` 以 `ensure_workspace_scaffold(new_project=True)` 寫入 `NEW_PROJECT_TEMPLATES`（先寫保護規則再寫新版 `SOUL.md`、`AGENTS.md`，已存在的不覆寫，中斷後重試會補上）；全新安裝以「工作區目錄原本不存在」判斷。範本內容：不越權、無關問題婉拒、敏感議題先關懷；純文字、不用 emoji、不附網址；只依資料回答、查不到就說無法確認。升版前就存在的專案不會補這份檔案，缺 `SOUL.md`／`AGENTS.md` 時補的是升版前的 `WORKSPACE_TEMPLATES`（規則仍寫在人設裡），也不會從既有文件搬內容。讀取一律走 `read_guardrails`：檔案不存在、內容空白、是符號連結或硬連結（記 warning）、讀取失敗都當成沒設定，提示詞維持原樣（`prompt_templates.py` 的固定安全規則照樣在）。寫入上限 `GUARDRAILS_MAX_CHARS`（5000 字），工作區文件 API 的存檔、AI 整理套用與搬移到這個路徑都檢查，超過回 400；檔案是連結時存檔回 409，不寫進連結目標。
 * **可索引檔案**：`.md`、`.txt`、`.csv`，以及常見程式碼與設定檔（`.py`、`.ts`、`.yaml` 等，清單見 `knowledge/workspace.py`）。
 * **不進索引**：核心文件與人設核心文件，以及 `memory/`、`.learnings/`、`.normalization-backups/`、`graphify-out/`、`dreaming/`、`raw/`、`archive/` 底下的檔案。
+* **不收別名**：符號連結、經過連結資料夾的檔案（解析後位置必須與原路徑相同）以及有其他名稱的硬連結（`st_nlink > 1`，記 warning）不進索引，也不出現在知識庫清單與快速問答。否則 `knowledge/` 底下指向 `AGENTS.md` 的連結會讓工作規則被檢索出來。
 * **停用文件**：`.doc_meta.json` 的 `enabled: false`（後台文件頁的啟用開關）不會重建索引，而是在查詢時略過：向量／關鍵字檢索與知識圖譜擴充都會檢查。
 
 ### 4. 知識索引管線 (Knowledge Indexing Pipeline)
@@ -267,6 +270,7 @@ class BrainMessage:
 │ 產品規格篩選規則（專案有規格表時）               │
 │ IDENTITY → SOUL → MEMORY → AGENTS → TOOLS      │
 │   → LEARNINGS → ERRORS（依人設解析的核心文件）   │
+│ GUARDRAILS（<guardrails> 包起來，優先於人設）     │
 │ 回答規則                                       │
 │ ASR 詞表（第 14.5 節）                          │
 ├──────── 以下每輪會變 ─────────────────────────┤
@@ -278,6 +282,11 @@ class BrainMessage:
 │ 當輪語氣與檢索提示（每輪決策）                   │
 └──────────────────────────────────────────────┘
 ```
+
+保護規則每個專案固定，放在人設之後、回答規則之前，仍在快取的固定前綴內。廠商改得到 `SOUL.md` 與 `AGENTS.md`，所以標籤寫明兩者衝突時以保護規則為準；`core/prompt_templates.py` 的固定安全規則照舊。
+
+* **不能偽造**：system prompt 最後會被壓成一行，所以真的保護規則以 `GUARDRAILS（保護規則：…）` 標籤開頭、內容跳脫後包在 `<guardrails>…</guardrails>` 裡（`knowledge.workspace.guardrails_block`）。其他區塊（人設、記憶、學習紀錄、auto recall、對話摘要、當輪提示）組進去前先用 `strip_guardrails_markers` 移除同名標籤與標題，HTTP 與 Live 都一樣。
+* **不截斷**：保護規則不套區塊字元預算；`compress_text_keeping`（`infra/reflection.py`）在 system prompt 預算與 `enforce_context_budget` 的 system 壓縮時都把標籤到 `</guardrails>` 這一段整段保留，其餘內容依原比例分配剩下的字數；剩下的空間放不下其他內容時只留保護規則。長度由寫入時的上限保證。
 
 每輪決策判定不需要知識庫時，會改寫工具說明與回答規則裡「一定要先查」的句子，只有這類回合的快取會從工具說明斷開。
 
@@ -295,6 +304,7 @@ class BrainMessage:
 | `AGENTS` / `TOOLS` | `PROMPT_AGENTS_CHAR_BUDGET` / `PROMPT_TOOLS_CHAR_BUDGET` | 10000 / 10000 |
 | `IDENTITY` | `PROMPT_IDENTITY_CHAR_BUDGET` | 3000 |
 | `LEARNINGS` / `ERRORS` | `PROMPT_LEARNINGS_CHAR_BUDGET` / `PROMPT_ERRORS_CHAR_BUDGET` | 8000 / 5000 |
+| `GUARDRAILS` | 不截斷；寫入上限 `GUARDRAILS_MAX_CHARS` | 5000 |
 
 **溢出處理**（`core/pipeline.enforce_context_budget`）：超過的區塊以保留頭尾的方式壓縮（`compress_text`）；整份 messages 超過總預算時，先由舊到新移除對話輪次，仍超過才壓縮 system prompt。
 
@@ -449,6 +459,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 * 每日日誌依 persona 分目錄（`memory/<persona_id>/`）；長期記憶檢索依記錄 `metadata.persona_id` 過濾（空值或 `global` 為共用）。
 * `AVATAR.json` 記錄 persona 綁定的 avatar 角色（`POST /brain/personas/avatar`）。
 * 管理端點：`GET/POST/DELETE /brain/personas`、`POST /brain/personas/clone`。
+* 角色管理頁的文件端點：`GET/PUT /brain/personas/soul`、`GET/PUT /brain/personas/agents`（`{project_id, persona_id, content}`）與唯讀的 `GET /brain/personas/guardrails`（`{content, template, linked, max_chars, content_hash}`：`content` 是專案目前的內容，未設定或檔案是連結時為空字串；`template` 是建議範本，給有權限的內部帳號一鍵帶入；`linked` 表示檔案是連結；`content_hash` 與工作區文件 API 相同，存檔時當 `base_hash` 帶回，別處改過就回 409）。路徑由角色代號組出；廠商請求（`X-OpenVMan-Vendor`）拒絕符號連結與硬連結，內部請求照一般工作區規則解析，但解析後必須仍是某個角色的 `SOUL.md`／`AGENTS.md`，否則 403。非預設角色要有自己的 `SOUL.md`，只剩 `AGENTS.md` 的孤立資料夾讀寫都回 404；`agents` 在角色有 `SOUL.md` 但還沒有 `AGENTS.md` 時，儲存會建立該角色的 `AGENTS.md`，讀取回 404。保護規則的寫入只走工作區文件 API，需要「改其他設定」（`X-OpenVMan-Project-Writes: edit_settings`）。
 
 ### 13. 對話紀錄 (Sessions)
 
@@ -716,7 +727,7 @@ Content-Type: application/json
 
 * `brain/api/main.py` 只組裝 FastAPI app、路由與 middleware；啟動、預熱與排程器生命週期在 `startup.py`，HTTP tracing／metrics／logging 在 `safety/server_http.py`。HTTP 路由依資源拆在 `routes/`（`chat`、`knowledge`、`knowledge_qa`、`sessions`、`memory`、`personas`、`projects`、`tools`、`search`、`usage`、`backups`、`workspace`、`protocol`、`health`），內部端點與 Live WebSocket 在 `internal_routes.py`。
 * **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 背景預熱（先預熱台語判斷的 Gemini client，Backend 暫時連不上時每 2 秒重試、最多約 10 秒，再對每個有資料的專案建立資料表，並對 `knowledge` 跑一次實際檢索，開啟記憶的專案也預熱 `memories`；預熱失敗只記 warning，不擋 readiness；載入 LLM 套件、取模型設定、建工具表與各專案的 LLM client、解析型錄這幾個選用步驟合計最多等 30 秒，超過就略過，readiness 不再被它們無限期延後；模型設定與對話路徑若因 Backend 還沒起來而失敗，readiness 放行後每 2 秒重試，最多約 2 分鐘，只重試連不到 Backend 或回 5xx 的項目）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
-* **Gemini Live**：`live/gemini_live.py` 的 `GeminiLiveSession` 負責連線、收訊、重連與保活，並把事件分派給三個各自持有狀態的元件：`gemini_turns.py` 的 `GeminiLiveTurns` 持有回合版本、決策與預取結果，負責每輪決策、預取（查什麼由 `core/turn_reads.py` 決定）與工具呼叫；`gemini_audio.py` 的 `GeminiLiveAudio` 持有語句暫存、台語判定與音訊秒數，負責輸出音訊與用量；`gemini_transcripts.py` 的 `GeminiLiveTranscripts` 持有串流中的回覆，負責轉錄與回覆的持久化。三者共用的身分、設定與事件送出由 `gemini_context.py` 的 `LiveSessionContext` 在建構時傳入；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 的系統指令由 IDENTITY、SOUL、近期對話、記憶、工具使用規則與預設語言（第 14.3 節）組成；宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選），`save_memory` 同樣只在使用者明確要求時執行。上下行音訊以秒數記入用量帳本。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
+* **Gemini Live**：`live/gemini_live.py` 的 `GeminiLiveSession` 負責連線、收訊、重連與保活，並把事件分派給三個各自持有狀態的元件：`gemini_turns.py` 的 `GeminiLiveTurns` 持有回合版本、決策與預取結果，負責每輪決策、預取（查什麼由 `core/turn_reads.py` 決定）與工具呼叫；`gemini_audio.py` 的 `GeminiLiveAudio` 持有語句暫存、台語判定與音訊秒數，負責輸出音訊與用量；`gemini_transcripts.py` 的 `GeminiLiveTranscripts` 持有串流中的回覆，負責轉錄與回覆的持久化。三者共用的身分、設定與事件送出由 `gemini_context.py` 的 `LiveSessionContext` 在建構時傳入；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 的系統指令由 IDENTITY、SOUL、保護規則（專案有設定時才帶）、近期對話、記憶、工具使用規則與預設語言（第 14.3 節）組成。人設與近期對話沿用 relay 初始化時的快照，保護規則則獨立讀取（其他核心文件讀不到不影響它），每次組 setup（含重連）都重新讀；Live 不載入 `AGENTS.md`；宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選），`save_memory` 同樣只在使用者明確要求時執行。上下行音訊以秒數記入用量帳本。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
 * 根目錄 `tests/test_entry_boundaries.py` 禁止 inline 業務處理回到入口檔，並檢查自有正式程式碼每檔不超過 1000 實體行。
 
 

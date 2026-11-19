@@ -136,12 +136,14 @@ def _project_summary(
 
 
 def _can_edit_project_features(
-    runtime: AuthRuntime, current: CurrentAccount, project_id: str,
+    runtime: AuthRuntime,
+    current: CurrentAccount,
+    project_id: str,
+    access: ResourceAccess = ResourceAccess.EDIT_SETTINGS,
 ) -> bool:
     try:
         resolve_resource(
-            runtime.resources, current.user, ResourceType.PROJECT, project_id,
-            access=ResourceAccess.EDIT_SETTINGS,
+            runtime.resources, current.user, ResourceType.PROJECT, project_id, access=access,
         )
     except ResourceNotFoundError:
         return False
@@ -231,6 +233,10 @@ async def list_projects(
     }
     projects = [
         {
+            # 角色管理頁依這兩個旗標決定欄位能不能改；內部唯讀帳號也要看得出來。
+            "can_edit_knowledge": _can_edit_project_features(
+                runtime, current, project["project_id"], ResourceAccess.EDIT_KNOWLEDGE,
+            ),
             **_project_summary(project, accessible[project["project_id"]], current, runtime),
             "can_edit_features": _can_edit_project_features(runtime, current, project["project_id"]),
         }

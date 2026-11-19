@@ -6,11 +6,13 @@ from typing import Annotated
 from fastapi import Header, HTTPException
 
 from core.sse_events import build_protocol_error
-from knowledge.workspace import get_workspace_root
+from knowledge.workspace import GUARDRAILS_FILENAME, get_workspace_root
 
 VENDOR_HEADER = "X-OpenVMan-Vendor"
 VENDOR_CHAT_ERROR = "對話暫時無法完成，請稍後再試。"
 VendorRequest = Annotated[bool, Header(alias=VENDOR_HEADER, include_in_schema=False)]
+# 廠商在角色管理頁讀寫的人設文件：個性與說話方式、工作規則。保護規則另走唯讀路由。
+VENDOR_PERSONA_DOCUMENTS = frozenset({"SOUL.md", "AGENTS.md"})
 
 
 def vendor_workspace_path(project_id: str, relative: str, area: str) -> Path:
@@ -22,12 +24,13 @@ def vendor_workspace_path(project_id: str, relative: str, area: str) -> Path:
     root = get_workspace_root(project_id).resolve()
     target = root / path
     parts = path.parts
-    is_soul = area == "soul"
     is_qa_image = area == "qa_image"
-    if is_soul:
-        permitted = parts == ("SOUL.md",) or (
-            len(parts) == 3 and parts[0] == "personas" and parts[2] == "SOUL.md"
+    if area == "persona":
+        permitted = (len(parts) == 1 and parts[0] in VENDOR_PERSONA_DOCUMENTS) or (
+            len(parts) == 3 and parts[0] == "personas" and parts[2] in VENDOR_PERSONA_DOCUMENTS
         )
+    elif area == "guardrails":
+        permitted = parts == (GUARDRAILS_FILENAME,)
     elif is_qa_image:
         permitted = len(parts) == 3 and parts[:2] == ("knowledge", ".qa_images")
     else:

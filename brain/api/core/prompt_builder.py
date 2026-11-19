@@ -14,11 +14,19 @@ from core.asr_glossary import glossary_line
 from core.pipeline import enforce_context_budget
 from infra.reflection import (
     compress_text,
+    compress_text_keeping,
     select_recent_messages,
     summarize_message_history,
 )
 from knowledge.kb_settings import memory_enabled
-from knowledge.workspace import load_core_workspace_context
+from knowledge.workspace import (
+    GUARDRAILS_CLOSE,
+    GUARDRAILS_LABEL,
+    guardrails_block,
+    load_core_workspace_context,
+    read_guardrails,
+    strip_guardrails_markers,
+)
 from tools.builtin.product_tools import product_prompt_line
 from tools.context import active_vendor_chat
 
@@ -34,6 +42,9 @@ from .prompt_templates import (
 )
 from .turn_decisions import TurnPolicy
 
+
+# 組 system prompt 時保護規則的位置；用物件辨識，避免和任何文字內容撞在一起。
+GUARDRAILS_SLOT = object()
 
 # Workspace blocks injected into the system prompt, ordered by priority.
 # Each entry: (label used in prompt, config attribute for char budget).
@@ -88,6 +99,9 @@ def build_chat_messages(
         for label, budget_attr in _WORKSPACE_BLOCK_CONFIG
         if include_memory or label != "MEMORY"
     ]
+    # 保護規則接在人設之後：廠商改得到 SOUL／AGENTS，衝突時要以這份為準。每個專案固定，
+    # 放在快取範圍內不影響命中；整份照放，長度在存檔時限制。
+    guardrails = guardrails_block(read_guardrails(project_id))
 
     recall_block = _build_recall_block(
         cfg=cfg,
@@ -120,32 +134,36 @@ def build_chat_messages(
     # 固定的在前、每輪會變的在後：Gemini 隱式快取只認完全相同的開頭。原本 REQUEST
     # CONTEXT（trace_id、精確到秒的時間）夾在人設與回答規則中間、自動回憶插在人設
     # 前面，近 3 天只有 25% 輸入 tokens 命中快取。
+    blocks = [
+        "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。",
+        tool_instructions,
+        product_prompt_line(project_id) if allow_tools and not vendor else "",
+        *workspace_blocks,
+        GUARDRAILS_SLOT,
+        answer_rules,
+        supported_languages_line(project_id),
+        glossary_line(project_id),
+        recall_block,
+        _format_request_context(request_context),
+        history_summary,
+        reply_language_line(
+            project_id, user_message, _speech_language(request_context),
+            resolved_language=turn_policy.response_language if turn_policy else None,
+            preferred_language=preferred_language or "",
+        ),
+        _tone_delivery_line(turn_policy.tone if turn_policy else None),
+        _previous_picture_line(turn_policy, session_messages),
+        _turn_retrieval_line(turn_policy, include_memory=include_memory),
+    ]
+    # 保護規則以外的內容（人設、記憶、對話摘要等）都可能被廠商或使用者寫進同名標籤，先拿掉。
     system_prompt = "\n\n".join(
-
-        block
-        for block in [
-            "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。",
-            tool_instructions,
-            product_prompt_line(project_id) if allow_tools and not vendor else "",
-            *workspace_blocks,
-            answer_rules,
-            supported_languages_line(project_id),
-            glossary_line(project_id),
-            recall_block,
-            _format_request_context(request_context),
-            history_summary,
-            reply_language_line(
-                project_id, user_message, _speech_language(request_context),
-                resolved_language=turn_policy.response_language if turn_policy else None,
-                preferred_language=preferred_language or "",
-            ),
-            _tone_delivery_line(turn_policy.tone if turn_policy else None),
-            _previous_picture_line(turn_policy, session_messages),
-            _turn_retrieval_line(turn_policy, include_memory=include_memory),
-        ]
-        if block
+        (guardrails if block is GUARDRAILS_SLOT else strip_guardrails_markers(block))
+        for block in blocks
+        if block and (block is not GUARDRAILS_SLOT or guardrails)
     )
-    system_prompt = compress_text(system_prompt, cfg.prompt_system_char_budget)
+    system_prompt = compress_text_keeping(
+        system_prompt, cfg.prompt_system_char_budget, GUARDRAILS_LABEL, GUARDRAILS_CLOSE,
+    )
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(select_recent_messages(session_messages))

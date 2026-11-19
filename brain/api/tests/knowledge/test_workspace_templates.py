@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import pytest
 
-from knowledge.workspace import WORKSPACE_TEMPLATES
+from knowledge.workspace import NEW_PROJECT_TEMPLATES, WORKSPACE_TEMPLATES
 
 
 @pytest.mark.parametrize("fabricated", [
     "星耀科技", "StarTech", "陳經理", "get_customer_profile", "create_appointment",
 ])
 def test_templates_invent_no_company_or_tools(fabricated):
-    for name, template in WORKSPACE_TEMPLATES.items():
+    for name, template in (*WORKSPACE_TEMPLATES.items(), *NEW_PROJECT_TEMPLATES.items()):
         assert fabricated not in template, name
 
 
@@ -23,10 +23,12 @@ def test_templates_invent_no_company_or_tools(fabricated):
 def test_persona_template_names_no_customer(identifying):
     for name in ("SOUL.md", "AGENTS.md", "TOOLS.md", "MEMORY.md"):
         assert identifying not in WORKSPACE_TEMPLATES[name], name
+    for name, template in NEW_PROJECT_TEMPLATES.items():
+        assert identifying not in template, name
 
 
 def test_persona_template_leaves_reply_language_to_the_system():
     # 寫死「必須使用繁體中文，禁止其他語言」會蓋掉每輪指定的回答語言與分流設定。
-    soul = WORKSPACE_TEMPLATES["SOUL.md"]
-    assert "依本輪系統指定的回覆語言" in soul
-    assert "禁止英文" not in soul
+    for soul in (WORKSPACE_TEMPLATES["SOUL.md"], NEW_PROJECT_TEMPLATES["SOUL.md"]):
+        assert "依本輪系統指定的回覆語言" in soul
+        assert "禁止英文" not in soul

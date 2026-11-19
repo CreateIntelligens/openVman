@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from infra.reflection import compress_text
+from infra.reflection import compress_text_keeping
 from protocol.message_envelope import BrainMessage, METADATA_ORIGINAL_USER_MESSAGE
 
 logger = logging.getLogger(__name__)
@@ -128,9 +128,14 @@ def _compress_system(
 
     non_system_cost = sum(_message_chars(message) for message in messages[1:])
     system_budget = max(budget - non_system_cost, 0)
-    compressed_content = compress_text(
+    from knowledge.workspace import GUARDRAILS_CLOSE, GUARDRAILS_LABEL
+
+    # 使用者訊息很長時也不能切到保護規則。
+    compressed_content = compress_text_keeping(
         str(messages[0].get("content", "")),
         system_budget,
+        GUARDRAILS_LABEL,
+        GUARDRAILS_CLOSE,
     )
 
     return [

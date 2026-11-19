@@ -27,16 +27,22 @@ vi.mock("../api", () => ({
   fetchAvatarCharacters: vi.fn().mockResolvedValue({ characters: [] }),
   fetchKnowledgeDocument: vi.fn(async (path: string) => ({ path, content: `內容：${path}` })),
   fetchPersonas: vi.fn(async () => ({ personas: PERSONAS })),
+  fetchPersonaSoul: vi.fn(async () => ({ content: "# 預設\n\n## 角色設定\n\n小V" })),
+  fetchPersonaAgents: vi.fn(async () => ({ content: "工作規則", exists: true })),
+  fetchGuardrails: vi.fn(async () => ({ content: "## 範圍限制\n\n不越權" })),
+  fetchProjectKnowledgeSettings: vi.fn(async () => ({ language_routes: ["zh"], reply_seconds: 20 })),
   saveKnowledgeDocument: vi.fn().mockResolvedValue({ status: "ok" }),
   setPersonaAvatar: vi.fn().mockResolvedValue({ status: "ok" }),
 }));
 
+// 這些測試針對原始文件模式（四個分頁直接編輯）；內部帳號預設是表格模式，先切過去。
 function renderPage() {
   render(
     <NavigationGuardProvider>
       <Personas />
     </NavigationGuardProvider>,
   );
+  return screen.findByRole("button", { name: "原始文件" }).then((button) => fireEvent.click(button));
 }
 
 async function editor(title: string) {
@@ -56,7 +62,7 @@ describe("Personas unsaved changes", () => {
       status: "ok",
       persona: { persona_id: "persona-x", label: "客服小幫手", path: "personas/persona-x/SOUL.md", preview: "", is_default: false, avatar_char_id: null },
     } as Awaited<ReturnType<typeof createPersona>>);
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByRole("button", { name: /個性與說話方式/ })).toBeTruthy();
     expect(screen.queryByText("SOUL.md")).toBeNull();
@@ -71,7 +77,7 @@ describe("Personas unsaved changes", () => {
   });
 
   it("asks before switching persona and keeps the draft when the user stays", async () => {
-    renderPage();
+    await renderPage();
     const draft = await editor("預設");
     await waitFor(() => expect(draft.value).toBe("內容：SOUL.md"));
     fireEvent.change(draft, { target: { value: "還沒存的修改" } });
@@ -92,7 +98,7 @@ describe("Personas unsaved changes", () => {
   });
 
   it("keeps the phone drawer open when the user stays, closes it after switching", async () => {
-    renderPage();
+    await renderPage();
     const draft = await editor("預設");
     await waitFor(() => expect(draft.value).toBe("內容：SOUL.md"));
     fireEvent.change(draft, { target: { value: "還沒存的修改" } });
@@ -112,7 +118,7 @@ describe("Personas unsaved changes", () => {
   });
 
   it("asks before switching document tabs with unsaved edits", async () => {
-    renderPage();
+    await renderPage();
     const draft = await editor("預設");
     await waitFor(() => expect(draft.value).toBe("內容：SOUL.md"));
     fireEvent.change(draft, { target: { value: "還沒存的修改" } });
@@ -123,7 +129,7 @@ describe("Personas unsaved changes", () => {
   });
 
   it("stays on AGENTS.md after saving it instead of jumping back to SOUL.md", async () => {
-    renderPage();
+    await renderPage();
     await waitFor(() => expect(opened()).toEqual(["SOUL.md"]));
     fireEvent.click(screen.getByRole("button", { name: /工作規則/ }));
     const draft = await editor("預設");
@@ -138,7 +144,7 @@ describe("Personas unsaved changes", () => {
   });
 
   it("opens the first persona after deleting the selected one", async () => {
-    renderPage();
+    await renderPage();
     const switcher = await screen.findByRole("combobox", { name: "切換角色" });
     await waitFor(() => expect(opened()).toEqual(["SOUL.md"]));
     fireEvent.change(switcher, { target: { value: "nurse" } });

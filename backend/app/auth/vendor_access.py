@@ -16,7 +16,7 @@ KNOWLEDGE_DOCUMENT_ROUTES = {
 
 _GET = frozenset({
     "/auth/me", "/auth/admin-me", "/projects", "/uploads/limits",
-    "/personas", "/personas/soul",
+    "/personas", "/personas/soul", "/personas/agents", "/personas/guardrails",
     "/chat/history", "/chat/modes", "/sessions", "/sessions/export",
     "/knowledge/base/documents", "/knowledge/base/document", "/knowledge/qa",
     "/knowledge/qa/questions", "/knowledge/qa/nodes", "/knowledge/settings",
@@ -31,7 +31,10 @@ _POST = frozenset({
     "/knowledge/qa/nodes", "/knowledge/qa/nodes/adopt-source",
     "/knowledge/qa/images",
 })
-_PUT = frozenset({"/personas/soul", "/knowledge/base/document", "/knowledge/settings"})
+# 廠商可改個性與說話方式（SOUL.md）與工作規則（AGENTS.md）；保護規則只讀。
+_PUT = frozenset({
+    "/personas/soul", "/personas/agents", "/knowledge/base/document", "/knowledge/settings",
+})
 _DELETE = frozenset({
     "/knowledge/base/document", "/knowledge/base/directory", "/knowledge/raw/pending",
 })

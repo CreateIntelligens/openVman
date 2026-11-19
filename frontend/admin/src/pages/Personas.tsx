@@ -6,11 +6,9 @@ import {
        deletePersona,
        fetchAvatarCharacters,
        fetchPersonas,
-       fetchPersonaSoul,
        fetchKnowledgeDocument,
        PersonaSummary,
        saveKnowledgeDocument,
-       savePersonaSoul,
        setPersonaAvatar,
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
@@ -20,6 +18,8 @@ import Select from "../components/Select";
 import PersonaCreateForm from "../components/personas/PersonaCreateForm";
 import PersonaEditor from "../components/personas/PersonaEditor";
 import PersonaEmptyState from "../components/personas/PersonaEmptyState";
+import PersonaForm from "../components/personas/PersonaForm";
+import SegmentedControl from "../components/SegmentedControl";
 import PersonaList from "../components/personas/PersonaList";
 import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
 import { useAuth } from "../context/AuthContext";
@@ -31,6 +31,13 @@ import { generateAssetId } from "../utils/generateAssetId";
 
 type EditorMode = "edit" | "preview" | "split";
 const EDITOR_MODES: readonly EditorMode[] = ["edit", "split", "preview"];
+// 表格模式只露出人設欄位；原始文件模式是四份文件直接編輯，只給內部帳號。
+type ViewMode = "form" | "document";
+const VIEW_MODES: readonly ViewMode[] = ["form", "document"];
+const VIEW_MODE_OPTIONS: Array<{ id: ViewMode; label: string }> = [
+       { id: "form", label: "表格" },
+       { id: "document", label: "原始文件" },
+];
 type Status = { type: "success" | "error"; message: string } | null;
 type AvatarBindingOption = Pick<AvatarCharacter, "char_id" | "label">;
 
@@ -60,8 +67,14 @@ export default function Personas() {
        const { projectId, projects } = useProject();
        const { account } = useAuth();
        const vendor = Boolean(account && isVendorUser(account));
-       const readOnly = vendor && projects?.find((project) => project.project_id === projectId)?.can_edit_knowledge !== true;
-       const pageTitle = vendor ? "人設" : "角色管理";
+       const project = projects?.find((item) => item.project_id === projectId);
+       // 廠商要明確授權才可改；內部帳號以 Backend 回報的權限為準（舊版沒回報時照舊可改，寫入仍由後端把關）。
+       const canEditKnowledge = vendor
+              ? project?.can_edit_knowledge === true
+              : project?.can_edit_knowledge !== false;
+       const readOnly = !canEditKnowledge;
+       const canEditGuardrails = !vendor && project?.can_edit_features === true;
+       const pageTitle = "角色管理";
        const [personas, setPersonas] = useState<PersonaSummary[]>([]);
        const [newPersonaId, setNewPersonaId] = useState("");
        const [newPersonaLabel, setNewPersonaLabel] = useState("");
@@ -90,6 +103,12 @@ export default function Personas() {
               EDITOR_MODES,
        );
        const [deletePersonaTarget, setDeletePersonaTarget] = useState<PersonaSummary | null>(null);
+       const [storedViewMode, setStoredViewMode] = useLocalStorageState<ViewMode>(
+              "admin.personas.view_mode",
+              "form",
+              VIEW_MODES,
+       );
+       const viewMode: ViewMode = vendor ? "form" : storedViewMode;
 
        const hasUnsavedChanges = draftContent !== loadedContent;
        useUnsavedChanges("persona-editor", hasUnsavedChanges, "角色文件");
@@ -117,14 +136,12 @@ export default function Personas() {
               }
        };
 
-       const openDocument = async (path: string, personaId?: string) => {
+       const openDocument = async (path: string) => {
               const requestId = ++latestDocumentRequest.current;
               setLoadingDocument(true);
               setStatus(null);
               try {
-                     const response = personaId
-                            ? { ...await fetchPersonaSoul(personaId), path }
-                            : await fetchKnowledgeDocument(path);
+                     const response = await fetchKnowledgeDocument(path);
                      if (requestId !== latestDocumentRequest.current) return;
                      setSelectedPath(response.path);
                      setDraftContent(response.content);
@@ -140,16 +157,10 @@ export default function Personas() {
 
        const personaDrawer = useMobileTreeDrawer("關閉角色清單");
 
-       const openPersona = async (persona: PersonaSummary | null) => {
+       const openPersona = async (persona: PersonaSummary | null, mode: ViewMode = viewMode) => {
               setSelectedPersona(persona);
-              if (vendor && persona) {
-                     setSelectedPath("");
-                     setDraftContent("");
-                     setLoadedContent("");
-                     await openDocument("SOUL.md", persona.persona_id);
-                     return;
-              }
-              if (persona?.path) {
+              // 表格模式自己讀文件；原始文件的編輯器只在切過去時才載入。
+              if (mode === "document" && persona?.path) {
                      await openDocument(persona.path);
                      return;
               }
@@ -170,7 +181,7 @@ export default function Personas() {
        };
 
        const selectDocument = (path: string) => {
-              if (vendor || path === selectedPath) return;
+              if (path === selectedPath) return;
               requestNavigation(() => void openDocument(path));
        };
 
@@ -182,11 +193,7 @@ export default function Personas() {
               setStatus(null);
 
               try {
-                     if (vendor && selectedPersona) {
-                            await savePersonaSoul(selectedPersona.persona_id, draftContent);
-                     } else {
-                            await saveKnowledgeDocument(selectedPath, draftContent);
-                     }
+                     await saveKnowledgeDocument(selectedPath, draftContent);
                      if (requestId !== latestDocumentRequest.current) return;
                      setStatus({ type: "success", message: `已儲存「${personaDocLabel(selectedPath)}」` });
                      setLoadedContent(draftContent);
@@ -196,6 +203,15 @@ export default function Personas() {
               } finally {
                      setSaving(false);
               }
+       };
+
+       const changeViewMode = (next: ViewMode) => {
+              if (next === viewMode) return;
+              requestNavigation(() => {
+                     setStatus(null);
+                     setStoredViewMode(next);
+                     void openPersona(selectedPersona, next);
+              });
        };
 
        const openCreatedPersona = async (personaId: string) => {
@@ -441,6 +457,22 @@ export default function Personas() {
                                           </>
                                    )}
                             />
+                            {!vendor && selectedPersona && (
+                                   <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-4 py-3 lg:px-8">
+                                          <span className="text-sm text-content-muted">顯示方式</span>
+                                          <SegmentedControl
+                                                 label="顯示方式"
+                                                 options={VIEW_MODE_OPTIONS}
+                                                 value={viewMode}
+                                                 onChange={changeViewMode}
+                                          />
+                                          <span className="text-sm text-content-subtle">
+                                                 {viewMode === "form"
+                                                        ? "依欄位填寫人設，不顯示工具說明和長期記憶。"
+                                                        : "直接編輯整份文件，包含工具說明和長期記憶。"}
+                                          </span>
+                                   </div>
+                            )}
                             {status && (
                                    <div className="p-4 shrink-0 shadow-sm z-20 border-b border-border ">
                                           <StatusAlert type={status.type} message={status.message} />
@@ -454,12 +486,22 @@ export default function Personas() {
                                                  persona={selectedPersona}
                                                  onBind={onBindAvatar}
                                           />}
+                                          {viewMode === "form" ? (
+                                          <PersonaForm
+                                                 key={`${projectId}:${selectedPersona.persona_id}`}
+                                                 persona={selectedPersona}
+                                                 projectId={projectId}
+                                                 canEditKnowledge={canEditKnowledge}
+                                                 canEditGuardrails={canEditGuardrails}
+                                                 onSaved={() => void loadPersonas(selectedPersona.persona_id)}
+                                          />
+                                          ) : (
                                           <PersonaEditor
                                                  title={selectedPersona.label || selectedPersona.persona_id}
                                                  selectedPath={selectedPath}
                                                  draftContent={draftContent}
-                                                 coreDocs={vendor ? coreDocs.slice(0, 1) : coreDocs}
-                                                 readOnly={readOnly || (vendor && !selectedPath)}
+                                                 coreDocs={coreDocs}
+                                                 readOnly={readOnly}
                                                  editorMode={editorMode}
                                                  loadingDocument={loadingDocument}
                                                  saving={saving}
@@ -470,6 +512,7 @@ export default function Personas() {
                                                  onDiscard={() => setDraftContent(loadedContent)}
                                                  onSave={saveDocument}
                                           />
+                                          )}
                                    </>
                             ) : <PersonaEmptyState />}
                      </main>

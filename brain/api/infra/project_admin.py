@@ -49,7 +49,7 @@ def create_project(label: str) -> dict[str, Any]:
     from knowledge.workspace import ensure_workspace_scaffold
 
     save_project_features(pid, memory_enabled=False, graph_enabled=False)
-    ensure_workspace_scaffold(project_id=pid)
+    ensure_workspace_scaffold(project_id=pid, new_project=True)
     ensure_tables(project_id=pid)
 
     # Write a project metadata label file

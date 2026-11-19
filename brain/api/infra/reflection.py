@@ -73,3 +73,31 @@ def compress_text(text: str, max_chars: int) -> str:
     head = max_chars // 2
     tail = max_chars - head - 7
     return f"{normalized[:head]} ... {normalized[-tail:]}"
+
+
+def compress_text_keeping(text: str, max_chars: int, start: str, end: str) -> str:
+    """Like ``compress_text``, but the span from ``start`` to ``end`` is never cut.
+
+    保護規則夾在 system prompt 中段；整段壓縮保留頭尾會把它切掉，所以先把它拿出來，
+    其餘內容依原本比例分配剩下的字數。只剩它放得下時就只留它。
+    """
+    normalized = " ".join(text.split())
+    if len(normalized) <= max_chars:
+        return normalized
+    begin = normalized.find(start)
+    finish = normalized.find(end, begin) if begin >= 0 else -1
+    if begin < 0 or finish < 0:
+        return compress_text(normalized, max_chars)
+    finish += len(end)
+    kept = normalized[begin:finish]
+    before, after = normalized[:begin].strip(), normalized[finish:].strip()
+    room = max_chars - len(kept) - 2
+    if room <= 0 or not (before or after):
+        return kept
+    before_room = room * len(before) // (len(before) + len(after))
+    parts = (
+        compress_text(before, before_room) if before_room > 0 else "",
+        kept,
+        compress_text(after, room - before_room) if room - before_room > 0 else "",
+    )
+    return " ".join(part for part in parts if part)

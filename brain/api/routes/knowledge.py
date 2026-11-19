@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 from typing import Annotated, Any
 
@@ -233,15 +232,43 @@ def _require_directory_write(granted: str, path: str, project_id: str) -> None:
 
 
 def _check_workspace_document_write(
-    granted: str, path: str, project_id: str,
+    granted: str, path: str, project_id: str, content: str | None = None,
 ) -> str:
     relative = _document_path(path, project_id)
     _require_workspace_write(granted, relative)
+    _check_guardrails_write(path, relative, project_id, content)
     return relative
 
 
+def _check_guardrails_write(
+    requested: str, relative: str, project_id: str, content: str | None,
+) -> None:
+    """Refuse guardrails that are links or too long to go into the prompt whole."""
+    from posixpath import normpath
+
+    from knowledge.workspace import (
+        GUARDRAILS_FILENAME,
+        GUARDRAILS_MAX_CHARS,
+        guardrails_link_problem,
+    )
+
+    if normpath(requested.strip()) == GUARDRAILS_FILENAME and guardrails_link_problem(project_id):
+        # 連結會把內容寫到連結目標；提示詞也不採用連結，請專人先換成一般檔案。
+        raise HTTPException(
+            status_code=409,
+            detail="保護規則檔案是連結，AI 不會採用，也不能從這裡修改；請技術人員先換成一般檔案。",
+        )
+    if relative == GUARDRAILS_FILENAME and content is not None and len(content) > GUARDRAILS_MAX_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"保護規則最多 {GUARDRAILS_MAX_CHARS} 字，現在有 {len(content)} 字，請精簡後再存。",
+        )
+
+
 def _content_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    from knowledge.workspace import content_hash
+
+    return content_hash(text)
 
 
 @router.get("/knowledge/document", summary="讀取單一知識文件")
@@ -273,7 +300,7 @@ async def save_knowledge_document_route(
             if vendor:
                 vendor_workspace_path(payload.project_id, payload.path, "knowledge")
             path = _check_workspace_document_write(
-                project_writes, payload.path, payload.project_id,
+                project_writes, payload.path, payload.project_id, payload.content,
             )
             if payload.base_hash:
                 try:
@@ -422,6 +449,9 @@ async def move_knowledge_document_route(
             source = _document_path(payload.source_path, payload.project_id)
             target = _document_path(payload.target_path, payload.project_id)
             _require_workspace_write(project_writes, source, target)
+            if target == "GUARDRAILS.md" or payload.target_path.strip() == "GUARDRAILS.md":
+                moved = read_workspace_document(source, payload.project_id).get("content", "")
+                _check_guardrails_write(payload.target_path, target, payload.project_id, moved)
             is_qa = is_qa_document(source, payload.project_id)
             try:
                 document = move_workspace_document(source, target, payload.project_id)
@@ -534,7 +564,7 @@ async def apply_renormalize_knowledge_document_route(
     pid = payload.project_id
     _assert_not_qa_document(payload.path, pid)
     try:
-        path = _check_workspace_document_write(project_writes, payload.path, pid)
+        path = _check_workspace_document_write(project_writes, payload.path, pid, payload.content)
         document = await asyncio.to_thread(
             apply_workspace_document_normalization, path, payload.content, pid
         )

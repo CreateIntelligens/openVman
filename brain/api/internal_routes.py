@@ -151,7 +151,12 @@ def _build_live_system_instruction(
         primary_language_line,
         supported_languages_line,
     )
-    from knowledge.workspace import load_core_workspace_context
+    from knowledge.workspace import (
+        guardrails_block,
+        load_core_workspace_context,
+        read_guardrails,
+        strip_guardrails_markers,
+    )
 
     blocks: list[str] = []
 
@@ -165,10 +170,7 @@ def _build_live_system_instruction(
             blocks.append(soul)
     except Exception:
         logger.warning("Failed to load workspace context for live system instruction", exc_info=True)
-
     history_block = _build_history_context(session_id, persona_id, project_id)
-    if history_block:
-        blocks.append(history_block)
 
     rules_start = (
         "工具使用規則（重要）：\n"
@@ -193,19 +195,29 @@ def _build_live_system_instruction(
         primary_language_line(project_id),
     )
 
-    # 重連套用新開關時沿用 relay 初始化時的歷史，避免把當前問題再放進提示。
     @lru_cache(maxsize=1)
-    def render(include_memory: bool) -> str:
-        memory_block = ""
+    def memory_part(include_memory: bool) -> tuple[str, str]:
         memory_rule = "" if vendor else "2. 長期記憶已關閉，可以使用目前的對話紀錄。\n"
         # 廠商的對話測試不帶長期記憶，也不提記憶工具。
         if include_memory and not vendor:
-            memory_block = _build_memory_context(persona_id, project_id)
-            memory_rule = "2. 提到過去對話、偏好或可能曾經告知的個人資訊時，呼叫 search_memory。\n"
+            return (
+                _build_memory_context(persona_id, project_id),
+                "2. 提到過去對話、偏好或可能曾經告知的個人資訊時，呼叫 search_memory。\n",
+            )
+        return "", memory_rule
+
+    # 重連套用新開關時沿用 relay 初始化時的人設與歷史，避免把當前問題再放進提示；
+    # 保護規則每次組 setup 都重新讀，連線中改了規則，下一次重連就生效。
+    def render(include_memory: bool) -> str:
+        memory_block, memory_rule = memory_part(include_memory)
+        # 人設、歷史與記憶裡的同名標籤先拿掉，只有真的保護規則用 <guardrails> 包起來。
+        context = [strip_guardrails_markers(block) for block in (*blocks,)]
+        context.append(guardrails_block(read_guardrails(project_id)))
+        context.extend(strip_guardrails_markers(block) for block in (history_block, memory_block))
         return (
             "你是 openVman Brain 的對話核心。以下是你的角色設定和上下文，請在即時語音對話中遵守。\n\n"
             + "\n\n".join(filter(None, (
-                *blocks, memory_block, rules_start + memory_rule + other_tools + rules_end, *languages,
+                *context, rules_start + memory_rule + other_tools + rules_end, *languages,
             )))
         )
 

@@ -120,10 +120,17 @@ export async function fetchKnowledgeDocument(path: string, vendor = false) {
   return get<KnowledgeDocument>(knowledgeDocumentPath("/document", vendor), { path });
 }
 
-export function saveKnowledgeDocument(path: string, content: string, baseHash?: string, vendor = false) {
+export function saveKnowledgeDocument(
+  path: string, content: string, baseHash?: string, vendor = false, projectId?: string,
+) {
   return put<{ status: string; document: KnowledgeDocumentSummary }>(
     knowledgeDocumentPath("/document", vendor),
-    { path, content, project_id: getActiveProjectId(), ...(baseHash ? { base_hash: baseHash } : {}) },
+    {
+      path,
+      content,
+      project_id: projectId ?? getActiveProjectId(),
+      ...(baseHash ? { base_hash: baseHash } : {}),
+    },
   );
 }
 
@@ -431,6 +438,14 @@ export function saveKnowledgeSettings(settings: KnowledgeSettings) {
   return put<KnowledgeSettings>(knowledgePath("/settings"), {
     project_id: getActiveProjectId(),
     ...settings,
+  });
+}
+
+/** 只改回答長度；語言分流不帶，Brain 保留原本的設定。 */
+export function saveReplySeconds(projectId: string, replySeconds: number) {
+  return put<KnowledgeSettings>(knowledgePath("/settings"), {
+    project_id: projectId,
+    reply_seconds: replySeconds,
   });
 }
 
