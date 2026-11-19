@@ -431,14 +431,14 @@ export default function QuestionBank({
           </div>
           <div className="flex flex-wrap gap-2">
             <label className="flex min-w-0 items-center gap-2 text-sm text-content-muted">
-              狀態
+              <span className="shrink-0 whitespace-nowrap">狀態</span>
               <select className="input min-w-0" value={state} onChange={(event) => { setState(event.target.value); setShown(PAGE_SIZE); setSelected(new Set()); }}>
                 <option value="">全部狀態</option>
                 {facets.state.map((option) => <option key={option.value} value={option.value}>{option.label}（{option.count}）</option>)}
               </select>
             </label>
             <label className="flex min-w-0 items-center gap-2 text-sm text-content-muted">
-              來源
+              <span className="shrink-0 whitespace-nowrap">來源</span>
               <select className="input min-w-0" value={source} onChange={(event) => { setSource(event.target.value); setShown(PAGE_SIZE); setSelected(new Set()); }}>
                 <option value="">全部來源</option>
                 {facets.source.map((option) => (
