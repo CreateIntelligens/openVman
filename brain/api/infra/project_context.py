@@ -121,23 +121,24 @@ def get_project_db(ctx: ProjectContext) -> Any:
 # Per-project SessionStore cache
 # ---------------------------------------------------------------------------
 
-_session_store_cache: dict[str, Any] = {}
+_session_store_cache: dict[Path, Any] = {}
 _session_store_lock = Lock()
 
 
 def get_project_session_store(ctx: ProjectContext):
     """Return a cached SessionStore for the given project."""
-    if ctx.project_id in _session_store_cache:
-        return _session_store_cache[ctx.project_id]
+    path = ctx.session_db_path
+    if path in _session_store_cache:
+        return _session_store_cache[path]
 
     with _session_store_lock:
-        if ctx.project_id in _session_store_cache:
-            return _session_store_cache[ctx.project_id]
+        if path in _session_store_cache:
+            return _session_store_cache[path]
 
         from memory.session_store import SessionStore
 
-        store = SessionStore(db_path=str(ctx.session_db_path))
-        _session_store_cache[ctx.project_id] = store
+        store = SessionStore(db_path=str(path))
+        _session_store_cache[path] = store
         return store
 
 

@@ -17,6 +17,7 @@ def _ctx(**over):
     return chat_service.GenerationContext(**base)
 
 
+@pytest.mark.usefixtures("default_project_memory")
 def test_ephemeral_skips_user_message_but_persists_reply():
     appended = []
 
@@ -38,6 +39,7 @@ def test_ephemeral_skips_user_message_but_persists_reply():
     mock_archive.assert_not_called()
 
 
+@pytest.mark.usefixtures("default_project_memory")
 def test_non_ephemeral_persists_both():
     appended = []
 

@@ -18,7 +18,7 @@ from safety.internal_auth import require_internal_token
 
 
 @pytest.fixture
-def delivery(tmp_path, monkeypatch):
+def delivery(tmp_path, monkeypatch, default_project_memory):
     store = SessionStore(str(tmp_path / "sessions.db"))
     monkeypatch.setattr(memory, "get_session_store", lambda _: store)
     monkeypatch.setattr(memory, "_primary_language", lambda _: "zh")

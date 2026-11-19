@@ -256,6 +256,10 @@ def test_speech_language_controls_retrieval_but_explicit_language_controls_reply
 
 
 def test_failed_provider_chain_builds_baseline_and_never_raises(monkeypatch):
+    from knowledge.kb_settings import save_project_features
+
+    save_project_features("p1", memory_enabled=True)
+
     def unavailable(*args, **kwargs):
         raise decision_router.DecisionProviderError("all providers failed")
 

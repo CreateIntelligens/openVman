@@ -44,9 +44,11 @@ def create_project(label: str) -> dict[str, Any]:
     pid = _next_available_project_id(generate_project_id(clean_label))
     ctx = resolve_project_context(pid)
 
-    from knowledge.workspace import ensure_workspace_scaffold
     from infra.db import ensure_tables
+    from knowledge.kb_settings import save_project_features
+    from knowledge.workspace import ensure_workspace_scaffold
 
+    save_project_features(pid, memory_enabled=False, graph_enabled=False)
     ensure_workspace_scaffold(project_id=pid)
     ensure_tables(project_id=pid)
 

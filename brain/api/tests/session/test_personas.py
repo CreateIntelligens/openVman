@@ -168,6 +168,7 @@ def test_session_store_rejects_persona_mismatch(monkeypatch: pytest.MonkeyPatch,
         store.get_or_create_session("same-session", "doctor")
 
 
+@pytest.mark.usefixtures("default_project_memory")
 def test_archive_session_turn_writes_into_persona_subdirectory(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

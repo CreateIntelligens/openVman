@@ -6,6 +6,16 @@ from typing import Any
 
 VENDOR_KNOWLEDGE_TOOLS = frozenset({"search_knowledge", "get_document"})
 active_vendor_chat: ContextVar[bool] = ContextVar("brain_active_vendor_chat", default=False)
+MEMORY_TOOLS = frozenset({"search_memory", "save_memory"})
+GRAPH_TOOLS = frozenset({"graph_query", "graph_explain", "graph_status", "graphify:run"})
+
+
+def is_graph_tool(name: str) -> bool:
+    return name in GRAPH_TOOLS or (
+        name.startswith("proj:") and name.split(":", 2)[2:] == ["graphify:run"]
+    )
+
+
 active_persona_id: ContextVar[str] = ContextVar("brain_active_persona_id", default="default")
 active_project_id: ContextVar[str] = ContextVar("brain_active_project_id", default="default")
 active_user_message: ContextVar[str] = ContextVar("brain_active_user_message", default="")

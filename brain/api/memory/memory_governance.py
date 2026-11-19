@@ -24,6 +24,7 @@ from infra.db import (
     resolve_vector_table_name,
 )
 from infra.file_lock import atomic_write_text, file_lock
+from knowledge.kb_settings import memory_enabled
 from knowledge.workspace import (
     ensure_workspace_scaffold,
     get_archive_paths,
@@ -67,6 +68,8 @@ def maybe_run_memory_maintenance(force: bool = False, project_id: str = "default
     cfg = get_settings()
     if cfg.brain_role == "chat":
         return {"status": "skipped", "reason": "chat_role"}
+    if not memory_enabled(project_id):
+        return {"status": "skipped", "reason": "memory_disabled"}
     now = monotonic()
 
     with _project_lock(project_id):
@@ -84,7 +87,7 @@ def request_memory_maintenance(project_id: str = "default") -> bool:
     Returns True when this call ran it. A request that arrives during a run is
     picked up by that run's owner once it finishes, so nothing is lost.
     """
-    if get_settings().brain_role == "chat":
+    if get_settings().brain_role == "chat" or not memory_enabled(project_id):
         return False
     lock = _project_lock(project_id)
     with _state_lock:
@@ -110,6 +113,8 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
     """Summarize archived logs and rewrite the memories table without duplicates."""
     if get_settings().brain_role == "chat":
         return {"status": "skipped", "reason": "chat_role"}
+    if not memory_enabled(project_id):
+        return {"status": "skipped", "reason": "memory_disabled"}
     with memory_table_lock(project_id):
         return _run_memory_maintenance_locked(project_id)
 
@@ -223,6 +228,8 @@ def write_summary_and_reindex(
     Returns a status dict with writeback and reindex results.
     Skips writeback if the same fingerprint already exists for (persona_id, day).
     """
+    if not memory_enabled(project_id):
+        return {"status": "skipped", "reason": "memory_disabled"}
     ensure_workspace_scaffold(project_id)
     fingerprint = hashlib.sha256(summary_text.encode("utf-8")).hexdigest()
     normalized_persona = normalize_persona_id(persona_id)

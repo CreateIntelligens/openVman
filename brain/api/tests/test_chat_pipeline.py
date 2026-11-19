@@ -279,6 +279,7 @@ def test_build_chat_messages_omits_tool_instructions_for_direct_route(
     assert "save_memory" not in system_prompt
 
 
+@pytest.mark.usefixtures("default_project_memory")
 def test_build_chat_messages_includes_tool_instructions_for_tool_route(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

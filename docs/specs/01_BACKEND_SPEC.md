@@ -88,6 +88,9 @@ ROOT 可管理所有專案、授予帳號管理旗標及調整角色。此段以
 | 操作 | 所需專案權限 |
 | --- | --- |
 | 知識庫與問答、文件匯入及人設寫入 | 改知識庫與人設 |
+| 更新語言分流與回答秒數（`PUT /api/v1/knowledge/settings`） | 改知識庫與人設 |
+| 讀取記憶與知識圖譜擴展開關（`GET /api/v1/knowledge/settings`） | 讀 |
+| 更新記憶與知識圖譜擴展開關（`PATCH /api/v1/knowledge/features`） | 改其他設定 |
 | 技能、工具、記憶、工作區其他設定、專案資源政策與指派 | 改其他設定，另遵守各入口既有的管理層級 |
 | 對話清單、單段歷史、匯出及對話測試 | 讀 |
 | 對話單筆與批次刪除 | 改其他設定 |
@@ -111,6 +114,8 @@ Backend 依憑證所屬帳號判斷廠商身分，登入 session 與代發 API �
 - 知識庫檔案使用 `/api/v1/knowledge/base/document`（GET、PUT、DELETE）、`/base/document/meta`（PATCH）、`/base/directory`（POST、DELETE）及 `/base/move`（POST），沿用原文件操作的欄位。Backend 與 Brain 都拒絕前後帶空白的路徑。Backend 檢查路徑在 `knowledge/` 下，Brain 複核實際位置並拒絕符號連結與硬連結。清單、快速回覆、圖片、上傳與匯入也依專案及各自目錄限制。圖譜、重建索引、清理未用圖片及 AI 整理排版屬內部功能。
 - Backend 轉送前移除客戶端提供的 `X-OpenVMan-*`，以已驗證的帳號身分加上可信廠商標頭。Brain 路由仍以伺服器內部權杖驗證。
 - 專案摘要和明細提供目前帳號的 `can_edit_knowledge`，供人設頁決定可否編輯。所有寫入仍由 Backend 即時查核。
+
+`PATCH /api/v1/knowledge/features` 只接受布林開關 `memory_enabled`、`graph_enabled`，可只更新一項。Backend 先驗證目標專案及「改其他設定」權限，再自行產生 `X-OpenVMan-Project-Writes: edit_settings`，由 Brain 複核。廠商登入及代發金鑰都適用相同限制。`PUT /api/v1/knowledge/settings` 仍只更新語言分流與回答秒數。`GET /api/v1/projects` 的各專案摘要以 `can_edit_features` 反映當前帳號是否可更新開關。
 
 #### 廠商 API 回應欄位
 

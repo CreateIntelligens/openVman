@@ -7,6 +7,7 @@ export interface ProjectSummary {
   document_count: number;
   persona_count: number;
   vendor_name?: string | null;
+  can_edit_features?: boolean;
   /** 部署的預設專案（DEFAULT_PROJECT_ID）；沒帶專案的請求落在這裡。 */
   is_default?: boolean;
 }

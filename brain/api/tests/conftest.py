@@ -41,6 +41,14 @@ def default_internal_token_env(monkeypatch, tmp_path):
         kw._CORE_CONTEXT_CACHE.clear()
 
 
+@pytest.fixture
+def default_project_memory(default_internal_token_env):
+    """Opt into the memory-enabled project behavior exercised by older tests."""
+    from knowledge.kb_settings import save_project_features
+
+    save_project_features("default", memory_enabled=True)
+
+
 _MOCK_TOOL_MODULES = ("tools.tool_executor", "tools.tool_registry", "tools.mock_data")
 
 

@@ -13,6 +13,7 @@ from typing import Any
 
 from config import get_settings
 from core.gemini_credentials import project_model_entry
+from knowledge.kb_settings import memory_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +323,7 @@ def run_auto_recall(
 
     try:
         config = get_settings()
-        if not config.auto_recall_enabled:
+        if not config.auto_recall_enabled or not memory_enabled(project_id):
             return _make_result(status="disabled")
 
         query = build_recall_query(

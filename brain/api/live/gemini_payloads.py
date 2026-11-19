@@ -10,6 +10,7 @@ from typing import Any
 from core.turn_decisions import TurnDecision
 
 from config import BrainSettings
+from tools.context import MEMORY_TOOLS
 
 from .gemini_tools import build_gemini_tool_declarations
 
@@ -32,6 +33,7 @@ def _supports_thinking_level(model: str) -> bool:
 
 def build_setup_message(
     config: BrainSettings, system_instruction: str, *, vendor: bool = False,
+    include_memory: bool = True,
 ) -> dict[str, Any]:
     setup: dict[str, Any] = {
         "model": f"models/{config.live_gemini_model}",
@@ -73,7 +75,10 @@ def build_setup_message(
     setup["inputAudioTranscription"] = dict(transcription)
     if config.live_gemini_tools_enabled:
         setup["tools"] = [
-            {"functionDeclarations": build_gemini_tool_declarations(vendor=vendor)}
+            {"functionDeclarations": [
+                tool for tool in build_gemini_tool_declarations(vendor=vendor)
+                if include_memory or tool["name"] not in MEMORY_TOOLS
+            ]}
         ]
 
     # Without compression Gemini Live caps a session at 15 min (audio) or

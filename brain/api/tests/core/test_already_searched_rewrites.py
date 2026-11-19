@@ -10,13 +10,10 @@ import re
 import pytest
 
 from core import agent_loop
-from core.prompt_builder import _apply_retrieval_policy_to_instructions, _turn_retrieval_line
-from core.prompt_templates import (
-    ALREADY_SEARCHED_REWRITES,
-    DEFAULT_ANSWER_RULES,
-    DEFAULT_TOOL_INSTRUCTIONS,
-)
+from core.prompt_builder import build_chat_messages
+from core.prompt_templates import ALREADY_SEARCHED_REWRITES
 from core.turn_decisions import TurnPolicy
+from knowledge.kb_settings import save_project_features
 from tools.builtin import product_tools
 
 # 叫模型去查 search_knowledge 的說法；「不要再叫」「已經查好」這類不算。
@@ -27,17 +24,20 @@ _ASKS_TO_SEARCH = re.compile(
 )
 
 
-def _system_for(policy: TurnPolicy | None) -> str:
-    tools, rules = DEFAULT_TOOL_INSTRUCTIONS, DEFAULT_ANSWER_RULES
-    if policy is not None:
-        tools, rules = _apply_retrieval_policy_to_instructions(tools, rules, policy)
-    return "\n".join([tools, rules, _turn_retrieval_line(policy), product_tools._PROMPT_LINE])
+def _system_for(needs_knowledge: bool | None, memory_enabled: bool = True) -> str:
+    save_project_features("default", memory_enabled=memory_enabled)
+    messages = build_chat_messages(
+        "產品規格是什麼？",
+        {"project_id": "default"},
+        [],
+        turn_policy=TurnPolicy(needs_knowledge=needs_knowledge, auto_recall=False),
+    )
+    return "\n".join([messages[0]["content"], product_tools._PROMPT_LINE])
 
 
 @pytest.mark.parametrize("needs_knowledge", [True, False, None])
 def test_rewritten_prompt_no_longer_asks_for_the_search(needs_knowledge):
-    policy = TurnPolicy(needs_knowledge=needs_knowledge)
-    system = _system_for(policy)
+    system = _system_for(needs_knowledge)
     assert _ASKS_TO_SEARCH.search(system), "前提：原本的提示確實要求先查"
 
     messages = [{"role": "system", "content": system}]
@@ -49,6 +49,10 @@ def test_rewritten_prompt_no_longer_asks_for_the_search(needs_knowledge):
 
 
 def test_every_rewrite_still_matches_a_real_prompt_sentence():
-    texts = [_system_for(TurnPolicy(needs_knowledge=value)) for value in (True, False, None)]
+    texts = [
+        _system_for(needs_knowledge, memory_enabled)
+        for needs_knowledge in (True, False, None)
+        for memory_enabled in (True, False)
+    ]
     for before, _ in (*ALREADY_SEARCHED_REWRITES, *product_tools.ALREADY_SEARCHED_REWRITES):
         assert any(before in text for text in texts), f"改寫表的原句已經不在提示裡：{before!r}"

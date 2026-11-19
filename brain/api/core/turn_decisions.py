@@ -15,6 +15,7 @@ from core.decision_router import (
     DecisionResult,
     decide,
 )
+from knowledge.kb_settings import memory_enabled
 
 logger = logging.getLogger("core.turn_decisions")
 
@@ -185,10 +186,14 @@ def build_turn_questions(
     language_enabled: bool = True,
     tone_enabled: bool = True,
     previous_picture_enabled: bool = False,
+    include_memory: bool = True,
 ) -> dict[str, dict[str, Any]]:
     questions: dict[str, dict[str, Any]] = {}
     if retrieval_enabled:
-        questions.update(_RETRIEVAL_QUESTIONS)
+        questions.update(
+            (name, question) for name, question in _RETRIEVAL_QUESTIONS.items()
+            if include_memory or name != "needs_memory"
+        )
     if language_enabled:
         # 只問規則判斷不了的「明確指定回答語言」。輸入語言（主要語言、是否混用）原本每種
         # 語言各問一題，9 題佔整批約 1,100 tokens、六成，Clef 每 1,000 tokens 約多 0.45 秒，
@@ -287,10 +292,11 @@ def resolve_turn_policy(
     speech_language: str,
     config: TurnDecisionConfig,
     preferred_language: str = "",
+    include_memory: bool = True,
 ) -> TurnPolicy:
     needs_knowledge = _noul_signal("needs_knowledge", answers, config)
     needs_web = _noul_signal("needs_web", answers, config)
-    needs_memory = _noul_signal("needs_memory", answers, config)
+    needs_memory = _noul_signal("needs_memory", answers, config) if include_memory else None
     requested = _choice_signal(
         "requested_response_language",
         answers,
@@ -316,7 +322,7 @@ def resolve_turn_policy(
     # A confident positive uses the agent's explicit search_memory read. This
     # prevents duplicate auto-recall work in the same turn; uncertainty keeps
     # the existing auto-recall baseline.
-    auto_recall = False if needs_memory is not None else None
+    auto_recall = False if not include_memory or needs_memory is not None else None
     return TurnPolicy(
         needs_knowledge=needs_knowledge,
         needs_web=needs_web,
@@ -370,7 +376,10 @@ def run_turn_decision(
             logger.debug("turn decision metric write failed", exc_info=True)
         return decision
 
+    include_memory = memory_enabled(project_id)
     baseline = _baseline_policy(user_text, project_language, speech_language, preferred_language)
+    if not include_memory:
+        baseline = replace(baseline, auto_recall=False)
     groups = {
         "retrieval_enabled": config.retrieval_enabled,
         "language_enabled": config.language_enabled,
@@ -378,7 +387,7 @@ def run_turn_decision(
         # 這一題只有對話真的顯示過圖才問：Clef 的耗時跟 tokens 成正比，沒有圖可再看時白花約 50 tokens。
         "previous_picture_enabled": config.previous_picture_enabled and _has_shown_picture(history),
     }
-    questions = build_turn_questions(**groups)
+    questions = build_turn_questions(**groups, include_memory=include_memory)
     if not config.enabled or not questions:
         return record(TurnDecision(turn_id=turn_id, policy=baseline, source="baseline"))
     evidence = build_turn_evidence(
@@ -386,7 +395,10 @@ def run_turn_decision(
         history,
         speech_language=speech_language,
         project_language=project_language,
-        available_tools=available_tools,
+        available_tools=(
+            available_tools if include_memory
+            else [name for name in available_tools if name != "search_memory"]
+        ),
         preferred_language=preferred_language,
     )
     try:
@@ -405,6 +417,7 @@ def run_turn_decision(
             speech_language=speech_language,
             config=config,
             preferred_language=preferred_language,
+            include_memory=include_memory,
         )
     except DecisionProviderCancelled:
         raise

@@ -23,6 +23,14 @@ def _configure_root(root: str):
     project_context._DATA_ROOT = Path(root)
 
 
+def _enable_test_memory(root, monkeypatch):
+    from infra import project_context
+    from knowledge.kb_settings import save_project_features
+
+    monkeypatch.setattr(project_context, "_DATA_ROOT", root)
+    save_project_features("default", memory_enabled=True)
+
+
 def _transcript_writer(root: str, barrier, index: int):
     _configure_root(root)
     from memory.memory import archive_session_turn
@@ -109,7 +117,8 @@ def test_four_processes_initialize_and_append_to_one_wal_database(tmp_path: Path
         _cleanup(workers)
 
 
-def test_two_hundred_transcript_appends_survive_summary_rewrites(tmp_path: Path):
+def test_two_hundred_transcript_appends_survive_summary_rewrites(tmp_path: Path, monkeypatch):
+    _enable_test_memory(tmp_path, monkeypatch)
     ctx = multiprocessing.get_context("spawn")
     barrier = ctx.Barrier(5)
     workers = [
@@ -132,13 +141,14 @@ def test_two_hundred_transcript_appends_survive_summary_rewrites(tmp_path: Path)
         _cleanup(workers)
 
 
-def test_real_lancedb_add_waits_for_maintenance_overwrite(tmp_path: Path):
+def test_real_lancedb_add_waits_for_maintenance_overwrite(tmp_path: Path, monkeypatch):
     # Import outside pytest's conftest LanceDB stub in a fresh interpreter.
     import json
     import os
     import subprocess
     import sys
 
+    _enable_test_memory(tmp_path, monkeypatch)
     script = '''
 import json, lancedb, sys
 from memory.memory import build_memory_record

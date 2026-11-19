@@ -9,6 +9,7 @@ from pathlib import Path
 
 from config import get_settings
 from infra.project_context import get_data_root
+from knowledge.kb_settings import memory_enabled
 from memory.memory_governance import maybe_run_memory_maintenance
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,9 @@ def maintain_active_projects(seen: dict[str, tuple]) -> None:
     for path in sorted(get_data_root().glob("*/sessions.db")):
         project_id = path.parent.name
         try:
+            if not memory_enabled(project_id):
+                seen.pop(project_id, None)
+                continue
             activity = _activity(path)
             if activity == seen.get(project_id):
                 continue

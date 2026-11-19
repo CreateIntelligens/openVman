@@ -8,11 +8,11 @@ import logging
 from typing import Any
 
 from config import BrainSettings
-from knowledge.kb_settings import primary_language
+from knowledge.kb_settings import memory_enabled, primary_language
 from memory.embedder import encode_query_with_fallback
 from memory.language_detect import TAIWANESE, detect_language
 from memory.retrieval import search_records
-from tools.context import VENDOR_KNOWLEDGE_TOOLS
+from tools.context import MEMORY_TOOLS, VENDOR_KNOWLEDGE_TOOLS
 
 
 logger = logging.getLogger("brain.live.gemini_tool_execution")
@@ -78,6 +78,8 @@ class GeminiLiveToolExecutor:
         }
 
         try:
+            if name in MEMORY_TOOLS and not memory_enabled(self.project_id):
+                raise ValueError(f"{name} 已停用")
             if name == "search_web" and not getattr(
                 self.config, "url2md_search_enabled", True
             ):

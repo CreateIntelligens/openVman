@@ -91,7 +91,7 @@
         ├── MEMORY_SUMMARIES.md       # 記憶治理產生的每日摘要
         ├── DREAMS.md                 # Dreaming 每輪的紀錄
         ├── ASR_PROMPT.md             # 選填的語音專有名詞詞表（第 14.5 節）
-        ├── .kb_settings.json         # 語言分流與回答秒數
+        ├── .kb_settings.json         # 語言分流、回答秒數、記憶與圖譜擴展
         ├── .doc_meta.json            # 文件啟用狀態、來源與語言
         ├── .learnings/
         │   ├── LEARNINGS.md          # 學到的新知與偏好（人工維護）
@@ -418,7 +418,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 ### 11. 記憶治理 (Memory Governance)
 
-* **每日日誌**：每輪對話完成後，`memory/memory.archive_session_turn()` 把 `## HH:MM:SS | session <id>`、`### User`、`### Assistant` 追加到 `workspace/memory/<persona_id>/YYYY-MM-DD.md`；背景另追加一個帶 fingerprint 的 `### Summary` 區塊（相同 fingerprint 不重複寫）。視覺事件等 ephemeral 訊息不寫日誌。
+* **每日日誌**：專案開啟記憶時，每輪對話完成後，`memory/memory.archive_session_turn()` 把 `## HH:MM:SS | session <id>`、`### User`、`### Assistant` 追加到 `workspace/memory/<persona_id>/YYYY-MM-DD.md`。背景另追加一個帶 fingerprint 的 `### Summary` 區塊（相同 fingerprint 不重複寫）。視覺事件等 ephemeral 訊息不寫日誌。
 * **記憶維護**（`memory/memory_governance.run_memory_maintenance`）：每輪對話後在背景觸發，最多每 `MEMORY_MAINTENANCE_INTERVAL_SECONDS`（預設 300）秒執行一次；啟動時與 `POST /brain/memories/maintain` 會強制執行。步驟：
   1. 把超過 `TRANSCRIPT_RETENTION_DAYS`（預設 30）天的日誌移到 `archive/memory/`。
   2. 以規則從每日日誌整理摘要（使用者主題與回覆重點各最多 6 條），寫入 `MEMORY_SUMMARIES.md`。
@@ -479,6 +479,13 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 備份與正式資料在同一個資料卷，防得了誤刪與程式寫壞，防不了整顆磁碟損壞；要異地保存需另外同步主機的 `brain/data/backups/`。
 
 ### 14. 語言分流與回答長度 (Language Routes)
+
+**專案回答功能**（2026-11-19）
+
+- 兩個布林欄位 `memory_enabled`、`graph_enabled` 與語言分流共用工作區的 `.kb_settings.json`。欄位缺少視為 `true`（升版前的專案、備份還原與回滾都沿用原行為，沒有啟動遷移）；新建立的專案兩項寫為 `false`，全新安裝自動建立的預設專案也寫為 `false`。設定檔損壞或值非布林視為關閉，在損壞的設定檔上寫入其他欄位時兩項明寫為 `false`。語言分流的寫入只更新它自己的欄位，不補寫開關。
+- `GET /brain/knowledge/settings` 回傳兩個開關，`PUT /brain/knowledge/settings` 只更新語言與回答秒數。獨立的 `PATCH /brain/knowledge/features` 接受一個或兩個布林開關，回傳合併後的設定。Brain 複核 Backend 的 `edit_settings` 能力標頭。更新共用檔案鎖與原子取代，各 worker 依檔案簽章重新讀取。
+- 記憶關閉時，HTTP prompt 略過 `MEMORY.md` 與 auto recall，連帶略過相關 Jev 過濾與 LLM 摘要。HTTP 與 Live 的決策批次不問 `needs_memory`，也不提供或執行對話記憶工具。Live 在 Gemini 連線 setup 省略記憶上下文及工具宣告，執行工具時再檢查目前設定。變更設定會在空閒後收到下一次輸入時重新建立 Gemini 連線，沿用 SQLite session。對話仍寫入 `sessions.db`。每日 Markdown 日誌、`memory_governance` 摘要與索引停止寫入，保留已累積資料。Dreaming 的 Light Phase 仍以既有日誌為資料來源。
+- 圖譜關閉時，知識檢索不擴展圖譜鄰居，`related` 回傳空陣列，citations 僅含直接檢索結果。對話工具清單排除三個內建圖譜工具與共用 `graphify:run`。圖譜查看與重建端點照常運作。
 
 #### 14.1 分流設定與知識庫排序
 
@@ -708,7 +715,7 @@ Content-Type: application/json
 ### 19. 程式入口與 Live 模組邊界 (Entry Points & Module Boundaries)
 
 * `brain/api/main.py` 只組裝 FastAPI app、路由與 middleware；啟動、預熱與排程器生命週期在 `startup.py`，HTTP tracing／metrics／logging 在 `safety/server_http.py`。HTTP 路由依資源拆在 `routes/`（`chat`、`knowledge`、`knowledge_qa`、`sessions`、`memory`、`personas`、`projects`、`tools`、`search`、`usage`、`backups`、`workspace`、`protocol`、`health`），內部端點與 Live WebSocket 在 `internal_routes.py`。
-* **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 背景預熱（先預熱台語判斷的 Gemini client，Backend 暫時連不上時每 2 秒重試、最多約 10 秒，再對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索；預熱失敗只記 warning，不擋 readiness；載入 LLM 套件、取模型設定、建工具表與各專案的 LLM client、解析型錄這幾個選用步驟合計最多等 30 秒，超過就略過，readiness 不再被它們無限期延後；模型設定與對話路徑若因 Backend 還沒起來而失敗，readiness 放行後每 2 秒重試，最多約 2 分鐘，只重試連不到 Backend 或回 5xx 的項目）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
+* **啟動流程**（`startup.lifespan`）：建立 default 專案 workspace 並執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）→ 背景預熱（先預熱台語判斷的 Gemini client，Backend 暫時連不上時每 2 秒重試、最多約 10 秒，再對每個有資料的專案建立資料表，並對 `knowledge` 跑一次實際檢索，開啟記憶的專案也預熱 `memories`；預熱失敗只記 warning，不擋 readiness；載入 LLM 套件、取模型設定、建工具表與各專案的 LLM client、解析型錄這幾個選用步驟合計最多等 30 秒，超過就略過，readiness 不再被它們無限期延後；模型設定與對話路徑若因 Backend 還沒起來而失敗，readiness 放行後每 2 秒重試，最多約 2 分鐘，只重試連不到 Backend 或回 5xx 的項目）→ `DREAMING_ENABLED` 時啟動 dreaming 排程，並啟動每日對話備份排程。
 * **Gemini Live**：`live/gemini_live.py` 的 `GeminiLiveSession` 負責連線、收訊、重連與保活，並把事件分派給三個各自持有狀態的元件：`gemini_turns.py` 的 `GeminiLiveTurns` 持有回合版本、決策與預取結果，負責每輪決策、預取（查什麼由 `core/turn_reads.py` 決定）與工具呼叫；`gemini_audio.py` 的 `GeminiLiveAudio` 持有語句暫存、台語判定與音訊秒數，負責輸出音訊與用量；`gemini_transcripts.py` 的 `GeminiLiveTranscripts` 持有串流中的回覆，負責轉錄與回覆的持久化。三者共用的身分、設定與事件送出由 `gemini_context.py` 的 `LiveSessionContext` 在建構時傳入；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 的系統指令由 IDENTITY、SOUL、近期對話、記憶、工具使用規則與預設語言（第 14.3 節）組成；宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選），`save_memory` 同樣只在使用者明確要求時執行。上下行音訊以秒數記入用量帳本。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
 * 根目錄 `tests/test_entry_boundaries.py` 禁止 inline 業務處理回到入口檔，並檢查自有正式程式碼每檔不超過 1000 實體行。
 

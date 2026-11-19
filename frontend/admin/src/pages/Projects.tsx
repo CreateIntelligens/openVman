@@ -3,17 +3,20 @@ import { useState } from "react";
 import { isAtLeastAdmin } from "../api/auth";
 import type { ProjectSummary } from "../api/projects";
 import ConfirmModal from "../components/ConfirmModal";
+import ProjectFeaturesDialog from "../components/projects/ProjectFeaturesDialog";
 import ProjectGeminiCredentialDialog from "../components/projects/ProjectGeminiCredentialDialog";
 import ProjectPolicyDialog from "../components/projects/ProjectPolicyDialog";
 import StatusAlert from "../components/StatusAlert";
 import VendorNameDialog from "../components/VendorNameDialog";
 import { useAuth } from "../context/AuthContext";
 import { useProjectsAdmin } from "../hooks/useProjectsAdmin";
+import { isVendorUser } from "../utils/accountPermissions";
 
 export default function Projects() {
   const { account } = useAuth();
   const canManageProjects = account ? isAtLeastAdmin(account.role) : false;
   const canManageGeminiCredentials = account?.role === "root";
+  const canAccessFeatures = Boolean(account && !isVendorUser(account));
   const {
     canCreateProject,
     creating,
@@ -37,6 +40,8 @@ export default function Projects() {
   const [policyTarget, setPolicyTarget] = useState<ProjectSummary | null>(null);
   const [geminiTarget, setGeminiTarget] = useState<ProjectSummary | null>(null);
   const [vendorTarget, setVendorTarget] = useState<ProjectSummary | null>(null);
+  const [featureTargetId, setFeatureTargetId] = useState<string | null>(null);
+  const featureTarget = projects.find((project) => project.project_id === featureTargetId);
 
   return (
     <div className="page-scroll">
@@ -163,6 +168,15 @@ export default function Projects() {
                   </div>
                 </div>
 
+                {canAccessFeatures && project.can_edit_features && (
+                  <button
+                    type="button"
+                    onClick={() => setFeatureTargetId(project.project_id)}
+                    className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"
+                  >
+                    回答功能
+                  </button>
+                )}
                 {canManageProjects && (
                   <div className="mt-auto flex flex-col gap-2">
                     <button
@@ -212,6 +226,19 @@ export default function Projects() {
           </div>
         </section>
       </div>
+
+      {canAccessFeatures && featureTarget?.can_edit_features && (
+        <ProjectFeaturesDialog
+          key={featureTarget.project_id}
+          projectId={featureTarget.project_id}
+          projectLabel={featureTarget.label || featureTarget.project_id}
+          onClose={() => setFeatureTargetId(null)}
+          onSaved={() => {
+            setFeatureTargetId(null);
+            setStatus({ type: "success", message: "已儲存回答功能設定。" });
+          }}
+        />
+      )}
 
       {canManageProjects && policyTarget && (
         <ProjectPolicyDialog

@@ -17,6 +17,7 @@ from infra.db import ensure_tables, get_db
 from infra.project_admin import list_projects
 from infra.shared_budgets import shared_request_budget
 from infra.usage_ledger import shutdown_usage_writer
+from knowledge.kb_settings import memory_enabled
 from knowledge.product_catalog import load_product_catalogs
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import get_embedder
@@ -71,12 +72,13 @@ def _warmup_retrieval_path(project_id: str = "default") -> None:
 
     knowledge 與 memories 各自有獨立的 LanceDB 查詢路徑與 FTS 索引；search_memory
     走的是 memories 表，若只暖 knowledge，第一個「我是誰」這類記憶查詢仍會冷啟。
-    因此兩個表都要暖。
+    因此開啟記憶的專案要暖兩個表。
     """
     from memory.embedder import encode_query_with_fallback
     from memory.retrieval import search_records
 
-    for table_name in _WARMUP_TABLES:
+    tables = _WARMUP_TABLES if memory_enabled(project_id) else ("knowledge",)
+    for table_name in tables:
         try:
             route = encode_query_with_fallback(
                 "warmup", project_id=project_id, table_names=(table_name,)
@@ -387,11 +389,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
 
     if role == "admin":
-        ensure_workspace_scaffold("default")
-        get_db("default")
         from scripts.migrate_to_projects import run_migration
 
         await asyncio.to_thread(run_migration)
+        ensure_workspace_scaffold("default")
+        get_db("default")
 
     app.state.warmup_task = asyncio.create_task(warmup_resources(role))
     if role == "admin":

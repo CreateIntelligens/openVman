@@ -135,6 +135,19 @@ def _project_summary(
     return summary
 
 
+def _can_edit_project_features(
+    runtime: AuthRuntime, current: CurrentAccount, project_id: str,
+) -> bool:
+    try:
+        resolve_resource(
+            runtime.resources, current.user, ResourceType.PROJECT, project_id,
+            access=ResourceAccess.EDIT_SETTINGS,
+        )
+    except ResourceNotFoundError:
+        return False
+    return True
+
+
 def _replacement_request(
     request: Request,
     *,
@@ -217,7 +230,10 @@ async def list_projects(
         )
     }
     projects = [
-        _project_summary(project, accessible[project["project_id"]], current, runtime)
+        {
+            **_project_summary(project, accessible[project["project_id"]], current, runtime),
+            "can_edit_features": _can_edit_project_features(runtime, current, project["project_id"]),
+        }
         for project in payload["projects"]
         if isinstance(project, dict)
         and isinstance(project.get("project_id"), str)

@@ -35,6 +35,7 @@ from core.turn_decisions import (
 from core.reference_media import ReplyMediaChoice, choose_reference_media, earlier_pictures
 from core.turn_reads import vendor_turn_decision, without_disabled_recall
 from infra.learnings import record_error_event
+from knowledge.kb_settings import memory_enabled
 from knowledge.qa_images import qa_image_kind
 from memory.memory import (
     append_session_message_with_id,
@@ -504,15 +505,15 @@ def finalize_generation(
             "assistant", cleaned_reply,
             project_id=context.project_id, metadata=meta or None,
         )
-    if persist and not ephemeral_user:
-        archive_session_turn(
-            context.session_id,
-            context.user_message,
-            cleaned_reply,
-            context.persona_id,
-            project_id=context.project_id,
-        )
-    if persist:
+    if persist and memory_enabled(context.project_id):
+        if not ephemeral_user:
+            archive_session_turn(
+                context.session_id,
+                context.user_message,
+                cleaned_reply,
+                context.persona_id,
+                project_id=context.project_id,
+            )
         _schedule_memory_writes(context, cleaned_reply)
 
     history = [_serialize_history_message(msg) for msg in context.prior_messages]

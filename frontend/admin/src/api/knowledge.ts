@@ -404,7 +404,12 @@ export interface SpeechRates {
   words_per_second: number;
 }
 
-export interface KnowledgeSettings {
+export interface ProjectFeatures {
+  memory_enabled: boolean;
+  graph_enabled: boolean;
+}
+
+export interface KnowledgeSettings extends Partial<ProjectFeatures> {
   // zh 一定在；只有 zh 時不分流。nan（台語）勾了 Live 才會另外聽使用者是不是講台語。
   language_routes: KnowledgeLanguage[];
   // 回答要在幾秒內念完，0 是不限制；不帶就保留原本的設定。
@@ -417,7 +422,7 @@ export function fetchKnowledgeSettings() {
   return get<KnowledgeSettings>(knowledgePath("/settings"));
 }
 
-/** 指定專案的知識庫設定，不看目前選中的專案（權限圖譜一次讀所有專案）。 */
+/** 依指定的專案 ID 讀取設定。 */
 export function fetchProjectKnowledgeSettings(projectId: string) {
   return get<KnowledgeSettings>(knowledgePath("/settings"), { project_id: projectId });
 }
@@ -427,6 +432,10 @@ export function saveKnowledgeSettings(settings: KnowledgeSettings) {
     project_id: getActiveProjectId(),
     ...settings,
   });
+}
+
+export function saveProjectFeatures(projectId: string, changes: Partial<ProjectFeatures>) {
+  return patch<KnowledgeSettings>(knowledgePath("/features"), { project_id: projectId, ...changes });
 }
 
 export type KnowledgeNoteFormat = "text" | "qa";

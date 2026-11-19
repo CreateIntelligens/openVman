@@ -694,6 +694,7 @@ class TestEmptyReply:
 
 
 class TestParallelFirstRound:
+    @pytest.mark.usefixtures("default_project_memory")
     def test_positive_memory_signal_cannot_be_lost_when_model_returns_text_first(
         self, monkeypatch: pytest.MonkeyPatch,
     ):
@@ -1163,6 +1164,7 @@ class TestKnowledgePrefetch:
         assert queries == ["那它的揚程呢？", "50EUBL 是什麼樣的泵？\n那它的揚程呢？"]
 
     @pytest.mark.parametrize("extra", [{"force_web_search": True}, {"force_memory_search": True}])
+    @pytest.mark.usefixtures("default_project_memory")
     def test_other_forced_reads_keep_the_tool_round(self, monkeypatch, extra):
         """還要上網或查記憶時第一次呼叫本來就得寫參數，先查省不到，維持原本流程。"""
         agent_loop, result, calls, executed, seen = self._run(
@@ -1289,6 +1291,7 @@ class TestPrefetchKnowledgeAlways:
         assert len(calls) == 1 and "forced_tool_name" not in calls[0]
 
     @pytest.mark.parametrize("extra", [{"force_web_search": True}, {"force_memory_search": True}])
+    @pytest.mark.usefixtures("default_project_memory")
     def test_other_forced_reads_keep_the_tool_round_and_backfill_knowledge(self, monkeypatch, extra):
         """還要上網或查記憶時照原本流程：第一次呼叫強制工具，知識庫那一筆沒叫就補上。"""
         agent_loop, result, calls, executed, seen = self._run(

@@ -140,18 +140,20 @@ def test_chat_never_runs_requested_or_forced_memory_maintenance(monkeypatch):
     work.assert_not_called()
 
 
-def test_admin_scheduler_detects_new_project_and_new_wal_messages(monkeypatch, tmp_path):
+def test_admin_scheduler_detects_new_project_and_new_wal_messages(monkeypatch):
     import memory.maintenance_scheduler as scheduler
+    from infra.project_context import get_data_root
+    from knowledge.kb_settings import save_project_features
     from memory.session_store import SessionStore
 
     monkeypatch.setattr(scheduler, "get_settings", lambda: SimpleNamespace(brain_role="admin"))
-    monkeypatch.setattr(scheduler, "get_data_root", lambda: tmp_path)
     work = Mock(return_value={"status": "ok"})
     monkeypatch.setattr(scheduler, "maybe_run_memory_maintenance", work)
     seen = {}
     scheduler.maintain_active_projects(seen)
     work.assert_not_called()
-    store = SessionStore(tmp_path / "new-project" / "sessions.db")
+    save_project_features("new-project", memory_enabled=True)
+    store = SessionStore(get_data_root() / "new-project" / "sessions.db")
     store.append_message("session", "default", "assistant", "first")
     scheduler.maintain_active_projects(seen)
     work.assert_called_once_with(True, "new-project")

@@ -17,6 +17,7 @@ from infra.reflection import (
     select_recent_messages,
     summarize_message_history,
 )
+from knowledge.kb_settings import memory_enabled
 from knowledge.workspace import load_core_workspace_context
 from tools.builtin.product_tools import product_prompt_line
 from tools.context import active_vendor_chat
@@ -24,6 +25,7 @@ from tools.context import active_vendor_chat
 from .prompt_templates import (
     DEFAULT_ANSWER_RULES,
     DEFAULT_TOOL_INSTRUCTIONS,
+    MEMORY_TOOL_INSTRUCTIONS,
     NO_TOOLS_ANSWER_RULES,
     NO_TOOLS_INSTRUCTIONS,
     VENDOR_TOOL_INSTRUCTIONS,
@@ -67,14 +69,14 @@ def build_chat_messages(
     *preferred_language* is the caller's language hint; it only replaces the project's
     primary language for input that shows no language of its own.
 
-    Knowledge and memory retrieval are handled by tool calls (search_knowledge,
-    search_memory) during the agent loop — they are NOT injected into the prompt.
+    Includes workspace rules, session history, and automatic recall if enabled.
     """
     cfg = get_settings()
     persona_id = str(request_context.get("persona_id", "default"))
     project_id = str(request_context.get("project_id", "default"))
     session_id = str(request_context.get("session_id", ""))
     vendor = active_vendor_chat.get()
+    include_memory = memory_enabled(project_id)
 
     workspace = load_core_workspace_context(
         persona_id,
@@ -84,6 +86,7 @@ def build_chat_messages(
     workspace_blocks = [
         _format_workspace_block(label, workspace[label.lower()], getattr(cfg, budget_attr))
         for label, budget_attr in _WORKSPACE_BLOCK_CONFIG
+        if include_memory or label != "MEMORY"
     ]
 
     recall_block = _build_recall_block(
@@ -98,6 +101,12 @@ def build_chat_messages(
     )
     tool_instructions = DEFAULT_TOOL_INSTRUCTIONS if allow_tools else NO_TOOLS_INSTRUCTIONS
     answer_rules = DEFAULT_ANSWER_RULES if allow_tools else NO_TOOLS_ANSWER_RULES
+    if allow_tools and not include_memory:
+        tool_instructions = (
+            tool_instructions.replace(MEMORY_TOOL_INSTRUCTIONS, "")
+            .replace("save_memory、", "")
+            .replace("(e.g., search_memory(...))", "(e.g., search_knowledge(...))")
+        )
     if allow_tools and vendor:
         tool_instructions = VENDOR_TOOL_INSTRUCTIONS
         answer_rules = NO_TOOLS_ANSWER_RULES
@@ -105,6 +114,8 @@ def build_chat_messages(
         tool_instructions, answer_rules = _apply_retrieval_policy_to_instructions(
             tool_instructions, answer_rules, turn_policy,
         )
+    if not include_memory:
+        answer_rules = answer_rules.replace(" / search_memory", "")
 
     # 固定的在前、每輪會變的在後：Gemini 隱式快取只認完全相同的開頭。原本 REQUEST
     # CONTEXT（trace_id、精確到秒的時間）夾在人設與回答規則中間、自動回憶插在人設
@@ -130,7 +141,7 @@ def build_chat_messages(
             ),
             _tone_delivery_line(turn_policy.tone if turn_policy else None),
             _previous_picture_line(turn_policy, session_messages),
-            _turn_retrieval_line(turn_policy),
+            _turn_retrieval_line(turn_policy, include_memory=include_memory),
         ]
         if block
     )
@@ -164,7 +175,7 @@ def _build_recall_block(
     skip_jev_filter: bool = False,
 ) -> str:
     """Return the formatted auto-recall block, degrading silently on failure."""
-    if not enabled_by_policy or not cfg.auto_recall_enabled:
+    if not enabled_by_policy or not cfg.auto_recall_enabled or not memory_enabled(project_id):
         return ""
     if _is_session_recall_disabled(session_id=session_id, project_id=project_id):
         return ""
@@ -215,7 +226,7 @@ def _previous_picture_line(policy: TurnPolicy | None, session_messages: list[dic
     )
 
 
-def _turn_retrieval_line(policy: TurnPolicy | None) -> str:
+def _turn_retrieval_line(policy: TurnPolicy | None, *, include_memory: bool = True) -> str:
     if policy is None:
         return ""
     lines = []
@@ -225,7 +236,7 @@ def _turn_retrieval_line(policy: TurnPolicy | None) -> str:
         lines.append("當輪需要專案知識，請先使用 search_knowledge。")
     if policy.needs_web is True:
         lines.append("當輪需要公開或即時資訊，請使用 search_web。")
-    if policy.needs_memory is True:
+    if include_memory and policy.needs_memory is True:
         lines.append("當輪需要過去對話或個人偏好時，請使用 search_memory。")
     return "當輪檢索提示：" + "".join(lines) if lines else ""
 

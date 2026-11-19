@@ -19,6 +19,7 @@ from fastapi import (
 from fastapi.responses import HTMLResponse
 
 from core.chat_service import record_generation_failure
+from infra.project_context import resolve_project_context
 from knowledge.graph import (
     GRAPH_SUBDIR,
     EmptyGraphError,
@@ -74,6 +75,7 @@ from protocol.schemas import (
     KnowledgeNoteCreateRequest,
     KnowledgeRawCommitRequest,
     KnowledgeSettingsPutRequest,
+    ProjectFeaturesPatchRequest,
 )
 from safety.internal_auth import require_internal_token
 from safety.observability import log_event, log_exception
@@ -319,6 +321,29 @@ async def put_knowledge_settings_route(payload: KnowledgeSettingsPutRequest):
         payload.project_id,
         language_routes=payload.language_routes,
         reply_seconds=payload.reply_seconds,
+    ))
+
+
+@router.patch("/knowledge/features", summary="更新專案回答功能")
+async def patch_project_features_route(
+    payload: ProjectFeaturesPatchRequest, project_writes: ProjectWrites = "",
+):
+    from knowledge.kb_settings import save_project_features
+
+    if "edit_settings" not in project_writes.split(","):
+        raise HTTPException(status_code=403, detail="沒有修改其他專案設定的權限")
+    try:
+        project = resolve_project_context(payload.project_id)
+        if project.project_id in {".", ".."}:
+            raise ValueError("project_id 格式不合法")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not project.project_root.is_dir():
+        raise HTTPException(status_code=404, detail="專案不存在")
+    return _with_speech_rates(save_project_features(
+        project.project_id,
+        memory_enabled=payload.memory_enabled,
+        graph_enabled=payload.graph_enabled,
     ))
 
 

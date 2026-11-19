@@ -72,6 +72,7 @@ def _fake_workspace() -> dict[str, str]:
     }
 
 
+@pytest.mark.usefixtures("default_project_memory")
 class TestPromptBuilderRecallIntegration:
     @patch("core.prompt_builder.load_core_workspace_context", return_value=_fake_workspace())
     @patch("core.prompt_builder.get_settings")
@@ -193,6 +194,7 @@ class TestRecallToggleEndpoint:
         assert store.is_recall_disabled("nonexistent") is False
 
 
+@pytest.mark.usefixtures("default_project_memory")
 class TestPromptCachePrefix:
     """Gemini 隱式快取只認完全相同的開頭：每輪會變的內容都要在固定內容之後。"""
 

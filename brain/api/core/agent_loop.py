@@ -26,9 +26,15 @@ from core.reply_modes import ModeSettings, ReplyMode, resolve_mode
 from core.turn_budget import current_trace_id, current_turn_budget
 from core.turn_reads import planned_reads, previous_user_text, user_texts
 from core.usage import current_usage_scope
+from knowledge.kb_settings import load_kb_settings
 from safety.observability import log_event, record_node_attempt, timed_node
 from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, fit_product_tool
-from tools.context import VENDOR_KNOWLEDGE_TOOLS, active_vendor_chat
+from tools.context import (
+    MEMORY_TOOLS,
+    VENDOR_KNOWLEDGE_TOOLS,
+    active_vendor_chat,
+    is_graph_tool,
+)
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
 
@@ -323,14 +329,20 @@ def _tools_for_mode(tools: list[dict[str, Any]], mode: ReplyMode) -> list[dict[s
 
 
 def _tools_for_project(tools: list[dict[str, Any]], project_id: str) -> list[dict[str, Any]]:
-    """Fit filter_products to this project: drop it without a catalog, list the fields otherwise.
+    """Filter disabled tools and fit the product filter to this project's catalog.
 
     工具是全域註冊的，但欄位每個專案不同；沒有產品規格表的專案給了只會讓模型白叫一次。
     """
+    settings = load_kb_settings(project_id)
     fitted: list[dict[str, Any]] = []
     for tool in tools:
         function = tool.get("function", {})
-        if function.get("name") != FILTER_PRODUCTS_TOOL:
+        name = function.get("name") or ""
+        if (not settings["memory_enabled"] and name in MEMORY_TOOLS) or (
+            not settings["graph_enabled"] and is_graph_tool(name)
+        ):
+            continue
+        if name != FILTER_PRODUCTS_TOOL:
             fitted.append(tool)
             continue
         function = fit_product_tool(function, project_id)
@@ -365,11 +377,15 @@ def _run_tool_phase(
     tool_steps: list[dict[str, Any]] = []
     registry = get_tool_registry()
     tools = _tools_for_project(_tools_for_mode(registry.build_openai_tools(), mode), project_id)
+    offered_names = {tool.get("function", {}).get("name") for tool in tools}
     if active_vendor_chat.get() and forced_tool_name not in VENDOR_KNOWLEDGE_TOOLS:
         forced_tool_name = None
-    force_web_search = force_web_search and any(
-        tool.get("function", {}).get("name") == "search_web" for tool in tools
-    )
+    if forced_tool_name and forced_tool_name not in offered_names and (
+        forced_tool_name in MEMORY_TOOLS or is_graph_tool(forced_tool_name)
+    ):
+        forced_tool_name = None
+    force_memory_search = force_memory_search and "search_memory" in offered_names
+    force_web_search = force_web_search and "search_web" in offered_names
     hallucination_pattern = _build_hallucination_pattern(tools)
     hallucination_retried = False
     if allow_forced_knowledge_search and _prefetch_knowledge_always(cfg):

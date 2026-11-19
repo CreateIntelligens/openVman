@@ -136,6 +136,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("default_project_memory")
 class TestDailySummaryWriteback:
     def test_summary_written_to_daily_file(self, monkeypatch, tmp_path):
         """Summary block is appended to memory/YYYY-MM-DD.md."""
@@ -386,6 +387,7 @@ class TestTranscriptArchival:
         assert count == 0
         assert recent_file.exists()
 
+    @pytest.mark.usefixtures("default_project_memory")
     def test_maintenance_result_includes_archived_count(self, monkeypatch, tmp_path):
         """run_memory_maintenance result should include transcripts_archived."""
         gov, ws, _ = _stub_deps(monkeypatch, tmp_path)

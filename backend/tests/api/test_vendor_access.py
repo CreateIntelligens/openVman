@@ -110,6 +110,8 @@ def env(monkeypatch):
             return httpx.Response(200, json={"projects": projects, "project_count": len(projects)})
         if path.startswith("/brain/projects/"):
             return httpx.Response(200, json=_project(path.split("/")[-1]))
+        if path == "/brain/knowledge/settings" and request.method == "GET":
+            return httpx.Response(200, json={"memory_enabled": False, "graph_enabled": False})
         return httpx.Response(200, json={"status": "ok"})
 
     upstream = httpx.AsyncClient(transport=httpx.MockTransport(brain))
@@ -246,6 +248,95 @@ def test_project_read_allows_list_export_and_history_with_no_write_access(env):
     assert env.client.delete(
         "/api/v1/sessions/s1", headers=headers, params={"project_id": _PROJECT},
     ).status_code == 403
+
+
+@pytest.mark.parametrize("use_api_key", [False, True], ids=["session", "api-key"])
+def test_vendor_editor_cannot_change_project_features(env, use_api_key):
+    _assign_vendors(env)
+    created = env.create("vendor-editor", vendor_name="甲商", access=_access(knowledge=True))
+    assert created.status_code == 201, created.text
+    user_id = created.json()["id"]
+    headers = env.headers(user_id)
+    if use_api_key:
+        issued = env.client.post(
+            "/api/v1/api-keys", headers=env.headers(env.root.id),
+            json={"label": "delegated", "user_id": user_id},
+        )
+        assert issued.status_code == 201, issued.text
+        headers = {"Authorization": f"Bearer {issued.json()['key']}"}
+    headers["X-OpenVMan-Project-Writes"] = "edit_settings"
+    settings = env.client.get(
+        "/api/v1/knowledge/settings", headers=headers, params={"project_id": _PROJECT},
+    )
+    assert settings.status_code == 200, settings.text
+    assert settings.json() == {"memory_enabled": False, "graph_enabled": False}
+    assert "X-OpenVMan-Project-Writes" not in env.received[-1].headers
+    assert env.client.put(
+        "/api/v1/knowledge/settings", headers=headers,
+        json={"project_id": _PROJECT, "language_routes": ["en"]},
+    ).status_code == 200
+    received_before = len(env.received)
+    response = env.client.patch(
+        "/api/v1/knowledge/features", headers=headers,
+        json={"project_id": _PROJECT, "memory_enabled": True},
+    )
+    assert response.status_code == 403, response.text
+    assert len(env.received) == received_before
+    hidden = env.client.patch(
+        "/api/v1/knowledge/features", headers=headers,
+        json={"project_id": _UNGRANTED, "graph_enabled": True},
+    )
+    # 廠商守門先擋隱藏功能（403），不會走到專案權限判斷。
+    assert hidden.status_code == 403, hidden.text
+    assert len(env.received) == received_before
+
+
+@pytest.mark.parametrize("as_root", [False, True], ids=["settings-editor", "root"])
+def test_settings_editor_forwards_trusted_project_feature_permission(env, as_root):
+    if as_root:
+        user_id = env.root.id
+    else:
+        created = env.create("settings-editor", access=_access(knowledge=False, settings=True))
+        assert created.status_code == 201, created.text
+        user_id = created.json()["id"]
+    payload = {"project_id": _PROJECT, "graph_enabled": True}
+    response = env.client.patch(
+        "/api/v1/knowledge/features",
+        headers={**env.headers(user_id), "X-OpenVMan-Project-Writes": "edit_knowledge"},
+        json=payload,
+    )
+    assert response.status_code == 200, response.text
+    upstream = env.received[-1]
+    assert upstream.method == "PATCH"
+    assert upstream.url.path == "/brain/knowledge/features"
+    assert upstream.url.params["project_id"] == _PROJECT
+    assert upstream.headers["X-OpenVMan-Project-ID"] == _PROJECT
+    assert upstream.headers.get("X-OpenVMan-Project-Writes") == "edit_settings"
+    assert json.loads(upstream.content) == payload
+
+
+@pytest.mark.parametrize(
+    ("knowledge", "settings", "vendor", "expected"),
+    [
+        (False, True, None, True),
+        (True, False, None, False),
+        (False, False, None, False),
+        (True, False, "甲商", False),
+    ],
+    ids=["settings-editor", "knowledge-editor", "reader", "vendor-editor"],
+)
+def test_project_list_reports_current_account_feature_access(env, knowledge, settings, vendor, expected):
+    _assign_vendors(env)
+    created = env.create(
+        "feature-user", vendor_name=vendor,
+        access=_access(knowledge=knowledge, settings=settings),
+    )
+    assert created.status_code == 201, created.text
+    response = env.client.get("/api/v1/projects", headers=env.headers(created.json()["id"]))
+    assert response.status_code == 200, response.text
+    project, = response.json()["projects"]
+    assert project["project_id"] == _PROJECT
+    assert project["can_edit_features"] is expected
 
 
 def test_user_cannot_mint_keys_admin_can_issue_and_revoke(env):

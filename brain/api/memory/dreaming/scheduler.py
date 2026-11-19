@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from config import get_settings
 from core.gemini_credentials import project_model_entry
+from knowledge.kb_settings import memory_enabled
 from knowledge.workspace import get_workspace_root
 from memory.dreaming.paths import dreams_dir, resolve_timezone as _get_tz
 from memory.dreaming.recall_tracker import rotate_traces
@@ -74,6 +75,13 @@ def run_dreaming_cycle(
     force: bool = False,
 ) -> dict[str, Any]:
     """Execute a full Light → Deep → REM cycle synchronously."""
+    if not memory_enabled(project_id):
+        return {
+            "status": "skipped",
+            "reason": "memory_disabled",
+            "project_id": project_id,
+        }
+
     from .light_phase import run_light_phase
     from .deep_phase import run_deep_phase
     from .rem_phase import run_rem_phase
@@ -181,6 +189,9 @@ async def start_dreaming_scheduler(app: Any) -> None:
             if tick != last_tick and cron.matches(now.hour, now.minute):
                 last_tick = tick
                 for pid in await asyncio.to_thread(_discover_project_ids):
+                    if not await asyncio.to_thread(memory_enabled, pid):
+                        logger.info("dreaming scheduler: skipped project=%s (memory_disabled)", pid)
+                        continue
                     logger.info("dreaming scheduler: triggering project=%s", pid)
                     await asyncio.to_thread(run_dreaming_cycle, pid)
 

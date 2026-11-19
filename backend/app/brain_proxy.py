@@ -80,6 +80,7 @@ _TAG_KNOWLEDGE = ["Brain / Knowledge"]
 _TAG_PROTOCOL = ["Brain / Protocol"]
 _PUBLIC_BRAIN_PATHS = frozenset({f"{_PUBLIC_API_PREFIX}/health"})
 _CHAT_PATHS = frozenset({f"{_PUBLIC_API_PREFIX}/chat", f"{_PUBLIC_API_PREFIX}/chat/stream"})
+_PROJECT_FEATURES_PATH = "knowledge/features"
 
 _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/health", "methods": ["GET"], "tags": _TAG_BRAIN_SYSTEM, "summary": "Brain Health"},
@@ -123,6 +124,7 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/directory", "methods": ["DELETE"], "tags": _TAG_KNOWLEDGE, "summary": "Delete Knowledge Directory"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/note", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Create Knowledge Note"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/reindex", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Reindex Knowledge"},
+    {"path": f"{_PUBLIC_API_PREFIX}/{_PROJECT_FEATURES_PATH}", "methods": ["PATCH"], "tags": _TAG_KNOWLEDGE, "summary": "Update Project Memory and Graph Features"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/rebuild", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Rebuild Knowledge Graph"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/status", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph Status"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/summary", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph Summary"},
@@ -441,6 +443,8 @@ def _project_access(path: str, method: str) -> ResourceAccess:
     normalized = path.strip("/")
     if method.upper() in _SAFE_METHODS:
         return ResourceAccess.READ
+    if normalized == _PROJECT_FEATURES_PATH:
+        return ResourceAccess.EDIT_SETTINGS
     project_area = normalized.partition("/")[0]
     if project_area in {"knowledge", "personas"}:
         return ResourceAccess.EDIT_KNOWLEDGE
@@ -566,6 +570,8 @@ async def _authorize_project_context(
                 continue
             allowed.append(permission)
         request.state.project_writes = ",".join(permission.value for permission in allowed)
+    elif normalized_path == _PROJECT_FEATURES_PATH and access is ResourceAccess.EDIT_SETTINGS:
+        request.state.project_writes = access.value
     request.state.resolved_project_id = resolved_project_id
     return resolved_project_id
 
@@ -968,6 +974,8 @@ def _documented_responses(route_def: dict[str, Any]) -> dict[int | str, dict[str
     ):
         responses.update(_PROJECT_CONTEXT_RESPONSES)
     method = route_def["methods"][0]
+    if brain_path == _PROJECT_FEATURES_PATH:
+        responses[403] = {"description": "需要該專案的「改其他設定」權限"}
     if is_skill_write(brain_path.strip("/"), method):
         # 沒寫 scope=project 的請求一律視為共用技能。
         responses[403] = {

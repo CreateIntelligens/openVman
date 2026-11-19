@@ -4,7 +4,7 @@ from typing import Any
 
 from config import get_settings
 from core.turn_budget import number_setting
-from knowledge.kb_settings import primary_language
+from knowledge.kb_settings import load_kb_settings, memory_enabled, primary_language
 from memory.language_detect import detect_language, route_language
 from safety.observability import record_node_attempt
 from safety.vendor_access import vendor_workspace_path
@@ -165,7 +165,7 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     #    The primary query vector ranks each neighbour's chunks so the most
     #    relevant segment surfaces, not the file's opening.
     related: list[dict[str, Any]] = []
-    if table_name == "knowledge" and merged:
+    if table_name == "knowledge" and merged and load_kb_settings(project_id)["graph_enabled"]:
         graph_budget = number_setting(get_settings(), "knowledge_graph_timeout_seconds", 1.0)
         deadline = min(monotonic() + graph_budget, soft_deadline)
         related = _expand_via_graph(merged, project_id, primary_vector, deadline=deadline)
@@ -308,16 +308,22 @@ def _get_document(args: dict[str, Any]) -> dict[str, Any]:
     cfg = get_settings()
 
     project_id = active_project_id.get()
-    ws = get_workspace_root(project_id)
-    relative = str(args.get("path", ""))
+    ws = get_workspace_root(project_id).resolve()
+    requested = str(args.get("path", ""))
     if active_vendor_chat.get():
-        vendor_workspace_path(project_id, relative, "knowledge")
-    path = resolve_workspace_document(relative, project_id)
+        vendor_workspace_path(project_id, requested, "knowledge")
+    path = resolve_workspace_document(requested.strip(), project_id)
+    relative = path.relative_to(ws).as_posix()
+    if (
+        relative in {"MEMORY.md", "MEMORY_SUMMARIES.md"}
+        or relative.startswith(("memory/", "archive/memory/"))
+    ) and not memory_enabled(project_id):
+        raise ValueError("專案記憶已關閉")
     content = path.read_text(encoding="utf-8-sig")
     limit = max(200, cfg.tool_document_char_limit)
     truncated = content[:limit]
     return {
-        "path": path.relative_to(ws).as_posix(),
+        "path": relative,
         "content": truncated,
         "truncated": len(content) > len(truncated),
         "size": len(content),

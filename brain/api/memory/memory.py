@@ -10,6 +10,7 @@ from uuid import uuid4
 from infra.db import get_memories_table
 from infra.file_lock import file_lock
 from infra.project_context import get_project_session_store, resolve_project_context
+from knowledge.kb_settings import memory_enabled
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.locking import memory_table_lock
 from memory.session_store import SessionState, SessionStore
@@ -175,6 +176,8 @@ def archive_session_turn(
     project_id: str = "default",
 ) -> None:
     """Append the latest conversation turn into the daily markdown log."""
+    if not memory_enabled(project_id):
+        return
     root = ensure_workspace_scaffold(project_id)
     persona_key = normalize_persona_id(persona_id)
     log_dir = root / "memory" / persona_key

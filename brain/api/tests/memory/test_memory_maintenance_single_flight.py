@@ -6,11 +6,14 @@ import threading
 
 import pytest
 
+from knowledge.kb_settings import save_project_features
 import memory.memory_governance as gov
 
 
 @pytest.fixture
 def runs(monkeypatch):
+    for project_id in ("a", "b", "p"):
+        save_project_features(project_id, memory_enabled=True)
     calls: list[str] = []
     monkeypatch.setattr(gov, "run_memory_maintenance", lambda project_id: calls.append(project_id))
     monkeypatch.setattr(gov, "_project_locks", {})

@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Callable
+from functools import lru_cache
 from typing import Any
 
 from fastapi import (
@@ -17,6 +19,7 @@ from fastapi import (
 )
 from pydantic import BaseModel, ConfigDict, Field
 
+from knowledge.kb_settings import memory_enabled
 from protocol.schemas import InternalAsrJudgeRequest, InternalEnrichRequest
 from safety.internal_auth import INTERNAL_TOKEN_HEADER, require_internal_token
 from safety.vendor_access import VENDOR_HEADER, vendor_live_event
@@ -121,6 +124,10 @@ def _build_live_session(
 ):
     from live.gemini_live import GeminiLiveSession
 
+    system_instruction = _build_live_system_instruction(
+        persona_id, project_id, session_id, vendor=vendor,
+    )
+    system_instruction(memory_enabled(project_id))
     return GeminiLiveSession(
         relay_session_id=relay_session_id,
         client_id=client_id,
@@ -132,16 +139,18 @@ def _build_live_session(
         principal_type=principal_type,
         principal_id=principal_id,
         vendor=vendor,
-        system_instruction=_build_live_system_instruction(
-            persona_id, project_id, session_id=session_id, vendor=vendor,
-        ),
+        system_instruction=system_instruction,
         event_sink=event_sink,
     )
 
 
 def _build_live_system_instruction(
     persona_id: str, project_id: str, session_id: str = "", *, vendor: bool = False,
-) -> str:
+) -> Callable[[bool], str]:
+    from core.prompt_templates import (
+        primary_language_line,
+        supported_languages_line,
+    )
     from knowledge.workspace import load_core_workspace_context
 
     blocks: list[str] = []
@@ -161,20 +170,17 @@ def _build_live_system_instruction(
     if history_block:
         blocks.append(history_block)
 
-    if not vendor and (memory_block := _build_memory_context(persona_id, project_id)):
-        blocks.append(memory_block)
-
-    additional_tools = (
-        "2. 提到過去對話、偏好或可能曾經告知的個人資訊時，呼叫 search_memory。\n"
+    rules_start = (
+        "工具使用規則（重要）：\n"
+        "1. 任何事實性問題（地點、規格、流程、人員、時段、價格、產品、政策、機構資訊等），"
+        "**先呼叫 search_knowledge 再回答**；不要先反問使用者「能否提供更多資訊」。\n"
+    )
+    other_tools = (
         "3. 多主題請拆成 queries 陣列一次送出。\n"
         "4. 即時或公開網路資訊（包含新聞、天氣）先呼叫 search_web；需要完整內容時再呼叫 read_web_page。\n"
         "5. 長篇報告或使用者要求分享時可呼叫 publish_wiki，最後只回傳工具提供的 shareUrl。\n"
     ) if not vendor else "多主題請拆成 queries 陣列一次送出。\n"
-    tool_rules = (
-        "工具使用規則（重要）：\n"
-        "1. 任何事實性問題（地點、規格、流程、人員、時段、價格、產品、政策、機構資訊等），"
-        "**先呼叫 search_knowledge 再回答**；不要先反問使用者「能否提供更多資訊」。\n"
-        f"{additional_tools}"
+    rules_end = (
         "6. 工具有命中時以工具結果為準；多次查詢仍無命中時才如實說「資料中沒有提到」。\n"
         "7. 絕對不要透露答案的資訊來源。禁止任何來源標記語，例如「根據知識庫」、"
         "「根據記憶」、「根據紀錄」、「根據之前的紀錄」、「根據資料」、「記憶顯示」、"
@@ -182,20 +188,28 @@ def _build_live_system_instruction(
         "而非「根據紀錄你穿黑色上衣」）。\n"
         "8. 用使用者最新一句話的語言回答（中文用繁體、英文回英文、西班牙文回西班牙文），整段不要夾雜其他語言；無法判斷或只是很短的招呼或單字（例如 hi、ok、hola）時用最下方的預設語言。知識庫與人設裡的中文固定說法也要翻成回答語言，產品型號與專有名詞照原文。"
     )
-    blocks.append(tool_rules)
-    from core.prompt_templates import (
-        primary_language_line,
-        supported_languages_line,
+    languages = (
+        supported_languages_line(project_id),
+        primary_language_line(project_id),
     )
 
-    supported = supported_languages_line(project_id)
-    if supported:
-        blocks.append(supported)
-    blocks.append(primary_language_line(project_id))
-    return (
-        "你是 openVman Brain 的對話核心。以下是你的角色設定和上下文，請在即時語音對話中遵守。\n\n"
-        + "\n\n".join(blocks)
-    )
+    # 重連套用新開關時沿用 relay 初始化時的歷史，避免把當前問題再放進提示。
+    @lru_cache(maxsize=1)
+    def render(include_memory: bool) -> str:
+        memory_block = ""
+        memory_rule = "" if vendor else "2. 長期記憶已關閉，可以使用目前的對話紀錄。\n"
+        # 廠商的對話測試不帶長期記憶，也不提記憶工具。
+        if include_memory and not vendor:
+            memory_block = _build_memory_context(persona_id, project_id)
+            memory_rule = "2. 提到過去對話、偏好或可能曾經告知的個人資訊時，呼叫 search_memory。\n"
+        return (
+            "你是 openVman Brain 的對話核心。以下是你的角色設定和上下文，請在即時語音對話中遵守。\n\n"
+            + "\n\n".join(filter(None, (
+                *blocks, memory_block, rules_start + memory_rule + other_tools + rules_end, *languages,
+            )))
+        )
+
+    return render
 
 
 def _build_history_context(session_id: str, persona_id: str, project_id: str) -> str:
@@ -442,10 +456,10 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
         })
         if chat_id := str(payload.get("chat_session_id", "")).strip():
             state["session_id"] = chat_id
-        _ensure_live_session(state, relay_id, sink)
+    if not state["live_session"]:
+        await asyncio.to_thread(_ensure_live_session, state, relay_id, sink)
+    if event == "relay_init":
         return
-
-    _ensure_live_session(state, relay_id, sink)
     live = state["live_session"]
 
     if event == "set_decision_debug":
@@ -521,11 +535,9 @@ async def dreaming_status(project_id: str = "default"):
     "/brain/dreaming/run",
     tags=["Dreaming"],
     summary="手動觸發 Dreaming",
-    description="手動執行一次完整的 Light → Deep → REM 記憶整合週期。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID\n- `force` (Query, bool, 預設 false): 強制執行（忽略今日已執行檢查）",
+    description="手動執行一次完整的 Light → Deep → REM 記憶整合週期。專案關閉記憶時回傳 `skipped`。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID\n- `force` (Query, bool, 預設 false): 強制執行（忽略今日已執行檢查）",
 )
 async def dreaming_run(project_id: str = "default", force: bool = False):
-    import asyncio
-
     scheduler = _get_dreaming_scheduler()
     result = await asyncio.to_thread(
         scheduler.run_dreaming_cycle,

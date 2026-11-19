@@ -104,6 +104,7 @@ async def test_warmup_failure_still_releases_readiness(monkeypatch):
     assert warmup_state.is_warmup_done() is True
 
 
+@pytest.mark.usefixtures("default_project_memory")
 def test_warmup_retrieval_path_warms_knowledge_and_memories(monkeypatch):
     startup = _load_startup()
     searched_tables: list[str] = []
@@ -136,6 +137,7 @@ def test_warmup_retrieval_path_warms_knowledge_and_memories(monkeypatch):
     assert searched_tables == ["knowledge", "memories"]
 
 
+@pytest.mark.usefixtures("default_project_memory")
 def test_warmup_retrieval_path_one_table_failure_does_not_block_other(monkeypatch):
     startup = _load_startup()
     searched_tables: list[str] = []

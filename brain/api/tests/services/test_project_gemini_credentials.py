@@ -282,6 +282,10 @@ def test_invalid_project_gemini_moves_to_other_provider_without_borrowing_shared
 
 
 def test_auto_recall_worker_keeps_project_key_and_user_attribution(monkeypatch):
+    from knowledge.kb_settings import save_project_features
+
+    save_project_features("alpha", memory_enabled=True)
+
     recall = import_module("memory.auto_recall")
     monkeypatch.setattr(credentials, "fetch_document", lambda **kw: document("alpha"))
     cfg = SimpleNamespace(

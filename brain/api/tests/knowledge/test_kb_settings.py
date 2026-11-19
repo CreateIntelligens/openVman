@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture
-def kb(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    module = importlib.import_module("knowledge.kb_settings")
-    monkeypatch.setattr(module, "ensure_workspace_scaffold", lambda project_id="default": tmp_path)
-    return module
+def kb():
+    return importlib.import_module("knowledge.kb_settings")
 
 
 def test_defaults_to_chinese_only(kb):
@@ -31,7 +28,7 @@ def test_empty_routes_fall_back_to_chinese(kb):
     assert kb.save_kb_settings("p", language_routes=[])["language_routes"] == ["zh"]
 
 
-def test_taiwanese_route_follows_the_setting(kb, monkeypatch):
+def test_taiwanese_route_follows_the_setting(kb):
     from memory import language_detect
 
     assert language_detect.project_has_taiwanese_route("p") is False

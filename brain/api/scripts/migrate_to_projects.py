@@ -31,17 +31,24 @@ def _default_project() -> Path:
 
 
 def run_migration() -> None:
-    """Execute all migration steps.  Safe to call multiple times."""
-    marker = _default_project() / ".migrated"
+    """Move legacy data or initialize the feature defaults for a fresh install."""
+    project = _default_project()
+    marker = project / ".migrated"
     if marker.exists():
         return
 
+    fresh = not project.exists()
     migrated_any = False
 
     migrated_any |= _migrate_workspace()
     migrated_any |= _migrate_lancedb()
     migrated_any |= _migrate_sessions_db()
     migrated_any |= _migrate_index_state()
+
+    if fresh and not migrated_any:
+        from knowledge.kb_settings import save_project_features
+
+        save_project_features("default", memory_enabled=False, graph_enabled=False)
 
     # Write marker so future startups skip entirely
     marker.parent.mkdir(parents=True, exist_ok=True)

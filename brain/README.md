@@ -30,8 +30,8 @@ Edge nginx 對 `/brain/` 一律回 404。除了 `GET /brain/health` 與 `GET /br
 
 `startup.lifespan` 依序：
 
-1. 建立預設專案（`DEFAULT_PROJECT_ID`，未設定時為 `default`）的 workspace scaffold，執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`，舊資料搬進預設專案）。
-2. 背景預熱：先預熱台語語音判斷的 Gemini client（Backend 跟著一起重啟、暫時拿不到金鑰時，每 2 秒重試，最多約 10 秒），再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning，readiness 照樣放行；載入 LLM 套件、取模型設定、建工具表與各專案的 LLM client、解析型錄這些選用步驟合計最多等 30 秒，逾時就略過。映像檔沒有 `.pyc`，第一題才 import 的模組每個 worker 都要現場編譯，所以第一題會用到的程序內物件（工具表，以及各專案的 Gemini 與 LLM client）都在預熱時先建好；只建物件、不先連線（閒置連線 5 秒就會被關掉）。Compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱拿不到模型設定與金鑰，這兩項在 readiness 放行後每 2 秒重試，最多約 2 分鐘；只重試連不到 Backend 或回 5xx 的項目，設定錯誤記 warning 後不重試，取得模型設定後再照新設定重建各專案的 LLM client。
+1. admin 先執行舊目錄遷移（`scripts/migrate_to_projects.py`，舊資料搬進預設專案；全新安裝時預設專案的記憶與圖譜寫為關閉），再建立預設專案（`DEFAULT_PROJECT_ID`，未設定時為 `default`）的 workspace scaffold。
+2. 背景預熱：先預熱台語語音判斷的 Gemini client（Backend 跟著一起重啟、暫時拿不到金鑰時，每 2 秒重試，最多約 10 秒），再依序對每個有資料的專案建立資料表，並對 `knowledge` 跑一次實際檢索，開啟記憶的專案也預熱 `memories`。預熱失敗只記 warning，readiness 照樣放行；載入 LLM 套件、取模型設定、建工具表與各專案的 LLM client、解析型錄這些選用步驟合計最多等 30 秒，逾時就略過。映像檔沒有 `.pyc`，第一題才 import 的模組每個 worker 都要現場編譯，所以第一題會用到的程序內物件（工具表，以及各專案的 Gemini 與 LLM client）都在預熱時先建好；只建物件、不先連線（閒置連線 5 秒就會被關掉）。Compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱拿不到模型設定與金鑰，這兩項在 readiness 放行後每 2 秒重試，最多約 2 分鐘；只重試連不到 Backend 或回 5xx 的項目，設定錯誤記 warning 後不重試，取得模型設定後再照新設定重建各專案的 LLM client。
 3. `DREAMING_ENABLED` 時啟動 dreaming 排程；啟動每日對話備份排程。
 
 Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符時，Brain fail closed，不會在 API process 內自行改用其他 provider。
@@ -167,7 +167,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - Hybrid：向量檢索與 FTS 以 RRF 融合（`RAG_RRF_K`），再依相似度門檻過濾；FTS 也命中的段落用較寬的門檻。
 - 向量門檻（檢索、FTS 命中、去重、長期記憶合併、夢境整理、無標題 Markdown 的語意切段）一律是 cosine 相似度（0–1，越大越像），每個 embedding 版本一組，定義在 `memory/thresholds.py`；查詢退回另一個版本的索引時，用那個版本的門檻。要調整用 `EMBEDDING_THRESHOLDS` 依版本覆寫，例如 `{"gemma": {"retrieval": 0.68}}`。
 - `search_knowledge` 對模型改寫的每條查詢與使用者原句各檢索一次，融合後保留 `KNOWLEDGE_SEARCH_MERGE_LIMIT` 筆（依回覆模式覆寫）。
-- 依知識圖譜帶入一跳內相關文件的段落，放在結果的 `related`。
+- 專案開啟圖譜擴展時，依知識圖譜帶入一跳內相關文件的段落，放在結果的 `related`。
 - 每筆結果標記 `trust_boundary: untrusted_reference_data`，並產生 citations。
 
 ## 對話流程
@@ -175,9 +175,9 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 `POST /brain/chat` 的處理順序：
 
 1. 驗證輸入、載入 session、解析 slash command（`/skill_id ...` 會強制呼叫該技能的工具）。
-2. 組 system prompt：核心文件、auto recall 摘要、請求情境、歷史摘要、回答規則、ASR 詞表、本輪回答語言與長度。知識與記憶不直接注入，由工具取得。
+2. 組 system prompt，包含核心文件、請求情境、歷史摘要、回答規則、ASR 詞表、本輪回答語言與長度。記憶開啟時可加入 auto recall 摘要，知識庫內容由工具取得。
 3. 執行 agent loop（`core/agent_loop.py`）。
-4. 寫入對話與每日日誌，背景執行記憶治理與回覆的 PII 掃描。
+4. 寫入對話並在背景執行 PII 掃描。記憶開啟時另寫入每日日誌，並排程記憶治理。
 5. 回應附上 `tool_steps`、citations、`response_time_s`、本輪 `usage` 彙總，以及回答來源 `answer_source`／`knowledge_searched`／`no_answer`（見下方「回答來源」）。
    回答附圖：查完知識庫就在背景請決策鏈從前 5 筆附圖結果選最能回答的一筆，都不相關就不附圖；決策關閉（`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`）、逾時或失敗時照舊附第一筆引用的圖。使用者要求再看之前的圖（「再給我看看剛剛那張圖」，每輪決策的 `wants_previous_picture`，只在對話顯示過圖時才問）時，這段對話最近顯示過的 3 張圖連同當時的問題排在候選最前面，不必等查知識庫就開始選；判定否或不確定時流程不變（`TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED=false` 可關掉這一題）。判定為是時 system prompt 加一行當輪提示：圖會附在回答旁邊，只說這是先前的圖、不猜是哪一張也不描述內容（選圖與回答並行，模型看不到結果）、不要呼叫 `request_action` 切換頁面（對話還沒顯示過圖時改提示照實說明）。目前只接 HTTP 聊天，Live 還沒有。
 
@@ -330,6 +330,15 @@ Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉
 - `read_web_page` 只接受解析到公開位址的 HTTP(S) URL，拒絕 private、loopback、link-local、reserved、multicast 與 unspecified 位址。
 - 2md 與 Wiki 呼叫目前不帶認證。外部錯誤包成 tool error 交回 agent loop；密鑰不得放進工具參數或發布內容。
 
+## 專案回答功能
+
+後台「專案管理 → 回答功能」使用工作區的 `.kb_settings.json`。新專案的 `memory_enabled`、`graph_enabled` 皆為 `false`。設定檔裡沒有某個開關欄位時視為開啟，所以升版前就存在的專案、從備份還原或回滾過的專案都維持原本行為，不需要遷移。設定檔損壞或欄位不是布林值時視為關閉；在損壞的設定檔上存語言分流時，兩個開關會明寫為關閉。只改語言分流不會補寫開關欄位。
+
+- **記憶**關閉時，HTTP chat 略過 auto recall 與其 Jev 過濾／LLM 摘要，不把 `MEMORY.md` 放進提示詞。HTTP chat 與 Gemini Live 都略過每輪的 `needs_memory` 分類、停用 `search_memory`／`save_memory` 和每日日誌。Live 依開關組裝 Gemini 的記憶上下文與工具宣告。調整開關後，既有連線會在當前回合結束、下次收到輸入時重連。每日摘要與索引維護跳過該專案。對話歷史、匯出與備份照常讀寫 SQLite。既有日誌與長期記憶保留，另有 Dreaming Light Phase 會讀每日日誌的摘要。
+- **知識圖譜擴展**關閉時，`search_knowledge.related` 為空，引用僅來自直接命中的段落。模型的 `graph_query`、`graph_explain`、`graph_status` 和共用 `graphify:run` 不可用。後台仍可查看與重建知識圖譜。
+
+專案讀取權可用 `GET /api/v1/knowledge/settings?project_id=...` 讀取兩個開關。具「改其他設定」的內部帳號可用 `PATCH /api/v1/knowledge/features` 傳入 `project_id` 及至少一個布林開關，回應更新後的完整設定。語言分流與回答秒數沿用 `PUT /api/v1/knowledge/settings`。
+
 ## 記憶
 
 - 短期記憶：session 與訊息存在專案的 `sessions.db`。prompt 帶最近的對話並附上較早歷史的摘要（`SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`）；超過 `MAX_SESSION_TTL_MINUTES` 未更新的 session 與空 session 會被清理。
@@ -450,7 +459,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 檢索與記憶 | `POST /search`、`GET/POST/DELETE /memories`、`POST /memories/maintain` |
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
 | 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
-| 知識設定 | `GET/PUT /knowledge/settings`（語言分流、`reply_seconds`，回應附 `speech_rates`） |
+| 專案知識與回答設定 | `GET /knowledge/settings` 讀取全部設定，`PUT /knowledge/settings` 更新語言分流與 `reply_seconds`，`PATCH /knowledge/features` 更新記憶與圖譜擴展 |
 | QA 知識 | `GET /knowledge/qa`、`GET /knowledge/qa/questions`（所有題目清單，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |
 | 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar` |

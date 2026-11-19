@@ -199,6 +199,7 @@ class TestLlmSummarize:
 # ------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("default_project_memory")
 class TestRunAutoRecall:
     def _make_fake_bundle(self, memory_results: list[dict]) -> Any:
         return types.SimpleNamespace(
@@ -303,6 +304,7 @@ class TestRunAutoRecall:
         assert mock_retrieve.call_count == 2
 
 
+@pytest.mark.usefixtures("default_project_memory")
 class TestJevFilter:
     def _bundle(self, memory_results):
         return types.SimpleNamespace(knowledge_results=[], memory_results=memory_results, diagnostics={})

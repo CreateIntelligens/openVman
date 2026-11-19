@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, StrictBool, field_validator, model_validator
 from tools.skill import SKILL_ID_PATTERN
 
 
@@ -202,6 +202,19 @@ class KnowledgeDocumentMetaPatchRequest(BaseModel):
     source_url: str | None = None
     # auto 代表取消手動指定，改回依內容判斷。
     language: str | None = Field(None, pattern="^(zh|en|es|nan|ja|ko|auto)$")
+
+
+class ProjectFeaturesPatchRequest(BaseModel):
+    project_id: str = "default"
+    memory_enabled: StrictBool | None = None
+    graph_enabled: StrictBool | None = None
+
+    @model_validator(mode="after")
+    def _has_changes(self):
+        fields = self.model_fields_set - {"project_id"}
+        if not fields or any(getattr(self, field) is None for field in fields):
+            raise ValueError("請指定至少一個布林開關")
+        return self
 
 
 class KnowledgeSettingsPutRequest(BaseModel):
