@@ -29,7 +29,7 @@ FROM deps AS dev
 
 ENV TZ=Asia/Taipei
 # Vite runs as the node user under supervisord; keep bind/volume writes non-root.
-RUN apk add --no-cache tzdata nginx openssl supervisor \
+RUN apk add --no-cache tzdata "nginx>=1.30.7-r0" openssl supervisor \
     && chown node:node /app /app/node_modules
 
 COPY frontend/admin/nginx/http.d/ /etc/nginx/http.d/
@@ -55,7 +55,7 @@ COPY frontend/shared /shared
 COPY frontend/admin/ ./
 RUN pnpm build
 
-FROM nginx:1.31.8-alpine AS runner
+FROM nginx:1.31.9-alpine AS runner
 
 ENV TZ=Asia/Taipei
 RUN apk add --no-cache openssl tzdata

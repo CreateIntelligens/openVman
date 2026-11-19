@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **[2026-11-19]** **admin 與 avatar 容器的 nginx 升到 1.31.9，修補 2026-11 的 nginx 漏洞**：1.9.5～1.31.8 受 HTTP/2 flow control 記憶體破壞（CVE-2026-123007，不需登入）、HTTP/2 UAF（CVE-2026-123633）、resolver UAF（CVE-2026-123634）、TLS 1.3 讀 body 無限迴圈（CVE-2026-118899）影響，修正版為 1.31.9+／1.30.7+。兩個映像的 runner 由 `nginx:1.31.8-alpine` 換成 `nginx:1.31.9-alpine`；admin 的 dev stage 把 Alpine 套件釘在 `nginx>=1.30.7-r0`，也讓舊的建置快取失效。HTTP/2 照舊開啟。主機 nginx 已是 1.31.9。
+
 - **[2026-11-19]** **壓測工具可調上游延遲並記錄資源**：`scripts/experiments/brain-worker-split/` 的假 LLM、假 TTS 延遲改由 `FAKE_LLM_FIRST_SECONDS`、`FAKE_LLM_GAP_SECONDS`、`FAKE_TTS_FIRST_CHUNK_SECONDS`、`FAKE_TTS_SECONDS_PER_CHAR` 設定（預設不變），設 0 即「上游秒回」，只量 Backend＋Brain；`load.py` 以 `LOAD_WARMUP` 控制正式計時前的暖身；新增 `resource_monitor.py` 每秒讀各容器 cgroup 的 CPU 與記憶體、`compose.real-project.yaml` 以真實專案資料壓測、`questions-industrial.json` 題庫。新增 `scripts/experiments/tts-relay/run.py` 比較直接打 TTS 節點與經 Backend 轉發的首音時間（`--direct-url` 必填）。
 
 - **[2026-11-18]** **唯讀專案可看與匯出對話紀錄**：對話列表、單段歷史及匯出使用專案讀取權，刪除仍需「改其他設定」。一般帳號改由管理員代發 API 金鑰，既有金鑰照原本的期限與撤銷規則驗證。
