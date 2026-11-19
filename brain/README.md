@@ -332,7 +332,7 @@ Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉
 
 ## 專案回答功能
 
-後台「專案管理 → 回答功能」使用工作區的 `.kb_settings.json`。新專案的 `memory_enabled`、`graph_enabled` 皆為 `false`。設定檔裡沒有某個開關欄位時視為開啟，所以升版前就存在的專案、從備份還原或回滾過的專案都維持原本行為，不需要遷移。設定檔損壞或欄位不是布林值時視為關閉；在損壞的設定檔上存語言分流時，兩個開關會明寫為關閉。只改語言分流不會補寫開關欄位。
+後台「專案管理 → 回答功能」使用工作區的 `.kb_settings.json`。新專案的 `memory_enabled`、`graph_enabled` 皆為 `false`；建立表單上勾選的項目會在專案建好後立刻以 `PATCH /knowledge/features` 打開，失敗時提示到「回答功能」重設。設定檔裡沒有某個開關欄位時視為開啟，所以升版前就存在的專案、從備份還原或回滾過的專案都維持原本行為，不需要遷移。設定檔損壞或欄位不是布林值時視為關閉；在損壞的設定檔上存語言分流時，兩個開關會明寫為關閉。只改語言分流不會補寫開關欄位。
 
 - **記憶**關閉時，HTTP chat 略過 auto recall 與其 Jev 過濾／LLM 摘要，不把 `MEMORY.md` 放進提示詞。HTTP chat 與 Gemini Live 都略過每輪的 `needs_memory` 分類、停用 `search_memory`／`save_memory` 和每日日誌。Live 依開關組裝 Gemini 的記憶上下文與工具宣告。調整開關後，既有連線會在當前回合結束、下次收到輸入時重連。每日摘要與索引維護跳過該專案。對話歷史、匯出與備份照常讀寫 SQLite。既有日誌與長期記憶保留，另有 Dreaming Light Phase 會讀每日日誌的摘要。
 - **知識圖譜擴展**關閉時，`search_knowledge.related` 為空，引用僅來自直接命中的段落。模型的 `graph_query`、`graph_explain`、`graph_status` 和共用 `graphify:run` 不可用。後台仍可查看與重建知識圖譜。

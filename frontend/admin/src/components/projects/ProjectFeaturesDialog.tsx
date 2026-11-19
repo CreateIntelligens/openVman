@@ -8,10 +8,11 @@ import {
 import { errorMessage } from "../../utils/errorMessage";
 import StatusAlert from "../StatusAlert";
 
-const features = [
+export const PROJECT_FEATURE_OPTIONS = [
   { field: "memory_enabled", label: "記憶", description: "記住過去對話，回答時參考。" },
   { field: "graph_enabled", label: "知識圖譜擴展", description: "用知識圖譜找出更多相關文件，回答時一起參考。" },
 ] as const;
+const features = PROJECT_FEATURE_OPTIONS;
 
 interface ProjectFeaturesDialogProps {
   projectId: string;

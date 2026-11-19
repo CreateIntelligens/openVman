@@ -3,7 +3,7 @@ import { useState } from "react";
 import { isAtLeastAdmin } from "../api/auth";
 import type { ProjectSummary } from "../api/projects";
 import ConfirmModal from "../components/ConfirmModal";
-import ProjectFeaturesDialog from "../components/projects/ProjectFeaturesDialog";
+import ProjectFeaturesDialog, { PROJECT_FEATURE_OPTIONS } from "../components/projects/ProjectFeaturesDialog";
 import ProjectGeminiCredentialDialog from "../components/projects/ProjectGeminiCredentialDialog";
 import ProjectPolicyDialog from "../components/projects/ProjectPolicyDialog";
 import StatusAlert from "../components/StatusAlert";
@@ -28,10 +28,12 @@ export default function Projects() {
     lastCreatedId,
     loadProjects,
     loading,
+    newProjectFeatures,
     newProjectLabel,
     newProjectVendor,
     projects,
     setDeleteTargetId,
+    setNewProjectFeatures,
     setNewProjectLabel,
     setNewProjectVendor,
     setStatus,
@@ -96,6 +98,29 @@ export default function Projects() {
                   disabled={creating}
                 />
               </label>
+              {canAccessFeatures && (
+                <fieldset className="flex-1 text-xs text-content-muted" disabled={creating}>
+                  <legend className="mb-1">回答功能（建好後也能在「回答功能」改）</legend>
+                  {PROJECT_FEATURE_OPTIONS.map(({ field, label, description }) => (
+                    <label key={field} className="flex items-start gap-2 py-0.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={newProjectFeatures[field]}
+                        onChange={(event) => setNewProjectFeatures((current) => ({
+                          ...current,
+                          [field]: event.target.checked,
+                        }))}
+                      />
+                      <span>
+                        <span className="font-medium text-content">{label}</span>
+                        {"："}
+                        {description}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
               <button
                 type="submit"
                 disabled={!canCreateProject}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { saveProjectFeatures, type ProjectFeatures } from "../api/knowledge";
 import { createProject, deleteProject, fetchProjects, setProjectVendor, type ProjectSummary } from "../api/projects";
 import { useProject } from "../context/ProjectContext";
 import { useStatusState } from "./useStatusState";
@@ -9,6 +10,11 @@ export function useProjectsAdmin() {
   const [loading, setLoading] = useState(false);
   const [newProjectLabel, setNewProjectLabel] = useState("");
   const [newProjectVendor, setNewProjectVendor] = useState("");
+  // 新專案預設兩項都關；建立時勾了才在建好後打開。
+  const [newProjectFeatures, setNewProjectFeatures] = useState<ProjectFeatures>({
+    memory_enabled: false,
+    graph_enabled: false,
+  });
   const [lastCreatedId, setLastCreatedId] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState("");
@@ -51,20 +57,45 @@ export function useProjectsAdmin() {
 
     try {
       const result = await createProject(trimmedNewProjectLabel, newProjectVendor.trim() || undefined);
+      const enabled = Object.fromEntries(
+        Object.entries(newProjectFeatures).filter(([, on]) => on),
+      ) as Partial<ProjectFeatures>;
+      let featuresSaved = true;
+      if (Object.keys(enabled).length > 0) {
+        try {
+          await saveProjectFeatures(result.project_id, enabled);
+        } catch {
+          featuresSaved = false;
+        }
+      }
       setNewProjectLabel("");
       setNewProjectVendor("");
+      setNewProjectFeatures({ memory_enabled: false, graph_enabled: false });
       setLastCreatedId(result.project_id);
-      setStatus({
-        type: "success",
-        message: `專案「${trimmedNewProjectLabel}」已建立（ID: ${result.project_id}）`,
-      });
+      setStatus(featuresSaved
+        ? {
+          type: "success",
+          message: `專案「${trimmedNewProjectLabel}」已建立（ID: ${result.project_id}）`,
+        }
+        : {
+          type: "error",
+          message: `專案「${trimmedNewProjectLabel}」已建立，但記憶與知識圖譜沒有打開。請在專案卡片按「回答功能」再設定一次。`,
+        });
       await refreshProjectList();
     } catch (error) {
       setErrorStatus(error);
     } finally {
       setCreating(false);
     }
-  }, [canCreateProject, newProjectVendor, refreshProjectList, setErrorStatus, trimmedNewProjectLabel]);
+  }, [
+    canCreateProject,
+    newProjectFeatures,
+    newProjectVendor,
+    refreshProjectList,
+    setErrorStatus,
+    setStatus,
+    trimmedNewProjectLabel,
+  ]);
 
   async function handleSetVendor(projectId: string, vendorName: string | null) {
     await setProjectVendor(projectId, vendorName);
@@ -107,9 +138,11 @@ export function useProjectsAdmin() {
     loadProjects,
     loading,
     newProjectLabel,
+    newProjectFeatures,
     newProjectVendor,
     projects,
     setDeleteTargetId,
+    setNewProjectFeatures,
     setNewProjectLabel,
     setNewProjectVendor,
     setStatus,

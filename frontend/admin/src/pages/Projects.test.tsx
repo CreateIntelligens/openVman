@@ -118,6 +118,52 @@ describe("Projects", () => {
     expect(await screen.findByText("project-b")).toBeTruthy();
   });
 
+  it("creates a project with both switches off unless they are ticked", async () => {
+    authState.role = "admin";
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    render(<Projects />);
+    await screen.findByText("專案 A");
+    expect(screen.getByRole("checkbox", { name: /記憶/ })).toHaveProperty("checked", false);
+    expect(screen.getByRole("checkbox", { name: /知識圖譜擴展/ })).toHaveProperty("checked", false);
+    fireEvent.change(screen.getByRole("textbox", { name: "專案名稱" }), { target: { value: "展場" } });
+    fireEvent.click(screen.getByRole("button", { name: "建立專案" }));
+    await waitFor(() => expect(projectsState.createProject).toHaveBeenCalledWith("展場", undefined));
+    await screen.findByText("project-b");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("turns on only the ticked switch right after creating the project", async () => {
+    authState.role = "admin";
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      language_routes: [], reply_seconds: 20, memory_enabled: true, graph_enabled: false,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetch);
+    render(<Projects />);
+    await screen.findByText("專案 A");
+    fireEvent.change(screen.getByRole("textbox", { name: "專案名稱" }), { target: { value: "門市客服" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /記憶/ }));
+    fireEvent.click(screen.getByRole("button", { name: "建立專案" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const [url, init] = fetch.mock.calls[0];
+    expect(String(url)).toContain("/knowledge/features");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body)).toEqual({ project_id: "project-b", memory_enabled: true });
+    expect(await screen.findByText(/已建立（ID: project-b）/)).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /記憶/ })).toHaveProperty("checked", false);
+  });
+
+  it("says where to retry when the switch could not be saved after creating", async () => {
+    authState.role = "admin";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
+    render(<Projects />);
+    await screen.findByText("專案 A");
+    fireEvent.change(screen.getByRole("textbox", { name: "專案名稱" }), { target: { value: "門市客服" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /知識圖譜擴展/ }));
+    fireEvent.click(screen.getByRole("button", { name: "建立專案" }));
+    expect(await screen.findByText(/請在專案卡片按「回答功能」再設定一次/)).toBeTruthy();
+  });
+
   it("updates an existing project vendor and refreshes the project list", async () => {
     authState.role = "admin";
     render(<Projects />);

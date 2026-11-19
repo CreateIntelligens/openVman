@@ -78,7 +78,7 @@ Clef-Flash 決策 API 使用獨立網域 `https://decision-primary.example.com`�
 
 正式帳號的專案授權可分別開啟「改知識庫與人設」與「改其他設定」。讀取授權包含查看、匯出對話紀錄，刪除需要「改其他設定」。廠商帳號須明確授權到所屬廠商相同的專案。最高管理員可指定專人管理正式廠商一般帳號。廠商後台只開放知識庫、人設、對話測試、對話紀錄，人設的文件存取限該角色的 `SOUL.md`。角色組合與操作方式見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md) 與 [帳號管理手冊](docs/operations/account-administration.md)。
 
-有「改其他設定」權限的內部帳號可在「專案管理 → 回答功能」逐專案開關記憶與知識圖譜擴展。新專案兩項預設關閉，升版時既有專案保留開啟。記憶關閉時仍可查看與匯出對話紀錄，圖譜擴展關閉時仍可在後台查看與重建圖譜。 [Brain 設定說明](brain/README.md#專案回答功能)
+有「改其他設定」權限的內部帳號可在「專案管理 → 回答功能」逐專案開關記憶與知識圖譜擴展，建立專案時也可以直接勾選。新專案兩項預設關閉，升版時既有專案保留開啟。記憶關閉時仍可查看與匯出對話紀錄，圖譜擴展關閉時仍可在後台查看與重建圖譜。 [Brain 設定說明](brain/README.md#專案回答功能)
 
 先以 `GET /api/v1/me/capabilities` 取得帳號已授權資源、ASR 模式／部署設定與預設值，再指定單次辨識 `provider`、串流連線 `engine` 或 TTS 聲音，不必改帳號偏好。`configured` 代表必要設定齊全，不保證上游健康；專案以原始 `project_id` 傳遞，`label` 只供顯示。可執行的 Python 標準庫 CLI 與音訊格式處理見 [串接快速開始](docs/guides/integration-quickstart.md) 及 [integration_client.py](scripts/integration_client.py)。
 
