@@ -21,6 +21,12 @@ def _no_gemini_warmup(monkeypatch, request):
     """其他預熱測試不該真的連 Gemini；測台語判斷預熱的測試自己換掉 client。"""
     if "audio_language" not in request.node.name:
         monkeypatch.setattr(_load_startup(), "_warmup_audio_language", lambda *args, **kwargs: None)
+    # 測試裡連不到 Backend，補熱迴圈不能真的等兩分鐘；測補熱的測試自己設次數。
+    monkeypatch.setattr(_load_startup(), "_BACKEND_REWARM_ATTEMPTS", 0)
+    monkeypatch.setattr(_load_startup(), "_BACKEND_REWARM_RETRY_SECONDS", 0)
+    # 對話路徑預熱會建工具表與 LLM client，只在測它的測試裡真的跑。
+    if "chat_path" not in request.node.name:
+        monkeypatch.setattr(_load_startup(), "_warmup_chat_path", lambda *args, **kwargs: [])
 
 
 def test_warmup_project_ids_include_projects_with_knowledge_state(monkeypatch):
@@ -393,3 +399,298 @@ async def test_optional_warmup_steps_share_a_time_budget(monkeypatch):
     assert warmup_state.is_warmup_done() is True
     # 必要的檢索預熱照樣每個專案都做。
     assert warmed == ["default", "proj-a"]
+
+
+def _fake_hops(by_project: dict[str, list[tuple[str, str | None]]]):
+    from core.fallback_chain import RouteHop
+    from core.gemini_credentials import current_model_project
+
+    def build(trace_id, client=None):
+        hops = by_project[current_model_project()]
+        if isinstance(hops, Exception):
+            raise hops
+        return [
+            RouteHop(provider="openai", model="m", api_key=key, base_url=url, hop_index=i, trace_id=trace_id)
+            for i, (key, url) in enumerate(hops)
+        ]
+
+    return build
+
+
+class _RecordingOpenAI:
+    """Stands in for openai.OpenAI; records whether chat.completions was touched."""
+
+    touched: list[tuple[str, str | None]] = []
+
+    def __init__(self, *, api_key, base_url, **_kwargs):
+        self.key = (api_key, base_url)
+
+    @property
+    def chat(self):
+        outer = self
+
+        class _Chat:
+            @property
+            def completions(self):
+                _RecordingOpenAI.touched.append(outer.key)
+                return object()
+
+        return _Chat()
+
+
+def test_warmup_chat_path_builds_each_projects_tools_and_llm_clients(monkeypatch):
+    # 第一題才建 OpenAI client 會連帶 import httpcore2／openai chat 資源（映像檔沒有 .pyc），
+    # 換版後第一批同時進來的題目會一起慢；預熱要建出第一題會重用的那個 client。
+    import sys
+    from collections import OrderedDict
+
+    import core.llm_client as llm_client
+    from core.gemini_credentials import current_model_project
+    from tools.context import active_project_id
+
+    startup = _load_startup()
+    registries: list[str] = []
+    gemini: list[str | None] = []
+    monkeypatch.setattr(llm_client, "_SYNC_CLIENT_CACHE", OrderedDict())
+    monkeypatch.setattr(llm_client, "OpenAI", _RecordingOpenAI)
+    monkeypatch.setattr(_RecordingOpenAI, "touched", [])
+    monkeypatch.setattr(llm_client, "_get_gemini_client", lambda: gemini.append(current_model_project()))
+    monkeypatch.delitem(sys.modules, "knowledge.graph_rag", raising=False)
+    monkeypatch.setattr("tools.tool_registry.get_tool_registry", lambda: registries.append(active_project_id.get()))
+    monkeypatch.setattr("core.fallback_chain.build_fallback_chain", _fake_hops({
+        "default": [("key-shared", "http://llm.invalid/v1")],
+        "proj-a": [("key-a", None), ("key-shared", "http://llm.invalid/v1")],
+    }))
+
+    assert startup._warmup_chat_path(["default", "proj-a"]) == []
+
+    # 工具表是全域的，建一次就好；逐專案建只會互相蓋掉。
+    assert registries == ["default"]
+    assert gemini == ["default", "proj-a"]
+    assert "knowledge.graph_rag" in sys.modules
+    assert set(llm_client._SYNC_CLIENT_CACHE) == {("key-shared", "http://llm.invalid/v1"), ("key-a", None)}
+    # chat.completions 也是第一次取用才 import，預熱要碰到它。
+    assert ("key-a", None) in _RecordingOpenAI.touched
+    # 第一題拿到的就是預熱建好的 client。
+    cached = llm_client._SYNC_CLIENT_CACHE[("key-a", None)]
+    assert llm_client._get_sync_client("key-a", None) is cached
+
+
+def test_warmup_chat_path_builds_the_real_tool_registry(monkeypatch):
+    import tools.tool_registry as tool_registry
+
+    startup = _load_startup()
+    monkeypatch.setattr(tool_registry, "_registry", None)
+    monkeypatch.setattr("core.llm_client._get_gemini_client", lambda: None)
+    monkeypatch.setattr("core.fallback_chain.build_fallback_chain", lambda trace_id, client=None: [])
+
+    startup._warmup_chat_path(["default"])
+
+    assert tool_registry._registry is not None
+    assert tool_registry._registry.get("search_knowledge").name == "search_knowledge"
+
+
+def test_warmup_chat_path_one_project_failure_does_not_stop_others(monkeypatch, caplog):
+    from collections import OrderedDict
+
+    import core.llm_client as llm_client
+
+    startup = _load_startup()
+    monkeypatch.setattr(llm_client, "_SYNC_CLIENT_CACHE", OrderedDict())
+    monkeypatch.setattr(llm_client, "_get_gemini_client", lambda: None)
+    monkeypatch.setattr("tools.tool_registry.get_tool_registry", lambda: None)
+    monkeypatch.setattr("core.fallback_chain.build_fallback_chain", _fake_hops({
+        "broken": RuntimeError("no route"),
+        "proj-b": [("key-b", None)],
+    }))
+
+    # 設定錯誤不是連不到 Backend，不列入補熱。
+    assert startup._warmup_chat_path(["broken", "proj-b"]) == []
+
+    assert list(llm_client._SYNC_CLIENT_CACHE) == [("key-b", None)]
+    assert "對話路徑預熱失敗 project=broken" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_warmup_resources_warms_chat_path_after_model_settings(monkeypatch):
+    startup = _load_startup()
+    order: list[object] = []
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default", "proj-a"])
+    monkeypatch.setattr(startup, "get_embedder", lambda: None)
+    monkeypatch.setattr(startup, "_warmup_retrieval_path", lambda project_id: None)
+    monkeypatch.setattr(startup, "load_product_catalogs", lambda project_id: [])
+    monkeypatch.setattr(startup, "_warmup_model_settings", lambda project_ids: order.append("settings"))
+    monkeypatch.setattr(startup, "_warmup_chat_path", lambda project_ids: order.append(list(project_ids)))
+
+    await startup.warmup_resources("chat")
+
+    assert order == ["settings", ["default", "proj-a"]]
+
+
+def _stub_non_backend_warmup(monkeypatch, startup):
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default"])
+    monkeypatch.setattr(startup, "get_embedder", lambda: None)
+    monkeypatch.setattr(startup, "_warmup_retrieval_path", lambda project_id: None)
+    monkeypatch.setattr(startup, "load_product_catalogs", lambda project_id: [])
+
+
+def _connect_error():
+    import httpx
+
+    return httpx.ConnectError("refused", request=httpx.Request("GET", "http://backend.invalid"))
+
+
+def test_backend_unreachable_only_for_network_and_server_errors():
+    import httpx
+
+    from core.decision_router import DecisionProviderError
+    from core.gemini_credentials import GeminiCredentialUnavailable
+
+    startup = _load_startup()
+    request = httpx.Request("GET", "http://backend.invalid")
+
+    def status(code):
+        return httpx.HTTPStatusError("x", request=request, response=httpx.Response(code, request=request))
+
+    wrapped = DecisionProviderError("unavailable")
+    wrapped.__cause__ = _connect_error()
+    assert startup._backend_unreachable(_connect_error()) is True
+    assert startup._backend_unreachable(wrapped) is True
+    assert startup._backend_unreachable(status(502)) is True
+    assert startup._backend_unreachable(status(404)) is False
+    assert startup._backend_unreachable(ValueError("bad document")) is False
+    try:
+        try:
+            raise _connect_error()
+        except httpx.ConnectError:
+            raise GeminiCredentialUnavailable("binding broken") from None
+    except GeminiCredentialUnavailable as exc:
+        assert startup._backend_unreachable(exc) is False
+
+
+def test_model_settings_only_reports_unreachable_items_as_pending(monkeypatch, caplog):
+    from core.gemini_credentials import GeminiCredentialUnavailable
+
+    startup = _load_startup()
+    calls: list[str] = []
+
+    def credential(pid):
+        calls.append(pid)
+        if pid == "broken":
+            raise GeminiCredentialUnavailable("binding broken")
+        if pid == "down":
+            raise _connect_error()
+
+    monkeypatch.setattr("core.decision_router._provider_configuration", lambda timeout: None)
+    monkeypatch.setattr("core.fallback_chain._admin_chat", lambda: None)
+    monkeypatch.setattr("core.gemini_credentials.resolve_gemini_credential", credential)
+
+    pending = startup._warmup_model_settings(["broken", "down", "ok"], log_failures=False)
+
+    assert pending == ["gemini_credential:down"]
+    # 設定錯誤即使不記暫時性失敗也要記下來，連不到的不吵。
+    assert "gemini_credential:broken" in caplog.text
+    assert "gemini_credential:down" not in caplog.text
+    calls.clear()
+    assert startup._warmup_model_settings(["broken", "down", "ok"], False, ["gemini_credential:down"]) == [
+        "gemini_credential:down",
+    ]
+    assert calls == ["down"]
+
+
+def test_rewarm_skips_the_tool_registry(monkeypatch):
+    startup = _load_startup()
+    registries: list[str] = []
+    monkeypatch.setattr("tools.tool_registry.get_tool_registry", lambda: registries.append("built"))
+    monkeypatch.setattr("core.llm_client._get_gemini_client", lambda: None)
+    monkeypatch.setattr("core.fallback_chain.build_fallback_chain", lambda trace_id, client=None: [])
+
+    assert startup._warmup_chat_path(["default"], False, False) == []
+    assert registries == []
+
+
+@pytest.mark.asyncio
+async def test_warmup_retries_backend_steps_after_readiness(monkeypatch):
+    # compose 讓 Backend 等 Brain ready 才啟動：預熱時拿不到設定，readiness 放行後要補。
+    startup = _load_startup()
+    _stub_non_backend_warmup(monkeypatch, startup)
+    monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default", "proj-a"])
+    monkeypatch.setattr(startup, "_BACKEND_REWARM_ATTEMPTS", 5)
+    calls: list[tuple] = []
+
+    def settings(project_ids, log_failures=True, only=None):
+        calls.append(("settings", warmup_state.is_warmup_done(), only))
+        return ["chat_llm"] if len(calls) < 4 else []  # Backend 在第二輪補熱時起來
+
+    def chat_path(project_ids, log_failures=True, build_tools=True):
+        calls.append(("chat_path", warmup_state.is_warmup_done(), list(project_ids), build_tools))
+        return [] if warmup_state.is_warmup_done() else ["default"]
+
+    monkeypatch.setattr(startup, "_warmup_model_settings", settings)
+    monkeypatch.setattr(startup, "_warmup_chat_path", chat_path)
+
+    await startup.warmup_resources("chat")
+
+    assert calls == [
+        ("settings", False, None),
+        ("chat_path", False, ["default", "proj-a"], True),
+        # 補熱只重試沒拿到的設定；設定還沒到前不重建 client。
+        ("settings", True, ["chat_llm"]),
+        ("settings", True, ["chat_llm"]),
+        # 設定拿到後 client 照新設定全部重建，不再建工具表。
+        ("chat_path", True, ["default", "proj-a"], False),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_warmup_does_not_retry_when_backend_steps_succeed(monkeypatch):
+    startup = _load_startup()
+    _stub_non_backend_warmup(monkeypatch, startup)
+    monkeypatch.setattr(startup, "_BACKEND_REWARM_ATTEMPTS", 5)
+    calls: list[str] = []
+    monkeypatch.setattr(startup, "_warmup_model_settings", lambda *args, **kwargs: calls.append("s") or [])
+    monkeypatch.setattr(startup, "_warmup_chat_path", lambda *args, **kwargs: calls.append("c") or [])
+
+    await startup.warmup_resources("chat")
+
+    assert calls == ["s", "c"]
+
+
+@pytest.mark.asyncio
+async def test_warmup_does_not_rewarm_a_step_that_timed_out(monkeypatch):
+    # 逾時的執行緒還在背景跑，補熱會讓同一步並行兩份。
+    import threading
+
+    startup = _load_startup()
+    _stub_non_backend_warmup(monkeypatch, startup)
+    release = threading.Event()
+    monkeypatch.setattr(startup, "_OPTIONAL_WARMUP_BUDGET_S", 0.2, raising=False)
+    monkeypatch.setattr(startup, "_BACKEND_REWARM_ATTEMPTS", 5)
+    calls: list[str] = []
+
+    def slow_settings(*args, **kwargs):
+        calls.append("s")
+        release.wait(5)
+        return ["chat_llm"]
+
+    monkeypatch.setattr(startup, "_warmup_model_settings", slow_settings)
+    monkeypatch.setattr(startup, "_warmup_chat_path", lambda *args, **kwargs: calls.append("c") or ["default"])
+    try:
+        await startup.warmup_resources("chat")
+    finally:
+        release.set()
+
+    assert calls == ["s"]
+
+
+@pytest.mark.asyncio
+async def test_rewarm_gives_up_after_the_attempt_budget(monkeypatch, caplog):
+    startup = _load_startup()
+    monkeypatch.setattr(startup, "_BACKEND_REWARM_ATTEMPTS", 3)
+    calls: list[str] = []
+    monkeypatch.setattr(startup, "_warmup_model_settings", lambda *args, **kwargs: calls.append("s") or ["decision"])
+
+    await startup._rewarm_after_backend(["default"], ["decision"], ["default"])
+
+    assert calls == ["s", "s", "s"]
+    assert "Backend 一直沒回應" in caplog.text

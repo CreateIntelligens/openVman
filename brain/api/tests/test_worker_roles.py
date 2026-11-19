@@ -113,6 +113,9 @@ async def test_chat_warmup_only_reads_retrieval_paths(monkeypatch):
     monkeypatch.setattr(startup, "_warmup_project_ids", lambda: ["default", "new"])
     for name in ("_warmup_audio_language", "get_embedder", "mark_warmup_done"):
         monkeypatch.setattr(startup, name, Mock())
+    # 回空清單＝沒有要補熱的項目；回 Mock 會被當成待補，真的等兩分鐘。
+    for name in ("_warmup_model_settings", "_warmup_chat_path"):
+        monkeypatch.setattr(startup, name, Mock(return_value=[]))
     ensure_tables, scaffold, maintenance, retrieval = Mock(), Mock(), Mock(), Mock()
     monkeypatch.setattr(startup, "ensure_tables", ensure_tables)
     monkeypatch.setattr(startup, "ensure_workspace_scaffold", scaffold)

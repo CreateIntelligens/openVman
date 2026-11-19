@@ -32,6 +32,10 @@ _AUDIO_WARMUP_RETRY_SECONDS = 2.0
 # 選用預熱（LLM 套件、模型設定、型錄）合計最多等這麼久。Backend 或型錄卡住時
 # 第一題自己會再取，不值得讓 readiness 一直停在 pending。
 _OPTIONAL_WARMUP_BUDGET_S = 30.0
+# compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱多半連不到 Backend，
+# 模型設定與對話路徑會留給第一題自己做。readiness 放行後繼續每 2 秒重試，最多約 2 分鐘。
+_BACKEND_REWARM_ATTEMPTS = 60
+_BACKEND_REWARM_RETRY_SECONDS = 2.0
 
 
 def _warmup_project_ids() -> list[str]:
@@ -143,8 +147,37 @@ def _warmup_product_catalogs(project_id: str) -> None:
         logger.warning("型錄預熱失敗 project=%s: %s", project_id, type(exc).__name__)
 
 
-def _warmup_model_settings(project_ids: list[str]) -> None:
-    """先向 Backend 取一次模型與決策設定，第一批題目就不用各自去拿。"""
+def _backend_unreachable(exc: BaseException) -> bool:
+    """連不到 Backend 或它回 5xx 才值得重試；設定錯誤、專案金鑰綁定壞掉，再打幾次也一樣。"""
+    import httpx
+
+    from core.gemini_credentials import GeminiCredentialUnavailable
+
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, GeminiCredentialUnavailable):
+            return False
+        if isinstance(current, httpx.TransportError):
+            return True
+        if isinstance(current, httpx.HTTPStatusError) and current.response.status_code >= 500:
+            return True
+        current = current.__cause__ if current.__suppress_context__ else (
+            current.__cause__ or current.__context__
+        )
+    return False
+
+
+def _warmup_model_settings(
+    project_ids: list[str],
+    log_failures: bool = True,
+    only: list[str] | None = None,
+) -> list[str]:
+    """先向 Backend 取一次模型與決策設定，第一批題目就不用各自去拿。
+
+    回傳因為連不到 Backend 而沒取到、之後值得再試的項目名稱；`only` 只重試這些。
+    """
     from core.decision_router import _provider_configuration
     from core.fallback_chain import _admin_chat
     from core.gemini_credentials import resolve_gemini_credential
@@ -154,34 +187,126 @@ def _warmup_model_settings(project_ids: list[str]) -> None:
         ("chat_llm", _admin_chat),
         *((f"gemini_credential:{pid}", lambda pid=pid: resolve_gemini_credential(pid)) for pid in project_ids),
     ]
+    pending: list[str] = []
     for name, load in loaders:
+        if only is not None and name not in only:
+            continue
         try:
             load()
         except Exception as exc:  # 取不到時第一題照常自己取，預熱不擋啟動
-            logger.warning("模型設定預熱失敗 %s: %s", name, type(exc).__name__)
+            retry = _backend_unreachable(exc)
+            if retry:
+                pending.append(name)
+            if log_failures or not retry:
+                logger.warning("模型設定預熱失敗 %s: %s", name, type(exc).__name__)
+    return pending
+
+
+def _warmup_chat_path(
+    project_ids: list[str],
+    log_failures: bool = True,
+    build_tools: bool = True,
+) -> list[str]:
+    """先做第一題才會做的程序內準備：工具表、圖譜擴展模組、各專案的 LLM client。
+
+    映像檔沒有 .pyc，第一題才 import 的模組每個 worker 都要從原始碼編譯
+    （建 OpenAI client 會連帶載入 httpcore2、openai 的 chat 資源，約 0.15 秒 CPU，
+    期間同一個 worker 的其他題目都在等 GIL）。換版後第一批同時進來的題目會一起慢。
+    每題也會取專案金鑰的 Gemini client（建兩個 SSL context），跟台語判斷用的不是同一個。
+    只建物件、不連線：httpx 閒置 5 秒就關連線，預先連了也留不到第一題。
+
+    回傳因為連不到 Backend 而沒建好 client、之後值得再試的專案。
+    """
+    import knowledge.graph_rag  # noqa: F401  （檢索命中後才載入的圖譜擴展）
+    from core.fallback_chain import build_fallback_chain
+    from core.gemini_credentials import project_model_scope
+    from core.llm_client import _get_gemini_client, _get_sync_client
+    from openai import OpenAI
+    from tools.tool_registry import bind_tool_context, get_tool_registry
+
+    # 先用假金鑰建一個不留下來的 client：Backend 還沒起來、拿不到金鑰時，模組照樣先載入。
+    OpenAI(api_key="warmup", max_retries=0).chat.completions  # noqa: B018
+    # 工具表是全域的，一次只載入一個專案的技能：建一次就載入所有工具模組，
+    # 逐專案建只會互相蓋掉，還要每次重掃技能目錄。
+    if build_tools and project_ids:
+        try:
+            with bind_tool_context("default", project_ids[0]):
+                get_tool_registry()
+        except Exception as exc:  # 第一題照常自己建
+            logger.warning("工具表預熱失敗: %s", type(exc).__name__)
+    pending: list[str] = []
+    for project_id in project_ids:
+        try:
+            with project_model_scope(project_id):
+                _get_gemini_client()
+                # 不把 Gemini client 傳進去：開了模型探索時那會連線，預熱只建物件。
+                for hop in build_fallback_chain("warmup"):
+                    # chat.completions 也是第一次取用才載入。
+                    _get_sync_client(hop.api_key, hop.base_url).chat.completions  # noqa: B018
+        except Exception as exc:  # 單一專案失敗不影響其他專案，第一題照常自己建
+            retry = _backend_unreachable(exc)
+            if retry:
+                pending.append(project_id)
+            if log_failures or not retry:
+                logger.warning("對話路徑預熱失敗 project=%s: %s", project_id, type(exc).__name__)
+    return pending
+
+
+async def _rewarm_after_backend(
+    project_ids: list[str],
+    settings_pending: list[str],
+    chat_pending: list[str],
+) -> None:
+    """Backend 回應前做不完的預熱，等它起來再補；放行 readiness 之後才跑，只補沒做完的。"""
+    for _ in range(_BACKEND_REWARM_ATTEMPTS):
+        await asyncio.sleep(_BACKEND_REWARM_RETRY_SECONDS)
+        try:
+            if settings_pending:
+                settings_pending = await asyncio.to_thread(
+                    _warmup_model_settings, project_ids, False, settings_pending,
+                )
+                if not settings_pending:
+                    # 先前拿不到設定時 client 是照 .env 建的，金鑰可能不同，全部重建。
+                    chat_pending = list(project_ids)
+            if chat_pending and not settings_pending:
+                chat_pending = await asyncio.to_thread(
+                    _warmup_chat_path, chat_pending, False, False,
+                )
+        except Exception:  # noqa: BLE001 - 下一輪再試
+            continue
+        if not settings_pending and not chat_pending:
+            logger.info("Backend 回應後補完模型設定與對話路徑預熱")
+            return
+    logger.warning(
+        "Backend 一直沒回應，留給第一題：設定 %s、對話路徑 %s",
+        settings_pending, chat_pending,
+    )
 
 
 async def _optional_warmup(deadline: float, name: str, step, *args) -> None:
     """跑一個選用預熱步驟，所有選用步驟共用同一個期限；失敗或逾時都只記 log。
 
+    回傳步驟本身的回傳值；略過、逾時或拋錯時回 None。
     逾時後執行緒仍在背景跑完（執行緒無法中途取消），只是不再擋 readiness。
     """
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         logger.warning("預熱略過 %s：選用預熱時間已用完", name)
-        return
+        return None
     try:
-        await asyncio.wait_for(asyncio.to_thread(step, *args), remaining)
+        return await asyncio.wait_for(asyncio.to_thread(step, *args), remaining)
     except asyncio.TimeoutError:
         logger.warning("預熱逾時 %s（不影響啟動）", name)
     except Exception as exc:  # noqa: BLE001 - 選用預熱失敗不擋啟動
         logger.warning("預熱失敗 %s（不影響啟動）: %s", name, type(exc).__name__)
+    return None
 
 
 async def warmup_resources(role: str | None = None) -> None:
     """背景預熱 remote embedding 與資料路徑。"""
     role = role or get_settings().brain_role
     logger.info("背景預熱開始...")
+    rewarm: tuple[list[str], list[str], list[str]] | None = None
     try:
         try:
             # 最先做：部署後第一句台語可能在其他預熱跑完前就到。
@@ -193,9 +318,18 @@ async def warmup_resources(role: str | None = None) -> None:
         optional_deadline = time.monotonic() + _OPTIONAL_WARMUP_BUDGET_S
         await _optional_warmup(optional_deadline, "llm_modules", _warmup_llm_modules)
         project_ids = _warmup_project_ids()
-        await _optional_warmup(
+        settings_pending = await _optional_warmup(
             optional_deadline, "model_settings", _warmup_model_settings, project_ids,
         )
+        chat_pending = await _optional_warmup(
+            optional_deadline, "chat_path", _warmup_chat_path, project_ids,
+        )
+        # 兩步都跑完、明確回報連不到才補。回 None 是逾時或拋錯：逾時的執行緒
+        # 還在背景跑，補熱會讓同一步並行兩份。
+        if settings_pending is not None and chat_pending is not None and (
+            settings_pending or chat_pending
+        ):
+            rewarm = (project_ids, settings_pending, chat_pending)
         await asyncio.to_thread(get_embedder)
         for project_id in project_ids:
             if project_id != "default":
@@ -219,6 +353,8 @@ async def warmup_resources(role: str | None = None) -> None:
     finally:
         mark_warmup_done()
         logger.info("背景預熱完成")
+    if rewarm is not None:
+        await _rewarm_after_backend(*rewarm)
 
 
 async def cancel_task(task: asyncio.Task[None] | None) -> None:

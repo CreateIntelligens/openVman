@@ -16,6 +16,8 @@
 
 - **[2026-11-18]** **唯讀專案可看與匯出對話紀錄**：對話列表、單段歷史及匯出使用專案讀取權，刪除仍需「改其他設定」。一般帳號改由管理員代發 API 金鑰，既有金鑰照原本的期限與撤銷規則驗證。
 
+- **[2026-11-18]** **重啟後第一批題目不再整批慢半秒**：Brain 映像檔沒有 `.pyc`，第一題才建的 OpenAI client 會連帶 import `httpcore2`、openai 的 chat 資源，工具表也是第一題才載入，每個 worker 都在第一批題目上現場編譯這些模組，期間同一個 worker 的其他題目都在等。背景預熱現在先建好工具表，並對每個專案建好 Gemini client 與 LLM client（只建物件、不連線），第一題直接沿用。compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱拿不到模型設定與金鑰；這兩項現在在 readiness 放行後每 2 秒重試（最多約 2 分鐘），Backend 一回應就補完；只重試連不到 Backend 或它回 5xx 的項目，專案金鑰綁定壞掉之類的設定錯誤記 warning 後不再重試，補熱也不重建工具表。隔離環境（鶴記真實資料、LLM／TTS 用假服務、決策走真的 Jev）重啟後馬上 1 秒 100 題：聽到第一句中位數原本比第二批慢 0.6～0.9 秒，現在慢 0.2～0.3 秒；p95 仍比第二批慢 0.5～0.8 秒，原因還沒找到。
+
 - **[2026-11-18]** **Gemini 語音預設改為直連 Google，可在後台切換**：沒有綁專案金鑰的請求，以前一律經 `TTS_GEMINI_URL` 的轉接服務合成；現在預設用本系統的 Gemini 金鑰（後台 API 金鑰或 `GEMINI_API_KEY`）直接呼叫 Google，費用算在這把金鑰。ROOT 可在「模型供應商 → Gemini 語音」（`/admin/model-providers/voice`）改成經轉接服務，Backend 各 worker 約 3 秒內生效、不用重開；沒有 Gemini 金鑰時不能選直連，沒設 `TTS_GEMINI_URL` 時不能選轉接。沒在後台存過時照新的 `TTS_GEMINI_ROUTE`（`direct`／`relay`，預設 `direct`，其他值啟動時報錯）。專案綁了自己的金鑰時照舊一律用它直連。Gemini 聲音改為固定的 30 個 Google 預設聲音（不再向轉接服務查 `/api/voices`），任一條路線可用就登錄，切換路線不影響可選的聲音；有設 `TTS_GEMINI_URL` 就照舊背景探測。直連的整段合成也改用每站的時限，失敗訊息不再寫成「Project」。`PUT /api/v1/settings/model-providers` 新增選填欄位 `tts_gemini_route`，`GET` 回應新增 `tts_gemini`。
 
 - **[2026-11-18]** **部署文件補上主機參考規格**：`docs/operations/11_DEPLOYMENT.md` 依實測換算「1 秒內同時 100 題」需要的 CPU、記憶體、GPU 與硬碟，並說明每核可接的題數與量測主機的限制。

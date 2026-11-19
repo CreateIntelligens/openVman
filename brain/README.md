@@ -31,7 +31,7 @@ Edge nginx 對 `/brain/` 一律回 404。除了 `GET /brain/health` 與 `GET /br
 `startup.lifespan` 依序：
 
 1. 建立預設專案（`DEFAULT_PROJECT_ID`，未設定時為 `default`）的 workspace scaffold，執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`，舊資料搬進預設專案）。
-2. 背景預熱：先預熱台語語音判斷的 Gemini client（Backend 跟著一起重啟、暫時拿不到金鑰時，每 2 秒重試，最多約 10 秒），再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning，readiness 照樣放行；載入 LLM 套件、取模型設定、解析型錄這些選用步驟合計最多等 30 秒，逾時就略過。
+2. 背景預熱：先預熱台語語音判斷的 Gemini client（Backend 跟著一起重啟、暫時拿不到金鑰時，每 2 秒重試，最多約 10 秒），再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning，readiness 照樣放行；載入 LLM 套件、取模型設定、建工具表與各專案的 LLM client、解析型錄這些選用步驟合計最多等 30 秒，逾時就略過。映像檔沒有 `.pyc`，第一題才 import 的模組每個 worker 都要現場編譯，所以第一題會用到的程序內物件（工具表，以及各專案的 Gemini 與 LLM client）都在預熱時先建好；只建物件、不先連線（閒置連線 5 秒就會被關掉）。Compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱拿不到模型設定與金鑰，這兩項在 readiness 放行後每 2 秒重試，最多約 2 分鐘；只重試連不到 Backend 或回 5xx 的項目，設定錯誤記 warning 後不重試，取得模型設定後再照新設定重建各專案的 LLM client。
 3. `DREAMING_ENABLED` 時啟動 dreaming 排程；啟動每日對話備份排程。
 
 Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符時，Brain fail closed，不會在 API process 內自行改用其他 provider。
