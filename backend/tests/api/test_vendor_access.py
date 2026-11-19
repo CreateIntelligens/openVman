@@ -15,7 +15,8 @@ from app import brain_proxy, project_routes
 from app.auth import api_key_routes
 from app.auth.middleware import FailClosedAuthMiddleware
 from app.auth.models import AccountRole, AccountType, ResourceType
-from app.auth.routes import auth_router, users_router
+from app.auth.routes import auth_router
+from app.auth.users_routes import users_router
 from app.auth.runtime import get_auth_runtime
 from app.gateway import asr_stream
 from app.gateway import routes as gateway_routes

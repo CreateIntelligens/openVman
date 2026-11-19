@@ -15,7 +15,7 @@ if str(API_ROOT) not in sys.path:
 import knowledge.normalizer
 import knowledge.workspace
 from knowledge.doc_meta import get_document_meta
-from knowledge.knowledge_admin import (
+from knowledge.raw_import import (
     commit_raw_documents,
     normalize_raw_paths,
     qa_document_lock,
@@ -119,7 +119,7 @@ def test_commit_same_name_twice_keeps_both_archives(workspace):
 
 
 def test_list_raw_files(workspace):
-    from knowledge.knowledge_admin import list_raw_files
+    from knowledge.raw_import import list_raw_files
     raw_dir = workspace / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
     

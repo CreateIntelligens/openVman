@@ -1,7 +1,8 @@
 """HTTP routes exposed to a vendor account, after authentication."""
 
-from collections.abc import Mapping
 import re
+from collections.abc import Mapping
+from typing import Any
 
 VENDOR_HEADER = "X-OpenVMan-Vendor"
 
@@ -71,3 +72,13 @@ def vendor_route_allowed(method: str, path: str) -> bool:
         return False
     kind, identifier, action = match.groups()
     return identifier not in {".", ".."} and method in _QA_METHODS.get((kind, action), ())
+
+
+def is_vendor_knowledge_path(value: Any) -> bool:
+    if not isinstance(value, str) or value != value.strip():
+        return False
+    parts = value.split("/")
+    return len(parts) >= 2 and parts[0] == "knowledge" and all(
+        part and not part.startswith(".") and part not in {"graphify-out", "_catalog.yaml"}
+        for part in parts[1:]
+    )

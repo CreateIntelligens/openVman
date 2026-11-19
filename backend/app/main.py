@@ -10,12 +10,10 @@ from app.auth.middleware import FailClosedAuthMiddleware
 from app.auth.project_gemini_credential_routes import (
     router as project_gemini_credential_router,
 )
-from app.auth.routes import (
-    auth_router,
-    settings_router,
-    temporary_accounts_router,
-    users_router,
-)
+from app.auth.routes import auth_router
+from app.auth.settings_routes import settings_router
+from app.auth.temporary_accounts_routes import temporary_accounts_router
+from app.auth.users_routes import users_router
 from app.brain_proxy import router as brain_proxy_router
 from app.client_disconnect import ClientDisconnectMiddleware
 from app.config import get_tts_config

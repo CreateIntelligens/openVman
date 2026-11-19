@@ -19,11 +19,9 @@ from app.auth.models import (
 from app.auth.passwords import hash_password
 from app.auth.repository_errors import InvalidResourceGrantError
 from app.auth.resources import list_accessible_resources
-from app.auth.routes import (
-    auth_router,
-    temporary_accounts_router,
-    users_router,
-)
+from app.auth.routes import auth_router
+from app.auth.temporary_accounts_routes import temporary_accounts_router
+from app.auth.users_routes import users_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.auth.temporary_accounts_repository import TemporaryCredentialCreate
 from app.config import TTSRouterConfig

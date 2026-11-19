@@ -615,7 +615,7 @@ def test_daily_summary_and_maintenance_skip_disabled_projects(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_graph_expansion_gates_neighbors_and_citations_but_keeps_management(monkeypatch):
-    from routes import knowledge
+    from routes import knowledge_graph
     from tools.builtin import knowledge_tools
     from tools.tool_registry import bind_tool_context
 
@@ -641,10 +641,10 @@ async def test_graph_expansion_gates_neighbors_and_citations_but_keeps_managemen
     # 管理路由仍以專案與圖譜狀態回應。
     graph = Mock(return_value={"nodes": []})
     rebuild = Mock(return_value=True)
-    monkeypatch.setattr(knowledge, "load_project_graph", graph)
-    monkeypatch.setattr(knowledge, "_schedule_graph_rebuild", rebuild)
+    monkeypatch.setattr(knowledge_graph, "load_project_graph", graph)
+    monkeypatch.setattr(knowledge_graph, "schedule_graph_rebuild", rebuild)
     app = FastAPI()
-    app.include_router(knowledge.router)
+    app.include_router(knowledge_graph.router)
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test",
         headers={"X-Internal-Token": "test-internal-token"},

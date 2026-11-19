@@ -10,12 +10,7 @@ from math import ceil
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import Field
 
-from .dependencies import CurrentAccount, require_admin
-from .models import AccountRole
-from .passwords import hash_password
-from .policy import AccountPolicyError
-from .repository_errors import InvalidResourceGrantError, UserNotFoundError
-from .routes import (
+from .account_schemas import (
     AccountDefaultsProfile,
     AccountResourceGrants,
     AccountResourceGrantsView,
@@ -24,6 +19,11 @@ from .routes import (
     _defaults_tuple,
     _resource_grants,
 )
+from .dependencies import CurrentAccount, require_admin
+from .models import AccountRole
+from .passwords import hash_password
+from .policy import AccountPolicyError
+from .repository_errors import InvalidResourceGrantError, UserNotFoundError
 from .runtime import AuthRuntime, get_auth_runtime
 from .temporary_accounts_repository import (
     TemporaryBatch,

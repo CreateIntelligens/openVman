@@ -185,7 +185,7 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
 
 
 def test_project_content_writes_require_the_matching_permission() -> None:
-    from app.brain_proxy import _project_access
+    from app.auth.brain_project_access import _project_access
 
     assert _project_access("knowledge/document", "PUT") is ResourceAccess.EDIT_KNOWLEDGE
     assert _project_access("personas", "POST") is ResourceAccess.EDIT_KNOWLEDGE
@@ -231,7 +231,7 @@ def test_portal_user_can_only_forward_granted_project_edits(
     mock_client.send = AsyncMock(return_value=upstream)
 
     with (
-        patch("app.brain_proxy.get_auth_runtime", return_value=runtime),
+        patch("app.auth.brain_project_access.get_auth_runtime", return_value=runtime),
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=mock_client),
         TestClient(app) as isolated_client,
@@ -245,6 +245,7 @@ def test_portal_user_can_only_forward_granted_project_edits(
         )
 
     assert response.status_code == expected_status
+    runtime.resources.get.assert_called_with(ResourceType.PROJECT, "project-a")
     assert mock_client.send.await_count == (1 if granted else 0)
 
 
@@ -610,14 +611,15 @@ async def test_proxy_returns_413_and_never_calls_brain_when_body_too_large():
         patch("app.brain_proxy.get_tts_config", return_value=cfg),
         patch("app.brain_proxy._http.get", return_value=mock_client),
         patch(
-            "app.brain_proxy._authorize_project_context",
-            new=AsyncMock(return_value="default"),
-        ),
+            "app.auth.brain_project_access.authorize_project_context",
+            new_callable=AsyncMock,
+        ) as authorize,
     ):
         response = await proxy_to_brain(request, "knowledge/qa/images", current=None)
 
     assert response.status_code == 413
     assert b"detail" in response.body
+    authorize.assert_not_awaited()
     mock_client.send.assert_not_awaited()
 
 

@@ -16,6 +16,7 @@ from app import (
     jev_client,
     language_routes,
 )
+from app.auth import brain_project_access
 from app.auth.models import AccountRole
 from app.config import TTSRouterConfig
 from app.gateway import asr_stream, routes_vision
@@ -288,12 +289,12 @@ async def test_proxy_request_uses_method_when_selecting_upstream(
     }, receive=receive)
     monkeypatch.setattr(brain_proxy, "get_tts_config", lambda: cfg)
     monkeypatch.setattr(brain_proxy, "_unless_client_gone", complete)
-    monkeypatch.setattr(
-        brain_proxy, "_authorize_project_context", AsyncMock(return_value="test"),
-    )
+    authorize = AsyncMock(return_value="test")
+    monkeypatch.setattr(brain_project_access, "authorize_project_context", authorize)
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         monkeypatch.setattr(brain_proxy._http, "get", lambda: client)
         result = await brain_proxy.proxy_to_brain(request, path, current=None)
+    authorize.assert_awaited_once()
     assert result.status_code == 200
     assert requests[0].method == method
     assert str(requests[0].url) == f"{base}/brain/{path}?project_id=test"

@@ -14,7 +14,7 @@ def _setup(monkeypatch, calls):
         "rebuild_knowledge_index",
         lambda project_id: calls.append(project_id) or {"status": "ok"},
     )
-    monkeypatch.setattr(knowledge_routes, "_schedule_graph_rebuild", lambda project_id: True)
+    monkeypatch.setattr(knowledge_routes, "schedule_graph_rebuild", lambda project_id: True)
     knowledge_routes._reindex_state.clear()
 
 

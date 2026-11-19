@@ -40,7 +40,7 @@ from app.auth.resources import (
     resolve_resource,
 )
 from app.auth.runtime import AuthRuntime, get_auth_runtime
-from app.auth.routes import VendorAffiliationRequest, VendorName
+from app.auth.account_schemas import VendorAffiliationRequest, VendorName
 from app.brain_proxy import proxy_to_brain
 from app.utils.log_safe import log_safe
 

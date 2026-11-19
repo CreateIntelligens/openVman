@@ -13,6 +13,7 @@ from routes.chat import router as chat_router
 from routes.health import router as health_router
 from routes.knowledge import chat_router as knowledge_chat_router
 from routes.knowledge import router as knowledge_router
+from routes.knowledge_graph import router as knowledge_graph_router
 from routes.knowledge_qa import router as knowledge_qa_router
 from routes.memory import router as memory_router
 from routes.personas import router as personas_router
@@ -68,7 +69,7 @@ def create_app(role: str | None = None) -> FastAPI:
     ) if role == "chat" else (
         internal_router, health_router, tools_router, projects_router,
         personas_router, chat_router, search_router, memory_router,
-        sessions_router, knowledge_router, knowledge_qa_router,
+        sessions_router, knowledge_router, knowledge_graph_router, knowledge_qa_router,
         workspace_router, protocol_router, usage_router, backups_router,
     )
     for router in routers:

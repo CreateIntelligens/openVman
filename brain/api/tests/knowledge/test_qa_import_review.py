@@ -14,7 +14,7 @@ if str(API_ROOT) not in sys.path:
 import knowledge.normalizer
 import knowledge.workspace
 from knowledge import qa_nodes
-from knowledge.knowledge_admin import commit_raw_documents
+from knowledge.raw_import import commit_raw_documents
 
 MIXED = (
     "問題,答案\n"

@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
 
 from app import brain_proxy
+from app.auth import brain_project_access
 from app.auth.dependencies import get_current_account
 from app.auth.embed import is_allowlisted
 from app.client_disconnect import ClientDisconnectMiddleware
@@ -102,8 +103,10 @@ def test_chat_stream_is_a_documented_route_with_chat_auth() -> None:
     chat = routes[("/api/v1/chat", ("POST",))]
     stream = routes[("/api/v1/chat/stream", ("POST",))]
     assert [d.dependency for d in stream.dependencies] == [d.dependency for d in chat.dependencies]
-    assert brain_proxy._requires_project_context("chat/stream")
-    assert brain_proxy._project_access("chat/stream", "POST") is brain_proxy._project_access("chat", "POST")
+    assert brain_project_access.requires_project_context("chat/stream")
+    assert brain_project_access._project_access(
+        "chat/stream", "POST",
+    ) is brain_project_access._project_access("chat", "POST")
     # Embed key 能用 /chat 就能用逐句版，同一份配額。
     assert is_allowlisted("POST", "/api/v1/chat/stream")
 

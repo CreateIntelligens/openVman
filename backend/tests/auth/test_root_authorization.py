@@ -31,7 +31,8 @@ from app.auth.policy import (
     ensure_can_create_role,
     ensure_can_manage_account,
 )
-from app.auth.routes import auth_router, users_router
+from app.auth.routes import auth_router
+from app.auth.users_routes import users_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.config import TTSRouterConfig
 

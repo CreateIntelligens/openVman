@@ -16,7 +16,9 @@ from app.auth.database import AuthDatabase
 from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account
 from app.auth.models import AccountRole, AccountType, UserRecord, has_ai_cleanup_access
 from app.auth.passwords import hash_password
-from app.auth.routes import auth_router, temporary_accounts_router, users_router
+from app.auth.routes import auth_router
+from app.auth.temporary_accounts_routes import temporary_accounts_router
+from app.auth.users_routes import users_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.auth.user_repository import UserRepository
 from app.config import TTSRouterConfig
@@ -238,9 +240,13 @@ def test_the_proxy_applies_the_guard(current, payload, expected):
     with (
         patch("app.brain_proxy.get_tts_config", return_value=cfg),
         patch("app.brain_proxy._http.get", return_value=client),
-        patch("app.brain_proxy._authorize_project_context", AsyncMock(return_value="p")),
+        patch(
+            "app.auth.brain_project_access.authorize_project_context",
+            AsyncMock(return_value="p"),
+        ) as authorize,
     ):
         response = TestClient(_proxy_app(current)).post("/api/v1/knowledge/raw/commit", json=payload)
+    authorize.assert_awaited_once()
     if expected == 403:
         assert response.status_code == 403
         assert response.json()["detail"] == REFUSAL

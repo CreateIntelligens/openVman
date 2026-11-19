@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field
 
+from .account_schemas import _StrictModel
 from .dependencies import CurrentAccount, require_admin
 from .models import AccountRole, AdminScope, ResourceType
 from .policy import AccountPolicyError, ensure_can_manage_account
 from .repository_errors import InvalidResourceGrantError, UserNotFoundError
-from .routes import _StrictModel, users_router
 from .runtime import AuthRuntime, get_auth_runtime
+
+# 掛在 users_router 底下（/api/v1/users/{user_id}/scope），由 users_routes 引入。
+admin_scope_router = APIRouter()
 
 
 class AdminScopeResources(_StrictModel):
@@ -86,7 +89,7 @@ class UpdateAdminScopeRequest(_StrictModel):
     )
 
 
-@users_router.get(
+@admin_scope_router.get(
     "/{user_id}/scope",
     response_model=AdminScopeProfile,
     summary="讀取管理員的資源上限",
@@ -114,7 +117,7 @@ def get_admin_scope(
     )
 
 
-@users_router.put(
+@admin_scope_router.put(
     "/{user_id}/scope",
     response_model=AdminScopeProfile,
     summary="設定管理員的資源上限",

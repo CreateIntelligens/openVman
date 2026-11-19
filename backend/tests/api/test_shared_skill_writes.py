@@ -70,7 +70,7 @@ def _proxy(current: CurrentAccount, *, granted: bool = True) -> Iterator[tuple[T
     upstream.send = AsyncMock(side_effect=lambda *_a, **_k: _make_response())
 
     with (
-        patch("app.brain_proxy.get_auth_runtime", return_value=runtime),
+        patch("app.auth.brain_project_access.get_auth_runtime", return_value=runtime),
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=upstream),
         TestClient(app) as client,
@@ -179,7 +179,7 @@ def test_embed_key_cannot_write_shared_skills_even_for_a_root_owner() -> None:
     embed_key = MagicMock(project_id=_PROJECT, key_id="embed-1")
     method, url, kwargs = _SHARED_TOGGLES["toggle"]
     with (
-        patch("app.brain_proxy.enforce_project_binding"),
+        patch("app.auth.brain_project_access.enforce_project_binding"),
         _proxy(_account(AccountRole.ROOT, embed_key=embed_key)) as (client, upstream),
     ):
         response = client.request(method, url, **kwargs)

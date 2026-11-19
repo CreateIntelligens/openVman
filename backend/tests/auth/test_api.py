@@ -15,7 +15,8 @@ from app.auth.resources import (
     list_accessible_resources,
     resolve_resource,
 )
-from app.auth.routes import auth_router, users_router
+from app.auth.routes import auth_router
+from app.auth.users_routes import users_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.config import TTSRouterConfig
 

@@ -6,34 +6,29 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable
-from posixpath import normpath
 from time import monotonic
 from typing import Any, TypeVar
-from urllib.parse import parse_qsl, quote, urlencode
+from urllib.parse import quote
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
 from app.ai_cleanup_guard import AiCleanupRefused, guard_ai_cleanup
+from app.auth import brain_project_access
 from app.auth.dependencies import (
     CurrentAccount,
     authenticate_request,
     get_current_account,
 )
-from app.auth.embed import enforce_project_binding
-from app.auth.models import ResourceType
 from app.auth.policy import is_vendor_account
-from app.auth.resources import (
-    ResourceAccess,
-    ResourceNotFoundError,
-    resolve_resource,
-)
+from app.auth.resources import ResourceNotFoundError
 from app.auth.runtime import get_auth_runtime
 from app.auth.vendor_access import (
     KNOWLEDGE_DOCUMENT_ROUTES,
     VENDOR_HEADER,
+    is_vendor_knowledge_path,
     vendor_route_allowed,
 )
 from app.chat_tts_text import (
@@ -45,7 +40,6 @@ from app.chat_tts_text import (
 from app.client_disconnect import wait_for_client_disconnect
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
-from app.project_ids import canonical_project_id
 from app.skill_write_guard import (
     is_skill_toggle,
     is_skill_write,
@@ -80,7 +74,7 @@ _TAG_KNOWLEDGE = ["Brain / Knowledge"]
 _TAG_PROTOCOL = ["Brain / Protocol"]
 _PUBLIC_BRAIN_PATHS = frozenset({f"{_PUBLIC_API_PREFIX}/health"})
 _CHAT_PATHS = frozenset({f"{_PUBLIC_API_PREFIX}/chat", f"{_PUBLIC_API_PREFIX}/chat/stream"})
-_PROJECT_FEATURES_PATH = "knowledge/features"
+
 
 _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/health", "methods": ["GET"], "tags": _TAG_BRAIN_SYSTEM, "summary": "Brain Health"},
@@ -128,7 +122,7 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/directory", "methods": ["DELETE"], "tags": _TAG_KNOWLEDGE, "summary": "Delete Knowledge Directory"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/note", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Create Knowledge Note"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/reindex", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Reindex Knowledge"},
-    {"path": f"{_PUBLIC_API_PREFIX}/{_PROJECT_FEATURES_PATH}", "methods": ["PATCH"], "tags": _TAG_KNOWLEDGE, "summary": "Update Project Memory and Graph Features"},
+    {"path": f"{_PUBLIC_API_PREFIX}/{brain_project_access.PROJECT_FEATURES_PATH}", "methods": ["PATCH"], "tags": _TAG_KNOWLEDGE, "summary": "Update Project Memory and Graph Features"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/rebuild", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Rebuild Knowledge Graph"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/status", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph Status"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/summary", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph Summary"},
@@ -169,21 +163,6 @@ _EMBED_PRINCIPAL_TYPE = "embed_key"
 _API_KEY_PRINCIPAL_TYPE = "api_key"
 _SESSION_PRINCIPAL_TYPE = "user"
 _END_USER_AUTH_HEADERS = frozenset({"authorization", "cookie"})
-_PROJECT_SCOPED_PREFIXES = (
-    "chat",
-    "embed",
-    "health",
-    "identity",
-    "knowledge",
-    "memories",
-    "personas",
-    "search",
-    "sessions",
-    "skills",
-    "tools",
-    "dreaming",
-)
-_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # 這些 Brain 路徑由 Backend 自己的路由（含帳號範圍限制）對外提供，
 # catch-all 直通會繞過那層限制，所以一律擋掉。
 _BACKEND_OWNED_PREFIXES = (
@@ -275,10 +254,6 @@ CLIENT_CLOSED_REQUEST = 499
 _T = TypeVar("_T")
 
 
-class _InvalidProjectId(Exception):
-    """The request did not name exactly one project."""
-
-
 class _ClientDisconnected(Exception):
     """The caller hung up while Backend was still waiting on Brain."""
 
@@ -349,237 +324,6 @@ def _resolved_project_id(request: Request) -> str | None:
     return project_id or None
 
 
-def _reject_repeated_project_id(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    # json.loads 遇到重複的鍵只留最後一個；專案 ID 寫兩次就是請求本身有歧義，不替呼叫端挑。
-    if sum(1 for key, _ in pairs if key == "project_id") > 1:
-        raise _InvalidProjectId("project_id must appear only once")
-    return dict(pairs)
-
-
-def _json_object(body: bytes) -> dict[str, Any] | None:
-    """The body as Brain's FastAPI would see it: JSON whatever the Content-Type says."""
-    if not body.strip():
-        return None
-    try:
-        payload = json.loads(body, object_pairs_hook=_reject_repeated_project_id)
-    except (UnicodeDecodeError, ValueError):
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _project_id_holders(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    # Brain 讀 body 最上層的 project_id；對話信封另外會讀 message.project_id。
-    holders = [payload]
-    message = payload.get("message")
-    if isinstance(message, dict):
-        holders.append(message)
-    return holders
-
-
-def _request_project_id(request: Request, body: bytes) -> str | None:
-    """The single project the request names, from the query and the JSON body.
-
-    Brain 讀 query 時取最後一個值、空字串會落到預設專案；body 沒有 Content-Type
-    也照 JSON 解析。這裡任何一個來源跟其他來源不同、或 query 給了空值，都當成
-    請求格式錯誤，不猜呼叫端要哪一個。
-    """
-    candidates: list[str] = []
-    query_values = request.query_params.getlist("project_id")
-    if len(query_values) > 1:
-        raise _InvalidProjectId("project_id must appear only once")
-    for value in query_values:
-        query_project_id = canonical_project_id(value)
-        if not query_project_id:
-            raise _InvalidProjectId("project_id must not be empty")
-        candidates.append(query_project_id)
-
-    payload = _json_object(body)
-    for holder in _project_id_holders(payload) if payload is not None else []:
-        body_project_id = holder.get("project_id")
-        if body_project_id is None or body_project_id == "":
-            # 空值在轉送時會被換成授權的專案，不必擋。
-            continue
-        if not isinstance(body_project_id, str) or not canonical_project_id(body_project_id):
-            raise _InvalidProjectId("project_id must be a non-empty string")
-        candidates.append(canonical_project_id(body_project_id))
-
-    if not candidates:
-        return None
-    if len(set(candidates)) != 1:
-        raise _InvalidProjectId("project_id in query and body must match")
-    return candidates[0]
-
-
-def _bind_project(request: Request, body: bytes, project_id: str) -> tuple[str, bytes]:
-    """Rewrite the forwarded query and JSON body to name only the authorized project.
-
-    授權用的是 ``project_id``；Brain 各路由從 query、body 或對話信封自己讀專案，
-    沒寫時退回預設專案。轉送前把每個位置都寫成同一個值，Brain 就不會用到
-    沒授權的專案。
-    """
-    pairs = [
-        (key, value)
-        for key, value in parse_qsl(_raw_query(request), keep_blank_values=True)
-        if key != "project_id"
-    ]
-    pairs.append(("project_id", project_id))
-    query = urlencode(pairs, quote_via=quote)
-
-    payload = _json_object(body)
-    if payload is None:
-        return query, body
-    for holder in _project_id_holders(payload):
-        if holder is payload or "project_id" in holder:
-            holder["project_id"] = project_id
-    # 用 \\u 跳脫輸出：使用者內容可能含沒配對的 UTF-16 代理字元，直接編成 UTF-8 會丟例外變成 500。
-    return query, json.dumps(payload).encode("utf-8")
-
-
-def _requires_project_context(path: str) -> bool:
-    normalized = path.strip("/")
-    return any(
-        normalized == prefix or normalized.startswith(f"{prefix}/")
-        for prefix in _PROJECT_SCOPED_PREFIXES
-    )
-
-
-def _project_access(path: str, method: str) -> ResourceAccess:
-    normalized = path.strip("/")
-    if method.upper() in _SAFE_METHODS:
-        return ResourceAccess.READ
-    if normalized == _PROJECT_FEATURES_PATH:
-        return ResourceAccess.EDIT_SETTINGS
-    project_area = normalized.partition("/")[0]
-    if project_area in {"knowledge", "personas"}:
-        return ResourceAccess.EDIT_KNOWLEDGE
-    if project_area in {"dreaming", "memories", "sessions", "skills", "tools"}:
-        return ResourceAccess.EDIT_SETTINGS
-    return ResourceAccess.READ
-
-
-_WORKSPACE_WRITES = frozenset({
-    "knowledge/document", "knowledge/document/meta", "knowledge/directory", "knowledge/move",
-    "knowledge/renormalize", "knowledge/renormalize/preview", "knowledge/renormalize/apply",
-})
-_PERSONA_DOCUMENTS = frozenset({"SOUL.md", "IDENTITY.md", "AGENTS.md", "TOOLS.md"})
-_PROJECT_WRITES = (ResourceAccess.EDIT_KNOWLEDGE, ResourceAccess.EDIT_SETTINGS)
-
-
-def _workspace_access(path: str) -> ResourceAccess:
-    # Brain 再依實際解析到的檔案比對可信的寫入權限，避免符號連結跨越權限。
-    parts = normpath(path.strip()).split("/")
-    if (
-        parts[0] in {"knowledge", "raw"}
-        or (len(parts) == 1 and parts[0] in _PERSONA_DOCUMENTS)
-        or (
-            parts[0] == "personas"
-            and (len(parts) <= 2 or (len(parts) == 3 and parts[-1] in _PERSONA_DOCUMENTS))
-        )
-    ):
-        return ResourceAccess.EDIT_KNOWLEDGE
-    return ResourceAccess.EDIT_SETTINGS
-
-
-def _workspace_project_writes(
-    request: Request, path: str, body: bytes,
-) -> tuple[ResourceAccess, ...]:
-    if request.method == "DELETE":
-        fields = [request.query_params.get("path")]
-    else:
-        payload = _json_object(body) or {}
-        fields = (
-            [payload.get("source_path"), payload.get("target_path")]
-            if path == "knowledge/move"
-            else [payload.get("path")]
-        )
-    required = {_workspace_access(field) for field in fields if isinstance(field, str)}
-    return tuple(access for access in _PROJECT_WRITES if access in required) or (
-        ResourceAccess.EDIT_KNOWLEDGE,
-    )
-
-
-async def _authorize_project_context(
-    request: Request,
-    path: str,
-    current: CurrentAccount | None,
-    explicit_project_id: str | None,
-    body: bytes = b"",
-) -> str | None:
-    if current is None or not _requires_project_context(path):
-        return explicit_project_id
-
-    if current.embed_key is not None:
-        # Embed key 沒有資源授權，專案由金鑰本身綁定；client 自帶不同的
-        # project_id 一律 403，不能靜默改用金鑰的專案。
-        enforce_project_binding(
-            current.embed_key,
-            _request_project_id(request, body) or "",
-        )
-        # 金鑰可能在 default 拔掉前就綁了 "default"，一樣換成預設專案的正式 ID。
-        embed_project_id = canonical_project_id(current.embed_key.project_id)
-        request.state.resolved_project_id = embed_project_id
-        return embed_project_id
-
-    supplied_project_id = _request_project_id(request, body)
-    if explicit_project_id is not None:
-        explicit_project_id = canonical_project_id(explicit_project_id) or None
-    resolved_project_id = explicit_project_id or supplied_project_id
-    if (
-        explicit_project_id is not None
-        and supplied_project_id is not None
-        and supplied_project_id != explicit_project_id
-    ):
-        raise _InvalidProjectId("project_id in query and body must match")
-    if resolved_project_id is None:
-        # 缺欄位是請求格式問題，回 422 才不會讓串接方以為專案不存在；
-        # 專案看不到仍是 404，不洩漏存在與否。
-        raise _InvalidProjectId("project_id is required")
-
-    runtime = get_auth_runtime()
-    access = _project_access(path, request.method)
-    normalized_path = path.strip("/")
-    workspace_write = access is ResourceAccess.EDIT_KNOWLEDGE and normalized_path in _WORKSPACE_WRITES
-    required = (
-        _workspace_project_writes(request, normalized_path, body)
-        if workspace_write else (access,)
-    )
-
-    def resolve(permission: ResourceAccess) -> None:
-        resolve_resource(
-            runtime.resources, current.user, ResourceType.PROJECT,
-            resolved_project_id, access=permission,
-        )
-
-    try:
-        for permission in required:
-            resolve(permission)
-    except ResourceNotFoundError:
-        # 看得到專案、只是不能改（例如一般帳號刪對話、改知識庫）就明說 403；
-        # 回 404 會讓串接方以為專案或對話不存在。看不到的專案照舊 404，不洩漏存在與否。
-        if access is ResourceAccess.READ:
-            raise
-        resolve(ResourceAccess.READ)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account cannot modify this project",
-        ) from None
-    if workspace_write:
-        allowed = list(required)
-        for permission in _PROJECT_WRITES:
-            if permission in required:
-                continue
-            try:
-                resolve(permission)
-            except ResourceNotFoundError:
-                continue
-            allowed.append(permission)
-        request.state.project_writes = ",".join(permission.value for permission in allowed)
-    elif normalized_path == _PROJECT_FEATURES_PATH and access is ResourceAccess.EDIT_SETTINGS:
-        request.state.project_writes = access.value
-    request.state.resolved_project_id = resolved_project_id
-    return resolved_project_id
-
-
 def _trusted_upstream_headers(
     request: Request,
     *,
@@ -624,15 +368,6 @@ def _brain_base_url(path: str, method: str) -> str:
     if chat_methods.get(path.strip("/")) == method.upper():
         return cfg.resolved_brain_chat_url.rstrip("/")
     return cfg.brain_url.rstrip("/")
-
-
-def _raw_query(request: Request) -> str:
-    """The query string exactly as authorization parsed it (``request.query_params``).
-
-    ``request.url.query`` is re-split from a rebuilt URL, so a decoded ``?`` or ``#``
-    in the path would make it differ from what was authorized.
-    """
-    return request.scope.get("query_string", b"").decode("latin-1")
 
 
 def _target_url(path: str, query: str, method: str = "GET") -> str:
@@ -712,16 +447,6 @@ async def _read_capped_body(request: Request, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
-def _is_vendor_knowledge_path(value: Any) -> bool:
-    if not isinstance(value, str) or value != value.strip():
-        return False
-    parts = value.split("/")
-    return len(parts) >= 2 and parts[0] == "knowledge" and all(
-        part and not part.startswith(".") and part not in {"graphify-out", "_catalog.yaml"}
-        for part in parts[1:]
-    )
-
-
 async def proxy_to_brain(
     request: Request,
     path: str,
@@ -756,13 +481,13 @@ async def proxy_to_brain(
         if request.method in {"GET", "DELETE"}:
             fields = [request.query_params.get("path")]
         else:
-            payload = _json_object(body) or {}
+            payload = brain_project_access.proxy_json_object(body) or {}
             keys = ("source_path", "target_path") if path == "knowledge/move" else ("path",)
             fields = [payload.get(key) for key in keys]
-        if not all(_is_vendor_knowledge_path(field) for field in fields):
+        if not all(is_vendor_knowledge_path(field) for field in fields):
             return JSONResponse(status_code=403, content={"detail": "沒有權限使用這個功能。"})
     try:
-        project_id = await _authorize_project_context(
+        project_id = await brain_project_access.authorize_project_context(
             request,
             path,
             current,
@@ -774,7 +499,7 @@ async def proxy_to_brain(
             status_code=404,
             content={"detail": "Resource not found"},
         )
-    except _InvalidProjectId as exc:
+    except brain_project_access.InvalidProjectId as exc:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
     except HTTPException as exc:
         if vendor and exc.status_code == 403:
@@ -799,9 +524,9 @@ async def proxy_to_brain(
     )
     if refusal is not None:
         return refusal
-    query = _raw_query(request)
-    if current is not None and project_id and _requires_project_context(path):
-        query, body = _bind_project(request, body, project_id)
+    query = brain_project_access.raw_query(request)
+    if current is not None and project_id and brain_project_access.requires_project_context(path):
+        query, body = brain_project_access.bind_project(request, body, project_id)
     client = _http.get()
     started = monotonic()
 
@@ -953,7 +678,7 @@ def _catchall_current_account(request: Request) -> CurrentAccount | None:
     if (
         request.scope["path"] in _PUBLIC_BRAIN_PATHS
         # 公開的只有讀取；POST 之類若也免登入，會帶著內部 token 打到 Brain。
-        and request.method.upper() in _SAFE_METHODS
+        and request.method.upper() in brain_project_access.SAFE_METHODS
     ):
         return None
     existing = getattr(request.state, "current_account", None)
@@ -973,12 +698,12 @@ def _documented_responses(route_def: dict[str, Any]) -> dict[int | str, dict[str
     if route_def["path"] in _CHAT_PATHS:
         responses.update(_CHAT_RESPONSES)
     brain_path = route_def["path"].removeprefix(f"{_PUBLIC_API_PREFIX}/")
-    if route_def["path"] not in _PUBLIC_BRAIN_PATHS and _requires_project_context(
+    if route_def["path"] not in _PUBLIC_BRAIN_PATHS and brain_project_access.requires_project_context(
         brain_path
     ):
         responses.update(_PROJECT_CONTEXT_RESPONSES)
     method = route_def["methods"][0]
-    if brain_path == _PROJECT_FEATURES_PATH:
+    if brain_path == brain_project_access.PROJECT_FEATURES_PATH:
         responses[403] = {"description": "需要該專案的「改其他設定」權限"}
     if is_skill_write(brain_path.strip("/"), method):
         # 沒寫 scope=project 的請求一律視為共用技能。

@@ -12,7 +12,7 @@ API_ROOT = Path(__file__).resolve().parents[2]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
-from knowledge.knowledge_admin import qa_document_lock  # noqa: E402
+from knowledge.raw_import import qa_document_lock  # noqa: E402
 from main import app  # noqa: E402
 from routes.knowledge_qa import qa_document_lock as ingest_lock  # noqa: E402
 
