@@ -7,19 +7,18 @@ import type {
   KnowledgeNoteFormat,
 } from "../../api";
 import type { QaNode } from "../../hooks/useQaNodes";
-import type { Status } from "../../hooks/useStatusState";
 import FileView from "./FileView";
 import {
   findNodeReferencingSource,
-  findQaNode,
-  getQaNodeAncestors,
   type RightPane,
 } from "./helpers";
 import NoteComposer from "./NoteComposer";
-import MergedCsvPane, { type QaFocusRequest } from "./qa/MergedCsvPane";
 
 interface KnowledgeContentPaneProps {
-  /** 沒有選任何東西時顯示的「新增資料」畫面。 */
+  vendor?: boolean;
+  documentLabels?: ReadonlyMap<string, string>;
+  questionBank: ReactNode;
+  showHome: boolean;
   home: ReactNode;
   /** 上次看的文件還原完才知道要不要顯示首頁，先不要閃一下。 */
   contentReady: boolean;
@@ -28,12 +27,6 @@ interface KnowledgeContentPaneProps {
   creatingNote: boolean;
   onCloseNoteComposer: () => void;
   onCreateNote: (title: string, content: string, format: KnowledgeNoteFormat) => void;
-  selectedQaNodeId: string | null;
-  selectedQaNodeLabel?: string;
-  mergedRefreshKey: number;
-  qaFocusRequest: QaFocusRequest | null;
-  onQaStatus: (status: Status) => void;
-  onQaMutationSuccess: () => void;
   nodesTree: QaNode[];
   /** 「前往快速問答」：FileView 已經問過要不要捨棄，這裡不能再問一次。 */
   onOpenQaNode: (nodeId: string) => void;
@@ -56,19 +49,17 @@ interface KnowledgeContentPaneProps {
 }
 
 export default function KnowledgeContentPane({
+  vendor = false,
+  documentLabels,
   home,
+  questionBank,
+  showHome,
   contentReady,
   showNoteComposer,
   noteComposerFormat,
   creatingNote,
   onCloseNoteComposer,
   onCreateNote,
-  selectedQaNodeId,
-  selectedQaNodeLabel,
-  mergedRefreshKey,
-  qaFocusRequest,
-  onQaStatus,
-  onQaMutationSuccess,
   nodesTree,
   onOpenQaNode,
   rightPane,
@@ -92,38 +83,20 @@ export default function KnowledgeContentPane({
     return findNodeReferencingSource(nodesTree, openDocument.path) ?? null;
   }, [openDocument, nodesTree]);
 
-  const selectedQaNode = selectedQaNodeId ? findQaNode(nodesTree, selectedQaNodeId) : undefined;
-  const qaAncestors = useMemo(() => {
-    if (!selectedQaNodeId) return [];
-    return (getQaNodeAncestors(nodesTree, selectedQaNodeId) ?? [])
-      .flatMap((nodeId) => findQaNode(nodesTree, nodeId) ?? []);
-  }, [nodesTree, selectedQaNodeId]);
-
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {showNoteComposer ? (
         <NoteComposer
+          vendor={vendor}
           creating={creatingNote}
           initialFormat={noteComposerFormat}
           onClose={onCloseNoteComposer}
           onCreate={onCreateNote}
         />
-      ) : selectedQaNodeId ? (
-        <main className="min-w-0 flex-1 overflow-auto md:p-4">
-          <MergedCsvPane
-            nodeId={selectedQaNodeId}
-            nodeLabel={selectedQaNodeLabel}
-            parentLabels={qaAncestors.map((node) => node.label)}
-            nodeHidden={Boolean(selectedQaNode?.hidden) || qaAncestors.some((node) => node.hidden)}
-            childCategoryCount={selectedQaNode?.children?.length ?? 0}
-            refreshKey={mergedRefreshKey}
-            focusQuestion={qaFocusRequest}
-            onStatus={onQaStatus}
-            onSuccess={onQaMutationSuccess}
-          />
-        </main>
       ) : rightPane === "file" && openDocument ? (
         <FileView
+          vendor={vendor}
+          documentLabels={documentLabels}
           document={openDocument}
           editContent={editContent}
           setEditContent={onEditContentChange}
@@ -149,8 +122,12 @@ export default function KnowledgeContentPane({
           <span aria-hidden="true" className="material-symbols-outlined mr-1 animate-spin text-[1rem]">refresh</span>
           載入中…
         </div>
-      ) : (
+      ) : showHome ? (
         home
+      ) : (
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto xl:overflow-hidden">
+          <div className="flex min-w-0 flex-col xl:h-full xl:flex-row">{questionBank}</div>
+        </div>
       )}
     </div>
   );

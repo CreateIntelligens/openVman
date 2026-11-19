@@ -13,7 +13,7 @@ const FORMAT_OPTIONS: { id: KnowledgeNoteFormat; label: string }[] = [
 const FORMAT_COPY: Record<KnowledgeNoteFormat, { heading: string; hint: string; createLabel: string }> = {
   text: {
     heading: "自己輸入文件",
-    hint: "建立後會放在「文件」的 notes 資料夾，AI 回答時會參考。",
+    hint: "建立後會出現在左邊的「文件」清單，AI 回答時會參考。",
     createLabel: "建立文件",
   },
   qa: {
@@ -24,11 +24,13 @@ const FORMAT_COPY: Record<KnowledgeNoteFormat, { heading: string; hint: string; 
 };
 
 export default function NoteComposer({
+  vendor = false,
   creating,
   onClose,
   onCreate,
   initialFormat = "text",
 }: {
+  vendor?: boolean;
   creating: boolean;
   onClose: () => void;
   onCreate: (title: string, content: string, format: KnowledgeNoteFormat) => void;
@@ -98,7 +100,7 @@ export default function NoteComposer({
       </div>
 
       {format === "qa" ? (
-        <QaDocEditor content={qaContent} onChange={setQaContent} />
+        <QaDocEditor vendor={vendor} content={qaContent} onChange={setQaContent} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col px-4 pb-3 pt-2">
           <textarea

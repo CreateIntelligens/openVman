@@ -8,6 +8,7 @@ import {
   parentDirOf,
 } from "./helpers";
 import { useModalDismiss } from "./useModalDismiss";
+import { vendorDocumentLabel, vendorFolderLabel, vendorFolderName } from "./vendorDocumentLabels";
 
 const LISTED_SOURCE_LIMIT = 3;
 
@@ -20,12 +21,16 @@ function folderPathLabel(dir: string): string {
 }
 
 export default function MoveModal({
+  vendor = false,
+  documentLabels,
   sourcePaths,
   allDocuments,
   serverDirs,
   onMove,
   onClose,
 }: {
+  vendor?: boolean;
+  documentLabels?: ReadonlyMap<string, string>;
   sourcePaths: string[];
   allDocuments: KnowledgeDocumentSummary[];
   serverDirs: string[];
@@ -52,13 +57,13 @@ export default function MoveModal({
   const sortedDirs = [...dirs].sort();
   const isBatch = sourcePaths.length > 1;
   const sourceDir = isBatch ? null : parentDirOf(sourcePaths[0] ?? "");
-  const filename = isBatch ? "" : fileNameOf(sourcePaths[0] ?? "");
+  const sourceLabel = (path: string) => vendor ? vendorDocumentLabel(path, documentLabels) : fileNameOf(path);
   const allInSelectedDir = sourcePaths.every((path) => parentDirOf(path) === selectedDir);
-  const listedNames = sourcePaths.slice(0, LISTED_SOURCE_LIMIT).map(fileNameOf).join("、");
+  const listedNames = sourcePaths.slice(0, LISTED_SOURCE_LIMIT).map(sourceLabel).join("、");
   const unlistedCount = sourcePaths.length - LISTED_SOURCE_LIMIT;
   const dismiss = useModalDismiss(onClose);
   const title = isBatch ? `移動 ${sourcePaths.length} 個文件` : "移動文件";
-  const targetLabel = folderPathLabel(selectedDir);
+  const targetLabel = vendor ? vendorFolderLabel(selectedDir) : folderPathLabel(selectedDir);
 
   return (
     <div
@@ -91,7 +96,7 @@ export default function MoveModal({
           <p className="text-sm text-content font-mono truncate">
             {isBatch
               ? `${listedNames}${unlistedCount > 0 ? `，另有 ${unlistedCount} 個` : ""}`
-              : filename}
+              : listedNames}
           </p>
         </div>
         <div className="flex-1 overflow-y-auto py-2">
@@ -102,7 +107,7 @@ export default function MoveModal({
             const isSelected = dir === selectedDir;
             const label = dir === DOCUMENTS_ROOT_PATH
               ? `${DOCUMENTS_SECTION_LABEL}（最上層）`
-              : fileNameOf(dir);
+              : vendor ? vendorFolderName(dir) : fileNameOf(dir);
             return (
               <button
                 key={dir}

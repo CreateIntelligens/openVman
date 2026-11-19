@@ -1,5 +1,5 @@
 import { useId, useRef } from "react";
-import type { DragEvent, KeyboardEvent } from "react";
+import type { DragEvent, KeyboardEvent, ReactNode } from "react";
 
 import ActionMenu, { type ActionMenuGroup, type ActionMenuItem } from "../ActionMenu";
 import type { QaDropPosition, TreeNode } from "./helpers";
@@ -46,6 +46,8 @@ interface TreeViewProps {
   onMoveFile?: (path: string) => void;
   onDeleteFile?: (path: string) => void;
   onSelectQaNode?: (nodeId: string, question?: string) => void;
+  documentsToolbar?: ReactNode;
+  canCreateQaChild?: (id: string) => boolean;
   onCreateQaNode?: (parentNodeId: string | null) => void;
   onRenameQaNode?: (nodeId: string) => void;
   onMoveQaNode?: (nodeId: string) => void;
@@ -53,6 +55,7 @@ interface TreeViewProps {
   onDeleteQaNode?: (nodeId: string) => void;
   onOrderQaNode?: (parentNodeId: string | null) => void;
   canDropQaNode?: (draggedPath: string, targetPath: string, position?: QaDropPosition) => boolean;
+  qaNodeDropError?: (draggedPath: string, targetPath: string, position: QaDropPosition) => string | undefined;
   canDropQaEntry?: (draggedPath: string, targetPath: string) => boolean;
   multiSelect?: boolean;
   checkedPaths?: ReadonlySet<string>;
@@ -154,7 +157,7 @@ function buildRowMenu(node: TreeNode, actions: SharedTreeProps): ActionMenuGroup
       {
         id: "edit",
         items: compactItems([
-          onCreateQaNode && {
+          onCreateQaNode && (actions.canCreateQaChild?.(nodeId) ?? true) && {
             id: "create",
             label: "新增子分類",
             onSelect: () => onCreateQaNode(nodeId),
@@ -174,7 +177,7 @@ function buildRowMenu(node: TreeNode, actions: SharedTreeProps): ActionMenuGroup
             label: "調整子分類順序",
             onSelect: () => onOrderQaNode(nodeId),
           },
-          onToggleQaNodeHidden && {
+          onToggleQaNodeHidden && node.qaAncestorHidden === undefined && {
             id: "visibility",
             label: node.qaHidden ? "顯示（訪客看得到）" : "隱藏（訪客看不到）",
             onSelect: () => onToggleQaNodeHidden(nodeId, !node.qaHidden),
@@ -318,6 +321,7 @@ function TreeBranch({
     onSelectQaNode,
     onCreateQaNode,
     canDropQaNode,
+    qaNodeDropError,
     canDropQaEntry,
     multiSelect = false,
     checkedPaths,
@@ -381,7 +385,11 @@ function TreeBranch({
       : draggingQaEntry
         ? (isQaEntry && !!canDropQaEntry && canDropQaEntry(draggingPath, dropTargetKey))
       : (isQaRoot || isQaNode || isQaEntry || (!node.virtual && effectiveDropDir !== sourceDragDir)));
-  const isDropTarget = dropTargetPath === dropTargetKey && !!draggingPath;
+  const dropErrorAt = (position: QaDropPosition | null) =>
+    draggingQaNodeId && draggingPath && position ? qaNodeDropError?.(draggingPath, dropTargetKey, position) : undefined;
+  const isHoveredDropTarget = dropTargetPath === dropTargetKey && !!draggingPath;
+  const dropError = isHoveredDropTarget ? dropErrorAt(dropPosition) : undefined;
+  const isDropTarget = isHoveredDropTarget && !dropError;
   const showInsertLine = isDropTarget && !!draggingQaNodeId &&
     (dropPosition === "before" || dropPosition === "after");
   const isTreeTabStop = isSelected || node.path === fallbackTabStopPath;
@@ -408,7 +416,7 @@ function TreeBranch({
     node.name,
     node.qaLanguageCategory ? "語言分類" : null,
     questionCount,
-    node.qaHidden ? "已隱藏" : null,
+    node.qaAncestorHidden ? "上層已關閉" : node.qaHidden ? "已隱藏" : null,
     statusLabel === "可被搜尋" ? null : statusLabel,
   ].filter(Boolean).join("，");
 
@@ -546,11 +554,13 @@ function TreeBranch({
   const trackDropTarget = (event: DragEvent<HTMLDivElement>) => {
     if (!canAcceptDrop) return;
     event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = "move";
-    }
     const position = pointerDropPosition(event);
-    if (canDropAt(position)) {
+    const reason = dropErrorAt(position);
+    const allowed = canDropAt(position) && !reason;
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = allowed ? "move" : "none";
+    }
+    if (allowed || reason) {
       onDragTargetChange(dropTargetKey, position);
     } else {
       onDragTargetChange(null);
@@ -570,7 +580,8 @@ function TreeBranch({
     rowStateClass = "hover:bg-surface-sunken text-content-muted hover:text-content";
   }
   const icon = rowIcon(node, isExpanded);
-  const rowIndentRem = depth * 0.875 + 0.5;
+  const categoryControl = isQaNode && node.qaAncestorHidden !== undefined;
+  const rowIndentRem = (categoryControl ? Math.min(depth, 3) * 0.45 : depth * 0.875) + 0.5;
 
   return (
     <div
@@ -584,11 +595,12 @@ function TreeBranch({
         aria-selected={isCheckableFile ? isChecked : isSelected}
         aria-level={depth + 1}
         aria-label={rowLabel}
+        data-ancestor-hidden={node.qaAncestorHidden || undefined}
         data-drop-position={isDropTarget ? dropPosition ?? "into" : undefined}
         tabIndex={isTreeTabStop ? 0 : -1}
         className={`group relative flex cursor-pointer items-center px-2 py-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [@media(hover:none)]:py-1.5 ${rowStateClass} ${
           isDraggingThisNode ? "ring-1 ring-inset ring-primary/40" : ""
-        }`}
+        } ${node.qaAncestorHidden ? "bg-surface-sunken text-content-muted" : ""}`}
         style={{ paddingLeft: `${rowIndentRem}rem` }}
         onClick={(event) => handleSelect(event.currentTarget)}
         onKeyDown={handleKeyDown}
@@ -601,7 +613,7 @@ function TreeBranch({
             onDragTargetChange(dropTargetKey, draggingQaNodeId ? "into" : null);
           }
         }}
-        draggable={isDraggable}
+        draggable={isDraggable && !categoryControl}
         onDragStart={(event) => {
           finishKeyboardMove(event.currentTarget);
           if (isQaNode && qaNodeId) {
@@ -635,12 +647,12 @@ function TreeBranch({
         onDragLeave={(event) => {
           // 移到列內的子元素也會觸發 dragleave，不算離開。
           if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-          if (isDropTarget) onDragTargetChange(null);
+          if (isHoveredDropTarget) onDragTargetChange(null);
         }}
         onDrop={(event) => {
           if (!canAcceptDrop) return;
           const position = pointerDropPosition(event);
-          if (!canDropAt(position)) return;
+          if (!canDropAt(position) && !dropErrorAt(position)) return;
           event.preventDefault();
           event.stopPropagation();
           if (position) {
@@ -694,15 +706,24 @@ function TreeBranch({
           />
         )}
 
-        <div className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-          <span aria-hidden="true" className={`material-symbols-outlined text-[1.125rem] ${icon.className}`}>
-            {icon.name}
-          </span>
-        </div>
+        {categoryControl && !multiSelect ? (
+          <button type="button" draggable className={`${MENU_TRIGGER_CLASS} ml-0.5 cursor-grab shrink-0`}
+            aria-label={`拖曳或調整分類順序 ${node.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              rowRef.current?.focus();
+              shared.onOrderQaNode?.(node.qaOrderParentId ?? null);
+            }}
+          >⠿</button>
+        ) : (
+          <div className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+            <span aria-hidden="true" className={`material-symbols-outlined text-[1.125rem] ${icon.className}`}>{icon.name}</span>
+          </div>
+        )}
 
         <RowName node={node} emphasized={isSection || isSelected} />
 
-        {node.qaLanguageCategory && (
+        {node.qaLanguageCategory && !categoryControl && (
           <span aria-hidden="true" className="ml-1 shrink-0 whitespace-nowrap rounded bg-surface-sunken px-1 text-xs text-content-muted">
             語言
           </span>
@@ -713,7 +734,15 @@ function TreeBranch({
             {questionCount}
           </span>
         )}
-        {node.qaHidden && (
+        {categoryControl && qaNodeId && shared.onToggleQaNodeHidden && (
+          <label className="ml-1 shrink-0" onClick={(event) => event.stopPropagation()}>
+            <input type="checkbox" role="switch" className="accent-primary"
+              aria-label={`前台顯示 ${node.name}`} checked={!node.qaHidden} disabled={node.qaAncestorHidden}
+              onChange={(event) => shared.onToggleQaNodeHidden?.(qaNodeId, !event.target.checked)} />
+          </label>
+        )}
+        {node.qaAncestorHidden && <span className="ml-1 max-w-[3.5rem] shrink-0 text-xs text-content-muted">上層已關閉</span>}
+        {node.qaHidden && !categoryControl && (
           <span className="ml-1 shrink-0 whitespace-nowrap rounded bg-surface-sunken px-1 text-xs text-content-muted">
             已隱藏
           </span>
@@ -781,12 +810,16 @@ function TreeBranch({
         )}
       </div>
 
+      {dropError && <p role="status" className="px-2 py-1 text-xs text-danger">{dropError}</p>}
+      {node.treeKind === "documents-root" && isExpanded && shared.documentsToolbar}
+
       {isSection && isExpanded && node.children.length === 0 && !multiSelect && (
+
         <p
           className="py-1.5 pr-2 text-xs text-content-subtle"
           style={{ paddingLeft: `${rowIndentRem + 1.5}rem` }}
         >
-          {isQaRoot ? "還沒有分類。按上面的「新增分類」開始。" : "還沒有文件。按頁首的「新增資料」加入。"}
+          {isQaRoot ? "還沒有分類。按上面的「新增分類」開始。" : "還沒有文件。按頁首的「上傳」加入。"}
         </p>
       )}
 

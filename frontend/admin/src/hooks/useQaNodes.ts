@@ -7,6 +7,8 @@ import {
 } from "../api/common";
 import { errorMessage } from "../utils/errorMessage";
 
+export const QA_REFRESH_FAILED_MESSAGE = "資料已儲存，畫面更新失敗，請重新整理";
+
 export interface QaEntry {
   question: string;
   source_path: string;
@@ -25,11 +27,14 @@ export interface QaNode {
   children?: QaNode[];
 }
 
+export type QaImageKind = "qr" | "image";
+
 export interface MergedQaItem {
   index?: string;
   q: string;
   a: string;
   img?: string;
+  image_kind?: QaImageKind;
   url?: string;
   /** 空字串是選單專用題目：沒有答案，訪客點了照一般方式問。 */
   source_file: string;
@@ -86,7 +91,9 @@ export function useQaNodes(projectId = getActiveProjectId()) {
   }>(() => ({ projectId, nodes: [] }));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const activeProjectRef = useRef(projectId);
+  const treeRequest = useRef(0);
   activeProjectRef.current = projectId;
   const nodesTree = treeState.projectId === projectId ? treeState.nodes : [];
 
@@ -94,10 +101,13 @@ export function useQaNodes(projectId = getActiveProjectId()) {
     setTreeState({ projectId, nodes: [] });
     setLoading(false);
     setError(null);
+    setRefreshFailed(false);
   }, [projectId]);
 
-  const fetchTree = useCallback(async () => {
+  const fetchTree = useCallback(async (afterWrite = false) => {
     const requestedProjectId = projectId;
+    const request = ++treeRequest.current;
+    const isCurrent = () => activeProjectRef.current === requestedProjectId && request === treeRequest.current;
     setLoading(true);
     setError(null);
     try {
@@ -107,15 +117,19 @@ export function useQaNodes(projectId = getActiveProjectId()) {
         "GET",
       );
       if (activeProjectRef.current !== requestedProjectId) return [];
-      setTreeState({ projectId: requestedProjectId, nodes: data });
+      if (isCurrent()) {
+        setTreeState({ projectId: requestedProjectId, nodes: data });
+        setRefreshFailed(false);
+      }
       return data;
     } catch (error: unknown) {
-      if (activeProjectRef.current === requestedProjectId) {
-        setError(errorMessage(error, "Failed to fetch QA nodes tree"));
+      if (isCurrent()) {
+        if (afterWrite) setRefreshFailed(true);
+        else setError(errorMessage(error, "Failed to fetch QA nodes tree"));
       }
       throw error;
     } finally {
-      if (activeProjectRef.current === requestedProjectId) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [projectId]);
 
@@ -128,18 +142,19 @@ export function useQaNodes(projectId = getActiveProjectId()) {
       refetch = false,
     ): Promise<T> => {
       if (activeProjectRef.current === projectId) setError(null);
+      let data: T;
       try {
-        const data = await fn();
-        if (refetch && activeProjectRef.current === projectId) {
-          await fetchTree();
-        }
-        return data;
+        data = await fn();
       } catch (error: unknown) {
         if (activeProjectRef.current === projectId) {
           setError(errorMessage(error, fallback));
         }
         throw error;
       }
+      if (refetch && activeProjectRef.current === projectId) {
+        await fetchTree(true).catch(() => undefined);
+      }
+      return data;
     },
     [fetchTree, projectId],
   );
@@ -250,9 +265,21 @@ export function useQaNodes(projectId = getActiveProjectId()) {
     [projectId, run],
   );
 
+  const removeQaEntry = useCallback(
+    (id: string, question: string, sourcePath: string) => run(
+      () => qaJson<QaNode>(projectId, nodePath(id, "/entries"), "DELETE", undefined, {
+        question,
+        source_path: sourcePath,
+      }),
+      "Failed to remove QA entry",
+      true,
+    ),
+    [projectId, run],
+  );
+
   const uploadImage = useCallback(
     (file: File) => run(
-      () => qaFormData<{ image_id: string }>(
+      () => qaFormData<{ image_id: string; image_kind?: QaImageKind }>(
         projectId,
         "/knowledge/qa/images",
         file,
@@ -318,6 +345,7 @@ export function useQaNodes(projectId = getActiveProjectId()) {
     nodesTree,
     loading,
     error,
+    refreshFailed: treeState.projectId === projectId && refreshFailed,
     fetchTree,
     createNode,
     updateNode,
@@ -327,6 +355,7 @@ export function useQaNodes(projectId = getActiveProjectId()) {
     fetchMergedQa,
     saveMergedQa,
     addQaEntry,
+    removeQaEntry,
     uploadImage,
     deleteImage,
     cleanupImages,

@@ -1,6 +1,6 @@
 import type { KnowledgeDocumentSummary, KnowledgeLanguage } from "../../api";
 import type { QaNode } from "../../hooks/useQaNodes";
-import { isLanguageCategoryLabel } from "./qa/languageCategories";
+import { categoryLanguage, isLanguageCategoryLabel } from "./qa/languageCategories";
 
 /* ── Types ── */
 
@@ -22,6 +22,8 @@ export interface TreeNode {
   qaEntryQuestion?: string;
   qaEntrySourcePath?: string;
   qaHidden?: boolean;
+  qaAncestorHidden?: boolean;
+  qaOrderParentId?: string;
   /** 第一層、名字是「中文」「English」這類的分類，改名會影響匯入與訪客選單。 */
   qaLanguageCategory?: boolean;
   /** 這個分類自己的題數，不含子分類。 */
@@ -268,12 +270,17 @@ function qaNodeToTreeNode(
   node: QaTreeNodeInput,
   normalizedSearch: string,
   topLevel = false,
+  categoriesOnly = false,
+  qaAncestorHidden = false,
+  qaOrderParentId?: string,
 ): TreeNode | null {
   const childNodes = (node.children ?? [])
-    .map((child) => qaNodeToTreeNode(child, normalizedSearch))
+    .map((child) => qaNodeToTreeNode(
+      child, normalizedSearch, false, categoriesOnly, qaAncestorHidden || Boolean(node.hidden), node.node_id,
+    ))
     .filter((child): child is TreeNode => child !== null);
 
-  const entries: TreeNode[] = (node.qa_entries ?? [])
+  const entries: TreeNode[] = (categoriesOnly ? [] : node.qa_entries ?? [])
     .filter((entry) => !normalizedSearch || entry.question.toLowerCase().includes(normalizedSearch))
     .map((entry) => ({
       name: entry.question,
@@ -303,6 +310,7 @@ function qaNodeToTreeNode(
     virtual: true,
     qaNodeId: node.node_id,
     qaHidden: Boolean(node.hidden),
+    ...(categoriesOnly && { qaAncestorHidden, qaOrderParentId }),
     qaLanguageCategory: topLevel && isLanguageCategoryLabel(node.label),
     // 用未過濾的題數：搜尋時數字不跟著跳，看到的永遠是這個分類真正有幾題。
     qaQuestionCount: node.qa_entries?.length ?? 0,
@@ -315,16 +323,17 @@ export function mergeQaNodesIntoTree(
   documentTree: TreeNode,
   qaNodes: QaTreeNodeInput[],
   search = "",
+  categoriesOnly = false,
 ): TreeNode {
   const normalizedSearch = normalizeSearchTerm(search);
   const qaSection: TreeNode = {
-    name: QUICK_QA_TREE_LABEL,
+    name: categoriesOnly ? "快速回覆" : QUICK_QA_TREE_LABEL,
     path: QUICK_QA_TREE_PATH,
     type: "folder",
     treeKind: "qa-root",
     virtual: true,
     children: qaNodes
-      .map((node) => qaNodeToTreeNode(node, normalizedSearch, true))
+      .map((node) => qaNodeToTreeNode(node, categoriesOnly ? "" : normalizedSearch, true, categoriesOnly))
       .filter((node): node is TreeNode => node !== null),
   };
   const documentsSection: TreeNode = {
@@ -342,7 +351,7 @@ export function mergeQaNodesIntoTree(
     virtual: true,
     // 搜尋時只留有結果的段落，外層 children 是空的就代表沒有東西可顯示。
     children: normalizedSearch
-      ? sections.filter((section) => section.children.length > 0)
+      ? sections.filter((section) => categoriesOnly || section.children.length > 0)
       : sections,
   };
 }
@@ -463,6 +472,27 @@ export function getQaNodeAncestors(nodes: QaNode[], targetId: string, ancestors:
 export function getQaNodeParentId(nodes: QaNode[], targetId: string): string | null {
   const ancestors = getQaNodeAncestors(nodes, targetId);
   return ancestors && ancestors.length > 0 ? ancestors[ancestors.length - 1] : null;
+}
+
+export const QA_CATEGORY_DEPTH_LIMIT = 2;
+export const QA_CATEGORY_DEPTH_MESSAGE = "快速回覆最多兩層分類（語言分類不計），移到這裡會超過限制。";
+
+/** 同一分類可以掛在多處，取最深的位置，以免其中一條路徑超過限制。 */
+export function qaCategoryDepth(nodes: QaNode[], nodeId: string): number {
+  function visit(branch: QaNode[], depth: number): number {
+    return Math.max(-1, ...branch.map((node) => node.node_id === nodeId
+      ? depth : visit(node.children ?? [], depth + 1)));
+  }
+  return Math.max(-1, ...nodes.map((root) => visit([root], categoryLanguage(root.label) ? 0 : 1)));
+}
+
+export function qaMoveExceedsDepth(nodes: QaNode[], moving: QaNode, parentId: string | null): boolean {
+  if (parentId && moving.parent_ids.includes(parentId)) return false;
+  const start = parentId ? qaCategoryDepth(nodes, parentId) : categoryLanguage(moving.label) ? -1 : 0;
+  function exceeds(node: QaNode, depth: number): boolean {
+    return depth > QA_CATEGORY_DEPTH_LIMIT || (node.children ?? []).some((child) => exceeds(child, depth + 1));
+  }
+  return exceeds(moving, start + 1);
 }
 
 /** 要讓某個分類看得到內容所需展開的路徑；null 代表快速問答最上層。 */

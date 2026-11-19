@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { QaAllQuestions } from "../api/knowledge";
+import { question } from "../components/kb/questions/fixtures";
 import { NavigationGuardProvider } from "../context/NavigationGuardContext";
 import KnowledgeBase from "./KnowledgeBase";
 
@@ -19,15 +21,10 @@ vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({ account: { id: "admin", username: "admin", role: "admin", disabled: false, created_at: "" } }),
 }));
 
-vi.mock("../components/kb/qa/MergedCsvPane", () => ({
-  default: ({ nodeId, nodeLabel }: { nodeId: string | null; nodeLabel?: string }) => (
-    <div data-testid="merged-qa-pane">{nodeId}:{nodeLabel}</div>
-  ),
-}));
-
 interface ServerState {
   documents: Array<Record<string, unknown>>;
   qaNodes: Array<Record<string, unknown>>;
+  questionBank: QaAllQuestions;
   pending: Array<Record<string, unknown>>;
   job: Record<string, unknown>;
   uploadPaths: string[];
@@ -66,6 +63,16 @@ function route(url: string, init?: RequestInit): Response {
   }
   if (pathname.endsWith("/knowledge/settings")) return ok({ language_routes: ["zh"] });
   if (pathname.endsWith("/knowledge/qa/nodes")) return ok(server.qaNodes);
+  if (pathname.endsWith("/knowledge/qa/questions")) return ok(server.questionBank);
+  if (pathname.endsWith("/knowledge/qa/nodes/qa_node_1/merged")) {
+    return ok(server.questionBank.questions.map((item) => ({
+      original_q: item.question,
+      q: item.question,
+      a: item.answer,
+      source_file: item.source.path,
+      base_version: "version-1",
+    })));
+  }
   if (pathname.endsWith("/knowledge/raw/pending")) return ok({ files: server.pending });
   if (pathname.endsWith("/knowledge/raw/commit/status")) return ok(server.job);
   if (pathname.endsWith("/knowledge/raw/upload") && method === "POST") {
@@ -91,6 +98,10 @@ async function openPage() {
     </NavigationGuardProvider>,
   );
   await advance();
+}
+
+function showUpload() {
+  fireEvent.click(screen.getByRole("button", { name: "上傳" }));
 }
 
 function pickFile(name: string) {
@@ -125,6 +136,7 @@ beforeEach(() => {
   server = {
     documents: [],
     qaNodes: [],
+    questionBank: { categories: [], questions: [] },
     pending: [],
     job: IDLE_JOB,
     uploadPaths: [],
@@ -141,8 +153,9 @@ afterEach(() => {
 describe("KnowledgeBase import, end to end", () => {
   it("shows a QA table in the results and in the tree without reloading the page", async () => {
     await openPage();
-    expect(screen.getByText(/知識庫還沒有資料/)).toBeTruthy();
+    expect(screen.getByText(/還沒有題目/)).toBeTruthy();
     expect(screen.getByText("還沒有文件")).toBeTruthy();
+    showUpload();
 
     server.uploadPaths = ["raw/booth_faq_en.csv"];
     server.job = {
@@ -176,6 +189,23 @@ describe("KnowledgeBase import, end to end", () => {
       children: [],
     };
     server.qaNodes = [node];
+    server.questionBank = {
+      categories: [{
+        node_id: node.node_id,
+        label: node.label,
+        path: [node.label],
+        parent_id: null,
+        hidden: false,
+      }],
+      questions: node.qa_entries.map((entry, index) => question({
+        id: entry.question,
+        question: entry.question,
+        answer: `Imported answer ${index + 1}`,
+        language: "en",
+        source: { kind: "file", path: entry.source_path, label: "booth_faq_en.md" },
+        category_ids: [node.node_id],
+      })),
+    };
     server.documents = [makeDocument({ path: "knowledge/qa/booth_faq_en.md", source_type: "qa", is_indexed: true })];
     server.job = {
       ...server.job,
@@ -202,16 +232,23 @@ describe("KnowledgeBase import, end to end", () => {
     expect(within(tree).getByRole("treeitem", { name: /^booth_faq_en/ })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "查看 booth_faq_en.csv" }));
-    expect(screen.getByTestId("merged-qa-pane").textContent).toBe("qa_node_1:booth_faq_en");
+    expect(screen.getByRole("heading", { name: "booth_faq_en" })).toBeTruthy();
+    const table = screen.getByRole("table", { name: "題庫表格" });
+    expect(within(table).getByRole("button", { name: "Q1" })).toBeTruthy();
+    expect(within(table).getByRole("button", { name: "Q2" })).toBeTruthy();
+    fireEvent.click(within(table).getByRole("button", { name: "Q1" }));
+    await advance();
+    expect((screen.getByLabelText("答案") as HTMLTextAreaElement).value).toBe("Imported answer 1");
 
     // 結果留著：回到新增資料畫面還看得到。
-    fireEvent.click(screen.getByRole("button", { name: "新增資料" }));
+    showUpload();
     await advance();
     expect(screen.getByText("已放進快速問答：booth_faq_en（2 題）")).toBeTruthy();
   });
 
   it("follows a document from processing to searchable without reloading the page", async () => {
     await openPage();
+    showUpload();
 
     server.uploadPaths = ["raw/guide.docx"];
     server.documents = [makeDocument()];
@@ -240,6 +277,7 @@ describe("KnowledgeBase import, end to end", () => {
   it("offers files left behind without importing them along with a new upload", async () => {
     server.pending = [{ path: "old.md", size: 5, updated_at: "2026-11-01T10:00:00" }];
     await openPage();
+    showUpload();
     expect(screen.getByText("有 1 個之前上傳、還沒匯入的檔案")).toBeTruthy();
 
     server.uploadPaths = ["raw/new.md"];

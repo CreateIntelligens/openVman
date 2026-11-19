@@ -1,3 +1,4 @@
+import type { KnowledgeLanguage } from "../../../api/knowledge";
 import type { QaNode } from "../../../hooks/useQaNodes";
 
 /**
@@ -13,6 +14,13 @@ export const LANGUAGE_CATEGORY_LABELS: Record<string, string> = {
   "日本語": "ja",
   "한국어": "ko",
 };
+
+export function categoryLanguage(label: string): KnowledgeLanguage | undefined {
+  const key = label.trim().toLowerCase();
+  if (key === "台語") return "nan";
+  return Object.prototype.hasOwnProperty.call(LANGUAGE_CATEGORY_LABELS, key)
+    ? LANGUAGE_CATEGORY_LABELS[key] as KnowledgeLanguage : undefined;
+}
 
 export const LANGUAGE_CATEGORY_RENAME_WARNING =
   "這是語言分類：同語言的問答表會自動放進來，訪客選單也靠這個名字切換語言。改成別的名字後這兩件事都會失效。";

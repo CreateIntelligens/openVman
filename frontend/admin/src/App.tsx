@@ -36,7 +36,12 @@ import {
 } from "./components/app/navigation";
 import { BackendHealthProvider } from "./context/BackendHealthContext";
 import { MascotProvider } from "./context/MascotContext";
-import { NavigationProvider } from "./context/NavigationContext";
+import {
+  createChatTestRequest,
+  NavigationProvider,
+  type ChatTestOptions,
+  type ChatTestRequest,
+} from "./context/NavigationContext";
 import {
   NavigationGuardProvider,
   useNavigationGuard,
@@ -76,6 +81,7 @@ function initialRoute(): AdminRoute {
 function AppContent() {
   const { account, logout } = useAuth();
   const [route, setRoute] = useState<AdminRoute>(initialRoute);
+  const [chatTest, setChatTest] = useState<{ projectId: string; request: ChatTestRequest }>();
   const { collapsedGroups, toggleGroup } = useNavigationGroups(route.tab);
   const [isPinned, setIsPinned] = useState(initialSidebarPinned);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -109,6 +115,7 @@ function AppContent() {
       nextRoute: AdminRoute,
       nextProjectId: string,
       historyMode: "push" | "replace" | "none" = "push",
+      nextChatTest?: ChatTestRequest,
     ) => {
       const path = buildAdminPath(
         nextRoute.tab,
@@ -116,6 +123,7 @@ function AppContent() {
         nextRoute.subView,
       );
       setRoute(normalizeAdminRoute(nextRoute));
+      setChatTest(nextChatTest ? { projectId: nextProjectId, request: nextChatTest } : undefined);
       if (nextProjectId !== projectId) {
         setProjectId(nextProjectId);
       }
@@ -213,6 +221,12 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
+  const openChatTest = useCallback((options: ChatTestOptions) => {
+    requestNavigation(() => {
+      applyRoute({ tab: "Chat" }, projectId, "push", createChatTestRequest(options));
+    });
+  }, [applyRoute, projectId, requestNavigation]);
+
   if (!canAccessRoute(route, access, vendor)) {
     return <ForbiddenState routeDenied={vendor} />;
   }
@@ -222,6 +236,8 @@ function AppContent() {
       currentTab={route.tab}
       currentSubView={route.subView}
       onSelectTab={switchTab}
+      chatTest={chatTest?.projectId === projectId ? chatTest.request : undefined}
+      onOpenChatTest={openChatTest}
     >
       <div className="flex h-dvh overflow-hidden bg-surface text-content">
         <AppSidebar

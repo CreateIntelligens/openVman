@@ -7,8 +7,7 @@ import ConfirmModal from "../ConfirmModal";
 import LanguageRoutesButton from "./LanguageRoutesButton";
 
 const KNOWLEDGE_TABS = [
-  { id: "documents", label: "文件" },
-  { id: "questions", label: "所有題目" },
+  { id: "documents", label: "題庫" },
   { id: "graph", label: "圖譜" },
 ] as const;
 
@@ -17,8 +16,8 @@ const COMPACT_BUTTON = "max-sm:px-2";
 
 interface KnowledgeHeaderProps {
   vendor?: boolean;
-  activeTab: "documents" | "questions" | "graph";
-  setActiveTab: (tab: "documents" | "questions" | "graph") => void;
+  activeTab: "documents" | "graph";
+  setActiveTab: (tab: "documents" | "graph") => void;
   documentCount: number;
   /** 第一次載入完之前不知道有幾份，不要先寫出一個錯的數字。 */
   documentsLoaded: boolean;
@@ -26,6 +25,7 @@ interface KnowledgeHeaderProps {
   mobileTreeOpen: boolean;
   onOpenMobileTree: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onAddData: () => void;
+  onChatTest: () => void;
   importProgress: ImportProgress | null;
   pendingCount: number;
   onImportPending: () => void;
@@ -45,6 +45,7 @@ export default function KnowledgeHeader({
   mobileTreeOpen,
   onOpenMobileTree,
   onAddData,
+  onChatTest,
   importProgress,
   pendingCount,
   onImportPending,
@@ -119,21 +120,24 @@ export default function KnowledgeHeader({
               目錄
             </button>
             <LanguageRoutesButton projectId={projectId} />
-            {(!vendor || pendingCount > 0) && <ActionMenu
+            {!vendor && <ActionMenu
               label="知識庫維護"
               triggerLabel={reindexing ? "重建中…" : "維護"}
               triggerClassName={`btn btn-ghost ${COMPACT_BUTTON}`}
               groups={[{
                 id: "maintenance",
-                items: vendor ? maintenanceItems.filter((item) => item.id === "import-pending") : maintenanceItems,
+                items: maintenanceItems,
               }]}
             />}
+            <button type="button" onClick={onChatTest} className={`btn btn-ghost ${COMPACT_BUTTON}`}>
+              到對話頁測試
+            </button>
             <button
               type="button"
               onClick={onAddData}
               className={`btn btn-primary ${COMPACT_BUTTON}`}
             >
-              新增資料
+              上傳
             </button>
           </>
         ) : undefined}

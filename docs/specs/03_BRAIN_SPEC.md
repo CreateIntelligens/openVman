@@ -163,7 +163,7 @@
 
 | 動作 | 行為 |
 |---|---|
-| `PUT /nodes/{id}/merged` | 只更新這個節點的題目；同檔其他列與自訂欄原樣保留，內容沒變就不寫檔。這個節點獨佔檔案時 `index` 照畫面順序重編（拆成多檔的主題靠它記跨檔順序）；與別的節點共用時，每列留在原位、保留原本的 `index`，新題排在最大值之後，順序只記在節點上，否則同一題在兩個節點順序不同時，存一邊會改到另一邊的選單。`GET` 每列帶 `base_version`，存檔時原樣送回，列都刪光或全換新列時改用 `?base_version=`；節點已有題目卻沒帶版本，或載入後內容被改過都回 409，避免沒看過的新題被當成刪除。列的 `index` 由畫面順序決定，不看 client 帶的值 |
+| `PUT /nodes/{id}/merged` | 只更新這個節點的題目；同檔其他列與自訂欄原樣保留，內容沒變就不寫檔。這個節點獨佔檔案時 `index` 照畫面順序重編（拆成多檔的主題靠它記跨檔順序）；與別的節點共用時，每列留在原位、保留原本的 `index`，新題排在最大值之後，順序只記在節點上，否則同一題在兩個節點順序不同時，存一邊會改到另一邊的選單。`GET` 每列帶 `base_version`，存檔時原樣送回，列都刪光或全換新列時改用 `?base_version=`；節點已有題目卻沒帶版本，或載入後內容被改過都回 409，避免沒看過的新題被當成刪除。列的 `index` 由畫面順序決定，不看 client 帶的值。`GET` 的列若圖片已判定過，另帶唯讀的 `image_kind`；它不算進 `base_version`，`PUT` 帶回來也會忽略，判斷結果不因存檔改變 |
 | 從節點拿掉一題（`PUT`） | 別的節點也掛著就只取消掛載；沒有就刪掉檔案裡那一列。列刪光了檔案仍留著，要刪檔到文件樹刪 |
 | 改題目文字 | 用 `original_q` 認出原本那一列，掛同一題的節點一起改名，整份對照一次套用。改成檔案裡已有的題目，答案不同時回 400 並列出衝突；會讓別的節點出現同文字時也回 400 |
 | 新增列 | 文字與答案都和檔案裡的題目相同時只多掛一處，那一列不動。選單專用列（`source_file` 空字串）帶答案回 400，它沒有地方存答案 |
@@ -173,7 +173,7 @@
 | `POST /nodes/{id}/entries` | 帶 `source_path` 是掛載文件裡已有的題目，隱藏與圖片取自文件；不帶是新增選單專用題目 |
 | `DELETE /nodes/{id}/entries` | 只把題目拿下這個節點，文件的題目留在檔案裡、仍可被檢索，也不會被同步放回去 |
 | `DELETE /nodes/{id}` | 只拿掉分類與掛載，文件留著、仍可被檢索，裡面的題目也不會跑到別的節點 |
-| `GET /questions` | 只讀：所有題目一題一列（來源文件＋題目文字為身分，換行符號不算差異），附分類、語言與狀態；契約見 `brain/README.md` |
+| `GET /questions` | 只讀：所有題目一題一列（來源文件＋題目文字為身分，換行符號不算差異），附分類、語言與狀態；圖片已判定過的列帶 `image_kind`；契約見 `brain/README.md` |
 | `GET /nodes` | 不會替沒掛節點的 QA 文件建節點；要進選單用 `POST /nodes/adopt-source`（把文件拖進問答樹） |
 | 刪除文件 | 移除所有引用，只有因此變空且沒有子節點的節點會一起刪除 |
 | 重傳同名問答表 | 合併進現有文件：新題加入，新檔沒有的舊題留著，要刪到編輯畫面刪；隱藏狀態與各分類的位置不動。同一題的答案、或兩邊都有值的圖片與連結不同時，整份不匯入並列出衝突；舊檔沒填的圖片或連結會補上。分類已刪除的文件只更新內容，不回選單，表裡有 `path` 也一樣；分類還在但題目都拿掉了，題目會接回那個分類。換行符號不同不算內容不同 |
@@ -376,7 +376,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 
 一般 HTTP user turn 在載入近期歷史後、建立 prompt 前執行一次 `core.turn_decisions` batch，結果只存於伺服器端 `GenerationContext`。固定 5 題 typed questions：knowledge、web、memory 需求、明確回覆語言與當輪 tone；輸入語言不問供應商，由 `memory.language_detect` 規則判斷。題數影響延遲：Clef 包裝層每題固定約 60～80 tokens，延遲與 tokens 成正比，5 題約 0.39～0.52 秒。evidence 僅含當輪原句、最多 6 則 user／assistant 歷史（每則 600 字元）、語音語言、專案主要語言和允許的 read-tool 名稱，總字元上限 6,000。Noul 門檻為 positive 0.7、negative 0.1；choice confidence 0.8 且領先 0.2 才採用。信號逐項棄權，整體 2 秒、每 hop 0.8 秒（OpenAI Decisions 至少 1.5 秒，仍受整體期限限制；`TURN_DECISIONS_HOP_TIMEOUT_SECONDS`；Clef 單次約 450～800 ms，0.6 秒時多半逾時轉 Jev，反而更慢）。全部 hops、設定讀取或 timeout 失敗時使用 baseline policy；auto recall 會跳過本回合的 Jev filter，改走原有 LLM／formatted 摘要路徑。
 
-回應帶圖時同時帶 `image_kind`：`qr` 表示整張以 QR code 為主（解得出內容，且佔畫面至少 25%），`image` 是一般圖片；判斷不了時不出現，呼叫端應照常顯示。判斷由 `knowledge/qa_images.py` 用 OpenCV 執行，只看「偵測到」會誤判插圖，所以要解得出內容；上傳時判斷，舊圖第一次用到時補判，結果依檔案大小與修改時間存在 `knowledge/.qa_image_kinds.json`，之後只查表。既有圖片可跑 `python -m scripts.classify_qa_images` 一次補完。
+回應帶圖時同時帶 `image_kind`：`qr` 表示整張以 QR code 為主（解得出內容，且佔畫面至少 25%），`image` 是一般圖片；判斷不了時不出現，呼叫端應照常顯示。判斷由 `knowledge/qa_images.py` 用 OpenCV 執行，只看「偵測到」會誤判插圖，所以要解得出內容；上傳時判斷，舊圖第一次用到時補判，結果依檔案大小與修改時間存在 `knowledge/.qa_image_kinds.json`，之後只查表。後台的題目清單（`GET /knowledge/qa/questions`）與分類題目（`GET /knowledge/qa/nodes/{id}/merged`）也從這份表帶出 `image_kind`，但只查不判：沒判斷過或圖檔換過的圖不帶，後台顯示「未判定」。既有圖片可跑 `python -m scripts.classify_qa_images` 一次補完。
 
 回答附圖由 `core/reference_media.py` 決定：`search_knowledge` 一有附圖結果就在背景把使用者問題與前 5 筆附圖候選交給決策鏈（`choice`，含 `none`），與模型寫回答同時進行；選中的那筆回傳為 `image_id`，`none` 或信心低於 `CHAT_REFERENCE_MEDIA_MIN_CONFIDENCE`（預設 0.6）時不附圖並拿掉 citations 的圖片欄位，`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`／逾時／失敗時沿用第一筆 citation 的圖片。每輪決策另有 `wants_previous_picture`（只在對話紀錄裡有附過圖的 assistant 訊息時才問；noul，門檻同其他是非題 0.7；決策證據中附過圖的 assistant 訊息尾端標 `[A picture was shown with this reply.]`），判定為是時把 session 中最近 3 張已顯示的圖（assistant message metadata 的 `image_id`／`url`，附上引出它的 user 問題）排在候選前面、建構時即開始選；與這一輪檢索到的同一張圖去重。可替換回合在暫存時決定一次，確認時沿用。HTTP Chat 預設（`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`）不論 `needs_knowledge` 結果都由伺服器在第一次 LLM 呼叫前先執行 `search_knowledge`（見 9.1「先查知識庫」），`needs_knowledge` 只記錄訊號；關閉時高信心 `needs_knowledge=false` 略過知識檢索（仍保留 knowledge tool 供 agent 補查）、高信心 `true` 先查、不確定維持強制工具那一輪；正向 web／memory 會在合法工具第一輪以原句補上缺失 read call。要先查哪些、用什麼查詢由 `core/turn_reads.py` 統一決定（HTTP 與 Live 共用；知識庫查詢是這一句加「上一句＋這一句」，關閉 session recall 時取消 memory read），執行與放回對話的方式由各入口負責。Live finalized text 會在送出 generation 前並行執行必要 read-only prefetch，並以 bounded envelope 提供結果；結果明確標為不可信參考資料，已完成來源不重複呼叫，帶 citations 的結果照一般工具呼叫送出 `server_search_results`。預取總時限為 `LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`（預設 1 秒），逾時的那項取消並改列 `required_reads` 由模型自己查。`[視覺事件]` 回合不跑決策與預取。Mode、工具 registry、URL2MD 開關與 session recall 開關仍由既有程式決定。memory positive 使用 `search_memory` 並略過同回合 auto-recall；session recall 關閉時不會強制 memory read。memory write 仍由原本明確使用者意圖閘門控制。語言解析把 input、retrieval 與 response 分開；明確回覆語言優先於 ASR，response language 不會改寫訊息標籤或 TTS speech-language。Tone 只加當輪 delivery hint，不持久化。
 

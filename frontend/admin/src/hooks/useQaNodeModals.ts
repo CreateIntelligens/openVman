@@ -4,7 +4,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { findQaNode } from "../components/kb/helpers";
+import { findQaNode, QA_CATEGORY_DEPTH_MESSAGE, qaMoveExceedsDepth } from "../components/kb/helpers";
 import type { QaNodeDialog } from "../components/kb/qa/QaNodeModals";
 import type { QaNode, useQaNodes } from "./useQaNodes";
 
@@ -16,7 +16,6 @@ type QaNodeActions = Pick<
 interface UseQaNodeModalsOptions extends QaNodeActions {
   nodesTree: QaNode[];
   setSelectedQaNodeId: Dispatch<SetStateAction<string | null>>;
-  fetchQaTree: () => Promise<unknown>;
   loadDocuments: () => Promise<void>;
   /** 分類換了上層之後呼叫；parentId 是 null 代表移到最上層。 */
   onQaNodeMoved: (parentId: string | null) => void;
@@ -33,7 +32,6 @@ export function useQaNodeModals({
   deleteNode,
   moveNode,
   setSelectedQaNodeId,
-  fetchQaTree,
   loadDocuments,
   onQaNodeMoved,
   onRevealQaNode,
@@ -118,12 +116,14 @@ export function useQaNodeModals({
   const handleMoveQaNodeConfirm = useCallback(
     async (parentId: string | null) => {
       if (qaNodeDialog?.type !== "move") return;
-      await moveNode(qaNodeDialog.node.node_id, parentId ? [parentId] : []);
-      await fetchQaTree();
+      const node = findQaNode(nodesTree, qaNodeDialog.node.node_id);
+      if (!node) throw new Error("找不到這個分類，請重新整理後再試。");
+      if (qaMoveExceedsDepth(nodesTree, node, parentId)) throw new Error(QA_CATEGORY_DEPTH_MESSAGE);
+      await moveNode(node.node_id, parentId ? [parentId] : []);
       onQaNodeMoved(parentId);
       closeQaNodeDialog();
     },
-    [closeQaNodeDialog, fetchQaTree, moveNode, onQaNodeMoved, qaNodeDialog],
+    [closeQaNodeDialog, moveNode, nodesTree, onQaNodeMoved, qaNodeDialog],
   );
 
   const handleCreateQaNodeSubmit = useCallback(
@@ -137,7 +137,7 @@ export function useQaNodeModals({
         [],
         1.0,
         false,
-      );
+      ).catch(() => undefined);
       // 上層收合著的話新分類看不到，使用者會以為沒有新增成功。
       onRevealQaNode(parentId);
       closeQaNodeDialog();
@@ -151,7 +151,7 @@ export function useQaNodeModals({
         qaNodeDialog?.type === "rename" &&
         values.label !== qaNodeDialog.node.label
       ) {
-        void updateNode(qaNodeDialog.node.node_id, { label: values.label });
+        void updateNode(qaNodeDialog.node.node_id, { label: values.label }).catch(() => undefined);
       }
       closeQaNodeDialog();
     },
@@ -160,7 +160,7 @@ export function useQaNodeModals({
 
   const handleToggleQaNodeHidden = useCallback(
     (nodeId: string, hidden: boolean) => {
-      void updateNode(nodeId, { hidden });
+      void updateNode(nodeId, { hidden }).catch(() => undefined);
     },
     [updateNode],
   );
@@ -179,7 +179,7 @@ export function useQaNodeModals({
 
   const handleDeleteQaNodeConfirm = useCallback(() => {
     if (qaNodeDialog?.type === "delete") {
-      void handleDeleteQaNode(qaNodeDialog.node.node_id);
+      void handleDeleteQaNode(qaNodeDialog.node.node_id).catch(() => undefined);
     }
     closeQaNodeDialog();
   }, [closeQaNodeDialog, handleDeleteQaNode, qaNodeDialog]);

@@ -5,7 +5,11 @@ interface ConfirmModalProps {
   title: string;
   message: string;
   confirmLabel?: string;
+  confirmDisabled?: boolean;
   danger?: boolean;
+  /** 需要兩種做法讓人選時，另一個選項放在取消與確認之間。 */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -15,7 +19,10 @@ export default function ConfirmModal({
   title,
   message,
   confirmLabel = "確認",
+  confirmDisabled = false,
   danger = false,
+  secondaryLabel,
+  onSecondary,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -94,9 +101,20 @@ export default function ConfirmModal({
         >
           取消
         </button>
+        {secondaryLabel && onSecondary && (
+          <button
+            type="button"
+            onClick={onSecondary}
+            disabled={confirmDisabled}
+            className="btn btn-ghost border border-border"
+          >
+            {secondaryLabel}
+          </button>
+        )}
         <button
           type="button"
           onClick={onConfirm}
+          disabled={confirmDisabled}
           className={danger ? "btn btn-danger" : "btn btn-primary"}
         >
           {confirmLabel}

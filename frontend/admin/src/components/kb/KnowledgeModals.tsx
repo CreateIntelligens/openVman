@@ -15,10 +15,13 @@ import {
 import MoveModal from "./MoveModal";
 import NormalizationPreviewModal from "./NormalizationPreviewModal";
 import VisibilityOrderModal from "./qa/VisibilityOrderModal";
+import { vendorDocumentLabel, vendorFolderLabel } from "./vendorDocumentLabels";
 
 type OrderModalProps = ComponentProps<typeof VisibilityOrderModal>;
 
 interface KnowledgeModalsProps {
+  vendor?: boolean;
+  documentLabels?: ReadonlyMap<string, string>;
   documents: KnowledgeDocumentSummary[];
   serverDirs: string[];
   movingPath: string | null;
@@ -41,6 +44,8 @@ interface KnowledgeModalsProps {
 }
 
 export default function KnowledgeModals({
+  vendor = false,
+  documentLabels,
   documents,
   serverDirs,
   movingPath,
@@ -73,10 +78,16 @@ export default function KnowledgeModals({
   const isQaAttachedTarget =
     deleteTargetDocument?.source_type === "qa" &&
     deleteTargetDocument?.qa_attached === true;
-  const deleteFileName = deleteTarget ? fileNameOf(deleteTarget.value) : "";
+  const deleteFileName = !deleteTarget
+    ? ""
+    : vendor ? vendorDocumentLabel(deleteTarget.value, documentLabels) : fileNameOf(deleteTarget.value);
   const deleteMessage =
     deleteTarget?.type === "dir"
-      ? `確定要刪除資料夾「${displayDocumentPath(deleteTarget.value)}」嗎？資料夾裡還有檔案時不會刪除。`
+      ? `確定要刪除資料夾「${vendor ? vendorFolderLabel(deleteTarget.value) : displayDocumentPath(deleteTarget.value)}」嗎？資料夾裡還有檔案時不會刪除。`
+      : vendor
+      ? `確定要刪除「${deleteFileName}」嗎？刪除後 AI 就不會再用這份資料。刪除後無法復原。${
+        isQaAttachedTarget ? "對應的分類和題目也會一起刪除。" : ""
+      }`
       : isQaAttachedTarget
       ? `確定要刪除「${deleteFileName}」嗎？快速問答裡對應的分類和題目也會一起刪除。`
       : keepsOriginal
@@ -87,6 +98,8 @@ export default function KnowledgeModals({
     <>
       {movingPath && (
         <MoveModal
+          vendor={vendor}
+          documentLabels={documentLabels}
           sourcePaths={[movingPath]}
           allDocuments={documents}
           serverDirs={serverDirs}
@@ -105,7 +118,7 @@ export default function KnowledgeModals({
         onCancel={onCancelDelete}
       />
 
-      {normalizationPreview && (
+      {!vendor && normalizationPreview && (
         <NormalizationPreviewModal
           path={normalizationPreview.path}
           content={normalizationPreview.content}

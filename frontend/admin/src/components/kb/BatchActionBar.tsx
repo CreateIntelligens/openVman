@@ -19,6 +19,7 @@ import {
 } from "./helpers";
 import MoveModal from "./MoveModal";
 import { useModalDismiss } from "./useModalDismiss";
+import { vendorDocumentLabel } from "./vendorDocumentLabels";
 
 export type BatchActionKind = "move" | "delete" | "language";
 
@@ -99,6 +100,7 @@ function BatchLanguageModal({
 
 export default function BatchActionBar({
   vendor = false,
+  documentLabels,
   selectedPaths,
   documents,
   serverDirs,
@@ -109,6 +111,7 @@ export default function BatchActionBar({
   onRunningChange,
 }: {
   vendor?: boolean;
+  documentLabels?: ReadonlyMap<string, string>;
   selectedPaths: string[];
   documents: KnowledgeDocumentSummary[];
   serverDirs: string[];
@@ -151,7 +154,9 @@ export default function BatchActionBar({
       await onFinished(action, result.succeeded, options.targetPathOf ?? ((path) => path));
       onStatus({
         type: result.failed.length > 0 ? "error" : "success",
-        message: formatBatchSummary(label, result, options.note),
+        message: vendor && result.failed.length > 0
+          ? `${label}完成 ${result.succeeded.length} 個，${result.failed.length} 個未完成。未完成的文件仍有勾選，請稍後再試。`
+          : formatBatchSummary(label, result, options.note),
       });
     } finally {
       setProgress(null);
@@ -197,7 +202,9 @@ export default function BatchActionBar({
   };
 
   const deleteMessage = useMemo(() => {
-    const listed = selectedPaths.slice(0, LISTED_NAME_LIMIT).map((path) => `• ${fileNameOf(path)}`);
+    const listed = selectedPaths.slice(0, LISTED_NAME_LIMIT).map((path) =>
+      `• ${vendor ? vendorDocumentLabel(path, documentLabels) : fileNameOf(path)}`,
+    );
     const rest = count - LISTED_NAME_LIMIT;
     const selectedDocs = selectedPaths.flatMap((path) => documentsByPath.get(path) ?? []);
     const qaAttachedCount = selectedDocs.filter(
@@ -205,9 +212,11 @@ export default function BatchActionBar({
     ).length;
     const notes = [
       qaAttachedCount > 0
-        ? `其中 ${qaAttachedCount} 個掛在快速問答上，對應的分類與題目會一併移除。`
+        ? `其中 ${qaAttachedCount} 個掛在${vendor ? "快速回覆" : "快速問答"}上，對應的分類與題目會一併移除。`
         : "",
-      selectedDocs.some(hasOriginalBackup)
+      vendor
+        ? "刪除後 AI 就不會再用這些資料。刪除後無法復原。"
+        : selectedDocs.some(hasOriginalBackup)
         ? "上傳的檔案只會把內容從知識庫移除，原始上傳檔還留在系統備份裡。"
         : "",
     ].filter(Boolean);
@@ -217,7 +226,7 @@ export default function BatchActionBar({
       ...(rest > 0 ? [`…另有 ${rest} 個`] : []),
       ...(notes.length > 0 ? ["", ...notes] : []),
     ].join("\n");
-  }, [count, documentsByPath, selectedPaths]);
+  }, [count, documentLabels, documentsByPath, selectedPaths, vendor]);
 
   return (
     <div className="border-b border-border bg-primary/5 px-3 py-2">
@@ -281,6 +290,8 @@ export default function BatchActionBar({
 
       {dialog === "move" && (
         <MoveModal
+          vendor={vendor}
+          documentLabels={documentLabels}
           sourcePaths={selectedPaths}
           allDocuments={documents}
           serverDirs={serverDirs}

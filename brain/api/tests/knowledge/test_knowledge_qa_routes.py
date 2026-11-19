@@ -1404,3 +1404,78 @@ def test_the_all_questions_route_lists_every_question(client):
     assert [category["label"] for category in body["categories"]] == ["常見問題"]
     assert [row["question"] for row in body["questions"]] == ["選單題"]
     assert body["questions"][0]["source"]["kind"] == "menu_only"
+
+
+def _seed_image_question(client, kind_on_record: str | None):
+    """One CSV question with an image, optionally with a stored image kind."""
+    import knowledge.qa_images as qa_images
+    from knowledge.qa_nodes import update_node
+    from knowledge.workspace import ensure_workspace_scaffold
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "img_node", "label": "圖片"})
+    root = ensure_workspace_scaffold()
+    source_file = "knowledge/qa/media.csv"
+    (root / source_file).parent.mkdir(parents=True, exist_ok=True)
+    (root / source_file).write_text("q,a,img\n怎麼加入,掃描 QR code,B1-4\n", encoding="utf-8")
+    images = root / "knowledge" / ".qa_images"
+    images.mkdir(parents=True, exist_ok=True)
+    (images / "B1-4.png").write_bytes(b"png bytes")
+    update_node("img_node", {"qa_entries": [{"question": "怎麼加入", "source_path": source_file}]})
+    if kind_on_record:
+        real = qa_images.classify_image
+        qa_images.classify_image = lambda _data: {"kind": kind_on_record, "ratio": 0.5, "qr_payload": "x"}
+        try:
+            assert qa_images.qa_image_kind("B1-4", "default") == kind_on_record
+        finally:
+            qa_images.classify_image = real
+    return images / "B1-4.png"
+
+
+def _forbid_classifying(monkeypatch):
+    def refuse(_data):
+        raise AssertionError("listing must not classify images")
+
+    monkeypatch.setattr("knowledge.qa_images.classify_image", refuse)
+
+
+def test_question_list_and_merged_rows_carry_the_stored_image_kind(client, monkeypatch):
+    _seed_image_question(client, None)
+    unclassified = client.get("/brain/knowledge/qa/nodes/img_node/merged").json()[0]
+    assert "image_kind" not in unclassified
+
+    _seed_image_question(client, "qr")
+    _forbid_classifying(monkeypatch)
+    [question] = client.get("/brain/knowledge/qa/questions").json()["questions"]
+    [row] = client.get("/brain/knowledge/qa/nodes/img_node/merged").json()
+
+    assert question["image_kind"] == "qr"
+    assert row["image_kind"] == "qr"
+    # 類型不算進版本，否則只是補判一張圖，正在編輯的人存檔就會被當成衝突。
+    assert row["base_version"] == unclassified["base_version"]
+
+
+def test_saving_a_question_keeps_its_stored_image_kind(client, monkeypatch):
+    _seed_image_question(client, "qr")
+    _forbid_classifying(monkeypatch)
+    rows = client.get("/brain/knowledge/qa/nodes/img_node/merged").json()
+    rows[0]["a"] = "請掃描 QR code"
+
+    response = client.put("/brain/knowledge/qa/nodes/img_node/merged", json=rows)
+
+    assert response.status_code == 200
+    [row] = client.get("/brain/knowledge/qa/nodes/img_node/merged").json()
+    [question] = client.get("/brain/knowledge/qa/questions").json()["questions"]
+    assert (row["a"], row["image_kind"]) == ("請掃描 QR code", "qr")
+    assert question["image_kind"] == "qr"
+
+
+def test_a_replaced_image_is_unknown_until_classified_again(client, monkeypatch):
+    image = _seed_image_question(client, "qr")
+    image.write_bytes(b"a different picture")
+    _forbid_classifying(monkeypatch)
+
+    [question] = client.get("/brain/knowledge/qa/questions").json()["questions"]
+    [row] = client.get("/brain/knowledge/qa/nodes/img_node/merged").json()
+
+    assert "image_kind" not in question
+    assert "image_kind" not in row

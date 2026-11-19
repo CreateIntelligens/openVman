@@ -9,6 +9,7 @@ import {
 import Select from "../Select";
 
 interface SourcePanelProps {
+  vendor?: boolean;
   onPickFiles: (files: File[]) => void;
   /** 例如「100 MB」。 */
   maxUploadLabel: string;
@@ -42,6 +43,7 @@ export const IMPORT_TEMPLATES = [
 ] as const;
 
 export default function SourcePanel({
+  vendor = false,
   onPickFiles,
   maxUploadLabel,
   targetDir,
@@ -84,7 +86,7 @@ export default function SourcePanel({
                 checked={skipNormalize}
                 onChange={() => onSkipNormalizeChange(true)}
               />
-              直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）
+              直接放進知識庫（內容照原樣，AI 回答時會查這份資料）
             </label>
             <label className="flex cursor-pointer items-start gap-2 text-sm text-content">
               <input
@@ -94,7 +96,7 @@ export default function SourcePanel({
                 checked={!skipNormalize}
                 onChange={() => onSkipNormalizeChange(false)}
               />
-              先讓 AI 整理排版再放進去（適合掃描錯字多、排版很亂的檔案）
+              先讓 AI 整理排版再放進去（適合換行或排版很亂的文件）
             </label>
             <p className="text-xs text-content-muted">
               每次上傳開始後，會回到「直接放進知識庫」。問答表不看這個設定。
@@ -102,7 +104,7 @@ export default function SourcePanel({
           </fieldset>
         ) : (
           <p className="text-sm text-content">
-            這批文件會直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）。
+            這批文件會直接放進知識庫（內容照原樣，AI 回答時會查這份資料）。
           </p>
         )}
 
@@ -132,14 +134,28 @@ export default function SourcePanel({
           onChange={handleInputChange}
         />
 
-        <ul className="list-disc space-y-1 pl-5 text-sm text-content-muted">
-          <li>有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。</li>
-          <li>同名的問答表再傳一次是加上新題目，原本的題目都留著。答案和現有的不同時不會匯入，畫面會列出是哪幾題。</li>
-          <li>想指定放在哪個分類，加一欄「分類」，用斜線分層，例如「中文/產品/EUS」。沒填就放在以檔名命名的分類。</li>
-          <li>中文、英文、西文混在同一張表也可以，系統會一題一題判斷語言，放進「中文」「English」「Español」分類。這些分類要先建好，沒有的會先放在最上層。</li>
-          <li>其他文件會切成段落加入知識庫，AI 回答時查得到，不會變成問答。選 AI 整理時，內容維持原本的語言，不會翻譯。</li>
-          <li>可以上傳 {IMPORT_FORMATS_LABEL}，每個檔案 {maxUploadLabel} 以內。</li>
-        </ul>
+        {vendor ? (
+          <div className="space-y-2 text-sm text-content-muted">
+            <p>
+              <strong className="text-content">問答表</strong>　有「問題」和「答案」兩欄的試算表會放進快速回覆。
+              可加「分類」欄指定位置，例如「中文/產品/保養」。系統會辨識每題語言，沒有對應的語言分類時先放在最上層。
+              同名問答表重傳時只會加新題目，和既有題目同名但答案不同的題目會略過。
+            </p>
+            <p>
+              <strong className="text-content">一般文件</strong>　可上傳 Word（.docx）、PDF、文字檔（.md、.txt）或試算表（.xlsx、.csv）。
+              每個檔案限 {maxUploadLabel}。
+            </p>
+          </div>
+        ) : (
+          <ul className="list-disc space-y-1 pl-5 text-sm text-content-muted">
+            <li>有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。</li>
+            <li>同名的問答表再傳一次是加上新題目，原本的題目都留著。答案和現有的不同時不會匯入，畫面會列出是哪幾題。</li>
+            <li>想指定放在哪個分類，加一欄「分類」，用斜線分層，例如「中文/產品/保養」。沒填就放在以檔名命名的分類。</li>
+            <li>中文、英文、西文混在同一張表也可以。系統會辨識每題語言，沒有對應的語言分類時先放在最上層。</li>
+            <li>一般文件會保留原文供 AI 回答時查閱。選 AI 整理時會以原本的語言整理。</li>
+            <li>可以上傳 {IMPORT_FORMATS_LABEL}，每個檔案 {maxUploadLabel} 以內。</li>
+          </ul>
+        )}
 
         <div className="space-y-1 text-sm">
           <p className="font-medium text-content">不知道怎麼排？下載範例照著填：</p>
@@ -151,7 +167,7 @@ export default function SourcePanel({
                   href={`${TEMPLATE_BASE}${encodeURIComponent(template.file)}`}
                   download={template.file}
                 >
-                  {template.label}
+                  {vendor && template.file.endsWith(".md") ? "整理好的文件（文字檔）" : template.label}
                 </a>
               </li>
             ))}
@@ -168,7 +184,7 @@ export default function SourcePanel({
             onChange={onTargetDirChange}
           />
           <p className="text-xs text-content-muted">
-            問答表不看這個設定，一律放進快速問答。
+            問答表一律放進{vendor ? "快速回覆" : "快速問答"}。
           </p>
         </div>
       </section>

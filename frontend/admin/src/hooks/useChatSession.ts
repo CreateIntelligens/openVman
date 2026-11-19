@@ -26,6 +26,7 @@ import {
   type TranscriptionMeta,
 } from "@shared/speech";
 import { readReplyMode, writeReplyMode, type ReplyMode } from "../components/chat/replyMode";
+import type { ChatTestRequest } from "../context/NavigationContext";
 import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
@@ -162,7 +163,7 @@ function appendActionRequestToLastAssistant(
   });
 }
 
-export function useChatSession(vendor = false) {
+export function useChatSession(vendor = false, chatTest?: ChatTestRequest) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [privacyWarningsVisible, setPrivacyWarningsVisible] = useState(() => readPrivacyWarningsVisible());
@@ -216,7 +217,7 @@ export function useChatSession(vendor = false) {
     searchQuery,
     setSearchQuery,
     resetSearch,
-  } = useChatHistory(clearTtsPrefetchState);
+  } = useChatHistory(clearTtsPrefetchState, chatTest?.startFresh);
 
   const {
     slashOpen,
@@ -380,6 +381,7 @@ export function useChatSession(vendor = false) {
     }
   }, [persistSessionId, prefetchTts, setMessages, vendor]);
 
+  const testLanguage = chatTest?.language;
   const submit = useCallback(async (value = input) => {
     const nextMessage = value.trim();
     if (!nextMessage || sending || loadingPersonas) {
@@ -407,6 +409,7 @@ export function useChatSession(vendor = false) {
         sessionId || undefined,
         controller.signal,
         replyMode,
+        testLanguage,
       );
       const response_time_s = Math.round((performance.now() - submitTime) / 10) / 100;
 
@@ -462,9 +465,15 @@ export function useChatSession(vendor = false) {
       abortControllerRef.current = null;
       setSending(false);
     }
-  }, [applyChatResult, clearStopReplyTimer, input, loadSessions, loadingPersonas, persistSessionId, pushHistory, selectedPersonaId, sending, sessionId, setError, setMessages, showStoppedReplyNotice]);
+  }, [applyChatResult, clearStopReplyTimer, input, loadSessions, loadingPersonas, persistSessionId, pushHistory, replyMode, selectedPersonaId, sending, sessionId, setError, setMessages, showStoppedReplyNotice, testLanguage]);
 
   submitRef.current = submit;
+
+  useEffect(() => {
+    if (!chatTest || loadingPersonas || loadingHistory || sending) return;
+    const question = chatTest.takeQuestion();
+    if (question) void submit(question);
+  }, [chatTest, loadingHistory, loadingPersonas, sending, submit]);
 
   const notifyActionOutcome = useCallback((req: ActionRequest, outcome: "confirmed" | "cancelled") => {
     const verb = outcome === "confirmed" ? "已確認並觸發" : "拒絕了";

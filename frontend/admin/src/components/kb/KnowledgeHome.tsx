@@ -8,6 +8,7 @@ import { formatSize, KNOWLEDGE_LANGUAGE_LABELS } from "./helpers";
 import ImportResultList, { ImportFileName } from "./ImportResultList";
 import SourcePanel from "./SourcePanel";
 import { documentStatusLabel, type DocumentStatusLabel } from "./StatusDot";
+import { vendorFolderLabel } from "./vendorDocumentLabels";
 
 const STATUS_ORDER: DocumentStatusLabel[] = ["可被搜尋", "處理中", "已停用", "不會被搜尋"];
 
@@ -92,6 +93,8 @@ function KnowledgeStatus({ summary }: { summary: KnowledgeSummary }) {
 }
 
 interface KnowledgeHomeProps {
+  vendor?: boolean;
+  documentLabels?: ReadonlyMap<string, string>;
   importer: KnowledgeImport;
   documents: KnowledgeDocumentSummary[];
   /** 文件清單第一次載入完之前，不能下「知識庫是空的」的結論。 */
@@ -113,6 +116,8 @@ interface KnowledgeHomeProps {
 
 /** 右側的「新增資料」畫面：沒有選任何文件時顯示，頁首的「新增資料」也回到這裡。 */
 export default function KnowledgeHome({
+  vendor = false,
+  documentLabels,
   importer,
   allowAiCleanup = true,
   documents,
@@ -147,6 +152,10 @@ export default function KnowledgeHome({
   const summary = summarizeKnowledge(documents, nodesTree);
   const isEmpty = documentsLoaded && documents.length === 0 && nodesTree.length === 0;
   const showStatus = documentsLoaded && !isEmpty;
+  const pendingFileName = (path: string, index: number) => vendor ? `待匯入檔案 ${index + 1}` : path;
+  const discardLabel = discardTarget
+    ? pendingFileName(discardTarget, pendingFiles.findIndex((file) => file.path === discardTarget))
+    : "";
 
   return (
     <main className="min-w-0 flex-1 overflow-y-auto">
@@ -162,10 +171,13 @@ export default function KnowledgeHome({
         </div>
 
         <SourcePanel
+          vendor={vendor}
           onPickFiles={importer.startFiles}
           maxUploadLabel={maxUploadLabel}
           targetDir={importer.targetDir}
-          targetOptions={importer.targetOptions}
+          targetOptions={vendor
+            ? importer.targetOptions.map((option) => ({ ...option, label: vendorFolderLabel(option.value) }))
+            : importer.targetOptions}
           onTargetDirChange={importer.setTargetDir}
           skipNormalize={importer.skipNormalize}
           onSkipNormalizeChange={importer.setSkipNormalize}
@@ -181,6 +193,8 @@ export default function KnowledgeHome({
 
         <div ref={resultsRef}>
           <ImportResultList
+            vendor={vendor}
+            documentLabels={documentLabels}
             items={items}
             nodesTree={nodesTree}
             onViewDocument={onViewDocument}
@@ -207,16 +221,16 @@ export default function KnowledgeHome({
               </button>
             </div>
             <ul className="mt-1 divide-y divide-border">
-              {pendingFiles.map((file) => (
+              {pendingFiles.map((file, index) => (
                 <li key={file.path} className="flex items-center justify-between gap-3 py-2">
                   <span className="flex min-w-0 items-baseline gap-2">
-                    <ImportFileName name={file.path} />
+                    <ImportFileName name={pendingFileName(file.path, index)} />
                     <span className="shrink-0 text-xs text-content-subtle">{formatSize(file.size)}</span>
                   </span>
                   <button
                     type="button"
                     className="btn btn-danger shrink-0 px-2.5 py-1 text-xs"
-                    aria-label={`移除 ${file.path}`}
+                    aria-label={`移除 ${pendingFileName(file.path, index)}`}
                     onClick={() => setDiscardTarget(file.path)}
                   >
                     移除
@@ -241,7 +255,7 @@ export default function KnowledgeHome({
       <ConfirmModal
         open={discardTarget !== null}
         title="移除這個檔案？"
-        message={`「${discardTarget ?? ""}」還沒匯入，移除後檔案會被刪除，不能復原。`}
+        message={`「${discardLabel}」還沒匯入，移除後檔案會被刪除，不能復原。`}
         confirmLabel="移除"
         danger
         onConfirm={() => {

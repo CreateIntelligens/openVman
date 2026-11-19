@@ -4,6 +4,7 @@ import {
   type ReplyMode,
 } from "../components/chat/replyMode";
 import { fetchJson, apiUrl, projectUrl, getActiveProjectId } from "./common";
+import type { KnowledgeLanguage } from "./knowledge";
 
 /** Brain 在單一回合裡的 LLM 呼叫彙總；latency_ms 是所有呼叫加總。 */
 export interface ChatUsageSummary {
@@ -128,6 +129,7 @@ export async function fetchChat(
   sessionId: string | undefined,
   signal?: AbortSignal,
   mode: ReplyMode = DEFAULT_REPLY_MODE,
+  preferredLanguage?: KnowledgeLanguage,
 ): Promise<ChatDoneEvent> {
   return fetchJson<ChatDoneEvent>(apiUrl("/chat"), {
     method: "POST",
@@ -138,6 +140,7 @@ export async function fetchChat(
       session_id: sessionId,
       project_id: getActiveProjectId(),
       mode,
+      preferred_language: preferredLanguage,
     }),
     signal,
   });

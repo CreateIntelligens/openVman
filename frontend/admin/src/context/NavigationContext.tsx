@@ -6,10 +6,37 @@ import {
   type ReactNode,
 } from "react";
 
+import type { KnowledgeLanguage } from "../api/knowledge";
 import type { Tab } from "../components/app/navigation";
+
+export interface ChatTestOptions {
+  question?: string;
+  language?: KnowledgeLanguage;
+}
+
+export interface ChatTestRequest {
+  language?: KnowledgeLanguage;
+  startFresh: boolean;
+  takeQuestion: () => string | undefined;
+}
+
+export function createChatTestRequest({ question, language }: ChatTestOptions): ChatTestRequest {
+  let pendingQuestion = question?.trim() || undefined;
+  return {
+    language,
+    startFresh: Boolean(pendingQuestion),
+    takeQuestion: () => {
+      const value = pendingQuestion;
+      pendingQuestion = undefined;
+      return value;
+    },
+  };
+}
 
 interface NavigationContextType {
   navigateTo: (tab: Tab, subView?: string) => void;
+  openChatTest: (options: ChatTestOptions) => void;
+  chatTest?: ChatTestRequest;
   currentTab: Tab;
   currentSubView?: string;
 }
@@ -21,6 +48,8 @@ type NavigationProviderProps = {
   currentTab: Tab;
   currentSubView?: string;
   onSelectTab: (tab: Tab, subView?: string) => void;
+  chatTest?: ChatTestRequest;
+  onOpenChatTest?: (options: ChatTestOptions) => void;
 };
 
 export function NavigationProvider({
@@ -28,6 +57,8 @@ export function NavigationProvider({
   currentTab,
   currentSubView,
   onSelectTab,
+  chatTest,
+  onOpenChatTest,
 }: NavigationProviderProps) {
   const navigateTo = useCallback(
     (tab: Tab, subView?: string) => {
@@ -36,9 +67,14 @@ export function NavigationProvider({
     [onSelectTab],
   );
 
+  const openChatTest = useCallback((options: ChatTestOptions) => {
+    if (onOpenChatTest) onOpenChatTest(options);
+    else navigateTo("Chat");
+  }, [navigateTo, onOpenChatTest]);
+
   const value = useMemo(
-    () => ({ navigateTo, currentTab, currentSubView }),
-    [currentSubView, currentTab, navigateTo],
+    () => ({ navigateTo, openChatTest, chatTest, currentTab, currentSubView }),
+    [chatTest, currentSubView, currentTab, navigateTo, openChatTest],
   );
 
   return (

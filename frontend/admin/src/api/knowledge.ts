@@ -528,6 +528,7 @@ export interface QaQuestionRow {
   question: string;
   answer: string;
   image: string;
+  image_kind?: "qr" | "image";
   url: string;
   language: KnowledgeLanguage | null;
   source: {

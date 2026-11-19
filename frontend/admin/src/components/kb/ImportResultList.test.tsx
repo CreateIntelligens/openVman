@@ -31,7 +31,11 @@ function qaNode(id: string, label: string, children: QaNode[] = []): QaNode {
   };
 }
 
-function renderList(items: ImportItem[], nodesTree: QaNode[] = []) {
+function renderList(
+  items: ImportItem[],
+  nodesTree: QaNode[] = [],
+  overrides: Partial<Parameters<typeof ImportResultList>[0]> = {},
+) {
   const handlers = {
     onViewDocument: vi.fn(),
     onViewQaNode: vi.fn(),
@@ -40,7 +44,7 @@ function renderList(items: ImportItem[], nodesTree: QaNode[] = []) {
     onPickAgain: vi.fn(),
     onClear: vi.fn(),
   };
-  render(<ImportResultList items={items} nodesTree={nodesTree} {...handlers} />);
+  render(<ImportResultList items={items} nodesTree={nodesTree} {...handlers} {...overrides} />);
   return handlers;
 }
 
@@ -62,6 +66,24 @@ const qaResult = {
 };
 
 describe("ImportResultList", () => {
+  it("uses vendor-safe result names while retaining the action's real document path", () => {
+    const handlers = renderList([
+      row({ result: documentResult }),
+      row({ id: "row-2", state: "failed", name: "internal.csv", message: "Retry raw/internal.csv" }),
+      row({ id: "row-3", result: { ...qaResult, notes: ["raw/booth_faq_en.md"] } }),
+    ], [qaNode("qa_node_1", "booth_faq_en")], {
+      vendor: true,
+      documentLabels: new Map([[documentResult.target, "文件 3"]]),
+    });
+    const results = screen.getByRole("region", { name: "匯入結果" });
+    expect(results.textContent).not.toMatch(/guide\.docx|internal\.csv|booth_faq_en|raw\//);
+    expect(screen.getByText("匯入後有些內容需要確認。請查看題目的分類、答案和圖片。")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "查看 文件 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "再試一次 匯入檔案 2" }));
+    expect(handlers.onViewDocument).toHaveBeenCalledWith(documentResult.target);
+    expect(handlers.onRetry).toHaveBeenCalledWith("row-2");
+  });
+
   it("renders nothing without rows, so the page is not pushed around", () => {
     const { container } = render(
       <ImportResultList

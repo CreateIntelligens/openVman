@@ -3,11 +3,14 @@ import { readFileSync } from "node:fs";
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { QaAllQuestions } from "../api/knowledge";
 import { QUICK_QA_TREE_PATH, qaTreeNodePath, type TreeNode } from "../components/kb/helpers";
+import { question } from "../components/kb/questions/fixtures";
 import { useUnsavedChanges } from "../context/NavigationGuardContext";
+import type { QaNode } from "../hooks/useQaNodes";
 import KnowledgeBase from "./KnowledgeBase";
 
-const navigationMocks = vi.hoisted(() => ({ currentSubView: undefined as string | undefined, navigateTo: vi.fn() }));
+const navigationMocks = vi.hoisted(() => ({ currentSubView: undefined as string | undefined, navigateTo: vi.fn(), openChatTest: vi.fn() }));
 
 const knowledgeBaseMocks = vi.hoisted(() => ({
   closeFileView: vi.fn(),
@@ -70,21 +73,7 @@ const importerMocks = vi.hoisted(() => ({
 }));
 
 const qaNodeMocks = vi.hoisted(() => ({
-  nodesTree: [] as Array<{
-    node_id: string;
-    label: string;
-    parent_ids: string[];
-    child_ids: string[];
-    order: number;
-    hidden: boolean;
-    qa_entries: Array<{
-      question: string;
-      source_path: string;
-      hidden: boolean;
-      image_id: string | null;
-    }>;
-    children: unknown[];
-  }>,
+  nodesTree: [] as QaNode[],
   fetchTree: vi.fn(async () => []),
   createNode: vi.fn(),
   updateNode: vi.fn(),
@@ -95,10 +84,14 @@ const qaNodeMocks = vi.hoisted(() => ({
   ingestSource: vi.fn(),
   fetchMergedQa: vi.fn(),
   saveMergedQa: vi.fn(),
+  addQaEntry: vi.fn(),
+  removeQaEntry: vi.fn(),
   uploadImage: vi.fn(),
   deleteImage: vi.fn(),
   cleanupImages: vi.fn(async () => ({ deleted_files: [] as string[] })),
 }));
+
+const refreshQuestions = vi.hoisted(() => vi.fn(async () => undefined));
 
 const guideDoc = {
   path: "knowledge/guide.md",
@@ -271,17 +264,47 @@ vi.mock("../hooks/useQaNodes", () => ({
   }),
 }));
 
-const mergedPaneMocks = vi.hoisted(() => ({
-  props: null as null | Record<string, unknown>,
+let uncategorizedQuestions: QaAllQuestions["questions"] = [];
+
+function bankFixture(): QaAllQuestions {
+  const categories: QaAllQuestions["categories"] = [];
+  const questions: QaAllQuestions["questions"] = [];
+  function visit(node: QaNode, parents: string[] = [], parentHidden = false) {
+    const path = [...parents, node.label];
+    const hidden = parentHidden || node.hidden;
+    categories.push({
+      node_id: node.node_id,
+      label: node.label,
+      path,
+      parent_id: node.parent_ids[0] ?? null,
+      hidden,
+    });
+    for (const entry of node.qa_entries) {
+      questions.push(question({
+        id: `${node.node_id}:${entry.question}`,
+        question: entry.question,
+        answer: `${entry.question}的答案`,
+        source: { kind: "file", path: entry.source_path, label: "faq.md" },
+        category_ids: [node.node_id],
+        category_hidden: hidden,
+        hidden_in_file: entry.hidden,
+      }));
+    }
+    for (const child of node.children ?? []) visit(child, path, hidden);
+  }
+  for (const node of qaNodeMocks.nodesTree) visit(node);
+  return { categories, questions: [...questions, ...uncategorizedQuestions] };
+}
+
+vi.mock("../hooks/useQuestionBank", () => ({
+  useQuestionBank: () => ({ data: bankFixture(), loading: false, error: false, refresh: refreshQuestions }),
 }));
 
-vi.mock("../components/kb/qa/MergedCsvPane", () => ({
-  default: (props: { nodeId: string | null; nodeLabel?: string }) => {
-    mergedPaneMocks.props = props;
-    return <div data-testid="merged-qa-pane">{props.nodeId}:{props.nodeLabel}</div>;
-  },
-}));
-
+const directory = () => screen.getByRole("tree", { name: "知識庫目錄" });
+const categoryRow = (label: string) => within(directory()).getByRole("treeitem", { name: new RegExp(`^${label}`) });
+const selectCategory = (label: string) => fireEvent.click(categoryRow(label));
+const bankHeading = (label: string) => screen.getByRole("heading", { name: label });
+const showUpload = () => fireEvent.click(screen.getByRole("button", { name: "上傳" }));
 
 describe("KnowledgeBase merged tree", () => {
   beforeEach(() => {
@@ -289,6 +312,7 @@ describe("KnowledgeBase merged tree", () => {
     navigationMocks.currentSubView = undefined;
     vi.spyOn(Date, "now").mockReturnValue(1234567890);
     documentTree = makeDocumentTree();
+    uncategorizedQuestions = [];
     window.localStorage.clear();
     knowledgeBaseMocks.showNoteComposer = false;
     knowledgeBaseMocks.reindexing = false;
@@ -307,6 +331,9 @@ describe("KnowledgeBase merged tree", () => {
     knowledgeBaseMocks.search = "";
     knowledgeBaseMocks.hasActiveSearch = false;
     knowledgeBaseMocks.visibleExpandedDirs = new Set(["knowledge", QUICK_QA_TREE_PATH]);
+    qaNodeMocks.createNode.mockResolvedValue({});
+    qaNodeMocks.updateNode.mockResolvedValue({});
+    qaNodeMocks.fetchMergedQa.mockResolvedValue([]);
     qaNodeMocks.nodesTree = [
       {
         node_id: "returns",
@@ -325,18 +352,18 @@ describe("KnowledgeBase merged tree", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows QA nodes inside the file tree quick-QA directory and opens the quick-QA pane", () => {
+  it("shows categories in the directory and scopes the question bank when selected", () => {
     render(<KnowledgeBase />);
 
     const tree = screen.getByRole("tree", { name: "知識庫目錄" });
-    expect(within(tree).getByText("快速問答")).toBeTruthy();
+    expect(within(tree).getByText("快速回覆")).toBeTruthy();
     expect(within(tree).getByText("退換貨")).toBeTruthy();
     expect(screen.queryByText("問答知識節點")).toBeNull();
 
     fireEvent.click(within(tree).getByText("退換貨"));
 
     expect(knowledgeBaseMocks.closeFileView).toHaveBeenCalled();
-    expect(screen.getByTestId("merged-qa-pane").textContent).toBe("returns:退換貨");
+    expect(bankHeading("退換貨")).toBeTruthy();
   });
 
   it("does not force the quick-QA directory open when the expanded set excludes it", () => {
@@ -345,11 +372,11 @@ describe("KnowledgeBase merged tree", () => {
     render(<KnowledgeBase />);
 
     const tree = screen.getByRole("tree", { name: "知識庫目錄" });
-    expect(within(tree).getByText("快速問答")).toBeTruthy();
+    expect(within(tree).getByText("快速回覆")).toBeTruthy();
     expect(screen.queryByText("退換貨")).toBeNull();
 
     knowledgeBaseMocks.toggleExpand.mockClear();
-    fireEvent.click(within(tree).getByText("快速問答"));
+    fireEvent.click(within(tree).getByText("快速回覆"));
 
     expect(knowledgeBaseMocks.toggleExpand).toHaveBeenCalledWith(QUICK_QA_TREE_PATH);
   });
@@ -361,7 +388,7 @@ describe("KnowledgeBase merged tree", () => {
     const firstLevel = within(tree)
       .getAllByRole("treeitem")
       .filter((row) => row.getAttribute("aria-level") === "1");
-    expect(firstLevel.map((row) => row.getAttribute("aria-label"))).toEqual(["快速問答", "文件"]);
+    expect(firstLevel.map((row) => row.getAttribute("aria-label"))).toEqual(["快速回覆", "文件"]);
     expect(tree.textContent).not.toContain("knowledge");
     expect(firstLevel[1].getAttribute("aria-selected")).toBe("false");
   });
@@ -372,32 +399,37 @@ describe("KnowledgeBase merged tree", () => {
     expect(screen.queryByText("檔案與快速問答")).toBeNull();
     expect(screen.getByRole("button", { name: "多選" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "新增資料夾" })).toBeTruthy();
-    expect(screen.getByPlaceholderText("搜尋文件或問題")).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "搜尋問題或答案" })).toBeTruthy();
   });
 
-  it("shows the empty state only when neither section has results", () => {
-    knowledgeBaseMocks.search = "not-found";
-    knowledgeBaseMocks.hasActiveSearch = true;
-    documentTree = { ...makeDocumentTree(), children: [] };
-
+  it("keeps the directory available when no question matches the search", () => {
     render(<KnowledgeBase />);
 
-    expect(screen.getByText("找不到符合的文件或問題")).toBeTruthy();
-    expect(screen.queryByRole("tree")).toBeNull();
-    expect(screen.queryByText(/找到 \d+ 筆/)).toBeNull();
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜尋問題或答案" }), { target: { value: "找不到的內容" } });
+
+    expect(screen.getByText("沒有符合的題目。")).toBeTruthy();
+    expect(directory()).toBeTruthy();
+    expect(categoryRow("退換貨")).toBeTruthy();
   });
 
-  it("keeps the tree and counts results when only quick QA matches a search", () => {
-    knowledgeBaseMocks.search = "退換";
-    knowledgeBaseMocks.hasActiveSearch = true;
+  it("opens a question found by its answer even when there are no documents", async () => {
     documentTree = { ...makeDocumentTree(), children: [] };
+    qaNodeMocks.nodesTree[0].qa_entries = [
+      { question: "如何辦理退貨？", source_path: "knowledge/faq.md", hidden: false, image_id: null },
+    ];
+    qaNodeMocks.fetchMergedQa.mockResolvedValue([
+      { q: "如何辦理退貨？", a: "請備妥收據", source_file: "knowledge/faq.md", original_q: "如何辦理退貨？" },
+    ]);
 
     render(<KnowledgeBase />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜尋問題或答案" }), {
+      target: { value: "如何辦理退貨？的答案" },
+    });
+    const results = screen.getByRole("list", { name: "題目搜尋結果" });
+    fireEvent.click(within(results).getByRole("button", { name: /如何辦理退貨/ }));
 
-    expect(screen.queryByText("找不到符合的文件或問題")).toBeNull();
-    expect(screen.getByText("退換貨")).toBeTruthy();
-    expect(screen.queryByRole("treeitem", { name: "文件" })).toBeNull();
-    expect(screen.getByText("找到 1 筆")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "編輯題目" })).toBeTruthy();
+    await waitFor(() => expect((screen.getByLabelText("答案") as HTMLTextAreaElement).value).toBe("請備妥收據"));
   });
 
   it("only expands a clicked folder and leaves the open category and the drawer alone", () => {
@@ -406,8 +438,8 @@ describe("KnowledgeBase merged tree", () => {
       children: [{ name: "guides", path: "knowledge/guides", type: "folder", children: [] }],
     };
     render(<KnowledgeBase />);
-    fireEvent.click(screen.getByText("退換貨"));
-    expect(screen.getByTestId("merged-qa-pane")).toBeTruthy();
+    selectCategory("退換貨");
+    expect(bankHeading("退換貨")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "目錄" }));
 
     fireEvent.click(screen.getByText("guides"));
@@ -416,7 +448,7 @@ describe("KnowledgeBase merged tree", () => {
     expect(knowledgeBaseMocks.handleTreeSelect.mock.calls[0][0]).toMatchObject({
       path: "knowledge/guides",
     });
-    expect(screen.getByTestId("merged-qa-pane")).toBeTruthy();
+    expect(bankHeading("退換貨")).toBeTruthy();
     expect(screen.getByRole("dialog", { name: "知識庫檔案樹" })).toBeTruthy();
   });
 
@@ -441,7 +473,7 @@ describe("KnowledgeBase merged tree", () => {
       id: string,
       label: string,
       parentIds: string[] = [],
-      children: unknown[] = [],
+      children: QaNode[] = [],
     ) {
       return {
         node_id: id,
@@ -460,6 +492,12 @@ describe("KnowledgeBase merged tree", () => {
     }
 
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn() };
+
+    function dragCategory(name: string) {
+      const handle = within(row(name)).getByRole("button", { name: `拖曳或調整分類順序 ${name}` });
+      expect(handle.getAttribute("draggable")).toBe("true");
+      fireEvent.dragStart(handle, { dataTransfer });
+    }
 
     // jsdom 沒有 DragEvent，fireEvent 帶的 clientY 會被丟掉，要自己補上。
     function dropAt(target: HTMLElement, clientY: number) {
@@ -505,7 +543,7 @@ describe("KnowledgeBase merged tree", () => {
     it("moves a same-level category into the target when dropped on the middle", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("甲"), { dataTransfer });
+      dragCategory("甲");
       dropAt(row("乙"), MIDDLE);
 
       await waitFor(() => expect(qaNodeMocks.moveNode).toHaveBeenCalledWith("a", ["b"]));
@@ -516,7 +554,7 @@ describe("KnowledgeBase merged tree", () => {
     it("only reorders when dropped on the upper edge", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("乙"), { dataTransfer });
+      dragCategory("乙");
       dropAt(row("甲"), UPPER_EDGE);
 
       await waitFor(() => expect(qaNodeMocks.reorderNode).toHaveBeenCalledWith("b", ["b", "a"]));
@@ -526,7 +564,7 @@ describe("KnowledgeBase merged tree", () => {
     it("reorders after the target when dropped on the lower edge", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("丙"), { dataTransfer });
+      dragCategory("丙");
       dropAt(row("丁"), LOWER_EDGE);
 
       await waitFor(() => expect(qaNodeMocks.reorderNode).toHaveBeenCalledWith("c", ["d", "c"]));
@@ -536,7 +574,7 @@ describe("KnowledgeBase merged tree", () => {
     it("skips the request when the order would not change", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("甲"), { dataTransfer });
+      dragCategory("甲");
       dropAt(row("乙"), UPPER_EDGE);
 
       await waitFor(() => expect(row("甲").getAttribute("data-drop-position")).toBeNull());
@@ -547,7 +585,7 @@ describe("KnowledgeBase merged tree", () => {
     it("moves first and then reorders when dropped beside a category on another level", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("甲"), { dataTransfer });
+      dragCategory("甲");
       dropAt(row("丙"), UPPER_EDGE);
 
       await waitFor(() => expect(qaNodeMocks.reorderNode).toHaveBeenCalledWith("a", ["a", "c", "d"]));
@@ -559,7 +597,7 @@ describe("KnowledgeBase merged tree", () => {
     it("moves to the top level when dropped beside a top-level category", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("丙"), { dataTransfer });
+      dragCategory("丙");
       dropAt(row("甲"), LOWER_EDGE);
 
       await waitFor(() => expect(qaNodeMocks.reorderNode).toHaveBeenCalledWith("c", ["a", "c", "b"]));
@@ -569,7 +607,7 @@ describe("KnowledgeBase merged tree", () => {
     it("refuses to put a category into its own descendant, in any zone", () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("乙"), { dataTransfer });
+      dragCategory("乙");
       for (const clientY of [UPPER_EDGE, MIDDLE, LOWER_EDGE]) {
         dropAt(row("丙"), clientY);
       }
@@ -578,10 +616,35 @@ describe("KnowledgeBase merged tree", () => {
       expect(qaNodeMocks.reorderNode).not.toHaveBeenCalled();
     });
 
+    it.each(["into", "before", "after"])("refuses a third category level when dragging %s", (position) => {
+      const grandchild = qaCategory("e", "戊", ["c"]);
+      qaNodeMocks.nodesTree = [qaCategory("a", "甲"), qaCategory("b", "乙", [], [
+        qaCategory("c", "丙", ["b"], [grandchild]),
+      ])];
+      knowledgeBaseMocks.visibleExpandedDirs.add(qaTreeNodePath("c"));
+      render(<KnowledgeBase />);
+      dragCategory("甲");
+      dropAt(row(position === "into" ? "丙" : "戊"), position === "into" ? MIDDLE : position === "before" ? UPPER_EDGE : LOWER_EDGE);
+      expect(qaNodeMocks.moveNode).not.toHaveBeenCalled();
+      expect(qaNodeMocks.reorderNode).not.toHaveBeenCalled();
+      expect(knowledgeBaseMocks.setStatus).toHaveBeenCalledWith({ type: "error", message: expect.stringContaining("最多兩層") });
+    });
+
+    it("disables dialog destinations that would move a subtree to a third level", () => {
+      render(<KnowledgeBase />);
+      fireEvent.click(screen.getByRole("button", { name: "更多動作：乙" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "移到…" }));
+      const dialog = screen.getByRole("dialog", { name: "把「乙」移到…" });
+      const target = within(dialog).getByRole<HTMLInputElement>("radio", { name: /甲/ });
+      expect(target.disabled).toBe(true);
+      expect(target.closest("label")?.textContent).toContain("最多兩層");
+      expect(qaNodeMocks.moveNode).not.toHaveBeenCalled();
+    });
+
     it("does nothing when a category is dropped into the parent it already has", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("丙"), { dataTransfer });
+      dragCategory("丙");
       dropAt(row("乙"), MIDDLE);
 
       expect(qaNodeMocks.moveNode).not.toHaveBeenCalled();
@@ -591,8 +654,8 @@ describe("KnowledgeBase merged tree", () => {
     it("moves a nested category to the top level when dropped on the quick QA section", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("丙"), { dataTransfer });
-      dropAt(row("快速問答"), MIDDLE);
+      dragCategory("丙");
+      dropAt(row("快速回覆"), MIDDLE);
 
       await waitFor(() => expect(qaNodeMocks.moveNode).toHaveBeenCalledWith("c", []));
       await waitFor(() => expect(knowledgeBaseMocks.setStatus).toHaveBeenCalledWith({
@@ -604,17 +667,17 @@ describe("KnowledgeBase merged tree", () => {
     it("does not offer the quick QA section to a category already at the top level", () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("甲"), { dataTransfer });
-      dropAt(row("快速問答"), MIDDLE);
+      dragCategory("甲");
+      dropAt(row("快速回覆"), MIDDLE);
 
-      expect(row("快速問答").getAttribute("data-drop-position")).toBeNull();
+      expect(row("快速回覆").getAttribute("data-drop-position")).toBeNull();
       expect(qaNodeMocks.moveNode).not.toHaveBeenCalled();
     });
 
     it("expands the target and says where the category went", async () => {
       render(<KnowledgeBase />);
 
-      fireEvent.dragStart(row("甲"), { dataTransfer });
+      dragCategory("甲");
       dropAt(row("乙"), MIDDLE);
 
       await waitFor(() => expect(knowledgeBaseMocks.setStatus).toHaveBeenCalledWith({
@@ -654,7 +717,7 @@ describe("KnowledgeBase merged tree", () => {
       render(<KnowledgeBase />);
 
       fireEvent.dragStart(row("guide.md"), { dataTransfer });
-      dropAt(row("快速問答"), MIDDLE);
+      dropAt(row("快速回覆"), MIDDLE);
 
       await waitFor(() => expect(qaNodeMocks.adoptSource).toHaveBeenCalledWith("knowledge/guide.md"));
     });
@@ -670,7 +733,7 @@ describe("KnowledgeBase merged tree", () => {
       fireEvent.dragStart(row("guide.md"), { dataTransfer });
       dropAt(row("乙"), MIDDLE);
       fireEvent.dragStart(row("guide.md"), { dataTransfer });
-      dropAt(row("快速問答"), MIDDLE);
+      dropAt(row("快速回覆"), MIDDLE);
 
       await act(async () => undefined);
       expect(qaNodeMocks.adoptSource).not.toHaveBeenCalled();
@@ -869,7 +932,7 @@ describe("KnowledgeBase merged tree", () => {
     expect(document.activeElement).toBe(opener);
   });
 
-  it("reorders quick-QA entries by dragging one question onto another", async () => {
+  it("reorders questions by dragging one table row onto another", async () => {
     qaNodeMocks.nodesTree = [
       {
         node_id: "returns",
@@ -898,8 +961,9 @@ describe("KnowledgeBase merged tree", () => {
 
     render(<KnowledgeBase />);
 
-    const q1 = screen.getByText("Q1").closest(".group") as HTMLElement;
-    const q2 = screen.getByText("Q2").closest(".group") as HTMLElement;
+    selectCategory("退換貨");
+    const q1 = screen.getByRole("button", { name: "Q1" }).closest('[role="row"]') as HTMLElement;
+    const q2 = screen.getByRole("img", { name: "拖曳排序 Q2" });
     const dataTransfer = {
       effectAllowed: "",
       dropEffect: "",
@@ -913,10 +977,10 @@ describe("KnowledgeBase merged tree", () => {
     await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
     expect(qaNodeMocks.fetchMergedQa).toHaveBeenCalledWith("returns");
     expect(qaNodeMocks.saveMergedQa.mock.calls[0][0]).toBe("returns");
-    // 號碼要跟著新順序走：CSV 同步時依 index 排序，舊號碼會把順序排回去。
+    // 合併儲存 API 依列的位置重算順序。
     expect(
-      qaNodeMocks.saveMergedQa.mock.calls[0][1].map((row: { q: string; index: string }) => [row.index, row.q]),
-    ).toEqual([["1", "Q2"], ["2", "Q1"]]);
+      qaNodeMocks.saveMergedQa.mock.calls[0][1].map((row: { q: string }) => row.q),
+    ).toEqual(["Q2", "Q1"]);
   });
 
 
@@ -971,9 +1035,11 @@ describe("KnowledgeBase merged tree", () => {
       };
     }
 
-    it("shows the add-data screen when nothing is selected", () => {
+    it("opens the add-data screen from the default question bank", () => {
       render(<KnowledgeBase />);
 
+      expect(bankHeading("全部分類")).toBeTruthy();
+      showUpload();
       expect(screen.getByRole("heading", { name: "新增資料" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "把檔案拖到這裡，或點這裡選擇檔案" })).toBeTruthy();
       expect(screen.queryByText(/從檔案樹選擇/)).toBeNull();
@@ -991,6 +1057,7 @@ describe("KnowledgeBase merged tree", () => {
       it("only offers to put documents straight into the knowledge base", () => {
         render(<KnowledgeBase />);
 
+        showUpload();
         expect(screen.getByText(/這批文件會直接放進知識庫/)).toBeTruthy();
         expect(screen.queryByText(/先讓 AI 整理排版/)).toBeNull();
       });
@@ -1034,10 +1101,10 @@ describe("KnowledgeBase merged tree", () => {
     });
 
     // 實測：主要動作最不顯眼，最醒目的實心按鈕是維護用的「重新索引」。
-    it("makes 新增資料 the one solid button and keeps maintenance in a menu", () => {
+    it("makes 上傳 the solid button and keeps maintenance in a menu", () => {
       render(<KnowledgeBase />);
 
-      const addData = screen.getByRole("button", { name: "新增資料" });
+      const addData = screen.getByRole("button", { name: "上傳" });
       expect(addData.className).toContain("btn-primary");
       expect(screen.queryByRole("button", { name: /重建搜尋資料/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /採納/ })).toBeNull();
@@ -1050,13 +1117,13 @@ describe("KnowledgeBase merged tree", () => {
 
     it("goes back to the add-data screen from a selected category", () => {
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("退換貨"));
-      expect(screen.getByTestId("merged-qa-pane")).toBeTruthy();
+      selectCategory("退換貨");
+      expect(bankHeading("退換貨")).toBeTruthy();
       knowledgeBaseMocks.closeFileView.mockClear();
 
-      fireEvent.click(screen.getByRole("button", { name: "新增資料" }));
+      showUpload();
 
-      expect(screen.queryByTestId("merged-qa-pane")).toBeNull();
+      expect(screen.queryByRole("heading", { name: "退換貨" })).toBeNull();
       expect(screen.getByRole("heading", { name: "新增資料" })).toBeTruthy();
       expect(knowledgeBaseMocks.closeFileView).toHaveBeenCalled();
       expect(knowledgeBaseMocks.closeNoteComposer).toHaveBeenCalled();
@@ -1064,19 +1131,20 @@ describe("KnowledgeBase merged tree", () => {
 
     it("asks before leaving unsaved work, and stays when told to", () => {
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
       guardMocks.requestNavigation.mockClear();
       guardMocks.requestNavigation.mockImplementationOnce(() => false);
 
-      fireEvent.click(screen.getByRole("button", { name: "新增資料" }));
+      showUpload();
 
       expect(guardMocks.requestNavigation).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId("merged-qa-pane")).toBeTruthy();
+      expect(bankHeading("退換貨")).toBeTruthy();
     });
 
     it("leaves the add-data screen when a document is clicked in the tree", () => {
       render(<KnowledgeBase />);
 
+      showUpload();
       fireEvent.click(screen.getByRole("treeitem", { name: "guide.md" }));
 
       expect(knowledgeBaseMocks.handleTreeSelect).toHaveBeenCalledTimes(1);
@@ -1087,7 +1155,7 @@ describe("KnowledgeBase merged tree", () => {
       knowledgeBaseMocks.showNoteComposer = true;
       render(<KnowledgeBase />);
 
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
 
       expect(knowledgeBaseMocks.closeNoteComposer).toHaveBeenCalled();
     });
@@ -1101,8 +1169,8 @@ describe("KnowledgeBase merged tree", () => {
         fireEvent.click(screen.getByRole("treeitem", { name: "guide.md" }));
         expect(knowledgeBaseMocks.handleTreeSelect).not.toHaveBeenCalled();
 
-        fireEvent.click(screen.getByText("退換貨"));
-        expect(screen.queryByTestId("merged-qa-pane")).toBeNull();
+        selectCategory("退換貨");
+        expect(screen.queryByRole("heading", { name: "退換貨" })).toBeNull();
         expect(guardMocks.requestNavigation).toHaveBeenCalledTimes(2);
       } finally {
         guardMocks.requestNavigation.mockImplementation((action: () => void) => {
@@ -1127,13 +1195,13 @@ describe("KnowledgeBase merged tree", () => {
 
     it("does not ask when the category already on screen is clicked again", () => {
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
       guardMocks.requestNavigation.mockClear();
 
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
 
       expect(guardMocks.requestNavigation).not.toHaveBeenCalled();
-      expect(screen.getByTestId("merged-qa-pane")).toBeTruthy();
+      expect(bankHeading("退換貨")).toBeTruthy();
     });
 
     it("does not reload the open document when it is clicked again", () => {
@@ -1189,6 +1257,7 @@ describe("KnowledgeBase merged tree", () => {
     it("opens the composer in the chosen format", () => {
       const { rerender } = render(<KnowledgeBase />);
 
+      showUpload();
       fireEvent.click(screen.getByRole("button", { name: "自己輸入問答" }));
       expect(knowledgeBaseMocks.setShowNoteComposer).toHaveBeenCalledWith(true);
 
@@ -1202,11 +1271,11 @@ describe("KnowledgeBase merged tree", () => {
     it("shows import progress in the header and returns to the results from it", () => {
       importerMocks.value.progress = { done: 1, total: 3 };
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
 
       fireEvent.click(screen.getByRole("button", { name: "匯入中 1/3" }));
 
-      expect(screen.queryByTestId("merged-qa-pane")).toBeNull();
+      expect(screen.queryByRole("heading", { name: "退換貨" })).toBeNull();
       expect(screen.getByRole("heading", { name: "新增資料" })).toBeTruthy();
     });
 
@@ -1276,12 +1345,12 @@ describe("KnowledgeBase merged tree", () => {
 
     it("switches to the results when files are dropped", () => {
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
       guardMocks.requestNavigation.mockClear();
 
       act(() => importerMocks.options?.onDropStarted?.());
 
-      expect(screen.queryByTestId("merged-qa-pane")).toBeNull();
+      expect(screen.queryByRole("heading", { name: "退換貨" })).toBeNull();
       expect(screen.getByRole("heading", { name: "新增資料" })).toBeTruthy();
       expect(guardMocks.requestNavigation).not.toHaveBeenCalled();
     });
@@ -1289,12 +1358,12 @@ describe("KnowledgeBase merged tree", () => {
     it("does not throw away unsaved work when files are dropped", () => {
       guardMocks.hasUnsavedChanges = true;
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
       guardMocks.requestNavigation.mockClear();
 
       act(() => importerMocks.options?.onDropStarted?.());
 
-      expect(screen.getByTestId("merged-qa-pane")).toBeTruthy();
+      expect(bankHeading("退換貨")).toBeTruthy();
       expect(guardMocks.requestNavigation).not.toHaveBeenCalled();
       expect(knowledgeBaseMocks.setStatus.mock.calls.slice(-1)[0]?.[0].message).toContain("已開始匯入");
     });
@@ -1311,9 +1380,10 @@ describe("KnowledgeBase merged tree", () => {
       importerMocks.value.items = [qaImportRow()];
       render(<KnowledgeBase />);
 
+      showUpload();
       fireEvent.click(screen.getByRole("button", { name: "查看 booth_faq_en.csv" }));
 
-      expect(screen.getByTestId("merged-qa-pane").textContent).toBe("returns:退換貨");
+      expect(bankHeading("退換貨")).toBeTruthy();
       const updates = knowledgeBaseMocks.setExpandedDirs.mock.calls.map(
         ([update]) => update as (previous: Set<string>) => Set<string>,
       );
@@ -1326,6 +1396,7 @@ describe("KnowledgeBase merged tree", () => {
       importerMocks.value.items = [qaImportRow()];
       render(<KnowledgeBase />);
 
+      showUpload();
       fireEvent.click(screen.getByRole("button", { name: "改名 booth_faq_en.csv" }));
 
       expect((screen.getByLabelText(/分類名稱/) as HTMLInputElement).value).toBe("退換貨");
@@ -1339,6 +1410,7 @@ describe("KnowledgeBase merged tree", () => {
       }];
       render(<KnowledgeBase />);
 
+      showUpload();
       fireEvent.click(screen.getByRole("button", { name: "查看 guide.docx" }));
 
       expect(knowledgeBaseMocks.handleTreeSelect).toHaveBeenCalledWith({
@@ -1356,13 +1428,13 @@ describe("KnowledgeBase merged tree", () => {
     it("imports the waiting files from the menu and shows the results", () => {
       importerMocks.value.pendingFiles = [pendingFile];
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("退換貨"));
+      selectCategory("退換貨");
 
       fireEvent.click(screen.getByRole("button", { name: "維護" }));
       fireEvent.click(screen.getByRole("menuitem", { name: "匯入等待中的檔案（1）" }));
 
       expect(importerMocks.value.importPending).toHaveBeenCalledTimes(1);
-      expect(screen.queryByTestId("merged-qa-pane")).toBeNull();
+      expect(screen.queryByRole("heading", { name: "退換貨" })).toBeNull();
     });
 
     it("confirms before cleaning images and reports how many were removed", async () => {
@@ -1409,25 +1481,24 @@ describe("KnowledgeBase merged tree", () => {
     });
   });
 
-  describe("quick QA editor wiring", () => {
-    function category(id: string, label: string, overrides: Record<string, unknown> = {}) {
+  describe("question editor navigation", () => {
+    function category(id: string, label: string, overrides: Partial<QaNode> = {}): QaNode {
       return {
         node_id: id,
         label,
-        parent_ids: [] as string[],
-        child_ids: [] as string[],
+        parent_ids: [],
+        child_ids: [],
         order: 1,
         hidden: false,
         qa_entries: [
           { question: `${label}一`, source_path: "knowledge/faq.md", hidden: false, image_id: null },
           { question: `${label}二`, source_path: "knowledge/faq.md", hidden: false, image_id: null },
         ],
-        children: [] as unknown[],
+        children: [],
         ...overrides,
       };
     }
 
-    const treeRow = (text: string) => screen.getByText(text).closest(".group") as HTMLElement;
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn() };
 
     function dragOnto(from: HTMLElement, to: HTMLElement) {
@@ -1436,124 +1507,132 @@ describe("KnowledgeBase merged tree", () => {
       fireEvent.drop(to, { dataTransfer });
     }
 
+    function openQuestion(text: string) {
+      fireEvent.click(screen.getByRole("button", { name: text }));
+    }
+
     beforeEach(() => {
-      mergedPaneMocks.props = null;
       qaNodeMocks.nodesTree = [category("a", "甲"), category("b", "乙")];
-      qaNodeMocks.fetchMergedQa.mockResolvedValue([]);
+      qaNodeMocks.fetchMergedQa.mockImplementation(async (id: string) => {
+        const node = qaNodeMocks.nodesTree.find((item) => item.node_id === id);
+        return (node?.qa_entries ?? []).map((item) => ({
+          q: item.question, original_q: item.question, a: `${item.question}的答案`,
+          source_file: item.source_path, hidden: item.hidden, base_version: "v1",
+        }));
+      });
       qaNodeMocks.saveMergedQa.mockResolvedValue({ status: "ok" });
       qaNodeMocks.ingestSource.mockResolvedValue({ added: 1 });
-      qaNodeMocks.moveNode.mockResolvedValue({});
       knowledgeBaseMocks.visibleExpandedDirs = new Set([
-        "knowledge",
-        QUICK_QA_TREE_PATH,
-        qaTreeNodePath("a"),
-        qaTreeNodePath("b"),
+        "knowledge", QUICK_QA_TREE_PATH, qaTreeNodePath("a"), qaTreeNodePath("b"),
       ]);
     });
 
-    it("opens a clicked question's category and asks the editor to go to that question", () => {
+    it("opens a question from the table with its category while keeping the table scope", async () => {
       render(<KnowledgeBase />);
+      openQuestion("乙二");
 
-      fireEvent.click(screen.getByText("乙二"));
-
-      expect(screen.getByTestId("merged-qa-pane").textContent).toBe("b:乙");
-      expect(mergedPaneMocks.props?.focusQuestion).toEqual({ question: "乙二" });
+      expect(await screen.findByRole("heading", { name: "編輯題目" })).toBeTruthy();
+      expect((screen.getByLabelText("分類") as HTMLSelectElement).value).toBe("b");
+      expect(bankHeading("全部分類")).toBeTruthy();
       expect(guardMocks.requestNavigation).toHaveBeenCalledTimes(1);
+      expect(qaNodeMocks.fetchMergedQa).toHaveBeenCalledWith("b");
     });
 
-    it("goes to a question in the open category without asking, every time it is clicked", () => {
+    it("opens the source document from an uncategorized question", () => {
+      uncategorizedQuestions = [
+        question({ id: "off-menu", question: "尚未分類？", category_ids: [], off_menu: "never" }),
+      ];
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("甲"));
+      openQuestion("尚未分類？");
       guardMocks.requestNavigation.mockClear();
 
-      fireEvent.click(screen.getByText("甲一"));
-      const firstRequest = mergedPaneMocks.props?.focusQuestion;
-      fireEvent.click(screen.getByText("甲一"));
-      const secondRequest = mergedPaneMocks.props?.focusQuestion;
+      fireEvent.click(screen.getByRole("button", { name: "開啟來源文件" }));
 
-      expect(firstRequest).toEqual({ question: "甲一" });
-      expect(secondRequest).toEqual({ question: "甲一" });
-      // 要是新的物件，編輯器才知道同一題又被點了一次。
-      expect(secondRequest).not.toBe(firstRequest);
+      expect(guardMocks.requestNavigation).toHaveBeenCalledTimes(1);
+      expect(knowledgeBaseMocks.handleTreeSelect).toHaveBeenCalledWith({
+        type: "file",
+        path: "knowledge/qa/faq.csv",
+      });
+    });
+
+    it("does not reload an already open question when its row is clicked again", async () => {
+      render(<KnowledgeBase />);
+      selectCategory("甲");
+      openQuestion("甲一");
+      await waitFor(() => expect(qaNodeMocks.fetchMergedQa).toHaveBeenCalledTimes(1));
+      guardMocks.requestNavigation.mockClear();
+
+      openQuestion("甲一");
+
+      expect(qaNodeMocks.fetchMergedQa).toHaveBeenCalledTimes(1);
       expect(guardMocks.requestNavigation).not.toHaveBeenCalled();
     });
 
-    it("stays put when the user keeps their unsaved work", () => {
+    it("keeps the same table and editor when the user stays with their unsaved work", () => {
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("甲"));
+      selectCategory("甲");
+      openQuestion("甲一");
       guardMocks.requestNavigation.mockImplementationOnce(() => false);
 
-      fireEvent.click(screen.getByText("乙二"));
+      selectCategory("乙");
 
-      expect(screen.getByTestId("merged-qa-pane").textContent).toBe("a:甲");
-      expect(mergedPaneMocks.props?.focusQuestion).toBeNull();
+      expect(bankHeading("甲")).toBeTruthy();
+      expect((screen.getByLabelText("問題") as HTMLTextAreaElement).value).toBe("甲一");
     });
 
-    it("forgets the last question when a category is clicked", () => {
+    it("closes the open question when another category is selected", () => {
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("乙二"));
-      expect(mergedPaneMocks.props?.focusQuestion).toEqual({ question: "乙二" });
+      openQuestion("乙二");
+      expect(screen.getByRole("heading", { name: "編輯題目" })).toBeTruthy();
 
-      fireEvent.click(screen.getByText("甲"));
+      selectCategory("甲");
 
-      expect(mergedPaneMocks.props?.focusQuestion).toBeNull();
+      expect(screen.queryByRole("heading", { name: "編輯題目" })).toBeNull();
+      expect(bankHeading("甲")).toBeTruthy();
     });
 
-    it("tells the editor where the category sits and whether visitors can reach it", () => {
-      qaNodeMocks.nodesTree = [
-        category("zh", "中文", {
-          qa_entries: [],
-          children: [
-            category("sub", "保固", {
-              parent_ids: ["zh"],
-              children: [category("leaf", "年限", { parent_ids: ["sub"] })],
-            }),
-          ],
-        }),
-        category("off", "隱藏的上層", {
-          hidden: true,
-          qa_entries: [],
-          children: [category("under", "底下", { parent_ids: ["off"] })],
-        }),
-      ];
-      knowledgeBaseMocks.visibleExpandedDirs = new Set([
-        "knowledge",
-        QUICK_QA_TREE_PATH,
-        qaTreeNodePath("zh"),
-        qaTreeNodePath("sub"),
-        qaTreeNodePath("off"),
-      ]);
-      render(<KnowledgeBase />);
-
-      fireEvent.click(screen.getByText("保固"));
-      expect(mergedPaneMocks.props).toMatchObject({
-        parentLabels: ["中文"],
-        nodeHidden: false,
-        childCategoryCount: 1,
+    it("shows the category path and inherited display restriction", () => {
+      const parent = category("off", "隱藏的上層", {
+        hidden: true, qa_entries: [],
+        children: [category("under", "底下", { parent_ids: ["off"] })],
       });
+      qaNodeMocks.nodesTree = [parent];
+      knowledgeBaseMocks.visibleExpandedDirs.add(qaTreeNodePath("off"));
+      render(<KnowledgeBase />);
 
-      fireEvent.click(screen.getByText("年限"));
-      expect(mergedPaneMocks.props).toMatchObject({
-        parentLabels: ["中文", "保固"],
-        childCategoryCount: 0,
-      });
+      selectCategory("底下");
 
-      fireEvent.click(screen.getByText("底下"));
-      expect(mergedPaneMocks.props).toMatchObject({ parentLabels: ["隱藏的上層"], nodeHidden: true });
+      expect(bankHeading("隱藏的上層 › 底下")).toBeTruthy();
+      const child = categoryRow("底下");
+      const categorySwitch = within(child).getByRole("switch", { name: "前台顯示 底下" }) as HTMLInputElement;
+      expect(child.className).toContain("bg-surface-sunken");
+      expect(within(child).getByText("上層已關閉")).toBeTruthy();
+      expect(categorySwitch.disabled).toBe(true);
+      expect(categorySwitch.checked).toBe(true);
+      const hiddenRow = screen.getByRole("button", { name: "底下一" }).closest('[role="row"]') as HTMLElement;
+      expect(within(hiddenRow).getByText("上層已關閉")).toBeTruthy();
+      expect((within(hiddenRow).getByRole("checkbox", { name: "顯示 底下一" }) as HTMLInputElement).disabled).toBe(true);
     });
 
-    it("sends the editor's messages to the shared floating message", () => {
+    it("reports a successful editor save in the question bank", async () => {
       render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("甲"));
+      openQuestion("甲一");
+      const save = screen.getByRole("button", { name: "儲存" }) as HTMLButtonElement;
+      await waitFor(() => expect(save.disabled).toBe(false));
+      fireEvent.change(screen.getByLabelText("答案"), { target: { value: "新答案" } });
+      fireEvent.click(save);
 
-      expect(mergedPaneMocks.props?.onStatus).toBe(knowledgeBaseMocks.setStatus);
+      expect(await screen.findByText("已儲存題目。")).toBeTruthy();
+      expect(qaNodeMocks.saveMergedQa).toHaveBeenCalledWith("a", expect.arrayContaining([
+        expect.objectContaining({ q: "甲一", a: "新答案" }),
+      ]), "v1");
     });
 
     it("takes down an old error, but not a success message, when moving to another screen", () => {
       render(<KnowledgeBase />);
       knowledgeBaseMocks.setStatus.mockClear();
 
-      fireEvent.click(screen.getByText("甲"));
+      selectCategory("甲");
 
       const clear = knowledgeBaseMocks.setStatus.mock.lastCall?.[0] as (
         current: { type: string; message: string } | null,
@@ -1563,97 +1642,95 @@ describe("KnowledgeBase merged tree", () => {
       expect(clear(success)).toBe(success);
     });
 
-    describe("dragging while the editor has unsaved changes", () => {
+    it("lets users adjust question order with the keyboard", async () => {
+      render(<KnowledgeBase />);
+      selectCategory("甲");
+
+      fireEvent.click(screen.getByRole("button", { name: "上移 甲二" }));
+
+      await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalledWith("a", [
+        expect.objectContaining({ q: "甲二" }),
+        expect.objectContaining({ q: "甲一" }),
+      ], "v1"));
+    });
+
+    it("keeps unsaved text when reordering questions in the same category", async () => {
+      render(<KnowledgeBase />);
+      selectCategory("甲");
+      openQuestion("甲一");
+      const answer = screen.getByLabelText("答案") as HTMLTextAreaElement;
+      await waitFor(() => expect(answer.closest("fieldset")?.disabled).toBe(false));
+      fireEvent.change(answer, { target: { value: "還沒儲存的答案" } });
+
+      fireEvent.click(screen.getByRole("button", { name: "上移 甲二" }));
+
+      await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+      expect(answer.value).toBe("還沒儲存的答案");
+    });
+
+    describe("dragging a document when a question draft is open", () => {
       beforeEach(() => {
         guardMocks.hasUnsavedChanges = true;
       });
 
-      const expectBlockedMessage = () =>
-        expect(knowledgeBaseMocks.setStatus).toHaveBeenCalledWith({
-          type: "error",
-          message: expect.stringContaining("有未儲存的變更"),
-        });
-
-      it("does not reorder questions of the open category, which would reload the editor", async () => {
+      it("keeps a question draft when dropping a document refreshes its category", async () => {
         render(<KnowledgeBase />);
-        fireEvent.click(screen.getByText("甲"));
+        selectCategory("甲");
+        openQuestion("甲一");
+        const answer = screen.getByLabelText("答案") as HTMLTextAreaElement;
+        await waitFor(() => expect(answer.closest("fieldset")?.disabled).toBe(false));
+        fireEvent.change(answer, { target: { value: "還沒儲存的答案" } });
+        const file = within(directory()).getByRole("treeitem", { name: "guide.md" });
 
-        dragOnto(treeRow("甲二"), treeRow("甲一"));
+        dragOnto(file, categoryRow("甲"));
 
-        expectBlockedMessage();
-        await act(async () => {});
-        expect(qaNodeMocks.fetchMergedQa).not.toHaveBeenCalled();
-        expect(qaNodeMocks.saveMergedQa).not.toHaveBeenCalled();
+        await waitFor(() => expect(qaNodeMocks.ingestSource).toHaveBeenCalledWith("a", "knowledge/guide.md"));
+        expect(answer.value).toBe("還沒儲存的答案");
       });
 
-      it("does not drop a document into the open category", async () => {
+      it("lets other categories take documents without closing the editor", async () => {
         render(<KnowledgeBase />);
-        fireEvent.click(screen.getByText("甲"));
+        selectCategory("甲");
+        openQuestion("甲一");
+        const file = within(directory()).getByRole("treeitem", { name: "guide.md" });
 
-        dragOnto(treeRow("guide.md"), treeRow("甲"));
-
-        expectBlockedMessage();
-        await act(async () => {});
-        expect(qaNodeMocks.ingestSource).not.toHaveBeenCalled();
-        expect(qaNodeMocks.adoptSource).not.toHaveBeenCalled();
-      });
-
-      it("still lets other categories take documents, since the editor is not touched", async () => {
-        render(<KnowledgeBase />);
-        fireEvent.click(screen.getByText("甲"));
-
-        dragOnto(treeRow("guide.md"), treeRow("乙"));
+        dragOnto(file, categoryRow("乙"));
 
         await waitFor(() => expect(qaNodeMocks.ingestSource).toHaveBeenCalledWith("b", "knowledge/guide.md"));
+        expect(screen.getByRole("heading", { name: "編輯題目" })).toBeTruthy();
       });
-    });
-
-    it("reorders questions as usual when the editor has nothing unsaved", async () => {
-      qaNodeMocks.fetchMergedQa.mockResolvedValue([
-        { index: "1", q: "甲一", a: "答", img: "", url: "", source_file: "knowledge/faq.md", hidden: false },
-        { index: "2", q: "甲二", a: "答", img: "", url: "", source_file: "knowledge/faq.md", hidden: false },
-      ]);
-      render(<KnowledgeBase />);
-      fireEvent.click(screen.getByText("甲"));
-
-      dragOnto(treeRow("甲二"), treeRow("甲一"));
-
-      await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
     });
   });
 });
 
-
-vi.mock("../components/kb/questions/QuestionsView", () => ({
-  default: (props: { onOpenCategory: (id: string, q: string) => void; onOpenDocument: (path: string) => void }) => (
-    <div>
-      <button type="button" onClick={() => props.onOpenCategory("svc", "營業時間？")}>開分類</button>
-      <button type="button" onClick={() => props.onOpenDocument("knowledge/qa/faq.csv")}>開文件</button>
-    </div>
-  ),
-}));
-
 describe("KnowledgeBase route views", () => {
-  it("opens a question's category from the all-questions tab through the unsaved-changes guard", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+  });
+  afterEach(() => { navigationMocks.currentSubView = undefined; });
+
+  it("opens the unified question bank from the old all-questions URL", () => {
     navigationMocks.currentSubView = "questions";
     render(<KnowledgeBase />);
-    expect(screen.getByRole("tab", { name: "所有題目" }).getAttribute("aria-selected")).toBe("true");
 
-    fireEvent.click(screen.getByRole("button", { name: "開分類" }));
-
-    expect(guardMocks.requestNavigation).toHaveBeenCalled();
-    expect(knowledgeBaseMocks.closeFileView).toHaveBeenCalled();
-    expect(navigationMocks.navigateTo).toHaveBeenCalledWith("KnowledgeBase", "documents");
-
-    fireEvent.click(screen.getByRole("button", { name: "開文件" }));
-    expect(knowledgeBaseMocks.handleTreeSelect).toHaveBeenCalledWith({ type: "file", path: "knowledge/qa/faq.csv" });
-    navigationMocks.currentSubView = undefined;
+    expect(bankHeading("全部分類")).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "所有題目" })).toBeNull();
+    expect(screen.getByRole("searchbox", { name: "搜尋問題或答案" })).toBeTruthy();
   });
 
   it("navigates the graph tab through the shared router", () => {
     render(<KnowledgeBase />);
     fireEvent.click(screen.getByRole("tab", { name: "圖譜" }));
     expect(navigationMocks.navigateTo).toHaveBeenCalledWith("KnowledgeBase", "graph");
+  });
+
+  it("carries the selected language to the chat test page from the header", () => {
+    render(<KnowledgeBase />);
+    const languages = screen.getByRole("group", { name: "題庫語言" });
+    fireEvent.click(within(languages).getByRole("button", { name: /^English/ }));
+    fireEvent.click(screen.getByRole("button", { name: "到對話頁測試" }));
+    expect(navigationMocks.openChatTest).toHaveBeenCalledWith({ language: "en" });
   });
 });
 

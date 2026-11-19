@@ -23,8 +23,7 @@ function category(
   };
 }
 
-const grandchild = category("grandchild", "孫分類", ["child"]);
-const child = category("child", "子分類", ["moving"], [grandchild]);
+const child = category("child", "子分類", ["moving"]);
 const moving = category("moving", "退換貨", ["zh"], [child]);
 const zh = category("zh", "中文", [], [moving]);
 const hiddenOne = category("en", "English", [], [], true);
@@ -79,9 +78,8 @@ describe("MoveQaNodeModal", () => {
 
     expect(radio(/退換貨/).disabled).toBe(true);
     expect(radio(/子分類/).disabled).toBe(true);
-    expect(radio(/孫分類/).disabled).toBe(true);
     expect(screen.getByText("就是這個分類")).toBeTruthy();
-    expect(screen.getAllByText("在這個分類底下")).toHaveLength(2);
+    expect(screen.getByText("在這個分類底下")).toBeTruthy();
 
     expect(radio(/最上層/).disabled).toBe(false);
     expect(radio(/中文/).disabled).toBe(false);

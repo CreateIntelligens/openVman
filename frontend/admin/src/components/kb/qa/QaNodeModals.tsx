@@ -15,6 +15,7 @@ export type QaNodeDialog =
   | { type: "delete"; node: QaNode };
 
 interface QaNodeModalsProps {
+  vendor?: boolean;
   dialog: QaNodeDialog | null;
   nodesTree: QaNode[];
   onClose: () => void;
@@ -29,10 +30,13 @@ function deleteMessage(node: QaNode): string {
   const childNote = childCount > 0
     ? `底下的 ${childCount} 個子分類不會被刪除，會移到最上層。`
     : "";
-  return `確定要刪除分類「${node.label}」嗎？訪客的選單上不會再出現這個分類和它的問題。問題和答案會留在文件裡，AI 回答時還是會用；之後想放回選單，把文件拖進分類就好。${childNote}`;
+  const menuOnly = node.qa_entries?.filter((entry) => !entry.source_path).length ?? 0;
+  const permanent = menuOnly ? `這個分類有 ${menuOnly} 題只在選單上，刪除後無法復原。` : "";
+  return `確定要刪除分類「${node.label}」嗎？訪客的選單上不會再出現這個分類和它的問題。問題和答案會留在文件裡，AI 回答時還是會用；之後想放回選單，把文件拖進分類就好。${permanent}${childNote}`;
 }
 
 export default function QaNodeModals({
+  vendor = false,
   dialog,
   nodesTree,
   onClose,
@@ -79,6 +83,7 @@ export default function QaNodeModals({
 
       {dialog?.type === "move" && (
         <MoveQaNodeModal
+          vendor={vendor}
           node={dialog.node}
           nodesTree={nodesTree}
           onConfirm={onMoveConfirm}

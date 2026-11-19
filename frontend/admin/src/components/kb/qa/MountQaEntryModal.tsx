@@ -1,17 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
-import type { QaNode } from "../../../hooks/useQaNodes";
 import { errorMessage } from "../../../utils/errorMessage";
 import { useModalDismiss } from "../useModalDismiss";
-import { flattenCategories } from "./MoveQaNodeModal";
 
 interface MountQaEntryModalProps {
   question: string;
-  /** 正在編輯的分類，不能再放一次。 */
-  currentNodeId: string;
-  /** 已經放了這題的分類名稱。 */
-  alreadyIn: string[];
-  nodesTree: QaNode[];
+  categories: { id: string; label: string }[];
+  mountedCategoryIds: string[];
   /** 失敗就丟錯，對話框會留著並寫出原因。 */
   onConfirm: (nodeId: string) => Promise<void>;
   onClose: () => void;
@@ -19,13 +14,11 @@ interface MountQaEntryModalProps {
 
 export default function MountQaEntryModal({
   question,
-  currentNodeId,
-  alreadyIn,
-  nodesTree,
+  categories,
+  mountedCategoryIds,
   onConfirm,
   onClose,
 }: MountQaEntryModalProps) {
-  const categories = useMemo(() => flattenCategories(nodesTree), [nodesTree]);
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,30 +80,27 @@ export default function MountQaEntryModal({
               {categories.length === 0 && (
                 <p className="px-5 py-2 text-sm text-content-muted">還沒有其他分類。</p>
               )}
-              {categories.map(({ node: category, depth }) => {
-                const isCurrent = category.node_id === currentNodeId;
-                const hasIt = alreadyIn.includes(category.label);
-                const disabled = isCurrent || hasIt;
+              {categories.map(({ id, label }) => {
+                const disabled = mountedCategoryIds.includes(id);
                 return (
                   <label
-                    key={category.node_id}
+                    key={id}
                     className={optionClass(disabled)}
-                    style={{ paddingLeft: `${1.25 + depth}rem` }}
+                    style={{ paddingLeft: "1.25rem" }}
                   >
                     <input
                       type="radio"
                       name={titleId}
-                      value={category.node_id}
+                      value={id}
                       disabled={disabled}
-                      checked={selected === category.node_id}
-                      onChange={() => setSelected(category.node_id)}
+                      checked={selected === id}
+                      onChange={() => setSelected(id)}
                       className="shrink-0 accent-primary"
                     />
-                    <span className="min-w-0 flex-1 truncate" title={category.label}>
-                      {category.label}
+                    <span className="min-w-0 flex-1 truncate" title={label}>
+                      {label}
                     </span>
-                    {isCurrent && <span className="shrink-0 text-xs text-content-subtle">就是這個分類</span>}
-                    {!isCurrent && hasIt && <span className="shrink-0 text-xs text-content-subtle">已經有這題</span>}
+                    {disabled && <span className="shrink-0 text-xs text-content-subtle">已經有這題</span>}
                   </label>
                 );
               })}

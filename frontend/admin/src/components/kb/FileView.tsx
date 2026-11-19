@@ -18,6 +18,7 @@ import {
 import QaDocEditor from "./QaDocEditor";
 import SourceBadge from "./SourceBadge";
 import { documentStatusLabel, type DocumentStatusLabel } from "./StatusDot";
+import { vendorDocumentLabel } from "./vendorDocumentLabels";
 
 type DocView = "edit" | "preview" | "split";
 type QaView = "table" | "raw";
@@ -73,6 +74,8 @@ function PaneHeading({ children }: { children: ReactNode }) {
 }
 
 export default function FileView({
+  vendor = false,
+  documentLabels,
   document,
   editContent,
   setEditContent,
@@ -89,6 +92,8 @@ export default function FileView({
   onOpenQaTree,
   renormalizing,
 }: {
+  vendor?: boolean;
+  documentLabels?: ReadonlyMap<string, string>;
   document: KnowledgeDocument | null;
   editContent: string;
   setEditContent: (c: string) => void;
@@ -136,12 +141,14 @@ export default function FileView({
     }
   };
 
-  const displayName = document.title || fileNameOf(document.path);
+  const displayName = vendor
+    ? vendorDocumentLabel(document.path, documentLabels)
+    : document.title || fileNameOf(document.path);
   const displayPath = isManagedQaDocument(document) ? displayName : displayDocumentPath(document.path);
   const statusLabel = documentStatusLabel(document);
   const isQaDocument = document.source_type === "qa";
   const isQaAttached = isQaDocument && document.qa_attached === true;
-  const qaView: QaView = qaRawPath === document.path ? "raw" : "table";
+  const qaView: QaView = !vendor && qaRawPath === document.path ? "raw" : "table";
   const view: DocView = storedView === "split" && !hasSplitWidth ? "preview" : storedView;
   const isSplit = view === "split";
 
@@ -198,7 +205,7 @@ export default function FileView({
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">arrow_back</span>
               </button>
-              <h2 title={fileNameOf(document.path)} className="truncate text-base font-semibold text-content">
+              <h2 title={vendor ? undefined : fileNameOf(document.path)} className="truncate text-base font-semibold text-content">
                 {displayName}
               </h2>
             </div>
@@ -289,7 +296,7 @@ export default function FileView({
           )}
 
           <div className="max-w-full md:ml-auto">
-            {isQaDocument ? (
+            {isQaDocument ? !vendor && (
               <SegmentedControl
                 label="問答文件的檢視方式"
                 options={QA_VIEW_OPTIONS}
@@ -325,6 +332,7 @@ export default function FileView({
             />
           ) : (
             <QaDocEditor
+              vendor={vendor}
               content={editContent}
               onChange={setEditContent}
               format={document.extension?.toLowerCase() === ".csv" ? "csv" : "markdown"}
@@ -359,11 +367,15 @@ export default function FileView({
       )}
 
       <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-0.5 border-t border-border bg-surface-raised px-4 py-1.5 text-xs text-content-muted dark:bg-surface/30">
-        <span title={displayPath} className="min-w-0 flex-1 basis-[10rem] truncate">{displayPath}</span>
-        <span className="hidden shrink-0 sm:inline">{document.extension || "—"}</span>
+        {!vendor && (
+          <>
+            <span title={displayPath} className="min-w-0 flex-1 basis-[10rem] truncate">{displayPath}</span>
+            <span className="hidden shrink-0 sm:inline">{document.extension || "—"}</span>
+          </>
+        )}
         <span className="hidden shrink-0 sm:inline">{formatSize(document.size)}</span>
         <span className="shrink-0">{formatDate(document.updated_at)}</span>
-        {document.source_url && (
+        {!vendor && document.source_url && (
           <span title={document.source_url} className="min-w-0 flex-1 basis-[10rem] truncate text-info">
             {document.source_url}
           </span>

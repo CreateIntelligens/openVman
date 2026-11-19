@@ -61,15 +61,32 @@ vi.mock("./pages/EmbedKeys", () => ({
 const chatPage = vi.hoisted(() => ({ error: null as Error | null }));
 vi.mock("./pages/Chat", () => ({
   default: () => {
+    const { chatTest } = useNavigation();
+    const { refreshProjects } = useProject();
     if (chatPage.error) throw chatPage.error;
-    return <div data-testid="tab-chat">Chat tab</div>;
+    return (
+      <div data-testid="tab-chat" data-test-language={chatTest?.language}>
+        Chat tab
+        <button type="button" onClick={() => void refreshProjects()}>重讀授權清單</button>
+      </div>
+    );
   },
 }));
 vi.mock("./pages/Health", () => ({
   default: () => <div data-testid="tab-health">Health tab</div>,
 }));
 vi.mock("./pages/KnowledgeBase", () => ({
-  default: () => <div data-testid="tab-knowledge-base">Knowledge tab</div>,
+  default: () => {
+    const { openChatTest } = useNavigation();
+    return (
+      <div data-testid="tab-knowledge-base">
+        Knowledge tab
+        <button type="button" onClick={() => openChatTest({ language: "en", question: "Where is my order?" })}>
+          測試這一題
+        </button>
+      </div>
+    );
+  },
 }));
 vi.mock("./pages/Memory", () => ({
   default: () => <div data-testid="tab-memory">Memory tab</div>,
@@ -94,6 +111,8 @@ vi.mock("./pages/Workspace", () => ({
 }));
 
 import App from "./App";
+import { useNavigation } from "./context/NavigationContext";
+import { useProject } from "./context/ProjectContext";
 import { fetchProjects } from "./api";
 import {
   AdminPortalAccessError,
@@ -141,6 +160,42 @@ describe("App tab mounting", () => {
     render(<App />);
     await screen.findByTestId("tab-chat");
     expect(window.location.search).toBe("?session=s1&persona=p1");
+  });
+
+  it("opens the normal chat route and keeps the knowledge test handoff out of the URL", async () => {
+    window.history.replaceState(null, "", "/openvman/admin/knowledge");
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "測試這一題" }));
+    const chat = await screen.findByTestId("tab-chat");
+    expect(chat.getAttribute("data-test-language")).toBe("en");
+    expect(window.location.pathname).toBe("/openvman/admin/chat");
+    expect(window.location.search).toBe("");
+
+    act(() => {
+      window.history.pushState(null, "", "/openvman/admin/knowledge");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await screen.findByTestId("tab-knowledge-base");
+    act(() => {
+      window.history.pushState(null, "", "/openvman/admin/chat");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect((await screen.findByTestId("tab-chat")).getAttribute("data-test-language")).toBeNull();
+  });
+
+  it("drops the handoff if project grants refresh and switch the active project", async () => {
+    window.history.replaceState(null, "", "/admin/knowledge");
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "測試這一題" }));
+    expect((await screen.findByTestId("tab-chat")).getAttribute("data-test-language")).toBe("en");
+
+    vi.mocked(fetchProjects).mockResolvedValue({
+      project_count: 1,
+      projects: [{ project_id: "allowed", label: "Allowed", document_count: 0, persona_count: 0 }],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "重讀授權清單" }));
+    await waitFor(() => expect(window.location.search).toBe("?project=allowed"));
+    expect(screen.getByTestId("tab-chat").getAttribute("data-test-language")).toBeNull();
   });
 
   it("opens account API keys directly for a formal account with existing portal access", async () => {

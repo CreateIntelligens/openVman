@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
 import StatusAlert from "../components/StatusAlert";
 import BatchActionBar from "../components/kb/BatchActionBar";
 import GraphView from "../components/kb/GraphView";
-import QuestionsView from "../components/kb/questions/QuestionsView";
+import QuestionBank, { type OpenQuestion } from "../components/kb/questions/QuestionBank";
+import QuestionSearch from "../components/kb/questions/QuestionSearch";
+import { languageKey, languageLabel, NO_LANGUAGE } from "../components/kb/questions/allQuestions";
+import { languageTree, withTreeQuestionDetails } from "../components/kb/questions/questionBankData";
+import { relabelQaCategories, relabelQaNodes, vendorDocumentLabels, vendorFolderLabel, vendorQaCategoryLabels } from "../components/kb/vendorDocumentLabels";
 import KnowledgeContentPane from "../components/kb/KnowledgeContentPane";
 import KnowledgeHome from "../components/kb/KnowledgeHome";
 import KnowledgeModals from "../components/kb/KnowledgeModals";
@@ -12,9 +16,10 @@ import {
   collectFolderPaths,
   countSearchResults,
   findQaNode,
+  qaCategoryDepth,
+  QA_CATEGORY_DEPTH_LIMIT,
   mergeQaNodesIntoTree,
-  parseQaEntryDragPath,
-  parseQaNodeDragPath,
+  KNOWLEDGE_LANGUAGE_LABELS,
   qaNodeExpandPaths,
   qaTreeNodePath,
   QUICK_QA_TREE_PATH,
@@ -22,11 +27,12 @@ import {
 import KnowledgeHeader from "../components/kb/KnowledgeHeader";
 import KnowledgeTreeSidebar from "../components/kb/KnowledgeTreeSidebar";
 import UploadDropOverlay from "../components/kb/UploadDropOverlay";
-import type { QaFocusRequest } from "../components/kb/qa/MergedCsvPane";
+import { categoryLanguage } from "../components/kb/qa/languageCategories";
 import QaNodeModals from "../components/kb/qa/QaNodeModals";
-import type { KnowledgeNoteFormat } from "../api";
+import type { KnowledgeLanguage, KnowledgeNoteFormat, QaQuestionRow } from "../api/knowledge";
 import { canUseAiCleanup } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import { useNavigation } from "../context/NavigationContext";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
 import { useAdminSubView } from "../hooks/useAdminSubView";
 import { useKnowledgeBatchSelection } from "../hooks/useKnowledgeBatchSelection";
@@ -35,28 +41,16 @@ import { useKnowledgeTreeDragDrop } from "../hooks/useKnowledgeTreeDragDrop";
 import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
 import { useQaNodeModals } from "../hooks/useQaNodeModals";
 import { useQaNodeSelection } from "../hooks/useQaNodeSelection";
-import { useQaNodes } from "../hooks/useQaNodes";
+import { QA_REFRESH_FAILED_MESSAGE, useQaNodes } from "../hooks/useQaNodes";
+import { useQuestionBank } from "../hooks/useQuestionBank";
 import { useUploadLimits } from "../hooks/useUploadLimits";
 import { isVendorUser } from "../utils/accountPermissions";
 import { errorMessage } from "../utils/errorMessage";
 import { formatUploadSize } from "../utils/uploadLimits";
 import { removeScoped, writeScoped } from "../utils/scopedStorage";
 
-const KNOWLEDGE_TABS = ["documents", "questions", "graph"] as const;
+const KNOWLEDGE_TABS = ["documents", "graph"] as const;
 type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number];
-
-/** 拖題目排序、把文件拖進分類，都會讓那個分類的編輯器重新載入。 */
-function dropReloadsCategory(
-  draggingPath: string | null,
-  targetPath: string,
-  nodeId: string,
-): boolean {
-  if (!draggingPath) return false;
-  const draggedEntry = parseQaEntryDragPath(draggingPath);
-  if (draggedEntry) return draggedEntry.nodeId === nodeId;
-  if (parseQaNodeDragPath(draggingPath)) return false;
-  return targetPath === qaTreeNodePath(nodeId);
-}
 
 /** 文件拖進快速問答會變成題目，原本的文件就沒了，手上沒存的修改也跟著消失。 */
 function dropConsumesDocument(
@@ -70,6 +64,7 @@ function dropConsumesDocument(
 
 export default function KnowledgeBase() {
   const { account } = useAuth();
+  const { openChatTest } = useNavigation();
   const vendor = Boolean(account && isVendorUser(account));
   // 沒開放「AI 整理排版」的帳號只能直接放進知識庫，文件頁也不給整理按鈕；後端同樣會擋。
   const allowAiCleanup = !vendor && canUseAiCleanup(account);
@@ -125,7 +120,7 @@ export default function KnowledgeBase() {
     handleDeleteConfirm,
     handleMove,
     handleToggleEnabled,
-    handleChangeLanguage,
+    handleChangeLanguage: handleDocumentLanguage,
     handleCreateNote,
     handleCreateFolderSubmit,
     cancelCreateFolder,
@@ -137,32 +132,105 @@ export default function KnowledgeBase() {
     loadDocuments,
   } = useKnowledgeBase(vendor);
 
-  const [activeTab, setActiveTab] = useAdminSubView<KnowledgeTab>(
+  const [requestedTab, setActiveTab] = useAdminSubView<KnowledgeTab>(
     "KnowledgeBase", "documents", KNOWLEDGE_TABS,
   );
+  const activeTab = vendor ? "documents" : requestedTab;
   useUnsavedChanges("knowledge-base-editor", editorDirty, "知識庫文件");
   const { hasUnsavedChanges, requestNavigation } = useNavigationGuard();
 
+  const qaApi = useQaNodes(projectId);
   const {
-    nodesTree,
+    nodesTree: rawNodesTree,
     loading: qaTreeLoading,
     error: qaTreeError,
+    refreshFailed: qaTreeRefreshFailed,
     fetchTree: fetchQaTree,
-    createNode,
-    updateNode,
-    deleteNode,
+    createNode: createQaNode,
+    updateNode: updateQaNode,
+    deleteNode: deleteQaNode,
     moveNode,
-    reorderNode,
+    reorderNode: reorderQaNode,
     fetchMergedQa,
     saveMergedQa,
     adoptSource,
     ingestSource,
     cleanupImages,
-  } = useQaNodes(projectId);
+  } = qaApi;
 
   const [mergedRefreshKey, setMergedRefreshKey] = useState(0);
   const bumpMergedRefresh = useCallback(() => setMergedRefreshKey((key) => key + 1), []);
-  const [qaFocusRequest, setQaFocusRequest] = useState<QaFocusRequest | null>(null);
+  const [showAddData, setShowAddData] = useState(false);
+  const [questionSearch, setQuestionSearch] = useState("");
+  const [language, setLanguage] = useState("");
+  const [openQuestion, setOpenQuestion] = useState<OpenQuestion | null>(null);
+  const questionOpener = useRef<HTMLElement | null>(null);
+  const questionBank = useQuestionBank(projectId, mergedRefreshKey);
+  const documentLabels = useMemo(() => vendor ? vendorDocumentLabels(documents) : undefined, [vendor, documents]);
+  const qaLabels = useMemo(() => vendor ? vendorQaCategoryLabels(rawNodesTree, documentLabels) : undefined, [vendor, rawNodesTree, documentLabels]);
+  const nodesTree = useMemo(() => qaLabels?.size ? relabelQaNodes(rawNodesTree, qaLabels) : rawNodesTree, [qaLabels, rawNodesTree]);
+  const rawCategories = questionBank.data?.categories;
+  const visibleCategories = useMemo(() => rawCategories && qaLabels?.size ? relabelQaCategories(rawCategories, qaLabels) : rawCategories ?? [], [rawCategories, qaLabels]);
+  const questionRows = useMemo(() => withTreeQuestionDetails(questionBank.data, nodesTree), [questionBank.data, nodesTree]);
+  const visibleLanguageRows = useMemo(
+    () => language ? questionRows.filter((row) => languageKey(row) === language) : questionRows,
+    [questionRows, language],
+  );
+  const visibleQaTree = useMemo(() => languageTree(nodesTree, questionRows, language), [nodesTree, questionRows, language]);
+  const availableCategories = useMemo(() => {
+    const ids = new Set<string>();
+    const add = (branch: typeof nodesTree) => branch.forEach((node) => { ids.add(node.node_id); add(node.children ?? []); });
+    add(visibleQaTree);
+    return ids;
+  }, [visibleQaTree]);
+  const languageOptions = [
+    "", ...Object.keys(KNOWLEDGE_LANGUAGE_LABELS),
+    ...(questionRows.some((row) => languageKey(row) === NO_LANGUAGE) ? [NO_LANGUAGE] : []),
+  ];
+  const languageCounts = useMemo(() => {
+    const counts = new Map<string, number>([["", questionRows.length]]);
+    for (const row of questionRows) {
+      const key = languageKey(row);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [questionRows]);
+
+  useEffect(() => {
+    setOpenQuestion(null);
+    setShowAddData(false);
+    setLanguage("");
+    setQuestionSearch("");
+  }, [projectId]);
+
+  useEffect(() => {
+    if (activeTab === "graph") {
+      setOpenQuestion(null);
+      setQuestionSearch("");
+    }
+  }, [activeTab]);
+
+  const refreshQuestions = questionBank.refresh;
+  const createNode: typeof createQaNode = useCallback(async (...args) => {
+    const result = await createQaNode(...args);
+    await refreshQuestions(true);
+    return result;
+  }, [createQaNode, refreshQuestions]);
+  const updateNode: typeof updateQaNode = useCallback(async (...args) => {
+    const result = await updateQaNode(...args);
+    await refreshQuestions(true);
+    return result;
+  }, [updateQaNode, refreshQuestions]);
+  const deleteNode: typeof deleteQaNode = useCallback(async (...args) => {
+    const result = await deleteQaNode(...args);
+    await refreshQuestions(true);
+    return result;
+  }, [deleteQaNode, refreshQuestions]);
+  const reorderNode: typeof reorderQaNode = useCallback(async (...args) => {
+    const result = await reorderQaNode(...args);
+    await refreshQuestions(true);
+    return result;
+  }, [reorderQaNode, refreshQuestions]);
   const [noteComposerFormat, setNoteComposerFormat] = useState<KnowledgeNoteFormat>("text");
   const uploadLimits = useUploadLimits();
 
@@ -177,10 +245,10 @@ export default function KnowledgeBase() {
     loadDocuments,
     closeFileView,
     relocateOpenDocument,
-    fetchQaTree,
+    fetchQaTree: async () => { await fetchQaTree(); await refreshQuestions(); },
   });
 
-  const { selectedQaNodeId, setSelectedQaNodeId, selectedQaNode } =
+  const { selectedQaNodeId, setSelectedQaNodeId } =
     useQaNodeSelection({
       projectId,
       nodesTree,
@@ -201,10 +269,11 @@ export default function KnowledgeBase() {
   const handleQaNodeMoved = useCallback(
     (parentId: string | null) => {
       revealQaNode(parentId);
+      bumpMergedRefresh();
       const parentLabel = parentId ? findQaNode(nodesTree, parentId)?.label : "最上層";
       setStatus({ type: "success", message: `已移到 ${parentLabel ?? "新的分類"}` });
     },
-    [nodesTree, revealQaNode, setStatus],
+    [bumpMergedRefresh, nodesTree, revealQaNode, setStatus],
   );
 
   const qaModals = useQaNodeModals({
@@ -214,11 +283,9 @@ export default function KnowledgeBase() {
     deleteNode,
     moveNode,
     setSelectedQaNodeId,
-    fetchQaTree,
     loadDocuments,
     onQaNodeMoved: handleQaNodeMoved,
     onRevealQaNode: revealQaNode,
-    onQaNodeDeleted: bumpMergedRefresh,
   });
 
   const treeDrag = useKnowledgeTreeDragDrop({
@@ -230,27 +297,28 @@ export default function KnowledgeBase() {
     saveMergedQa,
     adoptSource,
     ingestSource,
-    fetchQaTree,
     loadDocuments,
     handleMove,
     setMergedRefreshKey,
     onQaNodeMoved: handleQaNodeMoved,
+    onQaNodeMoveBlocked: (message) => setStatus({ type: "error", message }),
   });
 
   const mobileTree = useMobileTreeDrawer();
   const { closeMobileTree, openMobileTree } = mobileTree;
 
   const displayTree = useMemo(
-    () => mergeQaNodesIntoTree(filteredTree, nodesTree, search),
-    [filteredTree, nodesTree, search],
+    () => mergeQaNodesIntoTree(filteredTree, visibleQaTree, search, true),
+    [filteredTree, visibleQaTree, search],
   );
 
+  const documentSection = displayTree.children.find((section) => section.treeKind === "documents-root");
   const displayExpandedDirs = useMemo(() => {
-    if (hasActiveSearch) {
-      return new Set(collectFolderPaths(displayTree));
+    if (hasActiveSearch && documentSection) {
+      return new Set([...visibleExpandedDirs, ...collectFolderPaths(documentSection)]);
     }
     return visibleExpandedDirs;
-  }, [displayTree, hasActiveSearch, visibleExpandedDirs]);
+  }, [documentSection, hasActiveSearch, visibleExpandedDirs]);
 
   const selectedTreePath = selectedQaNodeId
     ? qaTreeNodePath(selectedQaNodeId)
@@ -261,8 +329,9 @@ export default function KnowledgeBase() {
     removeScoped(`kb-selected-qa-node-id:${projectId}`);
   }, [projectId, setSelectedQaNodeId]);
 
-  // 右邊沒有選任何東西時顯示的就是「新增資料」，所以回到那裡就是把選取清掉。
   const showHome = useCallback(() => {
+    setOpenQuestion(null);
+    setShowAddData(true);
     clearQaSelection();
     closeFileView();
     closeNoteComposer();
@@ -285,7 +354,8 @@ export default function KnowledgeBase() {
   const selectQaNode = useCallback(
     (nodeId: string) => {
       setSelectedQaNodeId(nodeId);
-      setQaFocusRequest(null);
+      setOpenQuestion(null);
+      setShowAddData(false);
       writeScoped(`kb-selected-qa-node-id:${projectId}`, nodeId);
       removeScoped(`kb-selected-file-path:${projectId}`);
       closeFileView();
@@ -295,30 +365,89 @@ export default function KnowledgeBase() {
     [closeFileView, closeMobileTree, closeNoteComposer, projectId, setSelectedQaNodeId],
   );
 
-  const handleSelectQaNode = useCallback(
-    (nodeId: string, question?: string) => {
-      const focusRequest = question ? { question } : null;
-      // 點正在看的分類沒有東西要切換，不能問要不要捨棄修改；點題目只是捲過去。
-      if (nodeId === selectedQaNodeId && !showNoteComposer) {
-        if (focusRequest) setQaFocusRequest(focusRequest);
-        closeMobileTree();
-        return;
+  const handleSelectQaNode = useCallback((nodeId: string) => {
+    if (nodeId === selectedQaNodeId && !showNoteComposer && !showAddData) {
+      closeMobileTree();
+      return;
+    }
+    requestNavigation(() => {
+      clearStaleError();
+      selectQaNode(nodeId);
+    });
+  }, [clearStaleError, closeMobileTree, requestNavigation, selectQaNode, selectedQaNodeId, showNoteComposer, showAddData]);
+
+  const showQuestions = useCallback(() => {
+    clearStaleError();
+    setOpenQuestion(null);
+    setShowAddData(false);
+    closeFileView();
+    closeNoteComposer();
+    setActiveTab("documents");
+  }, [clearStaleError, closeFileView, closeNoteComposer, setActiveTab]);
+
+  const showAllQuestions = () => requestNavigation(() => {
+    showQuestions();
+    clearQaSelection();
+  });
+
+  const closeQuestion = () => {
+    setOpenQuestion(null);
+    const opener = questionOpener.current;
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+    else document.getElementById("knowledge-question-search")?.focus({ preventScroll: true });
+    questionOpener.current = null;
+  };
+
+  const handleOpenQuestion = (row: QaQuestionRow, category = row.category_ids[0] ?? "", fromSearch = false) => {
+    if (row.id === openQuestion?.row?.id && category === openQuestion.category) {
+      if (fromSearch) setQuestionSearch("");
+      return;
+    }
+    requestNavigation(() => {
+      questionOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      if (fromSearch || openDocument || showAddData || showNoteComposer) {
+        showQuestions();
+        if (category) {
+          revealQaNode(category);
+          selectQaNode(category);
+        } else {
+          clearQaSelection();
+        }
+        setQuestionSearch("");
       }
-      requestNavigation(() => {
-        clearStaleError();
-        selectQaNode(nodeId);
-        setQaFocusRequest(focusRequest);
-      });
-    },
-    [
-      clearStaleError,
-      closeMobileTree,
-      requestNavigation,
-      selectQaNode,
-      selectedQaNodeId,
-      showNoteComposer,
-    ],
-  );
+      setOpenQuestion({ row, category });
+    });
+  };
+
+  const handleCreateQuestion = () => requestNavigation(() => {
+    questionOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setOpenQuestion({ row: null, category: selectedQaNodeId ?? "" });
+  });
+
+  const handleChangeLanguage = (next: string) => {
+    if (next === language) return;
+    const change = () => {
+      setLanguage(next);
+      setOpenQuestion(null);
+      setQuestionSearch("");
+      if (!selectedQaNodeId || !next) return;
+      const available = languageTree(nodesTree, questionRows, next);
+      if (findQaNode(available, selectedQaNodeId)) return;
+
+      const samePath = (path: string[]) => JSON.stringify(categoryLanguage(path[0] ?? "") ? path.slice(1) : path);
+      const categories = questionBank.data?.categories ?? [];
+      const selected = categories.find((item) => item.node_id === selectedQaNodeId);
+      const counterpart = selected && categories.find((item) =>
+        findQaNode(available, item.node_id) && samePath(item.path) === samePath(selected.path));
+      if (counterpart) selectQaNode(counterpart.node_id);
+      else clearQaSelection();
+    };
+    if (openQuestion) requestNavigation(change);
+    else change();
+  };
+
+  const testLanguage = Object.prototype.hasOwnProperty.call(KNOWLEDGE_LANGUAGE_LABELS, language)
+    ? language as KnowledgeLanguage : undefined;
 
   const handleSelectTreeFile = useCallback(
     (node: TreeNode) => {
@@ -335,6 +464,8 @@ export default function KnowledgeBase() {
       requestNavigation(() => {
         clearStaleError();
         clearQaSelection();
+        setOpenQuestion(null);
+        setShowAddData(false);
         closeNoteComposer();
         handleTreeSelect(node);
         closeMobileTree();
@@ -355,23 +486,11 @@ export default function KnowledgeBase() {
   const handleViewImportedDocument = useCallback(
     (path: string) => {
       clearQaSelection();
+      setOpenQuestion(null);
+      setShowAddData(false);
       handleTreeSelect({ type: "file", path });
     },
     [clearQaSelection, handleTreeSelect],
-  );
-
-  // 「所有題目」點一題：照一般切換的規則先問未存的修改，再回到文件分頁打開分類、捲到那一題。
-  const handleOpenQuestionCategory = useCallback(
-    (nodeId: string, question: string) => {
-      requestNavigation(() => {
-        clearStaleError();
-        revealQaNode(nodeId);
-        selectQaNode(nodeId);
-        setQaFocusRequest({ question });
-        setActiveTab("documents");
-      });
-    },
-    [clearStaleError, requestNavigation, revealQaNode, selectQaNode, setActiveTab],
   );
 
   const handleOpenQuestionDocument = useCallback(
@@ -379,6 +498,8 @@ export default function KnowledgeBase() {
       requestNavigation(() => {
         clearStaleError();
         clearQaSelection();
+        setOpenQuestion(null);
+        setShowAddData(false);
         closeNoteComposer();
         handleTreeSelect({ type: "file", path });
         setActiveTab("documents");
@@ -402,6 +523,7 @@ export default function KnowledgeBase() {
   const handleOpenComposer = useCallback(
     (format: KnowledgeNoteFormat) => {
       clearQaSelection();
+      setOpenQuestion(null);
       setNoteComposerFormat(format);
       setShowNoteComposer(true);
     },
@@ -436,7 +558,7 @@ export default function KnowledgeBase() {
     loadDocuments,
     fetchQaTree: refreshQaAfterImport,
     onDropStarted: handleImportDropped,
-    onError: (message) => setStatus({ type: "error", message }),
+    onError: (message) => setStatus({ type: "error", message: vendor ? "移除檔案失敗，請稍後再試。" : message }),
   });
   const { importPending } = importer;
 
@@ -461,10 +583,6 @@ export default function KnowledgeBase() {
     }
   }, [cleanupImages, setStatus]);
 
-  const handleQaMutationSuccess = useCallback(() => {
-    void fetchQaTree().catch(() => undefined);
-  }, [fetchQaTree]);
-
   // 重新載入會把沒存的修改洗掉，放下之前都還沒發生，所以直接擋下來，不必問要不要捨棄。
   const handleTreeDrop = useCallback(
     (targetPath: string, position?: QaDropPosition) => {
@@ -476,28 +594,12 @@ export default function KnowledgeBase() {
         });
         return;
       }
-      if (
-        hasUnsavedChanges
-        && selectedQaNodeId
-        && !showNoteComposer
-        && dropReloadsCategory(treeDrag.draggingPath, targetPath, selectedQaNodeId)
-      ) {
-        treeDrag.handleTreeDragEnd();
-        setStatus({
-          type: "error",
-          message: "這個分類有未儲存的變更。請先按「儲存變更」或「取消變更」，再拖曳。",
-        });
-        return;
-      }
       void treeDrag.handleTreeDrop(targetPath, position);
     },
     [
       editorDirty,
-      hasUnsavedChanges,
       openDocument?.path,
-      selectedQaNodeId,
       setStatus,
-      showNoteComposer,
       treeDrag,
     ],
   );
@@ -506,7 +608,8 @@ export default function KnowledgeBase() {
   const handleDeleteConfirmAndRefreshQa = useCallback(async () => {
     await handleDeleteConfirm();
     await fetchQaTree();
-  }, [handleDeleteConfirm, fetchQaTree]);
+    await refreshQuestions();
+  }, [handleDeleteConfirm, fetchQaTree, refreshQuestions]);
 
   const handleComposerCreate = useCallback(
     (title: string, content: string, format: KnowledgeNoteFormat) => {
@@ -522,7 +625,7 @@ export default function KnowledgeBase() {
     [fetchQaTree, handleCreateNote, selectQaNode],
   );
 
-  const hasMatchingTreeNodes = displayTree.children.length > 0;
+  const hasMatchingTreeNodes = Boolean(documentSection?.children.length);
   const showSearchEmptyState = hasActiveSearch && !hasMatchingTreeNodes;
 
   return (
@@ -533,12 +636,16 @@ export default function KnowledgeBase() {
       onDragLeave={importer.handleDragLeave}
       onDrop={importer.handleDrop}
     >
-      {importer.dragOver && <UploadDropOverlay targetLabel={importer.targetLabel} />}
+      {importer.dragOver && <UploadDropOverlay targetLabel={vendor ? vendorFolderLabel(importer.targetDir) : importer.targetLabel} />}
 
       <KnowledgeHeader
         vendor={vendor}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(next) => {
+          if (next === "documents") requestNavigation(showQuestions);
+          else setActiveTab(next);
+        }}
+        onChatTest={() => openChatTest({ language: testLanguage })}
         documentCount={documents.length}
         documentsLoaded={documentsLoaded}
         processingCount={processingCount}
@@ -567,6 +674,10 @@ export default function KnowledgeBase() {
         </div>
       )}
 
+      {(qaTreeRefreshFailed || questionBank.refreshFailed) && (
+        <p role="alert" className="px-4 py-2 text-sm text-danger">{QA_REFRESH_FAILED_MESSAGE}</p>
+      )}
+
       <div
         id="knowledge-panel"
         role="tabpanel"
@@ -575,16 +686,25 @@ export default function KnowledgeBase() {
       >
         {activeTab === "graph" ? (
           <GraphView />
-        ) : activeTab === "questions" ? (
-          <QuestionsView
-            projectId={projectId}
-            onOpenCategory={handleOpenQuestionCategory}
-            onOpenDocument={handleOpenQuestionDocument}
-          />
         ) : (
           <>
+            <QuestionSearch value={questionSearch} rows={visibleLanguageRows} onChange={setQuestionSearch}
+              onOpen={(row) => handleOpenQuestion(row, row.category_ids[0], true)} />
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2" role="group" aria-label="題庫語言">
+              <span className="mr-1 text-sm font-medium text-content-muted">語言</span>
+              {languageOptions.map((option) => (
+                <button type="button" key={option} aria-pressed={language === option}
+                  className={`btn btn-ghost gap-1.5 text-sm ${language === option ? "bg-primary/10 text-primary" : ""}`}
+                  onClick={() => handleChangeLanguage(option)}>
+                  {option ? languageLabel(option) : "全部"}
+                  <span className="tabular-nums text-content-muted">{questionBank.data ? languageCounts.get(option) ?? 0 : "—"}</span>
+                </button>
+              ))}
+            </div>
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <KnowledgeTreeSidebar
+                vendor={vendor}
+                documentLabels={documentLabels}
                 mobileTreeOpen={mobileTree.mobileTreeOpen}
                 onCloseMobileTree={mobileTree.closeMobileTree}
                 mobileTreePanelRef={mobileTree.mobileTreePanelRef}
@@ -602,7 +722,7 @@ export default function KnowledgeBase() {
                 search={search}
                 onSearchChange={setSearch}
                 hasActiveSearch={hasActiveSearch}
-                searchResultCount={countSearchResults(displayTree)}
+                searchResultCount={documentSection ? countSearchResults(documentSection) : 0}
                 loading={loading}
                 documentCount={documents.length}
                 showSearchEmptyState={showSearchEmptyState}
@@ -623,13 +743,18 @@ export default function KnowledgeBase() {
                 onMoveFile={setMovingPath}
                 onDeleteFile={(path) => setDeleteTarget({ type: "file", value: path })}
                 onSelectQaNode={handleSelectQaNode}
-                onCreateQaNode={qaModals.openCreateQaNodeDialog}
+                onCreateQaNode={(parentId) => {
+                  const root = language && visibleQaTree.find((node) => categoryLanguage(node.label) === language);
+                  qaModals.openCreateQaNodeDialog(parentId ?? (root ? root.node_id : null));
+                }}
+                canCreateQaChild={(id) => qaCategoryDepth(nodesTree, id) < QA_CATEGORY_DEPTH_LIMIT}
                 onRenameQaNode={qaModals.openRenameQaNodeDialog}
                 onMoveQaNode={qaModals.openMoveQaNodeDialog}
                 onToggleQaNodeHidden={qaModals.handleToggleQaNodeHidden}
                 onDeleteQaNode={qaModals.openDeleteQaNodeDialog}
                 onOrderQaNode={qaModals.handleOpenOrderModal}
                 canDropQaNode={treeDrag.canDropQaNode}
+                qaNodeDropError={treeDrag.qaNodeDropError}
                 canDropQaEntry={treeDrag.canDropQaEntry}
                 multiSelect={batch.multiSelect}
                 onToggleMultiSelect={batch.handleToggleMultiSelect}
@@ -639,6 +764,7 @@ export default function KnowledgeBase() {
                 batchBar={
                   <BatchActionBar
                     vendor={vendor}
+                    documentLabels={documentLabels}
                     selectedPaths={batch.batchSelectedPaths}
                     documents={documents}
                     serverDirs={serverDirs}
@@ -652,8 +778,26 @@ export default function KnowledgeBase() {
               />
 
               <KnowledgeContentPane
+                vendor={vendor}
+                documentLabels={documentLabels}
+                questionBank={(
+                  <QuestionBank key={projectId} projectId={projectId} vendor={vendor} documentLabels={documentLabels}
+                    rows={questionRows} categories={visibleCategories} availableCategories={availableCategories}
+                    language={language} category={selectedQaNodeId}
+                    categoryEntries={selectedQaNodeId ? findQaNode(nodesTree, selectedQaNodeId)?.qa_entries : undefined} loading={questionBank.loading} error={questionBank.error}
+                    api={qaApi} open={openQuestion}
+                    onOpen={handleOpenQuestion} onCreate={handleCreateQuestion}
+                    onClose={() => requestNavigation(closeQuestion)} onCloseAfterChange={closeQuestion}
+                    onSelectCategory={handleSelectQaNode} onAllCategories={showAllQuestions}
+                    onRefresh={refreshQuestions}
+                    onTest={(question, questionLanguage) => openChatTest({ question, language: questionLanguage ?? testLanguage })}
+                    onOpenDocument={handleOpenQuestionDocument} />
+                )}
+                showHome={showAddData}
                 home={(
                   <KnowledgeHome
+                    vendor={vendor}
+                    documentLabels={documentLabels}
                     importer={importer}
                     allowAiCleanup={allowAiCleanup}
                     documents={documents}
@@ -677,12 +821,6 @@ export default function KnowledgeBase() {
                 creatingNote={creatingNote}
                 onCloseNoteComposer={handleCloseComposer}
                 onCreateNote={handleComposerCreate}
-                selectedQaNodeId={selectedQaNodeId}
-                selectedQaNodeLabel={selectedQaNode?.label}
-                mergedRefreshKey={mergedRefreshKey}
-                qaFocusRequest={qaFocusRequest}
-                onQaStatus={setStatus}
-                onQaMutationSuccess={handleQaMutationSuccess}
                 nodesTree={nodesTree}
                 onOpenQaNode={selectQaNode}
                 rightPane={rightPane}
@@ -692,18 +830,31 @@ export default function KnowledgeBase() {
                 editLoading={editLoading}
                 saving={saving}
                 editorDirty={editorDirty}
-                onSave={handleSave}
+                onSave={async () => {
+                  await handleSave();
+                  if (openDocument?.source_type === "qa") {
+                    await fetchQaTree().catch(() => undefined);
+                    await refreshQuestions();
+                  }
+                }}
                 onCloseFileView={closeFileView}
                 onDeleteFile={(path) => setDeleteTarget({ type: "file", value: path })}
                 onMoveFile={(path) => setMovingPath(path)}
-                onToggleEnabled={handleToggleEnabled}
-                onChangeLanguage={handleChangeLanguage}
+                onToggleEnabled={async (document) => {
+                  await handleToggleEnabled(document);
+                  if (document.source_type === "qa") await refreshQuestions();
+                }}
+                onChangeLanguage={async (document, next) => {
+                  await handleDocumentLanguage(document, next);
+                  if (document.source_type === "qa") await refreshQuestions();
+                }}
                 onRenormalize={allowAiCleanup ? handleRenormalize : undefined}
                 renormalizing={renormalizing || previewingNormalization}
               />
             </div>
 
             <QaNodeModals
+              vendor={vendor}
               dialog={qaModals.qaNodeDialog}
               nodesTree={nodesTree}
               onClose={qaModals.closeQaNodeDialog}
@@ -717,6 +868,8 @@ export default function KnowledgeBase() {
       </div>
 
       <KnowledgeModals
+        vendor={vendor}
+        documentLabels={documentLabels}
         documents={documents}
         serverDirs={serverDirs}
         movingPath={movingPath}

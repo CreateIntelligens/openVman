@@ -12,7 +12,9 @@ import {
   isQaNodeDescendant,
   parseQaEntryDragPath,
   parseQaNodeDragPath,
+  QA_CATEGORY_DEPTH_MESSAGE,
   qaEntryDragPath,
+  qaMoveExceedsDepth,
   qaNodeDragPath,
   QUICK_QA_TREE_PATH,
 } from "../components/kb/helpers";
@@ -31,12 +33,12 @@ type QaTreeActions = Pick<
 interface UseKnowledgeTreeDragDropOptions extends QaTreeActions {
   nodesTree: QaNode[];
   selectedQaNodeId: string | null;
-  fetchQaTree: () => Promise<unknown>;
   loadDocuments: () => Promise<void>;
   handleMove: (sourcePath: string, targetDir: string) => Promise<void>;
   setMergedRefreshKey: Dispatch<SetStateAction<number>>;
   /** 分類換了上層之後呼叫；parentId 是 null 代表移到最上層。 */
   onQaNodeMoved?: (parentId: string | null) => void;
+  onQaNodeMoveBlocked: (message: string) => void;
 }
 
 export function useKnowledgeTreeDragDrop({
@@ -48,11 +50,11 @@ export function useKnowledgeTreeDragDrop({
   saveMergedQa,
   adoptSource,
   ingestSource,
-  fetchQaTree,
   loadDocuments,
   handleMove,
   setMergedRefreshKey,
   onQaNodeMoved,
+  onQaNodeMoveBlocked,
 }: UseKnowledgeTreeDragDropOptions) {
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
@@ -92,6 +94,15 @@ export function useKnowledgeTreeDragDrop({
     },
     [nodesTree],
   );
+
+  const qaNodeDropError = useCallback((draggedPath: string, targetPath: string, position: QaDropPosition) => {
+    const draggedId = parseQaNodeDragPath(draggedPath);
+    const targetId = parseQaNodeDragPath(targetPath);
+    const moving = draggedId && findQaNode(nodesTree, draggedId);
+    if (!moving || (!targetId && targetPath !== QUICK_QA_TREE_PATH)) return;
+    const parentId = targetId && position !== "into" ? getQaNodeParentId(nodesTree, targetId) : targetId;
+    if (qaMoveExceedsDepth(nodesTree, moving, parentId)) return QA_CATEGORY_DEPTH_MESSAGE;
+  }, [nodesTree]);
 
   const canDropQaEntry = useCallback((draggedPath: string, targetPath: string) => {
     const draggedEntry = parseQaEntryDragPath(draggedPath);
@@ -141,7 +152,6 @@ export function useKnowledgeTreeDragDrop({
       if (position === "into") {
         if (draggedNode.parent_ids?.includes(targetId)) return;
         await moveNode(draggedId, [targetId]);
-        await fetchQaTree();
         onQaNodeMoved?.(targetId);
         return;
       }
@@ -165,10 +175,9 @@ export function useKnowledgeTreeDragDrop({
         await moveNode(draggedId, targetParentId ? [targetParentId] : []);
       }
       await reorderNode(draggedId, ordered);
-      await fetchQaTree();
       if (!isSameParent) onQaNodeMoved?.(targetParentId);
     },
-    [fetchQaTree, moveNode, nodesTree, onQaNodeMoved, reorderNode],
+    [moveNode, nodesTree, onQaNodeMoved, reorderNode],
   );
 
   const handleTreeDrop = useCallback(
@@ -189,6 +198,13 @@ export function useKnowledgeTreeDragDrop({
       };
 
       try {
+        if (draggedQaNodeId) {
+          const reason = qaNodeDropError(draggingPath, targetDir, position);
+          if (reason) {
+            onQaNodeMoveBlocked(reason);
+            return;
+          }
+        }
         if (draggedQaEntry && targetQaEntry) {
           if (
             draggedQaEntry.nodeId === targetQaEntry.nodeId &&
@@ -227,7 +243,6 @@ export function useKnowledgeTreeDragDrop({
         if (draggedQaNodeId && isQaRootDrop) {
           if (getQaNodeParentId(nodesTree, draggedQaNodeId) !== null) {
             await moveNode(draggedQaNodeId, []);
-            await fetchQaTree();
             onQaNodeMoved?.(null);
           }
           cleanup();
@@ -284,11 +299,12 @@ export function useKnowledgeTreeDragDrop({
       loadDocuments,
       selectedQaNodeId,
       nodesTree,
-      fetchQaTree,
       fetchMergedQa,
       saveMergedQa,
       moveNode,
       onQaNodeMoved,
+      onQaNodeMoveBlocked,
+      qaNodeDropError,
       setDropTarget,
       setMergedRefreshKey,
     ],
@@ -301,6 +317,7 @@ export function useKnowledgeTreeDragDrop({
     setDropTarget,
     sourceDragDir,
     canDropQaNode,
+    qaNodeDropError,
     canDropQaEntry,
     handleTreeDragStart,
     handleTreeDragEnd,

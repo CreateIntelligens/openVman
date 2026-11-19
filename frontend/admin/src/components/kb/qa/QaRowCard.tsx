@@ -8,6 +8,7 @@ export type QaRowField = "question" | "answer" | "img" | "url" | "hidden";
 export const QA_HIDDEN_HINT = "「已隱藏」的問題不會出現在訪客的選單，但 AI 回答時還是會用。";
 
 interface QaRowCardProps {
+  vendor?: boolean;
   /** 在完整清單裡的位置，題號由它來：搜尋時清單變短，題號也不能跟著變。 */
   index: number;
   question: string;
@@ -62,6 +63,7 @@ function fieldClass(invalid: boolean | undefined): string {
 }
 
 export default function QaRowCard({
+  vendor = false,
   index,
   question,
   answer,
@@ -97,6 +99,7 @@ export default function QaRowCard({
   const [urlOpen, setUrlOpen] = useState(Boolean(url));
   const showImage = imageOpen || Boolean(img);
   const showUrl = urlOpen || Boolean(url);
+  const uploadLabel = vendor && img ? "更換圖片" : "上傳圖片";
 
   const removeImage = () => {
     onChange("img", "");
@@ -287,12 +290,16 @@ export default function QaRowCard({
         <div className={`mt-2 grid gap-2 lg:grid-cols-2 ${hidden ? "opacity-60" : ""}`}>
           {showImage && (
             <div className="min-w-0">
-              <label htmlFor={`${fieldId}-img`} className={FIELD_LABEL_CLASS}>
-                圖片編號（AI 用這題回答時會附上這張圖）
-              </label>
+              {vendor ? (
+                <p className={FIELD_LABEL_CLASS}>圖片</p>
+              ) : (
+                <label htmlFor={`${fieldId}-img`} className={FIELD_LABEL_CLASS}>
+                  圖片編號（AI 用這題回答時會附上這張圖）
+                </label>
+              )}
               <div className="mt-0.5 flex flex-wrap items-center gap-2">
                 <QaImagePreview compact imageId={img} alt={`${question || `第 ${number} 題`}的參考圖片`} />
-                <input
+                {!vendor && <input
                   id={`${fieldId}-img`}
                   type="text"
                   aria-label={`第 ${number} 題的圖片編號`}
@@ -300,16 +307,16 @@ export default function QaRowCard({
                   onChange={(e) => onChange("img", e.target.value)}
                   placeholder="圖片編號"
                   className="input min-w-0 flex-1 basis-32 font-mono text-xs placeholder:text-content-subtle"
-                />
+                />}
                 {onPickImage && (
                   <button
                     type="button"
                     onClick={onPickImage}
                     disabled={uploadDisabled}
                     className={ROW_BUTTON_CLASS}
-                    aria-label={`第 ${number} 題上傳圖片`}
+                    aria-label={`第 ${number} 題${uploadLabel}`}
                   >
-                    {uploadingImage ? "上傳中…" : "上傳圖片"}
+                    {uploadingImage ? "上傳中…" : uploadLabel}
                   </button>
                 )}
                 <button

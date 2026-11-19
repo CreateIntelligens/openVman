@@ -15,6 +15,7 @@ import { useQaImageUpload } from "./qa/useQaImageUpload";
 import { useQaRowReveal } from "./qa/useQaRowReveal";
 
 interface QaDocEditorProps {
+  vendor?: boolean;
   content: string;
   onChange: (content: string) => void;
   format?: "markdown" | "csv";
@@ -51,7 +52,7 @@ function editableRowsFromContent(content: string, format: "markdown" | "csv"): E
   return (parsedRows.length > 0 ? parsedRows : [createEmptyQaRow()]).map(withLocalId);
 }
 
-export default function QaDocEditor({ content, onChange, format = "markdown" }: QaDocEditorProps) {
+export default function QaDocEditor({ vendor = false, content, onChange, format = "markdown" }: QaDocEditorProps) {
   const [rows, setRows] = useState<EditorRow[]>(() => editableRowsFromContent(content, format));
   const [moveToRowId, setMoveToRowId] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<{ error: boolean; text: string } | null>(null);
@@ -87,9 +88,9 @@ export default function QaDocEditor({ content, onChange, format = "markdown" }: 
     onUploaded: (rowId, imageId) => {
       if (!rowsRef.current.some((row) => row.localId === rowId)) return;
       emit(rowsRef.current.map((row) => (row.localId === rowId ? { ...row, img: imageId } : row)));
-      setUploadMessage({ error: false, text: "圖片已上傳，編號已經填好。" });
+      setUploadMessage({ error: false, text: vendor ? "圖片已上傳。" : "圖片已上傳，編號已經填好。" });
     },
-    onError: (text) => setUploadMessage({ error: true, text }),
+    onError: (text) => setUploadMessage({ error: true, text: vendor ? "圖片上傳失敗，請換用 JPG 或 PNG 後再試。" : text }),
   });
   const uploading = imageUpload.uploadingRowId !== null;
 
@@ -158,6 +159,7 @@ export default function QaDocEditor({ content, onChange, format = "markdown" }: 
               <QaRowListHeader />
               {rows.map((row, idx) => (
                 <QaRowCard
+                  vendor={vendor}
                   key={row.localId}
                   index={idx}
                   question={row.question}

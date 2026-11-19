@@ -52,7 +52,7 @@ describe("SourcePanel", () => {
     expect(screen.getByRole("button", { name: "把檔案拖到這裡，或點這裡選擇檔案" })).toBeTruthy();
     expect(screen.getByText("有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。")).toBeTruthy();
     expect(screen.getByText(/中文、英文、西文混在同一張表也可以/)).toBeTruthy();
-    expect(screen.getByText("其他文件會切成段落加入知識庫，AI 回答時查得到，不會變成問答。選 AI 整理時，內容維持原本的語言，不會翻譯。")).toBeTruthy();
+    expect(screen.getByText("一般文件會保留原文供 AI 回答時查閱。選 AI 整理時會以原本的語言整理。")).toBeTruthy();
     expect(screen.getByText(/每個檔案 100 MB 以內/)).toBeTruthy();
     expect(screen.getByText(/Excel（\.xlsx）/)).toBeTruthy();
     expect(screen.queryByText(/暫存區|採納|raw/)).toBeNull();
@@ -88,8 +88,8 @@ describe("SourcePanel", () => {
     expect(input.value).toBe("");
   });
 
-  const DIRECT = "直接放進知識庫（內容不變，系統自動切段，AI 回答時查得到）";
-  const TIDY = "先讓 AI 整理排版再放進去（適合掃描錯字多、排版很亂的檔案）";
+  const DIRECT = "直接放進知識庫（內容照原樣，AI 回答時會查這份資料）";
+  const TIDY = "先讓 AI 整理排版再放進去（適合換行或排版很亂的文件）";
 
   // 實測：勾選框在拖放區下面，選了檔案就開始上傳，由上往下操作的人來不及勾。
   it("asks how to bring the batch in above the drop zone, before any file is picked", () => {

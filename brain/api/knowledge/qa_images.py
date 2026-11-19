@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import threading
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -135,6 +136,33 @@ def qa_image_kind(image_id: str, project_id: str) -> str | None:
     except Exception as exc:  # noqa: BLE001 - 分類失敗不能讓回答失敗
         logger.warning("qa_image_kind_failed image=%s error=%s", image_id, type(exc).__name__)
         return None
+
+
+def stored_qa_image_kinds(image_ids: Iterable[str], project_id: str) -> dict[str, str]:
+    """Kinds already on record for these image ids; never classifies or writes.
+
+    題目清單一次可能上百張圖，現場判斷每張要近一秒，所以只查上傳或回答時存下的結果；
+    沒判斷過、或圖檔換過還沒重判的就不回，畫面顯示「未判定」。
+    """
+    wanted = {image_id for image_id in image_ids if image_id}
+    if not wanted:
+        return {}
+    try:
+        cache = _load_cache(project_id)
+        if not cache:
+            return {}
+        kinds: dict[str, str] = {}
+        for image_id in wanted:
+            path = resolve_qa_image_path(image_id, project_id)
+            if path is None:
+                continue
+            entry = cache.get(path.name)
+            if _is_current(entry, path.stat()):
+                kinds[image_id] = entry["kind"]
+        return kinds
+    except OSError as exc:
+        logger.warning("qa_image_kinds_lookup_failed error=%s", type(exc).__name__)
+        return {}
 
 
 def _is_current(entry: Any, stat: os.stat_result) -> bool:

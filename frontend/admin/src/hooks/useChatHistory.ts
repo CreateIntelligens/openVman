@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   deleteSession,
@@ -19,7 +19,7 @@ import {
 import { useRefetchOnRecovery } from "../context/BackendHealthContext";
 import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
 
-export function useChatHistory(clearTtsPrefetchState: () => void) {
+export function useChatHistory(clearTtsPrefetchState: () => void, startFresh = false) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [personas, setPersonas] = useState<PersonaSummary[]>([defaultPersona]);
   const [selectedPersonaId, setSelectedPersonaId] = useState("default");
@@ -32,6 +32,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const skipInitialSession = useRef(startFresh);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -139,9 +140,11 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
       deepLink?.personaId ??
       readScoped(getPersonaStorageKey()) ??
       "default";
+    let active = true;
     setLoadingPersonas(true);
     fetchPersonas()
       .then((response) => {
+        if (!active) return;
         const availablePersonas = response.personas.length ? response.personas : [defaultPersona];
         const nextPersonaId = resolvePersonaId(availablePersonas, storedPersonaId);
         setPersonas(availablePersonas);
@@ -149,17 +152,26 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
         writeScoped(getPersonaStorageKey(), nextPersonaId);
       })
       .catch((reason) => {
+        if (!active) return;
         setPersonas([defaultPersona]);
         setSelectedPersonaId("default");
         setError(String(reason));
       })
-      .finally(() => setLoadingPersonas(false));
+      .finally(() => {
+        if (active) setLoadingPersonas(false);
+      });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
     if (!selectedPersonaId || loadingPersonas) return;
 
     resetViewState();
+    // 單題測試從新對話開始，避免前一段紀錄影響這題的回答。
+    if (skipInitialSession.current) {
+      skipInitialSession.current = false;
+      return;
+    }
     const storedSessionId = readScoped(getSessionStorageKey(selectedPersonaId));
     if (!storedSessionId) return;
 

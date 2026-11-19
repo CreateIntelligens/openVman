@@ -50,7 +50,7 @@ export default function NormalizationPreviewModal({
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
           <p className="min-w-0 flex-1 basis-[14rem] text-xs text-content-muted">
-            套用後，這份內容會取代原本的文件。原本的內容會先留一份備份。
+            AI 整理用來調整排版與換行。請先確認文字意思有沒有變，套用前會備份原本的內容。
           </p>
           <div className="flex items-center gap-2">
             <button type="button" onClick={onClose} disabled={applying} className="btn btn-ghost">

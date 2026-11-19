@@ -172,9 +172,9 @@ describe("NoteComposer", () => {
 
   it("explains the result in plain words, without internal terms or paths", () => {
     const { container } = renderComposer();
-    expect(screen.getByText("建立後會放在「文件」的 notes 資料夾，AI 回答時會參考。")).toBeTruthy();
+    expect(screen.getByText("建立後會出現在左邊的「文件」清單，AI 回答時會參考。")).toBeTruthy();
     expect(container.textContent).toContain("0 字");
-    expect(container.textContent).not.toMatch(/knowledge\/|chars|手動|來源/);
+    expect(container.textContent).not.toMatch(/knowledge\/|notes|chars|手動|來源/);
 
     fireEvent.click(screen.getByRole("button", { name: "問答" }));
     expect(screen.getByText("一題一列。建立後會放進快速問答，分類名稱就是上面的標題。")).toBeTruthy();

@@ -2,12 +2,13 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "rea
 
 import type { QaNode } from "../../../hooks/useQaNodes";
 import { errorMessage } from "../../../utils/errorMessage";
-import { isQaNodeDescendant } from "../helpers";
+import { findQaNode, isQaNodeDescendant, QA_CATEGORY_DEPTH_MESSAGE, qaMoveExceedsDepth } from "../helpers";
 import { useModalDismiss } from "../useModalDismiss";
 
 const TOP_LEVEL_VALUE = "__top_level__";
 
 interface MoveQaNodeModalProps {
+  vendor?: boolean;
   node: QaNode;
   nodesTree: QaNode[];
   /** parentId 是 null 代表移到最上層；失敗就丟錯，對話框會留著並寫出原因。 */
@@ -15,13 +16,13 @@ interface MoveQaNodeModalProps {
   onClose: () => void;
 }
 
-export interface FlatCategory {
+interface FlatCategory {
   node: QaNode;
   depth: number;
 }
 
 // 同一分類可能掛在多個上層，攤平時只留第一次出現的位置。
-export function flattenCategories(
+function flattenCategories(
   nodes: QaNode[],
   depth = 0,
   seen = new Set<string>(),
@@ -37,6 +38,7 @@ export function flattenCategories(
 }
 
 export default function MoveQaNodeModal({
+  vendor = false,
   node,
   nodesTree,
   onConfirm,
@@ -68,7 +70,10 @@ export default function MoveQaNodeModal({
       ? currentParentIds.length === 0
       : currentParentIds.includes(value);
   // 掛在多個上層的分類選了其中一個仍算有變化：移動後只會留下選的這一個。
-  const canConfirm = !moving &&
+  const currentNode = findQaNode(nodesTree, node.node_id) ?? node;
+  const exceedsDepth = (id: string) => qaMoveExceedsDepth(nodesTree, currentNode, id === TOP_LEVEL_VALUE ? null : id);
+  const topTooDeep = exceedsDepth(TOP_LEVEL_VALUE);
+  const canConfirm = !moving && !exceedsDepth(selected) &&
     (selected !== currentValue || currentParentIds.length > 1);
 
   const handleSubmit = async (event: FormEvent) => {
@@ -79,7 +84,7 @@ export default function MoveQaNodeModal({
     try {
       await onConfirm(selected === TOP_LEVEL_VALUE ? null : selected);
     } catch (moveError) {
-      setError(`沒有移動成功：${errorMessage(moveError, "請再試一次。")}`);
+      setError(vendor ? "沒有移動成功，請另選分類或再試一次。" : `沒有移動成功：${errorMessage(moveError, "請再試一次。")}`);
       setMoving(false);
     }
   };
@@ -118,16 +123,18 @@ export default function MoveQaNodeModal({
           <div className="min-h-0 flex-1 overflow-y-auto">
             <fieldset className="min-w-0 py-2">
               <legend className="sr-only">新位置</legend>
-              <label className={optionClass(false)} style={{ paddingLeft: "1.25rem" }}>
+              <label className={optionClass(topTooDeep)} style={{ paddingLeft: "1.25rem" }}>
                 <input
                   type="radio"
                   name={titleId}
                   value={TOP_LEVEL_VALUE}
+                  disabled={topTooDeep}
                   checked={selected === TOP_LEVEL_VALUE}
                   onChange={() => setSelected(TOP_LEVEL_VALUE)}
                   className="shrink-0 accent-primary"
                 />
                 <span className="min-w-0 flex-1 truncate">最上層</span>
+                {topTooDeep && <span className="text-xs text-content-subtle">{QA_CATEGORY_DEPTH_MESSAGE}</span>}
                 {isCurrent(TOP_LEVEL_VALUE) && (
                   <span className="shrink-0 text-xs text-content-subtle">目前位置</span>
                 )}
@@ -135,8 +142,9 @@ export default function MoveQaNodeModal({
 
               {categories.map(({ node: category, depth }) => {
                 const isSelf = category.node_id === node.node_id;
-                const isDescendant = isQaNodeDescendant(node, category.node_id);
-                const disabled = isSelf || isDescendant;
+                const isDescendant = isQaNodeDescendant(currentNode, category.node_id);
+                const tooDeep = !isSelf && !isDescendant && exceedsDepth(category.node_id);
+                const disabled = isSelf || isDescendant || tooDeep;
                 return (
                   <label
                     key={category.node_id}
@@ -164,6 +172,7 @@ export default function MoveQaNodeModal({
                     {isSelf && (
                       <span className="shrink-0 text-xs text-content-subtle">就是這個分類</span>
                     )}
+                    {tooDeep && <span className="text-xs text-content-subtle">{QA_CATEGORY_DEPTH_MESSAGE}</span>}
                     {isDescendant && (
                       <span className="shrink-0 text-xs text-content-subtle">在這個分類底下</span>
                     )}

@@ -32,7 +32,7 @@ describe("NormalizationPreviewModal", () => {
 
     expect(screen.getByRole("heading", { name: "AI 整理排版預覽" })).toBeTruthy();
     expect(screen.getByText("guides/source.md").getAttribute("title")).toBe("guides/source.md");
-    expect(screen.getByText("套用後，這份內容會取代原本的文件。原本的內容會先留一份備份。")).toBeTruthy();
+    expect(screen.getByText("AI 整理用來調整排版與換行。請先確認文字意思有沒有變，套用前會備份原本的內容。")).toBeTruthy();
     expect(container.textContent).not.toContain("knowledge/");
 
     fireEvent.click(screen.getByRole("button", { name: "套用這份內容" }));

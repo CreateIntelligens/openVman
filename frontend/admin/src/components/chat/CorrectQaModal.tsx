@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { useQaNodes, type MergedQaItem, type QaNode } from "../../hooks/useQaNodes";
+import { QA_REFRESH_FAILED_MESSAGE, useQaNodes, type MergedQaItem, type QaNode } from "../../hooks/useQaNodes";
 import { errorMessage } from "../../utils/errorMessage";
 import { useModalDismiss } from "../useModalDismiss";
 
@@ -76,7 +76,7 @@ export function applyCorrection(
 }
 
 export default function CorrectQaModal({ open, question, answer, onClose }: CorrectQaModalProps) {
-  const { nodesTree, loading, error: treeError, fetchTree, fetchMergedQa, saveMergedQa } = useQaNodes();
+  const { nodesTree, loading, error: treeError, refreshFailed, fetchTree, fetchMergedQa, saveMergedQa } = useQaNodes();
   const { onPointerDown, onPointerUp } = useModalDismiss(onClose, open);
 
   const [q, setQ] = useState(question);
@@ -165,6 +165,7 @@ export default function CorrectQaModal({ open, question, answer, onClose }: Corr
               <span className="material-symbols-outlined shrink-0 text-[1.125rem]">check_circle</span>
               <span>{`已存入「${savedLabel}」。知識庫會在背景重建索引，幾秒後重新提問即可驗證。`}</span>
             </div>
+            {refreshFailed && <p role="alert" className="text-sm text-danger">{QA_REFRESH_FAILED_MESSAGE}</p>}
             <div className="flex justify-end">
               <button type="button" onClick={onClose} className="btn btn-primary">關閉</button>
             </div>

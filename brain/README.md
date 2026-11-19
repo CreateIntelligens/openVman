@@ -474,7 +474,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 `GET /knowledge/qa/questions?project_id=` 給後台「所有題目」用（`knowledge/qa_questions.py`，只讀）：問答文件的每一題加上選單上的掛載，一題一列。題目的身分是來源文件＋題目文字（比對時換行符號與前後空白不算），只在選單上、沒有來源文件的題目是分類＋題目文字；掛在多個分類也只有一列。
 
 - `categories`：照樹上順序的分類，`{ node_id, label, path, parent_id, hidden }`；`path` 是第一層到自己的名稱，`hidden` 是自己或上層被隱藏。
-- `questions`：`{ id, question, answer, image, url, language, source: { kind, path, label }, category_ids, category_hidden, hidden_in_file, off_menu, no_answer, document_enabled }`。`language` 先看 CSV 的 `language` 欄，認不得或沒填就用文件語言，只在選單上的題目是 `null`。`source.kind` 為 `file`、`manual`（後台自己輸入，`manual_*` 文件）或 `menu_only`。`off_menu` 是 `detached`（刻意拿下）、`never`（從沒放進分類）或 `null`。`category_hidden` 是掛著的分類全部被隱藏。只在選單上的題目本來就沒有答案，`no_answer` 為 false。掛在選單上、文件裡已找不到的題目照樣列出，答案為空。
+- `questions`：`{ id, question, answer, image, image_kind?, url, language, source: { kind, path, label }, category_ids, category_hidden, hidden_in_file, off_menu, no_answer, document_enabled }`。`image_kind`（`qr`／`image`）只在圖片已判定過時出現，讀自 `knowledge/.qa_image_kinds.json`，列清單時不會現場判斷。`language` 先看 CSV 的 `language` 欄，認不得或沒填就用文件語言，只在選單上的題目是 `null`。`source.kind` 為 `file`、`manual`（後台自己輸入，`manual_*` 文件）或 `menu_only`。`off_menu` 是 `detached`（刻意拿下）、`never`（從沒放進分類）或 `null`。`category_hidden` 是掛著的分類全部被隱藏。只在選單上的題目本來就沒有答案，`no_answer` 為 false。掛在選單上、文件裡已找不到的題目照樣列出，答案為空。
 
 `POST /chat` 一次回傳完整結果；`POST /chat/stream` 以 SSE 逐句送出同一份回答（見「逐句串流」）；即時語音走 Live WebSocket。
 

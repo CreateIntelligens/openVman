@@ -10,10 +10,13 @@ import {
   parentDirOf,
   splitFileNameForDisplay,
 } from "./helpers";
+import { vendorFolderLabel } from "./vendorDocumentLabels";
 
 const ROW_BUTTON = "btn btn-ghost px-2.5 py-1 text-xs";
 
 interface ImportResultListProps {
+  vendor?: boolean;
+  documentLabels?: ReadonlyMap<string, string>;
   items: ImportItem[];
   nodesTree: QaNode[];
   onViewDocument: (path: string) => void;
@@ -52,7 +55,7 @@ function qaPlacement(result: KnowledgeCommitFileResult, nodesTree: QaNode[]) {
 function languageSplitNote(result: KnowledgeCommitFileResult | undefined): string {
   const counts = Object.entries(result?.languages ?? {});
   if (counts.length < 2) return "";
-  const parts = counts.map(([code, count]) => `${KNOWLEDGE_LANGUAGE_LABELS[code as KnowledgeLanguage] ?? code} ${count} 題`);
+  const parts = counts.map(([code, count]) => `${KNOWLEDGE_LANGUAGE_LABELS[code as KnowledgeLanguage] ?? "未判定"} ${count} 題`);
   return `。表裡有不同語言，已依語言分開放：${parts.join("、")}`;
 }
 
@@ -61,9 +64,10 @@ function normalizeNote(item: ImportItem): string {
   return item.normalize ? "，AI 已整理排版" : "，內容未經 AI 修改";
 }
 
-function documentFolderNote(target: string): string {
+function documentFolderNote(target: string, vendor: boolean): string {
   const folder = parentDirOf(target);
   if (!folder || folder === DOCUMENTS_ROOT_PATH) return "";
+  if (vendor) return `，放在「${vendorFolderLabel(folder)}」`;
   const relative = folder.replace(`${DOCUMENTS_ROOT_PATH}/`, "");
   return `，放在「${relative.split("/").join(" › ")}」`;
 }
@@ -80,6 +84,8 @@ export function ImportFileName({ name }: { name: string }) {
 }
 
 function ImportResultRow({
+  vendor = false,
+  displayName,
   item,
   nodesTree,
   onViewDocument,
@@ -87,7 +93,10 @@ function ImportResultRow({
   onRenameQaNode,
   onRetry,
   onPickAgain,
-}: Omit<ImportResultListProps, "items" | "onClear"> & { item: ImportItem }) {
+}: Omit<ImportResultListProps, "items" | "onClear" | "documentLabels"> & {
+  item: ImportItem;
+  displayName: string;
+}) {
   const active = isImportItemActive(item);
   const result = item.state === "done" ? item.result : undefined;
   const placement = result?.kind === "qa" ? qaPlacement(result, nodesTree) : null;
@@ -106,11 +115,15 @@ function ImportResultRow({
   } else if (item.state === "skipped") {
     icon = "error";
     iconClass = "text-warn";
-    text = `沒有匯入：${item.message ?? ""}`;
+    text = vendor
+      ? "沒有匯入。請檢查檔案的格式、大小與內容後重新上傳。"
+      : `沒有匯入：${item.message ?? ""}`;
   } else if (item.state === "failed") {
     icon = "error";
     iconClass = "text-danger";
-    text = `沒有完成：${item.message ?? ""}`;
+    text = vendor
+      ? (item.rawPath ? "沒有完成，請按「再試一次」。" : "沒有完成，請重新選擇檔案。")
+      : `沒有完成：${item.message ?? ""}`;
   } else if (placement && !placement.text) {
     // 分類刪掉後重傳同名文件：只更新內容，不會自己回到選單。
     const changed = result?.updated
@@ -118,17 +131,21 @@ function ImportResultRow({
       : "已加入知識庫";
     text = `${changed}。這份文件不在選單上，要放回選單請把文件拖進分類。`;
   } else if (placement) {
-    const verb = result?.updated ? "已更新快速問答" : "已放進快速問答";
+    const verb = result?.updated ? "已更新" : "已放進";
+    const section = vendor ? "快速回覆" : "快速問答";
     const merged = result?.added === undefined
       ? ""
       : result.added > 0 ? `，新增 ${result.added} 題` : "，沒有新題目";
     const clashes = result?.name_clashes?.length
       ? `。有 ${result.name_clashes.length} 題沒放進選單，分類裡已有同名題目：${result.name_clashes.slice(0, 3).join("、")}`
       : "";
-    text = `${verb}：${placement.text}${merged}${languageSplitNote(result)}${clashes}`;
+    const place = vendor
+      ? (result?.question_count === undefined ? "" : `（${result.question_count} 題）`)
+      : `：${placement.text}`;
+    text = `${verb}${section}${place}${merged}${languageSplitNote(result)}${clashes}`;
   } else {
     const verb = result?.updated ? "已更新既有文件" : "已加入知識庫";
-    text = `${verb}${result ? documentFolderNote(result.target) : ""}${normalizeNote(item)}`;
+    text = `${verb}${result ? documentFolderNote(result.target, vendor) : ""}${normalizeNote(item)}`;
   }
 
   return (
@@ -138,7 +155,7 @@ function ImportResultRow({
       </span>
       <div className="min-w-0 flex-1 basis-[60%]">
         <div className="flex min-w-0 items-baseline gap-2">
-          <ImportFileName name={item.name} />
+          <ImportFileName name={displayName} />
           {item.size !== undefined && (
             <span className="shrink-0 text-xs text-content-subtle">{formatSize(item.size)}</span>
           )}
@@ -154,8 +171,8 @@ function ImportResultRow({
           {text}
           {language && <span className="chip ml-2 align-middle">{language}</span>}
         </p>
-        {result?.notes?.length ? (
-          <ul aria-label={`${item.name} 要注意的地方`} className="mt-1.5 space-y-1 text-sm text-content">
+        {!vendor && result?.notes?.length ? (
+          <ul aria-label={`${displayName} 要注意的地方`} className="mt-1.5 space-y-1 text-sm text-content">
             {result.notes.map((note) => (
               <li key={note} className="flex gap-1.5 break-words">
                 <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[1rem] leading-5 text-warn">info</span>
@@ -164,6 +181,11 @@ function ImportResultRow({
             ))}
           </ul>
         ) : null}
+        {vendor && !!result?.notes?.length && (
+          <p className="mt-1.5 text-sm text-content">
+            匯入後有些內容需要確認。請查看題目的分類、答案和圖片。
+          </p>
+        )}
       </div>
       {!active && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -171,7 +193,7 @@ function ImportResultRow({
             <button
               type="button"
               className={ROW_BUTTON}
-              aria-label={`查看 ${item.name}`}
+              aria-label={`查看 ${displayName}`}
               onClick={() => onViewDocument(result.target)}
             >
               查看
@@ -182,7 +204,7 @@ function ImportResultRow({
               <button
                 type="button"
                 className={ROW_BUTTON}
-                aria-label={`查看 ${item.name}`}
+                aria-label={`查看 ${displayName}`}
                 onClick={() => onViewQaNode(qaNodeId)}
               >
                 查看
@@ -190,7 +212,7 @@ function ImportResultRow({
               <button
                 type="button"
                 className={ROW_BUTTON}
-                aria-label={`改名 ${item.name}`}
+                aria-label={`改名 ${displayName}`}
                 onClick={() => onRenameQaNode(qaNodeId)}
               >
                 改名
@@ -203,7 +225,7 @@ function ImportResultRow({
             <button
               type="button"
               className={ROW_BUTTON}
-              aria-label={`重新選檔案 ${item.name}`}
+              aria-label={`重新選檔案 ${displayName}`}
               onClick={onPickAgain}
             >
               重新選檔案
@@ -213,7 +235,7 @@ function ImportResultRow({
             <button
               type="button"
               className={ROW_BUTTON}
-              aria-label={`再試一次 ${item.name}`}
+              aria-label={`再試一次 ${displayName}`}
               onClick={() => onRetry(item.id)}
             >
               再試一次
@@ -239,6 +261,8 @@ function summaryText(items: ImportItem[]): string {
 
 /** 這份清單留在畫面上直到使用者清除，上傳後看的就是這裡。 */
 export default function ImportResultList({
+  vendor = false,
+  documentLabels,
   items,
   nodesTree,
   onViewDocument,
@@ -265,9 +289,13 @@ export default function ImportResultList({
         )}
       </div>
       <ul className="mt-1 divide-y divide-border">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <ImportResultRow
             key={item.id}
+            vendor={vendor}
+            displayName={vendor
+              ? (item.result?.kind === "document" && documentLabels?.get(item.result.target)) || `匯入檔案 ${index + 1}`
+              : item.name}
             item={item}
             nodesTree={nodesTree}
             onViewDocument={onViewDocument}

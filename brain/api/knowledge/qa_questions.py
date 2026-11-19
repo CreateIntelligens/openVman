@@ -21,6 +21,7 @@ from knowledge.qa_csv import (
     qa_csv_row_extras,
     unify_newlines,
 )
+from knowledge.qa_images import stored_qa_image_kinds
 from knowledge.qa_nodes import (
     _load_nodes_data,
     _lock,
@@ -237,6 +238,12 @@ def list_all_questions(
             "no_answer": False,
             "document_enabled": True,
         })
+
+    # 圖片類型只讀上傳／回答時存下的判斷結果，沒判斷過的不帶，畫面顯示「未判定」。
+    kinds = stored_qa_image_kinds((item["image"] for item in questions), project_id)
+    for item in questions:
+        if kind := kinds.get(item["image"]):
+            item["image_kind"] = kind
 
     unplaced = len(position)
     questions = [

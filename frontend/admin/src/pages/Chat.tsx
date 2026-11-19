@@ -8,7 +8,9 @@ import QuickQaModal from "../components/chat/QuickQaModal";
 import CorrectQaModal from "../components/chat/CorrectQaModal";
 import { findPrecedingUserQuestion } from "../components/chat/helpers";
 import ChatSidebar from "../components/chat/ChatSidebar";
+import { KNOWLEDGE_LANGUAGE_LABELS } from "../components/kb/helpers";
 import { useAuth } from "../context/AuthContext";
+import { useNavigation } from "../context/NavigationContext";
 import { isVendorUser } from "../utils/accountPermissions";
 import { useProject } from "../context/ProjectContext";
 import { useMascot } from "../context/MascotContext";
@@ -36,6 +38,7 @@ function createLiveClientId(projectId: string): string {
 
 export default function Chat() {
   const { account } = useAuth();
+  const { chatTest } = useNavigation();
   const vendor = Boolean(account && isVendorUser(account));
   const [mode, setMode] = useLocalStorageState<ChatMode>(
     "admin.chat.mode",
@@ -118,7 +121,7 @@ export default function Chat() {
     searchQuery,
     setSearchQuery,
     resetSearch,
-  } = useChatSession(vendor);
+  } = useChatSession(vendor, chatTest);
   const visionAvailable = useVisionAvailable(!vendor);
 
   const liveClientIdRef = useRef<string>("");
@@ -346,6 +349,11 @@ export default function Chat() {
             onOpenSessions={() => setSessionsOpen(true)}
             onOpenQuickQa={() => setQuickQaOpen(true)}
           />
+          {chatTest?.language && (
+            <p className="border-b border-border px-4 py-2 text-sm text-content-muted">
+              測試語言　{KNOWLEDGE_LANGUAGE_LABELS[chatTest.language]}
+            </p>
+          )}
 
           {mode === "live" && (
             <div className="shrink-0 border-b border-border bg-surface-sunken px-4 py-3">

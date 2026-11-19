@@ -39,6 +39,7 @@ from knowledge.qa_csv import (
     serialize_qa_csv,
     unify_newlines,
 )
+from knowledge.qa_images import stored_qa_image_kinds
 from knowledge.qa_nodes import (
     get_node,
     is_source_referenced,
@@ -229,8 +230,15 @@ def merged_rows(node_id: str, node: dict[str, Any], project_id: str) -> list[dic
     rows = _rows_of(node, project_id)
     version = _version_of(rows)
     elsewhere = _mounts_elsewhere(project_id, node_id)
+    # 圖片類型只讀既有判斷結果，不算進 base_version：存檔不會寫回這個欄位。
+    kinds = stored_qa_image_kinds((extract_image_id(row["img"]) for row in rows), project_id)
     return [
-        {**row, "base_version": version, "also_in": elsewhere.get((posixpath.normpath(row["source_file"]), row["q"]), []) if row["source_file"] else []}
+        {
+            **row,
+            "base_version": version,
+            "also_in": elsewhere.get((posixpath.normpath(row["source_file"]), row["q"]), []) if row["source_file"] else [],
+            **({"image_kind": kind} if (kind := kinds.get(extract_image_id(row["img"]))) else {}),
+        }
         for row in rows
     ]
 

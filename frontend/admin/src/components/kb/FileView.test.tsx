@@ -79,6 +79,29 @@ function isShowingPreview() {
 }
 
 describe("FileView", () => {
+  it("uses a vendor-safe document label and hides paths, raw fields, and image identifiers", () => {
+    const document = {
+      ...baseDocument,
+      path: "knowledge/hidden/vendor-private.csv",
+      title: "vendor-private",
+      extension: ".csv",
+      source_url: "https://example.com/vendor-private.csv",
+      content: "q,a,img\n保養時間,每半年一次,private-photo.png\n",
+    };
+    const { container } = renderFileView({
+      vendor: true,
+      documentLabels: new Map([[document.path, "文件 7"]]),
+      document,
+    });
+
+    expect(screen.getByRole("heading", { name: "文件 7" }).hasAttribute("title")).toBe(false);
+    expect(screen.queryByText(/vendor-private|\.csv|圖片編號/)).toBeNull();
+    expect(screen.queryByRole("textbox", { name: /圖片編號/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "原始文字" })).toBeNull();
+    expect(screen.getByRole("button", { name: "第 1 題更換圖片" }).textContent).toBe("更換圖片");
+    expect(container.querySelector("input[value='private-photo.png']")).toBeNull();
+  });
+
   it("names a quick QA document by its title instead of its storage path", () => {
     const document = { ...baseDocument, path: "knowledge/qa/manual_1.md", title: "營業時間", qa_attached: true };
     renderFileView({ document });

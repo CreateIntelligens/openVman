@@ -91,7 +91,11 @@ export function useKnowledgeBase(vendor = false) {
   const [renormalizing, setRenormalizing] = useState(false);
   const [previewingNormalization, setPreviewingNormalization] = useState(false);
   const [normalizationPreview, setNormalizationPreview] = useState<KnowledgeNormalizationPreviewResponse | null>(null);
-  const { status, setStatus, setErrorStatus } = useStatusState();
+  const { status, setStatus, setErrorStatus: reportError } = useStatusState();
+  const setErrorStatus = useCallback((error: unknown, fallback = "操作沒有完成，請稍後再試。") => {
+    if (vendor) setStatus({ type: "error", message: fallback });
+    else reportError(error);
+  }, [reportError, setStatus, vendor]);
   const [search, setSearch] = useState("");
   const [selectedPath, setSelectedPath] = useState<string>(() => {
     return readScoped(selectedPathStorageKey(projectId)) ?? "knowledge";
@@ -162,7 +166,7 @@ export function useKnowledgeBase(vendor = false) {
       setIndexPollEpoch((epoch) => epoch + 1);
     } catch (error) {
       if (isLatest()) {
-        setErrorStatus(error);
+        setErrorStatus(error, "讀不到文件清單，請重新整理頁面再試。");
         setContentReady(true);
       }
     } finally {
@@ -305,7 +309,7 @@ export function useKnowledgeBase(vendor = false) {
       setEditContent(document.content);
     } catch (error) {
       if (activeProjectRef.current === requestedProjectId) {
-        setErrorStatus(error);
+        setErrorStatus(error, "讀不到這份文件，請重新選擇文件再試。");
         setRightPane("folder");
       }
     } finally {
@@ -387,13 +391,13 @@ export function useKnowledgeBase(vendor = false) {
     setSaving(true);
     try {
       await saveKnowledgeDocument(openDocument.path, editContent, openDocument.content_hash, vendor);
-      setStatus({ type: "success", message: `已儲存 ${fileNameOf(openDocument.path)}` });
+      setStatus({ type: "success", message: vendor ? "文件已儲存" : `已儲存 ${fileNameOf(openDocument.path)}` });
       setEditorDirty(false);
       await loadDocuments();
       const document = await fetchKnowledgeDocument(openDocument.path, vendor);
       setOpenDocument(document);
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "文件沒有儲存，請稍後再試。如果文件已被其他人更新，請先另存目前的內容，再重新開啟文件。");
     } finally {
       setSaving(false);
     }
@@ -460,13 +464,13 @@ export function useKnowledgeBase(vendor = false) {
     setStatus(null);
     try {
       const result = await apiCrawlUrl(url, vendor);
-      setStatus({ type: "success", message: `已匯入「${result.title}」` });
+      setStatus({ type: "success", message: vendor ? "網頁內容已匯入" : `已匯入「${result.title}」` });
       setCrawlUrlValue("");
       await loadDocuments();
       setSelectedPath(result.path);
       await openFile(result.path);
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "網頁內容未匯入，請確認網址可以開啟後再試。");
     } finally {
       setCrawling(false);
     }
@@ -480,7 +484,7 @@ export function useKnowledgeBase(vendor = false) {
     try {
       if (type === "file") {
         await deleteKnowledgeDocument(value, vendor);
-        setStatus({ type: "success", message: `已刪除 ${fileNameOf(value)}` });
+        setStatus({ type: "success", message: vendor ? "文件已刪除" : `已刪除 ${fileNameOf(value)}` });
         if (openDocument?.path === value) {
           setRightPane("folder");
           setOpenDocument(null);
@@ -490,14 +494,14 @@ export function useKnowledgeBase(vendor = false) {
         }
       } else {
         await deleteKnowledgeDirectory(value, vendor);
-        setStatus({ type: "success", message: `已刪除資料夾 ${fileNameOf(value)}` });
+        setStatus({ type: "success", message: vendor ? "資料夾已刪除" : `已刪除資料夾 ${fileNameOf(value)}` });
         if (selectedPath === value || selectedPath.startsWith(value + "/")) {
           setSelectedPath(value.split("/").slice(0, -1).join("/") || "knowledge");
         }
       }
       await loadDocuments();
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "刪除沒有完成，請確認資料夾沒有文件或稍後再試。");
     }
   }, [deleteTarget, loadDocuments, openDocument, selectedPath, setErrorStatus, vendor]);
 
@@ -527,7 +531,7 @@ export function useKnowledgeBase(vendor = false) {
       await moveKnowledgeDocument(sourcePath, targetPath, vendor);
       setStatus({
         type: "success",
-        message: targetDir === "knowledge" ? "已移到文件最上層" : `已移到 ${fileNameOf(targetDir)}`,
+        message: vendor ? "文件已移動" : targetDir === "knowledge" ? "已移到文件最上層" : `已移到 ${fileNameOf(targetDir)}`,
       });
       setMovingPath(null);
       await loadDocuments();
@@ -535,7 +539,7 @@ export function useKnowledgeBase(vendor = false) {
         await relocateOpenDocument(targetPath);
       }
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "移動沒有完成，請確認選擇的資料夾後再試。");
     }
   }, [loadDocuments, openDocument, relocateOpenDocument, setErrorStatus, vendor]);
 
@@ -549,9 +553,10 @@ export function useKnowledgeBase(vendor = false) {
       setOpenDocument((current) =>
         current && current.path === document.path ? { ...current, enabled: result.enabled } : current,
       );
-      setStatus({ type: "success", message: `${document.title || fileNameOf(document.path)} 已${result.enabled ? "啟用" : "停用"}` });
+      const name = vendor ? "文件" : `${document.title || fileNameOf(document.path)} `;
+      setStatus({ type: "success", message: `${name}已${result.enabled ? "啟用" : "停用"}` });
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "文件設定沒有更新，請稍後再試。");
     }
   }, [setErrorStatus, vendor]);
 
@@ -573,9 +578,10 @@ export function useKnowledgeBase(vendor = false) {
           ));
         }
       }
-      setStatus({ type: "success", message: `${document.title || fileNameOf(document.path)} 的語言已更新` });
+      const name = vendor ? "文件" : `${document.title || fileNameOf(document.path)} `;
+      setStatus({ type: "success", message: `${name}的語言已更新` });
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "文件語言沒有更新，請稍後再試。");
     }
   }, [loadDocuments, openDocument, projectId, setErrorStatus, vendor]);
 
@@ -589,19 +595,19 @@ export function useKnowledgeBase(vendor = false) {
     setStatus(null);
     try {
       const result = await createKnowledgeNote(title, content, "", noteFormat);
-      setStatus({ type: "success", message: `已建立「${result.document.title}」` });
+      setStatus({ type: "success", message: vendor ? "文件已建立" : `已建立「${result.document.title}」` });
       closeNoteComposer();
       await loadDocuments();
       setSelectedPath(result.path);
       await openFile(result.path);
       return { path: result.path, qaNodeId: result.document.qa_node_id };
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "文件沒有建立，請確認標題與內容後再試。");
       return null;
     } finally {
       setCreatingNote(false);
     }
-  }, [closeNoteComposer, loadDocuments, openFile, setErrorStatus]);
+  }, [closeNoteComposer, loadDocuments, openFile, setErrorStatus, vendor]);
 
   const handleCreateFolderSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -617,7 +623,7 @@ export function useKnowledgeBase(vendor = false) {
       setSelectedPath(newDir);
       setExpandedDirs((prev) => new Set([...prev, targetParent, newDir]));
     } catch (error) {
-      setErrorStatus(error);
+      setErrorStatus(error, "資料夾沒有建立，請換個名稱後再試。");
     }
 
     resetNewFolderForm();
