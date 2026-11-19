@@ -673,6 +673,8 @@ async def test_warmup_does_not_rewarm_a_step_that_timed_out(monkeypatch):
         release.wait(5)
         return ["chat_llm"]
 
+    # 冷啟動時載入 LLM 套件就會用掉 0.2 秒的預算，模型設定根本輪不到；這裡只測逾時的步驟。
+    monkeypatch.setattr(startup, "_warmup_llm_modules", lambda: None)
     monkeypatch.setattr(startup, "_warmup_model_settings", slow_settings)
     monkeypatch.setattr(startup, "_warmup_chat_path", lambda *args, **kwargs: calls.append("c") or ["default"])
     try:
