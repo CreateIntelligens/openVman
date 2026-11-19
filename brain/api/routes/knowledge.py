@@ -91,6 +91,8 @@ def schedule_reindex(project_id: str) -> None:
 
 
 async def _reindex_worker(project_id: str, state: dict[str, Any]) -> None:
+    from knowledge.kb_settings import load_kb_settings
+
     while state["dirty"]:
         await asyncio.sleep(_REINDEX_DEBOUNCE_SECONDS)
         state["dirty"] = False
@@ -100,7 +102,9 @@ async def _reindex_worker(project_id: str, state: dict[str, Any]) -> None:
             log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
             continue
         log_event("knowledge_reindex_auto", project_id=project_id, **result)
-    schedule_graph_rebuild(project_id)
+    # 關掉圖譜的專案不在每次存檔後自動重建；要重建仍可手動呼叫 /knowledge/graph/rebuild。
+    if load_kb_settings(project_id)["graph_enabled"]:
+        schedule_graph_rebuild(project_id)
 
 
 

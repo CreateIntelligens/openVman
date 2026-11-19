@@ -69,3 +69,23 @@ def test_projects_do_not_block_each_other(monkeypatch):
 
     asyncio.run(scenario())
     assert sorted(calls) == ["p1", "p2"]
+
+
+def test_auto_reindex_rebuilds_the_graph_only_where_it_is_switched_on(monkeypatch):
+    # 關掉圖譜的專案存檔後不排背景重建；手動重建路由不受影響（見 test_project_features）。
+    from knowledge import kb_settings
+
+    calls: list[str] = []
+    _setup(monkeypatch, calls)
+    scheduled: list[str] = []
+    monkeypatch.setattr(knowledge_routes, "schedule_graph_rebuild", lambda project_id: scheduled.append(project_id) or True)
+    monkeypatch.setattr(kb_settings, "load_kb_settings", lambda project_id: {"graph_enabled": project_id == "on"})
+
+    async def scenario():
+        knowledge_routes.schedule_reindex("on")
+        knowledge_routes.schedule_reindex("off")
+        await asyncio.sleep(0.5)
+
+    asyncio.run(scenario())
+    assert sorted(calls) == ["off", "on"]
+    assert scheduled == ["on"]

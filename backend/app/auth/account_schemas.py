@@ -254,6 +254,8 @@ class AdminAccountProfile(AccountProfile):
         grant_records = runtime.account_access.list_grants(user.id)
         profile = AccountProfile.from_record(user, runtime=runtime).model_dump()
         profile["created_by"] = user.created_by
+        # 對外的廠商 profile 不帶這個欄位；管理畫面要看到實際值，否則存檔會把權限關掉。
+        profile["ai_cleanup_access"] = has_ai_cleanup_access(user)
         return cls(
             **profile,
             resource_counts=runtime.resources.count_private_by_owner(user.id),

@@ -254,3 +254,19 @@ def test_the_proxy_applies_the_guard(current, payload, expected):
         return
     sent = client.build_request.call_args.kwargs["content"]
     assert json.loads(sent).get("normalize") is expected
+
+
+def test_the_admin_view_shows_a_vendor_accounts_real_permission(client: TestClient, runtime: AuthRuntime):
+    # 對外的廠商 profile 不帶這個欄位，但管理畫面要拿到實際值，不然存一次帳號設定就會把它關掉。
+    root = runtime.users.create_root(username="ai360", password_hash=hash_password(_ADMIN_PASSWORD))
+    vendor = runtime.users.create(username="vendor", password_hash=hash_password(_USER_PASSWORD), role=AccountRole.USER,
+                                  created_by=root.id, vendor_name="甲商", ai_cleanup_access=True)
+    root_headers = _bearer(client, "ai360", _ADMIN_PASSWORD)
+
+    listed = client.get("/api/v1/users", headers=root_headers)
+    assert listed.status_code == 200, listed.text
+    row = next(account for account in listed.json() if account["id"] == vendor.id)
+    assert row["ai_cleanup_access"] is True
+    assert "ai_cleanup_access" not in client.get(
+        "/api/v1/auth/me", headers=_bearer(client, "vendor", _USER_PASSWORD),
+    ).json()
