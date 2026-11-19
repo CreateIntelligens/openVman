@@ -29,15 +29,15 @@ x-brain: &brain
     LLM_DISABLE_MODEL_DISCOVERY: "true"
     EMBEDDING_SERVICE_URL: http://openvman-embedding-1:8009
     EMBEDDING_SERVICE_TOKEN: ${EMBEDDING_TEST_TOKEN:?Set only the existing embedding service token}
-    TURN_DECISIONS_ENABLED: "false"
-    JEV_LANGUAGE_ENABLED: "false"
-    JEV_MEMORY_GATE_ENABLED: "false"
+    TURN_DECISIONS_ENABLED: ${TURN_DECISIONS_ENABLED:-false}
+    JEV_LANGUAGE_ENABLED: ${JEV_LANGUAGE_ENABLED:-false}
+    JEV_MEMORY_GATE_ENABLED: ${JEV_MEMORY_GATE_ENABLED:-false}
     ASR_FINAL_JUDGE_ENABLED: "false"
-    AUTO_RECALL_USE_JEV_FILTER: "false"
-    AUTO_RECALL_USE_LLM_SUMMARIZER: "false"
-    NO_ANSWER_JUDGE_ENABLED: "false"
-    CHAT_REFERENCE_MEDIA_DECISION_ENABLED: "false"
-    PRIVACY_FILTER_ENABLED: "false"
+    AUTO_RECALL_USE_JEV_FILTER: ${AUTO_RECALL_USE_JEV_FILTER:-false}
+    AUTO_RECALL_USE_LLM_SUMMARIZER: ${AUTO_RECALL_USE_LLM_SUMMARIZER:-false}
+    NO_ANSWER_JUDGE_ENABLED: ${NO_ANSWER_JUDGE_ENABLED:-false}
+    CHAT_REFERENCE_MEDIA_DECISION_ENABLED: ${CHAT_REFERENCE_MEDIA_DECISION_ENABLED:-false}
+    PRIVACY_FILTER_ENABLED: ${PRIVACY_FILTER_ENABLED:-false}
     URL2MD_SEARCH_ENABLED: "false"
     URL2MD_READ_ENABLED: "false"
     WIKI_PUBLISH_ENABLED: "false"
@@ -56,6 +56,9 @@ services:
     image: ${WORKER_BACKEND_IMAGE:-tbdavid2019/openvman-backend:latest}
     entrypoint: [python, /experiments/fake_llm.py]
     volumes: [".:/experiments:ro"]
+    environment:
+      FAKE_LLM_FIRST_SECONDS: ${FAKE_LLM_FIRST_SECONDS:-0.8}
+      FAKE_LLM_GAP_SECONDS: ${FAKE_LLM_GAP_SECONDS:-0.02}
     labels:
       com.centurylinklabs.watchtower.enable: "false"
     networks: [isolated]
@@ -66,6 +69,8 @@ services:
     volumes: [".:/experiments:ro"]
     environment:
       FAKE_TTS_MAX_CONCURRENCY: ${FAKE_TTS_MAX_CONCURRENCY:-0}
+      FAKE_TTS_FIRST_CHUNK_SECONDS: ${FAKE_TTS_FIRST_CHUNK_SECONDS:-0.3}
+      FAKE_TTS_SECONDS_PER_CHAR: ${FAKE_TTS_SECONDS_PER_CHAR:-0.12}
     labels:
       com.centurylinklabs.watchtower.enable: "false"
     networks: [isolated]

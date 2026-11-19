@@ -23,7 +23,7 @@ from extra_acceptance import (
     verify_settings,
 )
 
-PROJECT = "synthetic-worker-split"
+PROJECT = os.environ.get("LOAD_PROJECT_ID") or "synthetic-worker-split"
 BACKEND = "http://split-backend:8200"
 ADMIN = "http://split-admin:8100"
 CHAT = "http://split-chat:8100"
@@ -31,6 +31,16 @@ INTERNAL_HEADERS = {"X-Internal-Token": "synthetic-worker-internal-token"}
 PASSWORD = "Synthetic-Worker-Only-2026"
 QUESTION = "請簡短介紹服務中心的週末預約諮詢服務"
 FAKE_TTS = "http://fake-tts:8090"
+# 真實專案時換成該專案的題目（JSON 字串陣列，放在這個目錄下），每題輪流。
+_QUESTIONS_FILE = os.environ.get("LOAD_QUESTIONS_FILE", "")
+QUESTIONS = json.loads(Path("/experiments", _QUESTIONS_FILE).read_text(encoding="utf-8")) if _QUESTIONS_FILE else [QUESTION]
+_question_index = 0
+
+
+def next_question():
+    global _question_index
+    _question_index += 1
+    return QUESTIONS[_question_index % len(QUESTIONS)]
 TTS_ENABLED = False
 
 
@@ -69,9 +79,21 @@ async def login(client):
     raise RuntimeError(f"isolated Backend did not become available: {last_error}")
 
 
+async def use_decision_hops(client, headers):
+    """Point per-turn decisions at the listed hops (e.g. "jev") through the Admin settings API."""
+    hops = [hop for hop in os.environ.get("LOAD_DECISION_HOPS", "").split(",") if hop]
+    if not hops:
+        return
+    everything = ["gemini", "clef-primary", "clef-backup", "jev", "openai"]
+    order = hops + [hop for hop in everything if hop not in hops]
+    response = await client.put(BACKEND + "/api/v1/settings/model-providers", headers=headers, json={"categories": {"decision": {"order": order, "enabled": hops}}})
+    response.raise_for_status()
+    print(json.dumps({"decision_hops": hops}), flush=True)
+
+
 async def first_audio(client, headers, text, started):
     """Synthesize a sentence the way the avatar front end does; seconds until its first audio byte."""
-    async with client.stream("POST", BACKEND + "/api/v1/tts/stream", headers=headers, json={"text": text, "provider": "indextts"}) as response:
+    async with client.stream("POST", BACKEND + "/api/v1/tts/stream", headers=headers, json={"text": text, "provider": os.environ.get("LOAD_TTS_PROVIDER") or "indextts"}) as response:
         response.raise_for_status()
         heard = None
         size = 0
@@ -84,7 +106,8 @@ async def first_audio(client, headers, text, started):
     return heard
 
 
-async def chat_request(client, headers, *, message=QUESTION, session_id=None, staged=False):
+async def chat_request(client, headers, *, message=None, session_id=None, staged=False):
+    message = message or next_question()
     session_id = session_id or "workerload-" + uuid.uuid4().hex
     payload = {"project_id": PROJECT, "persona_id": "default", "session_id": session_id, "message": message}
     if staged:
@@ -218,6 +241,7 @@ async def run(args):
         async with httpx.AsyncClient(timeout=90, limits=limits, trust_env=False) as client:
             await wait_ready(client)
             headers = await login(client)
+            await use_decision_hops(client, headers)
             if not args.load_only:
                 report["acceptance"] = await acceptance(client, headers)
                 print(json.dumps({"acceptance": report["acceptance"]}, ensure_ascii=False), flush=True)
@@ -227,7 +251,9 @@ async def run(args):
                 if args.settle_seconds:
                     print(json.dumps({"stage": "before-load", "settle_seconds": args.settle_seconds}), flush=True)
                     await asyncio.sleep(args.settle_seconds)
-                warm = await asyncio.gather(*(chat_request(client, headers) for _ in range(report["workers"] * 2)))
+                # 量 1 秒 N 題時要另外先熱身，量測前不能再塞一批請求進去。
+                warm_count = int(os.environ.get("LOAD_WARMUP", report["workers"] * 2))
+                warm = await asyncio.gather(*(chat_request(client, headers) for _ in range(warm_count)))
                 assert all(result["ok"] for result in warm), warm
                 for rate in args.rates:
                     report["scenarios"].append(await sustained(client, headers, rate, args.seconds))
@@ -239,15 +265,16 @@ async def run(args):
                         target = 5 if scenario["scenario"] == "burst-100" else 2 if scenario["scenario"] in ("rate-5", "rate-10") else None
                         if target is not None:
                             assert scenario["first_sentence_median"] <= target, f"{scenario['scenario']} exceeds {target}s median target"
-            if TTS_ENABLED:
+            if TTS_ENABLED and (os.environ.get("LOAD_TTS_PROVIDER") or "indextts") == "indextts":
                 tts_stats = await client.get(FAKE_TTS + "/stats")
                 tts_stats.raise_for_status()
                 report["fake_tts"] = tts_stats.json()
                 assert report["fake_tts"]["streams"] > 0, "Backend did not use the fake TTS"
-            stats = await client.get("http://fake-llm:8080/stats")
-            stats.raise_for_status()
-            report["fake_llm"] = stats.json()
-            assert report["fake_llm"]["streams"] > 0
+            if not os.environ.get("LOAD_REAL_LLM"):
+                stats = await client.get("http://fake-llm:8080/stats")
+                stats.raise_for_status()
+                report["fake_llm"] = stats.json()
+                assert report["fake_llm"]["streams"] > 0
     except Exception as error:  # noqa: BLE001 - Persist the acceptance failure before exiting.
         failure = error
         report["error"] = f"{type(error).__name__}: {error}"

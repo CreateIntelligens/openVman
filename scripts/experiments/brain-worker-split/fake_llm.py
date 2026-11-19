@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
+
+# 0 代表「上游秒回」，只量我們自己（Backend＋Brain）的效能。
+FIRST_SECONDS = float(os.environ.get("FAKE_LLM_FIRST_SECONDS", "0.8"))
+GAP_SECONDS = float(os.environ.get("FAKE_LLM_GAP_SECONDS", "0.02"))
 
 app = FastAPI()
 counts = {"requests": 0, "streams": 0, "held_requests": 0}
@@ -61,17 +66,17 @@ async def completion(request: Request):
         content = "服務中心週末提供預約諮詢。請攜帶預約確認單。"
     base = {"id": "synthetic-completion", "object": "chat.completion", "created": int(time.time()), "model": body.get("model", "synthetic-chat")}
     if not body.get("stream"):
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(FIRST_SECONDS)
         return {**base, "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}}
     counts["streams"] += 1
 
     async def events():
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(FIRST_SECONDS)
         for text in content.split("。"):
             if text:
                 chunk = {**base, "object": "chat.completion.chunk", "choices": [{"index": 0, "delta": {"content": text + "。"}, "finish_reason": None}]}
                 yield "data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n"
-                await asyncio.sleep(0.02)
+                await asyncio.sleep(GAP_SECONDS)
         yield "data: " + json.dumps({**base, "object": "chat.completion.chunk", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}}) + "\n\n"
         yield "data: [DONE]\n\n"
 

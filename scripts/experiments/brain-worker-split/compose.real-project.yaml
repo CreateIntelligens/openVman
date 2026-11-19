@@ -1,0 +1,44 @@
+# 疊在 compose.yaml 上：Brain 改用一份真實專案資料的複本（唯讀掛進來，啟動時複製進隔離 volume）。
+# 用法見 README「真實專案資料」。不會寫回來源目錄。
+x-real-project-env: &real-project-env
+  LOAD_PROJECT_ID: ${LOAD_PROJECT_ID:?Set the project id of the copied data}
+  DEFAULT_PROJECT_ID: ${LOAD_PROJECT_ID}
+
+# 主對話 LLM：預設照 compose.yaml 打假 LLM；要打真的就設 LOAD_LLM_*（例如 gemini）。
+x-llm-env: &llm-env
+  LLM_PROVIDER: ${LOAD_LLM_PROVIDER:-openai}
+  LLM_MODEL: ${LOAD_LLM_MODEL:-synthetic-chat}
+  LLM_BASE_URL: ${LOAD_LLM_BASE_URL-http://fake-llm:8080/v1}
+  LLM_FALLBACK_CHAIN: ${LOAD_LLM_CHAIN:-openai:synthetic-chat}
+  LLM_API_KEY: ${LOAD_LLM_API_KEY-synthetic-not-an-external-key}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+
+services:
+  split-admin:
+    volumes:
+      - ${PROJECT_SOURCE:?Set the path of the copied project directory}:/project-source:ro
+    environment:
+      <<: [*real-project-env, *llm-env]
+  split-chat:
+    environment:
+      <<: [*real-project-env, *llm-env]
+  split-backend:
+    environment:
+      <<: *real-project-env
+      # 決策走真實 Jev 時才需要；留空就照部署預設（Clef）。
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      # 決策走 Gemini Decisions 時用。
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # 真實 TTS 節點：預設空字串＝不用（compose.yaml 只接假 TTS）。
+      TTS_VOXCPM_URL: ${LOAD_TTS_VOXCPM_URL:-}
+      TTS_VOXCPM_API_KEY: ${TTS_VOXCPM_API_KEY:-}
+      TTS_INDEXTTS_NURSE_URL: ${LOAD_TTS_INDEXTTS_NURSE_URL:-}
+      TTS_GEMINI_URL: ${LOAD_TTS_GEMINI_URL:-}
+  client:
+    environment:
+      LOAD_PROJECT_ID: ${LOAD_PROJECT_ID}
+      LOAD_QUESTIONS_FILE: ${LOAD_QUESTIONS_FILE:-}
+      LOAD_DECISION_HOPS: ${LOAD_DECISION_HOPS:-}
+      LOAD_TTS_PROVIDER: ${LOAD_TTS_PROVIDER:-indextts}
+      LOAD_REAL_LLM: ${LOAD_REAL_LLM:-}

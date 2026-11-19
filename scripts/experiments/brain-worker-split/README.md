@@ -27,7 +27,7 @@ docker compose -f compose.yaml run --rm client --enforce-targets
 
 小型 E2E 包含授權拒絕、管理路由隔離、真實檢索、串流生成／另一條連線接受回合／對話歷史，以及後台關技能後 16 條獨立聊天連線立即看不到工具，再開啟確認恢復。另外驗證 KB settings 寫入後 admin／chat 一致、上傳 80 題虛構 QA CSV 並在背景匯入時聊天、備份實際包含剛接受的對話、enrich 後不同連線讀得到歷史，以及跨 worker 指標彙總。若匯入過快未觀察到 running，會明確失敗，不將未重疊的流程宣稱為並行驗證。技能同步透過 fake LLM 檢查實際送到模型的工具宣告，並未在 chat 角色開放工具管理路由。另建立一次性 project skill，經 Backend 驗證 list／files／toggle／delete 保留指定專案範圍，最後移除。
 
-fake LLM 只提供本地 OpenAI 相容介面，每次固定等 0.8 秒才輸出第一句，第二句間隔 0.02 秒。決策、PII、語言校正、記憶相關性判斷／LLM 摘要與外部工具關閉；auto-recall 檢索保留，bootstrap 會檢查這些隔離開關；此測試衡量分流、檢索、SQLite 與執行緒排隊，不代表真實 LLM／決策／語音容量。
+fake LLM 只提供本地 OpenAI 相容介面，預設等 0.8 秒才輸出第一句，第二句間隔 0.02 秒（`FAKE_LLM_FIRST_SECONDS`、`FAKE_LLM_GAP_SECONDS` 可改；fake TTS 對應 `FAKE_TTS_FIRST_CHUNK_SECONDS`、`FAKE_TTS_SECONDS_PER_CHAR`）。全部設 0 就是「上游秒回」，只量 Backend＋Brain。壓測時另開 `python3 resource_monitor.py <compose 專案名> <輸出.jsonl>`，每秒記錄各容器 CPU 核數與記憶體（讀 cgroup v2）。決策、PII、語言校正、記憶相關性判斷／LLM 摘要與外部工具關閉；auto-recall 檢索保留，bootstrap 會檢查這些隔離開關；此測試衡量分流、檢索、SQLite 與執行緒排隊，不代表真實 LLM／決策／語音容量。
 
 fake TTS（`fake_tts.py`）模仿 IndexTTS 的 `/health`、`/audio/voices`、`/tts`、`/tts_stream`，隔離 Backend 預設以 `TTS_INDEXTTS_URL=http://fake-tts:8090` 接它（設 `FAKE_TTS_URL=` 空字串則只剩 Edge）。音檔在啟動時預先做好，延遲照 GB10 實測：串流第一段 0.3 秒，整句 0.3 秒＋每字 0.12 秒。`FAKE_TTS_MAX_CONCURRENCY` 大於 0 時同時只合成這麼多句，用來模擬單一 GPU 節點排隊。client 加 `--tts` 時，收到第一句就照前台作法呼叫 Backend `POST /api/v1/tts/stream`（`provider: indextts`），另外記「聽到第一句」（送出問題到第一段音訊）的中位數與 p95，結束時檢查 fake TTS 確實收到串流請求：
 
@@ -72,6 +72,28 @@ unset EMBEDDING_TEST_TOKEN
 - `EMBEDDING_TEST_TOKEN` 需為現有 gateway 的 `EMBEDDING_BEARER_TOKEN`；若部署使用不同 credential 來源，請明確提供正確 token，不設共用 key fallback。
 - Compose 與腳本本身不宣稱通過；實測結果以當輪 JSON 與服務 log 為準。
 
+
+## 真實專案資料
+
+疊上 `compose.real-project.yaml` 時，Brain 改用一份真實專案資料的複本：`PROJECT_SOURCE` 指向先複製出來的專案目錄（唯讀掛載），管理容器啟動時由 `bootstrap.py` 複製進隔離 volume（略過 `*.lock` 與 `backups/`），不會寫回來源。`LOAD_PROJECT_ID` 為該專案 ID，必填。
+
+```bash
+export PROJECT_SOURCE=<複製出來的專案目錄>
+export LOAD_PROJECT_ID=<專案 ID>
+export LOAD_QUESTIONS_FILE=questions-industrial.json
+docker compose -f compose.yaml -f compose.real-project.yaml up -d split-backend
+docker compose -f compose.yaml -f compose.real-project.yaml run --rm client --load-only --rates 20 --burst 100
+```
+
+| 變數 | 作用 |
+| --- | --- |
+| `LOAD_QUESTIONS_FILE` | 本目錄下的 JSON 字串陣列，每題輪流送出；未設定時固定問同一題 |
+| `LOAD_WARMUP` | 正式計時前先送幾題暖身，預設為 worker 數的 2 倍。量「1 秒 N 題」時設成 worker 數以上，讓每個 worker 先處理過第一題 |
+| `LOAD_LLM_PROVIDER`、`LOAD_LLM_MODEL`、`LOAD_LLM_BASE_URL`、`LOAD_LLM_CHAIN`、`LOAD_LLM_API_KEY` | 主對話 LLM，預設仍打假 LLM。改打真實模型時同時設 `LOAD_REAL_LLM=1`，client 就不檢查假 LLM 的串流次數 |
+| `LOAD_DECISION_HOPS` | 逗號分隔的決策站順序（例如 `jev`），client 開跑前經後台設定 API 寫入；需同時把 `TURN_DECISIONS_ENABLED` 等開關設為 `true` 並提供對應金鑰 |
+| `LOAD_TTS_PROVIDER` | `--tts` 時送到 `/api/v1/tts/stream` 的引擎，預設 `indextts`（假 TTS）。改真實引擎時以 `LOAD_TTS_*_URL` 指定節點，client 不再檢查假 TTS 的請求數 |
+
+`compose.yaml` 的決策、記憶過濾、個資等隔離開關都可用同名環境變數覆寫，預設仍為關閉。要模擬機器核數，在 override 檔替 `split-chat` 與 `split-backend` 加 `cpus:`，並以 `resource_monitor.py` 確認實際用量。真實 LLM、決策與 TTS 會產生外部用量與費用，也受各服務限流影響。
 
 ## 瀏覽器驗收
 

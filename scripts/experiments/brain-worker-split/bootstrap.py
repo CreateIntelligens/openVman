@@ -6,13 +6,17 @@ import os
 import sys
 from pathlib import Path
 
-PROJECT = "synthetic-worker-split"
+PROJECT = os.environ.get("LOAD_PROJECT_ID") or "synthetic-worker-split"
+PROJECT_SOURCE = Path("/project-source")
 PASSWORD = "Synthetic-Worker-Only-2026"
 
 
 def seed_brain():
     from config import get_settings
 
+    if PROJECT_SOURCE.is_dir():
+        seed_real_project()
+        return
     cfg = get_settings()
     assert not any((
         cfg.turn_decisions_enabled, cfg.jev_language_enabled,
@@ -36,6 +40,16 @@ def seed_brain():
     ensure_tables(PROJECT)
     result = rebuild_knowledge_index(PROJECT)
     print({"seeded_project": PROJECT, "index": result}, flush=True)
+
+
+def seed_real_project():
+    """Copy a real project's data into the isolated volume; the source stays untouched."""
+    import shutil
+
+    target = Path("/data/projects") / PROJECT
+    if not target.exists():
+        shutil.copytree(PROJECT_SOURCE, target, ignore=shutil.ignore_patterns("*.lock", "backups"))
+    print({"seeded_project": PROJECT, "copied_from": str(PROJECT_SOURCE)}, flush=True)
 
 
 def seed_backend():
