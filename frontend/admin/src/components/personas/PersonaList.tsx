@@ -21,7 +21,7 @@ export default function PersonaList({
       <div className="flex items-center justify-between mb-3 px-1 text-[0.6875rem] font-medium text-content-subtle uppercase tracking-wider">
         <span>角色庫（{personas.length}）</span>
       </div>
-      <div className="grid gap-1">
+      <div className="grid grid-cols-1 gap-1">
         {personas.map((persona) => (
           <PersonaCard
             key={persona.persona_id}

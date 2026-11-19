@@ -17,9 +17,11 @@ from knowledge.workspace import (
     write_text_atomic,
 )
 from personas.personas import (
+    DEFAULT_PERSONA_LABEL,
     clone_persona_scaffold,
     create_persona_scaffold,
     delete_persona_scaffold,
+    extract_heading_or_name,
     list_personas,
     normalize_persona_id,
     set_persona_avatar,
@@ -124,13 +126,15 @@ def _list_vendor_personas(project_id: str) -> list[dict]:
             if persona_id != normalize_persona_id(persona_id):
                 continue
             path = _persona_soul_path(persona_id, project_id)
-            content = path.read_text(encoding="utf-8-sig")
+            label = (
+                DEFAULT_PERSONA_LABEL if persona_id == "default"
+                else extract_heading_or_name(path, persona_id)
+            )
         except (HTTPException, OSError, ValueError):
             continue
-        first_line = next((line.strip() for line in content.splitlines() if line.strip()), "")
         items.append({
             "persona_id": persona_id,
-            "label": first_line.lstrip("# ").strip() if first_line.startswith("#") else persona_id,
+            "label": label,
             "is_default": persona_id == "default",
         })
     return items

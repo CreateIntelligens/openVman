@@ -29,7 +29,7 @@ def test_vendor_persona_soul_read_write_and_summary():
     headers = {"X-Internal-Token": "test-internal-token", "X-OpenVMan-Vendor": "1"}
     assert client.get("/brain/personas", headers=headers).json() == {
         "personas": [
-            {"persona_id": "default", "label": "預設人設", "is_default": True},
+            {"persona_id": "default", "label": "預設角色", "is_default": True},
             {"persona_id": "support", "label": "客服人設", "is_default": False},
         ],
         "persona_count": 2,

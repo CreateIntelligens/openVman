@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Personas from "./Personas";
@@ -7,6 +7,8 @@ import {
   fetchGuardrails,
   fetchKnowledgeDocument,
   fetchPersonaAgents,
+  fetchPersonas,
+  fetchPersonaSoul,
   saveKnowledgeDocument,
   savePersonaAgents,
   savePersonaSoul,
@@ -92,6 +94,8 @@ describe("Personas table mode", () => {
     auth.account = null;
     project.can_edit_knowledge = true;
     project.can_edit_features = false;
+    vi.mocked(fetchPersonas).mockImplementation(async () => ({ personas: PERSONAS, persona_count: PERSONAS.length }));
+    vi.mocked(fetchPersonaSoul).mockImplementation(async () => ({ content: SOUL }));
   });
 
   it("opens internal accounts in table mode and writes the field back under its heading", async () => {
@@ -163,7 +167,7 @@ describe("Personas table mode", () => {
     expect(within(guardrails).queryByRole("textbox")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
     await waitFor(() => expect(savePersonaAgents).toHaveBeenCalledWith(
-      "default", "## 角色與任務\n\n回答保固問題\n", "proj-test",
+      "default", "回答保固問題\n", "proj-test",
     ));
     expect(saveKnowledgeDocument).not.toHaveBeenCalled();
   });
@@ -221,5 +225,129 @@ describe("Personas table mode", () => {
     vi.mocked(fetchPersonaAgents).mockResolvedValueOnce({ content: "", exists: false });
     renderPage();
     expect(await screen.findByText(/還沒有自己的工作規則/)).toBeTruthy();
+  });
+
+  it("does not snap back to the saved persona when a delayed reload resolves after switching", async () => {
+    let resolveSave!: (value: { status: string }) => void;
+    const savePromise = new Promise<{ status: string }>((done) => { resolveSave = done; });
+    let resolveReload!: (value: { personas: typeof PERSONAS; persona_count: number }) => void;
+    const reloadPromise = new Promise<{ personas: typeof PERSONAS; persona_count: number }>((done) => {
+      resolveReload = done;
+    });
+    vi.mocked(savePersonaSoul).mockReturnValueOnce(savePromise);
+    vi.mocked(fetchPersonas)
+      .mockResolvedValueOnce({ personas: PERSONAS, persona_count: 2 })
+      .mockReturnValueOnce(reloadPromise);
+    vi.mocked(fetchPersonaSoul).mockImplementation(async (personaId: string) => ({
+      content: personaId === "nurse" ? "# 護理師\n\n## 角色設定\n\n我是護理師。\n" : SOUL,
+    }));
+
+    renderPage();
+    fireEvent.change(await field("角色設定"), { target: { value: "更新後的預設" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
+    await waitFor(() => expect(savePersonaSoul).toHaveBeenCalledTimes(1));
+
+    const aside = screen.getByLabelText("角色清單");
+    fireEvent.click(within(aside).getByText("護理師"));
+
+    await act(async () => { resolveSave({ status: "ok" }); });
+    await waitFor(async () => expect((await field("角色設定")).value).toBe("我是護理師。"));
+
+    fireEvent.change(await field("角色設定"), { target: { value: "護理師未存檔草稿" } });
+
+    await act(async () => {
+      resolveReload({
+        personas: [
+          PERSONAS[0],
+          { ...PERSONAS[1], label: "資深護理師" },
+        ],
+        persona_count: 2,
+      });
+    });
+
+    expect(screen.getByRole("heading", { level: 3, name: "資深護理師" })).toBeTruthy();
+    expect((await field("角色設定")).value).toBe("護理師未存檔草稿");
+  });
+
+  it("ignores stale fetchPersonas responses when a newer refresh finishes first", async () => {
+    let resolveFirst!: (value: { personas: typeof PERSONAS; persona_count: number }) => void;
+    const first = new Promise<{ personas: typeof PERSONAS; persona_count: number }>((done) => { resolveFirst = done; });
+    let resolveSecond!: (value: { personas: typeof PERSONAS; persona_count: number }) => void;
+    const second = new Promise<{ personas: typeof PERSONAS; persona_count: number }>((done) => { resolveSecond = done; });
+    vi.mocked(fetchPersonas)
+      .mockResolvedValueOnce({ personas: PERSONAS, persona_count: 2 })
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second);
+
+    renderPage();
+    await field("角色設定");
+    const refresh = screen.getByRole("button", { name: "重新整理角色清單" });
+    fireEvent.click(refresh);
+    // Re-trigger via second click by temporarily resolving? Refresh disables while loadingList;
+    // instead trigger second loadPersonas via onSaved while first refresh is in flight.
+    fireEvent.change(await field("角色設定"), { target: { value: "新設定" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
+    await waitFor(() => expect(fetchPersonas).toHaveBeenCalledTimes(3));
+
+    const newer = [PERSONAS[0], { ...PERSONAS[1], label: "最新名稱" }];
+    const older = [PERSONAS[0], { ...PERSONAS[1], label: "舊版名稱" }];
+    await act(async () => { resolveSecond({ personas: newer, persona_count: 2 }); });
+    const aside = screen.getByLabelText("角色清單");
+    expect(within(aside).getByText("最新名稱")).toBeTruthy();
+
+    await act(async () => { resolveFirst({ personas: older, persona_count: 2 }); });
+    expect(within(aside).getByText("最新名稱")).toBeTruthy();
+    expect(within(aside).queryByText("舊版名稱")).toBeNull();
+  });
+
+  it("asks before replacing the current persona when refresh finds it was deleted", async () => {
+    vi.mocked(fetchPersonas)
+      .mockResolvedValueOnce({ personas: PERSONAS, persona_count: 2 })
+      .mockResolvedValueOnce({ personas: [PERSONAS[0]], persona_count: 1 });
+    vi.mocked(fetchPersonaSoul).mockImplementation(async (personaId: string) => ({
+      content: personaId === "nurse" ? "# 護理師\n\n## 角色設定\n\n我是護理師。\n" : SOUL,
+    }));
+
+    renderPage();
+    await field("角色設定");
+    fireEvent.click(within(screen.getByLabelText("角色清單")).getByText("護理師"));
+    await waitFor(async () => expect((await field("角色設定")).value).toBe("我是護理師。"));
+
+    fireEvent.change(await field("角色設定"), { target: { value: "未儲存的護理師修改" } });
+    fireEvent.click(screen.getByRole("button", { name: "重新整理角色清單" }));
+
+    expect(await screen.findByText("尚有未儲存的變更")).toBeTruthy();
+    expect((await field("角色設定")).value).toBe("未儲存的護理師修改");
+  });
+
+  it("hides persona creation, deletion, and avatar binding for read-only internal accounts", async () => {
+    project.can_edit_knowledge = false;
+    renderPage();
+    await field("角色設定");
+
+    expect(screen.queryByRole("button", { name: "建立角色" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "虛擬人" })).toBeNull();
+
+    fireEvent.click(within(screen.getByLabelText("角色清單")).getByText("護理師"));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 3, name: "護理師" })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "刪除角色 nurse" })).toBeNull();
+  });
+
+  it("makes MEMORY.md read-only when the internal account lacks settings permission", async () => {
+    project.can_edit_knowledge = true;
+    project.can_edit_features = false;
+    renderPage();
+    await field("角色設定");
+
+    fireEvent.click(screen.getByRole("button", { name: "原始文件" }));
+    const soulRaw = (await screen.findByRole("textbox", { name: "預設 文件內容" })) as HTMLTextAreaElement;
+    expect(soulRaw.readOnly).toBe(false);
+    expect(screen.getByRole("button", { name: /儲存設定/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /長期記憶/ }));
+    await waitFor(() => expect(fetchKnowledgeDocument).toHaveBeenCalledWith("MEMORY.md"));
+    await waitFor(() => expect(soulRaw.value).toBe("內容：MEMORY.md"));
+    expect(soulRaw.readOnly).toBe(true);
+    expect(screen.queryByRole("button", { name: /儲存設定/ })).toBeNull();
   });
 });

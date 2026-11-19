@@ -11,6 +11,8 @@ from typing import Any
 from knowledge import workspace
 
 AVATAR_META_FILENAME = "AVATAR.json"
+# 預設角色的 SOUL.md 標題是寫給模型看的（如「核心人格設定 (SOUL)」），清單上一律顯示這個名稱。
+DEFAULT_PERSONA_LABEL = "預設角色"
 
 PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
     "soul": "SOUL.md",
@@ -209,7 +211,7 @@ def _build_default_persona_summary(project_id: str = "default") -> dict[str, Any
         "default",
         soul_path,
         is_default=True,
-        label="default",
+        label=DEFAULT_PERSONA_LABEL,
         project_id=project_id,
     )
 
@@ -233,7 +235,7 @@ def _build_persona_summary(
     meta = _read_avatar_meta(persona_id, project_id, is_default=is_default)
     return {
         "persona_id": persona_id,
-        "label": label or _extract_heading_or_name(soul_path, persona_id),
+        "label": label or extract_heading_or_name(soul_path, persona_id),
         "path": soul_path.relative_to(ws).as_posix(),
         "preview": _read_preview(soul_path),
         "is_default": is_default,
@@ -294,7 +296,7 @@ def _build_persona_files(label: str) -> dict[str, str]:
     }
 
 
-def _extract_heading_or_name(path: Path, fallback: str) -> str:
+def extract_heading_or_name(path: Path, fallback: str) -> str:
     """Extract the first heading text from a markdown file, or return fallback."""
     for line in path.read_text(encoding="utf-8-sig").splitlines():
         stripped = line.strip()
@@ -324,13 +326,14 @@ def _simple_persona_template(section: str, description: str) -> callable:
 _PERSONA_TEMPLATES: dict[str, callable] = {
     "soul": lambda label: f"""# {label} Persona SOUL
 
-你是「{label}」這個 persona 的對話核心。
+## 角色設定
 
-## 角色定位
+你是「{label}」這個 persona 的對話核心。
 - 這個 persona 會覆蓋預設的 SOUL 設定。
 - 保留 openVman Brain 的誠實與可執行回覆原則。
 
-## 語氣要求
+## 回應風格
+
 - 先說重點，再補充必要細節。
 - 若資訊不足，直接指出缺口，不要編造。
 """,

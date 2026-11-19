@@ -74,13 +74,17 @@ export default function Personas() {
               : project?.can_edit_knowledge !== false;
        const readOnly = !canEditKnowledge;
        const canEditGuardrails = !vendor && project?.can_edit_features === true;
+       const canManagePersonas = !vendor && canEditKnowledge;
        const pageTitle = "角色管理";
        const [personas, setPersonas] = useState<PersonaSummary[]>([]);
        const [newPersonaId, setNewPersonaId] = useState("");
        const [newPersonaLabel, setNewPersonaLabel] = useState("");
        const [templateSourceId, setTemplateSourceId] = useState("");
 
+       const latestListRequest = useRef(0);
        const [selectedPersona, setSelectedPersona] = useState<PersonaSummary | null>(null);
+       const selectedPersonaIdRef = useRef<string | undefined>(undefined);
+       selectedPersonaIdRef.current = selectedPersona?.persona_id;
        const [avatarChars, setAvatarChars] = useState<AvatarBindingOption[]>([]);
 
        // Document Editor State
@@ -110,29 +114,58 @@ export default function Personas() {
        );
        const viewMode: ViewMode = vendor ? "form" : storedViewMode;
 
+       const isMemoryDoc = selectedPath === "MEMORY.md" || selectedPath.endsWith("/MEMORY.md");
+       // 後端寫入 MEMORY.md 需要「改其他設定」，僅有「改知識庫」權限的帳號在原始文件模式只能看。
+       const documentReadOnly = readOnly || (isMemoryDoc && !canEditGuardrails);
        const hasUnsavedChanges = draftContent !== loadedContent;
-       useUnsavedChanges("persona-editor", hasUnsavedChanges, "角色文件");
+       useUnsavedChanges("persona-editor", hasUnsavedChanges, "角色文件", saving);
        const { requestNavigation } = useNavigationGuard();
 
        // 重抓清單。keepId 的角色還在就只換成新資料、不重開文件：存檔、綁虛擬人、
        // 重新整理、刪別的角色之後，草稿和正在看的分頁都要留著。不在了才改開第一個。
-       const loadPersonas = async (keepId?: string): Promise<PersonaSummary[]> => {
+       const loadPersonas = async (
+              keepId?: string,
+              options?: { guardFallback?: boolean },
+       ): Promise<PersonaSummary[]> => {
+              const requestId = ++latestListRequest.current;
               setLoadingList(true);
               try {
                      const response = await fetchPersonas();
+                     // 過期的回應不動畫面，但清單本身仍可信：新建角色後要靠它找到剛建好的那一個。
+                     if (requestId !== latestListRequest.current) return response.personas;
                      setPersonas(response.personas);
-                     const kept = response.personas.find((p) => p.persona_id === keepId);
-                     if (kept) {
-                            setSelectedPersona(kept);
+                     const currentId = selectedPersonaIdRef.current;
+                     if (keepId !== undefined && currentId !== keepId) {
+                            // 回應抵達前使用者已換角色：不拉回 keepId，只同步目前角色的最新資料。
+                            const currentFresh = currentId
+                                   ? response.personas.find((p) => p.persona_id === currentId)
+                                   : undefined;
+                            if (currentFresh) setSelectedPersona(currentFresh);
                      } else {
-                            await openPersona(response.personas[0] ?? null);
+                            const kept = keepId
+                                   ? response.personas.find((p) => p.persona_id === keepId)
+                                   : undefined;
+                            if (kept) {
+                                   setSelectedPersona(kept);
+                            } else {
+                                   const fallback = response.personas[0] ?? null;
+                                   if (options?.guardFallback) {
+                                          requestNavigation(() => void openPersona(fallback));
+                                   } else {
+                                          await openPersona(fallback);
+                                   }
+                            }
                      }
                      return response.personas;
               } catch (error) {
-                     setStatus({ type: "error", message: String(error) });
+                     if (requestId === latestListRequest.current) {
+                            setStatus({ type: "error", message: String(error) });
+                     }
                      return [];
               } finally {
-                     setLoadingList(false);
+                     if (requestId === latestListRequest.current) {
+                            setLoadingList(false);
+                     }
               }
        };
 
@@ -158,6 +191,7 @@ export default function Personas() {
        const personaDrawer = useMobileTreeDrawer("關閉角色清單");
 
        const openPersona = async (persona: PersonaSummary | null, mode: ViewMode = viewMode) => {
+              selectedPersonaIdRef.current = persona?.persona_id;
               setSelectedPersona(persona);
               // 表格模式自己讀文件；原始文件的編輯器只在切過去時才載入。
               if (mode === "document" && persona?.path) {
@@ -186,7 +220,7 @@ export default function Personas() {
        };
 
        const saveDocument = async () => {
-              if (!selectedPath || readOnly || loadingDocument) return;
+              if (!selectedPath || documentReadOnly || loadingDocument || saving) return;
               const requestId = latestDocumentRequest.current;
 
               setSaving(true);
@@ -199,7 +233,9 @@ export default function Personas() {
                      setLoadedContent(draftContent);
                      await loadPersonas(selectedPersona?.persona_id);
               } catch (error) {
-                     setStatus({ type: "error", message: String(error) });
+                     if (requestId === latestDocumentRequest.current) {
+                            setStatus({ type: "error", message: String(error) });
+                     }
               } finally {
                      setSaving(false);
               }
@@ -303,13 +339,13 @@ export default function Personas() {
        }, [projectId, vendor]);
 
        useEffect(() => {
-              if (vendor) return;
+              if (!canManagePersonas) return;
               fetchAvatarCharacters()
                      .catch(() => ({ characters: [] }))
                      .then((charsRes) => {
                             setAvatarChars(buildAvatarBindingOptions(charsRes.characters));
                      });
-       }, [vendor]);
+       }, [canManagePersonas]);
 
        const onBindAvatar = async (personaId: string, charId: string | null) => {
               try {
@@ -368,7 +404,7 @@ export default function Personas() {
                                    </div>
                                    <div className="flex items-center gap-1">
                                           <button
-                                                 onClick={() => void loadPersonas(selectedPersona?.persona_id)}
+                                                 onClick={() => void loadPersonas(selectedPersona?.persona_id, { guardFallback: true })}
                                                  disabled={loadingList}
                                                  className="flex h-7 w-7 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-50"
                                                  title="重新整理"
@@ -395,10 +431,10 @@ export default function Personas() {
                                           selectedPersonaId={selectedPersona?.persona_id}
                                           deletingPersonaId={deletingPersonaId}
                                           onSelect={(persona) => selectPersona(persona, personaDrawer.closeMobileTree)}
-                                          onDelete={vendor ? undefined : setDeletePersonaTarget}
+                                          onDelete={canManagePersonas ? setDeletePersonaTarget : undefined}
                                    />
 
-                                   {!vendor && <>
+                                   {canManagePersonas && <>
                                    <hr className="border-border " />
 
                                    <PersonaCreateForm
@@ -481,7 +517,7 @@ export default function Personas() {
 
                             {selectedPersona ? (
                                    <>
-                                          {!vendor && <PersonaAvatarSelector
+                                          {canManagePersonas && <PersonaAvatarSelector
                                                  characters={avatarChars}
                                                  persona={selectedPersona}
                                                  onBind={onBindAvatar}
@@ -501,7 +537,7 @@ export default function Personas() {
                                                  selectedPath={selectedPath}
                                                  draftContent={draftContent}
                                                  coreDocs={coreDocs}
-                                                 readOnly={readOnly}
+                                                 readOnly={documentReadOnly}
                                                  editorMode={editorMode}
                                                  loadingDocument={loadingDocument}
                                                  saving={saving}
@@ -509,7 +545,9 @@ export default function Personas() {
                                                  onEditorModeChange={setEditorMode}
                                                  onOpenDocument={selectDocument}
                                                  onDraftContentChange={setDraftContent}
-                                                 onDiscard={() => setDraftContent(loadedContent)}
+                                                 onDiscard={() => {
+                                                        if (!saving) setDraftContent(loadedContent);
+                                                 }}
                                                  onSave={saveDocument}
                                           />
                                           )}

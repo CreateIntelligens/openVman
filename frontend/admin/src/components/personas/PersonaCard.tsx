@@ -17,7 +17,7 @@ export default function PersonaCard({
 }: PersonaCardProps) {
   return (
     <div
-      className={`rounded-md p-2.5 text-left transition-colors cursor-pointer border ${
+      className={`min-w-0 rounded-md p-2.5 text-left transition-colors cursor-pointer border ${
         selected
           ? "bg-surface-sunken dark:bg-surface-overlay/60 border-border shadow-sm"
           : "bg-transparent border-transparent hover:bg-surface-sunken "
@@ -37,7 +37,7 @@ export default function PersonaCard({
         </div>
       </div>
 
-      <div className="mt-1.5 flex items-center justify-between">
+      <div className="mt-1.5 flex items-center justify-between gap-2">
         <span className="text-[0.625rem] font-mono text-content-subtle truncate">{persona.persona_id}</span>
         {onDelete && selected && !persona.is_default && (
           <button
@@ -47,7 +47,7 @@ export default function PersonaCard({
             }}
             disabled={deleting}
             aria-label={`刪除角色 ${persona.persona_id}`}
-            className="flex items-center justify-center rounded bg-red-500/10 px-2 py-0.5 text-[0.625rem] font-bold text-red-400 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
+            className="shrink-0 flex items-center justify-center rounded bg-red-500/10 px-2 py-0.5 text-[0.625rem] font-bold text-red-400 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
           >
             {deleting ? "刪除中…" : "刪除"}
           </button>

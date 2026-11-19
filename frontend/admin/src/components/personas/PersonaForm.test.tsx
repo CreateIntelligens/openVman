@@ -5,6 +5,7 @@ import PersonaForm from "./PersonaForm";
 import { NavigationGuardProvider, useNavigationGuard } from "../../context/NavigationGuardContext";
 import {
   fetchGuardrails,
+  fetchPersonaAgents,
   fetchPersonaSoul,
   saveKnowledgeDocument,
   savePersonaAgents,
@@ -53,8 +54,11 @@ function deferred() {
 }
 
 let navigate: (action: () => void) => boolean = () => false;
+let guardDirty = false;
 function GuardProbe() {
-  navigate = useNavigationGuard().requestNavigation;
+  const guard = useNavigationGuard();
+  navigate = guard.requestNavigation;
+  guardDirty = guard.hasUnsavedChanges;
   return null;
 }
 
@@ -184,5 +188,107 @@ describe("PersonaForm saving", () => {
     expect(within(section).getByText(/檔案是連結/)).toBeTruthy();
     expect(within(section).queryByRole("button", { name: "帶入建議內容" })).toBeNull();
     expect(within(section).queryByRole("textbox")).toBeNull();
+  });
+
+  it("disables discard while a save is in flight", async () => {
+    const pending = deferred();
+    vi.mocked(savePersonaSoul).mockReturnValueOnce(pending.promise);
+    render(form());
+    const role = await field("角色設定");
+    fireEvent.change(role, { target: { value: "新版本" } });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(savePersonaSoul).toHaveBeenCalledTimes(1));
+
+    const discardBtn = screen.getByRole("button", { name: "捨棄修改" }) as HTMLButtonElement;
+    expect(discardBtn.disabled).toBe(true);
+    fireEvent.click(discardBtn);
+    expect(role.value).toBe("新版本");
+
+    await act(async () => { pending.resolve({ status: "ok" }); });
+    await waitFor(() => expect(screen.getByText(/已儲存「個性與說話方式」/)).toBeTruthy());
+  });
+
+  it("keeps unsaved state until guardrails hash refresh completes", async () => {
+    let resolveFresh!: (value: { content: string; content_hash: string }) => void;
+    const freshPromise = new Promise<{ content: string; content_hash: string }>((done) => { resolveFresh = done; });
+    vi.mocked(fetchGuardrails)
+      .mockResolvedValueOnce({ content: GUARDRAILS, content_hash: "hash-1", max_chars: 5000 })
+      .mockReturnValueOnce(freshPromise);
+
+    render(form({ canEditGuardrails: true }));
+    fireEvent.change(await field("範圍限制"), { target: { value: "- 新規則" } });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(fetchGuardrails).toHaveBeenCalledTimes(2));
+
+    expect(guardDirty).toBe(true);
+
+    await act(async () => { resolveFresh({ content: GUARDRAILS, content_hash: "hash-2" }); });
+    await waitFor(() => expect(guardDirty).toBe(false));
+  });
+
+  it("warns and prevents resaving with a stale hash when post-save guardrails refresh fails", async () => {
+    vi.mocked(fetchGuardrails)
+      .mockResolvedValueOnce({ content: GUARDRAILS, content_hash: "hash-1", max_chars: 5000 })
+      .mockRejectedValueOnce(new Error("network blip"));
+
+    render(form({ canEditGuardrails: true }));
+    fireEvent.change(await field("範圍限制"), { target: { value: "- 規則 1" } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(screen.getAllByText(/重新整理/).length).toBeGreaterThan(0));
+    const section = screen.getByRole("region", { name: "保護規則" });
+    expect(within(section).queryByRole("textbox")).toBeNull();
+  });
+
+  it("does not leak status or onSaved when projectId changes mid-save", async () => {
+    const pending = deferred();
+    vi.mocked(savePersonaSoul).mockReturnValueOnce(pending.promise);
+    const onSaved = vi.fn();
+    const view = render(form({ onSaved }));
+    fireEvent.change(await field("角色設定"), { target: { value: "A 改動" } });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(savePersonaSoul).toHaveBeenCalledTimes(1));
+
+    view.rerender(form({ projectId: "project-b", onSaved }));
+    await act(async () => { pending.resolve({ status: "ok" }); });
+    await waitFor(() => expect(screen.queryByText("儲存中…")).toBeNull());
+
+    expect(screen.queryByText(/已儲存「個性與說話方式」/)).toBeNull();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it("uses accurate read-only copy for missing agents and guardrails-only editors", async () => {
+    vi.mocked(fetchPersonaAgents).mockResolvedValueOnce({ content: "", exists: false });
+    const view = render(form({ canEditKnowledge: false, canEditGuardrails: false }));
+    expect(await screen.findByText(/還沒有自己的工作規則/)).toBeTruthy();
+    expect(screen.queryByText(/填寫並儲存後/)).toBeNull();
+
+    view.rerender(form({ canEditKnowledge: false, canEditGuardrails: true }));
+    expect(screen.queryByText(/你的帳號只能查看/)).toBeNull();
+    expect(screen.getByText(/保護規則/, { selector: "header p" })).toBeTruthy();
+  });
+
+  it("applies word-wrapping classes to title, load error, and read-only guardrails paragraphs", async () => {
+    vi.mocked(fetchPersonaSoul).mockRejectedValueOnce(new Error("read failed"));
+    vi.mocked(fetchGuardrails).mockResolvedValueOnce({
+      content: "# 保護規則\n\n## 範圍限制\n\n- https://example.com/long\n\n## 備註\n\nhttps://example.com/extra\n",
+    });
+    render(form({ canEditGuardrails: false }));
+    const heading = await screen.findByRole("heading", { level: 3, name: "預設" });
+    const loadError = screen.getByRole("alert");
+    const section = screen.getByRole("region", { name: "保護規則" });
+    const fieldParagraph = within(section).getByText("- https://example.com/long");
+    const extraParagraph = within(section).getByText(/https:\/\/example\.com\/extra/);
+
+    for (const el of [heading, loadError, fieldParagraph, extraParagraph]) {
+      expect(el.className).toMatch(/break-words|\[overflow-wrap:anywhere\]/);
+    }
+  });
+
+  it("shows a heading-only GUARDRAILS.md line in read-only view instead of hiding it", async () => {
+    vi.mocked(fetchGuardrails).mockResolvedValueOnce({ content: "# 禁止談論政治\n" });
+    render(form({ canEditGuardrails: false }));
+    const section = await screen.findByRole("region", { name: "保護規則" });
+    expect(within(section).getByText(/禁止談論政治/)).toBeTruthy();
   });
 });

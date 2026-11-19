@@ -62,7 +62,7 @@ export default function PersonaEditor({
             <button
               key={doc.path}
               onClick={() => onOpenDocument(doc.path)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[0.75rem] font-medium transition-colors whitespace-nowrap border ${
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[0.75rem] font-medium transition-colors whitespace-nowrap border ${
                 selectedPath === doc.path
                   ? "bg-surface-sunken dark:bg-surface-overlay/60 border-border text-content shadow-sm"
                   : "bg-transparent border-transparent text-content-muted hover:text-content hover:bg-surface-sunken "

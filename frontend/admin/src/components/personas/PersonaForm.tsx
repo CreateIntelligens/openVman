@@ -196,6 +196,7 @@ export default function PersonaForm({
     setDocs((current) => current && { ...current, [key]: { ...current[key], draft: update(current[key].draft) } });
 
   const discard = () => {
+    if (saving) return;
     setDocs((current) => current && {
       soul: { ...current.soul, draft: current.soul.base },
       agents: { ...current.agents, draft: current.agents.base },
@@ -260,6 +261,7 @@ export default function PersonaForm({
         if (stillShowing()) setExtras((current) => current && { ...current, agentsExists: true });
       } });
     }
+    const warnings: string[] = [];
     if (texts.guardrails !== undefined) {
       const snapshot = docs.guardrails.draft;
       const text = texts.guardrails;
@@ -267,9 +269,21 @@ export default function PersonaForm({
       steps.push({ label: DOC_LABELS.guardrails, run: async () => {
         // 帶上載入時的版本：別處已經改過就拒絕，舊畫面不會蓋掉較新的內容。
         await saveKnowledgeDocument(GUARDRAILS_PATH, text, baseHash || undefined, false, target.projectId);
-        settle("guardrails", snapshot, text);
+        // 等新版本雜湊回來再把這份標成已儲存，避免存檔尾聲先清掉未儲存防護。
         const fresh = await fetchGuardrails(target.projectId).catch(() => null);
-        if (fresh && stillShowing()) setExtras((current) => current && { ...current, guardrailsHash: fresh.content_hash ?? "" });
+        settle("guardrails", snapshot, text);
+        if (!stillShowing()) return;
+        if (fresh) {
+          setExtras((current) => current && { ...current, guardrailsHash: fresh.content_hash ?? "" });
+        } else {
+          // 沒拿到最新雜湊就不能留著舊值再存，先鎖住並請使用者重新整理。
+          setExtras((current) => current && { ...current, guardrailsHash: "" });
+          setDocs((current) => current && {
+            ...current,
+            guardrails: { ...current.guardrails, error: "未能取得最新版本，請重新整理頁面後再修改。" },
+          });
+          warnings.push("「保護規則」未能取得最新版本，請重新整理頁面後再修改。");
+        }
       } });
     }
     if (charsDirty) {
@@ -302,13 +316,15 @@ export default function PersonaForm({
           failed.push(`「${step.label}」沒有存成功：${errorText(error)}`);
         }
       }
-      const done = saved.length ? `已儲存「${saved.join("」「")}」。` : "";
-      setStatus(failed.length
-        ? { type: "error", message: [done, ...failed].filter(Boolean).join("\n") }
-        : { type: "success", message: `已儲存「${saved.join("」「")}」` });
+      if (stillShowing()) {
+        const done = saved.length ? `已儲存「${saved.join("」「")}」。` : "";
+        setStatus(failed.length || warnings.length
+          ? { type: "error", message: [done, ...warnings, ...failed].filter(Boolean).join("\n") }
+          : { type: "success", message: `已儲存「${saved.join("」「")}」` });
+      }
     } finally {
       setSaving(false);
-      if (saved.length) onSaved?.();
+      if (saved.length && stillShowing()) onSaved?.();
     }
   };
 
@@ -342,11 +358,13 @@ export default function PersonaForm({
         ) : docs && extras ? (
           <div className="mx-auto flex w-full max-w-[52rem] flex-col gap-6">
             <header>
-              <h3 className="card-title">{persona.label || persona.persona_id}</h3>
+              <h3 className="card-title [overflow-wrap:anywhere]">{persona.label || persona.persona_id}</h3>
               <p className="mt-1 text-sm text-content-muted">
                 {canEditKnowledge
                   ? "照每一格的說明填寫，AI 回答時會照這裡的設定。改完按下方「儲存設定」。"
-                  : "這些是 AI 回答時依照的設定，你的帳號只能查看。"}
+                  : canEditGuardrails
+                    ? "這些是 AI 回答時依照的設定，你的帳號只能調整下方的保護規則。"
+                    : "這些是 AI 回答時依照的設定，你的帳號只能查看。"}
               </p>
             </header>
 
@@ -367,7 +385,9 @@ export default function PersonaForm({
               <LoadError message={docs.agents.error} />
               {!extras.agentsExists && (
                 <p className="text-sm text-content-muted">
-                  這個角色還沒有自己的工作規則，目前照預設角色的規則回答。在這裡填寫並儲存後，這個角色就改用自己的。
+                  {editable.agents
+                    ? "這個角色還沒有自己的工作規則，目前照預設角色的規則回答。在這裡填寫並儲存後，這個角色就改用自己的。"
+                    : "這個角色還沒有自己的工作規則，目前照預設角色的規則回答。"}
                 </p>
               )}
               {AGENTS_FIELDS.map((field) => (
@@ -477,7 +497,7 @@ export default function PersonaForm({
 function LoadError({ message }: { message: string }) {
   if (!message) return null;
   return (
-    <p role="alert" className="text-sm text-danger">
+    <p role="alert" className="text-sm text-danger [overflow-wrap:anywhere]">
       這一份讀不到，暫時只能看、不能存：{message}
     </p>
   );
@@ -568,8 +588,10 @@ function GuardrailsSection({
   onChange: (update: (current: SectionDocument) => SectionDocument) => void;
   onUseTemplate?: () => void;
 }) {
-  // 開頭的「# 保護規則」大標題只是檔名用的，查看時不顯示。
-  const extra = value.other.replace(/^#(?!#)[ \t]+.*(?:\n|$)/, "").trim();
+  // 開頭的「# 保護規則」大標題通常只是檔名用的，查看時不顯示；但整份只有這一行時保留，避免規則完全消失。
+  const hasFieldContent = GUARDRAILS_TITLES.some((title) => Boolean((value.fields[title] ?? "").trim()));
+  const withoutTitle = value.other.replace(/^#(?!#)[ \t]+.*(?:\n|$)/, "").trim();
+  const extra = withoutTitle || hasFieldContent ? withoutTitle : value.other.trim();
   return (
     <section
       aria-label="保護規則"
@@ -626,7 +648,7 @@ function GuardrailsSection({
             ) : (
               <>
                 <h5 className="text-sm font-medium text-content">{title}</h5>
-                <p className="whitespace-pre-wrap text-sm text-content-muted">{text || "（沒有內容）"}</p>
+                <p className="whitespace-pre-wrap text-sm text-content-muted [overflow-wrap:anywhere]">{text || "（沒有內容）"}</p>
               </>
             )}
           </div>
@@ -651,7 +673,7 @@ function GuardrailsSection({
           ) : (
             <>
               <h5 className="text-sm font-medium text-content">其他規則</h5>
-              <p className="whitespace-pre-wrap text-sm text-content-muted">{extra}</p>
+              <p className="whitespace-pre-wrap text-sm text-content-muted [overflow-wrap:anywhere]">{extra}</p>
             </>
           )}
         </div>

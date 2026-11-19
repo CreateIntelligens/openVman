@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Personas from "./Personas";
@@ -157,5 +157,50 @@ describe("Personas unsaved changes", () => {
       const paths = opened();
       expect(paths[paths.length - 1]).toBe("SOUL.md");
     });
+  });
+
+  it("holds persona switching and disables discard while a raw document save is in flight", async () => {
+    let resolveSave!: (value: { status: string }) => void;
+    const savePromise = new Promise<{ status: string }>((done) => { resolveSave = done; });
+    vi.mocked(saveKnowledgeDocument).mockReturnValueOnce(savePromise as never);
+
+    await renderPage();
+    const draft = await editor("預設");
+    await waitFor(() => expect(draft.value).toBe("內容：SOUL.md"));
+    fireEvent.change(draft, { target: { value: "儲存中的內容" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
+    await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalledTimes(1));
+
+    expect((screen.getByRole("button", { name: "捨棄修改" }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "切換角色" }), { target: { value: "nurse" } });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(opened()).not.toContain("personas/nurse/SOUL.md");
+
+    await act(async () => { resolveSave({ status: "ok" }); });
+    await waitFor(() => expect(opened()).toContain("personas/nurse/SOUL.md"));
+  });
+
+  it("does not leak a stale raw document save error after switching to another persona", async () => {
+    let rejectSave!: (reason: unknown) => void;
+    const savePromise = new Promise<never>((_res, rej) => { rejectSave = rej; });
+    vi.mocked(saveKnowledgeDocument).mockReturnValueOnce(savePromise);
+
+    await renderPage();
+    await waitFor(() => expect(opened()).toEqual(["SOUL.md"]));
+    fireEvent.change(screen.getByRole("combobox", { name: "切換角色" }), { target: { value: "nurse" } });
+    const draft = await editor("護理師");
+    await waitFor(() => expect(draft.value).toBe("內容：personas/nurse/SOUL.md"));
+    fireEvent.change(draft, { target: { value: "修改後失敗" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
+    await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalledTimes(1));
+
+    // Delete the currently saving persona so the page opens default SOUL.md while savePromise is still pending.
+    fireEvent.click(screen.getByRole("button", { name: "刪除角色 nurse" }));
+    fireEvent.click(await screen.findByRole("button", { name: "刪除" }));
+    await waitFor(() => expect(opened().at(-1)).toBe("SOUL.md"));
+
+    await act(async () => { rejectSave(new Error("舊文件寫入失敗")); });
+    expect(screen.queryByText(/舊文件寫入失敗/)).toBeNull();
   });
 });

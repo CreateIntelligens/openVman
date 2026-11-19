@@ -65,7 +65,7 @@ export function EditorSaveBar({
         <button
           type="button"
           onClick={onDiscard}
-          disabled={!hasUnsavedChanges}
+          disabled={saving || !hasUnsavedChanges}
           className="btn btn-ghost"
         >
           捨棄修改

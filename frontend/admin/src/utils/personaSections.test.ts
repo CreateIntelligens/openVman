@@ -38,7 +38,10 @@ describe("persona sections", () => {
     const parsed = soul("# 客服小安\n\n你是親切的客服。\n說話簡短。\n");
     expect(parsed.fields).toEqual({ 角色設定: "你是親切的客服。\n說話簡短。", 回應風格: "" });
     expect(parsed.other).toBe("# 客服小安");
-    expect(save(edit(parsed, { 角色設定: "你是客服。" }))).toBe("# 客服小安\n\n## 角色設定\n\n你是客服。\n");
+    expect(save(edit(parsed, { 角色設定: "你是客服。" }))).toBe("# 客服小安\n\n你是客服。\n");
+    expect(save(edit(parsed, { 角色設定: "你是客服。", 回應風格: "溫和" }))).toBe(
+      "# 客服小安\n\n## 角色設定\n\n你是客服。\n\n## 回應風格\n\n溫和\n",
+    );
     const agents = parseSections("- 先查資料\n- 再回答\n", AGENTS_TITLES, "角色與任務");
     expect(agents.fields).toEqual({ 角色與任務: "- 先查資料\n- 再回答" });
   });
@@ -93,14 +96,20 @@ describe("persona sections", () => {
 
   it("adds a title only to documents without any heading, after front matter", () => {
     expect(save(edit(soul("你是小V。"), { 角色設定: "你是小安。" }), "persona-x")).toBe(
-      "# persona-x\n\n## 角色設定\n\n你是小安。\n",
+      "你是小安。\n",
+    );
+    expect(save(edit(soul("你是小V。"), { 角色設定: "你是小安。", 回應風格: "溫和" }), "persona-x")).toBe(
+      "# persona-x\n\n## 角色設定\n\n你是小安。\n\n## 回應風格\n\n溫和\n",
     );
     expect(save(edit(soul("## 角色設定\n\n你是小V。"), { 角色設定: "你是小安。" }), "角色設定")).toBe(
       "## 角色設定\n\n你是小安。\n",
     );
     const front = soul("---\nmodel: a\n---\n你是小V。\n");
     expect(save(edit(front, { 角色設定: "你是小安。" }), "客服")).toBe(
-      "---\nmodel: a\n---\n\n# 客服\n\n## 角色設定\n\n你是小安。\n",
+      "---\nmodel: a\n---\n\n你是小安。\n",
+    );
+    expect(save(edit(front, { 角色設定: "你是小安。", 回應風格: "溫和" }), "客服")).toBe(
+      "---\nmodel: a\n---\n\n# 客服\n\n## 角色設定\n\n你是小安。\n\n## 回應風格\n\n溫和\n",
     );
   });
 
@@ -134,5 +143,39 @@ describe("persona sections", () => {
     expect(serializeSections(edit(plain, { 回覆格式: "不用 emoji" }), GUARDRAILS_TITLES)).toBe(
       "只有一段\n\n## 回覆格式\n\n不用 emoji\n",
     );
+  });
+
+  it("keeps a headingless fallback document without adding ## 角色設定 when other known fields are empty", () => {
+    const source = "# 客服小安\n\n## 專長\n\n回答問題\n\n## 個性\n\n親切有禮\n";
+    const parsed = soul(source);
+    const edited = edit(parsed, { 角色設定: "## 專長\n\n回答問題\n\n## 個性\n\n親切有耐心" });
+    expect(sectionProblems(edited, SOUL_TITLES)).toEqual([]);
+    const saved = save(edited, "客服小安");
+    expect(saved).toBe("# 客服小安\n\n## 專長\n\n回答問題\n\n## 個性\n\n親切有耐心\n");
+    expect(saved).not.toContain("## 角色設定");
+    const reparsed = soul(saved);
+    expect(reparsed.fields.角色設定).toBe("## 專長\n\n回答問題\n\n## 個性\n\n親切有耐心");
+    expect(reparsed.other).toBe("# 客服小安");
+  });
+
+  it("blocks filling another known field when a headless fallback field contains unknown ## headings", () => {
+    const legacy = "# 客服 Persona SOUL\n\n你是「客服」這個 persona 的對話核心。\n\n## 角色定位\n- 覆蓋預設\n\n## 語氣要求\n- 先說重點\n";
+    const edited = edit(soul(legacy), { 回應風格: "溫和" });
+    const problems = sectionProblems(edited, SOUL_TITLES);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("## 角色定位");
+    expect(problems[0]).toContain("其他內容");
+  });
+
+  it("blocks unknown ## headings typed inside a headed field, except inside code fences", () => {
+    const parsed = soul("# 小安\n\n## 角色設定\n\n你是小安。\n");
+    const blocked = edit(parsed, { 角色設定: "你是小安。\n\n## 說話禁忌\n\n不要提競品。" });
+    const problems = sectionProblems(blocked, SOUL_TITLES);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("## 說話禁忌");
+    expect(problems[0]).toContain("其他內容");
+
+    const fenced = edit(parsed, { 角色設定: "你是小安。\n\n```md\n## 說話禁忌\n```" });
+    expect(sectionProblems(fenced, SOUL_TITLES)).toEqual([]);
   });
 });

@@ -479,3 +479,17 @@ def test_a_normal_persona_is_still_deleted(monkeypatch, tmp_path):
 
     assert personas.delete_persona_scaffold("shan", "default")["status"] == "ok"
     assert not (root / "personas" / "shan").exists()
+
+
+def test_create_persona_scaffold_soul_uses_form_section_headings(monkeypatch, tmp_path):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+
+    personas.create_persona_scaffold("doctor", "醫師助理")
+    soul = (root / "personas" / "doctor" / "SOUL.md").read_text(encoding="utf-8")
+
+    assert soul.startswith("# 醫師助理 Persona SOUL\n")
+    assert "## 角色設定\n" in soul
+    assert "## 回應風格\n" in soul
+    assert "## 角色定位" not in soul
+    assert "## 語氣要求" not in soul

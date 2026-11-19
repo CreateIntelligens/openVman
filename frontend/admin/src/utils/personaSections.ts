@@ -182,6 +182,17 @@ interface Plan {
   problems: string[];
 }
 
+function fieldText(document: SectionDocument, title: string): string {
+  return tidy((document.fields[title] ?? "").replace(/\r\n/g, "\n"));
+}
+
+/** 原文沒有已知標題的 fallback 欄位，在其他已知欄位都空著時維持無標題寫回。 */
+function staysHeadless(document: SectionDocument, titles: readonly string[], slotTitle: string): boolean {
+  const slot = document.layout.find((item) => item.kind === "field" && item.title === slotTitle);
+  if (!slot || slot.kind !== "field" || !slot.headless) return false;
+  return titles.every((title) => title === slotTitle || !fieldText(document, title));
+}
+
 function plan(document: SectionDocument, titles: readonly string[]): Plan {
   const { lead, sections } = splitSections(document.other.replace(/\r\n/g, "\n"));
   const used = new Set<number>();
@@ -216,6 +227,13 @@ function plan(document: SectionDocument, titles: readonly string[]): Plan {
       return heading !== null && known.has(heading);
     });
     if (clash) problems.push(`「${title}」裡有「${clash.trim()}」這一行，存檔後會變成另一個欄位，請改成別的寫法。`);
+    if (!staysHeadless(document, titles, title)) {
+      const split = lines.find((line, index) => {
+        const heading = inFence[index] ? null : headingTitle(line);
+        return heading !== null && !known.has(heading);
+      });
+      if (split) problems.push(`「${title}」裡的「${split.trim()}」存檔後會移到其他內容，請把 ## 改成 ### 或拿掉。`);
+    }
   }
   return { lead, bySlot, problems };
 }
@@ -246,7 +264,7 @@ export function serializeSections(
     return document.source;
   }
   const { lead, bySlot } = plan(document, titles);
-  const field = (title: string) => tidy((document.fields[title] ?? "").replace(/\r\n/g, "\n"));
+  const field = (title: string) => fieldText(document, title);
   const placed = new Set(document.layout.flatMap((slot) => (slot.kind === "field" ? [slot.title] : [])));
   const later = [...bySlot.values()].flat();
 
@@ -264,19 +282,32 @@ export function serializeSections(
     placed.add(title);
   }
 
+  const headlessField = (slot: Slot) =>
+    slot.kind === "field" && Boolean(slot.headless) && staysHeadless(document, titles, slot.title);
+  const writesFieldHeading = layout.some((slot) => {
+    if (slot.kind !== "field") return false;
+    return field(slot.title)
+      ? !headlessField(slot)
+      : later.some((section) => section.title === slot.title);
+  });
+
   const blocks: string[] = [];
   for (const slot of layout) {
     if (slot.kind === "lead") {
       const untitled = !document.source.split(/\r?\n/).some((line) => ANY_HEADING.test(line));
-      const head = options.title && untitled ? withTitle(lead, options.title) : lead;
+      const head = options.title && untitled && writesFieldHeading ? withTitle(lead, options.title) : lead;
       blocks.push(head, ...(bySlot.get("lead") ?? []).map(sectionText));
     } else if (slot.kind === "field") {
       const body = field(slot.title);
       if (body) {
-        // 沒改過的欄位照原文寫回；原本沒有標題（整份當成這一格）的要補上標題，
-        // 不然其他欄位的標題一出現，這段文字下次讀回來就變成其他內容。
-        const keepRaw = body === slot.body && slot.raw && !slot.headless;
-        blocks.push(keepRaw ? slot.raw : `## ${slot.title}\n\n${body}`);
+        if (headlessField(slot)) {
+          blocks.push(body);
+        } else {
+          // 沒改過的欄位照原文寫回；原本沒有標題（整份當成這一格）一旦有了其他已知欄位就要補上標題，
+          // 不然其他欄位的標題一出現，這段文字下次讀回來就變成其他內容。
+          const keepRaw = body === slot.body && slot.raw && !slot.headless;
+          blocks.push(keepRaw ? slot.raw : `## ${slot.title}\n\n${body}`);
+        }
       } else if (later.some((section) => section.title === slot.title)) {
         blocks.push(`## ${slot.title}`);
       }
