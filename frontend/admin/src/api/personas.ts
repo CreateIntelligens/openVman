@@ -1,18 +1,20 @@
 import {
   PERSONAS_PATH,
   fetchJson,
+  get,
   getActiveProjectId,
   jsonRequest,
   personaPath,
   post,
   projectUrl,
+  put,
 } from "./common";
 
 export interface PersonaSummary {
   persona_id: string;
   label: string;
-  path: string;
-  preview: string;
+  path?: string;
+  preview?: string;
   is_default: boolean;
   avatar_char_id?: string | null;
 }
@@ -84,5 +86,17 @@ export function setPersonaAvatar(
     persona_id: personaId,
     avatar_char_id: avatarCharId,
     project_id: getActiveProjectId(),
+  });
+}
+
+export function fetchPersonaSoul(personaId: string) {
+  return get<{ content: string }>(personaPath("/soul"), { persona_id: personaId });
+}
+
+export function savePersonaSoul(personaId: string, content: string) {
+  return put<{ status: string }>(personaPath("/soul"), {
+    project_id: getActiveProjectId(),
+    persona_id: personaId,
+    content,
   });
 }

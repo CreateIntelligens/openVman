@@ -5,7 +5,7 @@ interface PersonaCardProps {
   selected: boolean;
   deleting: boolean;
   onSelect: (persona: PersonaSummary) => void;
-  onDelete: (persona: PersonaSummary) => void;
+  onDelete?: (persona: PersonaSummary) => void;
 }
 
 export default function PersonaCard({
@@ -39,7 +39,7 @@ export default function PersonaCard({
 
       <div className="mt-1.5 flex items-center justify-between">
         <span className="text-[0.625rem] font-mono text-content-subtle truncate">{persona.persona_id}</span>
-        {selected && !persona.is_default && (
+        {onDelete && selected && !persona.is_default && (
           <button
             onClick={(event) => {
               event.stopPropagation();

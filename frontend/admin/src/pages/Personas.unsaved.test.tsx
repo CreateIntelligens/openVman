@@ -7,6 +7,10 @@ import { createPersona, deletePersona, fetchKnowledgeDocument, saveKnowledgeDocu
 
 // 未存提醒用真的 NavigationGuardProvider 與編輯器，只把 API 換掉。
 
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: null }),
+}));
+
 vi.mock("../context/ProjectContext", () => ({
   useProject: () => ({ projectId: "proj-test" }),
 }));

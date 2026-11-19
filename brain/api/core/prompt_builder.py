@@ -19,11 +19,14 @@ from infra.reflection import (
 )
 from knowledge.workspace import load_core_workspace_context
 from tools.builtin.product_tools import product_prompt_line
+from tools.context import active_vendor_chat
+
 from .prompt_templates import (
     DEFAULT_ANSWER_RULES,
     DEFAULT_TOOL_INSTRUCTIONS,
     NO_TOOLS_ANSWER_RULES,
     NO_TOOLS_INSTRUCTIONS,
+    VENDOR_TOOL_INSTRUCTIONS,
     reply_language_line,
     supported_languages_line,
 )
@@ -71,6 +74,7 @@ def build_chat_messages(
     persona_id = str(request_context.get("persona_id", "default"))
     project_id = str(request_context.get("project_id", "default"))
     session_id = str(request_context.get("session_id", ""))
+    vendor = active_vendor_chat.get()
 
     workspace = load_core_workspace_context(
         persona_id,
@@ -89,12 +93,15 @@ def build_chat_messages(
         persona_id=persona_id,
         project_id=project_id,
         session_id=session_id,
-        enabled_by_policy=turn_policy.auto_recall is not False if turn_policy else True,
+        enabled_by_policy=not vendor and (turn_policy is None or turn_policy.auto_recall is not False),
         skip_jev_filter=decision_dependency_unavailable,
     )
     tool_instructions = DEFAULT_TOOL_INSTRUCTIONS if allow_tools else NO_TOOLS_INSTRUCTIONS
     answer_rules = DEFAULT_ANSWER_RULES if allow_tools else NO_TOOLS_ANSWER_RULES
-    if allow_tools and turn_policy is not None:
+    if allow_tools and vendor:
+        tool_instructions = VENDOR_TOOL_INSTRUCTIONS
+        answer_rules = NO_TOOLS_ANSWER_RULES
+    elif allow_tools and turn_policy is not None:
         tool_instructions, answer_rules = _apply_retrieval_policy_to_instructions(
             tool_instructions, answer_rules, turn_policy,
         )
@@ -108,7 +115,7 @@ def build_chat_messages(
         for block in [
             "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。",
             tool_instructions,
-            product_prompt_line(project_id) if allow_tools else "",
+            product_prompt_line(project_id) if allow_tools and not vendor else "",
             *workspace_blocks,
             answer_rules,
             supported_languages_line(project_id),

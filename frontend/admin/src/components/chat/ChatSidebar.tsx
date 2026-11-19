@@ -19,7 +19,7 @@ interface ChatSidebarProps {
   onResetConversation: () => void;
   onLoadSessions: () => void;
   onLoadSessionHistory: (id: string) => void;
-  onDeleteSession: (s: SessionSummary) => void;
+  onDeleteSession?: (s: SessionSummary) => void;
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
   onResetSearch: () => void;
@@ -175,7 +175,7 @@ export default function ChatSidebar({
                           <span className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.625rem] text-content-subtle">
                             {s.message_count}
                           </span>
-                          <button
+                          {onDeleteSession && <button
                             onClick={(event) => {
                               event.stopPropagation();
                               onDeleteSession(s);
@@ -186,7 +186,7 @@ export default function ChatSidebar({
                             <span className="material-symbols-outlined text-[0.875rem]">
                               delete
                             </span>
-                          </button>
+                          </button>}
                         </div>
                       </div>
                       {s.last_message_preview && (

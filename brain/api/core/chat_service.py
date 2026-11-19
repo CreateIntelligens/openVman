@@ -33,7 +33,7 @@ from core.turn_decisions import (
     turn_decision_config,
 )
 from core.reference_media import ReplyMediaChoice, choose_reference_media, earlier_pictures
-from core.turn_reads import without_disabled_recall
+from core.turn_reads import vendor_turn_decision, without_disabled_recall
 from infra.learnings import record_error_event
 from knowledge.qa_images import qa_image_kind
 from memory.memory import (
@@ -58,6 +58,7 @@ from tools.context import (
     active_retrieval_language,
     active_speech_language,
     active_turn_decision_unavailable,
+    active_vendor_chat,
 )
 from tools.tool_registry import get_tool_registry
 
@@ -152,7 +153,10 @@ def prepare_generation(
                 capture_debug=decision_debug,
                 preferred_language=preferred_language or "",
             )
-        turn_decision = without_disabled_recall(turn_decision, session.session_id, project_id)
+        if active_vendor_chat.get():
+            turn_decision = vendor_turn_decision(turn_decision)
+        else:
+            turn_decision = without_disabled_recall(turn_decision, session.session_id, project_id)
 
     request_ctx = serialize_context(envelope.context)
     input_language = None

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 
 import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocketDisconnect
 from fastapi.testclient import TestClient
 
 from app import brain_proxy, project_routes
@@ -18,6 +19,7 @@ from app.auth.routes import auth_router, users_router
 from app.auth.runtime import get_auth_runtime
 from app.gateway import asr_stream
 from app.gateway import routes as gateway_routes
+from app.gateway import websocket as websocket_routes
 
 
 _PASSWORD = "user-password"
@@ -98,6 +100,8 @@ def env(monkeypatch):
         await request.aread()
         received.append(request)
         path = request.url.path
+        if path == "/brain/personas/soul" and request.method == "GET":
+            return httpx.Response(200, json={"content": "原始人設"})
         if path == "/brain/projects":
             if request.method == "POST":
                 data = json.loads(request.content)
@@ -113,7 +117,8 @@ def env(monkeypatch):
     app = FastAPI()
     for router in (
         auth_router, users_router, api_key_routes.router,
-        gateway_routes.router, project_routes.router, asr_stream.router, brain_proxy.router,
+        gateway_routes.router, project_routes.router, asr_stream.router,
+        websocket_routes.router, brain_proxy.router,
     ):
         app.include_router(router)
     app.add_middleware(FailClosedAuthMiddleware, runtime=runtime)
@@ -442,7 +447,7 @@ def test_vendor_assignment_enforced_by_grants_and_live_project_access(env):
     for hidden_id in (_OTHER, _UNGRANTED):
         assert env.client.get(f"/api/v1/projects/{hidden_id}", headers=headers).status_code == 404
         assert env.client.get(
-            "/api/v1/knowledge/documents", headers=headers, params={"project_id": hidden_id},
+            "/api/v1/knowledge/base/documents", headers=headers, params={"project_id": hidden_id},
         ).status_code == 404
     assert env.client.patch(
         f"/api/v1/projects/{_PROJECT}/vendor", headers=headers, json={"vendor_name": "乙商"},
@@ -451,7 +456,7 @@ def test_vendor_assignment_enforced_by_grants_and_live_project_access(env):
     assert _set_project_vendor(env, _PROJECT, "乙商").status_code == 200
     assert env.client.get("/api/v1/projects", headers=headers).json()["projects"] == []
     assert env.client.get(
-        "/api/v1/knowledge/documents", headers=headers, params={"project_id": _PROJECT},
+        "/api/v1/knowledge/base/documents", headers=headers, params={"project_id": _PROJECT},
     ).status_code == 404
     assert env.create("inside", access=_access(_OTHER)).status_code == 201
 
@@ -472,7 +477,7 @@ def test_vendor_assignment_enforced_by_grants_and_live_project_access(env):
     assert allowed_knowledge.status_code == 200, allowed_knowledge.text
     new_headers = env.headers(user_id)
     assert env.client.put(
-        "/api/v1/knowledge/document", headers=new_headers,
+        "/api/v1/knowledge/base/document", headers=new_headers,
         json={"project_id": _PROJECT, "path": "knowledge/public.md", "content": "public"},
     ).status_code == 200
     assert env.client.delete(
@@ -533,3 +538,230 @@ def test_vendor_asr_websocket_requires_a_granted_project(env, monkeypatch):
         ) as stream:
             assert stream.receive_json() == {"type": "error", "code": "not_allowed"}
     assert relayed_projects == [_PROJECT]
+
+
+@pytest.fixture()
+def vendor_accounts(env):
+    _assign_vendors(env)
+    accounts = {}
+    for name, fields in (
+        ("vendor-editor", {"vendor_name": "甲商", "access": _access(knowledge=True)}),
+        ("vendor-reader", {"vendor_name": "甲商", "access": _access(knowledge=False)}),
+        ("internal-editor", {"access": _access(knowledge=True, settings=True)}),
+    ):
+        result = env.create(name, **fields)
+        assert result.status_code == 201
+        accounts[name] = result.json()["id"]
+    return accounts
+
+
+def test_vendor_soul_reads_and_writes_are_bound_to_project(env, vendor_accounts):
+    route = "/api/v1/personas/soul"
+    editor = env.headers(vendor_accounts["vendor-editor"])
+    reader = env.headers(vendor_accounts["vendor-reader"])
+    for persona_id in ("default", "support"):
+        params = {"project_id": _PROJECT, "persona_id": persona_id}
+        response = env.client.get(route, params=params, headers=editor)
+        assert response.json() == {"content": "原始人設"}
+        request = env.received[-1]
+        assert request.url.path == "/brain/personas/soul"
+        assert request.headers["X-OpenVMan-Vendor"] == "1"
+        assert dict(request.url.params) == params
+        assert env.client.get(route, params=params, headers=reader).status_code == 200
+        data = {**params, "content": "新人設"}
+        assert env.client.put(route, json=data, headers=editor).json() == {"status": "ok"}
+        assert json.loads(env.received[-1].content) == data
+        assert env.client.put(route, json=data, headers=reader).status_code == 403
+    before = len(env.received)
+    for project in (_UNGRANTED, _OTHER):
+        params = {"project_id": project, "persona_id": "default"}
+        assert env.client.get(route, params=params, headers=editor).status_code == 404
+        assert env.client.put(route, json={**params, "content": "x"}, headers=editor).status_code == 404
+    assert len(env.received) == before
+
+
+@pytest.mark.parametrize("path", [
+    "SOUL.md", "AGENTS.md", "TOOLS.md", "MEMORY.md", "IDENTITY.md",
+    ".learnings/LEARNINGS.md", "personas/support/AGENTS.md",
+])
+def test_vendor_cannot_read_or_write_core_files_through_document_apis(env, vendor_accounts, path):
+    headers = env.headers(vendor_accounts["vendor-editor"])
+    before = len(env.received)
+    for route in ("knowledge/document", "knowledge/base/document"):
+        read = env.client.get(
+            f"/api/v1/{route}", params={"project_id": _PROJECT, "path": path}, headers=headers,
+        )
+        write = env.client.put(
+            f"/api/v1/{route}",
+            json={"project_id": _PROJECT, "path": path, "content": "blocked"}, headers=headers,
+        )
+        assert (read.status_code, write.status_code) == (403, 403)
+    assert len(env.received) == before
+
+
+@pytest.mark.parametrize(("method", "route", "payload"), [
+    ("GET", "knowledge/documents", None),
+    ("GET", "knowledge/document", None),
+    ("PUT", "knowledge/document", {"path": "knowledge/public.md", "content": "x"}),
+    ("PATCH", "knowledge/document/meta", {"path": "knowledge/public.md", "enabled": False}),
+    ("DELETE", "knowledge/document", None),
+    ("POST", "knowledge/move", {"source_path": "SOUL.md", "target_path": "x.md"}),
+    ("POST", "knowledge/copy", {"source_path": "SOUL.md", "target_path": "x.md"}),
+    ("POST", "knowledge/import", {"path": "AGENTS.md"}),
+    ("POST", "knowledge/renormalize/preview", {"path": "AGENTS.md"}),
+    ("POST", "knowledge/renormalize/apply", {"path": "AGENTS.md", "content": "x"}),
+    ("POST", "personas/clone", {"source_persona_id": "default", "target_persona_id": "copy"}),
+    ("POST", "personas/avatar", {"persona_id": "default", "avatar_char_id": None}),
+    ("POST", "search", {"query": "工作區", "table": "knowledge"}),
+    ("GET", "identity", None),
+    ("GET", "memories", None),
+    ("GET", "avatar", None),
+    ("GET", "backgrounds", None),
+    ("GET", "tts/providers", None),
+    ("GET", "tools", None),
+    ("GET", "settings/my-asr-provider", None),
+    ("GET", "settings/model-providers", None),
+    ("GET", "users", None),
+    ("GET", "embed-keys", None),
+    ("GET", "usage/summary", None),
+    ("GET", "health/detail", None),
+    ("GET", "metrics", None),
+    ("GET", "knowledge/graph", None),
+    ("GET", "knowledge/graph/html", None),
+    ("GET", f"projects/{_PROJECT}/policy", None),
+])
+def test_vendor_hidden_api_is_denied_before_upstream(env, vendor_accounts, method, route, payload):
+    before = len(env.received)
+    response = env.client.request(
+        method, f"/api/v1/{route}",
+        params={"project_id": _PROJECT, "path": "knowledge/public.md"},
+        json=payload, headers=env.headers(vendor_accounts["vendor-editor"]),
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "沒有權限使用這個功能。"}
+    assert len(env.received) == before
+
+
+def test_vendor_knowledge_page_is_scoped_and_internal_workspace_is_unchanged(env, vendor_accounts):
+    editor = env.headers(vendor_accounts["vendor-editor"])
+    for source, target in (
+        ("knowledge/public.md", "AGENTS.md"),
+        ("personas/default/MEMORY.md", "knowledge/public.md"),
+    ):
+        response = env.client.post("/api/v1/knowledge/base/move", headers=editor, json={
+            "project_id": _PROJECT, "source_path": source, "target_path": target,
+        })
+        assert response.status_code == 403
+    response = env.client.put("/api/v1/knowledge/base/document", headers=editor, json={
+        "project_id": _PROJECT, "path": "knowledge/public.md", "content": "ok",
+    })
+    assert response.status_code == 200
+    assert env.received[-1].url.path == "/brain/knowledge/document"
+    params = {"project_id": _PROJECT, "path": "AGENTS.md"}
+    for user_id in (env.root.id, vendor_accounts["internal-editor"]):
+        headers = {**env.headers(user_id), "X-OpenVMan-Vendor": "1"}
+        assert env.client.get("/api/v1/knowledge/documents", params=params, headers=headers).status_code == 200
+        assert env.client.get("/api/v1/knowledge/document", params=params, headers=headers).status_code == 200
+        assert env.client.put("/api/v1/knowledge/document", headers=headers, json={
+            **params, "content": "internal",
+        }).status_code == 200
+        assert "X-OpenVMan-Vendor" not in env.received[-1].headers
+
+
+def test_delegated_vendor_key_has_the_same_route_limit(env, vendor_accounts):
+    response = env.client.post(
+        "/api/v1/api-keys", headers=env.headers(env.root.id),
+        json={"label": "vendor-integration", "user_id": vendor_accounts["vendor-editor"]},
+    )
+    assert response.status_code == 201
+    headers = {"Authorization": f"Bearer {response.json()['key']}"}
+    params = {"project_id": _PROJECT}
+    assert env.client.get("/api/v1/personas/soul", headers=headers, params=params).status_code == 200
+    assert env.client.get("/api/v1/personas", headers=headers, params=params).status_code == 200
+    assert env.client.get("/api/v1/knowledge/documents", headers=headers, params=params).status_code == 403
+
+
+@pytest.mark.parametrize("path", [" knowledge/guide.md", "knowledge/guide.md ", "knowledge/guide.md\t"])
+def test_vendor_document_proxy_rejects_outer_whitespace(env, vendor_accounts, path):
+    before = len(env.received)
+    response = env.client.get(
+        "/api/v1/knowledge/base/document",
+        params={"project_id": _PROJECT, "path": path},
+        headers=env.headers(vendor_accounts["vendor-editor"]),
+    )
+    assert response.status_code == 403, response.text
+    assert len(env.received) == before
+
+
+@pytest.mark.parametrize("account", ["vendor-editor", "internal-editor"])
+def test_knowledge_upload_keeps_conversion_diagnostics_internal(env, vendor_accounts, monkeypatch, account):
+    diagnostics = "conversion failed at http://api:8100/document for /tmp/converter/input.pdf"
+
+    async def fail_conversion(*args, **kwargs):
+        raise RuntimeError(diagnostics)
+
+    monkeypatch.setattr(gateway_routes, "_prepare_document_upload", fail_conversion)
+    response = env.client.post(
+        "/api/v1/knowledge/upload", headers=env.headers(vendor_accounts[account]),
+        data={"project_id": _PROJECT}, files={"files": ("input.pdf", b"test", "application/pdf")},
+    )
+    assert response.status_code == 500, response.text
+    if account == "vendor-editor":
+        assert response.json() == {"detail": "無法上傳檔案，請確認檔案後再試。"}
+    else:
+        assert response.json()["error"] == diagnostics
+
+
+@pytest.mark.parametrize("account", ["vendor-editor", "internal-editor"])
+def test_live_relay_uses_authenticated_account_for_vendor_header(env, vendor_accounts, monkeypatch, account):
+    captured = []
+
+    class BrainSocket:
+        async def send(self, raw):
+            if json.loads(raw)["event"] == "user_speak":
+                ready.set()
+
+        async def recv(self):
+            await ready.wait()
+            ready.clear()
+            return json.dumps({"event": "server_stream_chunk", "text": "你好"})
+
+        async def close(self):
+            pass
+
+    ready = asyncio.Event()
+
+    async def connect(_url, *, additional_headers, **kwargs):
+        captured.append(additional_headers)
+        return BrainSocket()
+
+    monkeypatch.setattr("app.gateway.brain_live_relay.websockets.connect", connect)
+    headers = {**env.headers(vendor_accounts[account]), "X-OpenVMan-Vendor": "0" if account == "vendor-editor" else "1"}
+    with env.client.websocket_connect("/api/v1/ws/vendor-test", headers=headers) as socket:
+        socket.send_json({"event": "client_init", "capabilities": {"project_id": _PROJECT}})
+        assert socket.receive_json()["event"] == "server_init_ack"
+        socket.send_json({"event": "user_speak", "text": "你好"})
+        assert socket.receive_json()["event"] == "server_stream_chunk"
+    assert len(captured) == 1
+    assert captured[0].get("X-OpenVMan-Vendor") == ("1" if account == "vendor-editor" else None)
+    assert captured[0]["X-OpenVMan-Project-ID"] == _PROJECT
+
+
+def test_vendor_live_requires_project_initialization_before_relay(env, vendor_accounts, monkeypatch):
+    class FakeRelay:
+        def __init__(self, _session, *, event_sink):
+            self.event_sink = event_sink
+
+        async def send_event(self, _event):
+            await self.event_sink({"event": "server_stream_chunk", "text": "測試"})
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(websocket_routes, "BrainLiveRelay", FakeRelay)
+    headers = env.headers(vendor_accounts["vendor-editor"])
+    with env.client.websocket_connect("/api/v1/ws/vendor-project-test", headers=headers) as socket:
+        socket.send_json({"event": "user_speak", "text": "測試"})
+        with pytest.raises(WebSocketDisconnect) as exc:
+            socket.receive_json()
+    assert exc.value.code == 1008

@@ -245,6 +245,8 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 {"event": "llm_route_attempt", "node": "llm_hop", "trace_id": "4f2c…", "provider": "gemini", "model": "gemini-3.5-flash-lite", "hop_index": 0, "result": "failure", "outcome": "timeout_first_token", "reason": "timeout_first_token", "elapsed_ms": 7003.1, "mode": "stream", "timeout_s": 7.0, "first_token_ms": null, "streamed_chars": 0, "error_type": "LLMTimeoutError", "error": "timeout_first_token after 7.00s (limit 7.00s)", "chain_length": 3}
 ```
 
+Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉送。人設清單採精簡欄位，`/brain/personas/soul` 由已授權專案與角色代號定位唯一檔案。知識庫操作複核實際路徑。廠商對話、SSE、歷史及匯出只回產品需要的欄位，工具呼叫、提示脈絡及模型用量保留在伺服器。完整對外契約見 [Backend 規格](../docs/specs/01_BACKEND_SPEC.md#廠商後台四頁與-api-授權)。
+
 ### 逐句串流（`POST /brain/chat/stream`）
 
 與 `POST /brain/chat` 同一個請求與流程（共用 `routes/chat.py` 的 `_generate_chat_response`），回應改成 SSE，讓整合方拿第一句就開始 TTS：

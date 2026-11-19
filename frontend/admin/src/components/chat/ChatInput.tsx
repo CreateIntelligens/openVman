@@ -19,6 +19,7 @@ interface ChatInputProps {
   slashOpen: boolean;
   slashMatches: SkillInfo[];
   clampedSlashIndex: number;
+  showVoiceControls?: boolean;
   ttsProviders: TtsProvider[];
   ttsProvider: string;
   ttsVoice: string;
@@ -72,6 +73,7 @@ export default function ChatInput(props: ChatInputProps) {
     slashOpen,
     slashMatches,
     clampedSlashIndex,
+    showVoiceControls = true,
     ttsProviders,
     ttsProvider,
     ttsVoice,
@@ -259,14 +261,14 @@ export default function ChatInput(props: ChatInputProps) {
               {mode === "text" && (
                 <div className="flex flex-wrap items-center gap-2">
                   <ReplyModeControl value={replyMode} onChange={onReplyModeChange} />
-                  <TtsControls
+                  {showVoiceControls && <TtsControls
                     ttsProviders={ttsProviders}
                     ttsProvider={ttsProvider}
                     ttsVoice={ttsVoice}
                     activeTtsProvider={activeTtsProvider}
                     onTtsProviderChange={onTtsProviderChange}
                     onTtsVoiceChange={onTtsVoiceChange}
-                  />
+                  />}
                   {onAsrProviderChange && (
                     <AsrControls
                       provider={asrProvider ?? null}

@@ -12,7 +12,12 @@ from core.turn_decisions import (
     run_turn_decision_async,
     turn_decision_config,
 )
-from core.turn_reads import planned_reads, previous_user_text, without_disabled_recall
+from core.turn_reads import (
+    planned_reads,
+    previous_user_text,
+    vendor_turn_decision,
+    without_disabled_recall,
+)
 
 from .gemini_context import LiveSessionContext
 from .gemini_payloads import build_user_turn_message
@@ -146,11 +151,15 @@ class GeminiLiveTurns:
                 project_id=context.project_id,
                 project_language=primary_language(context.project_id),
                 speech_language=speech_language,
-                available_tools=("search_knowledge", "search_web", "search_memory"),
+                available_tools=("search_knowledge",) if context.vendor else (
+                    "search_knowledge", "search_web", "search_memory",
+                ),
                 config=cfg,
                 turn_id=f"live:{context.relay_session_id}:{self._turn_revision}",
                 capture_debug=self.decision_debug_enabled and not text.startswith("[視覺事件]"),
             )
+            if context.vendor:
+                return vendor_turn_decision(decision)
             return without_disabled_recall(decision, context.session_id, context.project_id)
         except asyncio.CancelledError:
             raise

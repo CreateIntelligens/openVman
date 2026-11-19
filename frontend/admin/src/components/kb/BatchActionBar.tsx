@@ -98,6 +98,7 @@ function BatchLanguageModal({
 }
 
 export default function BatchActionBar({
+  vendor = false,
   selectedPaths,
   documents,
   serverDirs,
@@ -107,6 +108,7 @@ export default function BatchActionBar({
   onStatus,
   onRunningChange,
 }: {
+  vendor?: boolean;
   selectedPaths: string[];
   documents: KnowledgeDocumentSummary[];
   serverDirs: string[];
@@ -170,7 +172,8 @@ export default function BatchActionBar({
         if (documentsByPath.get(path)?.qa_attached) {
           throw new Error("已放進快速問答，不能移動");
         }
-        await moveKnowledgeDocument(path, targetPathOf(path));
+        if (vendor) await moveKnowledgeDocument(path, targetPathOf(path), true);
+        else await moveKnowledgeDocument(path, targetPathOf(path));
       },
       {
         note: alreadyThere > 0 ? `${alreadyThere} 個原本就在目標資料夾` : undefined,
@@ -180,7 +183,7 @@ export default function BatchActionBar({
   };
 
   const handleDelete = () => {
-    void runBatch("delete", "刪除", [...selectedPaths], (path) => deleteKnowledgeDocument(path));
+    void runBatch("delete", "刪除", [...selectedPaths], (path) => vendor ? deleteKnowledgeDocument(path, true) : deleteKnowledgeDocument(path));
   };
 
   const handleLanguage = (language: KnowledgeLanguage | "auto") => {
@@ -188,7 +191,8 @@ export default function BatchActionBar({
       if (documentsByPath.get(path)?.is_indexable === false) {
         throw new Error("這類檔案不支援語言設定");
       }
-      await updateKnowledgeDocumentMeta(path, { language });
+      if (vendor) await updateKnowledgeDocumentMeta(path, { language }, true);
+      else await updateKnowledgeDocumentMeta(path, { language });
     });
   };
 

@@ -2,8 +2,10 @@
 
 from typing import Any
 
+from tools.context import VENDOR_KNOWLEDGE_TOOLS
 
-def build_gemini_tool_declarations() -> list[dict[str, Any]]:
+
+def build_gemini_tool_declarations(*, vendor: bool = False) -> list[dict[str, Any]]:
     """Build the function declarations for Gemini Live setup."""
     from config import get_settings
 
@@ -141,4 +143,7 @@ def build_gemini_tool_declarations() -> list[dict[str, Any]]:
         disabled.add("read_web_page")
     if not getattr(cfg, "wiki_publish_enabled", True):
         disabled.add("publish_wiki")
-    return [item for item in declarations if item["name"] not in disabled]
+    return [
+        item for item in declarations
+        if item["name"] not in disabled and (not vendor or item["name"] in VENDOR_KNOWLEDGE_TOOLS)
+    ]

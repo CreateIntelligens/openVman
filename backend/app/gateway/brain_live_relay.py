@@ -17,6 +17,9 @@ from urllib.parse import urlparse, urlunparse
 
 import websockets
 
+from app.auth.dependencies import CurrentAccount
+from app.auth.policy import is_vendor_account
+from app.auth.vendor_access import VENDOR_HEADER
 from app.config import TTSRouterConfig, get_tts_config
 from app.session_manager import Session
 from app.usage_ledger_client import usage_scope_for
@@ -64,6 +67,8 @@ class BrainLiveRelay:
         self._closed = False
         self._connect_lock = asyncio.Lock()
         self._accumulated_text = ""
+        current = session.metadata.get("_current_account")
+        self._vendor = isinstance(current, CurrentAccount) and is_vendor_account(current.user)
 
     def _voice_source(self) -> str:
         return _normalize_voice_source(
@@ -97,6 +102,7 @@ class BrainLiveRelay:
                     ),
                     "X-Principal-Type": str(caller.get("principal_type", "")),
                     "X-Principal-Id": str(caller.get("principal_id", "")),
+                    **({VENDOR_HEADER: "1"} if self._vendor else {}),
                 },
                 open_timeout=10,
                 max_size=4 * 1024 * 1024,
@@ -167,7 +173,10 @@ class BrainLiveRelay:
                     {
                         "event": "server_error",
                         "error_code": "INTERNAL_ERROR",
-                        "message": "Brain live relay disconnected",
+                        "message": (
+                            "對話暫時無法完成，請稍後再試。" if self._vendor
+                            else "Brain live relay disconnected"
+                        ),
                         "timestamp": int(time.time() * 1000),
                     }
                 )

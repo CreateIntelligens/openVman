@@ -2,6 +2,7 @@ import { SESSION_LANGUAGE_LABELS, type SessionLanguage } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
 import { PageHeader } from "../components/app/PageHeader";
 import SessionBackupPanel from "../components/sessions/SessionBackupPanel";
+import { isVendorUser } from "../utils/accountPermissions";
 import { useAuth } from "../context/AuthContext";
 import { useProject } from "../context/ProjectContext";
 import Select from "../components/Select";
@@ -103,6 +104,7 @@ export default function Sessions() {
   } = useSessionBrowser();
 
   const { account } = useAuth();
+  const vendor = Boolean(account && isVendorUser(account));
   const { projectId } = useProject();
   const selectedCount = selectedSessionIds.size;
   const allSelected = sessions.length > 0 && selectedCount === sessions.length;
@@ -291,7 +293,7 @@ export default function Sessions() {
               {selectedCount > 0 && (
                 <>
                   <span className="chip">已選 {selectedCount} 筆</span>
-                  <button
+                  {!vendor && <button
                     onClick={() => setBulkDeleteOpen(true)}
                     disabled={deletingSessions}
                     className="btn btn-ghost px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
@@ -300,7 +302,7 @@ export default function Sessions() {
                       delete
                     </span>
                     刪除已選
-                  </button>
+                  </button>}
                 </>
               )}
             </div>
@@ -417,7 +419,7 @@ export default function Sessions() {
                         </span>
                         匯出
                       </button>
-                      <button
+                      {!vendor && <button
                         onClick={() => setDeleteTarget(session)}
                         className="btn btn-ghost px-2.5 py-1.5 text-xs hover:text-danger"
                         aria-label="刪除對話"
@@ -426,7 +428,7 @@ export default function Sessions() {
                           delete
                         </span>
                         刪除
-                      </button>
+                      </button>}
                     </div>
                   </li>
                 );

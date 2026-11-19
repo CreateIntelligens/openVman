@@ -11,15 +11,17 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app import language_routes as language_routes_mod
 from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
 from app.auth.models import ResourceType, is_at_least_admin
+from app.auth.policy import is_vendor_account
 from app.auth.resources import ResourceAccess, ResourceNotFoundError, resolve_resource
 from app.auth.runtime import AuthRuntime, get_auth_runtime
+from app.auth.vendor_access import VENDOR_HEADER
 from app.brain_proxy import _http as _brain_http
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response, upload_rejected_response
@@ -66,6 +68,7 @@ def _trusted_brain_headers(
         "X-OpenVMan-User-ID": current.user.id,
         "X-OpenVMan-Role": current.user.role.value,
         "X-OpenVMan-Project-ID": project_id,
+        **({VENDOR_HEADER: "1"} if is_vendor_account(current.user) else {}),
     }
 
 
@@ -266,7 +269,14 @@ async def _upload_raw_artifact(
     response.raise_for_status()
 
 
-def _relay_brain_response(resp: httpx.Response) -> Response:
+def _vendor_upload_failure(status_code: int) -> JSONResponse:
+    detail = "沒有權限使用這個功能。" if status_code == 403 else "無法上傳檔案，請確認檔案後再試。"
+    return JSONResponse(status_code=status_code, content={"detail": detail})
+
+
+def _relay_brain_response(resp: httpx.Response, *, vendor: bool = False) -> Response:
+    if vendor and resp.is_error:
+        return _vendor_upload_failure(resp.status_code)
     content_type = resp.headers.get("content-type", "")
     if "application/json" in content_type:
         return JSONResponse(status_code=resp.status_code, content=resp.json())
@@ -536,6 +546,8 @@ async def get_upload_limits(
     _current: CurrentAccount = Depends(get_current_account),
 ) -> dict[str, int | float]:
     cfg = get_tts_config()
+    if is_vendor_account(_current.user):
+        return {"document_max_upload_bytes": cfg.document_max_upload_bytes}
     # 後台上傳畫面據此顯示上限並先擋過大的檔案；伺服器端仍會再驗一次。
     return {
         "document_max_upload_bytes": cfg.document_max_upload_bytes,
@@ -565,6 +577,7 @@ async def upload_raw_knowledge_documents(
 ) -> Response:
     cfg = get_tts_config()
     _require_project_edit(runtime, current, project_id)
+    vendor = is_vendor_account(current.user)
     try:
         # raw 區只收原始文件；target_dir 一律正規化成 raw/ 底下，不能指到 personas/、memory/ 等。
         raw_target_dir = _build_raw_target_dir(target_dir)
@@ -589,15 +602,28 @@ async def upload_raw_knowledge_documents(
                 current, project_id, cfg.gateway_internal_token,
             ),
         )
-        return _relay_brain_response(response)
+        return _relay_brain_response(response, vendor=vendor)
     except InvalidTargetDirError as exc:
+        if vendor:
+            return _vendor_upload_failure(400)
         return upload_failed_response(status_code=400, error=str(exc), detail=str(exc))
     except UploadLimitError as exc:
+        if vendor:
+            return _vendor_upload_failure(413 if isinstance(exc, UploadTooLargeError) else 415)
         return upload_rejected_response(exc)
     except httpx.TimeoutException:
+        if vendor:
+            return _vendor_upload_failure(504)
         return _error_response(504, "brain request timeout")
     except httpx.RequestError:
+        if vendor:
+            return _vendor_upload_failure(502)
         return _error_response(502, "brain service unavailable")
+    except Exception:
+        if vendor:
+            logger.exception("knowledge_raw_upload_failed project_id=%s", log_safe(project_id))
+            return _vendor_upload_failure(500)
+        raise
     finally:
         for upload in files:
             await upload.close()
@@ -620,6 +646,7 @@ async def upload_knowledge_documents(
     cfg = get_tts_config()
     client = _brain_http.get()
     _require_project_edit(runtime, current, project_id)
+    vendor = is_vendor_account(current.user)
     trusted_headers = _trusted_brain_headers(
         current,
         project_id,
@@ -663,22 +690,30 @@ async def upload_knowledge_documents(
             data=post_data,
             headers=trusted_headers,
         )
-        return _relay_brain_response(resp)
+        return _relay_brain_response(resp, vendor=vendor)
     except InvalidTargetDirError as exc:
+        if vendor:
+            return _vendor_upload_failure(400)
         return upload_failed_response(status_code=400, error=str(exc), detail=str(exc))
     except UploadLimitError as exc:
+        if vendor:
+            return _vendor_upload_failure(413 if isinstance(exc, UploadTooLargeError) else 415)
         return upload_rejected_response(exc)
     except httpx.ConnectError:
         logger.warning(
             "knowledge_upload_brain_unreachable target_dir=%s project_id=%s",
             log_safe(target_dir), log_safe(project_id),
         )
+        if vendor:
+            return _vendor_upload_failure(502)
         return _error_response(502, "brain service unavailable")
     except Exception as exc:
         logger.error(
             "knowledge_upload_failed target_dir=%s project_id=%s err=%s",
             log_safe(target_dir), log_safe(project_id), log_safe(exc),
         )
+        if vendor:
+            return _vendor_upload_failure(500)
         return upload_failed_response(
             status_code=500,
             error=str(exc),
@@ -694,14 +729,24 @@ async def upload_knowledge_documents(
     summary="即時抓取頁面內容",
     description="抓取網址頁面內容並回傳，不存入知識庫。本端點供給 AI Tool 當作即時爬蟲功能使用。支援一般網頁及 YouTube 連結（自動擷取字幕）。\n\n**所需欄位**：\n- `url` (Body, str): 要抓取的網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
 )
-async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
+async def fetch_web_content(req: CrawlIngestRequest, request: Request = None) -> JSONResponse:
     """抓取網址內容但不存入知識庫，供 agent tool 即時查詢使用。"""
+    current = getattr(request.state, "current_account", None) if request else None
+    vendor = current is not None and is_vendor_account(current.user)
+    if vendor:
+        _require_project_edit(get_auth_runtime(), current, req.project_id)
     if is_youtube_url(req.url):
         yt = await _fetch_youtube_transcript(req.url, fallback_to_metadata=True)
+        if vendor:
+            if isinstance(yt, JSONResponse):
+                return JSONResponse(status_code=yt.status_code, content={"detail": "無法讀取這個網址。"})
+            yt = {key: yt[key] for key in ("status", "title", "source_url", "content") if key in yt}
         return yt if isinstance(yt, JSONResponse) else JSONResponse(content=yt)
 
     result = await _safe_fetch_page(req.url)
     if isinstance(result, JSONResponse):
+        if vendor:
+            return JSONResponse(status_code=result.status_code, content={"detail": "無法讀取這個網址。"})
         return result
 
     return JSONResponse(content={

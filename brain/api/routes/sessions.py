@@ -14,6 +14,7 @@ from memory.memory import (
     list_sessions_for_project,
 )
 from protocol.history import serialize_history_messages
+from safety.vendor_access import VendorRequest, vendor_chat_history, vendor_session_summary
 from safety.internal_auth import require_internal_token
 from safety.observability import log_event, log_exception
 
@@ -87,6 +88,7 @@ async def list_sessions(
     date_to: str | None = None,
     search: str | None = None,
     language: str | None = None,
+    vendor: VendorRequest = False,
 ):
     _validate_date_range(
         date_from, date_to,
@@ -105,6 +107,8 @@ async def list_sessions(
     except Exception as exc:
         log_exception("list_sessions_error", exc)
         raise HTTPException(status_code=500, detail="無法讀取 session 列表") from exc
+    if vendor:
+        sessions = [vendor_session_summary(session) for session in sessions]
     return {"sessions": sessions, "session_count": len(sessions)}
 
 
@@ -128,6 +132,7 @@ def export_sessions(
     session_ids: str | None = None,
     simple: bool = False,
     language: str | None = None,
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     _validate_date_range(
         date_from, date_to,
@@ -157,12 +162,10 @@ def export_sessions(
         total_messages = 0
         for summary in summaries:
             summary_persona_id = str(summary["persona_id"])
-            messages = serialize_history_messages(
-                store.list_conversation_messages(
-                    str(summary["session_id"]),
-                    persona_id=summary_persona_id,
-                )
+            raw_messages = store.list_conversation_messages(
+                str(summary["session_id"]), persona_id=summary_persona_id,
             )
+            messages = vendor_chat_history(raw_messages) if vendor else serialize_history_messages(raw_messages)
             if simple:
                 # 給人看或匯入試算表用：只留誰、說了什麼、何時說。
                 messages = [
@@ -176,7 +179,7 @@ def export_sessions(
             total_messages += len(messages)
             exported_sessions.append(
                 {
-                    **summary,
+                    **(vendor_session_summary(summary) if vendor else summary),
                     "messages": messages,
                 }
             )

@@ -12,7 +12,9 @@ from app.cors import api_cors_headers, origin_allowed
 
 from .dependencies import CurrentAccount, authenticate_request
 from .embed import EMBED_KEY_HEADER, cors_headers, is_preflight_target
+from .policy import is_vendor_account
 from .runtime import AuthRuntime, get_auth_runtime
+from .vendor_access import vendor_route_allowed
 
 _PUBLIC_EXACT_PATHS = frozenset(
     {
@@ -129,8 +131,20 @@ class FailClosedAuthMiddleware(BaseHTTPMiddleware):
                 headers=headers,
             )
 
+        if is_vendor_account(current.user) and not vendor_route_allowed(
+            request.method, request.scope["path"],
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "沒有權限使用這個功能。"},
+                headers={"X-OpenVMan-Operation-Denied": "1"},
+            )
+
         if not _is_embed_principal(current):
-            return await call_next(request)
+            response = await call_next(request)
+            if is_vendor_account(current.user) and response.status_code == 403:
+                response.headers["X-OpenVMan-Operation-Denied"] = "1"
+            return response
 
         origin = request.headers.get("origin", "")
         # Preflight 不必走到 handler：允許清單與金鑰都驗過了就直接回 204。

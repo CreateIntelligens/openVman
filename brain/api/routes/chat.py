@@ -64,6 +64,14 @@ from safety.observability import (
     record_node_attempt,
     timed_node,
 )
+from safety.vendor_access import (
+    VENDOR_CHAT_ERROR,
+    VENDOR_HEADER,
+    VendorRequest,
+    vendor_chat_history,
+    vendor_chat_reply,
+)
+from tools.context import bind_vendor_chat
 from tools.skill_manager import get_skill_manager
 
 logger = logging.getLogger("brain.chat")
@@ -92,14 +100,18 @@ def _maybe_rewrite_slash(payload: ChatRequest) -> dict[str, Any]:
 
 
 def _decision_debug_requested(request: Request, payload: ChatRequest) -> bool:
-    return bool(payload.decision_debug) and may_see_decision_debug(
-        request.headers.get(USER_ROLE_HEADER, ""),
-        request.headers.get(PRINCIPAL_TYPE_HEADER, ""),
+    return (
+        request.headers.get(VENDOR_HEADER) != "1"
+        and bool(payload.decision_debug)
+        and may_see_decision_debug(
+            request.headers.get(USER_ROLE_HEADER, ""),
+            request.headers.get(PRINCIPAL_TYPE_HEADER, ""),
+        )
     )
 
 
 def _prepare_chat_context(request: Request, payload: ChatRequest) -> Any:
-    raw = _maybe_rewrite_slash(payload)
+    raw = payload.model_dump() if request.headers.get(VENDOR_HEADER) == "1" else _maybe_rewrite_slash(payload)
     envelope = build_message_envelope(request, raw, content_key="message")
     return prepare_generation(
         envelope, reply_mode=payload.mode, decision_debug=_decision_debug_requested(request, payload),
@@ -285,7 +297,11 @@ async def _generate_chat_response(
 ) -> dict[str, Any]:
     """Run one chat turn and build the /chat payload; shared by /chat and /chat/stream."""
     turn_budget_s = number_setting(get_settings(), "chat_turn_budget_seconds", 30.0)
-    with bind_cancel_event(cancel_event), bind_turn_budget(turn_budget_s, started=run.started):
+    with (
+        bind_cancel_event(cancel_event),
+        bind_turn_budget(turn_budget_s, started=run.started),
+        bind_vendor_chat(request.headers.get(VENDOR_HEADER) == "1"),
+    ):
         if payload.turn_id is not None:
             await _to_thread_timed(request, "register_turn", register_turn, request, payload)
         logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
@@ -379,7 +395,8 @@ async def chat(request: Request, payload: ChatRequest):
     try:
         try:
             async with deadline:
-                return await _generate_chat_response(request, payload, cancel_event, run)
+                data = await _generate_chat_response(request, payload, cancel_event, run)
+                return vendor_chat_reply(data) if request.headers.get(VENDOR_HEADER) == "1" else data
         except TimeoutError:
             if not deadline.expired():
                 raise
@@ -416,6 +433,7 @@ _background_runs: set[asyncio.Task[None]] = set()
 
 
 async def _stream_chat_events(request: Request, payload: ChatRequest) -> AsyncIterator[str]:
+    vendor = request.headers.get(VENDOR_HEADER) == "1"
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
 
@@ -472,11 +490,18 @@ async def _stream_chat_events(request: Request, payload: ChatRequest) -> AsyncIt
                 run.deadline_exceeded = True
                 cancel_event.set()
                 _log_deadline_exceeded(request, payload, run, deadline_s)
-                yield _sse(*_error_event(_deadline_error()))
+                if vendor:
+                    yield _sse("error", {"status": 504, "detail": "對話逾時，請再試一次。"})
+                else:
+                    yield _sse(*_error_event(_deadline_error()))
                 return
             if item is None:
                 return
             event, data = item
+            if vendor and event == "done":
+                data = vendor_chat_reply(data)
+            if vendor and event == "error":
+                data = {"status": data["status"], "detail": VENDOR_CHAT_ERROR}
             yield _sse(event, data)
             if event != "sentence":
                 return
@@ -505,11 +530,12 @@ async def chat_stream(request: Request, payload: ChatRequest):
 
 @router.post("/chat/accept", summary="確認接收可合併回合的回答")
 async def chat_accept(request: Request, payload: ChatTurnAcceptRequest):
-    return await accept_turn(request, payload)
+    data = await accept_turn(request, payload)
+    return vendor_chat_reply(data) if request.headers.get(VENDOR_HEADER) == "1" else data
 
 
 @router.get("/chat/modes", summary="可用的回覆深度模式")
-async def chat_modes():
+async def chat_modes(vendor: VendorRequest = False):
     """List the reply depth modes so clients don't hardcode them."""
     return {
         "default": DEFAULT_MODE,
@@ -517,8 +543,10 @@ async def chat_modes():
             {
                 "name": mode.name,
                 "label": mode.label,
-                "max_followup_tool_rounds": mode.max_followup_tool_rounds,
-                "allow_web_search": mode.allow_web_search,
+                **({} if vendor else {
+                    "max_followup_tool_rounds": mode.max_followup_tool_rounds,
+                    "allow_web_search": mode.allow_web_search,
+                }),
             }
             for mode in available_modes()
         ],
@@ -526,9 +554,12 @@ async def chat_modes():
 
 
 @router.get("/chat/history", summary="對話歷史")
-async def chat_history(session_id: str, project_id: str = "default", persona_id: str = "default"):
+async def chat_history(
+    session_id: str, project_id: str = "default", persona_id: str = "default",
+    vendor: VendorRequest = False,
+):
     from memory.memory import list_conversation_messages
 
     messages = list_conversation_messages(session_id=session_id, persona_id=persona_id, project_id=project_id)
-    history = serialize_history_messages(messages)
+    history = vendor_chat_history(messages) if vendor else serialize_history_messages(messages)
     return {"session_id": session_id, "persona_id": persona_id, "history": history}

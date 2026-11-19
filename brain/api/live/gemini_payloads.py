@@ -31,7 +31,7 @@ def _supports_thinking_level(model: str) -> bool:
 
 
 def build_setup_message(
-    config: BrainSettings, system_instruction: str
+    config: BrainSettings, system_instruction: str, *, vendor: bool = False,
 ) -> dict[str, Any]:
     setup: dict[str, Any] = {
         "model": f"models/{config.live_gemini_model}",
@@ -73,7 +73,7 @@ def build_setup_message(
     setup["inputAudioTranscription"] = dict(transcription)
     if config.live_gemini_tools_enabled:
         setup["tools"] = [
-            {"functionDeclarations": build_gemini_tool_declarations()}
+            {"functionDeclarations": build_gemini_tool_declarations(vendor=vendor)}
         ]
 
     # Without compression Gemini Live caps a session at 15 min (audio) or

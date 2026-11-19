@@ -1,6 +1,7 @@
 import { fetchJson, apiUrl, post, jsonRequest, projectPath, PROJECTS_PATH } from "./common";
 
 export interface ProjectSummary {
+  can_edit_knowledge?: boolean;
   project_id: string;
   label: string;
   document_count: number;

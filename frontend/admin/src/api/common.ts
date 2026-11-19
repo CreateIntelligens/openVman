@@ -188,7 +188,7 @@ export async function apiFetch(
   }
   if (!isAuthEndpoint(input)) {
     if (res.status === 401) unauthorizedHandler?.();
-    if (res.status === 403) forbiddenHandler?.();
+    if (res.status === 403 && !res.headers?.has("X-OpenVMan-Operation-Denied")) forbiddenHandler?.();
   }
   return res;
 }

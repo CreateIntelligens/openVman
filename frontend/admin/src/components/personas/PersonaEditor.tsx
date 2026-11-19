@@ -15,6 +15,7 @@ interface PersonaEditorProps {
   editorMode: EditorMode;
   loadingDocument: boolean;
   saving: boolean;
+  readOnly?: boolean;
   hasUnsavedChanges: boolean;
   onEditorModeChange: (mode: EditorMode) => void;
   onOpenDocument: (path: string) => void;
@@ -31,6 +32,7 @@ export default function PersonaEditor({
   editorMode,
   loadingDocument,
   saving,
+  readOnly = false,
   hasUnsavedChanges,
   onEditorModeChange,
   onOpenDocument,
@@ -87,6 +89,7 @@ export default function PersonaEditor({
         {editorMode === "edit" || editorMode === "split" ? (
           <textarea
             aria-label={`${title} 文件內容`}
+            readOnly={readOnly}
             value={draftContent}
             onChange={(event) => onDraftContentChange(event.target.value)}
             className={`h-full w-full bg-transparent p-6 text-[0.8125rem] leading-relaxed text-content placeholder:text-content-subtle focus:outline-none font-mono resize-none ${
@@ -101,7 +104,7 @@ export default function PersonaEditor({
         ) : null}
       </div>
 
-      <EditorSaveBar
+      {!readOnly && <EditorSaveBar
         hasUnsavedChanges={hasUnsavedChanges}
         charCount={draftContent.length}
         saving={saving}
@@ -109,7 +112,7 @@ export default function PersonaEditor({
         saveLabel="儲存設定"
         onDiscard={onDiscard}
         onSave={onSave}
-      />
+      />}
     </div>
   );
 }

@@ -75,6 +75,8 @@ logger = logging.getLogger(__name__)
 _CATEGORY_NOT_FOUND = "找不到這個分類，可能已經被刪除，請重新整理頁面"
 _MOVE_REFUSED = "不能移到這裡，目標分類可能已經被刪除，或者就在這個分類底下"
 
+from safety.vendor_access import VendorRequest, vendor_workspace_path, visible_workspace_path
+
 router = APIRouter(
     prefix="/brain/knowledge/qa",
     tags=["Knowledge QA"],
@@ -188,28 +190,57 @@ def _merged_target_content(target_file: Path, new_items: list[dict[str, Any]]) -
 
 
 @router.get("/questions")
-def list_all_questions_route(project_id: str = "default") -> dict[str, Any]:
+def list_all_questions_route(project_id: str = "default", vendor: VendorRequest = False) -> dict[str, Any]:
     """Every quick Q&A question in one list, with categories and states (see knowledge/qa_questions.py)."""
     from knowledge.qa_questions import list_all_questions
 
+    if vendor:
+        return list_all_questions(
+            project_id, visible=lambda path: visible_workspace_path(project_id, path, "knowledge"),
+        )
     return list_all_questions(project_id)
 
 
+def _vendor_node(node: dict[str, Any], project_id: str) -> dict[str, Any]:
+    return {
+        **node,
+        "qa_entries": [
+            entry for entry in node.get("qa_entries", [])
+            if not (source := entry.get("source_path"))
+            or visible_workspace_path(project_id, source, "knowledge")
+        ],
+        **({"children": [_vendor_node(child, project_id) for child in node["children"]]}
+           if "children" in node else {}),
+    }
+
+
+def _check_qa_sources(node: dict[str, Any], project_id: str) -> None:
+    for entry in node.get("qa_entries", []):
+        if source := entry.get("source_path"):
+            vendor_workspace_path(project_id, source, "knowledge")
+
+
 @router.get("/nodes")
-def list_qa_nodes_route(project_id: str = "default") -> list[dict[str, Any]]:
-    return get_node_tree(project_id)
+def list_qa_nodes_route(
+    project_id: str = "default", vendor: VendorRequest = False,
+) -> list[dict[str, Any]]:
+    nodes = get_node_tree(project_id)
+    return [_vendor_node(node, project_id) for node in nodes] if vendor else nodes
 
 
 @router.post("/nodes/adopt-source")
 async def adopt_source_route(
     payload: SourcePathRequest,
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     def _adopt() -> dict[str, Any]:
         path = payload.path.strip()
         if not path:
             raise HTTPException(status_code=400, detail="path 不可為空")
 
+        if vendor:
+            vendor_workspace_path(project_id, path, "knowledge")
         try:
             path = canonical_knowledge_path(path, project_id)
         except MergedSaveError as exc:
@@ -252,6 +283,7 @@ async def ingest_source_route(
     id: str,
     payload: SourcePathRequest,
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     def _ingest() -> dict[str, Any]:
         path = payload.path.strip()
@@ -262,6 +294,8 @@ async def ingest_source_route(
         if not node:
             raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
 
+        if vendor:
+            vendor_workspace_path(project_id, path, "knowledge")
         try:
             path = canonical_knowledge_path(path, project_id)
         except MergedSaveError as exc:
@@ -299,6 +333,8 @@ async def ingest_source_route(
 
         if not target_path:
             target_path = f"knowledge/qa/{id}.md"
+        if vendor:
+            vendor_workspace_path(project_id, target_path, "knowledge")
 
         try:
             target_file = resolve_workspace_document(target_path, project_id)
@@ -414,6 +450,7 @@ def patch_qa_node_route(
     id: str,
     payload: UpdateNodeRequest,
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     updates: dict[str, Any] = {}
     if payload.label is not None:
@@ -425,7 +462,7 @@ def patch_qa_node_route(
         node = update_node(id, updates, project_id=project_id)
         if node is None:
             raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-        return node
+        return _vendor_node(node, project_id) if vendor else node
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -443,12 +480,13 @@ def move_qa_node_route(
     id: str,
     payload: MoveNodeRequest,
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     try:
         node = move_node(id, payload.new_parent_ids, project_id=project_id)
         if node is None:
             raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-        return node
+        return _vendor_node(node, project_id) if vendor else node
     except ValueError as exc:
         # move_node 的訊息帶內部編號，這句會直接顯示在「移到…」對話框。
         raise HTTPException(status_code=400, detail=_MOVE_REFUSED) from exc
@@ -459,12 +497,13 @@ def reorder_qa_node_route(
     id: str,
     payload: ReorderNodeRequest,
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     try:
         node = reorder_node(id, payload.sibling_ids_ordered, project_id=project_id)
         if node is None:
             raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-        return node
+        return _vendor_node(node, project_id) if vendor else node
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -473,11 +512,12 @@ def reorder_qa_node_route(
 def get_merged_qa_route(
     id: str,
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> list[dict[str, Any]]:
     node = get_node(id, project_id=project_id)
     if not node:
         raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
-    return merged_rows(id, node, project_id)
+    return merged_rows(id, _vendor_node(node, project_id) if vendor else node, project_id)
 
 
 @router.put("/nodes/{id}/merged")
@@ -486,9 +526,15 @@ async def put_merged_qa_route(
     payload: list[MergedQaItem],
     project_id: str = "default",
     base_version: str | None = None,
+    vendor: VendorRequest = False,
 ) -> dict[str, str]:
     def _save() -> None:
         with qa_document_lock:
+            if vendor:
+                _check_qa_sources(get_node(id, project_id=project_id) or {}, project_id)
+                for item in payload:
+                    if item.source_file:
+                        vendor_workspace_path(project_id, item.source_file, "knowledge")
             try:
                 save_merged_rows(
                     id, [item.model_dump() for item in payload], project_id, base_version,
@@ -506,6 +552,7 @@ def add_qa_entry_route(
     id: str,
     payload: AddEntryRequest,
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     """Mount a document's question on this node, or add a menu-only question."""
     question = payload.question.strip()
@@ -524,6 +571,8 @@ def add_qa_entry_route(
         hidden = payload.hidden
         image_id = None
         if source_path:
+            if vendor:
+                vendor_workspace_path(project_id, source_path, "knowledge")
             try:
                 source_path = normalized_qa_source(source_path, project_id)
                 found = read_question(source_path, question, project_id)
@@ -542,7 +591,7 @@ def add_qa_entry_route(
             },
             project_id=project_id,
         )
-    return updated or {}
+    return _vendor_node(updated, project_id) if vendor and updated else (updated or {})
 
 
 @router.delete("/nodes/{id}/entries")
@@ -551,6 +600,7 @@ def remove_qa_entry_route(
     question: str,
     source_path: str = "",
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, Any]:
     """Take a question off this node; the document keeps it and search still finds it."""
     with qa_document_lock:
@@ -565,13 +615,14 @@ def remove_qa_entry_route(
         updated = remove_qa_entry_from_node(
             id, question, project_id=project_id, source_path=source_path
         )
-    return updated or {}
+    return _vendor_node(updated, project_id) if vendor and updated else (updated or {})
 
 
 @router.post("/images")
 async def upload_image_route(
     file: UploadFile = File(...),
     project_id: str = "default",
+    vendor: VendorRequest = False,
 ) -> dict[str, str]:
     settings = get_settings()
     ext = Path(file.filename or "").suffix.lower()
@@ -580,6 +631,8 @@ async def upload_image_route(
     file_bytes = await read_upload_limited(file, settings.qa_image_max_bytes)
     validate_qa_image(file_bytes, ext, settings.qa_image_max_side_px)
     image_id = f"{uuid4()}{ext}"
+    if vendor:
+        vendor_workspace_path(project_id, f"knowledge/.qa_images/{image_id}", "qa_image")
 
     await asyncio.to_thread(
         save_uploaded_artifact,
@@ -605,15 +658,23 @@ def _resolve_qa_image(id: str, project_id: str) -> Path:
 
 
 @router.get("/images/{id}")
-def get_image_route(id: str, project_id: str = "default") -> FileResponse:
+def get_image_route(
+    id: str, project_id: str = "default", vendor: VendorRequest = False,
+) -> FileResponse:
     path = _resolve_qa_image(id, project_id)
+    if vendor:
+        vendor_workspace_path(project_id, f"knowledge/.qa_images/{path.name}", "qa_image")
     media_type = QA_IMAGE_MEDIA_TYPES[path.suffix.lower()]
     return FileResponse(path, media_type=media_type)
 
 
 @router.delete("/images/{id}")
-def delete_image_route(id: str, project_id: str = "default") -> dict[str, str]:
+def delete_image_route(
+    id: str, project_id: str = "default", vendor: VendorRequest = False,
+) -> dict[str, str]:
     safe_id = Path(id).name
+    if vendor:
+        vendor_workspace_path(project_id, f"knowledge/.qa_images/{safe_id}", "qa_image")
     path = resolve_workspace_artifact(f"knowledge/.qa_images/{safe_id}", project_id)
     if path.exists() and path.is_file():
         path.unlink()

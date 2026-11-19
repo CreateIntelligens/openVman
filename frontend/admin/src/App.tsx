@@ -95,6 +95,7 @@ function AppContent() {
   );
   const ActiveComponent = pageComponents[route.tab];
   const access: TabAccess = account?.role ?? "user";
+  const vendor = Boolean(account && isVendorUser(account));
   const accessSection = route.tab === "Access"
     ? accessSectionOf(route.subView)
     : undefined;
@@ -188,14 +189,18 @@ function AppContent() {
   const switchTab = useCallback(
     (tab: Tab, subView?: string) => {
       // 側欄只給分頁不給子視圖；有記憶就回到上次停的地方，不要每次都掉回預設頁。
-      const nextRoute = normalizeAdminRoute({ tab, subView: subView ?? recallSubView(tab) });
+      const remembered = normalizeAdminRoute({ tab, subView: recallSubView(tab) });
+      const nextRoute = normalizeAdminRoute({
+        tab,
+        subView: subView ?? (canAccessRoute(remembered, access, vendor) ? remembered.subView : undefined),
+      });
       if (nextRoute.tab === route.tab && nextRoute.subView === route.subView) {
         return;
       }
       requestNavigation(() => applyRoute(nextRoute, projectId));
       setMobileNavOpen(false);
     },
-    [applyRoute, projectId, requestNavigation, route],
+    [access, applyRoute, projectId, requestNavigation, route, vendor],
   );
 
   const switchProject = useCallback(
@@ -208,8 +213,8 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
-  if (!canAccessRoute(route, access) || (accessSection === "api-keys" && account && isVendorUser(account))) {
-    return <ForbiddenState />;
+  if (!canAccessRoute(route, access, vendor)) {
+    return <ForbiddenState routeDenied={vendor} />;
   }
 
   return (
@@ -224,6 +229,7 @@ function AppContent() {
           projectId={projectId}
           isPinned={isPinned}
           access={access}
+          vendor={vendor}
           collapsedGroups={collapsedGroups}
           onToggleGroup={toggleGroup}
           onSelectTab={switchTab}
@@ -264,6 +270,7 @@ function AppContent() {
             onClose={closeMobileNav}
             onSelectTab={switchTab}
             access={access}
+            vendor={vendor}
             canManageApiKeys={canOpenAccountKeys(account)}
             onOpenApiKeys={() => switchTab("Access", "api-keys")}
             collapsedGroups={collapsedGroups}
@@ -301,7 +308,7 @@ function AppContent() {
           </div>
         </main>
 
-        {accessSection !== "accounts"
+        {!vendor && accessSection !== "accounts"
           && accessSection !== "api-keys"
           && accessSection !== "graph"
           && <MascotWidget />}

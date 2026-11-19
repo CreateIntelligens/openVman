@@ -162,7 +162,7 @@ function appendActionRequestToLastAssistant(
   });
 }
 
-export function useChatSession() {
+export function useChatSession(vendor = false) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [privacyWarningsVisible, setPrivacyWarningsVisible] = useState(() => readPrivacyWarningsVisible());
@@ -191,7 +191,7 @@ export function useChatSession() {
     playTts,
     handleTtsProviderChange,
     handleTtsVoiceChange,
-  } = useTts();
+  } = useTts(!vendor);
 
   const {
     messages,
@@ -226,7 +226,7 @@ export function useChatSession() {
     pickSlash,
     setSlashIndex,
     setSlashOpen,
-  } = useSlashAutocomplete(input, setInput);
+  } = useSlashAutocomplete(input, setInput, !vendor);
 
   const { push: pushHistory, seed: seedHistory, onKeyDown: onHistoryKeyDown } = useInputHistory();
   const starterPrompts = useStarterPrompts();
@@ -297,7 +297,7 @@ export function useChatSession() {
     setAsrInterim(text);
   }, []);
 
-  if (!controllerRef.current) {
+  if (!vendor && !controllerRef.current) {
     controllerRef.current = createSpeechController({
       http: {
         request: (path, init) => apiFetch(path, init),
@@ -313,7 +313,7 @@ export function useChatSession() {
 
   useEffect(() => {
     const ctrl = controllerRef.current;
-    if (!ctrl) return;
+    if (vendor || !ctrl) return;
     ctrl.updateCallbacks({
       onResult: handleFinalTranscript,
       onInterim: handleInterim,
@@ -321,16 +321,16 @@ export function useChatSession() {
       onProviderChange: (p) => setAsrProviderState(p),
       onStateChange: (state) => setAsrState(state),
     });
-  }, [handleFinalTranscript, handleInterim, handleAsrError]);
+  }, [handleFinalTranscript, handleInterim, handleAsrError, vendor]);
 
   useEffect(() => {
     const ctrl = controllerRef.current;
-    if (!ctrl) return;
+    if (vendor || !ctrl) return;
     void ctrl.init();
     return () => {
       ctrl.dispose();
     };
-  }, []);
+  }, [vendor]);
 
   const toggleAsr = useCallback(() => {
     controllerRef.current?.toggleListening();
@@ -376,9 +376,9 @@ export function useChatSession() {
     persistSessionId(payload.session_id);
 
     if (payload.reply) {
-      void prefetchTts(payload.reply, speechLanguage);
+      if (!vendor) void prefetchTts(payload.reply, speechLanguage);
     }
-  }, [persistSessionId, prefetchTts, setMessages]);
+  }, [persistSessionId, prefetchTts, setMessages, vendor]);
 
   const submit = useCallback(async (value = input) => {
     const nextMessage = value.trim();

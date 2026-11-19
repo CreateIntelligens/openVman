@@ -18,6 +18,8 @@
 
 - **[2026-11-19]** **壓測工具可調上游延遲並記錄資源**：`scripts/experiments/brain-worker-split/` 的假 LLM、假 TTS 延遲改由 `FAKE_LLM_FIRST_SECONDS`、`FAKE_LLM_GAP_SECONDS`、`FAKE_TTS_FIRST_CHUNK_SECONDS`、`FAKE_TTS_SECONDS_PER_CHAR` 設定（預設不變），設 0 即「上游秒回」，只量 Backend＋Brain；`load.py` 以 `LOAD_WARMUP` 控制正式計時前的暖身；新增 `resource_monitor.py` 每秒讀各容器 cgroup 的 CPU 與記憶體、`compose.real-project.yaml` 以真實專案資料壓測、`questions-industrial.json` 題庫。新增 `scripts/experiments/tts-relay/run.py` 比較直接打 TTS 節點與經 Backend 轉發的首音時間（`--direct-url` 必填）。
 
+- **[2026-11-19]** **廠商後台只開放四頁，人設只可改內容**：廠商帳號在桌面和手機只看得到知識庫、人設、對話測試、對話紀錄。直接打開其他頁面顯示「沒有權限」，呼叫隱藏功能的 API 回 403。人設頁只讀取與儲存授權專案的 `SOUL.md`，唯讀帳號只能瀏覽。知識庫文件操作限知識庫目錄，拒絕前後帶空白的路徑及檔案連結。通用工作區檔案與角色綁定僅供內部使用。文字、串流與即時對話只提供本專案的唯讀知識庫工具，工具診斷留在內部。即時對話須先驗證專案授權，知識庫上傳失敗以固定訊息回覆。廠商代發金鑰沿用相同的路由和專案限制。
+
 - **[2026-11-18]** **唯讀專案可看與匯出對話紀錄**：對話列表、單段歷史及匯出使用專案讀取權，刪除仍需「改其他設定」。一般帳號改由管理員代發 API 金鑰，既有金鑰照原本的期限與撤銷規則驗證。
 
 - **[2026-11-18]** **重啟後第一批題目不再整批慢半秒**：Brain 映像檔沒有 `.pyc`，第一題才建的 OpenAI client 會連帶 import `httpcore2`、openai 的 chat 資源，工具表也是第一題才載入，每個 worker 都在第一批題目上現場編譯這些模組，期間同一個 worker 的其他題目都在等。背景預熱現在先建好工具表，並對每個專案建好 Gemini client 與 LLM client（只建物件、不連線），第一題直接沿用。compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱拿不到模型設定與金鑰；這兩項現在在 readiness 放行後每 2 秒重試（最多約 2 分鐘），Backend 一回應就補完；只重試連不到 Backend 或它回 5xx 的項目，專案金鑰綁定壞掉之類的設定錯誤記 warning 後不再重試，補熱也不重建工具表。隔離環境（鶴記真實資料、LLM／TTS 用假服務、決策走真的 Jev）重啟後馬上 1 秒 100 題：聽到第一句中位數原本比第二批慢 0.6～0.9 秒，現在慢 0.2～0.3 秒；p95 仍比第二批慢 0.5～0.8 秒，原因還沒找到。

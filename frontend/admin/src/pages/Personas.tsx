@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
        AvatarCharacter,
        clonePersona,
@@ -6,9 +6,11 @@ import {
        deletePersona,
        fetchAvatarCharacters,
        fetchPersonas,
+       fetchPersonaSoul,
        fetchKnowledgeDocument,
        PersonaSummary,
        saveKnowledgeDocument,
+       savePersonaSoul,
        setPersonaAvatar,
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
@@ -20,9 +22,11 @@ import PersonaEditor from "../components/personas/PersonaEditor";
 import PersonaEmptyState from "../components/personas/PersonaEmptyState";
 import PersonaList from "../components/personas/PersonaList";
 import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
+import { useAuth } from "../context/AuthContext";
 import { useProject } from "../context/ProjectContext";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
+import { isVendorUser } from "../utils/accountPermissions";
 import { generateAssetId } from "../utils/generateAssetId";
 
 type EditorMode = "edit" | "preview" | "split";
@@ -53,7 +57,11 @@ function buildAvatarBindingOptions(
 }
 
 export default function Personas() {
-       const { projectId } = useProject();
+       const { projectId, projects } = useProject();
+       const { account } = useAuth();
+       const vendor = Boolean(account && isVendorUser(account));
+       const readOnly = vendor && projects?.find((project) => project.project_id === projectId)?.can_edit_knowledge !== true;
+       const pageTitle = vendor ? "人設" : "角色管理";
        const [personas, setPersonas] = useState<PersonaSummary[]>([]);
        const [newPersonaId, setNewPersonaId] = useState("");
        const [newPersonaLabel, setNewPersonaLabel] = useState("");
@@ -63,6 +71,7 @@ export default function Personas() {
        const [avatarChars, setAvatarChars] = useState<AvatarBindingOption[]>([]);
 
        // Document Editor State
+       const latestDocumentRequest = useRef(0);
        const [selectedPath, setSelectedPath] = useState("");
        const [draftContent, setDraftContent] = useState("");
        const [loadedContent, setLoadedContent] = useState("");
@@ -108,18 +117,24 @@ export default function Personas() {
               }
        };
 
-       const openDocument = async (path: string) => {
+       const openDocument = async (path: string, personaId?: string) => {
+              const requestId = ++latestDocumentRequest.current;
               setLoadingDocument(true);
               setStatus(null);
               try {
-                     const response = await fetchKnowledgeDocument(path);
+                     const response = personaId
+                            ? { ...await fetchPersonaSoul(personaId), path }
+                            : await fetchKnowledgeDocument(path);
+                     if (requestId !== latestDocumentRequest.current) return;
                      setSelectedPath(response.path);
                      setDraftContent(response.content);
                      setLoadedContent(response.content);
               } catch (error) {
-                     setStatus({ type: "error", message: String(error) });
+                     if (requestId === latestDocumentRequest.current) {
+                            setStatus({ type: "error", message: String(error) });
+                     }
               } finally {
-                     setLoadingDocument(false);
+                     if (requestId === latestDocumentRequest.current) setLoadingDocument(false);
               }
        };
 
@@ -127,10 +142,19 @@ export default function Personas() {
 
        const openPersona = async (persona: PersonaSummary | null) => {
               setSelectedPersona(persona);
+              if (vendor && persona) {
+                     setSelectedPath("");
+                     setDraftContent("");
+                     setLoadedContent("");
+                     await openDocument("SOUL.md", persona.persona_id);
+                     return;
+              }
               if (persona?.path) {
                      await openDocument(persona.path);
                      return;
               }
+              ++latestDocumentRequest.current;
+              setLoadingDocument(false);
               setSelectedPath("");
               setDraftContent("");
               setLoadedContent("");
@@ -146,18 +170,24 @@ export default function Personas() {
        };
 
        const selectDocument = (path: string) => {
-              if (path === selectedPath) return;
+              if (vendor || path === selectedPath) return;
               requestNavigation(() => void openDocument(path));
        };
 
        const saveDocument = async () => {
-              if (!selectedPath) return;
+              if (!selectedPath || readOnly || loadingDocument) return;
+              const requestId = latestDocumentRequest.current;
 
               setSaving(true);
               setStatus(null);
 
               try {
-                     await saveKnowledgeDocument(selectedPath, draftContent);
+                     if (vendor && selectedPersona) {
+                            await savePersonaSoul(selectedPersona.persona_id, draftContent);
+                     } else {
+                            await saveKnowledgeDocument(selectedPath, draftContent);
+                     }
+                     if (requestId !== latestDocumentRequest.current) return;
                      setStatus({ type: "success", message: `已儲存「${personaDocLabel(selectedPath)}」` });
                      setLoadedContent(draftContent);
                      await loadPersonas(selectedPersona?.persona_id);
@@ -254,15 +284,16 @@ export default function Personas() {
        useEffect(() => {
               loadPersonas();
               // eslint-disable-next-line react-hooks/exhaustive-deps
-       }, [projectId]);
+       }, [projectId, vendor]);
 
        useEffect(() => {
+              if (vendor) return;
               fetchAvatarCharacters()
                      .catch(() => ({ characters: [] }))
                      .then((charsRes) => {
                             setAvatarChars(buildAvatarBindingOptions(charsRes.characters));
                      });
-       }, []);
+       }, [vendor]);
 
        const onBindAvatar = async (personaId: string, charId: string | null) => {
               try {
@@ -281,7 +312,7 @@ export default function Personas() {
        const docPrefix = selectedPersona?.is_default ? "" : `personas/${selectedPersona?.persona_id}/`;
        const coreDocs = selectedPersona
               ? [
-                     { path: selectedPersona.path, label: personaDocLabel("SOUL.md"), icon: "psychology" },
+                     { path: selectedPersona.path ?? "SOUL.md", label: personaDocLabel("SOUL.md"), icon: "psychology" },
                      { path: `${docPrefix}AGENTS.md`, label: personaDocLabel("AGENTS.md"), icon: "group_work" },
                      { path: `${docPrefix}TOOLS.md`, label: personaDocLabel("TOOLS.md"), icon: "build" },
                      { path: `${docPrefix}MEMORY.md`, label: personaDocLabel("MEMORY.md"), icon: "memory" },
@@ -317,7 +348,7 @@ export default function Personas() {
                                           <div className="w-8 h-8 rounded flex items-center justify-center bg-surface-sunken text-content-muted">
                                                  <span className="material-symbols-outlined text-[1.25rem]">groups_2</span>
                                           </div>
-                                          <h1 className="page-title">角色管理</h1>
+                                          <h1 className="page-title">{pageTitle}</h1>
                                    </div>
                                    <div className="flex items-center gap-1">
                                           <button
@@ -348,9 +379,10 @@ export default function Personas() {
                                           selectedPersonaId={selectedPersona?.persona_id}
                                           deletingPersonaId={deletingPersonaId}
                                           onSelect={(persona) => selectPersona(persona, personaDrawer.closeMobileTree)}
-                                          onDelete={setDeletePersonaTarget}
+                                          onDelete={vendor ? undefined : setDeletePersonaTarget}
                                    />
 
+                                   {!vendor && <>
                                    <hr className="border-border " />
 
                                    <PersonaCreateForm
@@ -365,6 +397,7 @@ export default function Personas() {
                                           onTemplateSourceIdChange={setTemplateSourceId}
                                           onSubmit={handleCreateOrClone}
                                    />
+                                   </>}
                             </div>
                      </aside>
 
@@ -372,7 +405,7 @@ export default function Personas() {
                      <main className="flex-1 flex flex-col min-w-0 bg-surface dark:bg-background-dark relative overflow-hidden">
                             {/* 手機看不到側欄：主標題與切換角色放在這一列，桌面版由側欄負責。 */}
                             <PageHeader
-                                   title="角色管理"
+                                   title={pageTitle}
                                    sticky={false}
                                    className="md:hidden"
                                    actions={(
@@ -416,16 +449,17 @@ export default function Personas() {
 
                             {selectedPersona ? (
                                    <>
-                                          <PersonaAvatarSelector
+                                          {!vendor && <PersonaAvatarSelector
                                                  characters={avatarChars}
                                                  persona={selectedPersona}
                                                  onBind={onBindAvatar}
-                                          />
+                                          />}
                                           <PersonaEditor
                                                  title={selectedPersona.label || selectedPersona.persona_id}
                                                  selectedPath={selectedPath}
                                                  draftContent={draftContent}
-                                                 coreDocs={coreDocs}
+                                                 coreDocs={vendor ? coreDocs.slice(0, 1) : coreDocs}
+                                                 readOnly={readOnly || (vendor && !selectedPath)}
                                                  editorMode={editorMode}
                                                  loadingDocument={loadingDocument}
                                                  saving={saving}

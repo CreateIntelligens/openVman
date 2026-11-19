@@ -13,10 +13,11 @@ const RETRY_DELAY_MS = 600;
  * 跟虛擬人端同一套規則：401/403 是工作階段還沒就緒，不是後端掛了，重問一次、
  * 仍失敗就維持 null；5xx 與網路錯誤才 fail-open，後端暫時掛掉不該讓功能消失。
  */
-export function useVisionAvailable(): boolean | null {
+export function useVisionAvailable(enabled = true): boolean | null {
   const [available, setAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     async function probe(retryOnUnauthorized: boolean): Promise<void> {
@@ -44,7 +45,7 @@ export function useVisionAvailable(): boolean | null {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return available;
 }

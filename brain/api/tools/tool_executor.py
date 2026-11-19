@@ -13,6 +13,7 @@ from typing import Any, Callable
 from config import get_settings
 from core.turn_budget import current_trace_id, current_turn_budget, number_setting
 from safety.observability import get_metrics_store, log_event, log_exception
+from tools.context import active_vendor_chat
 from tools.tool_registry import get_tool_registry
 
 
@@ -121,7 +122,8 @@ def execute_tool_call(tool_name: str, raw_arguments: str | dict[str, Any]) -> st
         )
     except Exception as exc:
         log_exception("tool_execution_error", exc, tool_name=tool_name)
-        return _finalize(tool_name, "error", start, ToolResult.fail(tool_name, f"工具執行失敗：{exc}"))
+        message = "無法完成知識庫查詢。" if active_vendor_chat.get() else f"工具執行失敗：{exc}"
+        return _finalize(tool_name, "error", start, ToolResult.fail(tool_name, message))
 
     return _finalize(tool_name, "ok", start, ToolResult.ok(tool_name, _coerce_tool_data(result)))
 

@@ -71,7 +71,7 @@ Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 
 
 **授權的專案就是 Brain 用的專案**：代理先讀 body（受 `BRAIN_PROXY_MAX_BODY_BYTES` 上限保護，超過回 413），再決定專案。專案來源包括 query 的每一個 `project_id`、body 最上層與 `message` 裡的 `project_id`；body 不論 `Content-Type`，只要是 JSON 物件就解析（Brain 也是）。query 的 `project_id` 空白或多個值不一致、body 的 `project_id` 不是字串、或各來源不一致，一律 422。授權後，需要專案的路徑轉給 Brain 時只帶授權過的正規化專案 ID：query 的 `project_id` 全部換成這一個，JSON body 最上層一律寫入（`message` 裡有寫的也覆蓋），並放在可信標頭 `X-OpenVMan-Project-ID`。呼叫端的 `X-Brain-*` 標頭一律不轉（Brain 曾把 `X-Brain-Project` 當專案備援）。Embed key 用同一個值檢查綁定。公開的 `/api/v1/health` 只放行 GET／HEAD／OPTIONS，其他方法要登入。
 
-### 1.2 對外客服權限（第 1 段）
+### 1.2 對外客服權限
 
 下表定義五種組合的能力與專案範圍。專案授權包含「讀」，另有獨立的「改知識庫與人設」及「改其他設定」。任何一種寫入權都包含該專案的讀取權。專案刪除、資源指派、模型供應商與共用技能仍受各入口原有的管理層級約束。
 
@@ -92,7 +92,25 @@ ROOT 可管理所有專案、授予帳號管理旗標及調整角色。此段以
 | 對話清單、單段歷史、匯出及對話測試 | 讀 |
 | 對話單筆與批次刪除 | 改其他設定 |
 
-共用的工作區文件 API 依目標路徑判定，`knowledge/`、`raw/` 及人設的 `SOUL.md`、`IDENTITY.md`、`AGENTS.md`、`TOOLS.md` 使用「改知識庫與人設」。`MEMORY.md` 與其他工作區路徑使用「改其他設定」。移動時一併檢查來源與目的，Brain 以實際解析的路徑複核 Backend 授權。正式廠商帳號不得取得「改其他設定」。有資源上限的管理員只可列出與管理落在上限內的廠商帳號。
+內部帳號的共用工作區文件 API 依目標路徑判定，`knowledge/`、`raw/` 及人設的 `SOUL.md`、`IDENTITY.md`、`AGENTS.md`、`TOOLS.md` 使用「改知識庫與人設」。`MEMORY.md` 與其他工作區路徑使用「改其他設定」。移動時一併檢查來源與目的，Brain 以實際解析的路徑複核 Backend 授權。正式廠商帳號不得取得「改其他設定」。有資源上限的管理員只可列出與管理落在上限內的廠商帳號。
+
+#### 廠商後台四頁與 API 授權
+
+依《Vman 對外客服整合評估》4-6 ⑤ #5 與「共通：廠商帳號的後台框架」，桌面和手機只顯示下列四頁。直接開啟隱藏頁及知識庫圖譜顯示「沒有權限」。選專案時只列明確授權且歸屬相符的專案。
+
+| 頁面 | 網址 | 廠商可用範圍 |
+| --- | --- | --- |
+| 知識庫 | `/admin/knowledge` | 文件、快速回覆、所有題目、回答語言與長度。文件與匯入限該專案知識庫 |
+| 人設 | `/admin/personas` | 切換該專案既有人設，瀏覽或儲存 `SOUL.md` |
+| 對話測試 | `/admin/chat` | 文字測試、快速問題及對話歷史 |
+| 對話紀錄 | `/admin/sessions` | 清單、單段歷史及匯出 |
+
+Backend 依憑證所屬帳號判斷廠商身分，登入 session 與代發 API 金鑰共用 HTTP 路由及方法允許清單。隱藏功能及通用工作區文件 API 回 403。允許的專案端點仍需查核專案讀取或寫入權，未獲授權的專案回 404。
+
+- 人設清單 `GET /api/v1/personas?project_id=…` 只回角色代號、名稱與預設狀態。`GET /api/v1/personas/soul?project_id=…&persona_id=…` 回 `{content}`，`PUT /api/v1/personas/soul` 接受 `{project_id, persona_id, content}`，成功回 `{status: "ok"}`。後者需「改知識庫與人設」。預設人設對應工作區根目錄 `SOUL.md`，其餘對應 `personas/<persona_id>/SOUL.md`。指定人設沒有自己的檔案時回 404。角色建立、複製、刪除及虛擬人綁定由內部人員處理。
+- 知識庫檔案使用 `/api/v1/knowledge/base/document`（GET、PUT、DELETE）、`/base/document/meta`（PATCH）、`/base/directory`（POST、DELETE）及 `/base/move`（POST），沿用原文件操作的欄位。Backend 與 Brain 都拒絕前後帶空白的路徑。Backend 檢查路徑在 `knowledge/` 下，Brain 複核實際位置並拒絕符號連結與硬連結。清單、快速回覆、圖片、上傳與匯入也依專案及各自目錄限制。圖譜、重建索引、清理未用圖片及 AI 整理排版屬內部功能。
+- Backend 轉送前移除客戶端提供的 `X-OpenVMan-*`，以已驗證的帳號身分加上可信廠商標頭。Brain 路由仍以伺服器內部權杖驗證。
+- 專案摘要和明細提供目前帳號的 `can_edit_knowledge`，供人設頁決定可否編輯。所有寫入仍由 Backend 即時查核。
 
 #### 廠商 API 回應欄位
 
@@ -100,10 +118,14 @@ ROOT 可管理所有專案、授予帳號管理旗標及調整角色。此段以
 | --- | --- |
 | 專案摘要與明細 | `project_root`、`has_session_db`、`has_lancedb` 等伺服器位置、儲存細節與其他廠商歸屬 |
 | 帳號與金鑰 | 密碼及雜湊、金鑰明文與雜湊、其他帳號、內部稽核、帳號管理旗標與委派關係 |
-| 人設、工作區、知識庫 | 屬於隱藏功能的檔案清單、路徑、內容與中繼資料，包含後續限制的 `AGENTS.md`、`TOOLS.md`、`MEMORY.md`，以及內部絕對路徑 |
+| 人設、工作區、知識庫 | 屬於隱藏功能的檔案清單、路徑、內容與中繼資料，包含 `AGENTS.md`、`TOOLS.md`、`MEMORY.md`、`IDENTITY.md` 與 `.learnings/`，以及內部絕對路徑 |
 | 對話、匯出、串流、設定與錯誤 | 系統提示詞、模型供應商憑證、內部位址、技術除錯資料、呼叫堆疊與隱藏功能的設定值 |
 
-本段實作專案與帳號守門，以及專案回應裁切。四頁導覽、只開放 `SOUL.md`、其餘廠商回應欄位裁切、三個月對話保留窗及軟刪除另行交付。
+- HTTP chat 與 SSE 只讓廠商使用 `search_knowledge` 和 `get_document`。後者使用與文件 API 相同的目錄、空白及連結檢查。即時對話只有 `search_knowledge`，廠商回合停用長期記憶檢索、外部網頁查詢與發布、技能、圖譜和 A2A 工具。
+- WebSocket 依握手驗證的帳號判斷廠商身分，先驗證 `client_init` 的專案授權，再附上 `X-OpenVMan-Vendor: 1` 連線至 Brain。Brain 轉送語音、文字、轉錄和停止音訊事件，省略搜尋引用與決策診斷事件，並將 `server_error` 轉成固定的對話失敗訊息。
+- 知識庫文件與 raw 上傳處理失敗時，保留 HTTP 狀態碼。廠商收到固定的上傳失敗或權限訊息，轉檔例外、上游網址與暫存路徑只供內部診斷。
+
+三個月對話查詢窗、軟刪除、人物設定版型與強制載入根目錄 `AGENTS.md` 另行交付。
 
 ### 2. 連線與 Session 管理 (Session Management)
 伺服器必須在記憶體中維護一個 Session Map，管理所有活躍的機台連線。

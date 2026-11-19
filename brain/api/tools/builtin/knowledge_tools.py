@@ -7,12 +7,14 @@ from core.turn_budget import number_setting
 from knowledge.kb_settings import primary_language
 from memory.language_detect import detect_language, route_language
 from safety.observability import record_node_attempt
+from safety.vendor_access import vendor_workspace_path
 from tools.context import (
     active_persona_id,
     active_project_id,
     active_retrieval_language,
     active_speech_language,
     active_user_message,
+    active_vendor_chat,
     mode_settings,
 )
 from tools.search_helpers import (
@@ -307,7 +309,10 @@ def _get_document(args: dict[str, Any]) -> dict[str, Any]:
 
     project_id = active_project_id.get()
     ws = get_workspace_root(project_id)
-    path = resolve_workspace_document(str(args.get("path", "")).strip(), project_id)
+    relative = str(args.get("path", ""))
+    if active_vendor_chat.get():
+        vendor_workspace_path(project_id, relative, "knowledge")
+    path = resolve_workspace_document(relative, project_id)
     content = path.read_text(encoding="utf-8-sig")
     limit = max(200, cfg.tool_document_char_limit)
     truncated = content[:limit]

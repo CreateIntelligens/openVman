@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchTools, type SkillInfo } from "../api";
 
-export function useSlashAutocomplete(input: string, setInput: (val: string) => void) {
+export function useSlashAutocomplete(input: string, setInput: (val: string) => void, enabled = true) {
        const [slashSkills, setSlashSkills] = useState<SkillInfo[]>([]);
        const [slashOpen, setSlashOpen] = useState(false);
        const [slashIndex, setSlashIndex] = useState(0);
 
        useEffect(() => {
+              if (!enabled) return;
               fetchTools()
                      .then((data) => setSlashSkills(data.skills.filter((skill) => skill.enabled)))
                      .catch((reason) => console.warn("Failed to load skills for autocomplete:", reason));
-       }, []);
+       }, [enabled]);
 
        const slashFilter = slashOpen ? input.slice(1).toLowerCase() : "";
        const slashMatches = slashOpen

@@ -248,7 +248,7 @@ describe("App tab mounting", () => {
     expect(window.location.pathname).toBe("/admin/access/api-keys");
   });
 
-  it("hides account key controls from vendors and denies direct entry", async () => {
+  function mockVendorProfile() {
     vi.mocked(getCurrentAccount).mockResolvedValue({
       id: "vendor-1",
       username: "vendor",
@@ -258,19 +258,38 @@ describe("App tab mounting", () => {
       disabled: false,
       created_at: "2026-08-17T00:00:00Z",
     });
-    window.history.replaceState(null, "", "/admin/access");
-    render(<App />);
-    await screen.findByTestId("tab-projects");
-    expect(screen.queryByRole("tab", { name: "API 金鑰" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "管理帳號 API 金鑰" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "開啟導覽" }));
-    expect(within(screen.getByRole("dialog", { name: "主要導覽" }))
-      .queryByRole("button", { name: "API 金鑰" })).toBeNull();
+  }
 
-    window.history.pushState(null, "", "/admin/access/api-keys");
-    fireEvent.popState(window);
-    expect(await screen.findByText("權限不足")).toBeTruthy();
-    expect(screen.queryByTestId("tab-api-keys")).toBeNull();
+  it("shows exactly four vendor pages on desktop and mobile", async () => {
+    mockVendorProfile();
+    window.history.replaceState(null, "", "/admin/chat");
+    render(<App />);
+    await screen.findByTestId("tab-chat");
+
+    const labels = ["對話測試", "對話紀錄", "知識庫", "人設"];
+    const linkLabels = (root: HTMLElement) =>
+      within(root).getAllByRole("link", { hidden: true }).map((link) => link.getAttribute("title"));
+    expect(linkLabels(screen.getByRole("complementary"))).toEqual(labels);
+
+    fireEvent.click(screen.getByRole("button", { name: "開啟導覽" }));
+    const drawer = screen.getByRole("dialog", { name: "主要導覽" });
+    expect(linkLabels(drawer)).toEqual(labels);
+    expect(within(drawer).queryByRole("button", { name: "API 金鑰" })).toBeNull();
+  });
+
+  it.each([
+    "workspace", "search", "memory", "tools", "avatar", "voice",
+    "access", "access/api-keys", "access/accounts", "model-providers",
+    "usage", "system", "system/monitoring", "knowledge/graph",
+  ])("shows a plain permission message for a direct vendor URL /admin/%s", async (path) => {
+    mockVendorProfile();
+    window.history.replaceState(null, "", `/admin/${path}`);
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "沒有權限" })).toBeTruthy();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "返回" }));
+    expect(await screen.findByTestId("tab-chat")).toBeTruthy();
   });
 
   it("uses the URL default project instead of a saved project for direct links", async () => {

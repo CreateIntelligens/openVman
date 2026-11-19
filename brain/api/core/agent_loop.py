@@ -28,6 +28,7 @@ from core.turn_reads import planned_reads, previous_user_text, user_texts
 from core.usage import current_usage_scope
 from safety.observability import log_event, record_node_attempt, timed_node
 from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, fit_product_tool
+from tools.context import VENDOR_KNOWLEDGE_TOOLS, active_vendor_chat
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
 
@@ -364,6 +365,8 @@ def _run_tool_phase(
     tool_steps: list[dict[str, Any]] = []
     registry = get_tool_registry()
     tools = _tools_for_project(_tools_for_mode(registry.build_openai_tools(), mode), project_id)
+    if active_vendor_chat.get() and forced_tool_name not in VENDOR_KNOWLEDGE_TOOLS:
+        forced_tool_name = None
     force_web_search = force_web_search and any(
         tool.get("function", {}).get("name") == "search_web" for tool in tools
     )

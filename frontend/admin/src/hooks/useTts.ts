@@ -37,7 +37,7 @@ type CachedSpeech = {
        fallback?: string;
 };
 
-export function useTts() {
+export function useTts(enabled = true) {
        const [ttsProviders, setTtsProviders] = useState<TtsProvider[]>([]);
        const [ttsProvider, setTtsProvider] = useState(() => readScoped(TTS_PROVIDER_STORAGE_KEY) || "auto");
        const [ttsVoice, setTtsVoice] = useState(() => readScoped(TTS_VOICE_STORAGE_KEY) || "");
@@ -70,6 +70,7 @@ export function useTts() {
        const activeTtsProvider = ttsProviders.find((provider) => provider.id === ttsProvider);
 
         useEffect(() => {
+               if (!enabled) return;
                fetchTtsProviders()
                       .then((providers) => {
                              setTtsProviders(providers);
@@ -103,7 +104,7 @@ export function useTts() {
                              }
                       })
                       .catch((reason) => console.warn("Failed to load TTS providers:", reason));
-        }, []);
+        }, [enabled]);
 
        const clearTtsPrefetchState = useCallback(() => {
               ttsPrefetchAbortRef.current?.abort();

@@ -24,12 +24,18 @@ from app.auth.dependencies import (
 )
 from app.auth.embed import enforce_project_binding
 from app.auth.models import ResourceType
+from app.auth.policy import is_vendor_account
 from app.auth.resources import (
     ResourceAccess,
     ResourceNotFoundError,
     resolve_resource,
 )
 from app.auth.runtime import get_auth_runtime
+from app.auth.vendor_access import (
+    KNOWLEDGE_DOCUMENT_ROUTES,
+    VENDOR_HEADER,
+    vendor_route_allowed,
+)
 from app.chat_tts_text import (
     TTS_TEXT_PATHS,
     TTS_TEXT_STREAM_PATHS,
@@ -86,6 +92,7 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/skills/{{skill_id}}/files", "methods": ["PUT"], "tags": _TAG_TOOLS, "summary": "Update Skill Files"},
     {"path": f"{_PUBLIC_API_PREFIX}/skills/{{skill_id}}", "methods": ["DELETE"], "tags": _TAG_TOOLS, "summary": "Delete Skill"},
     {"path": f"{_PUBLIC_API_PREFIX}/skills/reload", "methods": ["POST"], "tags": _TAG_TOOLS, "summary": "Reload Skills"},
+    {"path": f"{_PUBLIC_API_PREFIX}/personas/soul", "methods": ["GET", "PUT"], "tags": _TAG_PERSONAS, "summary": "Read or save persona SOUL.md"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["GET"], "tags": _TAG_PERSONAS, "summary": "List Personas"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Create Persona"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["DELETE"], "tags": _TAG_PERSONAS, "summary": "Delete Persona"},
@@ -695,6 +702,16 @@ async def _read_capped_body(request: Request, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
+def _is_vendor_knowledge_path(value: Any) -> bool:
+    if not isinstance(value, str) or value != value.strip():
+        return False
+    parts = value.split("/")
+    return len(parts) >= 2 and parts[0] == "knowledge" and all(
+        part and not part.startswith(".") and part not in {"graphify-out", "_catalog.yaml"}
+        for part in parts[1:]
+    )
+
+
 async def proxy_to_brain(
     request: Request,
     path: str,
@@ -703,6 +720,12 @@ async def proxy_to_brain(
     project_id: str | None = None,
 ) -> Response:
     """Forward a request with identity supplied only by trusted Backend state."""
+    vendor = current is not None and is_vendor_account(current.user)
+    if vendor and not vendor_route_allowed(request.method, request.scope["path"]):
+        return JSONResponse(status_code=403, content={"detail": "沒有權限使用這個功能。"})
+    alias = KNOWLEDGE_DOCUMENT_ROUTES.get(f"/{path}")
+    if alias:
+        path = alias.removeprefix("/")
     normalized_path = path.strip("/")
     # HTTPX resolves dot segments before forwarding. Reject them before checking
     # route ownership and project access so both layers see the same target.
@@ -719,6 +742,15 @@ async def proxy_to_brain(
         body = await _read_capped_body(request, get_tts_config().brain_proxy_max_body_bytes)
     except _BodyTooLarge as exc:
         return JSONResponse(status_code=413, content={"detail": str(exc)})
+    if vendor and alias:
+        if request.method in {"GET", "DELETE"}:
+            fields = [request.query_params.get("path")]
+        else:
+            payload = _json_object(body) or {}
+            keys = ("source_path", "target_path") if path == "knowledge/move" else ("path",)
+            fields = [payload.get(key) for key in keys]
+        if not all(_is_vendor_knowledge_path(field) for field in fields):
+            return JSONResponse(status_code=403, content={"detail": "沒有權限使用這個功能。"})
     try:
         project_id = await _authorize_project_context(
             request,
@@ -734,11 +766,17 @@ async def proxy_to_brain(
         )
     except _InvalidProjectId as exc:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
+    except HTTPException as exc:
+        if vendor and exc.status_code == 403:
+            return JSONResponse(status_code=403, content={"detail": "沒有權限使用這個功能。"})
+        raise
     headers = _trusted_upstream_headers(
         request,
         current=current,
         project_id=project_id,
     )
+    if vendor:
+        headers[VENDOR_HEADER] = "1"
     if project_writes := getattr(request.state, "project_writes", None):
         headers[_PROJECT_WRITES_HEADER] = project_writes
     try:
@@ -778,6 +816,15 @@ async def proxy_to_brain(
         )
         content_type = upstream.headers.get("content-type", "")
         resp_headers = _filter_headers(upstream.headers)
+
+        if vendor and upstream.is_error:
+            await upstream.aclose()
+            detail = {
+                403: "沒有權限使用這個功能。",
+                404: "找不到指定的資料。",
+                409: "資料已變更，請重新載入再試。",
+            }.get(upstream.status_code, "操作失敗，請確認輸入後再試。")
+            return JSONResponse(status_code=upstream.status_code, content={"detail": detail})
 
         # SSE / streaming responses — forward chunks via StreamingResponse.
         if "text/event-stream" in content_type:

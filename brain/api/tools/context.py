@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
 
+VENDOR_KNOWLEDGE_TOOLS = frozenset({"search_knowledge", "get_document"})
+active_vendor_chat: ContextVar[bool] = ContextVar("brain_active_vendor_chat", default=False)
 active_persona_id: ContextVar[str] = ContextVar("brain_active_persona_id", default="default")
 active_project_id: ContextVar[str] = ContextVar("brain_active_project_id", default="default")
 active_user_message: ContextVar[str] = ContextVar("brain_active_user_message", default="")
@@ -15,6 +18,15 @@ active_turn_decision_unavailable: ContextVar[bool] = ContextVar(
 # 這一輪的回覆模式（fast / standard / deep）。工具透過 mode_settings() 取用，
 # 才能在同一個行程裡讓不同請求有不同的查詢深度。
 active_reply_mode: ContextVar[str] = ContextVar("brain_active_reply_mode", default="")
+
+
+@contextmanager
+def bind_vendor_chat(vendor: bool):
+    token = active_vendor_chat.set(vendor)
+    try:
+        yield
+    finally:
+        active_vendor_chat.reset(token)
 
 
 def mode_settings() -> Any:

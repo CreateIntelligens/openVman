@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from protocol.schemas import InternalAsrJudgeRequest, InternalEnrichRequest
 from safety.internal_auth import INTERNAL_TOKEN_HEADER, require_internal_token
+from safety.vendor_access import VENDOR_HEADER, vendor_live_event
 
 logger = logging.getLogger("brain.internal_routes")
 
@@ -115,6 +116,7 @@ def _build_live_session(
     role: str = "",
     principal_type: str = "",
     principal_id: str = "",
+    vendor: bool = False,
     event_sink,
 ):
     from live.gemini_live import GeminiLiveSession
@@ -129,12 +131,17 @@ def _build_live_session(
         role=role,
         principal_type=principal_type,
         principal_id=principal_id,
-        system_instruction=_build_live_system_instruction(persona_id, project_id, session_id=session_id),
+        vendor=vendor,
+        system_instruction=_build_live_system_instruction(
+            persona_id, project_id, session_id=session_id, vendor=vendor,
+        ),
         event_sink=event_sink,
     )
 
 
-def _build_live_system_instruction(persona_id: str, project_id: str, session_id: str = "") -> str:
+def _build_live_system_instruction(
+    persona_id: str, project_id: str, session_id: str = "", *, vendor: bool = False,
+) -> str:
     from knowledge.workspace import load_core_workspace_context
 
     blocks: list[str] = []
@@ -154,18 +161,20 @@ def _build_live_system_instruction(persona_id: str, project_id: str, session_id:
     if history_block:
         blocks.append(history_block)
 
-    memory_block = _build_memory_context(persona_id, project_id)
-    if memory_block:
+    if not vendor and (memory_block := _build_memory_context(persona_id, project_id)):
         blocks.append(memory_block)
 
-    tool_rules = (
-        "工具使用規則（重要）：\n"
-        "1. 任何事實性問題（地點、規格、流程、人員、時段、價格、產品、政策、機構資訊等），"
-        "**先呼叫 search_knowledge 再回答**；不要先反問使用者「能否提供更多資訊」。\n"
+    additional_tools = (
         "2. 提到過去對話、偏好或可能曾經告知的個人資訊時，呼叫 search_memory。\n"
         "3. 多主題請拆成 queries 陣列一次送出。\n"
         "4. 即時或公開網路資訊（包含新聞、天氣）先呼叫 search_web；需要完整內容時再呼叫 read_web_page。\n"
         "5. 長篇報告或使用者要求分享時可呼叫 publish_wiki，最後只回傳工具提供的 shareUrl。\n"
+    ) if not vendor else "多主題請拆成 queries 陣列一次送出。\n"
+    tool_rules = (
+        "工具使用規則（重要）：\n"
+        "1. 任何事實性問題（地點、規格、流程、人員、時段、價格、產品、政策、機構資訊等），"
+        "**先呼叫 search_knowledge 再回答**；不要先反問使用者「能否提供更多資訊」。\n"
+        f"{additional_tools}"
         "6. 工具有命中時以工具結果為準；多次查詢仍無命中時才如實說「資料中沒有提到」。\n"
         "7. 絕對不要透露答案的資訊來源。禁止任何來源標記語，例如「根據知識庫」、"
         "「根據記憶」、「根據紀錄」、「根據之前的紀錄」、「根據資料」、「記憶顯示」、"
@@ -377,6 +386,7 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
     except HTTPException:
         await websocket.close(code=1008, reason="invalid internal token")
         return
+    vendor = websocket.headers.get(VENDOR_HEADER) == "1"
     await websocket.accept()
     state: dict[str, Any] = {
         "live_session": None,
@@ -388,6 +398,7 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
             "role": websocket.headers.get("X-OpenVMan-Role", ""),
             "principal_type": websocket.headers.get("X-Principal-Type", ""),
             "principal_id": websocket.headers.get("X-Principal-Id", ""),
+            "vendor": vendor,
         },
         "session_id": relay_session_id,
         "client_disconnected": False,
@@ -398,8 +409,11 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
     async def _event_sink(event: dict) -> None:
         if state["client_disconnected"]:
             return
+        outgoing = vendor_live_event(event) if vendor else event
+        if outgoing is None:
+            return
         try:
-            await websocket.send_json(event)
+            await websocket.send_json(outgoing)
         except (WebSocketDisconnect, RuntimeError):
             state["client_disconnected"] = True
 
@@ -437,7 +451,9 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
     if event == "set_decision_debug":
         from safety.internal_auth import may_see_decision_debug
 
-        allowed = may_see_decision_debug(state["args"]["role"], state["args"]["principal_type"])
+        allowed = not state["args"].get("vendor") and may_see_decision_debug(
+            state["args"]["role"], state["args"]["principal_type"],
+        )
         live.decision_debug_enabled = allowed and payload.get("enabled") is True
     elif event == "user_speak" and (text := str(payload.get("text", "")).strip()):
         live.debug_client_turn_id = payload.get("turn_id") if isinstance(payload.get("turn_id"), str) else None

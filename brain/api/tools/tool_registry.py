@@ -11,10 +11,12 @@ from typing import TYPE_CHECKING, Any
 
 from safety.observability import log_exception
 from tools.context import (
+    VENDOR_KNOWLEDGE_TOOLS,
     active_persona_id,
     active_project_id,
     active_reply_mode,
     active_user_message,
+    active_vendor_chat,
 )
 
 logger = logging.getLogger("brain.tools")
@@ -65,12 +67,18 @@ class ToolRegistry:
             del self._tools[name]
 
     def get(self, name: str) -> Tool:
-        if name not in self._tools:
+        if name not in self._tools or (
+            active_vendor_chat.get() and name not in VENDOR_KNOWLEDGE_TOOLS
+        ):
             raise ValueError(f"未知工具：{name}")
         return self._tools[name]
 
     def list_tools(self) -> list[Tool]:
-        return sorted(self._tools.values(), key=lambda t: t.name)
+        vendor = active_vendor_chat.get()
+        return sorted(
+            (tool for name, tool in self._tools.items() if not vendor or name in VENDOR_KNOWLEDGE_TOOLS),
+            key=lambda tool: tool.name,
+        )
 
     def build_openai_tools(self) -> list[dict[str, Any]]:
         return [

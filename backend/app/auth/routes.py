@@ -235,6 +235,7 @@ class AccountProfile(_StrictModel):
             result.pop("account_management_access", None)
             if self.vendor_name and not isinstance(self, AdminAccountProfile):
                 result.pop("created_by", None)
+                result.pop("ai_cleanup_access", None)
         return result
 
     @classmethod

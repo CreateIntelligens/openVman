@@ -16,6 +16,7 @@ const KNOWLEDGE_TABS = [
 const COMPACT_BUTTON = "max-sm:px-2";
 
 interface KnowledgeHeaderProps {
+  vendor?: boolean;
   activeTab: "documents" | "questions" | "graph";
   setActiveTab: (tab: "documents" | "questions" | "graph") => void;
   documentCount: number;
@@ -35,6 +36,7 @@ interface KnowledgeHeaderProps {
 }
 
 export default function KnowledgeHeader({
+  vendor = false,
   activeTab,
   setActiveTab,
   documentCount,
@@ -117,12 +119,15 @@ export default function KnowledgeHeader({
               目錄
             </button>
             <LanguageRoutesButton projectId={projectId} />
-            <ActionMenu
+            {(!vendor || pendingCount > 0) && <ActionMenu
               label="知識庫維護"
               triggerLabel={reindexing ? "重建中…" : "維護"}
               triggerClassName={`btn btn-ghost ${COMPACT_BUTTON}`}
-              groups={[{ id: "maintenance", items: maintenanceItems }]}
-            />
+              groups={[{
+                id: "maintenance",
+                items: vendor ? maintenanceItems.filter((item) => item.id === "import-pending") : maintenanceItems,
+              }]}
+            />}
             <button
               type="button"
               onClick={onAddData}
@@ -136,7 +141,7 @@ export default function KnowledgeHeader({
           <PageTabs
             idPrefix="knowledge"
             label="知識庫分頁"
-            tabs={KNOWLEDGE_TABS}
+            tabs={vendor ? KNOWLEDGE_TABS.filter((tab) => tab.id !== "graph") : KNOWLEDGE_TABS}
             active={activeTab}
             onSelect={setActiveTab}
           />

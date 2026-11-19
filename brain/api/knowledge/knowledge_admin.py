@@ -39,6 +39,7 @@ from knowledge.workspace import (
     write_text_atomic,
 )
 from personas.personas import is_persona_core_relative_path
+from safety.vendor_access import vendor_workspace_path
 
 logger = logging.getLogger("brain.knowledge.admin")
 
@@ -106,7 +107,9 @@ def _list_document_summaries(paths: Iterable[Path], project_id: str) -> list[dic
     ]
 
 
-def list_knowledge_base_documents(project_id: str = "default") -> list[dict[str, Any]]:
+def list_knowledge_base_documents(
+    project_id: str = "default", *, visible: Callable[[str], bool] | None = None,
+) -> list[dict[str, Any]]:
     """Return documents under the workspace knowledge/ directory, minus system files."""
     from knowledge.doc_meta import resolve_document_languages
     from knowledge.product_catalog import is_catalog_definition
@@ -115,7 +118,8 @@ def list_knowledge_base_documents(project_id: str = "default") -> list[dict[str,
     # 選型篩選的 _catalog.yaml 照樣進索引，只是不列給後台；索引走 iter_indexable_documents。
     paths = [
         path for path in iter_knowledge_documents(project_id)
-        if not is_catalog_definition(path.relative_to(root).as_posix())
+        if not is_catalog_definition(relative := path.relative_to(root).as_posix())
+        and (visible is None or visible(relative))
     ]
     # 列表要顯示每份文件的語言；還沒判斷過的在這裡判斷並存起來。
     resolve_document_languages(
@@ -249,6 +253,7 @@ def save_uploaded_document(
     target_dir: str = "",
     project_id: str = "default",
     relative_path: str = "",
+    *, vendor: bool = False,
 ) -> dict[str, Any]:
     """Save an uploaded file into the workspace root.
 
@@ -263,6 +268,8 @@ def save_uploaded_document(
     sub_path = _sanitize_relative_subpath(relative_path) if relative_path else Path(safe_name)
     base = Path(target_dir.strip()) if target_dir.strip() else Path()
     relative_path_obj = base / sub_path
+    if vendor:
+        vendor_workspace_path(project_id, relative_path_obj.as_posix(), "knowledge")
     path = resolve_workspace_document(relative_path_obj.as_posix(), project_id)
     relative = path.relative_to(ensure_workspace_scaffold(project_id).resolve()).as_posix()
     decoded = content.decode("utf-8-sig")
@@ -286,6 +293,7 @@ def save_uploaded_artifact(
     target_dir: str = "raw",
     project_id: str = "default",
     relative_path: str = "",
+    *, vendor: bool = False,
 ) -> dict[str, Any]:
     """Save a binary artifact into the workspace without indexing it."""
     safe_name = Path(filename).name
@@ -295,6 +303,8 @@ def save_uploaded_artifact(
     sub_path = _sanitize_relative_subpath(relative_path) if relative_path else Path(safe_name)
     base = Path(target_dir.strip()) if target_dir.strip() else Path()
     relative_path_obj = base / sub_path
+    if vendor:
+        vendor_workspace_path(project_id, relative_path_obj.as_posix(), "raw")
     path = resolve_workspace_artifact(relative_path_obj.as_posix(), project_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
@@ -328,6 +338,7 @@ def save_workspace_note(
     project_id: str = "default",
     target_dir: str = "",
     note_format: str = "text",
+    *, vendor: bool = False,
 ) -> dict[str, Any]:
     """Create a manual note under the default notes directory or target directory.
 
@@ -357,6 +368,8 @@ def save_workspace_note(
 
     parent = Path("knowledge") / "qa" if is_qa else _resolve_note_parent(target_dir)
     relative_path = parent / filename
+    if vendor:
+        vendor_workspace_path(project_id, relative_path.as_posix(), "knowledge")
     path = resolve_workspace_document(relative_path.as_posix(), project_id)
     if path.exists():
         raise ValueError("文件已存在")
@@ -571,11 +584,15 @@ def _parse_qa_markdown(content: str, relative_path: str) -> list[dict[str, str]]
     ]
 
 
-def list_qa_entries(project_id: str = "default") -> list[dict[str, str]]:
+def list_qa_entries(
+    project_id: str = "default", *, visible: Callable[[str], bool] | None = None,
+) -> list[dict[str, str]]:
     """Return every question/answer pair from enabled QA-sourced documents."""
     entries: list[dict[str, str]] = []
     for path in iter_knowledge_documents(project_id):
         relative_path = path.relative_to(ensure_workspace_scaffold(project_id)).as_posix()
+        if visible and not visible(relative_path):
+            continue
         meta = get_document_meta(relative_path, project_id)
         if meta["source_type"] != "qa" or not meta["enabled"]:
             continue
@@ -763,6 +780,7 @@ def _commit_raw_file(
     normalize: bool,
     claimed_targets: dict[str, str],
     report: Callable[[str], None],
+    vendor: bool = False,
 ) -> dict[str, Any]:
     """Import one raw/ file and describe the outcome.
 
@@ -798,6 +816,9 @@ def _commit_raw_file(
 
     root = ensure_workspace_scaffold(project_id)
     src = root / "raw" / relative
+    if vendor:
+        vendor_workspace_path(project_id, f"raw/{relative}", "raw")
+        vendor_workspace_path(project_id, f"archive/originals/{relative}", "archive")
     if not src.is_file():
         raise _ImportRefused(_REASON_MISSING)
     if src.suffix.lower() not in SUPPORTED_SUFFIXES:
@@ -839,6 +860,8 @@ def _commit_raw_file(
         if not content.strip():
             raise _ImportRefused(_REASON_NO_TEXT)
 
+    if vendor:
+        vendor_workspace_path(project_id, target, "knowledge")
     dest = resolve_workspace_document(target, project_id)
     origin_hash = hashlib.sha256(origin_bytes).hexdigest()
     # 節點寫在中繼資料之前：source_type 一標成 qa，輪詢問答樹時就會把還沒節點的文件自動收養，
@@ -930,6 +953,7 @@ def commit_raw_documents(
     normalize: bool = True,
     on_result: Callable[[str, dict[str, Any]], None] | None = None,
     on_skip: Callable[[str, str], None] | None = None,
+    vendor: bool = False,
 ) -> dict[str, Any]:
     """Promote staged files from raw/ into knowledge/ (the 'commit' step).
 
@@ -967,6 +991,7 @@ def commit_raw_documents(
                 normalize=normalize,
                 claimed_targets=claimed_targets,
                 report=partial(_report, relative),
+                **({"vendor": True} if vendor else {}),
             )
         except _ImportRefused as refused:
             reason = str(refused)

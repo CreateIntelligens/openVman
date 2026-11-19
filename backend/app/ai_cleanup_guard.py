@@ -12,6 +12,7 @@ from typing import Any
 
 from app.auth.dependencies import CurrentAccount
 from app.auth.models import has_ai_cleanup_access
+from app.auth.policy import is_vendor_account
 
 REFUSAL = "這個帳號沒有開放「AI 整理排版」。請改用「直接放進知識庫」，或請管理員在帳號設定開放。"
 _COMMIT_PATH = "knowledge/raw/commit"
@@ -26,7 +27,7 @@ def _allowed(current: CurrentAccount | None) -> bool:
     # 嵌入金鑰給的是網站上的訪客，不是工作人員；API 金鑰照它所屬帳號的權限。
     if current is None or current.embed_key is not None:
         return False
-    return has_ai_cleanup_access(current.user)
+    return not is_vendor_account(current.user) and has_ai_cleanup_access(current.user)
 
 
 def guard_ai_cleanup(path: str, method: str, body: bytes, current: CurrentAccount | None) -> bytes:

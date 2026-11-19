@@ -112,39 +112,43 @@ export async function fetchKnowledgeBaseDocuments() {
   return get<KnowledgeDocumentsResponse>(knowledgePath("/base/documents"));
 }
 
-export async function fetchKnowledgeDocument(path: string) {
-  return get<KnowledgeDocument>(knowledgePath("/document"), { path });
+function knowledgeDocumentPath(path: string, vendor: boolean) {
+  return knowledgePath(vendor ? `/base${path}` : path);
 }
 
-export function saveKnowledgeDocument(path: string, content: string, baseHash?: string) {
+export async function fetchKnowledgeDocument(path: string, vendor = false) {
+  return get<KnowledgeDocument>(knowledgeDocumentPath("/document", vendor), { path });
+}
+
+export function saveKnowledgeDocument(path: string, content: string, baseHash?: string, vendor = false) {
   return put<{ status: string; document: KnowledgeDocumentSummary }>(
-    knowledgePath("/document"),
+    knowledgeDocumentPath("/document", vendor),
     { path, content, project_id: getActiveProjectId(), ...(baseHash ? { base_hash: baseHash } : {}) },
   );
 }
 
-export async function deleteKnowledgeDocument(path: string) {
-  return del<{ status: string }>(knowledgePath("/document"), { path });
+export async function deleteKnowledgeDocument(path: string, vendor = false) {
+  return del<{ status: string }>(knowledgeDocumentPath("/document", vendor), { path });
 }
 
-export function createKnowledgeDirectory(dirPath: string) {
-  return post<{ status: string; path: string }>(knowledgePath("/directory"), {
+export function createKnowledgeDirectory(dirPath: string, vendor = false) {
+  return post<{ status: string; path: string }>(knowledgeDocumentPath("/directory", vendor), {
     project_id: getActiveProjectId(),
     path: dirPath,
     content: "",
   });
 }
 
-export async function deleteKnowledgeDirectory(dirPath: string) {
+export async function deleteKnowledgeDirectory(dirPath: string, vendor = false) {
   return del<{ status: string; path: string }>(
-    knowledgePath("/directory"),
+    knowledgeDocumentPath("/directory", vendor),
     { path: dirPath },
   );
 }
 
-export function moveKnowledgeDocument(sourcePath: string, targetPath: string) {
+export function moveKnowledgeDocument(sourcePath: string, targetPath: string, vendor = false) {
   return post<{ status: string; document: KnowledgeDocumentSummary }>(
-    knowledgePath("/move"),
+    knowledgeDocumentPath("/move", vendor),
     { source_path: sourcePath, target_path: targetPath, project_id: getActiveProjectId() },
   );
 }
@@ -349,7 +353,7 @@ function sanitizeFilename(name: string): string {
   return cleaned.length > 0 ? cleaned.slice(0, 120) : "untitled";
 }
 
-export async function crawlUrl(url: string): Promise<CrawlIngestResponse> {
+export async function crawlUrl(url: string, vendor = false): Promise<CrawlIngestResponse> {
   const fetched = await post<FetchPageResponse>(knowledgePath("/fetch"), {
     url,
     project_id: getActiveProjectId(),
@@ -367,7 +371,7 @@ export async function crawlUrl(url: string): Promise<CrawlIngestResponse> {
   updateKnowledgeDocumentMeta(summary.path, {
     source_type: "web",
     source_url: fetched.source_url || url,
-  }).catch(() => {});
+  }, vendor).catch(() => {});
 
   return {
     status: uploaded.status,
@@ -387,9 +391,10 @@ export function updateKnowledgeDocumentMeta(
     // auto：取消手動指定，改回依內容判斷。
     language?: KnowledgeLanguage | "auto";
   },
+  vendor = false,
 ) {
   return patch<KnowledgeDocumentMetaResponse>(
-    knowledgePath("/document/meta"),
+    knowledgeDocumentPath("/document/meta", vendor),
     { path, project_id: getActiveProjectId(), ...metadata },
   );
 }

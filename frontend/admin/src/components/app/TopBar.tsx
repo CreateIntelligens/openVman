@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { AccountProfile } from "../../api/auth";
 import type { CollapsedGroups } from "../../hooks/useNavigationGroups";
-import { canOpenAccountKeys } from "../../utils/accountPermissions";
+import { canOpenAccountKeys, isVendorUser } from "../../utils/accountPermissions";
 import TabGroup from "./TabGroup";
 import {
   allTabs,
-  isTabVisible,
+  isTabVisible, tabLabel,
   tabGroups,
   type NavigationGroup,
   type ProjectSummary,
@@ -73,7 +73,7 @@ export default function TopBar({
 
       <div className="flex min-w-0 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium text-content md:hidden">
         {activeTab && <span aria-hidden="true" className="material-symbols-outlined text-[1rem] text-primary">{activeTab.icon}</span>}
-        <span>{activeTab?.label}</span>
+        <span>{activeTab && tabLabel(activeTab, isVendorUser(account))}</span>
       </div>
 
       {/* 平板加固定側欄時寬度最緊，先讓位給專案名稱。 */}
@@ -225,6 +225,7 @@ interface MobileNavDrawerProps {
   onClose: () => void;
   onSelectTab: (tab: Tab) => void;
   access: TabAccess;
+  vendor?: boolean;
   canManageApiKeys: boolean;
   onOpenApiKeys: () => void;
   username: string;
@@ -240,6 +241,7 @@ export function MobileNavDrawer({
   onClose,
   onSelectTab,
   access,
+  vendor = false,
   canManageApiKeys,
   onOpenApiKeys,
   username,
@@ -314,7 +316,9 @@ export function MobileNavDrawer({
             <TabGroup
               key={group.label}
               title={group.title}
-              tabs={group.tabs.filter((tab) => isTabVisible(tab, access))}
+              tabs={group.tabs
+                .filter((tab) => isTabVisible(tab, access, vendor))
+                .map((tab) => ({ ...tab, label: tabLabel(tab, vendor) }))}
               active={active}
               projectId={projectId}
               isExpanded

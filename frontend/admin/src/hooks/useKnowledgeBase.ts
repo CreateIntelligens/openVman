@@ -82,7 +82,7 @@ function withFreshStatus(
   return unchanged ? open : { ...open, ...status };
 }
 
-export function useKnowledgeBase() {
+export function useKnowledgeBase(vendor = false) {
   const { projectId } = useProject();
   const [documents, setDocuments] = useState<KnowledgeDocumentSummary[]>([]);
   const [serverDirs, setServerDirs] = useState<string[]>([]);
@@ -299,7 +299,7 @@ export function useKnowledgeBase() {
     setEditLoading(true);
     setEditorDirty(false);
     try {
-      const document = await fetchKnowledgeDocument(path);
+      const document = await fetchKnowledgeDocument(path, vendor);
       if (activeProjectRef.current !== requestedProjectId) return;
       setOpenDocument(document);
       setEditContent(document.content);
@@ -311,7 +311,7 @@ export function useKnowledgeBase() {
     } finally {
       if (activeProjectRef.current === requestedProjectId) setEditLoading(false);
     }
-  }, [projectId, setErrorStatus]);
+  }, [projectId, setErrorStatus, vendor]);
 
   useEffect(() => {
     if (selectedPath && selectionProjectId === projectId) {
@@ -386,18 +386,18 @@ export function useKnowledgeBase() {
     if (!openDocument) return;
     setSaving(true);
     try {
-      await saveKnowledgeDocument(openDocument.path, editContent, openDocument.content_hash);
+      await saveKnowledgeDocument(openDocument.path, editContent, openDocument.content_hash, vendor);
       setStatus({ type: "success", message: `已儲存 ${fileNameOf(openDocument.path)}` });
       setEditorDirty(false);
       await loadDocuments();
-      const document = await fetchKnowledgeDocument(openDocument.path);
+      const document = await fetchKnowledgeDocument(openDocument.path, vendor);
       setOpenDocument(document);
     } catch (error) {
       setErrorStatus(error);
     } finally {
       setSaving(false);
     }
-  }, [editContent, loadDocuments, openDocument, setErrorStatus]);
+  }, [editContent, loadDocuments, openDocument, setErrorStatus, vendor]);
 
   const handleReindex = useCallback(async () => {
     setReindexing(true);
@@ -459,7 +459,7 @@ export function useKnowledgeBase() {
     setCrawling(true);
     setStatus(null);
     try {
-      const result = await apiCrawlUrl(url);
+      const result = await apiCrawlUrl(url, vendor);
       setStatus({ type: "success", message: `已匯入「${result.title}」` });
       setCrawlUrlValue("");
       await loadDocuments();
@@ -470,7 +470,7 @@ export function useKnowledgeBase() {
     } finally {
       setCrawling(false);
     }
-  }, [crawlUrlValue, loadDocuments, openFile, setErrorStatus]);
+  }, [crawlUrlValue, loadDocuments, openFile, setErrorStatus, vendor]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
@@ -479,7 +479,7 @@ export function useKnowledgeBase() {
     setStatus(null);
     try {
       if (type === "file") {
-        await deleteKnowledgeDocument(value);
+        await deleteKnowledgeDocument(value, vendor);
         setStatus({ type: "success", message: `已刪除 ${fileNameOf(value)}` });
         if (openDocument?.path === value) {
           setRightPane("folder");
@@ -489,7 +489,7 @@ export function useKnowledgeBase() {
           setSelectedPath(value.split("/").slice(0, -1).join("/") || "knowledge");
         }
       } else {
-        await deleteKnowledgeDirectory(value);
+        await deleteKnowledgeDirectory(value, vendor);
         setStatus({ type: "success", message: `已刪除資料夾 ${fileNameOf(value)}` });
         if (selectedPath === value || selectedPath.startsWith(value + "/")) {
           setSelectedPath(value.split("/").slice(0, -1).join("/") || "knowledge");
@@ -499,7 +499,7 @@ export function useKnowledgeBase() {
     } catch (error) {
       setErrorStatus(error);
     }
-  }, [deleteTarget, loadDocuments, openDocument, selectedPath, setErrorStatus]);
+  }, [deleteTarget, loadDocuments, openDocument, selectedPath, setErrorStatus, vendor]);
 
   // 搬移不改內容，所以只換路徑與文件資訊：重新讀檔會用伺服器版本蓋掉還沒存的修改。
   const relocateOpenDocument = useCallback(async (targetPath: string) => {
@@ -507,7 +507,7 @@ export function useKnowledgeBase() {
     setSelectedPath(targetPath);
     setOpenDocument((current) => (current ? { ...current, path: targetPath } : current));
     try {
-      const refreshed = await fetchKnowledgeDocument(targetPath);
+      const refreshed = await fetchKnowledgeDocument(targetPath, vendor);
       if (activeProjectRef.current !== requestedProjectId) return;
       // 編輯區沒換成新內容，版本也要留著舊的，否則存檔時就檢查不出別處改過。
       setOpenDocument((current) => (
@@ -516,7 +516,7 @@ export function useKnowledgeBase() {
     } catch {
       // 路徑已經換好，文件資訊等下次列表更新。
     }
-  }, [projectId]);
+  }, [projectId, vendor]);
 
   const handleMove = useCallback(async (sourcePath: string, targetDir: string) => {
     const filename = sourcePath.split("/").pop() || "";
@@ -524,7 +524,7 @@ export function useKnowledgeBase() {
     if (sourcePath === targetPath) return;
     setStatus(null);
     try {
-      await moveKnowledgeDocument(sourcePath, targetPath);
+      await moveKnowledgeDocument(sourcePath, targetPath, vendor);
       setStatus({
         type: "success",
         message: targetDir === "knowledge" ? "已移到文件最上層" : `已移到 ${fileNameOf(targetDir)}`,
@@ -537,12 +537,12 @@ export function useKnowledgeBase() {
     } catch (error) {
       setErrorStatus(error);
     }
-  }, [loadDocuments, openDocument, relocateOpenDocument, setErrorStatus]);
+  }, [loadDocuments, openDocument, relocateOpenDocument, setErrorStatus, vendor]);
 
   const handleToggleEnabled = useCallback(async (document: KnowledgeDocumentSummary) => {
     setStatus(null);
     try {
-      const result = await updateKnowledgeDocumentMeta(document.path, { enabled: !document.enabled });
+      const result = await updateKnowledgeDocumentMeta(document.path, { enabled: !document.enabled }, vendor);
       setDocuments((current) =>
         current.map((item) => (item.path === document.path ? { ...item, enabled: result.enabled } : item)),
       );
@@ -553,7 +553,7 @@ export function useKnowledgeBase() {
     } catch (error) {
       setErrorStatus(error);
     }
-  }, [setErrorStatus]);
+  }, [setErrorStatus, vendor]);
 
   const handleChangeLanguage = useCallback(async (
     document: KnowledgeDocumentSummary,
@@ -561,12 +561,12 @@ export function useKnowledgeBase() {
   ) => {
     setStatus(null);
     try {
-      await updateKnowledgeDocumentMeta(document.path, { language });
+      await updateKnowledgeDocumentMeta(document.path, { language }, vendor);
       // auto 要等下次列表才重判，重新載入拿判斷結果。
       await loadDocuments();
       // 只換文件資訊：openFile 會用存檔內容蓋掉編輯區，還沒儲存的修改就沒了。
       if (openDocument?.path === document.path) {
-        const refreshed = await fetchKnowledgeDocument(document.path);
+        const refreshed = await fetchKnowledgeDocument(document.path, vendor);
         if (activeProjectRef.current === projectId) {
           setOpenDocument((current) => (
             current ? { ...refreshed, content_hash: current.content_hash } : refreshed
@@ -577,7 +577,7 @@ export function useKnowledgeBase() {
     } catch (error) {
       setErrorStatus(error);
     }
-  }, [loadDocuments, openDocument, projectId, setErrorStatus]);
+  }, [loadDocuments, openDocument, projectId, setErrorStatus, vendor]);
 
   const handleCreateNote = useCallback(async (
     title: string,
@@ -612,7 +612,7 @@ export function useKnowledgeBase() {
     const newDir = `${targetParent}/${newFolderName.trim()}`;
 
     try {
-      await createKnowledgeDirectory(newDir);
+      await createKnowledgeDirectory(newDir, vendor);
       await loadDocuments();
       setSelectedPath(newDir);
       setExpandedDirs((prev) => new Set([...prev, targetParent, newDir]));
@@ -621,7 +621,7 @@ export function useKnowledgeBase() {
     }
 
     resetNewFolderForm();
-  }, [documents, loadDocuments, newFolderName, resetNewFolderForm, selectedPath, setErrorStatus]);
+  }, [documents, loadDocuments, newFolderName, resetNewFolderForm, selectedPath, setErrorStatus, vendor]);
 
   const cancelCreateFolder = resetNewFolderForm;
 

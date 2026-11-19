@@ -77,6 +77,7 @@ from protocol.schemas import (
 )
 from safety.internal_auth import require_internal_token
 from safety.observability import log_event, log_exception
+from safety.vendor_access import VendorRequest, vendor_workspace_path, visible_workspace_path
 
 router = APIRouter(
     prefix="/brain",
@@ -143,9 +144,16 @@ async def list_knowledge_documents_route(project_id: str = "default"):
 
 
 @router.get("/knowledge/base/documents", summary="取得知識庫樹狀結構")
-async def list_knowledge_base_documents_route(project_id: str = "default"):
-    documents = list_knowledge_base_documents(project_id)
-    directories = list_knowledge_base_directories(project_id)
+async def list_knowledge_base_documents_route(
+    project_id: str = "default", vendor: VendorRequest = False,
+):
+    if vendor:
+        visible = lambda path: visible_workspace_path(project_id, path, "knowledge")
+        documents = list_knowledge_base_documents(project_id, visible=visible)
+        directories = [path for path in list_knowledge_base_directories(project_id) if visible(path)]
+    else:
+        documents = list_knowledge_base_documents(project_id)
+        directories = list_knowledge_base_directories(project_id)
     return {
         "documents": documents,
         "document_count": len(documents),
@@ -166,8 +174,15 @@ def _assert_not_qa_document(path: str, project_id: str) -> None:
 
 
 @router.get("/knowledge/qa", summary="取得所有已啟用 QA 來源的問答清單")
-async def list_knowledge_qa_route(project_id: str = "default"):
-    entries = list_qa_entries(project_id)
+async def list_knowledge_qa_route(
+    project_id: str = "default", vendor: VendorRequest = False,
+):
+    if vendor:
+        entries = list_qa_entries(
+            project_id, visible=lambda path: visible_workspace_path(project_id, path, "knowledge"),
+        )
+    else:
+        entries = list_qa_entries(project_id)
     return {"entries": entries, "count": len(entries)}
 
 
@@ -228,7 +243,11 @@ def _content_hash(text: str) -> str:
 
 
 @router.get("/knowledge/document", summary="讀取單一知識文件")
-async def get_knowledge_document_route(path: str, project_id: str = "default"):
+async def get_knowledge_document_route(
+    path: str, project_id: str = "default", vendor: VendorRequest = False,
+):
+    if vendor:
+        vendor_workspace_path(project_id, path, "knowledge")
     try:
         document = read_workspace_document(path, project_id)
     except ValueError as exc:
@@ -241,6 +260,7 @@ async def get_knowledge_document_route(path: str, project_id: str = "default"):
 @router.put("/knowledge/document", summary="儲存知識文件")
 async def save_knowledge_document_route(
     payload: KnowledgeDocumentPutRequest, project_writes: ProjectWrites = "",
+    vendor: VendorRequest = False,
 ):
     # 問答存檔會改同一份檔案，兩邊都進同一把鎖；帶了 base_hash 時，載入後被改過就拒絕，
     # 否則開著的舊全文會蓋掉別處剛存的內容。
@@ -248,6 +268,8 @@ async def save_knowledge_document_route(
         from knowledge.qa_nodes import is_qa_document, sync_entries_for_source
 
         with qa_document_lock:
+            if vendor:
+                vendor_workspace_path(payload.project_id, payload.path, "knowledge")
             path = _check_workspace_document_write(
                 project_writes, payload.path, payload.project_id,
             )
@@ -303,7 +325,10 @@ async def put_knowledge_settings_route(payload: KnowledgeSettingsPutRequest):
 @router.patch("/knowledge/document/meta", summary="更新文件中繼屬性")
 async def patch_knowledge_document_meta_route(
     payload: KnowledgeDocumentMetaPatchRequest, project_writes: ProjectWrites = "",
+    vendor: VendorRequest = False,
 ):
+    if vendor:
+        vendor_workspace_path(payload.project_id, payload.path, "knowledge")
     try:
         path = _check_workspace_document_write(
             project_writes, payload.path, payload.project_id,
@@ -334,11 +359,14 @@ async def patch_knowledge_document_meta_route(
 @router.delete("/knowledge/document", summary="刪除知識文件")
 async def delete_knowledge_document_route(
     path: str, project_id: str = "default", project_writes: ProjectWrites = "",
+    vendor: VendorRequest = False,
 ):
     def _delete() -> None:
         from knowledge.qa_nodes import is_qa_document, remove_entries_for_source
 
         with qa_document_lock:
+            if vendor:
+                vendor_workspace_path(project_id, path, "knowledge")
             relative = _check_workspace_document_write(project_writes, path, project_id)
             if is_qa_document(relative, project_id):
                 remove_entries_for_source(relative, project_id)
@@ -357,11 +385,15 @@ async def delete_knowledge_document_route(
 @router.post("/knowledge/move", summary="移動/重新命名知識文件")
 async def move_knowledge_document_route(
     payload: KnowledgeDocumentMoveRequest, project_writes: ProjectWrites = "",
+    vendor: VendorRequest = False,
 ):
     def _move() -> tuple[str, str, dict[str, Any]]:
         from knowledge.qa_nodes import is_qa_document, rename_source_path_in_nodes
 
         with qa_document_lock:
+            if vendor:
+                vendor_workspace_path(payload.project_id, payload.source_path, "knowledge")
+                vendor_workspace_path(payload.project_id, payload.target_path, "knowledge")
             source = _document_path(payload.source_path, payload.project_id)
             target = _document_path(payload.target_path, payload.project_id)
             _require_workspace_write(project_writes, source, target)
@@ -384,7 +416,10 @@ async def move_knowledge_document_route(
 @router.post("/knowledge/directory", summary="建立資料夾")
 async def create_knowledge_directory_route(
     payload: KnowledgeDocumentPutRequest, project_writes: ProjectWrites = "",
+    vendor: VendorRequest = False,
 ):
+    if vendor:
+        vendor_workspace_path(payload.project_id, payload.path, "knowledge")
     try:
         _require_directory_write(project_writes, payload.path, payload.project_id)
         return create_workspace_directory(payload.path, payload.project_id)
@@ -395,7 +430,10 @@ async def create_knowledge_directory_route(
 @router.delete("/knowledge/directory", summary="刪除資料夾")
 async def delete_knowledge_directory_route(
     path: str, project_id: str = "default", project_writes: ProjectWrites = "",
+    vendor: VendorRequest = False,
 ):
+    if vendor:
+        vendor_workspace_path(project_id, path, "knowledge")
     try:
         _require_directory_write(project_writes, path, project_id)
         return delete_workspace_directory(path, project_id)
@@ -411,6 +449,7 @@ async def upload_knowledge_raw_documents_route(
     target_dir: str = Form("raw"),
     project_id: str = Form("default"),
     relative_paths: list[str] = Form(default_factory=list),
+    vendor: VendorRequest = False,
 ):
     from config import get_settings
 
@@ -431,6 +470,7 @@ async def upload_knowledge_raw_documents_route(
                     target_dir,
                     project_id,
                     relative_path=relative_path,
+                    vendor=vendor,
                 )
             )
     except ValueError as exc:
@@ -464,6 +504,7 @@ async def preview_renormalize_knowledge_document_route(
 @router.post("/knowledge/renormalize/apply", summary="套用預覽整理結果並重建索引與圖譜")
 async def apply_renormalize_knowledge_document_route(
     payload: KnowledgeDocumentPutRequest, project_writes: ProjectWrites = "",
+    vendor: VendorRequest = False,
 ):
     pid = payload.project_id
     _assert_not_qa_document(payload.path, pid)
@@ -531,7 +572,9 @@ async def renormalize_knowledge_document_route(
 
 
 @router.post("/knowledge/raw/commit", summary="匯入 raw 區檔案進知識庫（背景執行，逐檔進度可查詢）", status_code=202)
-async def commit_knowledge_raw_route(payload: KnowledgeRawCommitRequest, response: Response):
+async def commit_knowledge_raw_route(
+    payload: KnowledgeRawCommitRequest, response: Response, vendor: VendorRequest = False,
+):
     """The 'commit' step: promote staged raw/ files into knowledge/ in the
     background (per-file LLM normalization is slow), then rebuild the vector
     index and concept graph. Progress is polled via /knowledge/raw/commit/status.
@@ -550,6 +593,10 @@ async def commit_knowledge_raw_route(payload: KnowledgeRawCommitRequest, respons
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     pending = await asyncio.to_thread(list_raw_files, pid)
     files = pending if requested is None else requested
+    if vendor:
+        for path in requested or []:
+            vendor_workspace_path(pid, f"raw/{path}", "raw")
+        files = [path for path in files if visible_workspace_path(pid, f"raw/{path}", "raw")]
     if not set(files) & set(pending):
         response.status_code = 200
         return {"status": "nothing_to_commit", "project_id": pid, "committed": [], "skipped": []}
@@ -557,12 +604,14 @@ async def commit_knowledge_raw_route(payload: KnowledgeRawCommitRequest, respons
         response.status_code = 200
         return {"status": "already_running", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
     # 一律帶明確清單：開工後才傳上來的檔案不算這一批。
-    asyncio.create_task(_run_commit_job(pid, files, payload.normalize))
+    asyncio.create_task(_run_commit_job(pid, files, payload.normalize, **({"vendor": True} if vendor else {})))
     response.status_code = 202
     return {"status": "started", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
 
 
-async def _run_commit_job(project_id: str, files: list[str], normalize: bool = True) -> None:
+async def _run_commit_job(
+    project_id: str, files: list[str], normalize: bool = True, *, vendor: bool = False,
+) -> None:
     def _on_progress(path: str, state: str) -> None:
         commit_jobs.update_file(project_id, path, state)
 
@@ -581,6 +630,7 @@ async def _run_commit_job(project_id: str, files: list[str], normalize: bool = T
             normalize=normalize,
             on_result=_on_result,
             on_skip=_on_skip,
+            **({"vendor": True} if vendor else {}),
         )
     except Exception as exc:
         commit_jobs.fail_job(project_id, "匯入中斷，還沒處理的檔案都留著，可以再試一次")
@@ -603,19 +653,28 @@ async def commit_status_route(project_id: str = "default"):
 
 
 @router.get("/knowledge/raw/pending", summary="列出等待匯入的檔案")
-async def list_raw_pending_route(project_id: str = "default"):
+async def list_raw_pending_route(project_id: str = "default", vendor: VendorRequest = False):
     # 正在匯入的不算等待中。沒匯入成功的還在 raw/，要列出來才看得到、才移得掉。
     active = commit_jobs.active_files(project_id)
     files = await asyncio.to_thread(list_pending_raw_files, project_id)
-    return {"files": [item for item in files if item["path"] not in active]}
+    return {"files": [
+        item for item in files
+        if item["path"] not in active and (
+            not vendor or visible_workspace_path(project_id, f"raw/{item['path']}", "raw")
+        )
+    ]}
 
 
 @router.delete("/knowledge/raw/pending", summary="移除一個等待匯入的檔案")
-async def delete_raw_pending_route(path: str, project_id: str = "default"):
+async def delete_raw_pending_route(
+    path: str, project_id: str = "default", vendor: VendorRequest = False,
+):
     try:
         relative = (await asyncio.to_thread(normalize_raw_paths, [path], project_id))[0]
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if vendor:
+        vendor_workspace_path(project_id, f"raw/{relative}", "raw")
     if relative in commit_jobs.active_files(project_id):
         raise HTTPException(status_code=409, detail="這個檔案正在匯入，等匯入結束再移除")
     try:
@@ -631,6 +690,7 @@ async def upload_knowledge_documents_route(
     target_dir: str = Form(""),
     project_id: str = Form("default"),
     relative_paths: list[str] = Form(default_factory=list),
+    vendor: VendorRequest = False,
 ):
     from config import get_settings
 
@@ -648,6 +708,7 @@ async def upload_knowledge_documents_route(
                     target_dir,
                     project_id,
                     relative_path=relative_paths[index] if index < len(relative_paths) else "",
+                    vendor=vendor,
                 )
                 for index, (upload, content) in enumerate(zip(files, contents))
             ]
@@ -663,7 +724,7 @@ async def upload_knowledge_documents_route(
 
 
 @router.post("/knowledge/note", summary="建立知識筆記")
-async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
+async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest, vendor: VendorRequest = False):
     def _create() -> dict[str, Any]:
         # 問答筆記會建節點，和問答存檔用同一把鎖。
         with qa_document_lock:
@@ -673,6 +734,7 @@ async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
                 payload.project_id,
                 payload.target_dir,
                 note_format=payload.note_format,
+                **({"vendor": True} if vendor else {}),
             )
 
     try:

@@ -381,3 +381,56 @@ async def test_live_debug_toggle_is_session_local(monkeypatch):
         state['args'] = args
         await internal_routes._dispatch_live_event(state, 'relay', None, {'event': 'set_decision_debug', 'enabled': True})
         assert fake.decision_debug_enabled is False
+
+
+@pytest.mark.parametrize("vendor", [True, False], ids=["vendor", "internal"])
+def test_live_bridge_applies_account_policy_to_model_and_client(vendor, monkeypatch):
+    from live.gemini_live import GeminiLiveSession
+    from live.gemini_tool_execution import GeminiLiveToolExecutor
+    from protocol.protocol_events import validate_server_event
+
+    declarations = []
+    memory_reads = []
+    search = {"event": "server_search_results", "citations": [{"path": "/internal/workspace/fixture.md"}]}
+    error = {"event": "server_error", "error_code": "INTERNAL_ERROR", "message": "test diagnostics", "debug": "extra"}
+    chunk = {"event": "server_stream_chunk", "text": "正常回覆", "is_final": True}
+
+    async def record_search(_self, table, *_args):
+        memory_reads.append(table)
+        return {"results": []}
+
+    async def turn(self, *_args):
+        setup = self._build_setup_message()
+        declarations.extend(tool["name"] for tool in setup["tools"][0]["functionDeclarations"])
+        await self._turns.execute_function_call({"id": "memory", "name": "search_memory", "args": {}})
+        for event in (search, error, chunk):
+            await self._emit(event)
+
+    monkeypatch.setenv("LIVE_GEMINI_TOOLS_ENABLED", "true")
+    monkeypatch.setattr(GeminiLiveToolExecutor, "search", record_search)
+    monkeypatch.setattr(GeminiLiveSession, "send_text_turn", turn)
+    headers = _internal_headers()
+    if vendor:
+        headers["X-OpenVMan-Vendor"] = "1"
+    with _client() as client, client.websocket_connect("/brain/internal/live/relay-1", headers=headers) as socket:
+        socket.send_json({"event": "relay_init"})
+        socket.send_json({"event": "user_speak", "text": "測試"})
+        events = [socket.receive_json()]
+        while events[-1]["event"] != "server_stream_chunk":
+            events.append(socket.receive_json())
+
+    if vendor:
+        assert [event["event"] for event in events] == ["server_error", "server_stream_chunk"]
+        outgoing_error, outgoing_chunk = events
+        validate_server_event(outgoing_error)
+        assert isinstance(outgoing_error.pop("timestamp"), int)
+        assert [outgoing_error, outgoing_chunk] == [
+            {"event": "server_error", "error_code": "INTERNAL_ERROR", "message": "對話暫時無法完成，請稍後再試。"},
+            chunk,
+        ]
+        assert declarations == ["search_knowledge"]
+        assert memory_reads == []
+    else:
+        assert events == [search, error, chunk]
+        assert "search_memory" in declarations
+        assert memory_reads == ["memories"]

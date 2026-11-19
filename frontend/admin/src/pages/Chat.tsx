@@ -8,6 +8,8 @@ import QuickQaModal from "../components/chat/QuickQaModal";
 import CorrectQaModal from "../components/chat/CorrectQaModal";
 import { findPrecedingUserQuestion } from "../components/chat/helpers";
 import ChatSidebar from "../components/chat/ChatSidebar";
+import { useAuth } from "../context/AuthContext";
+import { isVendorUser } from "../utils/accountPermissions";
 import { useProject } from "../context/ProjectContext";
 import { useMascot } from "../context/MascotContext";
 import { useChatSession } from "../hooks/useChatSession";
@@ -33,6 +35,8 @@ function createLiveClientId(projectId: string): string {
 }
 
 export default function Chat() {
+  const { account } = useAuth();
+  const vendor = Boolean(account && isVendorUser(account));
   const [mode, setMode] = useLocalStorageState<ChatMode>(
     "admin.chat.mode",
     "text",
@@ -46,7 +50,8 @@ export default function Chat() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [quickQaOpen, setQuickQaOpen] = useState(false);
   const [correctionTarget, setCorrectionTarget] = useState<{ question: string; answer: string } | null>(null);
-  const { projectId } = useProject();
+  const { projectId, projects } = useProject();
+  const canEditKnowledge = !vendor || projects.find((project) => project.project_id === projectId)?.can_edit_knowledge === true;
   const { isClosed } = useMascot();
   const {
     messages,
@@ -113,8 +118,8 @@ export default function Chat() {
     searchQuery,
     setSearchQuery,
     resetSearch,
-  } = useChatSession();
-  const visionAvailable = useVisionAvailable();
+  } = useChatSession(vendor);
+  const visionAvailable = useVisionAvailable(!vendor);
 
   const liveClientIdRef = useRef<string>("");
   if (!liveClientIdRef.current) {
@@ -308,7 +313,7 @@ export default function Chat() {
   return (
     <div className="flex h-full w-full overflow-hidden bg-surface">
       {/* 視覺上以動態對話標題（ChatHeader）取代固定頁名，此標題僅供 a11y 使用 */}
-      <h1 className="page-title sr-only">對話</h1>
+      <h1 className="page-title sr-only">{vendor ? "對話測試" : "對話"}</h1>
       <ChatSidebar
         open={sessionsOpen}
         projectId={projectId}
@@ -324,7 +329,7 @@ export default function Chat() {
         onResetConversation={resetConversation}
         onLoadSessions={loadSessions}
         onLoadSessionHistory={loadSessionHistory}
-        onDeleteSession={setDeleteSessionTarget}
+        onDeleteSession={vendor ? undefined : setDeleteSessionTarget}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         onResetSearch={resetSearch}
@@ -406,13 +411,13 @@ export default function Chat() {
                     <span className="material-symbols-outlined text-[1.75rem]">psychology</span>
                   </div>
                   <h2 className="mb-2 text-2xl font-semibold text-content">今天我能幫你什麼？</h2>
-                  <p className="text-sm leading-relaxed text-content-muted">
+                  {!vendor && <p className="text-sm leading-relaxed text-content-muted">
                     我是你的智慧助手,基於{" "}
                     <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.8125rem] text-content">
                       workspace/
                     </code>{" "}
                     上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
-                  </p>
+                  </p>}
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {starterPrompts.map((prompt) => (
@@ -444,12 +449,12 @@ export default function Chat() {
                       playingIndex={playingIndex}
                       ttsPrefetching={ttsPrefetching}
                       isLastMessage={isLast}
-                      onPlayTts={playTts}
+                      onPlayTts={vendor ? undefined : playTts}
                       privacyWarningsVisible={privacyWarningsVisible}
-                      showAssistantActions
+                      showAssistantActions={!vendor}
                       onActionConfirmed={handleActionConfirmed}
                       onActionCancelled={handleActionCancelled}
-                      onCorrectAsQa={correctionQuestion
+                      onCorrectAsQa={canEditKnowledge && correctionQuestion
                         ? () => setCorrectionTarget({ question: correctionQuestion, answer: message.content })
                         : undefined}
                     />
@@ -498,6 +503,7 @@ export default function Chat() {
           </div>
 
           <ChatInput
+            showVoiceControls={!vendor}
             mode={mode}
             input={input}
             sending={mode === "text" ? sending : false}
@@ -511,14 +517,14 @@ export default function Chat() {
             activeTtsProvider={activeTtsProvider}
             ttsFallbackToast={ttsFallbackToast}
             asrListening={asrListening}
-            asrSupported={asrSupported}
+            asrSupported={!vendor && asrSupported}
             asrSpeaking={asrSpeaking}
             asrInputMode={asrInputMode}
             asrTranscribing={asrTranscribing}
             asrStarting={asrStarting}
             asrInterim={asrInterim}
             asrProvider={asrProvider}
-            onAsrProviderChange={changeAsrProvider}
+            onAsrProviderChange={vendor ? undefined : changeAsrProvider}
             privacyWarningsVisible={privacyWarningsVisible}
             replyMode={replyMode}
             onReplyModeChange={setReplyMode}

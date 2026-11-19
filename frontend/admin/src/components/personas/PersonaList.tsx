@@ -6,7 +6,7 @@ interface PersonaListProps {
   selectedPersonaId?: string;
   deletingPersonaId: string;
   onSelect: (persona: PersonaSummary) => void;
-  onDelete: (persona: PersonaSummary) => void;
+  onDelete?: (persona: PersonaSummary) => void;
 }
 
 export default function PersonaList({

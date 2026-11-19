@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Personas from "./Personas";
 import { setPersonaAvatar } from "../api";
 
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: null }),
+}));
+
 vi.mock("../context/ProjectContext", () => ({
   useProject: () => ({ projectId: "default" }),
 }));

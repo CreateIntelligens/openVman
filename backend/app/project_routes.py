@@ -121,9 +121,13 @@ def _project_summary(
     payload: dict[str, Any],
     record: ResourceRecord,
     current: CurrentAccount,
+    runtime: AuthRuntime,
 ) -> dict[str, Any]:
     if is_vendor_account(current.user):
         summary = {key: value for key, value in payload.items() if key in _VENDOR_PROJECT_FIELDS}
+        summary["can_edit_knowledge"] = runtime.resources.has_grant(
+            current.user.id, ResourceType.PROJECT, record.resource_id, project_write="edit_knowledge",
+        )
     else:
         summary = dict(payload)
     if record.vendor_name is not None:
@@ -213,7 +217,7 @@ async def list_projects(
         )
     }
     projects = [
-        _project_summary(project, accessible[project["project_id"]], current)
+        _project_summary(project, accessible[project["project_id"]], current, runtime)
         for project in payload["projects"]
         if isinstance(project, dict)
         and isinstance(project.get("project_id"), str)
@@ -291,7 +295,7 @@ async def create_project(
         return response
     return JSONResponse(
         status_code=response.status_code,
-        content=_project_summary(payload, record, current),
+        content=_project_summary(payload, record, current, runtime),
     )
 
 
@@ -369,7 +373,7 @@ async def get_project(
         return JSONResponse(status_code=502, content={"detail": "Invalid project service response"})
     return JSONResponse(
         status_code=response.status_code,
-        content=_project_summary(payload, record, current),
+        content=_project_summary(payload, record, current, runtime),
     )
 
 

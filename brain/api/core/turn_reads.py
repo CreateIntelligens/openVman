@@ -98,3 +98,9 @@ def without_disabled_recall(
         decision,
         policy=replace(decision.policy, needs_memory=None, auto_recall=False),
     )
+
+
+def vendor_turn_decision(decision: TurnDecision) -> TurnDecision:
+    return replace(decision, policy=replace(
+        decision.policy, needs_web=False, needs_memory=False, auto_recall=False,
+    ))

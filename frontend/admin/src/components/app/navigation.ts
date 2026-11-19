@@ -48,7 +48,14 @@ export const allTabs = [
 ] as const;
 
 export type Tab = (typeof allTabs)[number]["key"];
-export type TabConfig = (typeof allTabs)[number];
+export type TabConfig = { key: Tab; label: string; icon: string };
+const VENDOR_TABS = new Set<Tab>(["KnowledgeBase", "Personas", "Chat", "Sessions"]);
+
+export function tabLabel(tab: TabConfig, vendor = false): string {
+  if (vendor && tab.key === "Chat") return "對話測試";
+  if (vendor && tab.key === "Personas") return "人設";
+  return tab.label;
+}
 export type NavigationGroup = (typeof tabGroups)[number]["label"];
 export type ProjectSummary = { project_id: string; label: string };
 
@@ -201,12 +208,15 @@ export function requiredRouteAccess(route: AdminRoute): TabAccess {
   return "user";
 }
 
-export function canAccessRoute(route: AdminRoute, access: TabAccess): boolean {
+export function canAccessRoute(route: AdminRoute, access: TabAccess, vendor = false): boolean {
+  if (vendor && (!VENDOR_TABS.has(route.tab) || (route.tab === "KnowledgeBase" && route.subView === "graph"))) {
+    return false;
+  }
   return hasAccess(access, requiredRouteAccess(route));
 }
 
-export function isTabVisible(tab: TabConfig, access: TabAccess): boolean {
-  return canAccessRoute({ tab: tab.key }, access);
+export function isTabVisible(tab: TabConfig, access: TabAccess, vendor = false): boolean {
+  return canAccessRoute({ tab: tab.key }, access, vendor);
 }
 
 export function parseAdminRoute(

@@ -175,14 +175,14 @@ export function AdminPortalDeniedState() {
   );
 }
 
-export function ForbiddenState() {
+export function ForbiddenState({ routeDenied = false }: { routeDenied?: boolean } = {}) {
   const { account, clearForbidden, logout } = useAuth();
 
   return (
     <main className="flex h-full items-center justify-center bg-surface p-6 text-content">
       <section className="max-w-lg rounded-xl border border-border bg-surface-raised p-8 text-center shadow-lg">
         <span className="material-symbols-outlined text-[2.5rem] text-warn">lock</span>
-        <h1 className="mt-4 text-xl font-semibold">權限不足</h1>
+        <h1 className="mt-4 text-xl font-semibold">{routeDenied ? "沒有權限" : "權限不足"}</h1>
         <p className="mt-2 text-sm text-content-muted">
           帳號「{account?.username}」沒有存取這個功能的權限。
         </p>

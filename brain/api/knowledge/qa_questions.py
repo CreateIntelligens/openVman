@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import posixpath
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -113,7 +114,9 @@ def _file_rows(source: str, project_id: str) -> list[dict[str, Any]]:
     return list(rows.values())
 
 
-def list_all_questions(project_id: str = "default") -> dict[str, Any]:
+def list_all_questions(
+    project_id: str = "default", *, visible: Callable[[str], bool] | None = None,
+) -> dict[str, Any]:
     """Every question with its answer, language, source, categories and states."""
     tree = get_node_tree(project_id)
     categories, entries_by_node = _categories(tree)
@@ -132,7 +135,10 @@ def list_all_questions(project_id: str = "default") -> dict[str, Any]:
     for category in categories:
         for entry in entries_by_node.get(category["node_id"], []):
             question = entry.get("question") or ""
-            source = _source_key(entry.get("source_path") or "")
+            source_path = entry.get("source_path") or ""
+            if source_path and visible and not visible(source_path):
+                continue
+            source = _source_key(source_path)
             id_key = f"{source}::{question_key(question)}" if source else f"menu::{category['node_id']}::{question_key(question)}"
             position.setdefault(id_key, len(position))
             if not source:
@@ -149,7 +155,9 @@ def list_all_questions(project_id: str = "default") -> dict[str, Any]:
         return bool(node_ids) and all(hidden_category.get(node_id, False) for node_id in node_ids)
 
     meta = load_doc_meta(project_id)
-    sources = sorted(_qa_document_paths(project_id))
+    sources = sorted(
+        path for path in _qa_document_paths(project_id) if visible is None or visible(path)
+    )
     languages = resolve_document_languages(sources, project_id) if sources else {}
     questions: list[dict[str, Any]] = []
     listed: set[tuple[str, str]] = set()

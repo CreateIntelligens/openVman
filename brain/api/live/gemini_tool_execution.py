@@ -12,6 +12,7 @@ from knowledge.kb_settings import primary_language
 from memory.embedder import encode_query_with_fallback
 from memory.language_detect import TAIWANESE, detect_language
 from memory.retrieval import search_records
+from tools.context import VENDOR_KNOWLEDGE_TOOLS
 
 
 logger = logging.getLogger("brain.live.gemini_tool_execution")
@@ -27,11 +28,13 @@ class GeminiLiveToolExecutor:
         relay_session_id: str,
         project_id: str,
         persona_id: str,
+        vendor: bool = False,
     ) -> None:
         self.config = config
         self.relay_session_id = relay_session_id
         self.project_id = project_id
         self.persona_id = persona_id
+        self.vendor = vendor
 
     async def execute(
         self,
@@ -44,6 +47,8 @@ class GeminiLiveToolExecutor:
     ) -> dict[str, Any]:
         name = str(function_call.get("name", "")).strip()
         call_id = str(function_call.get("id", "")).strip()
+        if self.vendor and name not in VENDOR_KNOWLEDGE_TOOLS:
+            return {"id": call_id, "name": name, "response": {"error": "沒有權限使用這個工具。"}}
         args = function_call.get("args") or {}
         if isinstance(args, str):
             args = json.loads(args)
@@ -92,7 +97,7 @@ class GeminiLiveToolExecutor:
             response = await handler()
         except Exception as exc:
             logger.warning("Gemini Live tool %s failed: %s", name, exc)
-            response = {"error": str(exc)}
+            response = {"error": "無法完成知識庫查詢。" if self.vendor else str(exc)}
 
         return {"id": call_id, "name": name, "response": response}
 

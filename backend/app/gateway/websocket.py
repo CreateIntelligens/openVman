@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.auth.dependencies import CurrentAccount, authenticate_websocket
 from app.auth.models import ResourceType
+from app.auth.policy import is_vendor_account
 from app.auth.resources import ResourceNotFoundError, resolve_resource
 from app.auth.runtime import get_auth_runtime
 from app.gateway.brain_live_relay import (
@@ -134,6 +135,13 @@ async def _handle_websocket_event(
     session: Session,
     websocket: WebSocket,
 ) -> None:
+    current = session.metadata.get("_current_account")
+    if isinstance(current, CurrentAccount) and is_vendor_account(current.user):
+        if event != "client_init" and not session.metadata.get("client_initialized"):
+            await websocket.close(code=1008, reason="project initialization required")
+            return
+        if event == "set_decision_debug":
+            return
     if event == "client_init":
         await _handle_client_init(data, session, websocket)
     elif event == "client_interrupt":
@@ -160,6 +168,7 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
     previous_voice_source = session.metadata.get("voice_source", DEFAULT_VOICE_SOURCE)
     previous_chat_session_id = str(session.metadata.get("chat_session_id", "")).strip()
     previous_persona_id = str(session.metadata.get("persona_id", "default")).strip()
+    previous_project_id = session.metadata.get("project_id")
 
     current = session.metadata.get("_current_account")
     if not isinstance(current, CurrentAccount):
@@ -168,7 +177,6 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
 
     session.metadata["client_id"] = data.get("client_id", session.session_id)
     session.metadata["voice_source"] = _get_requested_voice_source(data)
-    session.metadata["client_initialized"] = True
     capabilities = data.get("capabilities") or {}
     chat_session_id = str(capabilities.get("session_id", "")).strip()
     if chat_session_id:
@@ -210,6 +218,7 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
         await websocket.close(code=1008, reason="resource not found")
         return
     session.metadata["project_id"] = project_id
+    session.metadata["client_initialized"] = True
 
     await websocket.send_json(
         {
@@ -226,6 +235,7 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
         session.metadata["voice_source"] != previous_voice_source
         or chat_session_id != previous_chat_session_id
         or persona_id != previous_persona_id
+        or project_id != previous_project_id
     )
     if relay_needs_refresh and existing_relay is not None:
         await existing_relay.close()

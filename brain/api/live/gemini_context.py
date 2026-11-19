@@ -28,6 +28,7 @@ class LiveSessionContext:
     config: Any
     event_sink: EventSink | None = None
     gemini_credential: Callable[[], GeminiCredential | None] | None = None
+    vendor: bool = False
 
     async def emit(self, event: dict[str, Any]) -> None:
         if self.event_sink is not None:

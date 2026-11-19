@@ -37,6 +37,7 @@ import { useQaNodeModals } from "../hooks/useQaNodeModals";
 import { useQaNodeSelection } from "../hooks/useQaNodeSelection";
 import { useQaNodes } from "../hooks/useQaNodes";
 import { useUploadLimits } from "../hooks/useUploadLimits";
+import { isVendorUser } from "../utils/accountPermissions";
 import { errorMessage } from "../utils/errorMessage";
 import { formatUploadSize } from "../utils/uploadLimits";
 import { removeScoped, writeScoped } from "../utils/scopedStorage";
@@ -69,8 +70,9 @@ function dropConsumesDocument(
 
 export default function KnowledgeBase() {
   const { account } = useAuth();
+  const vendor = Boolean(account && isVendorUser(account));
   // 沒開放「AI 整理排版」的帳號只能直接放進知識庫，文件頁也不給整理按鈕；後端同樣會擋。
-  const allowAiCleanup = canUseAiCleanup(account);
+  const allowAiCleanup = !vendor && canUseAiCleanup(account);
   const {
     projectId = "default",
     documents,
@@ -133,7 +135,7 @@ export default function KnowledgeBase() {
     updateEditContent,
     relocateOpenDocument,
     loadDocuments,
-  } = useKnowledgeBase();
+  } = useKnowledgeBase(vendor);
 
   const [activeTab, setActiveTab] = useAdminSubView<KnowledgeTab>(
     "KnowledgeBase", "documents", KNOWLEDGE_TABS,
@@ -534,6 +536,7 @@ export default function KnowledgeBase() {
       {importer.dragOver && <UploadDropOverlay targetLabel={importer.targetLabel} />}
 
       <KnowledgeHeader
+        vendor={vendor}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         documentCount={documents.length}
@@ -635,6 +638,7 @@ export default function KnowledgeBase() {
                 onToggleChecked={batch.handleToggleChecked}
                 batchBar={
                   <BatchActionBar
+                    vendor={vendor}
                     selectedPaths={batch.batchSelectedPaths}
                     documents={documents}
                     serverDirs={serverDirs}
