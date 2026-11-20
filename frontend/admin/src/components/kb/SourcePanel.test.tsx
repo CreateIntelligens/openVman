@@ -188,5 +188,18 @@ describe("SourcePanel", () => {
       expect(existsSync(resolve(__dirname, "../../../public/templates", file))).toBe(true);
     });
   });
+
+  it("explains in vendor mode that a conflicting answer blocks the entire re-uploaded QA table", () => {
+    renderPanel({ vendor: true });
+
+    expect(screen.getByText(/整份都不會匯入/)).toBeTruthy();
+    expect(screen.queryByText(/會略過/)).toBeNull();
+  });
+
+  it("explains in internal mode that a conflicting answer blocks the entire re-uploaded QA table", () => {
+    renderPanel();
+
+    expect(screen.getByText(/只要有一題的答案和現有的不同，整份都不會匯入/)).toBeTruthy();
+  });
 });
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -1479,3 +1480,126 @@ def test_a_replaced_image_is_unknown_until_classified_again(client, monkeypatch)
 
     assert "image_kind" not in question
     assert "image_kind" not in row
+
+
+def _read_qa_nodes_json(root: Path) -> dict:
+    return json.loads((root / "knowledge" / ".qa_nodes.json").read_text(encoding="utf-8"))
+
+
+def test_vendor_cannot_remove_qa_entry_from_hidden_source(client, tmp_path):
+    from knowledge.qa_nodes import update_node
+
+    root = tmp_path / "workspace"
+    hidden_source = "knowledge/.hidden/secret.md"
+    _write_doc(root, hidden_source, "## 內部題\n\n內部答案\n")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    update_node(
+        "n1",
+        {
+            "qa_entries": [
+                {"question": "內部題", "source_path": hidden_source, "hidden": False, "image_id": None}
+            ]
+        },
+    )
+
+    response = client.delete(
+        "/brain/knowledge/qa/nodes/n1/entries",
+        params={"question": "內部題", "source_path": hidden_source},
+        headers={"X-OpenVMan-Vendor": "1"},
+    )
+
+    assert response.status_code == 403
+    entries = _read_qa_nodes_json(root)["nodes"]["n1"]["qa_entries"]
+    assert [(e["question"], e["source_path"]) for e in entries] == [("內部題", hidden_source)]
+
+
+def test_vendor_can_remove_qa_entry_from_visible_source(client, tmp_path):
+    from knowledge.qa_nodes import update_node
+
+    root = tmp_path / "workspace"
+    visible_source = "knowledge/qa/門市問答.md"
+    _write_doc(root, visible_source, "## 營業時間\n\n每天九點\n")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    update_node(
+        "n1",
+        {
+            "qa_entries": [
+                {"question": "營業時間", "source_path": visible_source, "hidden": False, "image_id": None}
+            ]
+        },
+    )
+
+    response = client.delete(
+        "/brain/knowledge/qa/nodes/n1/entries",
+        params={"question": "營業時間", "source_path": visible_source},
+        headers={"X-OpenVMan-Vendor": "1"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["qa_entries"] == []
+    assert _read_qa_nodes_json(root)["nodes"]["n1"]["qa_entries"] == []
+
+
+def test_vendor_removing_menu_only_entry_leaves_same_question_hidden_source_untouched(client, tmp_path):
+    from knowledge.qa_nodes import update_node
+
+    root = tmp_path / "workspace"
+    hidden_source = "knowledge/.hidden/secret.md"
+    _write_doc(root, hidden_source, "## 同字題\n\n內部答案\n")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    update_node(
+        "n1",
+        {
+            "qa_entries": [
+                {"question": "同字題", "source_path": hidden_source, "hidden": False, "image_id": None},
+                {"question": "同字題", "source_path": "", "hidden": False, "image_id": None},
+            ]
+        },
+    )
+
+    response = client.delete(
+        "/brain/knowledge/qa/nodes/n1/entries",
+        params={"question": "同字題", "source_path": ""},
+        headers={"X-OpenVMan-Vendor": "1"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["qa_entries"] == []
+    entries = _read_qa_nodes_json(root)["nodes"]["n1"]["qa_entries"]
+    assert [(e["question"], e["source_path"]) for e in entries] == [("同字題", hidden_source)]
+
+    # 選單專用題已移除後，再以空的 source_path 刪除不得配到隱藏來源的同名題。
+    second = client.delete(
+        "/brain/knowledge/qa/nodes/n1/entries",
+        params={"question": "同字題", "source_path": ""},
+        headers={"X-OpenVMan-Vendor": "1"},
+    )
+    assert second.status_code == 404
+    entries_after = _read_qa_nodes_json(root)["nodes"]["n1"]["qa_entries"]
+    assert [(e["question"], e["source_path"]) for e in entries_after] == [("同字題", hidden_source)]
+
+
+def test_non_vendor_can_remove_qa_entry_from_hidden_source(client, tmp_path):
+    from knowledge.qa_nodes import update_node
+
+    root = tmp_path / "workspace"
+    hidden_source = "knowledge/.hidden/secret.md"
+    _write_doc(root, hidden_source, "## 內部題\n\n內部答案\n")
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    update_node(
+        "n1",
+        {
+            "qa_entries": [
+                {"question": "內部題", "source_path": hidden_source, "hidden": False, "image_id": None}
+            ]
+        },
+    )
+
+    response = client.delete(
+        "/brain/knowledge/qa/nodes/n1/entries",
+        params={"question": "內部題", "source_path": hidden_source},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["qa_entries"] == []
+    assert _read_qa_nodes_json(root)["nodes"]["n1"]["qa_entries"] == []

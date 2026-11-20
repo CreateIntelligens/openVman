@@ -604,6 +604,8 @@ def remove_qa_entry_route(
 ) -> dict[str, Any]:
     """Take a question off this node; the document keeps it and search still finds it."""
     with qa_document_lock:
+        if vendor and source_path:
+            vendor_workspace_path(project_id, source_path, "knowledge")
         if not get_node(id, project_id=project_id):
             raise HTTPException(status_code=404, detail="Node not found")
         node = get_node(id, project_id=project_id)
