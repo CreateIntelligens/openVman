@@ -40,6 +40,7 @@ from knowledge.qa_csv import (
     unify_newlines,
 )
 from knowledge.qa_images import stored_qa_image_kinds
+from knowledge.qa_import_review import duplicate_qa_questions
 from knowledge.qa_nodes import (
     get_node,
     is_source_referenced,
@@ -282,6 +283,27 @@ class ReuploadMerge:
     content: str | None
     added: int
     kept: int
+    both: list[str] = field(default_factory=list)
+    later: list[dict[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class ReuploadQuestionComparison:
+    question: str
+    status: str
+    old: dict[str, Any] | None
+    new: dict[str, Any]
+
+
+@dataclass
+class ReuploadComparison:
+    is_csv: bool
+    before_bytes: bytes
+    before_text: str
+    before_items: list[dict[str, Any]]
+    in_file: dict[str, dict[str, Any]]
+    questions: list[ReuploadQuestionComparison]
+    duplicate_conflicts: list[str]
 
 
 def _quoted_list(questions: list[str], limit: int = 5) -> str:
@@ -289,17 +311,41 @@ def _quoted_list(questions: list[str], limit: int = 5) -> str:
     return f"{shown} 等 {len(questions)} 題" if len(questions) > limit else shown
 
 
-def merge_reupload(
+def _reupload_conflict_detail(questions: list[str]) -> str:
+    return (
+        f"{_quoted_list(list(dict.fromkeys(questions)))} 的內容和現有的不同，這份檔案沒有匯入。"
+        "請改成一樣，或先到分類編輯改掉舊答案，再重新上傳。"
+    )
+
+
+def reupload_format_error(comparison: ReuploadComparison) -> str | None:
+    """A repeated input row with different content cannot be resolved by a per-question choice."""
+    duplicates = set(comparison.duplicate_conflicts)
+    if duplicates:
+        return _reupload_conflict_detail([
+            item.question for item in comparison.questions if item.question in duplicates
+        ])
+    return None
+
+
+def _next_both_question_name(question: str, taken: set[str]) -> str:
+    candidate = f"{question}（新）"
+    if candidate not in taken:
+        return candidate
+    suffix = 2
+    while f"{question}（新{suffix}）" in taken:
+        suffix += 1
+    return f"{question}（新{suffix}）"
+
+
+def compare_reupload(
     source: str,
     entries: list[dict[str, Any]],
-    extras: dict[str, dict[str, Any]],
     project_id: str,
-) -> ReuploadMerge:
-    """Merge a re-uploaded QA table into the document it would replace.
-
-    新題加進去，檔案裡已有、新檔沒有的題目留著（要刪到編輯畫面刪）。同一題內容不同時整份拒絕：
-    哪一版才對要有人決定，直接蓋掉就是默默丟資料。同一題只差舊檔沒填的圖片或連結時補上。
-    """
+    *,
+    image_map: dict[str, str] | None = None,
+) -> ReuploadComparison:
+    """Compare a re-uploaded QA table against the stored document without writing anything."""
     doc_path = resolve_workspace_document(source, project_id)
     is_csv = doc_path.suffix.lower() == ".csv"
     before_bytes = doc_path.read_bytes()
@@ -313,59 +359,148 @@ def merge_reupload(
     def _differs(new: dict[str, Any], old: dict[str, Any], key: str) -> bool:
         return bool(new.get(key)) and bool(old.get(key)) and new[key] != old[key]
 
-    updates: list[dict[str, Any]] = []
-    conflicts: list[str] = []
-    fresh: list[dict[str, Any]] = []
-    seen: dict[str, dict[str, Any]] = {}
-    kept = 0
-    for entry in entries:
-        q = entry["q"].strip()
-        values = {
-            "q": q,
+    def _mapped_image(raw_image: str) -> str:
+        extracted = extract_image_id(raw_image)
+        if not image_map:
+            return extracted
+        return image_map.get(raw_image.strip()) or image_map.get(extracted) or extracted
+
+    questions: list[ReuploadQuestionComparison] = []
+    normalized = [
+        {
+            "q": entry["q"].strip(),
             "a": unify_newlines(entry["a"]).strip(),
-            "img": extract_image_id(entry.get("img") or ""),
+            "img": _mapped_image(entry.get("img") or ""),
             "url": (entry.get("url") or "").strip(),
             "hidden": bool(entry.get("hidden")),
         }
-        # 同一份檔案裡重複的列：一樣就算一題，不一樣（例如圖片不同）要有人決定。
+        for entry in entries
+    ]
+    seen: set[str] = set()
+    for values in normalized:
+        q = values["q"]
         if q in seen:
-            if seen[q] != values:
-                conflicts.append(q)
             continue
-        seen[q] = values
+        seen.add(q)
         old = in_file.get(q)
         if old is None:
+            questions.append(ReuploadQuestionComparison(q, "new", None, values))
+            continue
+        old_raw_img = extract_image_id(old.get("img") or "")
+        old_values = {
+            "a": unify_newlines(old["a"]).strip(),
+            "img": old_raw_img,
+            "url": (old.get("url") or "").strip(),
+            "hidden": bool(old.get("hidden")),
+        }
+        old_compare = {
+            "img": _mapped_image(old_raw_img),
+            "url": old_values["url"],
+        }
+        is_conflict = (
+            old_values["a"] != values["a"]
+            or any(_differs(values, old_compare, key) for key in ("img", "url"))
+        )
+        questions.append(
+            ReuploadQuestionComparison(
+                q,
+                "conflict" if is_conflict else "same",
+                old_values,
+                values,
+            )
+        )
+    return ReuploadComparison(
+        is_csv=is_csv,
+        before_bytes=before_bytes,
+        before_text=before_text,
+        before_items=before_items,
+        in_file=in_file,
+        questions=questions,
+        duplicate_conflicts=duplicate_qa_questions(normalized),
+    )
+
+
+def merge_reupload(
+    source: str,
+    entries: list[dict[str, Any]],
+    extras: dict[str, dict[str, Any]],
+    project_id: str,
+    *,
+    conflict_decisions: dict[str, str] | None = None,
+    image_map: dict[str, str] | None = None,
+) -> ReuploadMerge:
+    """Merge a re-uploaded QA table into the document it would replace.
+
+    新題加進去，檔案裡已有、新檔沒有的題目留著（要刪到編輯畫面刪）。同一題內容不同時，
+    若沒有逐題決定就整份拒絕：哪一版才對要有人決定，直接蓋掉就是默默丟資料。
+    同一題只差舊檔沒填的圖片或連結時補上。
+    """
+    comparison = compare_reupload(source, entries, project_id, image_map=image_map)
+    if reason := reupload_format_error(comparison):
+        raise MergedSaveError(400, reason)
+    taken_names = set(comparison.in_file) | {item.question for item in comparison.questions}
+
+    updates: list[dict[str, Any]] = []
+    conflicts: list[str] = []
+    fresh: list[dict[str, Any]] = []
+    both_questions: list[str] = []
+    later_items: list[dict[str, str]] = []
+    kept = 0
+    for item in comparison.questions:
+        q = item.question
+        values = item.new
+        if item.status == "new":
             fresh.append({"match": None, **values, "language": extras.get(q, {}).get("language", "")})
             continue
+        old = comparison.in_file[q]
         old_values = {
-            "img": extract_image_id(old.get("img") or ""),
-            "url": (old.get("url") or "").strip(),
+            "img": (item.old or {}).get("img", ""),
+            "url": (item.old or {}).get("url", ""),
         }
-        if unify_newlines(old["a"]).strip() != values["a"] or any(_differs(values, old_values, key) for key in ("img", "url")):
-            conflicts.append(q)
+        filled = {key: values[key] or old_values[key] for key in ("img", "url")}
+        if item.status == "conflict":
+            decision = (conflict_decisions or {}).get(q)
+            if decision == "overwrite":
+                updates.append({"match": q, **values, **filled, "hidden": bool(old.get("hidden"))})
+            elif decision == "keep":
+                kept += 1
+            elif decision == "later":
+                kept += 1
+                later_items.append({"question": q, "answer": values["a"]})
+            elif decision == "both":
+                kept += 1
+                new_q = _next_both_question_name(q, taken_names)
+                taken_names.add(new_q)
+                both_questions.append(new_q)
+                if q in extras:
+                    extras[new_q] = dict(extras[q])
+                fresh.append({
+                    "match": None,
+                    **values,
+                    "q": new_q,
+                    "hidden": True,
+                    "language": extras.get(q, {}).get("language", ""),
+                })
+            else:
+                conflicts.append(q)
             continue
         kept += 1
-        filled = {key: values[key] or old_values[key] for key in ("img", "url")}
         if filled != old_values:
             # 隱藏狀態留舊的：工作人員可能在後台隱藏過。
             updates.append({"match": q, **values, **filled, "hidden": bool(old.get("hidden"))})
     if conflicts:
-        raise MergedSaveError(
-            400,
-            f"{_quoted_list(list(dict.fromkeys(conflicts)))} 的內容和現有的不同，這份檔案沒有匯入。"
-            "請改成一樣，或先到分類編輯改掉舊答案，再重新上傳。",
-        )
+        raise MergedSaveError(400, _reupload_conflict_detail(conflicts))
     updates.extend(fresh)
     if not updates:
-        return ReuploadMerge(None, 0, kept)
+        return ReuploadMerge(None, 0, kept, both=both_questions, later=later_items)
 
-    if is_csv:
-        content = rewrite_qa_csv(before_bytes, updates, set(), shared=True)
+    if comparison.is_csv:
+        content = rewrite_qa_csv(comparison.before_bytes, updates, set(), shared=True)
     else:
-        content = rewrite_qa_markdown(before_text, updates, set(), shared=True)
-    after_items = parse_qa_csv(content.encode("utf-8")) if is_csv else parse_qa_markdown(content)
-    _verify_rewrite(source, before_items, updates, set(), after_items)
-    return ReuploadMerge(content, len(fresh), kept)
+        content = rewrite_qa_markdown(comparison.before_text, updates, set(), shared=True)
+    after_items = parse_qa_csv(content.encode("utf-8")) if comparison.is_csv else parse_qa_markdown(content)
+    _verify_rewrite(source, comparison.before_items, updates, set(), after_items)
+    return ReuploadMerge(content, len(fresh), kept, both=both_questions, later=later_items)
 
 
 def _hidden_of(item: dict[str, Any], in_file: dict[str, Any] | None) -> bool:

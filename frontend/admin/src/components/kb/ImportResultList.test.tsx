@@ -39,6 +39,7 @@ function renderList(
   const handlers = {
     onViewDocument: vi.fn(),
     onViewQaNode: vi.fn(),
+    onOpenLaterQuestion: vi.fn(),
     onRenameQaNode: vi.fn(),
     onRetry: vi.fn(),
     onPickAgain: vi.fn(),
@@ -91,6 +92,7 @@ describe("ImportResultList", () => {
         nodesTree={[]}
         onViewDocument={vi.fn()}
         onViewQaNode={vi.fn()}
+        onOpenLaterQuestion={vi.fn()}
         onRenameQaNode={vi.fn()}
         onRetry={vi.fn()}
         onClear={vi.fn()}
@@ -394,5 +396,45 @@ describe("ImportResultList", () => {
     renderList([row({ size: undefined, state: "waiting" })]);
 
     expect(screen.queryByText(/KB|MB/)).toBeNull();
+  });
+
+  it("opens a deferred result by source and shows its archived original and hidden additions", () => {
+    const { onOpenLaterQuestion } = renderList([
+      row({
+        name: "faq.csv",
+        result: {
+          ...qaResult,
+          updated: true,
+          both: ["營業時間（新）"],
+          origin_path: "archive/originals/faq.csv",
+          later: [{ question: "門票費用", answer: "週末改為 150 元" }],
+        },
+      }),
+    ]);
+
+    expect(screen.getByText("兩題都留（新增的隱藏題目）")).toBeTruthy();
+    expect(screen.getByText("營業時間（新）")).toBeTruthy();
+    expect(screen.getByText("待處理")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "門票費用" }));
+    expect(onOpenLaterQuestion).toHaveBeenCalledWith(qaResult.target, { question: "門票費用", answer: "週末改為 150 元" });
+    expect(screen.getByText("週末改為 150 元")).toBeTruthy();
+    expect(screen.getByText("原始上傳檔案：archive/originals/faq.csv")).toBeTruthy();
+  });
+
+  it("keeps the archived file path out of a vendor's deferred result", () => {
+    renderList([
+      row({
+        name: "faq.csv",
+        result: {
+          ...qaResult,
+          updated: true,
+          origin_path: "archive/originals/faq.csv",
+          later: [{ question: "門票費用", answer: "週末改為 150 元" }],
+        },
+      }),
+    ], [], { vendor: true });
+
+    expect(screen.getByRole("button", { name: "門票費用" })).toBeTruthy();
+    expect(screen.queryByText(/archive\/originals|faq\.csv/)).toBeNull();
   });
 });

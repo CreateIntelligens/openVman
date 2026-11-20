@@ -121,13 +121,20 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 語言：整理時不翻譯。每段輸出都和原文比對語言，並檢查中文字有沒有憑空出現或消失，不一致就保留那段原文。
 - LLM 呼叫失敗或輸出沒通過檢查時，匯入保留那段原文；後台的「AI 整理排版」（`POST /knowledge/renormalize/preview`、`/renormalize`）則回 400，`detail` 寫白話原因，文件不變。
 - 同一來源重傳：目標文件已被問答節點引用時，只更新該節點的題目，名稱、上層與隱藏狀態不動；`knowledge/qa/<檔名>.csv` 已掛在樹上時更新那份 CSV。一般文件同路徑時覆蓋，手動指定的語言保留。題目全部拿掉後分類還留著時，接回當初匯入建立的分類，不另開同名分類。
-- 問答表的內容：有列只有答案沒有題目，或同一題有不同答案時，整份不匯入，原因一次列出所有這類題目；同一題答案相同只算一題。寫檔前也會檢查分類欄格式：同列同時填「分類」和「第一層／第二層」、只有第二層沒有第一層、或「分類」（`path`）去掉開頭語言分類名稱後超過兩層時，整份不匯入並一次列出所有違規題目。
+- 問答表的內容：有列只有答案沒有題目，或同一題有不同答案時，整份不匯入，原因一次列出所有這類題目；同一題重複列內容相同只算一題，答案相同但圖片、連結或顯示狀態不同也會擋下整份問答表。寫檔前也會檢查分類欄格式：同列同時填「分類」和「第一層／第二層」、只有第二層沒有第一層、或「分類」（`path`）去掉開頭語言分類名稱後超過兩層時，整份不匯入並一次列出所有違規題目。
 - 混語言的問答表（`knowledge/qa_import_review.py`）：沒人標語言時，逐題以 `detect_row_language` 判斷，判出兩種以上語言才算混語言；這時空白的 `language` 欄由系統補上（人寫的值不改，看不懂的值照留），表存成 CSV，每題放進自己語言的第一層分類底下（有填「第一層」「第二層」時接在語言分類後面，沒填則放進以檔名命名的分類）。只有一種語言的表照舊整份一個語言、存成 Markdown（有填「語言」欄時保持 CSV）。已經依語言分開的同名表重傳時，就算這次只有一種語言也逐題標語言，新題放進自己的語言分類。原本是單一語言（Markdown）的同名表重傳時混了語言，不分開放，題目照舊放在一起並在 `notes` 說明，因為 Markdown 存不了每題的語言。全部列都已標語言的表不重寫，原樣存檔。`languages` 只在至少一種語言有分類、真的分開放時回傳。
-- 新問答的位置與層數上限：第一層有符合語言的節點就放進去（有填 `level1`／`level2`（別名「第一層」「第二層」）時自動掛在語言分類底下，舊的 `path`／「分類」斜線欄仍照填的放），沒有語言分類就放最上層，不自動建立語言分類。名稱對照是 `knowledge/qa_nodes.py` 的 `LANGUAGE_LABELS`，與前台 `quickQaText.ts` 相同，有測試鎖住兩邊一致。快速問答最多兩層分類（語言分類不計），建立或搬移分類超過上限時回 400。匯入時依文件排序（「順序」／`index` 欄）掛入題目，重傳時已掛題目位置不動、新題依序接在後面。
+- 新問答的位置與層數上限：第一層有符合語言的節點就放進去（有填 `level1`／`level2`（別名「第一層」「第二層」）時自動掛在語言分類底下，舊的 `path`／「分類」斜線欄仍照填的放），沒有語言分類就放最上層，不自動建立語言分類。名稱對照是 `knowledge/qa_category_depth.py` 的 `LANGUAGE_LABELS`，與前台 `quickQaText.ts` 相同，有測試鎖住兩邊一致。快速問答最多兩層分類（語言分類不計），建立或搬移分類超過上限時回 400。匯入時依文件排序（「順序」／`index` 欄）掛入題目，重傳時已掛題目位置不動、新題依序接在後面。
 - 寫入：目標文件原子寫入，並和拖曳併入（`ingest-source`）共用 `qa_document_lock`，兩者不會互相蓋掉。`.doc_meta.json` 同樣原子寫入，匯入與後台列文件同時進行也不會蓋掉彼此的欄位。問答表轉 Markdown 前逐題轉換再讀回比對，答案裡有 `##` 開頭的行、沒收尾的 ```` ``` ```` 或題目有換行時整份不匯入，原因列出所有這類題目；逐題沒抓到、整份讀回卻不同時，保底指出第一個對不上的題目。
 - 失敗：單一檔案失敗不影響其他檔案。沒匯入的留在 `raw/`，原因記在 `skip_reasons`；成功的原檔搬到 `archive/originals/`。匯入途中同一路徑又傳了新版時，新版留在 `raw/` 等下一批。
 
 ### API
+
+`POST /knowledge/raw/preview`
+
+預覽 `raw/` 待匯入檔案，不寫檔、不改節點、不搬移原始檔（對廠商開放，經 Backend `/api/v1/knowledge/raw/preview` 轉送並檢查廠商路徑可見性）。請求 `{ project_id, paths? }`，回應 `{ files: { "<raw 檔名>": ... } }`：
+
+- 一般文件：`{ kind: "document" }`。
+- 問答表：`{ kind: "qa", target, existing, errors, duplicate_rows, questions, missing_images, notes }`。`errors` 為格式錯誤訊息陣列，以換行串接後與匯入拒絕原因相同。`duplicate_rows` 計算在同一份表裡出現多次的題目共有幾列，包含每題第一次出現的那列。`questions` 每題含 `{ question, status: "new" | "same" | "conflict", placement: string[] | null, language, old?: { answer, image, url }, new?: { answer, image, url } }`；`missing_images` 為 `[{ image, questions }]`。
 
 `POST /knowledge/raw/commit`
 
@@ -136,12 +143,13 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | `project_id` | 專案 |
 | `paths` | 選填。只匯入這些檔案，路徑相對 `raw/`，帶 `raw/` 前綴也可以。不給就是全部，空陣列就是沒有要匯入的 |
 | `normalize` | 選填，預設 `true`；`false` 時略過 LLM 整理。後台「新增資料」畫面預設送 `false`，使用者選了 AI 整理才送 `true`。經 Backend（`/api/v1`）呼叫時，沒開放「AI 整理排版」的帳號送 `true` 會被擋下、沒帶會改成 `false`（見 `docs/operations/account-administration.md`） |
+| `decisions` | 選填。`{ "<raw 檔名>": { conflicts?: { "<題目>": "overwrite" \| "keep" \| "both" \| "later" }, images?: { "<表內圖片值>": "<補傳後的 image_id>" } } }`。未帶或某題衝突未決定時維持整份不匯入；補傳的 `image_id` 不存在時也整份不匯入。`overwrite` 更新答案，圖片和連結有填才更新，留白時沿用舊值 |
 
 回應的 `status`：`started`（202，帶 `job`）、`already_running`（200，帶進行中的 `job`，這次的檔案沒有開始，等這批結束再送一次）、`nothing_to_commit`（200）。路徑超出 `raw/` 回 400。
 
 `GET /knowledge/raw/commit/status` 回傳 `state`（`idle`、`running`、`done`、`failed`）、`started_at`、`finished_at`、`files`（路徑對應 `pending`、`normalizing`、`committed`、`skipped`）、`committed`、`skipped`、`error`，以及逐檔處理完就更新的：
 
-- `results`：路徑對應 `{ target, kind, language, updated, qa_node_id?, qa_node_label?, qa_parent_label?, question_count?, languages?, notes? }`。`languages` 只在混語言的表出現，是每種語言的題數；`notes` 是匯入成功但要人回頭看的白話提示：沒讀進去的欄位、看不懂的語言值、還沒有的語言分類、沒有答案的題目、找不到的圖片，以及 CSV／Excel 因為缺問題或答案欄而當成一般文件。`kind` 是 `qa` 或 `document`；`updated` 表示目標文件原本就存在；`qa_` 開頭的欄位與 `question_count` 只有問答表才有，沒有上層時不帶 `qa_parent_label`。
+- `results`：路徑對應 `{ target, kind, language, updated, added?, kept?, both?, later?, origin_path?, name_clashes?, qa_node_id?, qa_node_label?, qa_parent_label?, question_count?, qa_category_count?, languages?, notes? }`。`both` 是衝突選「兩題都留」時新增的隱藏題目清單（如 `["原題目（新）"]`）；`later` 是選「稍後調整」的 `{ question, answer }` 清單，並附 `origin_path`（`archive/originals/...`）；`languages` 只在混語言的表出現，是每種語言的題數；`notes` 是匯入成功但要人回頭看的白話提示：沒讀進去的欄位、看不懂的語言值、還沒有的語言分類、沒有答案的題目、找不到的圖片，以及 CSV／Excel 因為缺問題或答案欄而當成一般文件。`kind` 是 `qa` 或 `document`；`updated` 表示目標文件原本就存在；`qa_` 開頭的欄位與 `question_count` 只有問答表才有，沒有上層時不帶 `qa_parent_label`。
 - `skip_reasons`：路徑對應給工作人員看的原因。
 
 進度存在記憶體，服務重啟後回到 `idle`，`raw/` 裡的檔案不受影響。
@@ -462,7 +470,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | Session | `GET /sessions`、`GET /sessions/export`（皆可用 `language` 篩選）、`DELETE /sessions/{id}`、`POST /sessions/batch-delete`、`POST /sessions/{id}/recall-toggle` |
 | 檢索與記憶 | `POST /search`、`GET/POST/DELETE /memories`、`POST /memories/maintain` |
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
-| 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
+| 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/preview`（只讀檢查）、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
 | 專案知識與回答設定 | `GET /knowledge/settings` 讀取全部設定，`PUT /knowledge/settings` 更新語言分流與 `reply_seconds`，`PATCH /knowledge/features` 更新記憶與圖譜擴展 |
 | QA 知識 | `GET /knowledge/qa`、`GET/PUT /knowledge/qa/questions`（所有題目清單與單題直接存檔，見下）、`POST /knowledge/qa/questions/move`（單題或批次跨分類移動／掛載）、`GET /knowledge/qa/sync-status`（各分類索引同步狀態，見下）、`GET /knowledge/qa/export`（匯出 Excel，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |

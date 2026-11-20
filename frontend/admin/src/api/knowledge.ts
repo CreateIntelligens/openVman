@@ -226,6 +226,67 @@ export type KnowledgeCommitFileState =
   | "committed"
   | "skipped";
 
+export type KnowledgeConflictDecision = "overwrite" | "keep" | "both" | "later";
+
+export interface KnowledgeFileDecision {
+  conflicts?: Record<string, KnowledgeConflictDecision>;
+  images?: Record<string, string>;
+}
+
+export interface KnowledgeCommitLaterItem {
+  question: string;
+  answer: string;
+}
+
+export interface KnowledgePreviewQuestionSide {
+  answer: string;
+  image: string;
+  url: string;
+}
+
+export interface KnowledgePreviewQuestion {
+  question: string;
+  status: "new" | "same" | "conflict";
+  placement: string[] | null;
+  language?: KnowledgeLanguage | string | null;
+  old?: KnowledgePreviewQuestionSide;
+  new?: KnowledgePreviewQuestionSide;
+}
+
+export interface KnowledgePreviewMissingImage {
+  image: string;
+  questions: string[];
+}
+
+export interface KnowledgePreviewQaFile {
+  kind: "qa";
+  target: string;
+  existing: boolean;
+  errors: string[];
+  duplicate_rows: number;
+  questions: KnowledgePreviewQuestion[];
+  missing_images: KnowledgePreviewMissingImage[];
+  notes: string[];
+}
+
+export interface KnowledgePreviewDocumentFile {
+  kind: "document";
+}
+
+export type KnowledgePreviewFile = KnowledgePreviewQaFile | KnowledgePreviewDocumentFile;
+
+export interface KnowledgeRawPreviewResponse {
+  files: Record<string, KnowledgePreviewFile>;
+}
+
+/** Preview staged raw/ files before committing them. */
+export function previewRawKnowledge(paths: string[]) {
+  return post<KnowledgeRawPreviewResponse>(knowledgePath("/raw/preview"), {
+    project_id: getActiveProjectId(),
+    paths,
+  });
+}
+
 /** 一個檔案匯入後的結果。沒有上層的分類不會帶 qa_parent_label。 */
 export interface KnowledgeCommitFileResult {
   target: string;
@@ -235,6 +296,12 @@ export interface KnowledgeCommitFileResult {
   /** 重傳同名問答表時才有：這次新增幾題、幾題和現有內容相同。 */
   added?: number;
   kept?: number;
+  /** 衝突選「兩題都留」新增的隱藏題目。 */
+  both?: string[];
+  /** 衝突選「稍後再調整」的題目與新答案。 */
+  later?: KnowledgeCommitLaterItem[];
+  /** 原始上傳檔存放在 archive/originals 的路徑。 */
+  origin_path?: string;
   /** 分類裡已有同名題目、沒能放進選單的題目。 */
   name_clashes?: string[];
   qa_node_id?: string;
@@ -275,6 +342,8 @@ export interface KnowledgeCommitOptions {
   paths?: string[];
   /** false 時略過 AI 整理；不給就是要整理。 */
   normalize?: boolean;
+  /** 每個問答表檔案的重複題目決定與補傳圖片對照。 */
+  decisions?: Record<string, KnowledgeFileDecision>;
 }
 
 /** Promote staged raw/ files into the knowledge base as a background job. */

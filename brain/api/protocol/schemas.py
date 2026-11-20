@@ -1,6 +1,6 @@
 """Pydantic schemas for API requests and responses."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, StrictBool, field_validator, model_validator
 from tools.skill import SKILL_ID_PATTERN
@@ -265,6 +265,21 @@ class AdminActionRequest(BaseModel):
     project_id: str = "default"
 
 
+class KnowledgeRawPreviewRequest(BaseModel):
+    project_id: str = "default"
+    paths: list[str] | None = Field(
+        None,
+        description="預覽這些檔案（相對 raw/，可帶 raw/ 前綴）；不給就是全部",
+    )
+
+
+class KnowledgeFileDecision(BaseModel):
+    conflicts: dict[str, Literal["overwrite", "keep", "both", "later"]] = Field(
+        default_factory=dict,
+    )
+    images: dict[str, str] = Field(default_factory=dict)
+
+
 class KnowledgeRawCommitRequest(BaseModel):
     project_id: str = "default"
     paths: list[str] | None = Field(
@@ -272,6 +287,10 @@ class KnowledgeRawCommitRequest(BaseModel):
         description="只匯入這些檔案（相對 raw/，可帶 raw/ 前綴）；不給就是全部，空陣列就是沒有要匯入的",
     )
     normalize: bool = Field(True, description="false 時略過 AI 整理；問答表本來就不經 AI")
+    decisions: dict[str, KnowledgeFileDecision] | None = Field(
+        None,
+        description="每個 raw 檔案的衝突決定與補傳圖片對照",
+    )
 
 
 class SkillCreateRequest(BaseModel):

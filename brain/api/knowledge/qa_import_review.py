@@ -13,9 +13,14 @@ from typing import Any
 
 from knowledge.converters import qa_table_ignored_columns
 from knowledge.qa_csv import (
+    UNTITLED_QUESTION,
+    convert_csv_to_qa_markdown,
     label_qa_csv_languages,
+    normalize_qa_csv_rows,
     normalize_row_language,
     parse_qa_csv,
+    parse_qa_markdown,
+    qa_entry_values,
     qa_csv_row_categories,
     qa_csv_row_extras,
 )
@@ -158,7 +163,8 @@ def question_paths(
     放進以檔名命名的分類。語言分類不自動建立，沒有就放最上層；專案有其他語言分類時，
     缺的那些回報給使用者。
     """
-    from knowledge.qa_nodes import LANGUAGE_LABELS, find_language_category, node_label
+    from knowledge.qa_category_depth import LANGUAGE_LABELS
+    from knowledge.qa_nodes import find_language_category, node_label
 
     # 台語沒有對應的分類名稱，提示「先建分類」也沒用，只報建得出來的語言。
     nameable = set(LANGUAGE_LABELS.values())
@@ -189,7 +195,7 @@ def category_column_problems(qa_csv: bytes) -> list[str]:
     2. 只填第二層、沒填第一層。
     3. ``path`` 去掉開頭的語言分類名稱後超過兩段。
     """
-    from knowledge.qa_nodes import QA_CATEGORY_DEPTH_LIMIT, is_language_label
+    from knowledge.qa_category_depth import QA_CATEGORY_DEPTH_LIMIT, is_language_label
 
     mixed_columns: list[str] = []
     missing_level1: list[str] = []
@@ -217,7 +223,8 @@ def category_column_problems(qa_csv: bytes) -> list[str]:
 
 def missing_language_category(language: str, category: str | None, project_id: str) -> dict[str, int]:
     """The file's language when the project sorts by language but lacks that category."""
-    from knowledge.qa_nodes import LANGUAGE_LABELS, find_language_category
+    from knowledge.qa_category_depth import LANGUAGE_LABELS
+    from knowledge.qa_nodes import find_language_category
 
     if category is not None or language not in set(LANGUAGE_LABELS.values()) or not any(
         find_language_category(code, project_id) for code in set(LANGUAGE_LABELS.values())
@@ -247,6 +254,61 @@ def unclear_question_problems(entries: list[dict[str, Any]], untitled: str) -> l
     if conflicts:
         problems.append(f"{_listing(conflicts, None)}在檔案裡有不同的答案，每題請只留一個答案")
     return problems
+
+
+def duplicate_qa_questions(entries: list[dict[str, Any]]) -> list[str]:
+    """Questions whose repeated rows differ in content or visibility."""
+    first: dict[str, tuple[str, str, str, str, bool]] = {}
+    conflicts: dict[str, None] = {}
+    for values in qa_entry_values(entries):
+        question = values[0]
+        if first.setdefault(question, values) != values:
+            conflicts[question] = None
+    return list(conflicts)
+
+
+@dataclass
+class QaDocumentDraft:
+    entries: list[dict[str, Any]]
+    content: str | None
+    errors: list[str]
+
+
+def prepare_qa_document(csv_bytes: bytes, target: Path) -> QaDocumentDraft:
+    """Validate and render without writing; preview and commit use the same error strings."""
+    errors: list[str] = []
+    if problems := category_column_problems(csv_bytes):
+        errors.append("；".join(problems) + "。改好後重新上傳")
+
+    normalized = normalize_qa_csv_rows(csv_bytes)
+    entries = parse_qa_csv(normalized) if normalized is not None else []
+    if normalized is None or not entries:
+        return QaDocumentDraft(entries, None, [*errors, "這份問答表沒有任何題目"])
+    if problems := unclear_question_problems(entries, UNTITLED_QUESTION):
+        errors.append("；".join(problems) + "。改好後重新上傳")
+
+    if target.suffix == ".csv":
+        return QaDocumentDraft(entries, normalized.decode("utf-8"), errors)
+    if broken := markdown_breaking_questions(entries):
+        return QaDocumentDraft(entries, None, [*errors, markdown_refusal(broken)])
+    markdown = convert_csv_to_qa_markdown(csv_bytes)
+    expected = qa_entry_values(entries)
+    actual = qa_entry_values(parse_qa_markdown(markdown))
+    if expected != actual:
+        # 保底：若整份讀回來仍對不上，指出第一題，避免寫入後才發現內容被拆壞。
+        first = next((e for e, a in zip(expected, actual) if e != a), expected[-1])
+        errors.append(markdown_refusal([first[0]]))
+    return QaDocumentDraft(entries, markdown, errors)
+
+
+def claimed_target_error(claimed_by: str) -> str:
+    return f"和同一批的 {claimed_by} 會存成同一份文件，請改檔名後再上傳"
+
+
+def new_table_duplicate_error(entries: list[dict[str, Any]]) -> str | None:
+    if duplicates := duplicate_qa_questions(entries):
+        return f"{_listing(duplicates, None)}在檔案裡有不同的內容，每題請只留一列。改好後重新上傳"
+    return None
 
 
 def qa_table_notes(

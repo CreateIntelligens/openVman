@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   discardRawPending: vi.fn(),
   fetchRawPending: vi.fn(),
   getCommitStatus: vi.fn(),
+  previewRawKnowledge: vi.fn(),
   uploadRawKnowledgeDocuments: vi.fn(),
 }));
 
@@ -104,6 +105,9 @@ beforeEach(() => {
   sessionStorage.clear();
   api.fetchRawPending.mockReset().mockResolvedValue({ files: [] });
   api.getCommitStatus.mockReset().mockResolvedValue(IDLE_JOB);
+  api.previewRawKnowledge.mockReset().mockImplementation(async (paths: string[]) => ({
+    files: Object.fromEntries(paths.map((path) => [path, { kind: "document" }])),
+  }));
   api.commitRawKnowledge.mockReset();
   api.uploadRawKnowledgeDocuments.mockReset();
   api.discardRawPending.mockReset().mockResolvedValue({ status: "ok" });
@@ -1199,6 +1203,84 @@ describe("useKnowledgeImport", () => {
 
       expect(callbacks.onError).toHaveBeenCalledWith("這裡面沒有檔案可以匯入");
       expect(callbacks.onDropStarted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("QA upload review before commit", () => {
+    const qaPreview = {
+      kind: "qa" as const,
+      target: "knowledge/qa/faq.md",
+      existing: true,
+      errors: [],
+      duplicate_rows: 0,
+      questions: [
+        {
+          question: "Q1",
+          status: "conflict" as const,
+          placement: ["faq"],
+          language: "zh" as const,
+          old: { answer: "舊答", image: "", url: "" },
+          new: { answer: "新答", image: "", url: "" },
+        },
+      ],
+      missing_images: [{ image: "pic.png", questions: ["Q1"] }],
+      notes: [],
+    };
+
+    it("opens review for QA tables and sends decisions on confirm", async () => {
+      uploaded("raw/faq.csv");
+      api.previewRawKnowledge.mockResolvedValueOnce({
+        files: { "faq.csv": qaPreview },
+      });
+      started({ "faq.csv": "pending" });
+      const { result } = renderImport();
+      await flush();
+
+      act(() => result.current.startFiles([file("faq.csv")]));
+      await flush();
+
+      expect(api.previewRawKnowledge).toHaveBeenCalledWith(["faq.csv"]);
+      expect(api.commitRawKnowledge).not.toHaveBeenCalled();
+      expect(result.current.review?.files).toHaveLength(1);
+      expect(result.current.review?.files[0].rawPath).toBe("faq.csv");
+
+      const decisions = {
+        "faq.csv": {
+          conflicts: { Q1: "overwrite" as const },
+          images: { "pic.png": "uploaded_1.png" },
+        },
+      };
+      act(() => result.current.confirmReview(["faq.csv"], decisions));
+      await flush();
+
+      expect(result.current.review).toBeNull();
+      expect(api.commitRawKnowledge).toHaveBeenCalledWith({
+        paths: ["faq.csv"],
+        normalize: false,
+        decisions,
+      });
+    });
+
+    it("does not call commit when review is cancelled, leaving the file in pending", async () => {
+      uploaded("raw/faq.csv");
+      api.previewRawKnowledge.mockResolvedValueOnce({
+        files: { "faq.csv": qaPreview },
+      });
+      const pendingFile = { path: "faq.csv", size: 10, updated_at: "2026-11-05T10:00:00" };
+      const { result } = renderImport();
+      await flush();
+      api.fetchRawPending.mockResolvedValue({ files: [pendingFile] });
+
+      act(() => result.current.startFiles([file("faq.csv")]));
+      await flush();
+      expect(result.current.review).not.toBeNull();
+
+      act(() => result.current.cancelReview());
+      await flush();
+
+      expect(result.current.review).toBeNull();
+      expect(api.commitRawKnowledge).not.toHaveBeenCalled();
+      expect(result.current.pendingFiles).toEqual([pendingFile]);
     });
   });
 });

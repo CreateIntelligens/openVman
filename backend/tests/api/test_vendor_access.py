@@ -885,6 +885,16 @@ def test_vendor_knowledge_page_is_scoped_and_internal_workspace_is_unchanged(env
     })
     assert response.status_code == 200
     assert env.received[-1].url.path == "/brain/knowledge/document"
+    preview_res = env.client.post("/api/v1/knowledge/raw/preview", headers=editor, json={
+        "project_id": _PROJECT, "paths": ["faq.csv"],
+    })
+    assert preview_res.status_code == 200
+    assert env.received[-1].url.path == "/brain/knowledge/raw/preview"
+    assert env.received[-1].headers["X-OpenVMan-Vendor"] == "1"
+    reader = env.headers(vendor_accounts["vendor-reader"])
+    assert env.client.post("/api/v1/knowledge/raw/preview", headers=reader, json={
+        "project_id": _PROJECT, "paths": ["faq.csv"],
+    }).status_code == 403
     params = {"project_id": _PROJECT, "path": "AGENTS.md"}
     for user_id in (env.root.id, vendor_accounts["internal-editor"]):
         headers = {**env.headers(user_id), "X-OpenVMan-Vendor": "1"}

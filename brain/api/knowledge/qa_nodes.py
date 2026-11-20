@@ -6,7 +6,6 @@ import os
 import tempfile
 import threading
 import time
-import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +19,14 @@ from knowledge.qa_category_depth import (
     category_depth,
     is_language_label,
     language_label_code,
+)
+from knowledge.qa_import_placement import (
+    build_node_tree,
+    place_entries_by_path,
+    referencing_nodes,
+    source_node_can_refill,
+    source_node_id as _source_node_id,
+    unique_source_node_id,
 )
 from knowledge.qa_node_sources import _build_entries_for_source, _parse_source_items
 from knowledge.workspace import ensure_workspace_scaffold, resolve_workspace_document
@@ -92,6 +99,15 @@ def restore_nodes_snapshot(snapshot: bytes | None, project_id: str = "default") 
             path.unlink(missing_ok=True)
         else:
             path.write_bytes(snapshot)
+
+
+def source_placement_snapshot(
+    source: str, project_id: str = "default",
+) -> tuple[dict[str, dict[str, Any]], set[str]]:
+    """Read categories and questions deliberately detached from this source together."""
+    with _lock:
+        data = _load_nodes_data(project_id)
+        return data["nodes"], set(data.get("detached", {}).get(source, []))
 
 
 def list_nodes(project_id: str = "default") -> dict[str, dict[str, Any]]:
@@ -444,52 +460,7 @@ def reorder_node(
 def get_node_tree(project_id: str = "default") -> list[dict[str, Any]]:
     with _lock:
         data = _load_nodes_data(project_id)
-        nodes = data.get("nodes", {})
-
-        roots = []
-        for nid, node in nodes.items():
-            parents = node.get("parent_ids", [])
-            is_root = not parents or all(p not in nodes for p in parents)
-            if is_root:
-                roots.append((nid, node))
-
-        roots.sort(key=lambda item: item[1].get("order", 1.0))
-
-        def build_subtree(node_id: str, visited_path: set[str]) -> dict[str, Any]:
-            node = nodes[node_id]
-            tree_node = {
-                "node_id": node_id,
-                "label": node.get("label", ""),
-                "parent_ids": list(node.get("parent_ids", [])),
-                "child_ids": list(node.get("child_ids", [])),
-                "order": node.get("order", 1.0),
-                "hidden": node.get("hidden", False),
-                "qa_entries": list(node.get("qa_entries", [])),
-                "children": [],
-            }
-
-            if node_id in visited_path:
-                return tree_node
-
-            new_visited = visited_path | {node_id}
-
-            children_nodes = []
-            for cid in node.get("child_ids", []):
-                if cid in nodes:
-                    children_nodes.append((cid, nodes[cid]))
-
-            children_nodes.sort(key=lambda x: x[1].get("order", 1.0))
-
-            for cid, _ in children_nodes:
-                tree_node["children"].append(build_subtree(cid, new_visited))
-
-            return tree_node
-
-        result = []
-        for rid, _ in roots:
-            result.append(build_subtree(rid, set()))
-
-        return result
+        return build_node_tree(data["nodes"])
 
 
 def add_qa_entry_to_node(
@@ -589,22 +560,6 @@ def add_qa_entries_to_node(
         return node
 
 
-def _source_node_id(label: str) -> str:
-    slug = "".join(ch if ch.isalnum() else "_" for ch in label.lower()).strip("_")
-    slug = "_".join(part for part in slug.split("_") if part) or "node"
-    return f"qa_{slug}"
-
-
-def _unique_node_id(existing: set[str], label: str) -> str:
-    candidate = _source_node_id(label)
-    if candidate not in existing:
-        return candidate
-    suffix = 2
-    while f"{candidate}_{suffix}" in existing:
-        suffix += 1
-    return f"{candidate}_{suffix}"
-
-
 def refill_emptied_node(
     source_path: str, label: str, project_id: str = "default"
 ) -> dict[str, Any] | None:
@@ -617,9 +572,10 @@ def refill_emptied_node(
     node_id = _source_node_id(label)
     with _lock:
         data = _load_nodes_data(project_id)
-        node = data["nodes"].get(node_id)
-        if node is None or node.get("qa_entries") or node.get("child_ids"):
+        nodes = data["nodes"]
+        if not source_node_can_refill(nodes, node_id):
             return None
+        node = nodes[node_id]
         node["qa_entries"] = entries
         # 整份接回去了，之前刻意拿下選單的記錄不再適用。
         data.get("detached", {}).pop(source_path, None)
@@ -640,7 +596,7 @@ def create_node_for_source(
     entries = _build_entries_for_source(source_path, project_id)
     with _lock:
         data = _load_nodes_data(project_id)
-        node_id = _unique_node_id(set(data["nodes"]), label)
+        node_id = unique_source_node_id(set(data["nodes"]), label)
     node = create_node(
         node_id,
         label,
@@ -659,43 +615,6 @@ def node_label(node_id: str, project_id: str = "default") -> str:
     return str((get_node(node_id, project_id) or {}).get("label", ""))
 
 
-def _label_key(label: str) -> str:
-    return unicodedata.normalize("NFKC", label).strip().casefold()
-
-
-def _ensure_path(data: dict[str, Any], parts: list[str]) -> str:
-    """The node at ``parts`` (labels from the top), creating what is missing."""
-    nodes = data["nodes"]
-    parent_id: str | None = None
-    for part in parts:
-        siblings = (
-            [nid for nid, n in nodes.items() if not any(p in nodes for p in n.get("parent_ids", []))]
-            if parent_id is None
-            else [nid for nid in nodes[parent_id].get("child_ids", []) if nid in nodes]
-        )
-        wanted = _label_key(part)
-        # 同名的分類有隱藏也有顯示時放顯示中的：放到隱藏的，訪客看不到。
-        matches = sorted(
-            (nid for nid in siblings if _label_key(str(nodes[nid].get("label", ""))) == wanted),
-            key=lambda nid: bool(nodes[nid].get("hidden", False)),
-        )
-        found = matches[0] if matches else None
-        if found is None:
-            found = _unique_node_id(set(nodes), part)
-            nodes[found] = {
-                "label": part,
-                "parent_ids": [parent_id] if parent_id else [],
-                "child_ids": [],
-                "order": max((float(nodes[nid].get("order", 1.0)) for nid in siblings), default=0.0) + 1.0,
-                "hidden": False,
-                "qa_entries": [],
-            }
-            if parent_id:
-                nodes[parent_id].setdefault("child_ids", []).append(found)
-        parent_id = found
-    return str(parent_id)
-
-
 def place_questions_by_path(
     source_path: str, paths: dict[str, list[str]], project_id: str = "default",
 ) -> list[str]:
@@ -706,20 +625,10 @@ def place_questions_by_path(
     回傳因為分類裡已有同名題目而放不進去的題目，呼叫端要告訴使用者。
     """
     entries = _build_entries_for_source(source_path, project_id)
-    clashes: list[str] = []
     with _lock:
         data = _load_nodes_data(project_id)
         detached = set(data.get("detached", {}).get(source_path, []))
-        for entry in entries:
-            question = entry["question"]
-            parts = paths.get(question)
-            if not parts or question in detached or _is_mounted(data, source_path, question):
-                continue
-            node = data["nodes"][_ensure_path(data, parts)]
-            if any(existing["question"] == question for existing in node.get("qa_entries", [])):
-                clashes.append(question)
-                continue
-            node.setdefault("qa_entries", []).append(dict(entry))
+        clashes = place_entries_by_path(data["nodes"], source_path, entries, paths, detached)
         _save_nodes_data(data, project_id)
     return clashes
 
@@ -786,20 +695,9 @@ def sync_entries_for_source(
 
     with _lock:
         data = _load_nodes_data(project_id)
-        referencing = [
-            node_id
-            for node_id, node in data["nodes"].items()
-            if any(entry.get("source_path") == source_path for entry in node.get("qa_entries", []))
-        ]
+        referencing = referencing_nodes(data["nodes"], source_path)
         if not referencing:
             return 0
-        # 新題放進掛最多這份文件題目的節點；只多掛一題的節點不該變成新題的落點。
-        referencing.sort(
-            key=lambda node_id: -sum(
-                entry.get("source_path") == source_path
-                for entry in data["nodes"][node_id]["qa_entries"]
-            )
-        )
 
         mounted = {
             entry["question"]

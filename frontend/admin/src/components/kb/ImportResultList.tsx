@@ -1,4 +1,4 @@
-import type { KnowledgeCommitFileResult, KnowledgeLanguage } from "../../api";
+import type { KnowledgeCommitFileResult, KnowledgeCommitLaterItem, KnowledgeLanguage } from "../../api";
 import { isImportItemActive, type ImportItem } from "../../hooks/useKnowledgeImport";
 import type { QaNode } from "../../hooks/useQaNodes";
 import {
@@ -21,6 +21,7 @@ interface ImportResultListProps {
   nodesTree: QaNode[];
   onViewDocument: (path: string) => void;
   onViewQaNode: (nodeId: string) => void;
+  onOpenLaterQuestion: (source: string, item: KnowledgeCommitLaterItem) => void;
   onRenameQaNode: (nodeId: string) => void;
   onRetry: (itemId: string) => void;
   /** 打開選檔視窗：內容被拒絕的檔案要先改過，再重新選一次。 */
@@ -90,6 +91,7 @@ function ImportResultRow({
   nodesTree,
   onViewDocument,
   onViewQaNode,
+  onOpenLaterQuestion,
   onRenameQaNode,
   onRetry,
   onPickAgain,
@@ -186,6 +188,41 @@ function ImportResultRow({
             匯入後有些內容需要確認。請查看題目的分類、答案和圖片。
           </p>
         )}
+        {result?.both?.length ? (
+          <div className="mt-2 rounded-lg border border-border bg-surface p-2.5 text-sm text-content">
+            <p className="font-medium text-content">兩題都留（新增的隱藏題目）</p>
+            <ul className="mt-1 space-y-0.5 text-content-muted">
+              {result.both.map((question) => (
+                <li key={question} className="break-words">{question}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {result?.later?.length ? (
+          <div className="mt-2 rounded-lg border border-border bg-surface p-2.5 text-sm text-content">
+            <p className="font-medium text-content">待處理</p>
+            <ul className="mt-1 space-y-1">
+              {result.later.map((entry) => (
+                <li key={entry.question} className="[overflow-wrap:anywhere]">
+                  <button
+                    type="button"
+                    className="rounded text-left font-medium text-primary underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-primary"
+                    onClick={() => onOpenLaterQuestion(result.target, entry)}
+                  >
+                    {entry.question}
+                  </button>
+                  <p className="whitespace-pre-wrap text-content-muted">{entry.answer}</p>
+                </li>
+              ))}
+            </ul>
+            {/* 廠商畫面不顯示檔名與內部資料夾。 */}
+            {result.origin_path && !vendor && (
+              <p className="mt-2 text-xs text-content-muted [overflow-wrap:anywhere]">
+                原始上傳檔案：{result.origin_path}
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
       {!active && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -267,6 +304,7 @@ export default function ImportResultList({
   nodesTree,
   onViewDocument,
   onViewQaNode,
+  onOpenLaterQuestion,
   onRenameQaNode,
   onRetry,
   onPickAgain,
@@ -300,6 +338,7 @@ export default function ImportResultList({
             nodesTree={nodesTree}
             onViewDocument={onViewDocument}
             onViewQaNode={onViewQaNode}
+            onOpenLaterQuestion={onOpenLaterQuestion}
             onRenameQaNode={onRenameQaNode}
             onRetry={onRetry}
             onPickAgain={onPickAgain}

@@ -28,7 +28,7 @@ _POST = frozenset({
     "/auth/logout", "/auth/password",
     "/chat", "/chat/stream", "/chat/accept",
     "/knowledge/base/directory", "/knowledge/base/move", "/knowledge/note",
-    "/knowledge/upload", "/knowledge/raw/upload", "/knowledge/raw/commit",
+    "/knowledge/upload", "/knowledge/raw/upload", "/knowledge/raw/preview", "/knowledge/raw/commit",
     "/knowledge/fetch",
     "/knowledge/qa/nodes", "/knowledge/qa/nodes/adopt-source",
     "/knowledge/qa/questions/move",

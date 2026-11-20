@@ -29,7 +29,13 @@ import KnowledgeTreeSidebar from "../components/kb/KnowledgeTreeSidebar";
 import UploadDropOverlay from "../components/kb/UploadDropOverlay";
 import { categoryLanguage } from "../components/kb/qa/languageCategories";
 import QaNodeModals from "../components/kb/qa/QaNodeModals";
-import type { KnowledgeLanguage, KnowledgeNoteFormat, QaQuestionRow } from "../api/knowledge";
+import {
+  fetchAllQuestions,
+  type KnowledgeCommitLaterItem,
+  type KnowledgeLanguage,
+  type KnowledgeNoteFormat,
+  type QaQuestionRow,
+} from "../api/knowledge";
 import { canUseAiCleanup } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import { useNavigation } from "../context/NavigationContext";
@@ -164,7 +170,9 @@ export default function KnowledgeBase() {
   const [showAddData, setShowAddData] = useState(false);
   const [questionSearch, setQuestionSearch] = useState("");
   const [language, setLanguage] = useState("");
-  const [openQuestion, setOpenQuestion] = useState<OpenQuestion | null>(null);
+  const [openQuestion, setOpenQuestion] = useState<(OpenQuestion & { reference?: KnowledgeCommitLaterItem }) | null>(null);
+  const activeProject = useRef(projectId);
+  activeProject.current = projectId;
   const questionOpener = useRef<HTMLElement | null>(null);
   const questionBank = useQuestionBank(projectId, mergedRefreshKey);
   const { statuses: qaSyncStatuses, refresh: refreshQaSyncStatus } = useQaSyncStatus(projectId);
@@ -436,7 +444,12 @@ export default function KnowledgeBase() {
     questionOpener.current = null;
   };
 
-  const handleOpenQuestion = (row: QaQuestionRow, category = row.category_ids[0] ?? "", fromSearch = false) => {
+  const handleOpenQuestion = (
+    row: QaQuestionRow,
+    category = row.category_ids[0] ?? "",
+    fromSearch = false,
+    reference?: KnowledgeCommitLaterItem,
+  ) => {
     if (row.id === openQuestion?.row?.id && category === openQuestion.category) {
       if (fromSearch) setQuestionSearch("");
       return;
@@ -453,8 +466,25 @@ export default function KnowledgeBase() {
         }
         setQuestionSearch("");
       }
-      setOpenQuestion({ row, category });
+      setOpenQuestion({ row, category, reference });
     });
+  };
+
+  const handleOpenLaterQuestion = async (source: string, reference: KnowledgeCommitLaterItem) => {
+    const matches = (row: QaQuestionRow) => row.source.path === source && row.question === reference.question;
+    try {
+      const row = questionRows.find(matches) ?? (await fetchAllQuestions(projectId)).questions.find(matches);
+      if (activeProject.current !== projectId) return;
+      if (row) {
+        handleOpenQuestion(row, row.category_ids[0], true, reference);
+      } else {
+        setStatus({ type: "error", message: "找不到這一題，可能已經改名或移除。" });
+      }
+    } catch {
+      if (activeProject.current === projectId) {
+        setStatus({ type: "error", message: "讀不到這一題，請稍後再試。" });
+      }
+    }
   };
 
   const handleCreateQuestion = () => requestNavigation(() => {
@@ -601,6 +631,10 @@ export default function KnowledgeBase() {
     fetchQaTree: refreshQaAfterImport,
     onDropStarted: handleImportDropped,
     onError: (message) => setStatus({ type: "error", message: vendor ? "移除檔案失敗，請稍後再試。" : message }),
+    onPreviewError: (message) => setStatus({
+      type: "error",
+      message: vendor ? "檢查檔案失敗。檔案已留在等待匯入區，請稍後再試。" : message,
+    }),
   });
   const { importPending } = importer;
 
@@ -830,18 +864,28 @@ export default function KnowledgeBase() {
                 vendor={vendor}
                 documentLabels={documentLabels}
                 questionBank={(
-                  <QuestionBank key={projectId} projectId={projectId} vendor={vendor} documentLabels={documentLabels}
-                    rows={questionRows} categories={visibleCategories} availableCategories={availableCategories}
-                    language={language} category={selectedQaNodeId}
-                    categorySyncStatus={selectedQaNodeId ? qaSyncStatuses[selectedQaNodeId] : undefined}
-                    categoryEntries={selectedQaNodeId ? findQaNode(nodesTree, selectedQaNodeId)?.qa_entries : undefined} loading={questionBank.loading} error={questionBank.error}
-                    api={qaApi} open={openQuestion}
-                    onOpen={handleOpenQuestion} onCreate={handleCreateQuestion}
-                    onClose={() => requestNavigation(closeQuestion)} onCloseAfterChange={closeQuestion}
-                    onSelectCategory={handleSelectQaNode} onAllCategories={showAllQuestions}
-                    onRefresh={refreshQuestionsWithSync}
-                    onTest={(question, questionLanguage) => openChatTest({ question, language: questionLanguage ?? testLanguage })}
-                    onOpenDocument={handleOpenQuestionDocument} />
+                  <>
+                    <QuestionBank key={projectId} projectId={projectId} vendor={vendor} documentLabels={documentLabels}
+                      rows={questionRows} categories={visibleCategories} availableCategories={availableCategories}
+                      language={language} category={selectedQaNodeId}
+                      categorySyncStatus={selectedQaNodeId ? qaSyncStatuses[selectedQaNodeId] : undefined}
+                      categoryEntries={selectedQaNodeId ? findQaNode(nodesTree, selectedQaNodeId)?.qa_entries : undefined} loading={questionBank.loading} error={questionBank.error}
+                      api={qaApi} open={openQuestion}
+                      onOpen={handleOpenQuestion} onCreate={handleCreateQuestion}
+                      onClose={() => requestNavigation(closeQuestion)} onCloseAfterChange={closeQuestion}
+                      onSelectCategory={handleSelectQaNode} onAllCategories={showAllQuestions}
+                      onRefresh={refreshQuestionsWithSync}
+                      onTest={(question, questionLanguage) => openChatTest({ question, language: questionLanguage ?? testLanguage })}
+                      onOpenDocument={handleOpenQuestionDocument} />
+                    {openQuestion?.reference && (
+                      <aside aria-label="新檔案的答案" className="min-w-0 border-t border-border bg-surface-raised p-4 xl:w-1/4 xl:shrink-0 xl:overflow-y-auto xl:border-l xl:border-t-0">
+                        <h2 className="text-base font-semibold">新檔案的答案</h2>
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-content [overflow-wrap:anywhere]">
+                          {openQuestion.reference.answer || "（沒有文字答案）"}
+                        </p>
+                      </aside>
+                    )}
+                  </>
                 )}
                 showHome={showAddData}
                 home={(
@@ -852,7 +896,7 @@ export default function KnowledgeBase() {
                     allowAiCleanup={allowAiCleanup}
                     documents={documents}
                     documentsLoaded={documentsLoaded}
-                    nodesTree={nodesTree}
+                    nodesTree={nodesTree} rawNodesTree={rawNodesTree} qaCategoryLabels={qaLabels}
                     maxUploadLabel={formatUploadSize(uploadLimitBytes)}
                     crawlUrlValue={crawlUrlValue}
                     setCrawlUrlValue={setCrawlUrlValue}
@@ -861,6 +905,7 @@ export default function KnowledgeBase() {
                     onOpenComposer={handleOpenComposer}
                     onViewDocument={handleViewImportedDocument}
                     onViewQaNode={handleViewImportedQaNode}
+                    onOpenLaterQuestion={handleOpenLaterQuestion}
                     onRenameQaNode={qaModals.openRenameQaNodeDialog}
                     onOpenMobileTree={openMobileTree}
                   />

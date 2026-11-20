@@ -7,6 +7,9 @@ import logging
 import os
 import re
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from time import monotonic
 
@@ -240,6 +243,19 @@ _SCAFFOLD_RECHECK_SECONDS = 5.0
 _scaffolded_at: dict[Path, float] = {}
 
 
+_skip_scaffold = ContextVar("skip_workspace_scaffold", default=False)
+
+
+@contextmanager
+def without_workspace_scaffold() -> Iterator[None]:
+    """Resolve paths without creating missing directories or core documents in this read."""
+    token = _skip_scaffold.set(True)
+    try:
+        yield
+    finally:
+        _skip_scaffold.reset(token)
+
+
 def ensure_workspace_scaffold(project_id: str = "default", *, new_project: bool = False) -> Path:
     """Ensure the workspace root, core docs, and support directories exist.
 
@@ -248,6 +264,8 @@ def ensure_workspace_scaffold(project_id: str = "default", *, new_project: bool 
     project's settings has already created its directory.
     """
     ws = get_workspace_root(project_id)
+    if _skip_scaffold.get():
+        return ws
     checked = _scaffolded_at.get(ws)
     if (
         not new_project

@@ -12,12 +12,15 @@ import {
   discardRawPending,
   fetchRawPending,
   getCommitStatus,
+  previewRawKnowledge,
   uploadRawKnowledgeDocuments,
   type KnowledgeCommitFileResult,
   type KnowledgeCommitJob,
+  type KnowledgeFileDecision,
   type KnowledgeRawPendingFile,
   type KnowledgeUploadEntry,
 } from "../api";
+import type { QaUploadReviewFileItem } from "../components/kb/QaUploadReview";
 import {
   DOCUMENTS_ROOT_PATH,
   DOCUMENTS_SECTION_LABEL,
@@ -26,6 +29,7 @@ import {
 import { errorMessage } from "../utils/errorMessage";
 import { currentStorageScope } from "../utils/scopedStorage";
 import { formatUploadSize } from "../utils/uploadLimits";
+import { collectDroppedEntries, entriesFromFiles, isFileDragEvent } from "./knowledgeImportFiles";
 
 export type ImportItemState =
   | "uploading"
@@ -168,12 +172,18 @@ export function computeImportProgress(items: ImportItem[]): ImportProgress | nul
 function visiblePending(
   pending: KnowledgeRawPendingFile[],
   items: ImportItem[],
+  review: ImportReviewState | null = null,
 ): KnowledgeRawPendingFile[] {
   const shown = new Set(
     items
       .filter((item) => item.state !== "done" && item.rawPath)
       .map((item) => item.rawPath as string),
   );
+  if (review) {
+    for (const row of review.rows) {
+      if (row.rawPath) shown.add(row.rawPath);
+    }
+  }
   return pending.filter((file) => !shown.has(file.path));
 }
 
@@ -216,72 +226,24 @@ function writeStoredItems(projectId: string, items: ImportItem[]): void {
   }
 }
 
-/* ── 拖放 ── */
-
-async function collectFileSystemEntries(roots: FileSystemEntry[]): Promise<KnowledgeUploadEntry[]> {
-  const out: KnowledgeUploadEntry[] = [];
-  const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
-    if (entry.isFile) {
-      const fileEntry = entry as FileSystemFileEntry;
-      const file: File = await new Promise((resolve, reject) => fileEntry.file(resolve, reject));
-      out.push({ file, relativePath: prefix ? `${prefix}/${file.name}` : file.name });
-      return;
-    }
-    if (entry.isDirectory) {
-      const dirEntry = entry as FileSystemDirectoryEntry;
-      const reader = dirEntry.createReader();
-      const next = prefix ? `${prefix}/${entry.name}` : entry.name;
-      // readEntries returns at most 100 per call; loop until empty.
-      while (true) {
-        const batch: FileSystemEntry[] = await new Promise((resolve, reject) =>
-          reader.readEntries(resolve, reject),
-        );
-        if (!batch.length) break;
-        for (const child of batch) {
-          await walk(child, next);
-        }
-      }
-    }
-  };
-  for (const root of roots) {
-    await walk(root, "");
-  }
-  return out;
-}
-
-function entriesFromFiles(files: Iterable<File>): KnowledgeUploadEntry[] {
-  return Array.from(files, (file) => ({
-    file,
-    relativePath: file.webkitRelativePath || file.name,
-  }));
-}
-
-/** dataTransfer 在事件結束後就失效，取項目的部分要在第一個 await 之前做完。 */
-function collectDroppedEntries(dataTransfer: DataTransfer): Promise<KnowledgeUploadEntry[]> {
-  const items = dataTransfer.items;
-  if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
-    const roots = Array.from(items)
-      .map((item) => item.webkitGetAsEntry())
-      .filter((entry): entry is FileSystemEntry => entry !== null);
-    return collectFileSystemEntries(roots);
-  }
-  return Promise.resolve(entriesFromFiles(dataTransfer.files));
-}
-
-function isFileDragEvent(event: DragEvent): boolean {
-  return event.dataTransfer?.types?.includes("Files") ?? false;
-}
-
 /* ── 匯入工作階段 ──
  * 一個專案一個 session，切換專案或卸載時 cancel。API 都打「目前專案」，所以每個
  * await 之後都要先看 cancelled：不只是不能寫舊專案的狀態，繼續跑還會把舊專案的
  * 路徑送到新專案去。
  */
 
+export interface ImportReviewState {
+  files: QaUploadReviewFileItem[];
+  documentPaths: string[];
+  rows: ImportItem[];
+  normalize: boolean;
+}
+
 interface ImportBatch {
   itemIds: Set<string>;
   paths: string[];
   normalize: boolean;
+  decisions?: Record<string, KnowledgeFileDecision>;
   /** 接手伺服器上已經在跑的匯入，不用再送一次。 */
   runningJob?: KnowledgeCommitJob;
 }
@@ -290,12 +252,14 @@ interface ImportView {
   projectId: string;
   items: ImportItem[];
   pending: KnowledgeRawPendingFile[];
+  review: ImportReviewState | null;
 }
 
 interface SessionOptions {
   projectId: string;
   pollIntervalMs: number;
   onChange: (view: ImportView) => void;
+  onPreviewError: (message: string) => void;
   /** 有檔案匯入成功時呼叫，更新文件清單與快速問答；回傳的 Promise 不能 reject。 */
   onKnowledgeChanged: () => Promise<unknown>;
 }
@@ -311,19 +275,23 @@ function createImportSession({
   projectId,
   pollIntervalMs,
   onChange,
+  onPreviewError,
   onKnowledgeChanged,
 }: SessionOptions) {
   let cancelled = false;
   let items = readStoredItems(projectId);
   let pending: KnowledgeRawPendingFile[] = [];
+  let review: ImportReviewState | null = null;
   let draining = false;
   let pendingRequest = 0;
   const queue: ImportBatch[] = [];
+  const previewQueue: ImportBatch[] = [];
+  let previewing = false;
 
   const publish = () => {
     if (cancelled) return;
     writeStoredItems(projectId, items);
-    onChange({ projectId, items, pending });
+    onChange({ projectId, items, pending, review });
   };
 
   const setItems = (next: ImportItem[]) => {
@@ -449,7 +417,13 @@ function createImportSession({
     while (!job) {
       let otherJob: KnowledgeCommitJob | undefined;
       try {
-        const response = await commitRawKnowledge({ paths, normalize: batch.normalize });
+        const response = await commitRawKnowledge({
+          paths,
+          normalize: batch.normalize,
+          ...(batch.decisions && Object.keys(batch.decisions).length
+            ? { decisions: batch.decisions }
+            : {}),
+        });
         if (cancelled) return;
         if (response.status === "nothing_to_commit") {
           settleBatch(batch, "skipped", REASON_MISSING);
@@ -529,6 +503,78 @@ function createImportSession({
     return true;
   };
 
+  const leaveWaiting = (rows: ImportItem[]) => {
+    const files = new Map(pending.map((file) => [file.path, file]));
+    for (const row of rows) {
+      if (row.rawPath && !files.has(row.rawPath)) {
+        files.set(row.rawPath, { path: row.rawPath, size: row.size ?? 0, updated_at: "" });
+      }
+    }
+    pending = [...files.values()];
+  };
+
+  const drainPreviews = async () => {
+    if (previewing || review) return;
+    previewing = true;
+    try {
+      while (!cancelled && !review && previewQueue.length) {
+        const batch = previewQueue.shift()!;
+        const rowsByPath = new Map(items.filter((row) => batch.itemIds.has(row.id))
+          .map((row) => [row.rawPath, row]));
+        const qaFiles: QaUploadReviewFileItem[] = [];
+        const documentPaths: string[] = [];
+        try {
+          const response = await previewRawKnowledge(batch.paths);
+          if (cancelled) return;
+          for (const rawPath of batch.paths) {
+            const preview = response.files?.[rawPath];
+            const row = rowsByPath.get(rawPath);
+            if (!row || (preview?.kind !== "qa" && preview?.kind !== "document")) {
+              throw new Error("沒有收到完整的檢查結果");
+            }
+            if (preview.kind === "document") documentPaths.push(rawPath);
+            else qaFiles.push({ rawPath, name: row.name, itemId: row.id, size: row.size, preview });
+          }
+        } catch (error) {
+          if (cancelled) return;
+          leaveWaiting([...rowsByPath.values()]);
+          setItems(items.filter((row) => !batch.itemIds.has(row.id)));
+          onPreviewError(`檢查檔案失敗：${errorMessage(error, "請稍後再試")}。檔案已留在等待匯入區。`);
+          continue;
+        }
+
+        if (qaFiles.length) {
+          review = { files: qaFiles, documentPaths, rows: [...rowsByPath.values()], normalize: batch.normalize };
+          items = items.filter((row) => !batch.itemIds.has(row.id));
+          publish();
+        } else {
+          const rows = [...rowsByPath.values()].filter((row) => !takeOverWaitingRow(row));
+          publish();
+          if (rows.length) {
+            enqueue({
+              itemIds: new Set(rows.map((row) => row.id)),
+              paths: rows.map((row) => row.rawPath as string),
+              normalize: batch.normalize,
+            });
+          }
+        }
+      }
+    } finally {
+      previewing = false;
+    }
+  };
+
+  const checkThenImport = (rows: ImportItem[], normalize: boolean) => {
+    if (!rows.length) return;
+    const byPath = new Map(rows.map((row) => [row.rawPath as string, row]));
+    const itemIds = new Set([...byPath.values()].map((row) => row.id));
+    const duplicates = new Set(rows.filter((row) => !itemIds.has(row.id)).map((row) => row.id));
+    items = items.filter((row) => !duplicates.has(row.id));
+    previewQueue.push({ itemIds, paths: [...byPath.keys()], normalize });
+    publish();
+    void drainPreviews();
+  };
+
   const uploadAndImport = async (
     entries: KnowledgeUploadEntry[],
     options: { targetDir: string; normalize: boolean; maxFileBytes: number },
@@ -591,54 +637,65 @@ function createImportSession({
         : { ...item, state: "failed", message: REASON_UPLOAD_LOST };
     });
 
-    const batchPaths = new Set<string>();
-    const batchIds = new Set<string>();
-    for (const item of items) {
-      if (!acceptedIds.has(item.id) || item.state !== "waiting") continue;
-      if (takeOverWaitingRow(item)) continue;
-      batchIds.add(item.id);
-      batchPaths.add(item.rawPath as string);
-    }
+    const ready = items.filter((item) => acceptedIds.has(item.id) && item.state === "waiting");
+    if (ready.length) checkThenImport(ready, options.normalize);
+    else publish();
+  };
+
+  const confirmReview = (
+    selectedQaPaths: string[],
+    decisions: Record<string, KnowledgeFileDecision>,
+  ) => {
+    if (!review) return;
+    const current = review;
+    review = null;
+    const allowedPaths = new Set([...current.documentPaths, ...selectedQaPaths]);
+    const run = nextRun();
+    const chosen = current.rows.filter((row) => allowedPaths.has(row.rawPath as string))
+      .map((row) => ({ ...row, run }));
+    leaveWaiting(current.rows.filter((row) => !allowedPaths.has(row.rawPath as string)));
+    items = [...items, ...chosen];
     publish();
-    if (batchIds.size) {
-      enqueue({ itemIds: batchIds, paths: [...batchPaths], normalize: options.normalize });
+    if (chosen.length) {
+      enqueue({
+        itemIds: new Set(chosen.map((row) => row.id)),
+        paths: chosen.map((row) => row.rawPath as string),
+        normalize: current.normalize,
+        decisions,
+      });
     }
+    void drainPreviews();
+  };
+
+  const cancelReview = () => {
+    if (!review) return;
+    leaveWaiting(review.rows);
+    review = null;
+    publish();
+    void refreshPending();
+    void drainPreviews();
   };
 
   const importExisting = (files: KnowledgeRawPendingFile[], normalize: boolean) => {
     if (!files.length) return;
     const run = nextRun();
     const rows = files.map<ImportItem>((file) => ({
-      id: newItemId(),
-      name: file.path,
-      size: file.size,
-      state: "waiting",
-      rawPath: file.path,
-      normalize,
-      run,
+      id: newItemId(), name: file.path, size: file.size, state: "waiting",
+      rawPath: file.path, normalize, run,
     }));
-    setItems([...items, ...rows]);
-    enqueue({
-      itemIds: new Set(rows.map((row) => row.id)),
-      paths: rows.map((row) => row.rawPath as string),
-      normalize,
-    });
+    items = [...items, ...rows];
+    checkThenImport(rows, normalize);
   };
 
   const retry = (itemId: string) => {
     const target = items.find((item) => item.id === itemId);
     if (!target?.rawPath || isImportItemActive(target)) return;
-    const run = nextRun();
-    setItems(items.map((item) =>
-      item.id === itemId
-        ? { ...item, state: "waiting", message: undefined, result: undefined, run }
-        : item));
-    enqueue({
-      itemIds: new Set([itemId]),
-      paths: [target.rawPath],
-      // 不知道原本怎麼匯入的，就照原樣：不讓 AI 改到可能已經整理好的文件。
-      normalize: target.normalize ?? false,
-    });
+    const row: ImportItem = {
+      ...target, state: "waiting", message: undefined, result: undefined, run: nextRun(),
+    };
+    items = items.map((item) => item.id === itemId ? row : item);
+    // 不知道原本怎麼匯入的，就照原樣：不讓 AI 改到可能已經整理好的文件。
+    checkThenImport([row], target.normalize ?? false);
   };
 
   const clearFinished = () => {
@@ -718,12 +775,14 @@ function createImportSession({
       cancelled = true;
     },
     uploadAndImport,
+    confirmReview,
+    cancelReview,
     importExisting,
     retry,
     clearFinished,
     refreshPending,
     isCancelled: () => cancelled,
-    getVisiblePending: () => visiblePending(pending, items),
+    getVisiblePending: () => visiblePending(pending, items, review),
   };
 }
 
@@ -741,6 +800,7 @@ interface UseKnowledgeImportOptions {
   /** 檔案拖進來並開始匯入時呼叫，讓頁面切到結果。 */
   onDropStarted?: () => void;
   onError: (message: string) => void;
+  onPreviewError?: (message: string) => void;
   pollIntervalMs?: number;
 }
 
@@ -753,9 +813,10 @@ export function useKnowledgeImport({
   fetchQaTree,
   onDropStarted,
   onError,
+  onPreviewError = onError,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 }: UseKnowledgeImportOptions) {
-  const [view, setView] = useState<ImportView>({ projectId, items: [], pending: [] });
+  const [view, setView] = useState<ImportView>({ projectId, items: [], pending: [], review: null });
   // 預設直接切段放進知識庫；AI 整理是使用者要求才做，整理本身會改動內容。
   const [skipNormalize, setSkipNormalize] = useState(true);
   const [targetChoice, setTargetChoice] = useState<{ dir: string; currentDir: string } | null>(null);
@@ -764,14 +825,15 @@ export function useKnowledgeImport({
   const sessionRef = useRef<ImportSession | null>(null);
 
   // session 活得比一次 render 久，要拿到最新的 callback。
-  const latest = useRef({ loadDocuments, fetchQaTree, onDropStarted, onError });
-  latest.current = { loadDocuments, fetchQaTree, onDropStarted, onError };
+  const latest = useRef({ loadDocuments, fetchQaTree, onDropStarted, onError, onPreviewError });
+  latest.current = { loadDocuments, fetchQaTree, onDropStarted, onError, onPreviewError };
 
   useEffect(() => {
     const session = createImportSession({
       projectId,
       pollIntervalMs,
       onChange: setView,
+      onPreviewError: (message) => latest.current.onPreviewError(message),
       onKnowledgeChanged: () =>
         Promise.allSettled([latest.current.loadDocuments(), latest.current.fetchQaTree()]),
     });
@@ -788,6 +850,7 @@ export function useKnowledgeImport({
   // 切換專案的那一次 render，session 還是舊的，不能把舊專案的清單畫出來。
   const items = view.projectId === projectId ? view.items : EMPTY_ITEMS;
   const pending = view.projectId === projectId ? view.pending : EMPTY_PENDING;
+  const review = view.projectId === projectId ? view.review : null;
 
   const targetOptions = useMemo<ImportTargetOption[]>(() => {
     const folders = directories.filter((dir) =>
@@ -822,6 +885,17 @@ export function useKnowledgeImport({
   const startFiles = useCallback((files: Iterable<File>) => {
     startEntries(entriesFromFiles(files));
   }, [startEntries]);
+
+  const confirmReview = useCallback(
+    (selectedQaPaths: string[], decisions: Record<string, KnowledgeFileDecision>) => {
+      sessionRef.current?.confirmReview(selectedQaPaths, decisions);
+    },
+    [],
+  );
+
+  const cancelReview = useCallback(() => {
+    sessionRef.current?.cancelReview();
+  }, []);
 
   const importPending = useCallback(() => {
     const session = sessionRef.current;
@@ -887,12 +961,15 @@ export function useKnowledgeImport({
   }, [startEntries]);
 
   const progress = useMemo(() => computeImportProgress(items), [items]);
-  const pendingFiles = useMemo(() => visiblePending(pending, items), [items, pending]);
+  const pendingFiles = useMemo(() => visiblePending(pending, items, review), [items, pending, review]);
 
   return {
     items,
     progress,
     pendingFiles,
+    review,
+    confirmReview,
+    cancelReview,
     targetDir,
     targetLabel,
     targetOptions,

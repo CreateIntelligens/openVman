@@ -13,14 +13,7 @@ from typing import Any
 from core.gemini_credentials import project_model_entry
 from knowledge.doc_meta import touch_document_meta, upsert_document_meta
 from knowledge.knowledge_admin import qa_document_lock
-from knowledge.qa_csv import (
-    UNTITLED_QUESTION,
-    convert_csv_to_qa_markdown,
-    normalize_qa_csv_rows,
-    parse_qa_csv,
-    parse_qa_markdown,
-    qa_entry_values,
-)
+from knowledge.qa_csv import replace_qa_csv_images
 from knowledge.workspace import (
     ensure_workspace_scaffold,
     resolve_workspace_document,
@@ -93,7 +86,6 @@ class _ImportRefused(Exception):
 
 _REASON_MISSING = "找不到這個檔案，可能已經被移除"
 _REASON_NO_TEXT = "讀不到文字內容，可能是掃描檔或檔案損毀"
-_REASON_NO_QUESTIONS = "這份問答表沒有任何題目"
 _REASON_TARGET_IS_QA = "快速問答已經有同名的問答文件，請改檔名後再上傳"
 _REASON_NOT_UTF8 = "這個檔案不是 UTF-8 編碼，請另存成 UTF-8 後再上傳"
 _REASON_FAILED = "處理這個檔案時發生錯誤，可以再試一次；一直失敗請找管理員"
@@ -109,7 +101,7 @@ def _no_text_reason(src: Path, origin_bytes: bytes) -> str:
     return _REASON_NO_TEXT
 
 
-def _qa_table_target(filename: str, project_id: str, keep_csv: bool = False) -> Path:
+def qa_table_target(filename: str, project_id: str, keep_csv: bool = False) -> Path:
     """Where an imported QA table is stored: ``knowledge/qa/<name>.md``.
 
     拖進樹的 CSV 文件不會轉成 .md；同名的已經掛在樹上時要更新它，不能另開一份多一個分類。
@@ -123,52 +115,6 @@ def _qa_table_target(filename: str, project_id: str, keep_csv: bool = False) -> 
         keep_csv or is_qa_document(existing_csv.as_posix(), project_id)
     ):
         return existing_csv
-    return markdown
-
-
-def _refuse_unclear_questions(entries: list[dict[str, Any]]) -> None:
-    """Refuse rows the quick Q&A cannot show correctly, listing all of them at once."""
-    from knowledge.qa_import_review import unclear_question_problems
-
-    problems = unclear_question_problems(entries, UNTITLED_QUESTION)
-    if problems:
-        raise _ImportRefused("；".join(problems) + "。改好後重新上傳")
-
-
-def _refuse_category_problems(csv_bytes: bytes) -> None:
-    """Refuse QA tables with invalid category columns before touching any file or tree."""
-    from knowledge.qa_import_review import category_column_problems
-
-    problems = category_column_problems(csv_bytes)
-    if problems:
-        raise _ImportRefused("；".join(problems) + "。改好後重新上傳")
-
-
-def _render_qa_document(csv_bytes: bytes, target: Path) -> str:
-    """Render a QA table in ``target``'s format, refusing what the format cannot hold.
-
-    轉成 Markdown 後，答案裡的 ## 行和多行題目會被切成別的題目。寫入前先讀回比對（和
-    ingest-source 同樣的做法），否則題目會默默拆壞，重傳時還會蓋掉原本正確的內容。
-    """
-    normalized = normalize_qa_csv_rows(csv_bytes)
-    entries = parse_qa_csv(normalized) if normalized is not None else []
-    if normalized is None or not entries:
-        raise _ImportRefused(_REASON_NO_QUESTIONS)
-    _refuse_unclear_questions(entries)
-    if target.suffix == ".csv":
-        return normalized.decode("utf-8")
-
-    from knowledge.qa_import_review import markdown_breaking_questions, markdown_refusal
-
-    if broken := markdown_breaking_questions(entries):
-        raise _ImportRefused(markdown_refusal(broken))
-    markdown = convert_csv_to_qa_markdown(csv_bytes)
-    expected = qa_entry_values(entries)
-    actual = qa_entry_values(parse_qa_markdown(markdown))
-    if expected != actual:
-        # 逐題檢查沒抓到、整份讀回來卻不一樣：保底，指出第一個對不上的題目。
-        first = next((e for e, a in zip(expected, actual) if e != a), expected[-1])
-        raise _ImportRefused(markdown_refusal([first[0]]))
     return markdown
 
 
@@ -204,6 +150,7 @@ def _commit_raw_file(
     claimed_targets: dict[str, str],
     report: Callable[[str], None],
     vendor: bool = False,
+    file_decision: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Import one raw/ file and describe the outcome.
 
@@ -218,13 +165,17 @@ def _commit_raw_file(
     from knowledge.normalizer import normalize_to_markdown
     from knowledge.qa_images import resolve_qa_image_path
     from knowledge.qa_import_review import (
+        claimed_target_error,
         is_mixed,
         language_counts,
         missing_language_category,
+        new_table_duplicate_error,
         not_a_qa_table_note,
+        prepare_qa_document,
         prepare_qa_table,
         qa_table_notes,
         question_paths,
+        row_languages,
     )
     from knowledge.qa_merged import MergedSaveError, merge_reupload
     from knowledge.qa_nodes import (
@@ -255,11 +206,22 @@ def _commit_raw_file(
     is_qa = qa_csv is not None
     table = prepare_qa_table(src, origin_bytes, qa_csv, project_id) if qa_csv is not None else None
     qa_csv, extras, languages = (table.qa_csv, table.extras, table.languages) if table else (None, {}, {})
+    conflict_decisions: dict[str, str] = dict((file_decision or {}).get("conflicts") or {})
+    image_map: dict[str, str] = {
+        str(k).strip(): str(v).strip()
+        for k, v in ((file_decision or {}).get("images") or {}).items()
+        if str(k).strip()
+    }
+    if is_qa and image_map:
+        for new_image_id in image_map.values():
+            if not new_image_id or resolve_qa_image_path(new_image_id, project_id) is None:
+                raise _ImportRefused(f"補傳的圖片「{new_image_id}」不存在，這份檔案沒有匯入")
+        qa_csv = replace_qa_csv_images(qa_csv, image_map)
     notes: list[str] = []
     missing_categories: dict[str, int] = {}
     by_language = False
     target_rel = (
-        _qa_table_target(
+        qa_table_target(
             src.name, project_id, keep_csv=any(row["language"] for row in extras.values()),
         )
         if is_qa
@@ -269,13 +231,14 @@ def _commit_raw_file(
     mixed = bool(table and table.split_for(target_rel, project_id, notes))
     if target in claimed_targets:
         # 同名不同副檔名（a.csv、a.xlsx）或不同資料夾的問答表會存成同一份，後面的會蓋掉前面的。
-        raise _ImportRefused(
-            f"和同一批的 {claimed_targets[target]} 會存成同一份文件，請改檔名後再上傳"
-        )
+        raise _ImportRefused(claimed_target_error(claimed_targets[target]))
 
-    if is_qa:
-        _refuse_category_problems(qa_csv)
-        content = _render_qa_document(qa_csv, target_rel)
+    entries: list[dict[str, Any]] = []
+    if qa_csv is not None:
+        draft = prepare_qa_document(qa_csv, target_rel)
+        if draft.errors:
+            raise _ImportRefused("\n".join(draft.errors))
+        content, entries = draft.content, draft.entries
     else:
         text = convert_to_text(src)
         if not text:
@@ -288,6 +251,9 @@ def _commit_raw_file(
         vendor_workspace_path(project_id, target, "knowledge")
     dest = resolve_workspace_document(target, project_id)
     origin_hash = hashlib.sha256(origin_bytes).hexdigest()
+    both_questions: list[str] = []
+    later_items: list[dict[str, str]] = []
+    archived_rel: str | None = None
     # 節點寫在中繼資料之前：source_type 一標成 qa，輪詢問答樹時就會把還沒節點的文件自動收養，
     # 接著這裡又建一次，就多出一個分類。原檔最後才搬走，中途失敗都還能重跑。
     with qa_document_lock:
@@ -300,11 +266,24 @@ def _commit_raw_file(
         existing_qa = is_qa and updated and is_qa_document(target, project_id)
         if existing_qa:
             try:
-                merged = merge_reupload(target, parse_qa_csv(normalize_qa_csv_rows(qa_csv)), extras, project_id)
+                merged = merge_reupload(
+                    target,
+                    entries,
+                    extras,
+                    project_id,
+                    conflict_decisions=conflict_decisions,
+                    image_map=image_map,
+                )
             except MergedSaveError as exc:
                 raise _ImportRefused(exc.detail) from exc
             content = merged.content
             merge_counts = {"added": merged.added, "kept": merged.kept}
+            both_questions = merged.both
+            later_items = merged.later
+            if both_questions:
+                languages = row_languages(extras)
+        elif is_qa and (reason := new_table_duplicate_error(entries)):
+            raise _ImportRefused(reason)
         dest.parent.mkdir(parents=True, exist_ok=True)
         if content is not None:
             write_text_atomic(dest, content)
@@ -347,7 +326,7 @@ def _commit_raw_file(
     if qa_csv is not None:
         notes += qa_table_notes(
             ignored=table.ignored if table else [],
-            entries=parse_qa_csv(normalize_qa_csv_rows(qa_csv) or b""),
+            entries=entries,
             extras=extras,
             missing_categories=missing_categories,
             stem=target_rel.stem,
@@ -361,11 +340,38 @@ def _commit_raw_file(
         "language": language,
         "updated": updated,
         **merge_counts,
+        **({"both": both_questions} if both_questions else {}),
+        **(
+            {
+                "later": later_items,
+                **({"origin_path": archived_rel} if archived_rel else {}),
+            }
+            if later_items
+            else {}
+        ),
         **({"name_clashes": name_clashes} if name_clashes else {}),
         **({"languages": language_counts(languages)} if by_language and is_mixed(languages) else {}),
         **({"notes": notes} if notes else {}),
     }
     return {**result, **_qa_node_summary(target, project_id)} if is_qa else result
+
+
+def _normalize_decisions(
+    decisions: dict[str, Any] | None,
+    project_id: str,
+) -> dict[str, dict[str, Any]]:
+    if not decisions:
+        return {}
+    raw_root = ensure_workspace_scaffold(project_id) / "raw"
+    normalized: dict[str, dict[str, Any]] = {}
+    for raw_key, item in decisions.items():
+        value = item.model_dump() if hasattr(item, "model_dump") else dict(item or {})
+        try:
+            rel = raw_relative_path(raw_key, raw_root)
+        except ValueError:
+            rel = raw_key
+        normalized[rel] = value
+    return normalized
 
 
 @project_model_entry("knowledge")
@@ -378,6 +384,7 @@ def commit_raw_documents(
     on_result: Callable[[str, dict[str, Any]], None] | None = None,
     on_skip: Callable[[str, str], None] | None = None,
     vendor: bool = False,
+    decisions: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Promote staged files from raw/ into knowledge/ (the 'commit' step).
 
@@ -397,6 +404,7 @@ def commit_raw_documents(
     relative_paths = (
         list_raw_files(project_id) if paths is None else normalize_raw_paths(paths, project_id)
     )
+    decisions_by_path = _normalize_decisions(decisions, project_id)
 
     def _report(path: str, state: str) -> None:
         if on_progress:
@@ -408,6 +416,7 @@ def commit_raw_documents(
     skip_reasons: dict[str, str] = {}
     claimed_targets: dict[str, str] = {}
     for relative in relative_paths:
+        file_decision = decisions_by_path.get(relative)
         try:
             result = _commit_raw_file(
                 relative,
@@ -416,6 +425,7 @@ def commit_raw_documents(
                 claimed_targets=claimed_targets,
                 report=partial(_report, relative),
                 **({"vendor": True} if vendor else {}),
+                **({"file_decision": file_decision} if file_decision else {}),
             )
         except _ImportRefused as refused:
             reason = str(refused)

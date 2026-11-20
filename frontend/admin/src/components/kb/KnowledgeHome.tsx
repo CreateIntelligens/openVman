@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
-import type { KnowledgeDocumentSummary, KnowledgeNoteFormat } from "../../api";
+import type { KnowledgeCommitLaterItem, KnowledgeDocumentSummary, KnowledgeNoteFormat } from "../../api";
 import { isImportItemActive, type KnowledgeImport } from "../../hooks/useKnowledgeImport";
 import type { QaNode } from "../../hooks/useQaNodes";
 import ConfirmModal from "../ConfirmModal";
 import { formatSize, KNOWLEDGE_LANGUAGE_LABELS } from "./helpers";
 import ImportResultList, { ImportFileName } from "./ImportResultList";
+import QaUploadReview from "./QaUploadReview";
 import SourcePanel from "./SourcePanel";
 import { documentStatusLabel, type DocumentStatusLabel } from "./StatusDot";
 import { vendorFolderLabel } from "./vendorDocumentLabels";
@@ -100,6 +101,9 @@ interface KnowledgeHomeProps {
   /** 文件清單第一次載入完之前，不能下「知識庫是空的」的結論。 */
   documentsLoaded: boolean;
   nodesTree: QaNode[];
+  /** 廠商畫面的分類樹換過名稱；匯入前檢查要拿原名比對預覽的分類，再顯示換過的名稱。 */
+  rawNodesTree?: QaNode[];
+  qaCategoryLabels?: ReadonlyMap<string, string>;
   maxUploadLabel: string;
   crawlUrlValue: string;
   setCrawlUrlValue: (value: string) => void;
@@ -108,6 +112,7 @@ interface KnowledgeHomeProps {
   onOpenComposer: (format: KnowledgeNoteFormat) => void;
   onViewDocument: (path: string) => void;
   onViewQaNode: (nodeId: string) => void;
+  onOpenLaterQuestion: (source: string, item: KnowledgeCommitLaterItem) => void;
   onRenameQaNode: (nodeId: string) => void;
   onOpenMobileTree: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   /** 這個帳號能不能用「AI 整理排版」。 */
@@ -123,6 +128,8 @@ export default function KnowledgeHome({
   documents,
   documentsLoaded,
   nodesTree,
+  rawNodesTree,
+  qaCategoryLabels,
   maxUploadLabel,
   crawlUrlValue,
   setCrawlUrlValue,
@@ -131,6 +138,7 @@ export default function KnowledgeHome({
   onOpenComposer,
   onViewDocument,
   onViewQaNode,
+  onOpenLaterQuestion,
   onRenameQaNode,
   onOpenMobileTree,
 }: KnowledgeHomeProps) {
@@ -191,7 +199,18 @@ export default function KnowledgeHome({
           allowAiCleanup={allowAiCleanup}
         />
 
-        <div ref={resultsRef}>
+        <div ref={resultsRef} className="space-y-4">
+          {importer.review && (
+            <QaUploadReview
+              vendor={vendor}
+              files={importer.review.files}
+              documentPaths={importer.review.documentPaths}
+              nodesTree={rawNodesTree ?? nodesTree}
+              categoryLabels={qaCategoryLabels}
+              onConfirm={importer.confirmReview}
+              onCancel={importer.cancelReview}
+            />
+          )}
           <ImportResultList
             vendor={vendor}
             documentLabels={documentLabels}
@@ -199,6 +218,7 @@ export default function KnowledgeHome({
             nodesTree={nodesTree}
             onViewDocument={onViewDocument}
             onViewQaNode={onViewQaNode}
+            onOpenLaterQuestion={onOpenLaterQuestion}
             onRenameQaNode={onRenameQaNode}
             onRetry={importer.retryItem}
             onPickAgain={() => fileInputRef.current?.click()}

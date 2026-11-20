@@ -62,6 +62,7 @@ from protocol.schemas import (
     KnowledgeDocumentPutRequest,
     KnowledgeNoteCreateRequest,
     KnowledgeRawCommitRequest,
+    KnowledgeRawPreviewRequest,
     KnowledgeSettingsPutRequest,
     ProjectFeaturesPatchRequest,
 )
@@ -657,6 +658,23 @@ async def renormalize_knowledge_document_route(
     }
 
 
+@router.post("/knowledge/raw/preview", summary="匯入前預覽 raw 區問答表（不寫檔、不改節點）")
+async def preview_knowledge_raw_route(
+    payload: KnowledgeRawPreviewRequest, vendor: VendorRequest = False,
+):
+    from knowledge.qa_import_preview import preview_raw_documents
+
+    try:
+        return await asyncio.to_thread(
+            preview_raw_documents,
+            payload.project_id,
+            paths=payload.paths,
+            vendor=bool(vendor),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/knowledge/raw/commit", summary="匯入 raw 區檔案進知識庫（背景執行，逐檔進度可查詢）", status_code=202)
 async def commit_knowledge_raw_route(
     payload: KnowledgeRawCommitRequest, response: Response, vendor: VendorRequest = False,
@@ -689,14 +707,32 @@ async def commit_knowledge_raw_route(
     if not commit_jobs.start_job(pid, files):
         response.status_code = 200
         return {"status": "already_running", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
+    decisions = (
+        {key: item.model_dump() for key, item in payload.decisions.items()}
+        if payload.decisions
+        else None
+    )
     # 一律帶明確清單：開工後才傳上來的檔案不算這一批。
-    asyncio.create_task(_run_commit_job(pid, files, payload.normalize, **({"vendor": True} if vendor else {})))
+    asyncio.create_task(
+        _run_commit_job(
+            pid,
+            files,
+            payload.normalize,
+            **({"vendor": True} if vendor else {}),
+            **({"decisions": decisions} if decisions else {}),
+        )
+    )
     response.status_code = 202
     return {"status": "started", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
 
 
 async def _run_commit_job(
-    project_id: str, files: list[str], normalize: bool = True, *, vendor: bool = False,
+    project_id: str,
+    files: list[str],
+    normalize: bool = True,
+    *,
+    vendor: bool = False,
+    decisions: dict[str, Any] | None = None,
 ) -> None:
     def _on_progress(path: str, state: str) -> None:
         commit_jobs.update_file(project_id, path, state)
@@ -717,6 +753,7 @@ async def _run_commit_job(
             on_result=_on_result,
             on_skip=_on_skip,
             **({"vendor": True} if vendor else {}),
+            **({"decisions": decisions} if decisions else {}),
         )
     except Exception as exc:
         commit_jobs.fail_job(project_id, "匯入中斷，還沒處理的檔案都留著，可以再試一次")

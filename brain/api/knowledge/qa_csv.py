@@ -702,6 +702,33 @@ def extract_image_id(raw: str) -> str:
     return value
 
 
+def replace_qa_csv_images(file_bytes: bytes, image_map: dict[str, str]) -> bytes:
+    """Replace ``img`` cell values in a QA CSV according to ``image_map``."""
+    if not image_map:
+        return file_bytes
+    table = _decode_qa_csv_table(file_bytes)
+    header, rows = table[0], table[1:]
+    column_of: dict[str, int] = {}
+    for position, raw in enumerate(header):
+        column_of.setdefault(normalize_fieldname(raw), position)
+    img_col = column_of.get("img")
+    if img_col is None:
+        return file_bytes
+    changed = False
+    for row in rows:
+        if img_col >= len(row):
+            continue
+        raw_val = row[img_col].strip()
+        extracted = extract_image_id(raw_val)
+        replacement = image_map.get(raw_val) or image_map.get(extracted)
+        if replacement:
+            row[img_col] = replacement
+            changed = True
+    if not changed:
+        return file_bytes
+    return _write_csv_table([header, *rows]).encode("utf-8")
+
+
 def qa_markdown_block(
     question: str, answer: str, img: str = "", url: str = "", hidden: bool = False
 ) -> str:
