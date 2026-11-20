@@ -6,7 +6,8 @@ first audio byte is timed. All timestamps are epoch seconds, so `node_report.py`
 can line them up with Backend and Brain log lines (same host clock) by `trace_id`.
 
     python3 burst_nodes.py --base https://example --project <id> --out run.json
-    # credentials: LOAD_TOKEN=<bearer>, or LOAD_USERNAME / LOAD_PASSWORD to log in
+    # credentials: LOAD_TOKEN=<bearer>, LOAD_USERNAME / LOAD_PASSWORD to log in,
+    # or LOAD_EMBED_KEY + LOAD_ORIGIN (an allowlisted origin) like an embedded page
 
 Sessions are named `burst-<run>-<n>` so they can be found and removed afterwards.
 """
@@ -25,6 +26,10 @@ import httpx
 
 
 async def login(client: httpx.AsyncClient, base: str) -> dict[str, str]:
+    embed_key = os.environ.get("LOAD_EMBED_KEY", "").strip()
+    if embed_key:
+        # 公開網頁的接法：embed key 加上白名單內的 Origin，跟 SDK 的對話模式一樣。
+        return {"X-Embed-Key": embed_key, "Origin": os.environ.get("LOAD_ORIGIN", "")}
     token = os.environ.get("LOAD_TOKEN", "").strip()
     if not token:
         response = await client.post(
