@@ -48,7 +48,8 @@ def has_ai_cleanup_access(user: UserRecord) -> bool:
 
 
 def has_web_search_access(user: UserRecord) -> bool:
-    return user.web_search_access
+    # ROOT 不能經由帳號管理改自己的權限；不讓它一律可用，全新安裝的 ROOT 就永遠關著。
+    return user.role is AccountRole.ROOT or user.web_search_access
 
 
 # 「admin 以上」的角色值，供 SQL 的 IN 子句使用。從階層推導而非寫死字面

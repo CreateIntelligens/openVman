@@ -82,6 +82,14 @@ def test_preset_creation_respects_account_management_and_grant_scope(env):
         manager_path, headers=root_headers, json={"enabled": True},
     ).status_code == 200
     assert env.create("no-root", actor_id=env.admin.id, preset="rd").status_code == 403
+    # BD 會開網路搜尋，建立者自己要有。
+    no_web = env.create("no-web-search", actor_id=env.admin.id, preset="bd")
+    assert no_web.status_code == 403, no_web.text
+    assert env.runtime.users.get_by_username("no-web-search") is None
+    assert env.client.put(
+        f"/api/v1/users/{env.admin.id}/access", headers=root_headers,
+        json={"web_search_access": True},
+    ).status_code == 200
     env.runtime.admin_scopes.replace(
         admin_user_id=env.admin.id, updated_by=env.root.id, scoped=True,
         resources=[(ResourceType.PROJECT, _PROJECT)],
@@ -176,3 +184,54 @@ def test_chat_proxies_web_search_access_from_authenticated_principal(env, princi
     )
     assert response.status_code == 200, response.text
     assert env.received[-1].headers.get_list("X-OpenVMan-Web-Search") == [expected]
+
+
+def test_web_search_cannot_be_delegated_by_an_admin_without_it(env):
+    root_headers = env.headers(env.root.id)
+    admin_headers = env.headers(env.admin.id)
+
+    blocked = env.create(
+        "child-admin", actor_id=env.admin.id, role="admin",
+        access={"web_search_access": True},
+    )
+    assert blocked.status_code == 403, blocked.text
+    assert env.runtime.users.get_by_username("child-admin") is None
+
+    child = env.create("child-user", actor_id=env.admin.id).json()
+    updated = env.client.put(
+        f"/api/v1/users/{child['id']}/access", headers=admin_headers,
+        json={"web_search_access": True},
+    )
+    assert updated.status_code == 403, updated.text
+    assert env.runtime.users.get_by_id(child["id"]).web_search_access is False
+
+    assert env.client.put(
+        f"/api/v1/users/{env.admin.id}/access", headers=root_headers,
+        json={"web_search_access": True},
+    ).status_code == 200
+    allowed = env.client.put(
+        f"/api/v1/users/{child['id']}/access", headers=env.headers(env.admin.id),
+        json={"web_search_access": True},
+    )
+    assert allowed.status_code == 200, allowed.text
+
+
+def test_root_can_always_search_the_web_on_a_fresh_install(env):
+    from app.auth.models import has_web_search_access
+
+    root = env.runtime.users.get_by_id(env.root.id)
+    assert root.web_search_access is True
+    assert has_web_search_access(root)
+
+
+def test_becoming_a_vendor_account_turns_web_search_off(env):
+    _assign_vendors(env)
+    account = env.create("internal-bd", preset="bd", project_ids=[_PROJECT]).json()
+    assert account["web_search_access"] is True
+
+    moved = env.client.patch(
+        f"/api/v1/users/{account['id']}/vendor", headers=env.headers(env.root.id),
+        json={"vendor_name": "甲商"},
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["web_search_access"] is False

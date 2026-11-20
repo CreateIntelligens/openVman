@@ -265,8 +265,9 @@ class UserRepository:
                     INSERT INTO users(
                         id, username, username_normalized, password_hash, role,
                         account_type, disabled, token_version, created_at,
-                        updated_at, created_by, admin_portal_access
-                    ) VALUES (?, ?, ?, ?, 'root', 'formal', 0, 0, ?, ?, NULL, 0)
+                        updated_at, created_by, admin_portal_access,
+                        web_search_access
+                    ) VALUES (?, ?, ?, ?, 'root', 'formal', 0, 0, ?, ?, NULL, 0, 1)
                     """,
                     (
                         user_id,
@@ -444,6 +445,11 @@ class UserRepository:
                 """,
                 (vendor_name, now, user_id),
             )
+            if vendor_name:
+                # 廠商帳號預設不能上網搜尋；換成廠商或換廠商時一律關掉，要開由管理員再決定。
+                connection.execute(
+                    "UPDATE users SET web_search_access = 0 WHERE id = ?", (user_id,),
+                )
             # 換了廠商，舊的帳號金鑰是照原歸屬代發的；token_version 只讓登入失效，金鑰要另外撤銷。
             connection.execute(
                 "UPDATE account_api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",

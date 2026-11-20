@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from .models import AccountRole, AccountType, UserRecord, is_at_least_admin
+from .models import (
+    AccountRole,
+    AccountType,
+    UserRecord,
+    has_web_search_access,
+    is_at_least_admin,
+)
 
 
 class AccountPolicyError(PermissionError):
@@ -36,6 +42,13 @@ def can_manage_vendor_accounts(actor: UserRecord) -> bool:
     return actor.role is AccountRole.ROOT or (
         actor.role is AccountRole.ADMIN and actor.account_management_access
     )
+
+
+def ensure_can_grant_web_search(actor: UserRecord, requested: bool | None) -> None:
+    """Only an account that may search the web can turn it on for another account or key."""
+    # 委派鏈上每一層的範圍只會更窄：自己被關掉的人，開子帳號或嵌入金鑰也拿不回來。
+    if requested and not has_web_search_access(actor):
+        raise AccountPolicyError("你的帳號沒有網路搜尋權限，不能替其他帳號或嵌入金鑰開啟。")
 
 
 def ensure_can_grant_account_management(actor: UserRecord) -> None:

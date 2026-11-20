@@ -22,7 +22,7 @@ from .account_schemas import (
 from .dependencies import CurrentAccount, require_admin
 from .models import AccountRole
 from .passwords import hash_password
-from .policy import AccountPolicyError
+from .policy import AccountPolicyError, ensure_can_grant_web_search
 from .repository_errors import InvalidResourceGrantError, UserNotFoundError
 from .runtime import AuthRuntime, get_auth_runtime
 from .temporary_accounts_repository import (
@@ -247,6 +247,7 @@ def create_temporary_batch(
         for locator, password in generated
     ]
     try:
+        ensure_can_grant_web_search(admin.user, body.web_search_access)
         batch = runtime.temporary_accounts.create_batch(
             created_by=admin.user.id,
             credentials=credentials,

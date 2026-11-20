@@ -20,6 +20,7 @@ from .embed_keys_repository import (
     EmbedKeyNotFoundError,
 )
 from .models import EmbedKeyRecord, ResourceType
+from .policy import AccountPolicyError, ensure_can_grant_web_search
 from .resources import ResourceNotFoundError, resolve_admin_scope, resolve_resource
 from .runtime import AuthRuntime, get_auth_runtime
 
@@ -175,6 +176,7 @@ async def create_embed_key(
 ) -> dict[str, object]:
     origins = _normalize_origins(payload.allowed_origins)
     _require_project(runtime, current, payload.project_id)
+    _require_web_search_grant(current, payload.web_search_access)
     try:
         record = runtime.embed_keys.create(
             label=payload.label,
@@ -195,6 +197,13 @@ async def create_embed_key(
     return _serialize(record, 0)
 
 
+def _require_web_search_grant(current: CurrentAccount, requested: bool | None) -> None:
+    try:
+        ensure_can_grant_web_search(current.user, requested)
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
 @router.patch("/{key_id}", summary="更新 Embed 金鑰")
 async def update_embed_key(
     key_id: str,
@@ -203,6 +212,7 @@ async def update_embed_key(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, object]:
     _manageable_key(runtime, current, key_id)
+    _require_web_search_grant(current, payload.web_search_access)
     changes = payload.model_dump(exclude_none=True)
     if "allowed_origins" in changes:
         changes["allowed_origins"] = _normalize_origins(changes["allowed_origins"])

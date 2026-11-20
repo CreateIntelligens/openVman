@@ -159,8 +159,18 @@ def test_list_reports_todays_request_count(admin_client):
     assert listed[0]["requests_today"] == 1
 
 
+def _allow_web_search(username: str = "test-admin") -> None:
+    from app.auth.runtime import get_auth_runtime
+
+    with get_auth_runtime().database.transaction(write=True) as connection:
+        connection.execute(
+            "UPDATE users SET web_search_access = 1 WHERE username = ?", (username,),
+        )
+
+
 def test_patch_applies_without_restart(admin_client):
     _module, client = admin_client
+    _allow_web_search()
     created = client.post("/api/v1/embed-keys", json=_create_payload()).json()
 
     response = client.patch(
@@ -267,3 +277,26 @@ def test_generated_key_ids_are_unique_and_well_formed(admin_client):
 
     assert len(key_ids) == 5
     assert all(KEY_ID_PATTERN.match(key_id) for key_id in key_ids)
+
+
+def test_an_admin_without_web_search_cannot_turn_it_on_for_a_key(admin_client):
+    _module, client = admin_client
+
+    created = client.post(
+        "/api/v1/embed-keys", json=_create_payload(web_search_access=True),
+    )
+    assert created.status_code == 403
+    assert "網路搜尋" in created.json()["detail"]
+
+    key = client.post("/api/v1/embed-keys", json=_create_payload()).json()
+    patched = client.patch(
+        f"/api/v1/embed-keys/{key['key_id']}", json={"web_search_access": True},
+    )
+    assert patched.status_code == 403
+    from app.auth.runtime import get_auth_runtime
+
+    assert get_auth_runtime().embed_keys.get(key["key_id"]).web_search_access is False
+    # 關掉本來就可以。
+    assert client.patch(
+        f"/api/v1/embed-keys/{key['key_id']}", json={"web_search_access": False},
+    ).status_code == 200

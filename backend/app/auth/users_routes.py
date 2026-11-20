@@ -24,6 +24,7 @@ from .passwords import PasswordValidationError, hash_password
 from .policy import (
     AccountPolicyError,
     can_manage_vendor_accounts,
+    ensure_can_grant_web_search,
     is_vendor_account,
 )
 from .repository_errors import (
@@ -150,6 +151,7 @@ def update_account_access(
 ) -> AdminAccountProfile:
     access = body if isinstance(body, UpdateAccountAccessRequest) else None
     try:
+        ensure_can_grant_web_search(admin.user, body.web_search_access)
         runtime.account_access.replace(
             user_id=user_id,
             granted_by=admin.user.id,
@@ -208,6 +210,12 @@ def create_account(
     try:
         password_hash = hash_password(body.password)
         access = body.access if isinstance(body.access, UpdateAccountAccessRequest) else None
+        ensure_can_grant_web_search(
+            admin.user,
+            ACCOUNT_PRESETS[body.preset].web_search_access
+            if body.preset is not None
+            else bool(body.access and body.access.web_search_access),
+        )
         user = runtime.users.create(
             username=body.username,
             password_hash=password_hash,
