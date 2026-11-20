@@ -1,5 +1,5 @@
 import { ApiError, statusMessage } from "../../../api/common";
-import type { QaQuestionRow } from "../../../api/knowledge";
+import { moveQaQuestions, saveQaQuestion, type QaQuestionRow } from "../../../api/knowledge";
 import type { MergedQaItem, useQaNodes } from "../../../hooks/useQaNodes";
 
 export type QuestionApi = Pick<ReturnType<typeof useQaNodes>,
@@ -23,11 +23,34 @@ export function questionErrorMessage(failure: unknown, fallback: string) {
   if (failure instanceof QuestionActionError) return failure.message;
   if (!(failure instanceof ApiError)) return fallback;
   if (failure.status === 409) return QUESTION_CONFLICT;
+  const detail = failure.message;
+  if (failure.status === 404) {
+    if (
+      detail === "目標分類不存在" ||
+      detail === "這份文件裡沒有這個題目" ||
+      detail === "找不到指定文件" ||
+      detail.includes("不在原本的分類裡") ||
+      detail.includes("不在來源文件裡")
+    ) {
+      return detail;
+    }
+    return statusMessage(404);
+  }
   if (failure.status !== 400) return statusMessage(failure.status);
 
-  const detail = failure.message;
   if (/^(同一個分類不能有文字相同的題目|這個分類已經有相同的題目)/.test(detail)) {
     return "這個分類已有相同的問題。請改題目文字，或選擇其他分類。";
+  }
+  if (
+    detail.includes("在目標分類已經有相同的題目") ||
+    detail.includes("在同一批移動裡重複") ||
+    detail === "這份文件裡已經有相同的題目" ||
+    detail === "請指定來源文件" ||
+    detail.endsWith("沒有指定來源文件") ||
+    detail.endsWith("不是知識庫文件") ||
+    detail.endsWith("不是 QA 文件")
+  ) {
+    return detail;
   }
   if (detail.startsWith("改名後") && detail.includes("裡的題目重複")) {
     return "改名後會和另一個掛載分類裡的題目重複，請換個問題文字。";
@@ -38,7 +61,7 @@ export function questionErrorMessage(failure: unknown, fallback: string) {
   if (/^(這些題目已經有別的答案|文件裡這些題目重複)/.test(detail)) {
     return "來源文件有重複題目或不同答案，請先到文件頁處理。";
   }
-  if (/^(題目不可空白|這一列沒有題目|選單專用的題目沒有固定答案|這份文件裡沒有這個題目)/.test(detail)) {
+  if (/^(題目不可空白|答案不可空白|這一列沒有題目|選單專用的題目沒有固定答案|這份文件裡沒有這個題目)/.test(detail)) {
     return detail;
   }
   return statusMessage(400);
@@ -81,35 +104,6 @@ export async function detachQuestion(api: QuestionApi, row: QaQuestionRow, categ
   await api.removeQaEntry(category, item.q, item.source_file);
 }
 
-export async function moveQuestion(api: QuestionApi, row: QaQuestionRow, from: string[], to: string) {
-  const sources = from.filter((id) => id !== to);
-  const alreadyAtTarget = row.category_ids.includes(to);
-  if (!sources.length && alreadyAtTarget) return "unchanged";
-  if (!alreadyAtTarget) {
-    if (row.source.path) {
-      await api.addQaEntry(to, row.question, row.source.path);
-    } else {
-      const { item } = await requireMergedRow(api, sources[0], row);
-      const destination = await api.fetchMergedQa(to);
-      if (destination.some((current) => current.q === item.q)) {
-        throw new QuestionActionError("目標分類已有相同問題。");
-      }
-      const { base_version: _version, original_q: _original, ...copy } = item;
-      await api.saveMergedQa(to, [...destination, copy], destination[0]?.base_version);
-    }
-  }
-
-  let incomplete = false;
-  for (const category of sources) {
-    try {
-      await detachQuestion(api, row, category);
-    } catch {
-      incomplete = true;
-    }
-  }
-  return incomplete ? "partial" : "moved";
-}
-
 export async function deleteQuestion(api: QuestionApi, row: QaQuestionRow) {
   const [last, ...otherCategories] = row.category_ids;
   if (!last) throw new QuestionActionError("請開啟來源文件刪除這一題。");
@@ -140,14 +134,66 @@ export async function saveQuestion(
   from: string,
   form: QuestionDraft,
   baseline?: MergedQaItem,
+  projectId?: string,
 ) {
+  const { q, a, img, url, hidden } = form;
+  if (row && !from) {
+    const source_file = row.source.path;
+    const updated: MergedQaItem = { q, a, img, url, hidden, source_file };
+    const current: MergedQaItem = baseline ?? {
+      q: row.question, a: row.answer, img: row.image, url: row.url,
+      hidden: row.hidden_in_file, source_file,
+    };
+    const contentChanged = rowContent(updated) !== rowContent(current);
+    let saved = row;
+    // 只選分類或重試掛載時，不需要經過內容儲存的答案驗證。
+    if (contentChanged) {
+      const result = await saveQaQuestion(
+        {
+          source_path: source_file,
+          original_q: row.question,
+          q,
+          a,
+          img,
+          url,
+          hidden,
+          base_hash: row.content_hash,
+        },
+        projectId,
+      );
+      saved = {
+        ...row,
+        question: result.question.q,
+        answer: result.question.a,
+        image: result.question.img,
+        url: result.question.url,
+        hidden_in_file: result.question.hidden,
+        content_hash: result.content_hash,
+      };
+    }
+    if (form.category) {
+      const savedQuestion: SavedQuestion = { row: saved, item: updated };
+      try {
+        await moveQaQuestions(
+          form.category,
+          [{ question: saved.question, source_path: source_file, from_node_ids: [] }],
+          projectId,
+        );
+      } catch (failure) {
+        if (!contentChanged) throw failure;
+        const reason = questionErrorMessage(failure, "請重新確認題目所在的分類。");
+        throw new QuestionActionError(`題目內容已儲存，但放進分類未完成。${reason}`, true, savedQuestion);
+      }
+    }
+    return;
+  }
+
   const category = row ? from : form.category;
   const rows = await api.fetchMergedQa(category);
   const item = row && from ? findMergedRow(rows, row) : undefined;
   if (row && (!item || (baseline && rowContent(baseline) !== rowContent(item)))) {
     throw new QuestionActionError(QUESTION_CONFLICT);
   }
-  const { q, a, img, url, hidden } = form;
   const source_file = item?.source_file || (a || url ? `knowledge/qa/manual_${category}.md` : "");
   const updated = { ...item, q, a, img, url, hidden, source_file };
   // 內容沒變（例如上次只差移動分類沒完成）就不再寫一次，只重試移動。
@@ -157,18 +203,19 @@ export async function saveQuestion(
   }
 
   if (row && from !== form.category) {
+    // 這是唯一保留兩步（先存內容、再搬分類）的地方：內容存在原分類的版本檢查下，
+    // 先以 PUT merged(from) 寫回，成功後再呼叫一次 moveQaQuestions 完成跨分類移動。
     // 改名或新增來源檔後，移動仍要使用儲存後的題目定位資料。
+    const from_node_ids = row.category_ids.includes(form.category) ? [from, form.category] : [from];
     const saved = { ...row, question: q, source: { ...row.source, path: source_file } };
     const savedQuestion = { row: saved, item: updated };
     try {
-      const destination = await api.fetchMergedQa(form.category);
-      saved.category_ids = findMergedRow(destination, saved) ? [form.category] : [];
-      const result = await moveQuestion(api, saved, [from], form.category);
-      if (result === "partial") {
-        throw new QuestionActionError("題目內容已儲存，也已加入目標分類，但尚未從原分類移除。", true, savedQuestion);
-      }
+      await moveQaQuestions(
+        form.category,
+        [{ question: saved.question, source_path: source_file, from_node_ids }],
+        projectId,
+      );
     } catch (failure) {
-      if (failure instanceof QuestionActionError && failure.saved) throw failure;
       const reason = questionErrorMessage(failure, "請重新確認題目所在的分類。");
       throw new QuestionActionError(`題目內容已儲存，但移動分類未完成。${reason}`, true, savedQuestion);
     }

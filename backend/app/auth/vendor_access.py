@@ -31,11 +31,13 @@ _POST = frozenset({
     "/knowledge/upload", "/knowledge/raw/upload", "/knowledge/raw/commit",
     "/knowledge/fetch",
     "/knowledge/qa/nodes", "/knowledge/qa/nodes/adopt-source",
+    "/knowledge/qa/questions/move",
     "/knowledge/qa/images",
 })
 # 廠商可改個性與說話方式（SOUL.md）與工作規則（AGENTS.md）；保護規則只讀。
 _PUT = frozenset({
     "/personas/soul", "/personas/agents", "/knowledge/base/document", "/knowledge/settings",
+    "/knowledge/qa/questions",
 })
 _DELETE = frozenset({
     "/knowledge/base/document", "/knowledge/base/directory", "/knowledge/raw/pending",

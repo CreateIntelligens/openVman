@@ -50,7 +50,7 @@ from knowledge.qa_nodes import (
     sync_entries_for_source,
     update_node,
 )
-from knowledge.workspace import ensure_workspace_scaffold
+from knowledge.workspace import content_hash, ensure_workspace_scaffold
 
 logger = logging.getLogger(__name__)
 
@@ -95,16 +95,26 @@ def canonical_knowledge_path(source: str, project_id: str) -> str:
     return relative.as_posix()
 
 
-def normalized_qa_source(source: str, project_id: str, known: set[str] | None = None) -> str:
+def normalized_qa_source(
+    source: str,
+    project_id: str,
+    known: set[str] | None = None,
+    *,
+    mounted_sources: set[str] | None = None,
+) -> str:
     """``canonical_knowledge_path`` that also requires a QA document.
 
     掛在樹上的舊文件可能沒標類型，或覆蓋上傳後被標成 upload，掛著就算 QA 文件。
+    傳入掛載來源的快照可省下讀取分類樹，空集合則只接受已標為 QA 的文件或 known。
     """
     relative = canonical_knowledge_path(source, project_id)
     if (
         resolve_workspace_document(relative, project_id).exists()
         and get_document_meta(relative, project_id).get("source_type") != "qa"
-        and not is_source_referenced(relative, project_id)
+        and not (
+            is_source_referenced(relative, project_id)
+            if mounted_sources is None else relative in mounted_sources
+        )
         and relative not in (known or set())
     ):
         raise MergedSaveError(400, f"{source} 不是 QA 文件")
@@ -370,6 +380,8 @@ def _plan_file(
     own: set[str],
     mounted_elsewhere: set[str],
     project_id: str,
+    *,
+    keep_positions: bool = False,
 ) -> _FilePlan:
     doc_path = resolve_workspace_document(source, project_id)
     is_csv = doc_path.suffix.lower() == ".csv"
@@ -441,15 +453,16 @@ def _plan_file(
     if not before_bytes.strip() and not updates:
         return plan
 
+    shared = keep_positions or bool(mounted_elsewhere)
     try:
         if is_csv:
             content = (
-                rewrite_qa_csv(before_bytes, updates, removed, shared=bool(mounted_elsewhere))
+                rewrite_qa_csv(before_bytes, updates, removed, shared=shared)
                 if before_bytes.strip()
                 else serialize_qa_csv(updates)
             )
         else:
-            content = rewrite_qa_markdown(before_text, updates, removed, shared=bool(mounted_elsewhere))
+            content = rewrite_qa_markdown(before_text, updates, removed, shared=shared)
     except ValueError as exc:
         raise MergedSaveError(400, f"{source}：{exc}，未做任何變更") from exc
 
@@ -622,3 +635,104 @@ def _refuse_renames_that_collide(plans: list[_FilePlan], node_id: str, project_i
                     raise MergedSaveError(
                         400, f"改名後「{new}」會和分類「{other.get('label') or other_id}」裡的題目重複，未做任何變更",
                     )
+
+
+def save_question(
+    source_path: str,
+    original_q: str,
+    q: str,
+    a: str,
+    project_id: str = "default",
+    *,
+    img: str | None = "",
+    url: str | None = "",
+    hidden: bool | None = False,
+    base_hash: str | None = None,
+) -> dict[str, Any]:
+    """Update a single question in its QA source document without going through a category."""
+    if not (source_path or "").strip():
+        raise MergedSaveError(400, "請指定來源文件")
+    source = normalized_qa_source(source_path, project_id, mounted_sources=set())
+    doc_path = resolve_workspace_document(source, project_id)
+    if not doc_path.exists():
+        raise MergedSaveError(404, "找不到指定文件")
+
+    try:
+        before_text = doc_path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise MergedSaveError(400, f"{source} 不是 UTF-8，未做任何變更") from exc
+    if base_hash and content_hash(before_text) != base_hash:
+        raise MergedSaveError(409, "這份文件在你編輯時被改過了，請重新載入後再存檔")
+
+    try:
+        before_items = _read_items(doc_path)
+    except (UnicodeDecodeError, csv.Error) as exc:
+        raise MergedSaveError(400, f"{source} 讀不懂（{exc}），未做任何變更") from exc
+    positions = {
+        entry["q"].strip(): position
+        for position, entry in enumerate(before_items, start=1)
+    }
+    orig = (original_q or "").strip()
+    if not orig or orig not in positions:
+        raise MergedSaveError(404, "這份文件裡沒有這個題目")
+    new_q = (q or "").strip()
+    new_a = (a or "").strip()
+    if not new_q or new_q == UNTITLED_QUESTION:
+        raise MergedSaveError(400, "題目不可空白，未做任何變更")
+    if not new_a:
+        raise MergedSaveError(400, "答案不可空白，未做任何變更")
+
+    in_file = {entry["q"].strip(): entry for entry in before_items}
+    if (
+        new_q != orig
+        and new_q in in_file
+        and unify_newlines(in_file[new_q]["a"]).strip() == unify_newlines(new_a).strip()
+    ):
+        raise MergedSaveError(400, "這份文件裡已經有相同的題目")
+
+    item = {
+        "q": new_q,
+        "a": new_a,
+        "img": img or "",
+        "url": url or "",
+        "hidden": bool(hidden),
+        "original_q": orig,
+        "_position": positions[orig],
+    }
+    mounted_elsewhere = {
+        entry["question"]
+        for node in list_nodes(project_id).values()
+        for entry in node.get("qa_entries", [])
+        if posixpath.normpath(entry.get("source_path") or "") == source
+        and entry.get("question") == orig
+    }
+    plan = _plan_file(
+        source, [item], {orig}, mounted_elsewhere, project_id, keep_positions=True,
+    )
+    if plan.gone:
+        logger.error(
+            "qa_save_question_unexpected_removal source=%s original_q=%s q=%s gone=%s",
+            source,
+            orig,
+            new_q,
+            plan.gone,
+        )
+        raise MergedSaveError(500, "儲存題目時發生預期外的刪除，未做任何變更")
+    _refuse_renames_that_collide([plan], "", project_id)
+
+    def _update_nodes() -> None:
+        if plan.renames:
+            rename_questions_in_nodes(plan.source, plan.renames, project_id)
+        # 單題存檔不動文件的列順序，也就沒有文件頁的排序要帶回分類。
+        sync_entries_for_source(
+            plan.source,
+            project_id,
+            delete_emptied=False,
+            place_unmounted=False,
+            keep_order=True,
+        )
+
+    _write_all([plan], project_id, _update_nodes)
+    saved_row = read_question(source, new_q, project_id)
+    new_hash = content_hash(doc_path.read_text(encoding="utf-8-sig"))
+    return {"question": saved_row, "content_hash": new_hash}

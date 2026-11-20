@@ -540,6 +540,8 @@ export interface QaQuestionRow {
     path: string;
     label: string;
   };
+  /** 來源文件的版本雜湊，單題直接存回文件時用來檢查衝突。 */
+  content_hash?: string;
   category_ids: string[];
   /** 掛著的分類全部被隱藏（含上層）。 */
   category_hidden: boolean;
@@ -619,4 +621,67 @@ export async function exportQaExcel(
   const blob = await res.blob();
   const filename = parseContentDispositionFilename(res.headers?.get("content-disposition") ?? null);
   return { blob, filename };
+}
+
+export interface SaveQaQuestionPayload {
+  project_id?: string;
+  source_path: string;
+  original_q: string;
+  q: string;
+  a: string;
+  img?: string;
+  url?: string;
+  hidden?: boolean;
+  base_hash?: string;
+}
+
+export interface SaveQaQuestionResponse {
+  question: {
+    q: string;
+    a: string;
+    img: string;
+    url: string;
+    hidden: boolean;
+  };
+  content_hash: string;
+}
+
+export function saveQaQuestion(
+  payload: SaveQaQuestionPayload,
+  projectId: string = getActiveProjectId(),
+) {
+  return put<SaveQaQuestionResponse>(knowledgePath("/qa/questions"), {
+    project_id: payload.project_id ?? projectId,
+    source_path: payload.source_path,
+    original_q: payload.original_q,
+    q: payload.q,
+    a: payload.a,
+    img: payload.img ?? "",
+    url: payload.url ?? "",
+    hidden: Boolean(payload.hidden),
+    ...(payload.base_hash ? { base_hash: payload.base_hash } : {}),
+  });
+}
+
+export interface MoveQaQuestionItem {
+  question: string;
+  source_path: string;
+  from_node_ids: string[];
+}
+
+export interface MoveQaQuestionsResponse {
+  to: Record<string, unknown>;
+  from: Array<Record<string, unknown>>;
+}
+
+export function moveQaQuestions(
+  toNodeId: string,
+  items: MoveQaQuestionItem[],
+  projectId: string = getActiveProjectId(),
+) {
+  return post<MoveQaQuestionsResponse>(knowledgePath("/qa/questions/move"), {
+    project_id: projectId,
+    to_node_id: toNodeId,
+    items,
+  });
 }

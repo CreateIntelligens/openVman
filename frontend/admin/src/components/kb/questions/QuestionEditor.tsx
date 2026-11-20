@@ -90,7 +90,7 @@ export default function QuestionEditor({
     setDraft((previous) => ({ ...previous, [key]: value }));
 
   const upload = async (file: File | undefined) => {
-    if (!file || uploading || locked || isOffMenu || loading || loadFailed || saving) return;
+    if (!file || uploading || locked || loading || loadFailed || saving) return;
     setError("");
     setUploading(true);
     try {
@@ -107,7 +107,7 @@ export default function QuestionEditor({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const q = draft.q.trim();
-    if (!q || !draft.category || saving || locked || uploading || loading || loadFailed) return;
+    if (!q || (!isOffMenu && !draft.category) || saving || locked || uploading || loading || loadFailed) return;
     setError("");
     setSaving(true);
     try {
@@ -134,45 +134,43 @@ export default function QuestionEditor({
       <form onSubmit={submit} className="space-y-4 p-4">
         {loading && <p role="status" className="text-sm text-content-muted">正在讀取題目…</p>}
         {loadFailed && <p role="alert" className="text-sm text-danger">讀不到題目，請關閉後再開一次。</p>}
-        {isOffMenu && <p className="text-sm text-content-muted">這題還沒放進分類。你可以選擇分類，或開啟來源文件修改內容。</p>}
+        {isOffMenu && <p className="text-sm text-content-muted">這題還沒放進分類。可直接修改內容，或選擇分類放進選單。</p>}
         <fieldset disabled={disabled} className="space-y-4">
           <label className={fieldClass}>問題
-            <textarea className="input w-full resize-y" rows={2} required readOnly={isOffMenu} value={draft.q} onChange={(event) => update("q", event.target.value)} />
+            <textarea className="input w-full resize-y" rows={2} required value={draft.q} onChange={(event) => update("q", event.target.value)} />
           </label>
           <label className={fieldClass}>答案
-            <textarea className="input w-full resize-y" rows={5} readOnly={isOffMenu} value={draft.a} onChange={(event) => update("a", event.target.value)} />
+            <textarea className="input w-full resize-y" rows={5} value={draft.a} onChange={(event) => update("a", event.target.value)} />
           </label>
           <div className="space-y-2">
             <p className="text-sm font-medium text-content">圖片</p>
             {draft.img && <QaImagePreview imageId={draft.img} alt="題目的圖片" />}
-            {!isOffMenu && (
-              <div
-                className="grid gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-content-muted"
-                onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); }}
-                onDragEnter={(event) => event.stopPropagation()}
-                onDragLeave={(event) => event.stopPropagation()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  void upload(event.dataTransfer.files[0]);
-                }}
-              >
-                <p>可把圖片拖到這裡</p>
-                <div className="flex flex-wrap gap-2">
-                  <input ref={imageInput} type="file" accept="image/*" hidden onChange={(event) => {
-                    void upload(event.currentTarget.files?.[0]);
-                    event.currentTarget.value = "";
-                  }} />
-                  <button type="button" className="btn btn-ghost" disabled={uploading} onClick={() => imageInput.current?.click()}>
-                    {uploading ? "圖片上傳中…" : draft.img ? "更換圖片" : "上傳圖片"}
-                  </button>
-                  {draft.img && <button type="button" className="btn btn-ghost" disabled={uploading} onClick={() => {
-                    update("img", "");
-                    setImageKind("");
-                  }}>移除圖片</button>}
-                </div>
+            <div
+              className="grid gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-content-muted"
+              onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); }}
+              onDragEnter={(event) => event.stopPropagation()}
+              onDragLeave={(event) => event.stopPropagation()}
+              onDrop={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void upload(event.dataTransfer.files[0]);
+              }}
+            >
+              <p>可把圖片拖到這裡</p>
+              <div className="flex flex-wrap gap-2">
+                <input ref={imageInput} type="file" accept="image/*" hidden onChange={(event) => {
+                  void upload(event.currentTarget.files?.[0]);
+                  event.currentTarget.value = "";
+                }} />
+                <button type="button" className="btn btn-ghost" disabled={uploading} onClick={() => imageInput.current?.click()}>
+                  {uploading ? "圖片上傳中…" : draft.img ? "更換圖片" : "上傳圖片"}
+                </button>
+                {draft.img && <button type="button" className="btn btn-ghost" disabled={uploading} onClick={() => {
+                  update("img", "");
+                  setImageKind("");
+                }}>移除圖片</button>}
               </div>
-            )}
+            </div>
           </div>
           <label className={fieldClass}>圖片類型
             <select className="input w-full" value={imageKind} disabled aria-describedby="question-image-kind-hint">
@@ -181,16 +179,16 @@ export default function QuestionEditor({
           </label>
           <p id="question-image-kind-hint" className="text-xs text-content-muted">手動調整圖片類型之後開放。</p>
           <label className={fieldClass}>網址
-            <input className="input w-full" inputMode="url" readOnly={isOffMenu} value={draft.url} onChange={(event) => update("url", event.target.value)} />
+            <input className="input w-full" inputMode="url" value={draft.url} onChange={(event) => update("url", event.target.value)} />
           </label>
           <label className={fieldClass}>分類
-            <select className="input w-full" required value={draft.category} onChange={(event) => update("category", event.target.value)}>
-              {!draft.category && <option value="">選擇分類</option>}
+            <select className="input w-full" required={!isOffMenu} value={draft.category} onChange={(event) => update("category", event.target.value)}>
+              {(!draft.category || isOffMenu) && <option value="">選擇分類</option>}
               {categories.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
             </select>
           </label>
           <label className="flex items-center gap-2 text-sm font-medium text-content">
-            <input type="checkbox" className="accent-primary" checked={!isOffMenu && !draft.hidden} disabled={isOffMenu || Boolean(closure)}
+            <input type="checkbox" className="accent-primary" checked={!draft.hidden} disabled={Boolean(closure)}
               onChange={(event) => update("hidden", !event.target.checked)} />
             前台顯示
           </label>
@@ -200,7 +198,7 @@ export default function QuestionEditor({
         </fieldset>
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-          <button type="submit" className="btn btn-primary" disabled={disabled || uploading || !draft.q.trim() || !draft.category}>
+          <button type="submit" className="btn btn-primary" disabled={disabled || uploading || !draft.q.trim() || (!isOffMenu && !draft.category)}>
             {saving ? "儲存中…" : "儲存"}
           </button>
           {row && <button type="button" className="btn btn-ghost" onClick={onTest} disabled={saving || locked}>▶ 測試</button>}

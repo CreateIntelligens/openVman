@@ -464,7 +464,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
 | 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
 | 專案知識與回答設定 | `GET /knowledge/settings` 讀取全部設定，`PUT /knowledge/settings` 更新語言分流與 `reply_seconds`，`PATCH /knowledge/features` 更新記憶與圖譜擴展 |
-| QA 知識 | `GET /knowledge/qa`、`GET /knowledge/qa/questions`（所有題目清單，見下）、`GET /knowledge/qa/sync-status`（各分類索引同步狀態，見下）、`GET /knowledge/qa/export`（匯出 Excel，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
+| QA 知識 | `GET /knowledge/qa`、`GET/PUT /knowledge/qa/questions`（所有題目清單與單題直接存檔，見下）、`POST /knowledge/qa/questions/move`（單題或批次跨分類移動／掛載）、`GET /knowledge/qa/sync-status`（各分類索引同步狀態，見下）、`GET /knowledge/qa/export`（匯出 Excel，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |
 | 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar` |
 | 工具與技能 | `GET /tools`、`POST /skills`、`PATCH /skills/{id}/toggle`、`GET/PUT /skills/{id}/files`、`DELETE /skills/{id}`、`POST /skills/reload` |
@@ -476,7 +476,11 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 `GET /knowledge/qa/questions?project_id=` 給後台「所有題目」用（`knowledge/qa_questions.py`，只讀）：問答文件的每一題加上選單上的掛載，一題一列。題目的身分是來源文件＋題目文字（比對時換行符號與前後空白不算），只在選單上、沒有來源文件的題目是分類＋題目文字；掛在多個分類也只有一列。
 
 - `categories`：照樹上順序的分類，`{ node_id, label, path, parent_id, hidden }`；`path` 是第一層到自己的名稱，`hidden` 是自己或上層被隱藏。
-- `questions`：`{ id, question, answer, image, image_kind?, url, language, source: { kind, path, label }, category_ids, category_hidden, hidden_in_file, off_menu, no_answer, document_enabled }`。`image_kind`（`qr`／`image`）只在圖片已判定過時出現，讀自 `knowledge/.qa_image_kinds.json`，列清單時不會現場判斷。`language` 先看 CSV 的 `language` 欄，認不得或沒填就用文件語言，只在選單上的題目是 `null`。`source.kind` 為 `file`、`manual`（後台自己輸入，`manual_*` 文件）或 `menu_only`。`off_menu` 是 `detached`（刻意拿下）、`never`（從沒放進分類）或 `null`。`category_hidden` 是掛著的分類全部被隱藏。只在選單上的題目本來就沒有答案，`no_answer` 為 false。掛在選單上、文件裡已找不到的題目照樣列出，答案為空。
+- `questions`：`{ id, question, answer, image, image_kind?, url, language, source: { kind, path, label }, content_hash?, category_ids, category_hidden, hidden_in_file, off_menu, no_answer, document_enabled }`。`image_kind`（`qr`／`image`）只在圖片已判定過時出現，讀自 `knowledge/.qa_image_kinds.json`，列清單時不會現場判斷。`content_hash` 為來源文件的版本雜湊（與 `GET /knowledge/document` 同一算法，每份檔案算一次），供單題直接存檔時帶回 `base_hash`；只在選單上的題目不帶。`language` 先看 CSV 的 `language` 欄，認不得或沒填就用文件語言，只在選單上的題目是 `null`。`source.kind` 為 `file`、`manual`（後台自己輸入，`manual_*` 文件）或 `menu_only`。`off_menu` 是 `detached`（刻意拿下）、`never`（從沒放進分類）或 `null`。`category_hidden` 是掛著的分類全部被隱藏。只在選單上的題目本來就沒有答案，`no_answer` 為 false。掛在選單上、文件裡已找不到的題目照樣列出，答案為空。
+
+`PUT /knowledge/qa/questions` 直接修改標記為 QA 的來源文件裡的一題，保留原列位置、`index` 與其他列。請求 `{ project_id, source_path, original_q, q, a, img, url, hidden, base_hash? }`，回應 `{ question, content_hash }`。帶 `base_hash` 且與文件目前雜湊不符回 409；找不到 `original_q` 回 404；`q` 或 `a` 空白、或改名撞到同檔已有的題目（不論答案是否相同）回 400。寫檔後同步更新所有掛載節點上的題目文字、隱藏與圖片。未分類題目保留未分類，刻意拿下選單的題目改名後也保留原狀態，各分類的題目順序不變。整個分類存檔（`PUT /knowledge/qa/nodes/{id}/merged`）仍會把同檔其他符合條件的未分類題目放進引用節點。單題存檔成功後會排程重建索引。
+
+`POST /knowledge/qa/questions/move` 一次完成單題或批次跨分類移動與未分類題目掛載，請求 `{ project_id, to_node_id, items: [{ question, source_path, from_node_ids }] }`，回應 `{ to, from }`。只讀寫一次 `.qa_nodes.json`，全有或全無：目標不存在或原分類沒有該題回 404，目標分類已有其他來源的同名題或同批題目文字重複回 400，整批不寫入。目標已有相同題目與來源時保留該條目及位置，只移除指定的其他掛載。`from_node_ids` 為空時沿用單筆掛載的 QA 來源驗證，題目可沒有答案。搬移拿掉原分類掛載時不記進 `detached`。
 
 `GET /knowledge/qa/sync-status?project_id=` 回傳 `{"categories": {"<node_id>": "synced" | "updating" | "failed"}}`（`knowledge/qa_sync_status.py`），供後台顯示每個快速問答分類的搜尋索引同步狀態：
 

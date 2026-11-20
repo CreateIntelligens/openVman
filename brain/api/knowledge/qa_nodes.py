@@ -21,6 +21,7 @@ from knowledge.qa_category_depth import (
     is_language_label,
     language_label_code,
 )
+from knowledge.qa_node_sources import _build_entries_for_source, _parse_source_items
 from knowledge.workspace import ensure_workspace_scaffold, resolve_workspace_document
 
 logger = logging.getLogger(__name__)
@@ -512,16 +513,19 @@ def add_qa_entry_to_node(
         return node
 
 
+def _referenced_source_paths(nodes: dict[str, dict[str, Any]]) -> set[str]:
+    return {
+        entry["source_path"]
+        for node in nodes.values()
+        for entry in node.get("qa_entries", [])
+        if entry.get("source_path")
+    }
+
+
 def referenced_source_paths(project_id: str = "default") -> set[str]:
     """Return every document path referenced by any node's qa_entries."""
     with _lock:
-        data = _load_nodes_data(project_id)
-        return {
-            entry["source_path"]
-            for node in data["nodes"].values()
-            for entry in node.get("qa_entries", [])
-            if entry.get("source_path")
-        }
+        return _referenced_source_paths(_load_nodes_data(project_id)["nodes"])
 
 
 def is_source_referenced(source_path: str, project_id: str = "default") -> bool:
@@ -583,41 +587,6 @@ def add_qa_entries_to_node(
 
         _save_nodes_data(data, project_id)
         return node
-
-
-def _parse_source_items(source_path: str, project_id: str = "default") -> list[dict[str, Any]]:
-    from knowledge.qa_csv import normalize_qa_csv_rows, parse_qa_csv, parse_qa_markdown
-
-    doc_path = resolve_workspace_document(source_path, project_id)
-    if not doc_path.exists():
-        return []
-    # CSV 直接解析：轉成 Markdown 再切的話，答案裡的 ## 行和多行題目會變成別的題目。
-    if source_path.lower().endswith(".csv"):
-        csv_bytes = doc_path.read_bytes()
-        return parse_qa_csv(normalize_qa_csv_rows(csv_bytes) or csv_bytes)
-    return parse_qa_markdown(doc_path.read_text(encoding="utf-8-sig", errors="ignore"))
-
-
-def _build_entries_for_source(
-    source_path: str, project_id: str = "default"
-) -> list[dict[str, Any]]:
-    """Parse a QA markdown or CSV doc into node qa_entries (deduped by question)."""
-    from knowledge.qa_csv import UNTITLED_QUESTION, extract_image_id
-
-    # 同題重複時取最後一列，和合併檢視顯示、存檔改寫的那列相同；排序留在第一次出現的位置。
-    entries: dict[str, dict[str, Any]] = {}
-    for item in _parse_source_items(source_path, project_id):
-        question = item["q"].strip()
-        if not question or question == UNTITLED_QUESTION:
-            continue
-        image_id = extract_image_id(item.get("img") or "")
-        entries[question] = {
-            "question": question,
-            "source_path": source_path,
-            "hidden": bool(item.get("hidden", False)),
-            "image_id": image_id or None,
-        }
-    return list(entries.values())
 
 
 def _source_node_id(label: str) -> str:
@@ -787,7 +756,12 @@ def _delete_emptied_nodes(data: dict[str, Any], emptied: list[str]) -> None:
 
 
 def sync_entries_for_source(
-    source_path: str, project_id: str = "default", delete_emptied: bool = True,
+    source_path: str,
+    project_id: str = "default",
+    delete_emptied: bool = True,
+    *,
+    place_unmounted: bool = True,
+    keep_order: bool = False,
 ) -> int:
     """Bring referencing nodes in line with ``source_path``; returns how many were updated.
 
@@ -800,6 +774,8 @@ def sync_entries_for_source(
     its entries when the file itself is gone; an edit must not delete a category.
     ``delete_emptied=False`` keeps nodes even then: saving one node must not delete
     another because their shared file went missing.
+    ``place_unmounted=False`` updates existing mounts without creating new ones.
+    ``keep_order=True`` keeps each node's order even when one node owns the file.
     """
     doc_entries = _build_entries_for_source(source_path, project_id)
     file_exists = resolve_workspace_document(source_path, project_id).exists()
@@ -855,7 +831,7 @@ def sync_entries_for_source(
                 seen.add(question)
                 doc_entry = doc_by_question[question]
                 kept.append({**entry, "hidden": doc_entry["hidden"], "image_id": doc_entry["image_id"]})
-            if position == 0:
+            if position == 0 and place_unmounted:
                 for doc_entry in unmounted:
                     same_text = [e for e in node["qa_entries"] if e["question"] == doc_entry["question"]]
                     # 同節點不能有兩個同文字的條目：選單專用題接上文件，別的文件的同名題就不掛。
@@ -866,7 +842,7 @@ def sync_entries_for_source(
                         kept.append(same_text[0])
             # 只有一個節點用這份文件時，在文件頁調整的順序要反映到選單；分給多個節點時，
             # 每個節點各自排序，照檔案排會把別的節點拖過的順序打亂。新題放在最後。
-            if len(referencing) == 1:
+            if len(referencing) == 1 and not keep_order:
                 kept.sort(key=lambda entry: doc_position[entry["question"]])
             node["qa_entries"] = _refill_source_slots(node["qa_entries"], source_path, kept)
             if not node["qa_entries"]:
@@ -896,6 +872,9 @@ def rename_questions_in_nodes(
             for entry in node.get("qa_entries", []):
                 if entry.get("source_path") == source_path and entry.get("question") in renames:
                     entry["question"] = renames[entry["question"]]
+        detached = data.get("detached", {}).get(source_path)
+        if isinstance(detached, list):
+            data["detached"][source_path] = [renames.get(q, q) for q in detached]
         _save_nodes_data(data, project_id)
 
 

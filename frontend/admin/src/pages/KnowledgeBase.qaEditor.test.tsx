@@ -41,16 +41,24 @@ vi.mock("../context/AuthContext", () => ({
 interface ServerState {
   qaNodes: QaNode[];
   merged: Record<string, MergedQaItem[]>;
+  uncategorized: MergedQaItem[];
   documents: Array<Record<string, unknown>>;
   contents: Record<string, string>;
   mergedGets: string[];
   mergedPuts: Array<{ id: string; rows: MergedQaItem[]; baseVersion: string | null }>;
+  questionPuts: Array<Record<string, unknown>>;
+  questionMoves: Array<{
+    to_node_id: string;
+    items: Array<{ question: string; source_path: string; from_node_ids: string[] }>;
+  }>;
   entryWrites: Array<{ id: string; method: string; question: string; sourcePath: string }>;
   categoryWrites: Array<{ id: string; hidden: boolean }>;
   imageUploads: File[];
   nodeListGets: number;
+  questionListGets: number;
   failSave: boolean;
   saveRejection?: { status: number; detail: string };
+  failMove?: { status: number; detail: string };
   failTreeRefresh?: boolean;
   refuseDetach?: string;
 }
@@ -101,6 +109,7 @@ function allQuestions(): QaAllQuestions {
           url: item.url ?? "",
           language: item.source_file.endsWith("/b.csv") ? "en" : "zh",
           source: { kind: "file", path: item.source_file, label: item.source_file.split("/").pop()! },
+          content_hash: "hash-1",
           category_ids: [node.node_id],
           category_hidden: category.hidden,
           hidden_in_file: Boolean(item.hidden),
@@ -113,6 +122,25 @@ function allQuestions(): QaAllQuestions {
     }
   };
   visit(server.qaNodes);
+  for (const item of server.uncategorized) {
+    questions.push({
+      id: `${item.source_file}:${item.q}`,
+      question: item.q,
+      answer: item.a,
+      image: item.img ?? "",
+      image_kind: item.image_kind,
+      url: item.url ?? "",
+      language: "zh",
+      source: { kind: "file", path: item.source_file, label: item.source_file.split("/").pop()! },
+      content_hash: item.base_version ?? "hash-off",
+      category_ids: [],
+      category_hidden: false,
+      hidden_in_file: Boolean(item.hidden),
+      document_enabled: true,
+      no_answer: !item.a,
+      off_menu: "never",
+    });
+  }
   return { categories, questions };
 }
 
@@ -128,7 +156,78 @@ function route(url: string, init?: RequestInit): Response {
     const summary = server.documents.find((document) => document.path === path);
     return ok({ ...summary, content: server.contents[path] ?? "" });
   }
-  if (pathname.endsWith("/knowledge/qa/questions")) return ok(allQuestions());
+  if (pathname.endsWith("/knowledge/qa/questions") && method === "PUT") {
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>;
+    server.questionPuts.push(body);
+    if (server.saveRejection) return reject(server.saveRejection.status, server.saveRejection.detail);
+    if (server.failSave) {
+      return reject(409, "這份文件在你編輯時被改過了，請重新載入後再存檔");
+    }
+    if (!String(body.a ?? "").trim()) return reject(400, "答案不可空白，未做任何變更");
+    const target = server.uncategorized.find(
+      (item) => item.q === body.original_q && item.source_file === body.source_path,
+    ) ?? Object.values(server.merged).flat().find(
+      (item) => item.q === body.original_q && item.source_file === body.source_path,
+    );
+    if (!target) return reject(404, "這份文件裡沒有這個題目");
+    target.q = String(body.q ?? "");
+    target.original_q = target.q;
+    target.a = String(body.a ?? "");
+    target.img = String(body.img ?? "");
+    target.url = String(body.url ?? "");
+    target.hidden = Boolean(body.hidden);
+    target.base_version = "hash-2";
+    return ok({
+      question: {
+        q: target.q,
+        a: target.a,
+        img: target.img,
+        url: target.url,
+        hidden: target.hidden,
+      },
+      content_hash: "hash-2",
+    });
+  }
+  if (pathname.endsWith("/knowledge/qa/questions/move") && method === "POST") {
+    const body = JSON.parse(init?.body as string) as {
+      to_node_id: string;
+      items: Array<{ question: string; source_path: string; from_node_ids: string[] }>;
+    };
+    server.questionMoves.push({ to_node_id: body.to_node_id, items: body.items });
+    if (server.failMove) return reject(server.failMove.status, server.failMove.detail);
+    if (server.refuseDetach) return reject(503, "暫時無法取下題目");
+    for (const item of body.items) {
+      const copied = Object.values(server.merged).flat().find(
+        (row) => row.q === item.question && row.source_file === item.source_path,
+      ) ?? server.uncategorized.find(
+        (row) => row.q === item.question && row.source_file === item.source_path,
+      );
+      if (!copied) return reject(404, `「${item.question}」不在原本的分類裡，請重新整理`);
+      const existing = (server.merged[body.to_node_id] ?? []).find((row) => row.q === item.question);
+      if (existing && existing.source_file !== item.source_path) {
+        return reject(400, `「${item.question}」在目標分類已經有相同的題目`);
+      }
+      for (const fid of item.from_node_ids) {
+        if (fid === body.to_node_id) continue;
+        server.merged[fid] = (server.merged[fid] ?? []).filter(
+          (row) => row.q !== item.question || row.source_file !== item.source_path,
+        );
+      }
+      if (!item.from_node_ids.length) {
+        server.uncategorized = server.uncategorized.filter(
+          (row) => row.q !== item.question || row.source_file !== item.source_path,
+        );
+      }
+      if (!existing) {
+        server.merged[body.to_node_id] = [...(server.merged[body.to_node_id] ?? []), { ...copied }];
+      }
+    }
+    return ok({ to: { node_id: body.to_node_id }, from: [] });
+  }
+  if (pathname.endsWith("/knowledge/qa/questions")) {
+    server.questionListGets += 1;
+    return ok(allQuestions());
+  }
   if (pathname.endsWith("/knowledge/qa/images") && method === "POST") {
     server.imageUploads.push((init?.body as FormData).get("file") as File);
     return ok({ image_id: "new-image.png", image_kind: "qr" });
@@ -158,7 +257,18 @@ function route(url: string, init?: RequestInit): Response {
       if (server.failSave) {
         return new Response(JSON.stringify({ detail: "hidden-file.csv changed" }), { status: 409 });
       }
-      server.merged[id] = rows;
+      for (const row of rows) {
+        if (!row.source_file || !row.original_q || row.original_q === row.q) continue;
+        for (const [otherId, otherRows] of Object.entries(server.merged)) {
+          if (otherId === id) continue;
+          server.merged[otherId] = otherRows.map((item) =>
+            item.source_file === row.source_file && item.q === row.original_q
+              ? { ...item, q: row.q, original_q: row.q }
+              : item,
+          );
+        }
+      }
+      server.merged[id] = rows.map((row) => ({ ...row, original_q: row.q }));
       return ok({ status: "ok" });
     }
     server.mergedGets.push(id);
@@ -315,6 +425,7 @@ beforeEach(() => {
       a: makeRows(["甲一", "甲二", "甲三"], "knowledge/qa/a.csv"),
       b: makeRows(["乙一", "乙二"], "knowledge/qa/b.csv"),
     },
+    uncategorized: [],
     documents: [makeDocument("knowledge/guide.md"), makeDocument("knowledge/other.md")],
     contents: {
       "knowledge/guide.md": "# 指南內容",
@@ -322,10 +433,13 @@ beforeEach(() => {
     },
     mergedGets: [],
     mergedPuts: [],
+    questionPuts: [],
+    questionMoves: [],
     entryWrites: [],
     categoryWrites: [],
     imageUploads: [],
     nodeListGets: 0,
+    questionListGets: 0,
     failSave: false,
   };
   vi.spyOn(global, "fetch").mockImplementation(async (input, init) => route(String(input), init));
@@ -613,20 +727,50 @@ describe("題庫語言、分類及批次工具", () => {
     expect(server.merged.a.map((row) => row.hidden)).toEqual([expected, expected, false]);
   });
 
-  it("批次移動先掛到目標分類，再取下來源分類", async () => {
+  it("批次移動一次送出所選題目", async () => {
     await openPage();
     const actions = selectTwoQuestions();
     fireEvent.change(actions.getByLabelText("批次移動的目標分類"), { target: { value: "b" } });
     fireEvent.click(actions.getByRole("button", { name: "移動到分類" }));
     await screen.findByText("已移動 2 題。");
 
-    expect(server.entryWrites).toEqual([
-      { id: "b", method: "POST", question: "甲一", sourcePath: "knowledge/qa/a.csv" },
-      { id: "a", method: "DELETE", question: "甲一", sourcePath: "knowledge/qa/a.csv" },
-      { id: "b", method: "POST", question: "甲二", sourcePath: "knowledge/qa/a.csv" },
-      { id: "a", method: "DELETE", question: "甲二", sourcePath: "knowledge/qa/a.csv" },
+    expect(server.questionMoves).toEqual([
+      {
+        to_node_id: "b",
+        items: [
+          { question: "甲一", source_path: "knowledge/qa/a.csv", from_node_ids: ["a"] },
+          { question: "甲二", source_path: "knowledge/qa/a.csv", from_node_ids: ["a"] },
+        ],
+      },
     ]);
+    expect(server.entryWrites).toEqual([]);
     expect(server.merged.a.map((row) => row.q)).toEqual(["甲三"]);
+  });
+
+  it("批次移動五題只發一次請求，失敗時題庫表格的資料不變", async () => {
+    server.qaNodes[0] = makeNode("a", "分類甲", ["甲一", "甲二", "甲三", "甲四", "甲五"], "knowledge/qa/a.csv");
+    server.merged.a = makeRows(["甲一", "甲二", "甲三", "甲四", "甲五"], "knowledge/qa/a.csv");
+    await openPage();
+    for (const q of ["甲一", "甲二", "甲三", "甲四", "甲五"]) {
+      fireEvent.click(within(table()).getByRole("checkbox", { name: `勾選 ${q}` }));
+    }
+    const actions = within(screen.getByRole("group", { name: "題目批次操作" }));
+    expect(actions.getByText("已選 5 題")).toBeTruthy();
+
+    server.failMove = { status: 400, detail: "「甲三」在目標分類已經有相同的題目" };
+    fireEvent.change(actions.getByLabelText("批次移動的目標分類"), { target: { value: "b" } });
+    fireEvent.click(actions.getByRole("button", { name: "移動到分類" }));
+    await screen.findByText("「甲三」在目標分類已經有相同的題目");
+    expect(server.questionMoves).toHaveLength(1);
+    expect(server.questionMoves[0].items).toHaveLength(5);
+    expect(server.merged.a.map((row) => row.q)).toEqual(["甲一", "甲二", "甲三", "甲四", "甲五"]);
+
+    server.failMove = undefined;
+    fireEvent.click(actions.getByRole("button", { name: "移動到分類" }));
+    await screen.findByText("已移動 5 題。");
+    expect(server.questionMoves).toHaveLength(2);
+    expect(server.questionMoves[1].items).toHaveLength(5);
+    expect(server.merged.a).toEqual([]);
   });
 
   it("批次移動正在編輯的題目前詢問，取消不觸發 API", async () => {
@@ -735,6 +879,41 @@ describe("知識庫新版型審查回歸", () => {
     server.merged.child = makeRows(["子題"], "knowledge/qa/child.csv");
   };
 
+  it("改名後移入已掛載的目標分類，保留目標的題目位置", async () => {
+    mount("b");
+    server.merged.a[0].also_in = ["分類乙"];
+    server.merged.b.unshift(server.merged.b.pop()!);
+    fireEvent.change(await openQuestionA(), { target: { value: "改名的甲一" } });
+    fireEvent.change(within(editor()).getByLabelText("分類"), { target: { value: "b" } });
+
+    save();
+
+    await screen.findByText("已儲存題目。");
+    expect(server.merged.a.map(({ q }) => q)).toEqual(["甲二", "甲三"]);
+    expect(server.merged.b.map(({ q }) => q)).toEqual(["改名的甲一", "乙一", "乙二"]);
+    expect(server.questionMoves[0].items).toEqual([
+      { question: "改名的甲一", source_path: "knowledge/qa/a.csv", from_node_ids: ["a", "b"] },
+    ]);
+  });
+
+  it("從單一分類批次移動時保留已在目標分類的題目位置", async () => {
+    mount("b");
+    server.merged.b.unshift(server.merged.b.pop()!);
+    await openPage();
+    fireEvent.click(inTree("分類甲"));
+    pick("甲一");
+
+    moveTo(pick("甲二"), "b");
+
+    await screen.findByText("已移動 2 題。");
+    expect(server.merged.a.map(({ q }) => q)).toEqual(["甲三"]);
+    expect(server.merged.b.map(({ q }) => q)).toEqual(["甲一", "乙一", "乙二", "甲二"]);
+    expect(server.questionMoves[0].items).toEqual([
+      { question: "甲一", source_path: "knowledge/qa/a.csv", from_node_ids: ["a", "b"] },
+      { question: "甲二", source_path: "knowledge/qa/a.csv", from_node_ids: ["a"] },
+    ]);
+  });
+
   it("新增題目寫入面板選定的分類", async () => {
     await openPage();
     fireEvent.click(inTree("分類甲"));
@@ -841,15 +1020,16 @@ describe("知識庫新版型審查回歸", () => {
     expect(server.merged.b.some(({ q }) => q === "甲一")).toBe(true);
   });
 
-  it("批次移動分開回報完整移動與只有掛到目的地的題數", async () => {
+  it("批次移動失敗時整批不變並顯示錯誤", async () => {
     await openPage();
     pick("乙一");
     const actions = pick("甲一");
     server.refuseDetach = "a";
     moveTo(actions, "b");
-    await screen.findByText(/已加入目標分類但尚未完全移出原分類 1 題/);
+    await screen.findByRole("alert");
+    expect(server.questionMoves).toHaveLength(1);
     expect(server.merged.a.some(({ q }) => q === "甲一")).toBe(true);
-    expect(server.merged.b.some(({ q }) => q === "甲一")).toBe(true);
+    expect(server.merged.b.some(({ q }) => q === "甲一")).toBe(false);
   });
 
   it("圖片類型只顯示伺服器值，停用手動欄位且存檔不再寫入瀏覽器", async () => {
@@ -912,9 +1092,14 @@ describe("知識庫新版型審查回歸", () => {
       await setup();
       await chooseInDialog("移出原本所有分類");
       await screen.findByText("已移動 2 題。");
-      expect(server.entryWrites.map(({ id, method, question }) => [id, method, question])).toEqual([
-        ["c", "POST", "甲一"], ["a", "DELETE", "甲一"], ["b", "DELETE", "甲一"],
-        ["c", "POST", "乙二"], ["b", "DELETE", "乙二"],
+      expect(server.questionMoves).toEqual([
+        {
+          to_node_id: "c",
+          items: [
+            { question: "甲一", source_path: "knowledge/qa/a.csv", from_node_ids: ["a", "b"] },
+            { question: "乙二", source_path: "knowledge/qa/b.csv", from_node_ids: ["b"] },
+          ],
+        },
       ]);
     });
 
@@ -922,8 +1107,14 @@ describe("知識庫新版型審查回歸", () => {
       await setup();
       await chooseInDialog("只加入新分類（保留原本的）");
       await screen.findByText("已移動 1 題，已加入新分類並保留原本分類 1 題。");
-      expect(server.entryWrites.map(({ id, method, question }) => [id, method, question])).toEqual([
-        ["c", "POST", "甲一"], ["c", "POST", "乙二"], ["b", "DELETE", "乙二"],
+      expect(server.questionMoves).toEqual([
+        {
+          to_node_id: "c",
+          items: [
+            { question: "甲一", source_path: "knowledge/qa/a.csv", from_node_ids: [] },
+            { question: "乙二", source_path: "knowledge/qa/b.csv", from_node_ids: ["b"] },
+          ],
+        },
       ]);
       expect(server.merged.a.some(({ q }) => q === "甲一")).toBe(true);
       expect(server.merged.b.some(({ q }) => q === "甲一")).toBe(true);
@@ -932,7 +1123,7 @@ describe("知識庫新版型審查回歸", () => {
     it("取消不寫入任何資料", async () => {
       await setup();
       await chooseInDialog("取消");
-      expect(server.entryWrites).toEqual([]);
+      expect(server.questionMoves).toEqual([]);
       expect(server.mergedPuts).toEqual([]);
     });
 
@@ -943,7 +1134,7 @@ describe("知識庫新版型審查回歸", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "移出原本所有分類" }));
       await waitFor(() => expect(dialog.textContent).toContain("剛剛有變更"));
       expect(dialog.textContent).toContain("分類甲、分類乙、分類丁");
-      expect(server.entryWrites).toEqual([]);
+      expect(server.questionMoves).toEqual([]);
     });
   });
 
@@ -954,7 +1145,7 @@ describe("知識庫新版型審查回歸", () => {
       fireEvent.change(within(editor()).getByLabelText("答案"), { target: { value: "新的答案" } });
       fireEvent.change(within(editor()).getByLabelText("分類"), { target: { value: "b" } });
       save();
-      await within(editor()).findByText(/題目內容已儲存/);
+      await within(editor()).findByText(/題目內容已儲存，但移動分類未完成/);
       expect(server.mergedPuts).toHaveLength(1);
       server.refuseDetach = undefined;
       save();
@@ -966,12 +1157,154 @@ describe("知識庫新版型審查回歸", () => {
       await failMove(question);
       expect(screen.queryByText(/有人同時修改/)).toBeNull();
       expect(server.mergedPuts).toHaveLength(1);
-      expect(server.entryWrites.filter(({ method }) => method === "DELETE")).toEqual([
-        { id: "a", method: "DELETE", question, sourcePath: "knowledge/qa/a.csv" },
-        { id: "a", method: "DELETE", question, sourcePath: "knowledge/qa/a.csv" },
+      expect(server.questionMoves).toEqual([
+        {
+          to_node_id: "b",
+          items: [{ question, source_path: "knowledge/qa/a.csv", from_node_ids: ["a"] }],
+        },
+        {
+          to_node_id: "b",
+          items: [{ question, source_path: "knowledge/qa/a.csv", from_node_ids: ["a"] }],
+        },
       ]);
       expect(server.merged.a.some(({ q }) => q === question)).toBe(false);
       expect(server.merged.b.find(({ q }) => q === question)?.a).toBe("新的答案");
+    });
+  });
+
+  describe("未分類題目直接編輯與掛上分類", () => {
+    beforeEach(() => {
+      server.uncategorized = [
+        {
+          index: "1",
+          q: "未分類題目",
+          a: "原本的未分類答案",
+          img: "",
+          url: "",
+          source_file: "knowledge/qa/off.csv",
+          hidden: false,
+          original_q: "未分類題目",
+          base_version: "hash-off-1",
+        },
+      ];
+    });
+
+    it("未分類題目可編輯問題、答案、網址、顯示與圖片並直接存檔，保留開啟來源文件按鈕", async () => {
+      await openPage();
+      await editQuestion("未分類題目");
+      const panel = within(editor());
+      expect(panel.getByRole("button", { name: "開啟來源文件" })).toBeTruthy();
+      expect(panel.queryByRole("button", { name: "刪除這題" })).toBeNull();
+
+      fireEvent.change(panel.getByLabelText("問題"), { target: { value: "改過的未分類題目" } });
+      fireEvent.change(panel.getByLabelText("答案"), { target: { value: "改過的未分類答案" } });
+      fireEvent.change(panel.getByLabelText("網址"), { target: { value: "https://example.com/off" } });
+      fireEvent.click(panel.getByLabelText("前台顯示"));
+      const file = new File(["image"], "off.png", { type: "image/png" });
+      fireEvent.drop(panel.getByText("可把圖片拖到這裡"), { dataTransfer: { files: [file] } });
+      await panel.findByRole("img", { name: "題目的圖片" });
+
+      save();
+      await screen.findByText("已儲存題目。");
+
+      expect(server.questionPuts).toEqual([
+        {
+          project_id: "default",
+          source_path: "knowledge/qa/off.csv",
+          original_q: "未分類題目",
+          q: "改過的未分類題目",
+          a: "改過的未分類答案",
+          img: "new-image.png",
+          url: "https://example.com/off",
+          hidden: true,
+          base_hash: "hash-off-1",
+        },
+      ]);
+      expect(server.questionMoves).toEqual([]);
+      expect(rowButton("改過的未分類題目")).toBeTruthy();
+    });
+
+    it("未分類題目選了分類時先送內容再送移動，第二步失敗顯示部分成功訊息且重試只補移動", async () => {
+      await openPage();
+      await editQuestion("未分類題目");
+      const panel = within(editor());
+      fireEvent.change(panel.getByLabelText("問題"), { target: { value: "準備歸類的題目" } });
+      fireEvent.change(panel.getByLabelText("答案"), { target: { value: "準備歸類的答案" } });
+      fireEvent.change(panel.getByLabelText("分類"), { target: { value: "b" } });
+      server.failMove = { status: 503, detail: "暫時無法放進分類" };
+
+      save();
+      await panel.findByText(/題目內容已儲存，但放進分類未完成/);
+      expect(server.questionPuts).toHaveLength(1);
+      expect(server.questionMoves).toEqual([
+        {
+          to_node_id: "b",
+          items: [{ question: "準備歸類的題目", source_path: "knowledge/qa/off.csv", from_node_ids: [] }],
+        },
+      ]);
+
+      server.failMove = undefined;
+      save();
+      await screen.findByText("已儲存題目。");
+      expect(server.questionPuts).toHaveLength(1);
+      expect(server.questionMoves).toHaveLength(2);
+      expect(server.merged.b.some(({ q }) => q === "準備歸類的題目")).toBe(true);
+    });
+
+    it("未分類題目存檔遇 409 時顯示衝突訊息並重新載入清單", async () => {
+      await openPage();
+      await editQuestion("未分類題目");
+      const panel = within(editor());
+      fireEvent.change(panel.getByLabelText("答案"), { target: { value: "衝突的草稿" } });
+      server.failSave = true;
+      const beforeGets = server.questionListGets;
+
+      save();
+      await panel.findByText("有人同時修改了題目，請重新整理後再改。");
+      await waitFor(() => expect(server.questionListGets).toBeGreaterThan(beforeGets));
+    });
+
+    it("未分類題目沒有答案時，只選分類也能掛載", async () => {
+      server.uncategorized[0].a = "";
+      await openPage();
+      await editQuestion("未分類題目");
+      fireEvent.change(within(editor()).getByLabelText("分類"), { target: { value: "b" } });
+
+      save();
+
+      await screen.findByText("已儲存題目。");
+      expect(server.uncategorized).toEqual([]);
+      expect(server.merged.b.find(({ q }) => q === "未分類題目")?.a).toBe("");
+    });
+
+    it.each(["請指定來源文件", "SOUL.md 不是知識庫文件", "knowledge/notes.md 不是 QA 文件"])(
+      "單題儲存顯示來源驗證錯誤（%s）",
+      async (detail) => {
+        await openPage();
+        await editQuestion("未分類題目");
+        const panel = within(editor());
+        fireEvent.change(panel.getByLabelText("答案"), { target: { value: "新答案" } });
+        server.saveRejection = { status: 400, detail };
+
+        save();
+
+        expect((await panel.findByRole("alert")).textContent).toBe(detail);
+        expect(server.uncategorized[0].a).toBe("原本的未分類答案");
+      },
+    );
+
+    it("只選分類時顯示移動路由的來源錯誤", async () => {
+      await openPage();
+      await editQuestion("未分類題目");
+      const panel = within(editor());
+      fireEvent.change(panel.getByLabelText("分類"), { target: { value: "b" } });
+      const detail = "「未分類題目」沒有指定來源文件";
+      server.failMove = { status: 400, detail };
+
+      save();
+
+      expect((await panel.findByRole("alert")).textContent).toBe(detail);
+      expect(server.uncategorized[0].q).toBe("未分類題目");
     });
   });
 });

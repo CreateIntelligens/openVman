@@ -86,6 +86,10 @@ def test_each_row_carries_the_answer_link_image_and_source(menu: Path):
     assert rows["Parking?"]["image"] == "map.png"
     assert rows["Parking?"]["hidden_in_file"] is True
     assert rows["營業時間？"]["source"] == {"kind": "file", "path": "knowledge/qa/faq.csv", "label": "faq.csv"}
+    expected_hash = knowledge.workspace.content_hash((menu / "knowledge/qa/faq.csv").read_text(encoding="utf-8-sig"))
+    assert rows["營業時間？"]["content_hash"] == expected_hash
+    assert rows["沒掛上的題目"]["content_hash"] == expected_hash
+    assert "content_hash" not in rows["只在選單上的題目"]
 
 
 def test_languages_come_from_the_row_label_then_the_document(menu: Path):

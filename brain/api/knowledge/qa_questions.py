@@ -29,7 +29,7 @@ from knowledge.qa_nodes import (
     get_node_tree,
     referenced_source_paths,
 )
-from knowledge.workspace import resolve_workspace_document
+from knowledge.workspace import content_hash, resolve_workspace_document
 
 
 def question_key(text: str) -> str:
@@ -115,6 +115,16 @@ def _file_rows(source: str, project_id: str) -> list[dict[str, Any]]:
     return list(rows.values())
 
 
+def _source_content_hash(source: str, project_id: str) -> str | None:
+    try:
+        doc_path = resolve_workspace_document(source, project_id)
+        if not doc_path.is_file():
+            return None
+        return content_hash(doc_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return None
+
+
 def list_all_questions(
     project_id: str = "default", *, visible: Callable[[str], bool] | None = None,
 ) -> dict[str, Any]:
@@ -160,11 +170,13 @@ def list_all_questions(
         path for path in _qa_document_paths(project_id) if visible is None or visible(path)
     )
     languages = resolve_document_languages(sources, project_id) if sources else {}
+    hashes: dict[str, str | None] = {}
     questions: list[dict[str, Any]] = []
     listed: set[tuple[str, str]] = set()
     for source in sources:
         key_source = _source_key(source)
         manual = _is_manual(source)
+        file_hash = hashes.setdefault(source, _source_content_hash(source, project_id))
         for row in _file_rows(source, project_id):
             key = (key_source, question_key(row["question"]))
             listed.add(key)
@@ -184,6 +196,7 @@ def list_all_questions(
                     "path": source,
                     "label": "自己輸入" if manual else Path(source).name,
                 },
+                **({"content_hash": file_hash} if file_hash is not None else {}),
                 "category_ids": node_ids,
                 "category_hidden": category_hidden(node_ids),
                 "hidden_in_file": row["hidden_in_file"],

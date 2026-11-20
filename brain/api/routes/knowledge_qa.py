@@ -33,6 +33,7 @@ from knowledge.qa_csv import (
     qa_markdown_block,
     serialize_qa_csv,
 )
+from knowledge.qa_entry_moves import QaEntryMoveError, move_qa_entries
 from knowledge.qa_images import (
     ALLOWED_QA_IMAGE_SUFFIXES,
     QA_IMAGE_MEDIA_TYPES,
@@ -48,6 +49,7 @@ from knowledge.qa_merged import (
     normalized_qa_source,
     read_question,
     save_merged_rows,
+    save_question,
 )
 from knowledge.qa_nodes import (
     QA_CATEGORY_DEPTH_ERROR,
@@ -132,6 +134,30 @@ class AddEntryRequest(BaseModel):
     question: str
     source_path: str = ""
     hidden: bool = False
+
+
+class SaveQuestionRequest(BaseModel):
+    project_id: str = "default"
+    source_path: str
+    original_q: str
+    q: str
+    a: str
+    img: str | None = ""
+    url: str | None = ""
+    hidden: bool | None = False
+    base_hash: str | None = None
+
+
+class MoveQuestionItem(BaseModel):
+    question: str
+    source_path: str = ""
+    from_node_ids: list[str] = []
+
+
+class MoveQuestionsRequest(BaseModel):
+    project_id: str = "default"
+    to_node_id: str
+    items: list[MoveQuestionItem]
 
 
 def parse_qa_markdown_with_metadata(content: str) -> list[dict[str, Any]]:
@@ -255,6 +281,68 @@ def export_qa_route(
         media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": content_disposition_attachment(filename)},
     )
+
+
+@router.put("/questions")
+async def put_question_route(
+    payload: SaveQuestionRequest,
+    project_id: str | None = None,
+    vendor: VendorRequest = False,
+) -> dict[str, Any]:
+    """Directly edit one QA question's content in its source document without going through a category."""
+    pid = project_id if project_id is not None else payload.project_id
+
+    def _save() -> dict[str, Any]:
+        with qa_document_lock:
+            if vendor and payload.source_path.strip():
+                vendor_workspace_path(pid, payload.source_path, "knowledge")
+            try:
+                return save_question(
+                    payload.source_path,
+                    payload.original_q,
+                    payload.q,
+                    payload.a,
+                    pid,
+                    img=payload.img,
+                    url=payload.url,
+                    hidden=payload.hidden,
+                    base_hash=payload.base_hash,
+                )
+            except MergedSaveError as exc:
+                raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+    result = await asyncio.to_thread(_save)
+    schedule_reindex(pid)
+    return result
+
+
+@router.post("/questions/move")
+def move_questions_route(
+    payload: MoveQuestionsRequest,
+    project_id: str | None = None,
+    vendor: VendorRequest = False,
+) -> dict[str, Any]:
+    """Atomically move or mount a batch of QA questions into a target category."""
+    pid = project_id if project_id is not None else payload.project_id
+    with qa_document_lock:
+        if vendor:
+            for item in payload.items:
+                if item.source_path:
+                    vendor_workspace_path(pid, item.source_path, "knowledge")
+        try:
+            result = move_qa_entries(
+                payload.to_node_id,
+                [item.model_dump() for item in payload.items],
+                project_id=pid,
+            )
+        except QaEntryMoveError as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+    if vendor:
+        return {
+            "to": _vendor_node(result["to"], pid),
+            "from": [_vendor_node(node, pid) for node in result["from"]],
+        }
+    return result
 
 
 def _vendor_node(node: dict[str, Any], project_id: str) -> dict[str, Any]:

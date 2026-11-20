@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { fetchAllQuestions, type KnowledgeLanguage, type QaCategorySummary, type QaQuestionRow, type QaSyncState } from "../../../api/knowledge";
+import { fetchAllQuestions, moveQaQuestions, type KnowledgeLanguage, type MoveQaQuestionItem, type QaCategorySummary, type QaQuestionRow, type QaSyncState } from "../../../api/knowledge";
 import type { MergedQaItem, QaEntry } from "../../../hooks/useQaNodes";
 import { useNavigationGuard } from "../../../context/NavigationGuardContext";
 import ConfirmModal from "../../ConfirmModal";
@@ -12,7 +12,7 @@ import { categoryScopes, EMPTY_FILTERS, facetOptions, filterQuestions, languageK
 import { categoryLanguage } from "../qa/languageCategories";
 import QuestionEditor, { IMAGE_KIND_LABELS, type CategoryClosure, type CategoryOption } from "./QuestionEditor";
 import {
-  deleteQuestion, detachQuestion, moveQuestion, questionErrorMessage, reorderQuestions, saveQuestion, setQuestionVisibility,
+  deleteQuestion, detachQuestion, questionErrorMessage, reorderQuestions, saveQuestion, setQuestionVisibility,
   QuestionActionError, type QuestionApi, type QuestionDraft, type SavedQuestion,
 } from "./questionMutations";
 
@@ -54,7 +54,7 @@ const ALL_LANGUAGES_GRID = "md:grid-cols-[2.4rem_3.5rem_2.6rem_minmax(0,1.1fr)_m
 const CONTROL = "rounded-md px-1 py-0.5 text-content-muted hover:bg-surface-sunken hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40";
 
 type QuestionRemoval = { items: QaQuestionRow[]; category?: string; scopeChanged?: boolean };
-type BatchOutcome = Awaited<ReturnType<typeof moveQuestion>> | "added" | CategoryClosure | "未分類";
+type BatchOutcome = CategoryClosure | "未分類" | void;
 type MoveChoice = "keep" | "replace";
 // 全部分類畫面移動「同時放在好幾個分類」的題目，要先問保留還是移出原本的分類。
 type PendingMove = {
@@ -208,31 +208,20 @@ export default function QuestionBank({
   const batch = async (
     selection: QaQuestionRow[],
     label: string,
-    action: (row: QaQuestionRow) => Promise<BatchOutcome | void>,
+    action: (row: QaQuestionRow) => Promise<BatchOutcome>,
     onSucceeded?: (ids: string[]) => void,
   ) => {
     setBusy(true);
     setNotice(undefined);
     const succeeded: string[] = [];
-    const unchanged: string[] = [];
-    const added: string[] = [];
     const skipped = new Map<CategoryClosure | "未分類", number>();
-    let partial = 0;
     let failed = 0;
     let firstFailure = "";
     let saved = false;
     for (const row of selection) {
       try {
         const result = await action(row);
-        if (result === "partial") {
-          partial += 1;
-          saved = true;
-        } else if (result === "unchanged") {
-          unchanged.push(row.id);
-        } else if (result === "added") {
-          added.push(row.id);
-          saved = true;
-        } else if (result === "上層已關閉" || result === "分類已關閉" || result === "未分類") {
+        if (result === "上層已關閉" || result === "分類已關閉" || result === "未分類") {
           skipped.set(result, (skipped.get(result) ?? 0) + 1);
         } else {
           succeeded.push(row.id);
@@ -244,18 +233,15 @@ export default function QuestionBank({
         firstFailure ||= questionErrorMessage(failure, "請重新確認題目後再試。");
       }
     }
-    select([...succeeded, ...added, ...unchanged], false);
+    select(succeeded, false);
     onSucceeded?.(succeeded);
     await onRefresh(saved);
     const summary = [
       succeeded.length ? `${label} ${succeeded.length} 題` : "",
-      added.length ? `已加入新分類並保留原本分類 ${added.length} 題` : "",
-      partial ? `已加入目標分類但尚未完全移出原分類 ${partial} 題` : "",
-      unchanged.length ? `已有 ${unchanged.length} 題在目標分類` : "",
       ...[...skipped].map(([reason, count]) => `略過 ${count} 題（${reason}）`),
       failed ? `${failed} 題未完成` : "",
     ].filter(Boolean).join("，");
-    setNotice({ text: `${summary}。${firstFailure}`, error: Boolean(failed || partial) });
+    setNotice({ text: `${summary}。${firstFailure}`, error: Boolean(failed) });
     setBusy(false);
   };
 
@@ -281,8 +267,7 @@ export default function QuestionBank({
     setNotice(undefined);
     let saved = false;
     try {
-      if (row && !from) await moveQuestion(api, row, [], draft.category);
-      else await saveQuestion(api, row, from, draft, retry?.item ?? baseline);
+      await saveQuestion(api, row, from, draft, retry?.item ?? baseline, projectId);
       saved = true;
       savedPart.current = undefined;
       onCloseAfterChange();
@@ -340,17 +325,55 @@ export default function QuestionBank({
       return;
     }
     setPendingMove(null);
-    await batch(selection, "已移動", async (row): Promise<BatchOutcome> => {
-      const current = latest.get(row.id);
-      if (!current) throw new QuestionActionError("題目已變更，請重新選取要移動的題目。");
-      if (!category) {
-        if (choice !== "keep" || current.category_ids.length < 2) return moveQuestion(api, current, current.category_ids, target);
-        return await moveQuestion(api, current, [], target) === "moved" ? "added" : "unchanged";
+    const items: MoveQaQuestionItem[] = [];
+    const moved: string[] = [];
+    const added: string[] = [];
+    const unchanged: string[] = [];
+    try {
+      for (const row of selection) {
+        const current = latest.get(row.id);
+        if (!current) throw new QuestionActionError("題目已變更，請重新選取要移動的題目。");
+        let fromIds: string[];
+        let keepOriginal = false;
+        if (!category) {
+          keepOriginal = choice === "keep" && current.category_ids.length >= 2;
+          fromIds = keepOriginal ? [] : current.category_ids;
+        } else {
+          const from = categoryFor(current);
+          if (!from) throw new QuestionActionError("題目已不在這個分類，請重新選取要移動的題目。");
+          fromIds = [from];
+        }
+        const sources = fromIds.filter((id) => id !== target);
+        const alreadyAtTarget = current.category_ids.includes(target);
+        if (!sources.length && alreadyAtTarget) {
+          unchanged.push(row.id);
+          continue;
+        }
+        items.push({
+          question: current.question,
+          source_path: current.source.path,
+          from_node_ids: alreadyAtTarget && !fromIds.includes(target) ? [...fromIds, target] : fromIds,
+        });
+        if (keepOriginal) added.push(row.id);
+        else moved.push(row.id);
       }
-      const from = categoryFor(current);
-      if (!from) throw new QuestionActionError("題目已不在這個分類，請重新選取要移動的題目。");
-      return moveQuestion(api, current, [from], target);
-    });
+      if (items.length > 0) {
+        await moveQaQuestions(target, items, projectId);
+      }
+      select([...moved, ...added, ...unchanged], false);
+      await onRefresh(items.length > 0);
+      const summary = [
+        moved.length ? `已移動 ${moved.length} 題` : "",
+        added.length ? `已加入新分類並保留原本分類 ${added.length} 題` : "",
+        unchanged.length ? `已有 ${unchanged.length} 題在目標分類` : "",
+      ].filter(Boolean).join("，");
+      setNotice({ text: `${summary}。` });
+    } catch (failure) {
+      await onRefresh(false);
+      setNotice({ text: questionErrorMessage(failure, "請重新確認題目後再試。"), error: true });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const batchMove = () => changeQuestions(chosen, () => void startMove(chosen, moveTo));

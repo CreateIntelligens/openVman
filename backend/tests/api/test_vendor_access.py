@@ -228,6 +228,16 @@ def test_explicit_project_permissions_at_proxy_and_direct_routes(env, knowledge,
         ),
         ("POST", "personas", {"persona_id": "new-persona"}, knowledge),
         ("PUT", "knowledge/settings", {"reply_language": "zh"}, knowledge),
+        (
+            "PUT", "knowledge/qa/questions",
+            {"source_path": "knowledge/qa/a.csv", "original_q": "Q1", "q": "Q1", "a": "A1"},
+            knowledge,
+        ),
+        (
+            "POST", "knowledge/qa/questions/move",
+            {"to_node_id": "n1", "items": [{"question": "Q1", "source_path": "knowledge/qa/a.csv", "from_node_ids": []}]},
+            knowledge,
+        ),
         ("POST", "memories/maintain", {}, settings),
         ("PATCH", "tools/example", {}, settings),
         ("PATCH", "skills/sample/toggle?scope=project", {}, settings),
@@ -625,6 +635,28 @@ def test_vendor_assignment_enforced_by_grants_and_live_project_access(env):
         "/api/v1/knowledge/base/document", headers=new_headers,
         json={"project_id": _PROJECT, "path": "knowledge/public.md", "content": "public"},
     ).status_code == 200
+    assert env.client.put(
+        "/api/v1/knowledge/qa/questions", headers=new_headers,
+        json={
+            "project_id": _PROJECT,
+            "source_path": "knowledge/qa/public.csv",
+            "original_q": "Q1",
+            "q": "Q1-updated",
+            "a": "A1",
+        },
+    ).status_code == 200
+    assert env.received[-1].url.path == "/brain/knowledge/qa/questions"
+    assert env.received[-1].headers["X-OpenVMan-Vendor"] == "1"
+    assert env.client.post(
+        "/api/v1/knowledge/qa/questions/move", headers=new_headers,
+        json={
+            "project_id": _PROJECT,
+            "to_node_id": "n1",
+            "items": [{"question": "Q1-updated", "source_path": "knowledge/qa/public.csv", "from_node_ids": []}],
+        },
+    ).status_code == 200
+    assert env.received[-1].url.path == "/brain/knowledge/qa/questions/move"
+    assert env.received[-1].headers["X-OpenVMan-Vendor"] == "1"
     assert env.client.delete(
         "/api/v1/sessions/s1", headers=new_headers, params={"project_id": _PROJECT},
     ).status_code == 403
