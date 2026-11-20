@@ -24,6 +24,7 @@ from .models import (
     TemporaryCredentialRecord,
     UserRecord,
     has_admin_portal_access,
+    has_web_search_access,
     is_at_least_admin,
 )
 from .runtime import AuthRuntime, get_auth_runtime
@@ -32,6 +33,7 @@ from .tokens import InvalidSessionTokenError
 _SESSION_COOKIE_NAME = "openvman_session"
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 _INVALID_SESSION_DETAIL = "Invalid or expired session"
+WEB_SEARCH_HEADER = "X-OpenVMan-Web-Search"
 
 
 class AuthTransport(StrEnum):
@@ -48,6 +50,17 @@ class CurrentAccount:
     temporary_credential: TemporaryCredentialRecord | None = None
     embed_key: EmbedKeyRecord | None = None
     api_key: ApiKeyRecord | None = None
+
+
+def web_search_header_value(current: CurrentAccount | None) -> str:
+    if current is None:
+        return "0"
+    enabled = (
+        current.embed_key.web_search_access
+        if current.embed_key is not None
+        else has_web_search_access(current.user)
+    )
+    return "1" if enabled else "0"
 
 
 def _unauthorized() -> HTTPException:

@@ -49,7 +49,8 @@ def test_vendor_access_migration_preserves_legacy_write_and_read_grants(tmp_path
     with database.transaction(write=True) as connection:
         # Reconstruct the production v27 schema before seeding the migration run.
         for table, columns in (
-            ("users", ("account_management_access", "vendor_name")),
+            ("users", ("account_management_access", "vendor_name", "web_search_access")),
+            ("embed_keys", ("web_search_access",)),
             ("resources", ("vendor_name",)),
             ("resource_grants", ("edit_knowledge", "edit_settings", "project_writes_explicit")),
         ):
@@ -57,7 +58,7 @@ def test_vendor_access_migration_preserves_legacy_write_and_read_grants(tmp_path
             for column in columns:
                 if column in existing:
                     connection.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
-        connection.execute("DELETE FROM schema_migrations WHERE version = 28")
+        connection.execute("DELETE FROM schema_migrations WHERE version >= 28")
         assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 27
         before = [tuple(row) for row in connection.execute(legacy_query)]
 

@@ -17,7 +17,11 @@ from urllib.parse import urlparse, urlunparse
 
 import websockets
 
-from app.auth.dependencies import CurrentAccount
+from app.auth.dependencies import (
+    WEB_SEARCH_HEADER,
+    CurrentAccount,
+    web_search_header_value,
+)
 from app.auth.policy import is_vendor_account
 from app.auth.vendor_access import VENDOR_HEADER
 from app.config import TTSRouterConfig, get_tts_config
@@ -86,11 +90,15 @@ class BrainLiveRelay:
                 self.config.resolved_brain_chat_url,
                 self.session.session_id,
             )
-            caller = usage_scope_for(self.session.metadata.get("_current_account"))
+            current = self.session.metadata.get("_current_account")
+            caller = usage_scope_for(current)
             self._ws = await self._websocket_factory(
                 url,
                 additional_headers={
                     INTERNAL_TOKEN_HEADER: self.config.gateway_internal_token,
+                    WEB_SEARCH_HEADER: web_search_header_value(
+                        current if isinstance(current, CurrentAccount) else None
+                    ),
                     "X-OpenVMan-User-ID": str(
                         self.session.metadata.get("user_id", "")
                     ),

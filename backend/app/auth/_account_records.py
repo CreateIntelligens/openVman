@@ -53,6 +53,7 @@ def _user_from_row(row: sqlite3.Row) -> UserRecord:
         last_login_at=row["last_login_at"],
         vendor_name=row["vendor_name"],
         account_management_access=bool(row["account_management_access"]),
+        web_search_access=bool(row["web_search_access"]),
     )
 
 

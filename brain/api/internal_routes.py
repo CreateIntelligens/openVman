@@ -21,8 +21,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from knowledge.kb_settings import memory_enabled
 from protocol.schemas import InternalAsrJudgeRequest, InternalEnrichRequest
-from safety.internal_auth import INTERNAL_TOKEN_HEADER, require_internal_token
+from safety.internal_auth import (
+    INTERNAL_TOKEN_HEADER,
+    WEB_SEARCH_HEADER,
+    require_internal_token,
+    trusted_web_search_allowed,
+)
 from safety.vendor_access import VENDOR_HEADER, vendor_live_event
+from tools.context import enabled_web_tools
 
 logger = logging.getLogger("brain.internal_routes")
 
@@ -120,12 +126,14 @@ def _build_live_session(
     principal_type: str = "",
     principal_id: str = "",
     vendor: bool = False,
+    web_search_allowed: bool | None = None,
     event_sink,
 ):
     from live.gemini_live import GeminiLiveSession
 
     system_instruction = _build_live_system_instruction(
-        persona_id, project_id, session_id, vendor=vendor,
+        persona_id, project_id, session_id,
+        vendor=vendor, web_search_allowed=web_search_allowed,
     )
     system_instruction(memory_enabled(project_id))
     return GeminiLiveSession(
@@ -139,17 +147,21 @@ def _build_live_session(
         principal_type=principal_type,
         principal_id=principal_id,
         vendor=vendor,
+        web_search_allowed=web_search_allowed,
         system_instruction=system_instruction,
         event_sink=event_sink,
     )
 
 
 def _build_live_system_instruction(
-    persona_id: str, project_id: str, session_id: str = "", *, vendor: bool = False,
+    persona_id: str, project_id: str, session_id: str = "", *,
+    vendor: bool = False, web_search_allowed: bool | None = None,
 ) -> Callable[[bool], str]:
+    from config import get_settings
     from core.prompt_templates import (
         primary_language_line,
         supported_languages_line,
+        web_tool_usage,
     )
     from knowledge.workspace import (
         guardrails_block,
@@ -177,11 +189,6 @@ def _build_live_system_instruction(
         "1. 任何事實性問題（地點、規格、流程、人員、時段、價格、產品、政策、機構資訊等），"
         "**先呼叫 search_knowledge 再回答**；不要先反問使用者「能否提供更多資訊」。\n"
     )
-    other_tools = (
-        "3. 多主題請拆成 queries 陣列一次送出。\n"
-        "4. 即時或公開網路資訊（包含新聞、天氣）先呼叫 search_web；需要完整內容時再呼叫 read_web_page。\n"
-        "5. 長篇報告或使用者要求分享時可呼叫 publish_wiki，最後只回傳工具提供的 shareUrl。\n"
-    ) if not vendor else "多主題請拆成 queries 陣列一次送出。\n"
     rules_end = (
         "6. 工具有命中時以工具結果為準；多次查詢仍無命中時才如實說「資料中沒有提到」。\n"
         "7. 絕對不要透露答案的資訊來源。禁止任何來源標記語，例如「根據知識庫」、"
@@ -210,6 +217,18 @@ def _build_live_system_instruction(
     # 保護規則每次組 setup 都重新讀，連線中改了規則，下一次重連就生效。
     def render(include_memory: bool) -> str:
         memory_block, memory_rule = memory_part(include_memory)
+        config = get_settings()
+        other_tools = ("" if vendor else "3. ") + "多主題請拆成 queries 陣列一次送出。\n"
+        if config.live_gemini_tools_enabled:
+            web_usage = web_tool_usage(enabled_web_tools(
+                config, allowed=web_search_allowed, vendor=vendor,
+            ))
+            if web_usage:
+                other_tools += ("" if vendor else "4. ") + web_usage
+        if not vendor:
+            other_tools += (
+                "5. 長篇報告或使用者要求分享時可呼叫 publish_wiki，最後只回傳工具提供的 shareUrl。\n"
+            )
         # 人設、歷史與記憶裡的同名標籤先拿掉，只有真的保護規則用 <guardrails> 包起來。
         context = [strip_guardrails_markers(block) for block in (*blocks,)]
         context.append(guardrails_block(read_guardrails(project_id)))
@@ -425,6 +444,7 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
             "principal_type": websocket.headers.get("X-Principal-Type", ""),
             "principal_id": websocket.headers.get("X-Principal-Id", ""),
             "vendor": vendor,
+            "web_search_allowed": trusted_web_search_allowed(websocket.headers.get(WEB_SEARCH_HEADER)),
         },
         "session_id": relay_session_id,
         "client_disconnected": False,

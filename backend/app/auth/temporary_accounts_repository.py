@@ -127,6 +127,7 @@ class TemporaryAccountRepository:
         admin_portal_access: bool = False,
         kiosk: bool = False,
         ai_cleanup_access: bool = False,
+        web_search_access: bool = False,
     ) -> TemporaryBatch:
         if len(credentials) != 5:
             raise ValueError("a temporary batch must contain exactly five credentials")
@@ -193,9 +194,10 @@ class TemporaryAccountRepository:
                             id, username, username_normalized, password_hash,
                             role, account_type, disabled, token_version,
                             created_at, updated_at, created_by,
-                            admin_portal_access, kiosk, ai_cleanup_access
+                            admin_portal_access, kiosk, ai_cleanup_access,
+                            web_search_access
                         ) VALUES (
-                            ?, ?, ?, ?, 'user', 'temporary', 0, 0, ?, ?, ?, ?, ?, ?
+                            ?, ?, ?, ?, 'user', 'temporary', 0, 0, ?, ?, ?, ?, ?, ?, ?
                         )
                         """,
                         (
@@ -209,6 +211,7 @@ class TemporaryAccountRepository:
                             int(admin_portal_access),
                             int(kiosk),
                             int(ai_cleanup_access),
+                            int(web_search_access),
                         ),
                     )
                     connection.execute(
@@ -247,6 +250,7 @@ class TemporaryAccountRepository:
                         "batch_id": batch_id,
                         "kiosk": kiosk,
                         "ai_cleanup_access": ai_cleanup_access,
+                        "web_search_access": web_search_access,
                     },
                     now=now,
                 )

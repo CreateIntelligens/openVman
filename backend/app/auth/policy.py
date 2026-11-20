@@ -38,6 +38,12 @@ def can_manage_vendor_accounts(actor: UserRecord) -> bool:
     )
 
 
+def ensure_can_grant_account_management(actor: UserRecord) -> None:
+    ensure_account_manager(actor)
+    if actor.role is not AccountRole.ROOT:
+        raise AccountPolicyError("only ROOT can grant account management access")
+
+
 def ensure_can_manage_account(
     actor: UserRecord,
     target: UserRecord,

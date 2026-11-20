@@ -275,7 +275,7 @@ Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉
 | `knowledge_searched` | 本輪有沒有呼叫 `search_knowledge`（不論結果） |
 | `no_answer` | `knowledge_searched` 為 true 且沒有任何知識庫引用 |
 
-有引用不代表模型真的照著回答，`qa`／`knowledge` 只表示知識庫有命中。專案開了網路搜尋時，知識庫沒命中但網路有結果的回答也是 `no_answer: true`。檢索門檻刻意放寬（相似度 0.68，接住錯字與跨語言），沾邊卻沒有答案的問題也會帶回段落（2026-10-14 醫院專案問「火星上有幾座醫院？」最高相似度 0.70）；相似度切不乾淨（相關最低 0.711、無關最高 0.719），所以有引用時再以決策鏈問一題 noul「回覆是不是在說查不到」（purpose `no_answer`，`NO_ANSWER_JUDGE_TIMEOUT_SECONDS` 預設 0.8 秒，`NO_ANSWER_JUDGE_ENABLED` 可關），機率 ≥ 0.5 即 `no_answer: true`；逾時或失敗只看引用。10 句真實回覆實測全對、每句約 0.12 秒。
+有引用不代表模型真的照著回答，`qa`／`knowledge` 只表示知識庫有命中。對話可使用網路搜尋時，知識庫沒命中但網路有結果的回答也是 `no_answer: true`。檢索門檻刻意放寬（相似度 0.68，接住錯字與跨語言），沾邊卻沒有答案的問題也會帶回段落（2026-10-14 醫院專案問「火星上有幾座醫院？」最高相似度 0.70）；相似度切不乾淨（相關最低 0.711、無關最高 0.719），所以有引用時再以決策鏈問一題 noul「回覆是不是在說查不到」（purpose `no_answer`，`NO_ANSWER_JUDGE_TIMEOUT_SECONDS` 預設 0.8 秒，`NO_ANSWER_JUDGE_ENABLED` 可關），機率 ≥ 0.5 即 `no_answer: true`；逾時或失敗只看引用。10 句真實回覆實測全對、每句約 0.12 秒。
 
 ## 工具
 
@@ -288,14 +288,14 @@ Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉
 | `filter_products` | 依產品規格表篩選、排序產品 | 專案至少有一份 `knowledge/products/<商品線>/_catalog.yaml` 才提供 |
 | `search_memory` | 檢索 `memories` 表 | |
 | `save_memory` | 寫入長期記憶 | 僅在使用者本輪明確要求記住時執行 |
-| `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | `URL2MD_SEARCH_ENABLED`；`fast` 模式不提供 |
-| `read_web_page` | 透過 2md 將網頁、PDF 等轉成 Markdown，參數 `urls` 一次帶多個 | `URL2MD_READ_ENABLED`；`fast` 模式不提供 |
+| `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | 全站 `URL2MD_SEARCH_ENABLED` 與呼叫者皆允許，且回覆模式支援網路工具 |
+| `read_web_page` | 透過 2md 將網頁、PDF 等轉成 Markdown，參數 `urls` 一次帶多個 | 全站 `URL2MD_READ_ENABLED` 與呼叫者皆允許，且回覆模式支援網路工具 |
 | `publish_wiki` | 發布長篇報告到 David888 Wiki，只回傳公開 `shareUrl` | `WIKI_PUBLISH_ENABLED` |
 | `graph_query`、`graph_explain`、`graph_status` | 查詢專案知識圖譜；未建圖時提示使用者到後台重建 | |
 | `request_action` | 向使用者提議動作卡片（`rebuild_graph` 需確認、`open_graph_view` 切換頁面），工具本身不執行 | |
 | `query_faq`、`query_order` | 示範用工具，讀 `tools/mock_data.py` 的假資料 | |
 
-停用的網路與 Wiki 工具不會註冊給 HTTP Chat，也不會宣告給 Gemini Live。修改開關後需重啟 Brain。天氣等即時資訊走 `search_web`，沒有另設 API。
+全站停用的網路與 Wiki 工具不會註冊給 HTTP Chat 或宣告給 Gemini Live。修改全站開關後需重啟 Brain。天氣等即時資訊走 `search_web`。
 
 技能（skills）放在 `brain/skills/<id>/`（共用）或 `brain/data/projects/<project_id>/skills/<id>/`（專案），各含 `skill.yaml` 與 `main.py`，工具動態註冊。技能 ID 只收英文字母、數字與底線且不能以數字開頭（會變成目錄與函式名稱）；技能檔案 API 不能上傳或替換 `main.py`，正式環境的技能原始碼應唯讀並經 code review。共用技能在後台唯讀，內容改 repo 再部署；經 Backend 只有最高管理員（ROOT）能啟用／停用共用技能，改檔案、刪除、建立一律拒絕。專案技能需要該專案的編輯權。內建技能有 `graphify`、`weather`、`joke` 與 `a2a`；`a2a` 經 Backend internal facade 呼叫，Backend 的 `A2A_ENABLED` 預設關閉，正式環境未啟用。
 
@@ -325,6 +325,8 @@ Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉
 工具說明會帶入該專案的欄位與單位；有規格表的專案，系統提示另有一條規則，要求選型、比較、極值類問題在第一輪同時呼叫 `filter_products` 與 `search_knowledge`（伺服器已先查好知識庫時只叫 `filter_products`，見「Agent loop」），並以 `matches` 為準列產品，所以 `fast` 模式（不准追加工具）也用得到。規則同時寫明規格表只收錄 `title` 所列的範圍，問題不限這些產品時，範圍外的款式依檢索片段補列；規格表沒收齊全部產品時，`title` 要寫清楚涵蓋哪些系列。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
 
 ### 網路工具（2md）
+
+Backend 對一般及串流對話、Gemini Live 傳入可信 `X-OpenVMan-Web-Search` 標頭，使用登入帳號、帳號 API 金鑰所屬帳號或網站嵌入金鑰的 `web_search_access` 設定。`0` 表示關閉，Brain 會從提示與工具宣告排除 `search_web`、`read_web_page`，並跳過預取、拒絕工具執行。`1` 允許使用全站已開啟的網路工具。A2A、排程等未帶標頭的內部呼叫沿用全站工具開關。帳號與金鑰的設定方式見 [帳號管理手冊](../docs/operations/account-administration.md#網路搜尋)。
 
 - 端點順序定義在 `core/two_md_defaults.TWO_MD_BASE_URLS`；以下以匿名示例域名表示，部署時請核對實際設定：`https://web-primary.example.com` → `https://web-fallback.example.com` → `https://web-tertiary.example.com`。`URL2MD_BASE_URLS` 可整份覆寫；未設定時才讀舊的 `URL2MD_PRIMARY_URL`、`URL2MD_FALLBACK_URLS`。
 - 同一個請求依序嘗試端點，不平行呼叫；整條鏈共用 `URL2MD_TOTAL_BUDGET_S`。只有網路錯誤、逾時與 HTTP 408／425／429／5xx 才換下一台，其他 4xx 立即結束；重試間隔為 full-jitter。
@@ -447,7 +449,7 @@ HTTP `POST /chat` 接受 boolean `decision_debug`（預設 false），只有 tru
 
 ## Gemini Live
 
-Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 Gemini Live 會話。`live/gemini_live.py` 協調會話、重連、每輪語言、持久化與用量；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選）。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
+Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 Gemini Live 會話。`live/gemini_live.py` 協調會話、重連、每輪語言、持久化與用量；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`，依工具開關與連線所屬的帳號或金鑰權限篩選。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
 
 ## HTTP 介面
 

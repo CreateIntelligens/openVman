@@ -187,12 +187,14 @@ def build_turn_questions(
     tone_enabled: bool = True,
     previous_picture_enabled: bool = False,
     include_memory: bool = True,
+    include_web: bool = True,
 ) -> dict[str, dict[str, Any]]:
     questions: dict[str, dict[str, Any]] = {}
     if retrieval_enabled:
         questions.update(
             (name, question) for name, question in _RETRIEVAL_QUESTIONS.items()
-            if include_memory or name != "needs_memory"
+            if (include_memory or name != "needs_memory")
+            and (include_web or name != "needs_web")
         )
     if language_enabled:
         # 只問規則判斷不了的「明確指定回答語言」。輸入語言（主要語言、是否混用）原本每種
@@ -293,9 +295,10 @@ def resolve_turn_policy(
     config: TurnDecisionConfig,
     preferred_language: str = "",
     include_memory: bool = True,
+    include_web: bool = True,
 ) -> TurnPolicy:
     needs_knowledge = _noul_signal("needs_knowledge", answers, config)
-    needs_web = _noul_signal("needs_web", answers, config)
+    needs_web = _noul_signal("needs_web", answers, config) if include_web else None
     needs_memory = _noul_signal("needs_memory", answers, config) if include_memory else None
     requested = _choice_signal(
         "requested_response_language",
@@ -377,6 +380,7 @@ def run_turn_decision(
         return decision
 
     include_memory = memory_enabled(project_id)
+    include_web = "search_web" in available_tools
     baseline = _baseline_policy(user_text, project_language, speech_language, preferred_language)
     if not include_memory:
         baseline = replace(baseline, auto_recall=False)
@@ -387,7 +391,9 @@ def run_turn_decision(
         # 這一題只有對話真的顯示過圖才問：Clef 的耗時跟 tokens 成正比，沒有圖可再看時白花約 50 tokens。
         "previous_picture_enabled": config.previous_picture_enabled and _has_shown_picture(history),
     }
-    questions = build_turn_questions(**groups, include_memory=include_memory)
+    questions = build_turn_questions(
+        **groups, include_memory=include_memory, include_web=include_web,
+    )
     if not config.enabled or not questions:
         return record(TurnDecision(turn_id=turn_id, policy=baseline, source="baseline"))
     evidence = build_turn_evidence(
@@ -418,6 +424,7 @@ def run_turn_decision(
             config=config,
             preferred_language=preferred_language,
             include_memory=include_memory,
+            include_web=include_web,
         )
     except DecisionProviderCancelled:
         raise

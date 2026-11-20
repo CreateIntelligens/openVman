@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   createAccount,
   deleteAccount,
+  listAccountPresets,
   listAccounts,
   revokeAccountSessions,
   setAccountDisabled,
@@ -10,6 +11,7 @@ import {
   setAccountVendor,
   updateAdminScope,
   type Account,
+  type AccountPreset,
   type AdminScopeResources,
   type AssignableAccountRole,
 } from "../api/auth";
@@ -20,6 +22,7 @@ import AccountAccessFields, {
 import AccountPasswordResetDialog from "../components/accounts/AccountPasswordResetDialog";
 import AccountRoleDialog from "../components/accounts/AccountRoleDialog";
 import ActionMenu from "../components/ActionMenu";
+import { groupAccessOptions } from "../components/accounts/accountAccessGroups";
 import {
   formatFullTime,
   formatRelative,
@@ -28,6 +31,7 @@ import {
 import AdminScopeFields, { EMPTY_SCOPE_RESOURCES } from "../components/accounts/AdminScopeFields";
 import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
+import GroupedChecklist from "../components/accounts/GroupedChecklist";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import SegmentedControl from "../components/SegmentedControl";
 import VendorNameDialog from "../components/VendorNameDialog";
@@ -88,6 +92,10 @@ export default function Accounts() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [presets, setPresets] = useState<AccountPreset[]>([]);
+  const [presetKey, setPresetKey] = useState("");
+  const [presetError, setPresetError] = useState<string | null>(null);
+  const [projectIds, setProjectIds] = useState<string[]>([]);
   const [vendorName, setVendorName] = useState("");
   const [role, setRole] = useState<AssignableAccountRole>("user");
   const [view, setView] = useAdminSubView("Access", "accounts", ACCOUNT_VIEWS);
@@ -121,16 +129,41 @@ export default function Accounts() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const vendorManager = canManageVendorAccounts(currentAccount);
-  const canCreateVendor = vendorManager && role === "user";
-  const newVendorName = canCreateVendor ? vendorName.trim() : "";
+  const preset = vendorManager ? presets.find(({ key }) => key === presetKey) : undefined;
+  const canCreateVendor = vendorManager && !preset && role === "user";
+  const needsVendor = preset?.requires_vendor_name ?? false;
+  const newVendorName = canCreateVendor || needsVendor ? vendorName.trim() : "";
   const accessForm = useAccountAccessForm("formal-account-create", undefined, true, newVendorName);
+  const projectOptions = accessForm.options?.projects ?? [];
+  const selectedProjectIds = projectIds.filter((id) => projectOptions.some((project) => project.id === id));
+  const presetReady = !(preset?.key === "rd" && !isRoot)
+    && (!preset?.requires_projects || !accessForm.loading)
+    && (!needsVendor || Boolean(newVendorName && selectedProjectIds.length));
+
+  function updatePresetProjects(ids: string[], selected: boolean) {
+    setProjectIds((current) => selected
+      ? [...new Set([...current, ...ids])]
+      : current.filter((id) => !ids.includes(id)));
+  }
+
+  useEffect(() => {
+    if (!vendorManager) return;
+    let active = true;
+    setPresetError(null);
+    void listAccountPresets().then((items) => {
+      if (active) setPresets(items);
+    }).catch((reason) => {
+      if (active) setPresetError(errorMessage(reason, "無法載入權限組合"));
+    });
+    return () => { active = false; };
+  }, [vendorManager]);
   // 建立管理員時一起設資源上限，不必建完再從更多選單找。
   const [newAdminScoped, setNewAdminScoped] = useState(false);
   const [newAdminScope, setNewAdminScope] = useState<AdminScopeResources>(EMPTY_SCOPE_RESOURCES);
   // 受限 admin 開出來的 admin 不能不設限（後端沒有上限列就是看得到全部）：
   // 切到管理員角色時先勾上並預選建立者自己看得到的全部，再讓他往下縮。
   useEffect(() => {
-    if (role !== "admin" || isRoot || !accessForm.options) return;
+    if (preset || role !== "admin" || isRoot || !accessForm.options) return;
     const visible = accessForm.options;
     setNewAdminScoped(true);
     setNewAdminScope({
@@ -141,7 +174,7 @@ export default function Accounts() {
       avatar_backgrounds: (visible.avatar_backgrounds ?? []).map((option) => option.id),
       asr_engines: (visible.asr_engines ?? []).map((option) => option.id),
     });
-  }, [role, isRoot, accessForm.options]);
+  }, [preset, role, isRoot, accessForm.options]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -167,8 +200,8 @@ export default function Accounts() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!username.trim() || !password) return;
-    if (role === "user" && !accessForm.complete) {
+    if (!username.trim() || !password || submitting || (preset && !presetReady)) return;
+    if (!preset && role === "user" && !accessForm.complete) {
       setError("一般使用者必須先選好各類資源授權與登入後預設值。");
       return;
     }
@@ -176,18 +209,28 @@ export default function Accounts() {
     setError(null);
     try {
       const createdUsername = username.trim();
-      const created = await createAccount({
+      const credentials = {
         username: createdUsername,
         password,
+      };
+      const customAccess = role === "user"
+        ? withProjectPermissions(accessForm.access, newVendorName)
+        : accessForm.access;
+      const access = accessForm.complete ? customAccess : customAccess.web_search_access
+        ? { web_search_access: true }
+        : undefined;
+      const created = await createAccount(preset ? {
+        ...credentials,
+        preset: preset.key,
+        project_ids: preset.requires_projects ? selectedProjectIds : [],
+        ...(needsVendor && { vendor_name: newVendorName }),
+      } : {
+        ...credentials,
         role,
         ...(newVendorName && { vendor_name: newVendorName }),
-        ...(accessForm.complete ? {
-          access: role === "user"
-            ? withProjectPermissions(accessForm.access, newVendorName)
-            : accessForm.access,
-        } : {}),
+        ...(access && { access }),
       });
-      if (role === "admin" && newAdminScoped) {
+      if (!preset && role === "admin" && newAdminScoped) {
         // 帳號已經建好；上限寫失敗要講清楚，不能讓人以為沒建成功。
         try {
           await updateAdminScope(created.id, { scoped: true, resources: newAdminScope });
@@ -198,6 +241,8 @@ export default function Accounts() {
       setUsername("");
       setPassword("");
       setVendorName("");
+      setPresetKey("");
+      setProjectIds([]);
       setRole("user");
       setNewAdminScoped(false);
       setNewAdminScope(EMPTY_SCOPE_RESOURCES);
@@ -313,6 +358,36 @@ export default function Accounts() {
                 </header>
                 <form onSubmit={handleCreate}>
                   <div className="grid gap-4 px-5 py-5 md:grid-cols-[1fr_1fr_0.75fr]">
+                    <div className="min-w-0 md:col-span-full">
+                      <label className="text-sm font-medium" htmlFor="new-account-preset">權限組合</label>
+                      <select
+                        id="new-account-preset"
+                        className="input mt-2"
+                        aria-describedby={preset ? "new-account-preset-description" : undefined}
+                        value={preset?.key ?? ""}
+                        onChange={(event) => {
+                          setPresetKey(event.target.value);
+                          setVendorName("");
+                          setProjectIds([]);
+                        }}
+                        disabled={submitting || !vendorManager}
+                      >
+                        <option value="">自訂</option>
+                        {vendorManager && presets.map(({ key, label }) => (
+                          <option key={key} value={key} disabled={key === "rd" && !isRoot}>
+                            {label}{key === "rd" && !isRoot ? "（限最高管理員）" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {preset && (
+                        <p id="new-account-preset-description" className="mt-2 text-sm text-content-muted">
+                          {preset.description}
+                        </p>
+                      )}
+                      {vendorManager && presetError && (
+                        <p className="mt-2 text-sm text-danger" role="alert">{presetError}</p>
+                      )}
+                    </div>
                     <label className="text-sm font-medium">
                       帳號
                       <input
@@ -338,36 +413,66 @@ export default function Accounts() {
                         required
                       />
                     </label>
-                    <label className="text-sm font-medium">
-                      角色
-                      <select
-                        className="input mt-2"
-                        value={role}
-                        onChange={(event) => setRole(
-                          event.target.value as AssignableAccountRole,
-                        )}
-                        disabled={submitting}
-                      >
-                        <option value="user">一般使用者</option>
-                        <option value="admin">管理員</option>
-                      </select>
-                    </label>
-                    {canCreateVendor && (
+                    {!preset && (
                       <label className="text-sm font-medium">
-                        所屬廠商
+                        角色
+                        <select
+                          className="input mt-2"
+                          value={role}
+                          onChange={(event) => setRole(
+                            event.target.value as AssignableAccountRole,
+                          )}
+                          disabled={submitting}
+                        >
+                          <option value="user">一般使用者</option>
+                          <option value="admin">管理員</option>
+                        </select>
+                      </label>
+                    )}
+                    {(canCreateVendor || needsVendor) && (
+                      <label className="text-sm font-medium">
+                        {needsVendor ? "廠商名稱" : "所屬廠商"}
                         <input
                           className="input mt-2"
                           value={vendorName}
-                          onChange={(event) => setVendorName(event.target.value)}
+                          onChange={(event) => {
+                            setVendorName(event.target.value);
+                            if (event.target.value.trim() !== newVendorName) setProjectIds([]);
+                          }}
                           maxLength={120}
                           disabled={submitting}
+                          required={needsVendor}
                         />
-                        <span className="mt-1 block text-xs text-content-muted">留白代表內部帳號。填寫後只可選同廠商的專案。</span>
+                        <span className="mt-1 block text-xs text-content-muted">
+                          {needsVendor ? "必填。填寫後可選同廠商的專案。" : "留白代表內部帳號。填寫後只可選同廠商的專案。"}
+                        </span>
                       </label>
                     )}
                   </div>
 
-                  {role === "user" ? (
+                  {preset?.requires_projects && (
+                    <section className="border-t border-border px-5 py-4" aria-labelledby="new-account-projects-title">
+                      <h3 id="new-account-projects-title" className="card-title">授權專案</h3>
+                      <p className="mt-1 text-xs text-content-muted">
+                        {needsVendor ? "至少選擇一個同廠商的專案。" : "可選多個專案，也可留空。"}
+                      </p>
+                      {accessForm.error && (
+                        <p className="mt-2 text-sm text-danger" role="alert">{accessForm.error}</p>
+                      )}
+                      <GroupedChecklist
+                        sections={groupAccessOptions("projects", needsVendor && !newVendorName ? [] : projectOptions)}
+                        isSelected={(option) => selectedProjectIds.includes(option.id)}
+                        onToggle={({ id }) => updatePresetProjects([id], !selectedProjectIds.includes(id))}
+                        onSetAll={(options, selected) => updatePresetProjects(options.map(({ id }) => id), selected)}
+                        loading={accessForm.loading}
+                        disabled={submitting}
+                        emptyText={needsVendor && !newVendorName ? "請先填寫廠商名稱。" : "目前沒有可選專案。"}
+                        searchLabel="搜尋授權專案"
+                      />
+                    </section>
+                  )}
+
+                  {!preset && (role === "user" ? (
                     <section className="border-t border-border" aria-labelledby="new-account-access-title">
                       <div className="px-5 py-4">
                         <h3 id="new-account-access-title" className="card-title">資源權限</h3>
@@ -380,7 +485,12 @@ export default function Accounts() {
                           {accessForm.error}
                         </div>
                       )}
-                      <AccountAccessFields form={accessForm} allowProjectWrites />
+                      <AccountAccessFields
+                        form={accessForm}
+                        allowProjectWrites
+                        showWebSearchAccess
+                        submitting={submitting}
+                      />
                     </section>
                   ) : (
                     <>
@@ -391,7 +501,12 @@ export default function Accounts() {
                             管理員看得到全部資源；這裡只決定他登入後預設的專案、人物與聲音。
                           </p>
                         </div>
-                        <AccountAccessFields form={accessForm} role="admin" />
+                        <AccountAccessFields
+                          form={accessForm}
+                          role="admin"
+                          showWebSearchAccess
+                          submitting={submitting}
+                        />
                       </section>
                       <section className="border-t border-border px-5 pb-4" aria-labelledby="new-admin-scope-title">
                         <h3 id="new-admin-scope-title" className="card-title pt-4">資源上限</h3>
@@ -409,7 +524,7 @@ export default function Accounts() {
                         />
                       </section>
                     </>
-                  )}
+                  ))}
 
                   <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-content-muted">
@@ -420,7 +535,7 @@ export default function Accounts() {
                       type="submit"
                       disabled={
                         submitting
-                        || (role === "user" && (accessForm.loading || !accessForm.complete))
+                        || (preset ? !presetReady : role === "user" && (accessForm.loading || !accessForm.complete))
                       }
                     >
                       {submitting ? "建立中…" : "建立正式帳號"}
@@ -510,10 +625,10 @@ export default function Accounts() {
                   const editingScope = editingScopeAccountId === account.id;
                   return (
                     <article key={account.id} className="px-5 py-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <div className="min-w-0 flex-1">
+                      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,0.35fr)_auto] md:items-center">
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">{account.username}</span>
+                            <span className="min-w-0 break-words font-medium">{account.username}</span>
                             <span className="chip">
                               {account.role === "root" ? "最高管理員" : account.role}
                             </span>
@@ -583,8 +698,12 @@ export default function Accounts() {
                             {resourceCount > 0 && <span>私有資源 {resourceCount} 項</span>}
                           </p>
                         </div>
+                        <dl className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm md:block">
+                          <dt className="text-xs text-content-subtle">權限組合</dt>
+                          <dd className="min-w-0 break-words">{account.preset_label ?? "自訂"}</dd>
+                        </dl>
                         {(canManage || canManageVendor) && (
-                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
                             {canManage && (
                               <button
                                 className={editingAccess ? "btn btn-primary" : "btn btn-ghost"}

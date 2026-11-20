@@ -32,6 +32,7 @@ from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, fit_product_tool
 from tools.context import (
     MEMORY_TOOLS,
     VENDOR_KNOWLEDGE_TOOLS,
+    WEB_TOOLS,
     active_vendor_chat,
     is_graph_tool,
 )
@@ -311,9 +312,6 @@ def _prefetched_knowledge_turn(arguments: dict[str, Any]) -> LLMReply:
     )
 
 
-_WEB_TOOLS = frozenset({"search_web", "read_web_page"})
-
-
 def _tools_for_mode(tools: list[dict[str, Any]], mode: ReplyMode) -> list[dict[str, Any]]:
     """Drop the web tools when the mode forbids them.
 
@@ -324,7 +322,7 @@ def _tools_for_mode(tools: list[dict[str, Any]], mode: ReplyMode) -> list[dict[s
     return [
         tool
         for tool in tools
-        if tool.get("function", {}).get("name") not in _WEB_TOOLS
+        if tool.get("function", {}).get("name") not in WEB_TOOLS
     ]
 
 
@@ -378,10 +376,12 @@ def _run_tool_phase(
     registry = get_tool_registry()
     tools = _tools_for_project(_tools_for_mode(registry.build_openai_tools(), mode), project_id)
     offered_names = {tool.get("function", {}).get("name") for tool in tools}
-    if active_vendor_chat.get() and forced_tool_name not in VENDOR_KNOWLEDGE_TOOLS:
+    if active_vendor_chat.get() and forced_tool_name not in VENDOR_KNOWLEDGE_TOOLS | WEB_TOOLS:
         forced_tool_name = None
     if forced_tool_name and forced_tool_name not in offered_names and (
-        forced_tool_name in MEMORY_TOOLS or is_graph_tool(forced_tool_name)
+        forced_tool_name in MEMORY_TOOLS
+        or forced_tool_name in WEB_TOOLS
+        or is_graph_tool(forced_tool_name)
     ):
         forced_tool_name = None
     force_memory_search = force_memory_search and "search_memory" in offered_names

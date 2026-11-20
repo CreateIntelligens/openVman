@@ -182,6 +182,7 @@ async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send
     assert connect_kwargs is not None
     assert connect_kwargs["additional_headers"] == {
         "X-Internal-Token": "internal-secret",
+        "X-OpenVMan-Web-Search": "0",
         "X-OpenVMan-User-ID": "account-1",
         "X-OpenVMan-Role": "user",
         "X-OpenVMan-Project-ID": "",

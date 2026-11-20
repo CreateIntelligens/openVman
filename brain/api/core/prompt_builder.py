@@ -28,17 +28,21 @@ from knowledge.workspace import (
     strip_guardrails_markers,
 )
 from tools.builtin.product_tools import product_prompt_line
-from tools.context import active_vendor_chat
+from tools.context import (
+    active_vendor_chat,
+    active_web_search_allowed,
+    enabled_web_tools,
+)
 
 from .prompt_templates import (
-    DEFAULT_ANSWER_RULES,
-    DEFAULT_TOOL_INSTRUCTIONS,
     MEMORY_TOOL_INSTRUCTIONS,
     NO_TOOLS_ANSWER_RULES,
     NO_TOOLS_INSTRUCTIONS,
     VENDOR_TOOL_INSTRUCTIONS,
+    chat_tool_instructions,
     reply_language_line,
     supported_languages_line,
+    web_tool_usage,
 )
 from .turn_decisions import TurnPolicy
 
@@ -74,6 +78,7 @@ def build_chat_messages(
     turn_policy: TurnPolicy | None = None,
     decision_dependency_unavailable: bool = False,
     preferred_language: str | None = None,
+    allow_web_search: bool = True,
 ) -> list[dict[str, str]]:
     """Build the system and conversation messages for the LLM call.
 
@@ -113,8 +118,15 @@ def build_chat_messages(
         enabled_by_policy=not vendor and (turn_policy is None or turn_policy.auto_recall is not False),
         skip_jev_filter=decision_dependency_unavailable,
     )
-    tool_instructions = DEFAULT_TOOL_INSTRUCTIONS if allow_tools else NO_TOOLS_INSTRUCTIONS
-    answer_rules = DEFAULT_ANSWER_RULES if allow_tools else NO_TOOLS_ANSWER_RULES
+    web_tools = enabled_web_tools(
+        cfg,
+        allowed=active_web_search_allowed.get(),
+        vendor=vendor,
+    ) if allow_tools and allow_web_search else set()
+    tool_instructions, answer_rules = (
+        chat_tool_instructions(web_tools) if allow_tools
+        else (NO_TOOLS_INSTRUCTIONS, NO_TOOLS_ANSWER_RULES)
+    )
     if allow_tools and not include_memory:
         tool_instructions = (
             tool_instructions.replace(MEMORY_TOOL_INSTRUCTIONS, "")
@@ -123,6 +135,8 @@ def build_chat_messages(
         )
     if allow_tools and vendor:
         tool_instructions = VENDOR_TOOL_INSTRUCTIONS
+        if web_usage := web_tool_usage(web_tools):
+            tool_instructions += "\n" + web_usage
         answer_rules = NO_TOOLS_ANSWER_RULES
     elif allow_tools and turn_policy is not None:
         tool_instructions, answer_rules = _apply_retrieval_policy_to_instructions(
@@ -153,7 +167,9 @@ def build_chat_messages(
         ),
         _tone_delivery_line(turn_policy.tone if turn_policy else None),
         _previous_picture_line(turn_policy, session_messages),
-        _turn_retrieval_line(turn_policy, include_memory=include_memory),
+        _turn_retrieval_line(
+            turn_policy, include_memory=include_memory, include_web="search_web" in web_tools,
+        ),
     ]
     # 保護規則以外的內容（人設、記憶、對話摘要等）都可能被廠商或使用者寫進同名標籤，先拿掉。
     system_prompt = "\n\n".join(
@@ -244,7 +260,9 @@ def _previous_picture_line(policy: TurnPolicy | None, session_messages: list[dic
     )
 
 
-def _turn_retrieval_line(policy: TurnPolicy | None, *, include_memory: bool = True) -> str:
+def _turn_retrieval_line(
+    policy: TurnPolicy | None, *, include_memory: bool = True, include_web: bool = True,
+) -> str:
     if policy is None:
         return ""
     lines = []
@@ -252,7 +270,7 @@ def _turn_retrieval_line(policy: TurnPolicy | None, *, include_memory: bool = Tr
         lines.append("當輪分類判定目前問題不需要專案知識；可直接回答，若回答過程發現需要專案事實仍可使用 search_knowledge。")
     elif policy.needs_knowledge is True:
         lines.append("當輪需要專案知識，請先使用 search_knowledge。")
-    if policy.needs_web is True:
+    if include_web and policy.needs_web is True:
         lines.append("當輪需要公開或即時資訊，請使用 search_web。")
     if include_memory and policy.needs_memory is True:
         lines.append("當輪需要過去對話或個人偏好時，請使用 search_memory。")
@@ -287,8 +305,8 @@ def _apply_retrieval_policy_to_instructions(
             "只有回答需要最新資訊、新聞、天氣、店家地點或其他公開資料時才搜尋。",
         )
         answer_rules = answer_rules.replace(
-            "涉及即時或公開網路資訊（包含新聞、天氣）時，使用 search_web；",
-            "回答需要即時或公開網路資訊（包含新聞、天氣）時，使用 search_web；",
+            "涉及即時或公開網路資訊（包含新聞、天氣）時，使用 search_web",
+            "回答需要即時或公開網路資訊（包含新聞、天氣）時，使用 search_web",
         )
     return tool_instructions, answer_rules
 

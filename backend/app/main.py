@@ -13,7 +13,7 @@ from app.auth.project_gemini_credential_routes import (
 from app.auth.routes import auth_router
 from app.auth.settings_routes import settings_router
 from app.auth.temporary_accounts_routes import temporary_accounts_router
-from app.auth.users_routes import users_router
+from app.auth.users_routes import account_presets_router, users_router
 from app.brain_proxy import router as brain_proxy_router
 from app.client_disconnect import ClientDisconnectMiddleware
 from app.config import get_tts_config
@@ -61,6 +61,7 @@ app.include_router(internal_router)
 app.include_router(auth_router)
 app.include_router(api_key_router)
 app.include_router(users_router)
+app.include_router(account_presets_router)
 app.include_router(settings_router)
 app.include_router(model_provider_router)
 app.include_router(project_gemini_credential_router)

@@ -100,7 +100,10 @@ def without_disabled_recall(
     )
 
 
-def vendor_turn_decision(decision: TurnDecision) -> TurnDecision:
+def vendor_turn_decision(decision: TurnDecision, *, allow_web_search: bool = False) -> TurnDecision:
     return replace(decision, policy=replace(
-        decision.policy, needs_web=False, needs_memory=False, auto_recall=False,
+        decision.policy,
+        needs_web=decision.policy.needs_web if allow_web_search else False,
+        needs_memory=False,
+        auto_recall=False,
     ))

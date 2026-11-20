@@ -28,22 +28,26 @@ export default function FormalAccountAccessPanel({
   onCancel,
 }: FormalAccountAccessPanelProps) {
   const canSetProjectWrites = account.role === "user";
-  const initialAccess: AccountAccessInput | undefined = (
-    account.grants && account.defaults
-      ? {
-        grants: account.grants,
-        defaults: account.defaults,
-        admin_portal_access: account.admin_portal_access ?? false,
-        kiosk: account.kiosk ?? false,
-        // 管理員回來的是生效值（一律為真）；降成一般帳號時不能因此默默開放。
-        ai_cleanup_access: isAtLeastAdmin(account.role) ? false : (account.ai_cleanup_access ?? false),
-      }
-      : undefined
-  );
+  const flags = {
+    admin_portal_access: account.admin_portal_access ?? false,
+    kiosk: account.kiosk ?? false,
+    // 管理員回來的是生效值（一律為真）；降成一般帳號時不能因此默默開放。
+    ai_cleanup_access: isAtLeastAdmin(account.role) ? false : (account.ai_cleanup_access ?? false),
+    web_search_access: account.web_search_access ?? false,
+  };
+  const initialAccess: Partial<AccountAccessInput> = {
+    ...flags,
+    ...(account.grants && { grants: account.grants }),
+    ...(account.defaults && { defaults: account.defaults }),
+  };
   const accessForm = useAccountAccessForm(
     account.id,
-    initialAccess && canSetProjectWrites
-      ? withProjectPermissions(initialAccess, account.vendor_name, Boolean(!account.vendor_name && account.admin_portal_access))
+    canSetProjectWrites && account.grants && account.defaults
+      ? withProjectPermissions(
+        { ...flags, grants: account.grants, defaults: account.defaults },
+        account.vendor_name,
+        Boolean(!account.vendor_name && account.admin_portal_access),
+      )
       : initialAccess,
     true,
     account.vendor_name,
@@ -51,18 +55,22 @@ export default function FormalAccountAccessPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 讀到資料後的快照；跟現在的表單不同就是「尚未儲存」，切帳號或離開頁面前會先問。
-  const snapshot = useRef<string | null>(null);
-  const serialized = JSON.stringify(accessForm.access);
+  const snapshot = useRef<{ resources: string; webSearch: boolean } | null>(null);
+  const { web_search_access: webSearch = false, ...resourceAccess } = accessForm.access;
+  const serialized = JSON.stringify(resourceAccess);
   useEffect(() => {
-    if (!accessForm.loading && accessForm.options && snapshot.current === null) {
-      snapshot.current = serialized;
+    if (!accessForm.loading && snapshot.current === null) {
+      snapshot.current = { resources: serialized, webSearch };
     }
-  }, [accessForm.loading, accessForm.options, serialized]);
-  const dirty = snapshot.current !== null && serialized !== snapshot.current;
+  }, [accessForm.loading, serialized, webSearch]);
+  const accessDirty = snapshot.current !== null && serialized !== snapshot.current.resources;
+  const webSearchDirty = snapshot.current !== null && webSearch !== snapshot.current.webSearch;
+  const webSearchOnly = webSearchDirty && !accessDirty;
+  const dirty = accessDirty || webSearchDirty;
   useUnsavedChanges(`account-access:${account.id}`, dirty, `${account.username} 的資源權限`);
 
   async function save() {
-    if (!accessForm.complete) {
+    if (!webSearchOnly && !accessForm.complete) {
       setError("每一類都至少要選一項授權資源，並指定預設值。");
       return;
     }
@@ -70,13 +78,13 @@ export default function FormalAccountAccessPanel({
     setSaving(true);
     setError(null);
     try {
-      const saved = await updateAccountAccess(
-        account.id,
-        canSetProjectWrites
-          ? withProjectPermissions(accessForm.access, account.vendor_name)
-          : accessForm.access,
-      );
-      snapshot.current = serialized;
+      const access = canSetProjectWrites
+        ? withProjectPermissions(resourceAccess, account.vendor_name)
+        : resourceAccess;
+      const saved = await updateAccountAccess(account.id, webSearchOnly
+        ? { web_search_access: webSearch }
+        : { ...access, ...(webSearchDirty && { web_search_access: webSearch }) });
+      snapshot.current = { resources: serialized, webSearch };
       onSaved(saved);
     } catch (reason) {
       setError(messageFrom(reason, "儲存資源權限失敗"));
@@ -116,7 +124,13 @@ export default function FormalAccountAccessPanel({
       )}
 
       <div className="mt-4">
-        <AccountAccessFields form={accessForm} role={account.role} allowProjectWrites={canSetProjectWrites} />
+        <AccountAccessFields
+          form={accessForm}
+          role={account.role}
+          allowProjectWrites={canSetProjectWrites}
+          showWebSearchAccess
+          submitting={saving}
+        />
       </div>
 
       <div className="mt-4 flex justify-end gap-2">
@@ -132,7 +146,7 @@ export default function FormalAccountAccessPanel({
           className="btn btn-primary"
           type="button"
           onClick={() => void save()}
-          disabled={accessForm.loading || saving || !accessForm.complete}
+          disabled={accessForm.loading || saving || (!accessForm.complete && !webSearchOnly)}
         >
           {saving ? "儲存中…" : "儲存權限"}
         </button>

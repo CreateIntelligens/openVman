@@ -17,6 +17,7 @@ from app import (
     language_routes,
 )
 from app.auth import brain_project_access
+from app.auth.dependencies import AuthTransport, CurrentAccount
 from app.auth.models import AccountRole
 from app.config import TTSRouterConfig
 from app.gateway import asr_stream, routes_vision
@@ -174,7 +175,10 @@ async def test_vision_reply_uses_chat_target_and_preserves_identity(
     client = _client({"reply": "hello"})
     monkeypatch.setattr(routes_vision, "get_tts_config", lambda: routing_config)
     monkeypatch.setattr(routes_vision._http, "get", lambda: client)
-    current = SimpleNamespace(user=SimpleNamespace(id="caller", role=AccountRole.USER))
+    current = CurrentAccount(
+        user=SimpleNamespace(id="caller", role=AccountRole.USER, web_search_access=True),
+        transport=AuthTransport.BEARER,
+    )
     result = await routes_vision._generate_reply(
         routes_vision.VisionDescribeRequest(frame_base64="AA==", project_id="test"),
         "context", "session", current,
@@ -185,6 +189,7 @@ async def test_vision_reply_uses_chat_target_and_preserves_identity(
     )
     assert client.post.await_args.kwargs["headers"]["X-OpenVMan-User-ID"] == "caller"
     assert client.post.await_args.kwargs["headers"]["X-OpenVMan-Project-ID"] == "test"
+    assert client.post.await_args.kwargs["headers"]["X-OpenVMan-Web-Search"] == "1"
 
 
 @pytest.mark.asyncio

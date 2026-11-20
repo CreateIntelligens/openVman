@@ -2,14 +2,16 @@
 
 from typing import Any
 
-from tools.context import VENDOR_KNOWLEDGE_TOOLS
+from tools.context import VENDOR_KNOWLEDGE_TOOLS, WEB_TOOLS, enabled_web_tools
 
 
-def build_gemini_tool_declarations(*, vendor: bool = False) -> list[dict[str, Any]]:
+def build_gemini_tool_declarations(
+    *, vendor: bool = False, web_search_allowed: bool | None = None, config: Any = None,
+) -> list[dict[str, Any]]:
     """Build the function declarations for Gemini Live setup."""
     from config import get_settings
 
-    cfg = get_settings()
+    cfg = config if config is not None else get_settings()
     declarations = [
         {
             "name": "search_knowledge",
@@ -136,14 +138,12 @@ def build_gemini_tool_declarations(*, vendor: bool = False) -> list[dict[str, An
             },
         },
     ]
-    disabled = set()
-    if not getattr(cfg, "url2md_search_enabled", True):
-        disabled.add("search_web")
-    if not getattr(cfg, "url2md_read_enabled", True):
-        disabled.add("read_web_page")
+    web_tools = enabled_web_tools(cfg, allowed=web_search_allowed, vendor=vendor)
+    disabled = WEB_TOOLS - web_tools
     if not getattr(cfg, "wiki_publish_enabled", True):
-        disabled.add("publish_wiki")
+        disabled |= {"publish_wiki"}
     return [
         item for item in declarations
-        if item["name"] not in disabled and (not vendor or item["name"] in VENDOR_KNOWLEDGE_TOOLS)
+        if item["name"] not in disabled
+        and (not vendor or item["name"] in VENDOR_KNOWLEDGE_TOOLS or item["name"] in web_tools)
     ]

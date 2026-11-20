@@ -16,8 +16,8 @@ from app.auth import api_key_routes
 from app.auth.middleware import FailClosedAuthMiddleware
 from app.auth.models import AccountRole, AccountType, ResourceType
 from app.auth.routes import auth_router
-from app.auth.users_routes import users_router
 from app.auth.runtime import get_auth_runtime
+from app.auth.users_routes import account_presets_router, users_router
 from app.gateway import asr_stream
 from app.gateway import routes as gateway_routes
 from app.gateway import websocket as websocket_routes
@@ -123,7 +123,7 @@ def env(monkeypatch):
     monkeypatch.setattr(brain_proxy._http, "get", lambda: upstream)
     app = FastAPI()
     for router in (
-        auth_router, users_router, api_key_routes.router,
+        auth_router, users_router, account_presets_router, api_key_routes.router,
         gateway_routes.router, project_routes.router, asr_stream.router,
         websocket_routes.router, brain_proxy.router,
     ):
@@ -919,7 +919,18 @@ def test_live_relay_uses_authenticated_account_for_vendor_header(env, vendor_acc
         return BrainSocket()
 
     monkeypatch.setattr("app.gateway.brain_live_relay.websockets.connect", connect)
-    headers = {**env.headers(vendor_accounts[account]), "X-OpenVMan-Vendor": "0" if account == "vendor-editor" else "1"}
+    internal = account == "internal-editor"
+    if internal:
+        response = env.client.put(
+            f"/api/v1/users/{vendor_accounts[account]}/access",
+            headers=env.headers(env.root.id), json={"web_search_access": True},
+        )
+        assert response.status_code == 200
+    headers = {
+        **env.headers(vendor_accounts[account]),
+        "X-OpenVMan-Vendor": "1" if internal else "0",
+        "X-OpenVMan-Web-Search": "0" if internal else "1",
+    }
     with env.client.websocket_connect("/api/v1/ws/vendor-test", headers=headers) as socket:
         socket.send_json({"event": "client_init", "capabilities": {"project_id": _PROJECT}})
         assert socket.receive_json()["event"] == "server_init_ack"
@@ -928,6 +939,7 @@ def test_live_relay_uses_authenticated_account_for_vendor_header(env, vendor_acc
     assert len(captured) == 1
     assert captured[0].get("X-OpenVMan-Vendor") == ("1" if account == "vendor-editor" else None)
     assert captured[0]["X-OpenVMan-Project-ID"] == _PROJECT
+    assert captured[0]["X-OpenVMan-Web-Search"] == ("1" if internal else "0")
 
 
 def test_vendor_live_requires_project_initialization_before_relay(env, vendor_accounts, monkeypatch):

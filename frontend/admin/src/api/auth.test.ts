@@ -7,6 +7,7 @@ import {
   fetchAdminScope,
   getCurrentAccount,
   isAtLeastAdmin,
+  listAccountPresets,
   listAccounts,
   login,
   resetAccountPassword,
@@ -299,6 +300,26 @@ describe("cookie auth API", () => {
       role: "user",
       access,
     });
+  });
+
+  it("fetches preset definitions and retains their server labels on accounts", async () => {
+    const preset = {
+      key: "rd", label: "創智研發", description: "研發管理員權限",
+      requires_vendor_name: false, requires_projects: false,
+    };
+    const account = {
+      id: "rd-1", username: "engineer", role: "admin", disabled: false,
+      created_at: "2026-11-20T00:00:00Z", preset: preset.key, preset_label: preset.label,
+      web_search_access: true,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json([preset]))
+      .mockResolvedValueOnce(Response.json([account]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listAccountPresets()).resolves.toEqual([preset]);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/admin/account-presets", expect.objectContaining({ credentials: "include" }));
+    await expect(listAccounts()).resolves.toEqual([account]);
   });
 
   it("loads grantable resources and updates formal account access", async () => {

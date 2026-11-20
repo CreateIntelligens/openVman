@@ -15,6 +15,7 @@ import { fetchProjects, type ProjectSummary } from "../api/projects";
 import ConfirmModal from "../components/ConfirmModal";
 import Select from "../components/Select";
 import StatusAlert from "../components/StatusAlert";
+import WebSearchAccessField from "../components/WebSearchAccessField";
 
 interface KeyFormState {
   label: string;
@@ -27,6 +28,7 @@ interface KeyFormState {
   defaultTtsVoice: string;
   rateLimitPerMinute: number;
   dailyRequestQuota: number;
+  webSearchAccess: boolean;
 }
 
 type PageStatus = { type: "success" | "error"; message: string } | null;
@@ -42,6 +44,7 @@ const EMPTY_FORM: KeyFormState = {
   defaultTtsVoice: "",
   rateLimitPerMinute: DEFAULT_RATE_LIMIT_PER_MINUTE,
   dailyRequestQuota: DEFAULT_DAILY_REQUEST_QUOTA,
+  webSearchAccess: false,
 };
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -60,6 +63,7 @@ function formFromKey(key: EmbedKey): KeyFormState {
     defaultTtsVoice: key.default_tts_voice,
     rateLimitPerMinute: key.rate_limit_per_minute,
     dailyRequestQuota: key.daily_request_quota,
+    webSearchAccess: key.web_search_access ?? false,
   };
 }
 
@@ -202,6 +206,7 @@ export default function EmbedKeys() {
       default_tts_voice: form.defaultTtsVoice.trim(),
       rate_limit_per_minute: form.rateLimitPerMinute,
       daily_request_quota: form.dailyRequestQuota,
+      web_search_access: form.webSearchAccess,
     };
 
     try {
@@ -567,6 +572,12 @@ export default function EmbedKeys() {
                 </div>
               </div>
 
+              <WebSearchAccessField
+                checked={form.webSearchAccess}
+                onChange={(webSearchAccess) => updateForm({ webSearchAccess })}
+                className="mt-4"
+                description="這把金鑰未開啟時，AI 只查知識庫，不上網搜尋。"
+              />
             </fieldset>
 
             {formError && (

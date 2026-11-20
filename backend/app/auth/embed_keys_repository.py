@@ -78,6 +78,7 @@ def _embed_key_from_row(row: sqlite3.Row) -> EmbedKeyRecord:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         last_used_at=row["last_used_at"],
+        web_search_access=bool(row["web_search_access"]),
     )
 
 
@@ -101,6 +102,7 @@ class EmbedKeyRepository:
         rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE,
         daily_request_quota: int = DEFAULT_DAILY_REQUEST_QUOTA,
         created_by: str | None = None,
+        web_search_access: bool = False,
     ) -> EmbedKeyRecord:
         if not allowed_origins:
             raise ValueError("at least one allowed origin is required")
@@ -117,8 +119,8 @@ class EmbedKeyRepository:
                     default_persona_id, default_tts_provider,
                     default_tts_voice, rate_limit_per_minute,
                     daily_request_quota, disabled, created_by, created_at,
-                    updated_at, last_used_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL)
+                    updated_at, last_used_at, web_search_access
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, ?)
                 """,
                 (
                     key_id,
@@ -135,6 +137,7 @@ class EmbedKeyRepository:
                     created_by,
                     now,
                     now,
+                    int(web_search_access),
                 ),
             )
         record = self.get(key_id)
@@ -176,8 +179,8 @@ class EmbedKeyRepository:
                     raise ValueError("limits must be at least 1")
                 assignments.append(f"{name} = ?")
                 params.append(limit)
-            elif name == "disabled":
-                assignments.append("disabled = ?")
+            elif name in ("disabled", "web_search_access"):
+                assignments.append(f"{name} = ?")
                 params.append(1 if value else 0)
             else:
                 raise ValueError(f"unknown embed key field: {name}")

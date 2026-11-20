@@ -14,6 +14,7 @@ export interface EmbedKey {
   default_tts_voice: string;
   rate_limit_per_minute: number;
   daily_request_quota: number;
+  web_search_access?: boolean;
   disabled: boolean;
   created_by: string | null;
   created_at: string;
@@ -37,6 +38,7 @@ export interface EmbedKeyCreateInput {
   default_tts_voice?: string;
   rate_limit_per_minute?: number;
   daily_request_quota?: number;
+  web_search_access?: boolean;
 }
 
 export type EmbedKeyUpdateInput = Partial<

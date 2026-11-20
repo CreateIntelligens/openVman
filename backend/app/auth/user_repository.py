@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from uuid import uuid4
 
@@ -23,6 +23,7 @@ from ._account_records import (
 )
 from ._admin_scope_rules import _inherit_admin_scope, _load_admin_scope
 from ._repository_base import now_iso
+from .account_presets import ACCOUNT_PRESETS, AccountPresetKey
 from .database import AuthDatabase
 from .models import (
     ADMIN_OR_ABOVE_VALUES,
@@ -40,6 +41,7 @@ from .policy import (
     ensure_account_manager,
     ensure_can_change_role,
     ensure_can_create_role,
+    ensure_can_grant_account_management,
     ensure_can_manage_account,
     ensure_can_reset_password,
 )
@@ -75,19 +77,39 @@ class UserRepository:
         ai_cleanup_access: bool = False,
         vendor_name: str | None = None,
         project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
+        web_search_access: bool = False,
+        preset: AccountPresetKey | None = None,
+        project_ids: Iterable[str] = (),
     ) -> UserRecord:
+        vendor_name = (vendor_name or "").strip() or None
+        preset_rules = ACCOUNT_PRESETS[preset] if preset is not None else None
+        account_management_access = False
+        if preset_rules is not None:
+            if created_by is None or account_type is not AccountType.FORMAL:
+                raise AccountPolicyError("權限組合限由帳號管理員套用於正式帳號。")
+            role = preset_rules.role
+            admin_portal_access = preset_rules.admin_portal_access
+            account_management_access = preset_rules.account_management_access
+            ai_cleanup_access = preset_rules.ai_cleanup_access
+            web_search_access = preset_rules.web_search_access
+            kiosk = False
+            grants = None
+            defaults = None
+            project_permissions = None
         if role is AccountRole.ROOT:
             raise AccountPolicyError("ROOT accounts cannot be created")
-        vendor_name = (vendor_name or "").strip() or None
-        if vendor_name and (role is not AccountRole.USER or account_type is not AccountType.FORMAL):
-            raise AccountPolicyError("vendor affiliation requires a formal user")
-        if vendor_name and created_by is None:
-            raise AccountPolicyError("vendor account management access required")
+        if preset_rules is None and vendor_name:
+            if role is not AccountRole.USER or account_type is not AccountType.FORMAL:
+                raise AccountPolicyError("vendor affiliation requires a formal user")
+            if created_by is None:
+                raise AccountPolicyError("vendor account management access required")
         if (grants is None) != (defaults is None):
             raise InvalidResourceGrantError(
                 "account grants and defaults must be provided together"
             )
-        normalized_access = (
+        normalized_access: tuple[
+            tuple[tuple[ResourceType, str], ...], tuple[str, ...] | None,
+        ] | None = (
             _normalize_account_access(grants, defaults)
             if grants is not None and defaults is not None
             else None
@@ -111,7 +133,20 @@ class UserRepository:
                         raise UserNotFoundError("creator account does not exist")
                     creator_record = _user_from_row(creator)
                     ensure_can_create_role(creator_record, role)
-                    if vendor_name and not can_manage_vendor_accounts(creator_record):
+                    if preset_rules is not None:
+                        if not can_manage_vendor_accounts(creator_record):
+                            raise AccountPolicyError("需要帳號管理權限才能套用權限組合。")
+                        if account_management_access:
+                            ensure_can_grant_account_management(creator_record)
+                        selected = preset_rules.selected_projects(project_ids, vendor_name)
+                        permissions = preset_rules.project_permissions
+                        if permissions is not None and selected:
+                            project_permissions = dict.fromkeys(selected, permissions)
+                            normalized_access = (
+                                tuple((ResourceType.PROJECT, project) for project in selected),
+                                None,
+                            )
+                    elif vendor_name and not can_manage_vendor_accounts(creator_record):
                         raise AccountPolicyError("vendor account management access required")
                     if (
                         normalized_access is not None
@@ -127,8 +162,9 @@ class UserRepository:
                         id, username, username_normalized, password_hash, role,
                         account_type, disabled, token_version, created_at,
                         updated_at, created_by, admin_portal_access, kiosk,
-                        ai_cleanup_access, vendor_name
-                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?)
+                        ai_cleanup_access, vendor_name, web_search_access,
+                        account_management_access
+                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
@@ -144,6 +180,8 @@ class UserRepository:
                         int(kiosk),
                         int(ai_cleanup_access),
                         vendor_name,
+                        int(web_search_access),
+                        int(account_management_access),
                     ),
                 )
                 if normalized_access is not None:
@@ -176,11 +214,13 @@ class UserRepository:
                         target_user_id=user_id,
                         metadata={
                             "account_type": account_type.value,
+                            "account_management_access": account_management_access,
                             "admin_portal_access": admin_portal_access,
                             "kiosk": kiosk,
                             "ai_cleanup_access": ai_cleanup_access,
                             "role": role.value,
                             "vendor_name": vendor_name,
+                            "web_search_access": web_search_access,
                         },
                         now=now,
                     )
@@ -424,9 +464,7 @@ class UserRepository:
     ) -> UserRecord:
         with self.database.transaction(write=True) as connection:
             actor, target = _load_actor_and_target(connection, actor_id, user_id)
-            ensure_account_manager(actor)
-            if actor.role is not AccountRole.ROOT:
-                raise AccountPolicyError("only ROOT can grant account management access")
+            ensure_can_grant_account_management(actor)
             if target.role is not AccountRole.ADMIN or target.account_type is not AccountType.FORMAL:
                 raise AccountPolicyError("account management access requires a formal administrator")
             if target.account_management_access == enabled:
@@ -545,6 +583,7 @@ class UserRepository:
         kiosk: bool | None = None,
         ai_cleanup_access: bool | None = None,
         project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
+        web_search_access: bool | None = None,
     ) -> UserRecord:
         if (grants is None) != (defaults is None):
             raise InvalidResourceGrantError(
@@ -614,6 +653,11 @@ class UserRepository:
                 connection.execute(
                     "UPDATE users SET ai_cleanup_access = ? WHERE id = ?",
                     (int(ai_cleanup_access), user_id),
+                )
+            if web_search_access is not None:
+                connection.execute(
+                    "UPDATE users SET web_search_access = ? WHERE id = ?",
+                    (int(web_search_access), user_id),
                 )
             _append_auth_audit(
                 connection,

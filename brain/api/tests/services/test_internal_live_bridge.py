@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from unittest.mock import patch
 
 import pytest
@@ -102,6 +103,104 @@ def test_internal_live_bridge_routes_text_audio_and_close(principal_type, princi
     assert fake_session.turn_complete_calls == 1
     assert fake_session.stop_calls == 1
     assert fake_session.close_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("header", "search_enabled", "read_enabled", "vendor", "expected"),
+    [
+        ("0", True, True, False, set()),
+        ("1", True, True, False, {"search_web", "read_web_page"}),
+        (None, True, True, False, {"search_web", "read_web_page"}),
+        (None, False, True, False, {"read_web_page"}),
+        (None, True, False, False, {"search_web"}),
+        ("1", False, False, False, set()),
+        (None, True, True, True, set()),
+        ("0", True, True, True, set()),
+        ("1", True, True, True, {"search_web", "read_web_page"}),
+    ],
+)
+def test_live_web_tools_match_authenticated_limit_and_global_switches(
+    monkeypatch, header, search_enabled, read_enabled, vendor, expected,
+):
+    from core.turn_decisions import TurnDecision, TurnPolicy
+    from live import gemini_turns
+    from live.gemini_live import GeminiLiveSession
+    from live.gemini_tool_execution import GeminiLiveToolExecutor
+    from safety.internal_auth import WEB_SEARCH_HEADER
+    from tools.context import WEB_TOOLS
+
+    monkeypatch.setenv("LIVE_GEMINI_TOOLS_ENABLED", "true")
+    monkeypatch.setenv("URL2MD_SEARCH_ENABLED", str(search_enabled))
+    monkeypatch.setenv("URL2MD_READ_ENABLED", str(read_enabled))
+    executed = []
+    decision_tools = []
+    result = {}
+
+    async def decide(**kwargs):
+        decision_tools.append(set(kwargs["available_tools"]))
+        return TurnDecision(
+            kwargs["turn_id"], TurnPolicy(needs_web="search_web" not in expected), "test",
+        )
+
+    async def probe_turn(self, user_text, *_args):
+        revision = self._turns.begin(user_text)
+        await self._turns.decide_text_turn(user_text, "", revision, None)
+        payload = self._turns.user_turn_message(user_text)
+        forced = await self._turns.handle_tool_call({"functionCalls": []})
+        requested = await self._turns.handle_tool_call({"functionCalls": [
+            {"id": name, "name": name, "args": {}} for name in sorted(WEB_TOOLS)
+        ]})
+        result.update({
+            "setup": self._build_setup_message(),
+            "envelope": json.loads(payload["realtimeInput"]["text"]),
+            "forced": forced,
+            "requested": requested,
+        })
+        await self._emit({"event": "server_stream_chunk", "text": "測試完成。", "is_final": True})
+
+    def fake_search(_self, _args):
+        executed.append("search_web")
+        return {"results": []}
+
+    def fake_read(_self, _args):
+        executed.append("read_web_page")
+        return {"content": "page"}
+
+    monkeypatch.setattr(gemini_turns, "run_turn_decision_async", decide)
+    monkeypatch.setattr(GeminiLiveSession, "send_text_turn", probe_turn)
+    monkeypatch.setattr(GeminiLiveToolExecutor, "_search_web", fake_search)
+    monkeypatch.setattr(GeminiLiveToolExecutor, "_read_web_page", fake_read)
+    headers = _internal_headers()
+    if header is not None:
+        headers[WEB_SEARCH_HEADER] = header
+    if vendor:
+        headers["X-OpenVMan-Vendor"] = "1"
+    with _client() as client, client.websocket_connect(
+        "/brain/internal/live/relay-web-tools", headers=headers,
+    ) as socket:
+        socket.send_json({"event": "relay_init", "web_search_allowed": True})
+        socket.send_json({"event": "user_speak", "text": "測試"})
+        assert socket.receive_json()["event"] == "server_stream_chunk"
+
+    declarations = result["setup"]["tools"][0]["functionDeclarations"]
+    instruction = result["setup"]["systemInstruction"]["parts"][0]["text"]
+    assert {tool["name"] for tool in declarations} & WEB_TOOLS == expected
+    if vendor:
+        assert {tool["name"] for tool in declarations} == {"search_knowledge", *expected}
+    assert {name for name in WEB_TOOLS if name in instruction} == expected
+    assert len(decision_tools) == 1 and decision_tools[0] & WEB_TOOLS == expected
+    assert result["envelope"]["required_reads"] == []
+    assert result["envelope"]["prefetched_reads"] == []
+    assert result["forced"] == []
+    assert executed == sorted(expected)
+    for call in result["requested"]:
+        name = call["name"]
+        if name in expected:
+            assert "error" not in call["response"]
+        elif vendor:
+            assert call["response"] == {"error": "沒有權限使用這個工具。"}
+        else:
+            assert call["response"] == {"error": f"{name} 已停用"}
 
 
 def test_internal_live_bridge_ephemeral_user_speak_not_persisted():

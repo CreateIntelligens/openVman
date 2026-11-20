@@ -75,6 +75,7 @@ class GeminiLiveSession:
         transport_factory: Any | None = None,
         event_sink: EventSink | None = None,
         vendor: bool = False,
+        web_search_allowed: bool | None = None,
     ) -> None:
         self.relay_session_id = relay_session_id
         self.client_id = client_id
@@ -86,6 +87,7 @@ class GeminiLiveSession:
         self.principal_type = principal_type
         self.principal_id = principal_id
         self._system_instruction = system_instruction
+        self._web_search_allowed = web_search_allowed
         self.config = config or get_settings()
         self._gemini_credential: GeminiCredential | None = None
         self._transport_factory = transport_factory
@@ -109,6 +111,7 @@ class GeminiLiveSession:
             project_id=project_id,
             persona_id=persona_id,
             vendor=vendor,
+            web_search_allowed=web_search_allowed,
         )
         try:
             audio_language_id = project_has_taiwanese_route(project_id)
@@ -486,6 +489,7 @@ class GeminiLiveSession:
         ) if part.strip())
         return build_setup_message(
             self.config, instruction, vendor=self._context.vendor, include_memory=include_memory,
+            web_search_allowed=self._web_search_allowed,
         )
 
     async def _wait_for_setup_complete(self, transport: JsonTransport) -> None:

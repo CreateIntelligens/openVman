@@ -18,6 +18,8 @@
 
 **「AI 整理排版」權限（2026-11-13）**：`proxy_to_brain` 讀完 request body 後交給 `app/ai_cleanup_guard.py`。帳號沒有 `ai_cleanup_access`（管理員以上一律有）時，`knowledge/renormalize`、`knowledge/renormalize/preview` 與帶 `normalize: true` 的 `knowledge/raw/commit` 回 403；`raw/commit` 沒帶 `normalize` 時改寫成 `false` 再轉給 Brain。API 金鑰照所屬帳號，嵌入金鑰一律不行。細節見 `docs/operations/account-administration.md`。
 
+**對話網路搜尋權限（2026-11-20）**。Backend 的 HTTP proxy、`POST /api/v1/vision/describe` 的視覺主動回覆與 `app/gateway/brain_live_relay.py` 依已驗證的身分產生 `X-OpenVMan-Web-Search: 0` 或 `X-OpenVMan-Web-Search: 1`。登入 session 使用帳號的 `web_search_access`，帳號 API 金鑰使用所屬帳號的值，網站嵌入金鑰使用該把金鑰的值。ROOT 與 admin 同樣受這個開關限制。對外收到的同名標頭不轉送。Brain 在一般對話、SSE 與 Gemini Live 依此控制 `search_web` 及 `read_web_page` 的提示、宣告、預取及執行，且仍遵守全站工具開關。A2A、排程等未傳此標頭的內部呼叫沿用全站開關。
+
 **chat 回應的 `tts_text`（2026-10-19）**：`proxy_to_brain` 轉發 `chat`、`chat/accept` 的 200 JSON 與 `chat/stream` 的 SSE 時，由 `app/chat_tts_text.py` 替 `reply`（`sentence` 事件為 `text`）加上 `tts_text`：`prepare_tts_text` 的本地路徑（不打 normalize API），去 markdown／emoji、電話與長數字轉逐字讀法、保留繁體；有漢字才套中文規則。SSE 逐事件改寫，收齊一個事件（空行）就轉出，不等整段。Brain 本身不產生這個欄位，OpenAPI 以 Backend 文件為準。
 
 ### Brain 對話與管理分流
@@ -73,17 +75,24 @@ Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 
 
 ### 1.2 對外客服權限
 
-下表定義五種組合的能力與專案範圍。專案授權包含「讀」，另有獨立的「改知識庫與人設」及「改其他設定」。任何一種寫入權都包含該專案的讀取權。專案刪除、資源指派、模型供應商與共用技能仍受各入口原有的管理層級約束。
+專案授權包含「讀」，另有獨立的「改知識庫與人設」及「改其他設定」。任何一種寫入權都包含該專案的讀取權。專案刪除、資源指派、模型供應商與共用技能仍受各入口原有的管理層級約束。
 
-| 權限組合 | 帳號與專案範圍 | 看知識庫、人設及對話測試 | 改知識庫與人設 | 改其他設定 | 看與匯出對話紀錄 | 刪除對話紀錄 | 帳號管理 | 帳號 API 金鑰 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 專人 | 管理員＋帳號管理旗標，預設可管理所有專案，ROOT 可縮小範圍 | 可以 | 可以 | 可以，限管理員功能 | 可以 | 可以 | 可建立、重設密碼與停用正式廠商一般帳號，包含其他人建立的帳號 | 自建，或在授權範圍內替廠商帳號代發與撤銷 |
-| BD | 管理員，預設可管理所有專案，ROOT 可縮小範圍 | 可以 | 可以 | 可以，限管理員功能 | 可以 | 可以 | 沿用內部直屬帳號權限。廠商帳號由專人管理 | 自建及在既有內部直屬範圍代發與撤銷 |
-| 內部唯讀 | 內部一般帳號，唯讀授權涵蓋所有專案 | 可以 | — | — | 可以 | — | — | 由管理員代發 |
-| 廠商編輯 | 正式一般帳號，限已授權的同廠商專案 | 可以 | 可以 | — | 可以 | — | — | 由專人代發 |
-| 廠商唯讀 | 正式一般帳號，限已授權的同廠商專案 | 可以 | — | — | 可以 | — | — | 由專人代發 |
+#### 正式帳號建立預設
 
-ROOT 可管理所有專案、授予帳號管理旗標及調整角色。此段以現有角色與逐專案授權組合配置，批次套用及自動授權未來新專案另行交付。既有內部帳號與專案的所屬廠商預設為空白。廠商名稱去除前後空白後比對。正式廠商帳號只取得明確授權且名稱相符的專案，歸屬變動後每次存取重新比對。既有具編輯權的專案授權遷移為兩種寫入皆可。
+| 預設 | 角色與帳號管理 | 專案範圍 | 網路搜尋 | AI 整理排版 |
+| --- | --- | --- | --- | --- |
+| 創智研發（`rd`） | `admin`，開啟管理廠商帳號 | 沿用管理員資源範圍 | 開啟 | 沿用管理員權限 |
+| BD（`bd`） | `user`，無帳號管理權 | 只授權選取的專案，可先留空 | 開啟 | 關閉 |
+| 廠商編輯（`vendor_editor`） | `user`，無帳號管理權 | 須填所屬廠商及至少一個相符的專案 | 關閉 | 關閉 |
+
+三種預設都可進後台。BD、廠商編輯為各選取專案設定 `edit_knowledge: true`、`edit_settings: false`。ROOT 可管理所有專案、授予帳號管理旗標及調整角色，創智研發預設也因此只有 ROOT 能套用。授權以建立當下選取的專案為準，後續新增專案須另行授權。廠商名稱去除前後空白後比對。正式廠商帳號只取得明確授權且名稱相符的專案，歸屬變動後每次存取重新比對。既有具編輯權的專案授權遷移為兩種寫入皆可。
+
+- `GET /api/v1/admin/account-presets` 供 ROOT 或有帳號管理旗標的 admin 使用。回傳陣列，每個項目含 `key`、`label`、`description`、`requires_vendor_name`、`requires_projects`。`requires_vendor_name` 只對廠商編輯為 `true`。BD 與廠商編輯的 `requires_projects` 為 `true` 以顯示專案選擇，BD 可留空。
+- `POST /api/v1/users` 可加選填 `preset` 與 `project_ids`。套用預設時由 Backend 設定角色、旗標及授權，帳號與專案授權寫入同一交易。省略 `preset` 時沿用既有自訂欄位，可在 `access.web_search_access` 設定網路搜尋。
+- 帳號管理回應的 `preset` 與 `preset_label` 依目前角色、旗標及授權推導。未符合任一組合時兩欄為 `null`，後台顯示「自訂」。
+- 新建帳號的 `web_search_access` 預設為 `false`，套用預設時依表設定。對有資源權限編輯權的正式帳號，可用 `PUT /api/v1/users/{id}/access` 單獨送 `web_search_access`，現有授權與登入預設值照原資料保留。`POST /api/v1/temporary-accounts/batches` 同樣可指定 `web_search_access`，由該批帳號共用。Auth DB migration 29 加入 `users.web_search_access` 與 `embed_keys.web_search_access`，既有內部帳號及嵌入金鑰開啟，既有廠商帳號關閉。
+
+#### 專案權限
 
 | 操作 | 所需專案權限 |
 | --- | --- |
@@ -126,12 +135,12 @@ Backend 依憑證所屬帳號判斷廠商身分，登入 session 與代發 API �
 | 回應範圍 | 廠商回應須排除的欄位 |
 | --- | --- |
 | 專案摘要與明細 | `project_root`、`has_session_db`、`has_lancedb` 等伺服器位置、儲存細節與其他廠商歸屬 |
-| 帳號與金鑰 | 密碼及雜湊、金鑰明文與雜湊、其他帳號、內部稽核、帳號管理旗標與委派關係 |
+| 帳號與金鑰 | 密碼及雜湊、金鑰明文與雜湊、其他帳號、內部稽核、帳號管理旗標、委派關係與自身帳號回應的 `web_search_access` |
 | 人設、工作區、知識庫 | 屬於隱藏功能的檔案清單、路徑、內容與中繼資料，包含 `TOOLS.md`、`MEMORY.md`、`IDENTITY.md` 與 `.learnings/`，以及內部絕對路徑（`AGENTS.md` 只經人設 API 提供，保護規則只提供內容） |
 | 對話、匯出、串流、設定與錯誤 | 系統提示詞、模型供應商憑證、內部位址、技術除錯資料、呼叫堆疊與隱藏功能的設定值 |
 
-- HTTP chat 與 SSE 只讓廠商使用 `search_knowledge` 和 `get_document`。後者使用與文件 API 相同的目錄、空白及連結檢查。即時對話只有 `search_knowledge`，廠商回合停用長期記憶檢索、外部網頁查詢與發布、技能、圖譜和 A2A 工具。
-- WebSocket 依握手驗證的帳號判斷廠商身分，先驗證 `client_init` 的專案授權，再附上 `X-OpenVMan-Vendor: 1` 連線至 Brain。Brain 轉送語音、文字、轉錄和停止音訊事件，省略搜尋引用與決策診斷事件，並將 `server_error` 轉成固定的對話失敗訊息。
+- HTTP chat 與 SSE 提供廠商 `search_knowledge` 和 `get_document`，後者使用與文件 API 相同的目錄、空白及連結檢查。即時對話提供 `search_knowledge`。帳號及全站工具開關均允許時，才額外提供網路工具 `search_web` 與 `read_web_page`。廠商回合停用長期記憶檢索、Wiki 發布、技能、圖譜和 A2A 工具。
+- WebSocket 依握手驗證的帳號判斷廠商身分，先驗證 `client_init` 的專案授權，再附上 `X-OpenVMan-Vendor: 1` 及網路搜尋權限標頭連線至 Brain。Brain 轉送語音、文字、轉錄和停止音訊事件，省略搜尋引用與決策診斷事件，並將 `server_error` 轉成固定的對話失敗訊息。
 - 知識庫文件與 raw 上傳處理失敗時，保留 HTTP 狀態碼。廠商收到固定的上傳失敗或權限訊息，轉檔例外、上游網址與暫存路徑只供內部診斷。
 
 三個月對話查詢窗、軟刪除、歡迎詞與強制載入根目錄 `AGENTS.md` 另行交付。
@@ -815,6 +824,8 @@ Brain Live 的內部 WebSocket 也沿用這些身分標頭及 `X-OpenVMan-User-I
 專案與金鑰一律回 404，跟不存在一樣。ROOT 與未設限的管理員管全部。
 金鑰資料存在 auth 資料庫的 `embed_keys` 與 `embed_key_daily_usage` 兩張表，
 由既有的 migration 機制（v8）建立。所有設定都掛在金鑰上，不引入新的環境變數。
+列表與寫入 API 使用布林欄位 `web_search_access` 控制該金鑰的網路搜尋能力。
+新建金鑰預設關閉，既有金鑰升級後保留開啟，更新金鑰時省略欄位保留原值。
 
 
 ### 帳號最後登入時間（2026-10-15）

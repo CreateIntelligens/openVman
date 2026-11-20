@@ -13,7 +13,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.dependencies import (
+    WEB_SEARCH_HEADER,
+    CurrentAccount,
+    get_current_account,
+    web_search_header_value,
+)
 from app.auth.models import ResourceType
 from app.auth.resources import ResourceNotFoundError, resolve_resource
 from app.auth.runtime import AuthRuntime, get_auth_runtime
@@ -169,6 +174,7 @@ async def _generate_reply(
                 "X-OpenVMan-User-ID": current.user.id,
                 "X-OpenVMan-Role": current.user.role.value,
                 "X-OpenVMan-Project-ID": payload.project_id,
+                WEB_SEARCH_HEADER: web_search_header_value(current),
             },
         )
         resp.raise_for_status()

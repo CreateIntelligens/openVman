@@ -53,6 +53,7 @@ def test_create_returns_the_generated_key_and_creation_defaults(admin_client):
     assert body["rate_limit_per_minute"] == 60
     assert body["daily_request_quota"] == 1000
     assert body["requests_today"] == 0
+    assert body["web_search_access"] is False
 
 
 def test_create_honours_supplied_limits_and_defaults(admin_client):
@@ -169,6 +170,7 @@ def test_patch_applies_without_restart(admin_client):
             "allowed_origins": ["https://other.example"],
             "rate_limit_per_minute": 5,
             "disabled": True,
+            "web_search_access": True,
         },
     )
 
@@ -178,11 +180,13 @@ def test_patch_applies_without_restart(admin_client):
     assert body["allowed_origins"] == ["https://other.example"]
     assert body["rate_limit_per_minute"] == 5
     assert body["disabled"] is True
+    assert body["web_search_access"] is True
 
     from app.auth.runtime import get_auth_runtime
 
     stored = get_auth_runtime().embed_keys.get(created["key_id"])
     assert stored.disabled is True
+    assert stored.web_search_access is True
     assert stored.allowed_origins == ("https://other.example",)
 
 

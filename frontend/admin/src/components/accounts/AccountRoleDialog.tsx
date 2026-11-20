@@ -46,8 +46,9 @@ export default function AccountRoleDialog({
         kiosk: account.kiosk ?? false,
         // 管理員回來的是生效值（一律為真）；降成一般帳號時不能因此默默開放。
         ai_cleanup_access: isAtLeastAdmin(account.role) ? false : (account.ai_cleanup_access ?? false),
+        web_search_access: account.web_search_access ?? false,
       }
-      : undefined,
+      : { web_search_access: account.web_search_access ?? false },
     // 只有降級才會顯示授權欄位，提升為管理員時不必抓選項。
     demoting,
   );
@@ -141,7 +142,7 @@ export default function AccountRoleDialog({
 
           {demoting && (
             <div className="mt-5">
-              <AccountAccessFields form={accessForm} allowProjectWrites />
+              <AccountAccessFields form={accessForm} allowProjectWrites showWebSearchAccess submitting={saving} />
             </div>
           )}
 

@@ -62,3 +62,13 @@ def test_trusted_context_keeps_an_embed_principal() -> None:
 
     assert context.principal_type == "embed_key"
     assert context.principal_id == "ovk_abc"
+
+
+@pytest.mark.parametrize(
+    ("value", "allowed"), [(None, None), ("1", True), ("0", False), ("true", False)],
+)
+def test_trusted_context_parses_web_search_capability(value, allowed):
+    context = internal_auth.trusted_request_context(
+        "internal-secret", "user-1", "user", "project-1", web_search=value,
+    )
+    assert context.web_search_allowed is allowed

@@ -108,6 +108,7 @@ class EmbedKeyCreateRequest(_StrictModel):
         ge=1,
     )
     daily_request_quota: int = Field(default=DEFAULT_DAILY_REQUEST_QUOTA, ge=1)
+    web_search_access: bool = False
 
 
 class EmbedKeyUpdateRequest(_StrictModel):
@@ -121,6 +122,7 @@ class EmbedKeyUpdateRequest(_StrictModel):
     rate_limit_per_minute: int | None = Field(default=None, ge=1)
     daily_request_quota: int | None = Field(default=None, ge=1)
     disabled: bool | None = None
+    web_search_access: bool | None = None
 
 
 def _serialize(record: EmbedKeyRecord, requests_today: int) -> dict[str, object]:
@@ -142,6 +144,7 @@ def _serialize(record: EmbedKeyRecord, requests_today: int) -> dict[str, object]
         "updated_at": record.updated_at,
         "last_used_at": record.last_used_at,
         "requests_today": requests_today,
+        "web_search_access": record.web_search_access,
     }
 
 
@@ -185,6 +188,7 @@ async def create_embed_key(
             rate_limit_per_minute=payload.rate_limit_per_minute,
             daily_request_quota=payload.daily_request_quota,
             created_by=current.user.id,
+            web_search_access=payload.web_search_access,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

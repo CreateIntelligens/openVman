@@ -12,7 +12,12 @@ from knowledge.kb_settings import memory_enabled, primary_language
 from memory.embedder import encode_query_with_fallback
 from memory.language_detect import TAIWANESE, detect_language
 from memory.retrieval import search_records
-from tools.context import MEMORY_TOOLS, VENDOR_KNOWLEDGE_TOOLS
+from tools.context import (
+    MEMORY_TOOLS,
+    VENDOR_KNOWLEDGE_TOOLS,
+    WEB_TOOLS,
+    enabled_web_tools,
+)
 
 
 logger = logging.getLogger("brain.live.gemini_tool_execution")
@@ -29,12 +34,22 @@ class GeminiLiveToolExecutor:
         project_id: str,
         persona_id: str,
         vendor: bool = False,
+        web_search_allowed: bool | None = None,
     ) -> None:
         self.config = config
         self.relay_session_id = relay_session_id
         self.project_id = project_id
         self.persona_id = persona_id
         self.vendor = vendor
+        self.web_search_allowed = web_search_allowed
+
+    @property
+    def web_tools(self) -> set[str]:
+        if not getattr(self.config, "live_gemini_tools_enabled", True):
+            return set()
+        return enabled_web_tools(
+            self.config, allowed=self.web_search_allowed, vendor=self.vendor,
+        )
 
     async def execute(
         self,
@@ -47,8 +62,11 @@ class GeminiLiveToolExecutor:
     ) -> dict[str, Any]:
         name = str(function_call.get("name", "")).strip()
         call_id = str(function_call.get("id", "")).strip()
-        if self.vendor and name not in VENDOR_KNOWLEDGE_TOOLS:
+        web_tools = self.web_tools if name in WEB_TOOLS else set()
+        if self.vendor and name not in VENDOR_KNOWLEDGE_TOOLS and name not in web_tools:
             return {"id": call_id, "name": name, "response": {"error": "沒有權限使用這個工具。"}}
+        if name in WEB_TOOLS and name not in web_tools:
+            return {"id": call_id, "name": name, "response": {"error": f"{name} 已停用"}}
         args = function_call.get("args") or {}
         if isinstance(args, str):
             args = json.loads(args)
@@ -80,14 +98,6 @@ class GeminiLiveToolExecutor:
         try:
             if name in MEMORY_TOOLS and not memory_enabled(self.project_id):
                 raise ValueError(f"{name} 已停用")
-            if name == "search_web" and not getattr(
-                self.config, "url2md_search_enabled", True
-            ):
-                raise ValueError("search_web 已停用")
-            if name == "read_web_page" and not getattr(
-                self.config, "url2md_read_enabled", True
-            ):
-                raise ValueError("read_web_page 已停用")
             if name == "publish_wiki" and not getattr(
                 self.config, "wiki_publish_enabled", True
             ):

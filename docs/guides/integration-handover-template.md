@@ -118,7 +118,7 @@ curl -s https://api.example.com/api/v1/tts/stream \
 | 403 | 沒有這個資源或動作的權限（聲音不在專案限制內、只有讀取權卻要刪） | 查 capabilities 或請管理者改授權 |
 | 404 | 專案、人物、聲音不存在，或這個帳號看不到 | 確認 ID（用 ID 不用名稱） |
 | 422 | 參數格式不對，或專案範圍 API 沒帶 `project_id` | 改參數 |
-| 429 | 超過每把 key 每分鐘上限（部署設定 `API_KEY_RATE_LIMIT_PER_MINUTE`，預設 300），或同一專案每分鐘超過 90 次對話（`LLM_OVERLOAD`） | 照 `Retry-After` 秒數後重試 |
+| 429 | 超過每把 key 每分鐘上限（部署設定 `API_KEY_RATE_LIMIT_PER_MINUTE`，預設 300），或同一專案每分鐘超過 1200 次對話（`LLM_OVERLOAD`） | 照 `Retry-After` 秒數後重試 |
 | 502 / 503 | 指定的上游引擎失敗或未設定 | 不指定引擎讓伺服器備援，或稍後重試 |
 
 限流以 60 秒滑動視窗計算，多台機器共用一把 key 就共用一個上限。

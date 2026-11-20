@@ -409,6 +409,8 @@ _PROJECT_ENGINE_ORDER_MIGRATION_NAME = "add_project_engine_order"
 # 「AI 整理排版」逐帳號開放；既有帳號一律從關閉開始，管理員以上不看這個欄位。
 _AI_CLEANUP_ACCESS_SCHEMA_VERSION = 27
 _AI_CLEANUP_ACCESS_MIGRATION_NAME = "add_users_ai_cleanup_access"
+_WEB_SEARCH_ACCESS_SCHEMA_VERSION = 29
+_WEB_SEARCH_ACCESS_MIGRATION_NAME = "add_web_search_access"
 _PROJECT_RESOURCE_SCOPE_MIGRATION_NAME = "project_resource_scope"
 
 _PROJECT_RESOURCE_SCOPE_RESOURCES_TABLE = """

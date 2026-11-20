@@ -1,6 +1,7 @@
 """Built-in tools for the openVman Brain."""
 
 from config import get_settings
+from tools.context import WEB_TOOLS, enabled_web_tools
 
 def list_builtin_tools():
     """Return all built-in tools, using lazy imports to avoid circular dependencies."""
@@ -30,10 +31,8 @@ def list_builtin_tools():
         filter_products_tool(),
     ]
     cfg = get_settings()
-    if not getattr(cfg, "url2md_search_enabled", True):
-        tools = [tool for tool in tools if tool.name != "search_web"]
-    if not getattr(cfg, "url2md_read_enabled", True):
-        tools = [tool for tool in tools if tool.name != "read_web_page"]
+    disabled_web_tools = WEB_TOOLS - enabled_web_tools(cfg)
+    tools = [tool for tool in tools if tool.name not in disabled_web_tools]
     if not getattr(cfg, "wiki_publish_enabled", True):
         tools = [tool for tool in tools if tool.name != "publish_wiki"]
     return tools

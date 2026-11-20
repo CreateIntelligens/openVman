@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from collections.abc import Iterable, Mapping
 
 from ._account_access_rules import (
@@ -45,16 +44,22 @@ class AccountAccessRepository:
         *,
         user_id: str,
         granted_by: str,
-        grants: Iterable[tuple[ResourceType, str]],
-        defaults: tuple[str, ...],
+        grants: Iterable[tuple[ResourceType, str]] | None = None,
+        defaults: tuple[str, ...] | None = None,
         admin_portal_access: bool = False,
         kiosk: bool | None = None,
         ai_cleanup_access: bool | None = None,
         project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
-    ) -> tuple[tuple[ResourceGrantRecord, ...], AccountDefaultsRecord]:
-        normalized_grants, normalized_defaults = _normalize_account_access(
-            grants,
-            defaults,
+        web_search_access: bool | None = None,
+    ) -> tuple[tuple[ResourceGrantRecord, ...], AccountDefaultsRecord | None]:
+        if (grants is None) != (defaults is None):
+            raise InvalidResourceGrantError(
+                "account grants and defaults must be provided together"
+            )
+        normalized_access = (
+            _normalize_account_access(grants, defaults)
+            if grants is not None and defaults is not None
+            else None
         )
         now = now_iso()
         with self.database.transaction(write=True) as connection:
@@ -80,51 +85,52 @@ class AccountAccessRepository:
                     "temporary account grants are managed by their batch"
                 )
 
-            _persist_account_access(
-                connection,
-                user_id=user_id,
-                granted_by=granted_by,
-                normalized_grants=normalized_grants,
-                normalized_defaults=normalized_defaults,
-                now=now,
-                clear_existing=True,
-                project_permissions=project_permissions,
-                legacy_project_edit=admin_portal_access,
-            )
+            metadata: dict[str, bool] = {}
+            portal_update = None
+            if normalized_access is not None:
+                normalized_grants, normalized_defaults = normalized_access
+                _persist_account_access(
+                    connection,
+                    user_id=user_id,
+                    granted_by=granted_by,
+                    normalized_grants=normalized_grants,
+                    normalized_defaults=normalized_defaults,
+                    now=now,
+                    clear_existing=True,
+                    project_permissions=project_permissions,
+                    legacy_project_edit=admin_portal_access,
+                )
+                portal_update = admin_portal_access
+                metadata["admin_portal_access"] = admin_portal_access
+
             connection.execute(
                 """
                 UPDATE users
-                SET admin_portal_access = ?,
+                SET admin_portal_access = COALESCE(?, admin_portal_access),
                     token_version = token_version + CASE
                         WHEN admin_portal_access != ? THEN 1 ELSE 0 END,
+                    kiosk = COALESCE(?, kiosk),
+                    ai_cleanup_access = COALESCE(?, ai_cleanup_access),
+                    web_search_access = COALESCE(?, web_search_access),
                     updated_at = ?
                 WHERE id = ?
                 """,
                 (
-                    int(admin_portal_access),
-                    int(admin_portal_access),
+                    portal_update,
+                    portal_update,
+                    kiosk,
+                    ai_cleanup_access,
+                    web_search_access,
                     now,
                     user_id,
                 ),
             )
-            metadata: dict[str, bool] = {
-                "admin_portal_access": admin_portal_access,
-            }
             if kiosk is not None:
-                # 展示機台只改前台行為，不動 token_version：改了會把正在現場
-                # 運作的機台直接登出。
-                connection.execute(
-                    "UPDATE users SET kiosk = ? WHERE id = ?",
-                    (int(kiosk), user_id),
-                )
                 metadata["kiosk"] = kiosk
             if ai_cleanup_access is not None:
-                # 每次請求都從資料庫讀帳號，改了下一個請求就生效，不用撤銷 session。
-                connection.execute(
-                    "UPDATE users SET ai_cleanup_access = ? WHERE id = ?",
-                    (int(ai_cleanup_access), user_id),
-                )
                 metadata["ai_cleanup_access"] = ai_cleanup_access
+            if web_search_access is not None:
+                metadata["web_search_access"] = web_search_access
             _append_auth_audit(
                 connection,
                 action="account_access_updated",
@@ -135,7 +141,7 @@ class AccountAccessRepository:
             )
 
         updated_defaults = self.get_defaults(user_id)
-        if updated_defaults is None:
+        if normalized_access is not None and updated_defaults is None:
             raise RepositoryError(
                 "updated account defaults could not be reloaded"
             )

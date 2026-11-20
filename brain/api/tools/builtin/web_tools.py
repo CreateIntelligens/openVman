@@ -390,7 +390,7 @@ def search_web_tool():
         description=(
             "使用 2md 即時搜尋網路。需要最新資訊、新聞、天氣、公開資料，"
             "或需要先找出相關網址時使用。"
-            "搜尋結果包含標題、網址與摘要；若需要完整內容，再呼叫 read_web_page。"
+            "搜尋結果包含標題、網址與摘要。"
         ),
         parameters={
             "type": "object",

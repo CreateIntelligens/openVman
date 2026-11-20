@@ -11,6 +11,14 @@ export type AccountRole = "root" | "admin" | "user";
 export type AssignableAccountRole = Exclude<AccountRole, "root">;
 export type AccountKind = "formal" | "temporary";
 
+export interface AccountPreset {
+  key: string;
+  label: string;
+  description: string;
+  requires_vendor_name: boolean;
+  requires_projects: boolean;
+}
+
 export interface AccountDefaults {
   project_id: string;
   character_id: string;
@@ -36,11 +44,14 @@ export interface AccountProfile {
   kiosk?: boolean;
   /** 可以用「AI 整理排版」的生效值：管理員以上一律為真。 */
   ai_cleanup_access?: boolean;
+  web_search_access?: boolean;
   vendor_name?: string | null;
   account_management_access?: boolean;
 }
 
 export interface Account extends AccountProfile {
+  preset?: string | null;
+  preset_label?: string | null;
   created_by?: string | null;
   updated_at?: string;
   token_version?: number;
@@ -96,6 +107,7 @@ function safeAccountProfile(account: AccountProfile): AccountProfile {
     admin_portal_access: account.admin_portal_access,
     kiosk: account.kiosk,
     ai_cleanup_access: account.ai_cleanup_access,
+    web_search_access: account.web_search_access,
     vendor_name: account.vendor_name,
     account_management_access: account.account_management_access,
   };
@@ -121,6 +133,8 @@ function safeAccount(account: Account): Account {
     : account.grants;
   return {
     ...safeAccountProfile(account),
+    preset: account.preset,
+    preset_label: account.preset_label,
     created_by: account.created_by,
     updated_at: account.updated_at,
     token_version: account.token_version,
@@ -201,7 +215,10 @@ export interface AccountAccessInput {
   admin_portal_access: boolean;
   kiosk?: boolean;
   ai_cleanup_access?: boolean;
+  web_search_access?: boolean;
 }
+
+type AccountAccessUpdateInput = AccountAccessInput | { web_search_access: boolean };
 
 export interface TemporaryCredential {
   user_id: string;
@@ -215,6 +232,7 @@ export interface TemporaryBatchResult {
   created_at: string;
   admin_portal_access: boolean;
   kiosk?: boolean;
+  web_search_access?: boolean;
 }
 
 export interface TemporaryBatchAudit {
@@ -230,6 +248,7 @@ export interface TemporaryBatchAudit {
   accounts?: TemporaryAccountAudit[];
   admin_portal_access?: boolean;
   kiosk?: boolean;
+  web_search_access?: boolean;
 }
 
 export interface TemporaryAccountAudit {
@@ -241,6 +260,7 @@ export interface TemporaryAccountAudit {
   first_used_at: string | null;
   expires_at: string | null;
   remaining_seconds: number | null;
+  web_search_access?: boolean;
 }
 
 interface TemporaryBatchListResponse {
@@ -329,13 +349,25 @@ export async function listAccounts(): Promise<Account[]> {
   return accounts.map(safeAccount);
 }
 
-export async function createAccount(input: {
+export async function listAccountPresets(): Promise<AccountPreset[]> {
+  return fetchJson<AccountPreset[]>(apiUrl("/admin/account-presets"));
+}
+
+type AccountCreateInput = {
   username: string;
   password: string;
-  role: AssignableAccountRole;
   vendor_name?: string;
-  access?: AccountAccessInput;
-}): Promise<Account> {
+} & ({
+  role: AssignableAccountRole;
+  access?: AccountAccessUpdateInput;
+  preset?: never;
+} | {
+  preset: string;
+  project_ids: string[];
+  role?: never;
+});
+
+export async function createAccount(input: AccountCreateInput): Promise<Account> {
   const account = await fetchJson<Account>(apiUrl("/users"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -350,7 +382,7 @@ export async function fetchAccountAccessOptions(): Promise<AccountAccessOptions>
 
 export async function updateAccountAccess(
   userId: string,
-  input: AccountAccessInput,
+  input: AccountAccessUpdateInput,
 ): Promise<Account> {
   const account = await fetchJson<Account>(
     apiUrl(`${itemPath("/users", userId)}/access`),

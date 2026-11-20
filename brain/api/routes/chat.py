@@ -54,8 +54,10 @@ from safety.internal_auth import (
     PRINCIPAL_TYPE_HEADER,
     USER_ID_HEADER,
     USER_ROLE_HEADER,
+    WEB_SEARCH_HEADER,
     may_see_decision_debug,
     require_internal_token,
+    trusted_web_search_allowed,
 )
 from safety.observability import (
     get_metrics_store,
@@ -71,7 +73,7 @@ from safety.vendor_access import (
     vendor_chat_history,
     vendor_chat_reply,
 )
-from tools.context import bind_vendor_chat
+from tools.context import bind_vendor_chat, bind_web_search
 from tools.skill_manager import get_skill_manager
 
 logger = logging.getLogger("brain.chat")
@@ -301,6 +303,7 @@ async def _generate_chat_response(
         bind_cancel_event(cancel_event),
         bind_turn_budget(turn_budget_s, started=run.started),
         bind_vendor_chat(request.headers.get(VENDOR_HEADER) == "1"),
+        bind_web_search(trusted_web_search_allowed(request.headers.get(WEB_SEARCH_HEADER))),
     ):
         if payload.turn_id is not None:
             await _to_thread_timed(request, "register_turn", register_turn, request, payload)

@@ -18,6 +18,7 @@ from core.turn_reads import (
     vendor_turn_decision,
     without_disabled_recall,
 )
+from tools.context import WEB_TOOLS
 
 from .gemini_context import LiveSessionContext
 from .gemini_payloads import build_user_turn_message
@@ -80,6 +81,7 @@ class GeminiLiveTurns:
     def user_turn_message(self, user_text: str) -> dict[str, Any]:
         return build_user_turn_message(
             user_text, self._turn_decision, self._prefetched_reads,
+            include_web="search_web" in self._tools.web_tools,
         )
 
     async def decide_text_turn(
@@ -145,21 +147,23 @@ class GeminiLiveTurns:
                     history = [*history[:index], *history[index + 1:]]
                     break
             cfg = turn_decision_config(context.config)
+            web_tools = self._tools.web_tools
+            available_tools = ["search_knowledge", *sorted(web_tools)]
+            if not context.vendor:
+                available_tools.append("search_memory")
             decision = await run_turn_decision_async(
                 user_text=text,
                 history=history,
                 project_id=context.project_id,
                 project_language=primary_language(context.project_id),
                 speech_language=speech_language,
-                available_tools=("search_knowledge",) if context.vendor else (
-                    "search_knowledge", "search_web", "search_memory",
-                ),
+                available_tools=available_tools,
                 config=cfg,
                 turn_id=f"live:{context.relay_session_id}:{self._turn_revision}",
                 capture_debug=self.decision_debug_enabled and not text.startswith("[視覺事件]"),
             )
             if context.vendor:
-                return vendor_turn_decision(decision)
+                return vendor_turn_decision(decision, allow_web_search="search_web" in web_tools)
             return without_disabled_recall(decision, context.session_id, context.project_id)
         except asyncio.CancelledError:
             raise
@@ -229,7 +233,7 @@ class GeminiLiveTurns:
             current_text=user_text,
             previous_text=previous_text,
             knowledge=policy.needs_knowledge is True,
-            web=policy.needs_web is True and getattr(config, "url2md_search_enabled", True),
+            web=policy.needs_web is True and "search_web" in self._tools.web_tools,
             memory=policy.needs_memory is True,
         )
         if not reads:
@@ -267,7 +271,10 @@ class GeminiLiveTurns:
             policy = self._turn_decision.policy
             required = [
                 ("search_knowledge", policy.needs_knowledge is True, {"queries": [self._last_user_message]}),
-                ("search_web", policy.needs_web is True, {"query": self._last_user_message}),
+                (
+                    "search_web", policy.needs_web is True and "search_web" in self._tools.web_tools,
+                    {"query": self._last_user_message},
+                ),
                 ("search_memory", policy.needs_memory is True, {"queries": [self._last_user_message]}),
             ]
             for name, enabled, args in required:
@@ -291,6 +298,7 @@ class GeminiLiveTurns:
 
         if (
             name in self._prefetched_reads
+            and (name not in WEB_TOOLS or name in self._tools.web_tools)
             and matches_prefetched_query(
                 function_call, name, self._prefetched_queries.get(name, ""),
                 self._last_user_message,

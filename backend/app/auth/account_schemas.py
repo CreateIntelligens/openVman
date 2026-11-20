@@ -14,6 +14,7 @@ from pydantic import (
     model_serializer,
 )
 
+from .account_presets import AccountPresetKey, derive_account_preset
 from .models import (
     AccountDefaultsRecord,
     AccountRole,
@@ -25,6 +26,7 @@ from .models import (
     UserRecord,
     has_admin_portal_access,
     has_ai_cleanup_access,
+    has_web_search_access,
 )
 from .policy import is_vendor_account
 from .runtime import AuthRuntime
@@ -177,6 +179,7 @@ class AccountProfile(_StrictModel):
     kiosk: bool
     # 生效值：管理員以上一律為真。後台據此決定要不要顯示「AI 整理排版」。
     ai_cleanup_access: bool = False
+    web_search_access: bool = False
     vendor_name: str | None = None
     account_management_access: bool = False
 
@@ -188,6 +191,7 @@ class AccountProfile(_StrictModel):
             if self.vendor_name and not isinstance(self, AdminAccountProfile):
                 result.pop("created_by", None)
                 result.pop("ai_cleanup_access", None)
+                result.pop("web_search_access", None)
         return result
 
     @classmethod
@@ -228,6 +232,7 @@ class AccountProfile(_StrictModel):
             admin_portal_access=has_admin_portal_access(user),
             kiosk=user.kiosk,
             ai_cleanup_access=has_ai_cleanup_access(user),
+            web_search_access=has_web_search_access(user),
             vendor_name=user.vendor_name,
             account_management_access=user.account_management_access,
             defaults=(
@@ -241,6 +246,8 @@ class AccountProfile(_StrictModel):
 class AdminAccountProfile(AccountProfile):
     resource_counts: dict[str, int]
     grants: AccountResourceGrantsView | None
+    preset: AccountPresetKey | None = None
+    preset_label: str | None = None
     # 後台清理帳號用：None 表示升級後還沒登入過／從沒用過 API key。
     last_login_at: str | None = None
     api_key_last_used_at: str | None = None
@@ -256,8 +263,12 @@ class AdminAccountProfile(AccountProfile):
         profile["created_by"] = user.created_by
         # 對外的廠商 profile 不帶這個欄位；管理畫面要看到實際值，否則存檔會把權限關掉。
         profile["ai_cleanup_access"] = has_ai_cleanup_access(user)
+        profile["web_search_access"] = has_web_search_access(user)
+        preset = derive_account_preset(user, grant_records)
         return cls(
             **profile,
+            preset=preset.key if preset else None,
+            preset_label=preset.label if preset else None,
             resource_counts=runtime.resources.count_private_by_owner(user.id),
             grants=(
                 AccountResourceGrantsView.from_records(

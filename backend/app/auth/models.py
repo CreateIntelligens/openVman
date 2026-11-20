@@ -47,6 +47,10 @@ def has_ai_cleanup_access(user: UserRecord) -> bool:
     return is_at_least_admin(user.role) or user.ai_cleanup_access
 
 
+def has_web_search_access(user: UserRecord) -> bool:
+    return user.web_search_access
+
+
 # 「admin 以上」的角色值，供 SQL 的 IN 子句使用。從階層推導而非寫死字面
 # 列表，新增角色時不會漏掉這裡。
 ADMIN_OR_ABOVE_VALUES = tuple(
@@ -100,6 +104,7 @@ class UserRecord:
     last_login_at: str | None = None
     vendor_name: str | None = None
     account_management_access: bool = False
+    web_search_access: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,6 +262,7 @@ class EmbedKeyRecord:
     created_at: str
     updated_at: str
     last_used_at: str | None
+    web_search_access: bool = False
 
     def allows_origin(self, origin: str) -> bool:
         """Match the exact `scheme://host[:port]` string, case-insensitively."""

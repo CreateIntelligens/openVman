@@ -12,11 +12,14 @@ from typing import TYPE_CHECKING, Any
 from safety.observability import log_exception
 from tools.context import (
     VENDOR_KNOWLEDGE_TOOLS,
+    WEB_TOOLS,
     active_persona_id,
     active_project_id,
     active_reply_mode,
     active_user_message,
     active_vendor_chat,
+    active_web_search_allowed,
+    web_search_permitted,
 )
 
 logger = logging.getLogger("brain.tools")
@@ -67,16 +70,20 @@ class ToolRegistry:
             del self._tools[name]
 
     def get(self, name: str) -> Tool:
-        if name not in self._tools or (
-            active_vendor_chat.get() and name not in VENDOR_KNOWLEDGE_TOOLS
+        if name not in self._tools or not _tool_available(
+            name, active_vendor_chat.get(), active_web_search_allowed.get(),
         ):
             raise ValueError(f"未知工具：{name}")
         return self._tools[name]
 
     def list_tools(self) -> list[Tool]:
         vendor = active_vendor_chat.get()
+        web_allowed = active_web_search_allowed.get()
         return sorted(
-            (tool for name, tool in self._tools.items() if not vendor or name in VENDOR_KNOWLEDGE_TOOLS),
+            (
+                tool for name, tool in self._tools.items()
+                if _tool_available(name, vendor, web_allowed)
+            ),
             key=lambda tool: tool.name,
         )
 
@@ -92,6 +99,12 @@ class ToolRegistry:
             }
             for tool in self.list_tools()
         ]
+
+
+def _tool_available(name: str, vendor: bool, web_allowed: bool | None) -> bool:
+    if name in WEB_TOOLS:
+        return web_search_permitted(web_allowed, vendor=vendor)
+    return not vendor or name in VENDOR_KNOWLEDGE_TOOLS
 
 
 _registry_lock = RLock()

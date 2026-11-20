@@ -106,6 +106,9 @@ describe("EmbedKeys", () => {
       screen.getByLabelText(/允許的來源網域/),
       { target: { value: "https://a.example\nhttps://b.example" } },
     );
+    const webSearch = screen.getByRole("checkbox", { name: "可用網路搜尋" }) as HTMLInputElement;
+    expect(webSearch.checked).toBe(false);
+    fireEvent.click(webSearch);
     fireEvent.click(screen.getByRole("button", { name: "建立" }));
 
     await waitFor(() => expect(api.createEmbedKey).toHaveBeenCalledTimes(1));
@@ -113,8 +116,25 @@ describe("EmbedKeys", () => {
       label: "新網站",
       project_id: "default",
       allowed_origins: ["https://a.example", "https://b.example"],
+      web_search_access: true,
     });
     await waitFor(() => expect(api.listEmbedKeys).toHaveBeenCalledTimes(2));
+  });
+
+  it("loads stored web search access and can disable it on edit", async () => {
+    const key = makeKey({ web_search_access: true });
+    api.listEmbedKeys.mockResolvedValue([key]);
+    render(<EmbedKeys />);
+    fireEvent.click(await screen.findByRole("button", { name: "編輯" }));
+    const checkbox = screen.getByRole("checkbox", { name: "可用網路搜尋" }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+
+    await waitFor(() => expect(api.updateEmbedKey).toHaveBeenCalledWith(
+      key.key_id, expect.objectContaining({ web_search_access: false }),
+    ));
   });
 
   it("refuses to submit an empty origin list", async () => {

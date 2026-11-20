@@ -9,6 +9,7 @@ import {
   type AccountRole,
   type ProjectWritePermissions,
 } from "../../api/auth";
+import WebSearchAccessField from "../WebSearchAccessField";
 import { groupAccessOptions, providerLabel, type GrantType } from "./accountAccessGroups";
 import GroupedChecklist from "./GroupedChecklist";
 
@@ -167,49 +168,49 @@ export function withProjectPermissions(
 
 export function accessFromOptions(
   options: AccountAccessOptions,
-  current?: AccountAccessInput,
+  current?: Partial<AccountAccessInput>,
 ): AccountAccessInput {
   const projects = initialSelection(
-    current?.grants.projects,
+    current?.grants?.projects,
     options.projects,
     PREFERRED_PROJECT,
   );
   const characters = initialSelection(
-    current?.grants.avatar_characters,
+    current?.grants?.avatar_characters,
     options.avatar_characters,
     PREFERRED_CHARACTER,
   );
   const voices = initialSelection(
-    current?.grants.custom_voices,
+    current?.grants?.custom_voices,
     options.custom_voices,
     PREFERRED_VOICE,
   );
   const mascots = initialSelection(
-    current?.grants.avatar_mascots,
+    current?.grants?.avatar_mascots,
     options.avatar_mascots ?? [],
     "",
     true,
   );
   // 背景預設給深色（前台的 fallback 也是它），小助理才是完全選填。
   const backgrounds = initialSelection(
-    current?.grants.avatar_backgrounds,
+    current?.grants?.avatar_backgrounds,
     options.avatar_backgrounds ?? [],
     PREFERRED_BACKGROUND,
   );
   // 辨識引擎沒有預設值、也不預勾；但一定要帶回去，後端 replace 是整份覆蓋，
   // 少了這一類就等於把既有的引擎授權清掉。
   const asrEngines = initialSelection(
-    current?.grants.asr_engines,
+    current?.grants?.asr_engines,
     options.asr_engines ?? [],
     "",
     true,
   );
-  const voiceId = initialDefault(current?.defaults.voice_id, voices);
+  const voiceId = initialDefault(current?.defaults?.voice_id, voices);
   const voice = options.custom_voices.find((option) => option.id === voiceId);
   return {
     grants: {
       projects,
-      ...selectedProjectPermissions(current?.grants.project_permissions, projects),
+      ...selectedProjectPermissions(current?.grants?.project_permissions, projects),
       avatar_characters: characters,
       custom_voices: voices,
       avatar_mascots: mascots,
@@ -217,25 +218,26 @@ export function accessFromOptions(
       asr_engines: asrEngines,
     },
     defaults: {
-      project_id: initialDefault(current?.defaults.project_id, projects),
+      project_id: initialDefault(current?.defaults?.project_id, projects),
       character_id: initialDefault(
-        current?.defaults.character_id,
+        current?.defaults?.character_id,
         characters,
       ),
       voice_provider: voice?.provider ?? "indextts",
       voice_id: voiceId,
-      mascot_id: initialDefault(current?.defaults.mascot_id, mascots),
-      background_id: initialDefault(current?.defaults.background_id, backgrounds),
+      mascot_id: initialDefault(current?.defaults?.mascot_id, mascots),
+      background_id: initialDefault(current?.defaults?.background_id, backgrounds),
     },
     admin_portal_access: current?.admin_portal_access ?? false,
     kiosk: current?.kiosk ?? false,
     ai_cleanup_access: current?.ai_cleanup_access ?? false,
+    ...(current?.web_search_access !== undefined && { web_search_access: current.web_search_access }),
   };
 }
 
 export function useAccountAccessForm(
   cacheKey: string,
-  initialAccess?: AccountAccessInput,
+  initialAccess?: Partial<AccountAccessInput>,
   /** 呼叫端還不需要授權欄位時跳過抓取（例如提升為管理員不會用到）。 */
   enabled = true,
   vendorName?: string | null,
@@ -275,7 +277,7 @@ export function useAccountAccessForm(
       .catch((reason) => {
         if (!active) return;
         setOptions(null);
-        setAccess(EMPTY_ACCESS);
+        setAccess({ ...EMPTY_ACCESS, ...initialAccess });
         setError(messageFrom(reason, "無法載入可授權資源"));
       })
       .finally(() => {
@@ -301,6 +303,10 @@ export function useAccountAccessForm(
 
   function setAiCleanupAccess(enabled: boolean) {
     setAccess((current) => ({ ...current, ai_cleanup_access: enabled }));
+  }
+
+  function setWebSearchAccess(enabled: boolean) {
+    setAccess((current) => ({ ...current, web_search_access: enabled }));
   }
 
   function setProjectPermission(
@@ -464,6 +470,7 @@ export function useAccountAccessForm(
     setAdminPortalAccess,
     setKiosk,
     setAiCleanupAccess,
+    setWebSearchAccess,
     setProjectPermission,
     vendorName,
     setDefault,
@@ -499,11 +506,15 @@ export default function AccountAccessFields({
   form,
   role,
   allowProjectWrites = false,
+  showWebSearchAccess = false,
+  submitting = false,
 }: {
   form: AccountAccessForm;
   /** 帳號角色；管理員與 ROOT 不受授權清單限制，畫面要講明白，不能讓人以為存了會生效。 */
   role?: AccountRole;
   allowProjectWrites?: boolean;
+  showWebSearchAccess?: boolean;
+  submitting?: boolean;
 }) {
   const unrestricted = role !== undefined && isAtLeastAdmin(role);
   return (
@@ -574,6 +585,14 @@ export default function AccountAccessFields({
           </span>
         </span>
       </label>
+      {showWebSearchAccess && (
+        <WebSearchAccessField
+          checked={form.access.web_search_access ?? false}
+          onChange={form.setWebSearchAccess}
+          disabled={form.loading || submitting}
+          className="border-b border-border bg-surface-sunken px-5 py-4"
+        />
+      )}
       <div className="grid grid-cols-1 gap-0 md:grid-cols-2 xl:grid-cols-3">
         {GROUPS.map((group) => (
           <AccessGroup

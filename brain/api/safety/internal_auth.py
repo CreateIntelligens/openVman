@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hmac
+from dataclasses import dataclass
 
 from fastapi import Header, HTTPException
 
@@ -13,6 +13,7 @@ INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 USER_ID_HEADER = "X-OpenVMan-User-ID"
 USER_ROLE_HEADER = "X-OpenVMan-Role"
 PROJECT_ID_HEADER = "X-OpenVMan-Project-ID"
+WEB_SEARCH_HEADER = "X-OpenVMan-Web-Search"
 PRINCIPAL_TYPE_HEADER = "X-Principal-Type"
 PRINCIPAL_ID_HEADER = "X-Principal-Id"
 
@@ -26,6 +27,7 @@ class TrustedRequestContext:
     # 這樣帳本欄位永遠有值，不必在查詢端處理空字串。
     principal_type: str = "user"
     principal_id: str = ""
+    web_search_allowed: bool | None = None
 
 
 def require_internal_token(
@@ -43,6 +45,7 @@ def trusted_request_context(
     project_id: str = Header("", alias=PROJECT_ID_HEADER),
     principal_type: str = Header("", alias=PRINCIPAL_TYPE_HEADER),
     principal_id: str = Header("", alias=PRINCIPAL_ID_HEADER),
+    web_search: str | None = Header(None, alias=WEB_SEARCH_HEADER),
 ) -> TrustedRequestContext:
     require_internal_token(token)
     if not user_id or not role or not project_id:
@@ -53,7 +56,16 @@ def trusted_request_context(
         project_id=project_id,
         principal_type=_header_value(principal_type) or "user",
         principal_id=_header_value(principal_id) or user_id,
+        web_search_allowed=trusted_web_search_allowed(
+            web_search if isinstance(web_search, str) else None,
+        ),
     )
+
+
+def trusted_web_search_allowed(value: str | None) -> bool | None:
+    """Read the Backend capability after validating the internal token."""
+    # 舊版 Backend 與內部呼叫未帶標頭時，沿用原本的廠商限制與 Brain 全域開關。
+    return None if value is None else value == "1"
 
 
 def _header_value(value: object) -> str:

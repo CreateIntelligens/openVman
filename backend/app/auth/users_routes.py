@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import Field
 
 from .account_access_options import AccountAccessOptions, scoped_options
+from .account_presets import ACCOUNT_PRESETS, AccountPresetError, AccountPresetKey
 from .account_schemas import (
     AccountDefaultsProfile,
     AccountResourceGrants,
@@ -37,6 +39,7 @@ from .resources import resolve_admin_scope
 from .runtime import AuthRuntime, get_auth_runtime
 
 users_router = APIRouter(prefix="/api/v1/users", tags=["Accounts"])
+account_presets_router = APIRouter(prefix="/api/v1/admin", tags=["Accounts"])
 
 
 class SetDisabledRequest(_StrictModel):
@@ -50,14 +53,29 @@ class UpdateAccountAccessRequest(_StrictModel):
     # None 表示不變更：沿用舊版前端送來、不知道這個欄位的請求不會把它清掉。
     kiosk: bool | None = None
     ai_cleanup_access: bool | None = None
+    web_search_access: bool | None = None
+
+
+class UpdateAccountWebSearchRequest(_StrictModel):
+    web_search_access: bool
 
 
 class CreateAccountRequest(_StrictModel):
     username: str
     password: str
     role: AccountRole = AccountRole.USER
-    access: UpdateAccountAccessRequest | None = None
+    access: UpdateAccountAccessRequest | UpdateAccountWebSearchRequest | None = None
     vendor_name: VendorName | None = None
+    preset: AccountPresetKey | None = None
+    project_ids: list[str] = Field(default_factory=list)
+
+
+class AccountPresetProfile(_StrictModel):
+    key: AccountPresetKey
+    label: str
+    description: str
+    requires_vendor_name: bool
+    requires_projects: bool
 
 
 class SetAccountManagementAccessRequest(_StrictModel):
@@ -126,20 +144,22 @@ def list_account_access_options(
 @users_router.put("/{user_id}/access", response_model=AdminAccountProfile)
 def update_account_access(
     user_id: str,
-    body: UpdateAccountAccessRequest,
+    body: UpdateAccountAccessRequest | UpdateAccountWebSearchRequest,
     admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> AdminAccountProfile:
+    access = body if isinstance(body, UpdateAccountAccessRequest) else None
     try:
         runtime.account_access.replace(
             user_id=user_id,
             granted_by=admin.user.id,
-            grants=_resource_grants(body.grants),
-            defaults=_defaults_tuple(body.defaults),
-            admin_portal_access=body.admin_portal_access,
-            kiosk=body.kiosk,
-            ai_cleanup_access=body.ai_cleanup_access,
-            project_permissions=body.grants.project_permissions,
+            grants=_resource_grants(access.grants) if access else None,
+            defaults=_defaults_tuple(access.defaults) if access else None,
+            admin_portal_access=bool(access and access.admin_portal_access),
+            kiosk=access.kiosk if access else None,
+            ai_cleanup_access=access.ai_cleanup_access if access else None,
+            project_permissions=access.grants.project_permissions if access else None,
+            web_search_access=body.web_search_access,
         )
     except UserNotFoundError as exc:
         raise HTTPException(
@@ -157,6 +177,24 @@ def update_account_access(
     return AdminAccountProfile.from_record(user, runtime)
 
 
+@account_presets_router.get("/account-presets")
+def list_account_presets(
+    admin: CurrentAccount = Depends(require_admin),
+) -> list[AccountPresetProfile]:
+    if not can_manage_vendor_accounts(admin.user):
+        raise HTTPException(status_code=403, detail="需要帳號管理權限。")
+    return [
+        AccountPresetProfile(
+            key=preset.key,
+            label=preset.label,
+            description=preset.description,
+            requires_vendor_name=preset.requires_vendor_name,
+            requires_projects=preset.requires_projects,
+        )
+        for preset in ACCOUNT_PRESETS.values()
+    ]
+
+
 @users_router.post(
     "",
     response_model=AdminAccountProfile,
@@ -169,7 +207,7 @@ def create_account(
 ) -> AdminAccountProfile:
     try:
         password_hash = hash_password(body.password)
-        access = body.access
+        access = body.access if isinstance(body.access, UpdateAccountAccessRequest) else None
         user = runtime.users.create(
             username=body.username,
             password_hash=password_hash,
@@ -182,9 +220,14 @@ def create_account(
             ai_cleanup_access=bool(access and access.ai_cleanup_access),
             vendor_name=body.vendor_name,
             project_permissions=access.grants.project_permissions if access else None,
+            web_search_access=bool(body.access and body.access.web_search_access),
+            preset=body.preset,
+            project_ids=body.project_ids,
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except AccountPresetError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (InvalidResourceGrantError, PasswordValidationError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except UsernameConflictError as exc:
@@ -312,6 +355,7 @@ def change_account_role(
             kiosk=access.kiosk if access is not None else None,
             ai_cleanup_access=access.ai_cleanup_access if access is not None else None,
             project_permissions=access.grants.project_permissions if access else None,
+            web_search_access=access.web_search_access if access else None,
         )
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc

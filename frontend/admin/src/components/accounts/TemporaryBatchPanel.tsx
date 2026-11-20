@@ -263,7 +263,7 @@ export default function TemporaryBatchPanel({
 
       {view === "create" && (
         <>
-          <AccountAccessFields form={accessForm} />
+          <AccountAccessFields form={accessForm} showWebSearchAccess submitting={submitting} />
 
           <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-content-muted">偏好值不可用時，已自動改用目前授權清單的第一項。</p>

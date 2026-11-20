@@ -16,6 +16,7 @@ import {
   updateAdminScope,
   deleteAccount,
   fetchAccountAccessOptions,
+  listAccountPresets,
   listAccounts,
   resetAccountPassword,
   revokeAccountSessions,
@@ -39,6 +40,7 @@ vi.mock("../api/auth", () => ({
   createAccount: vi.fn(),
   deleteAccount: vi.fn(),
   fetchAccountAccessOptions: vi.fn(),
+  listAccountPresets: vi.fn(),
   listAccounts: vi.fn(),
   resetAccountPassword: vi.fn(),
   revokeAccountSessions: vi.fn(),
@@ -112,6 +114,11 @@ describe("Accounts", () => {
       role: "admin",
     };
     vi.mocked(listAccounts).mockResolvedValue([]);
+    vi.mocked(listAccountPresets).mockResolvedValue([
+      { key: "rd", label: "創智研發", description: "研發管理員權限", requires_vendor_name: false, requires_projects: false },
+      { key: "bd", label: "BD", description: "內部專案唯讀權限", requires_vendor_name: false, requires_projects: true },
+      { key: "vendor_editor", label: "廠商編輯", description: "廠商知識庫編輯權限", requires_vendor_name: true, requires_projects: true },
+    ]);
     vi.mocked(fetchAccountAccessOptions).mockResolvedValue({
       projects: [{ id: "project-a", label: "專案 A" }],
       avatar_characters: [{ id: "character-a", label: "人物 A" }],
@@ -127,6 +134,94 @@ describe("Accounts", () => {
       disabled: false,
       created_at: "2026-08-18T00:00:00Z",
     });
+  });
+
+  it("requires a vendor name and a matching project before creating a vendor editor", async () => {
+    authState.account.account_management_access = true;
+    vi.mocked(fetchAccountAccessOptions).mockResolvedValue({
+      projects: [
+        { id: "project-a", label: "內部專案" },
+        { id: "project-v", label: "廠商專案", vendor_name: "合作廠商" },
+      ],
+      avatar_characters: [],
+      custom_voices: [],
+    });
+    render(<Accounts />);
+    await screen.findByRole("option", { name: "廠商編輯" });
+    fireEvent.change(screen.getByRole("combobox", { name: "權限組合" }), { target: { value: "vendor_editor" } });
+    fireEvent.change(screen.getByLabelText("帳號"), { target: { value: "vendor-alice" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "example-password" } });
+    const vendorInput = screen.getByRole("textbox", { name: /廠商名稱/ }) as HTMLInputElement;
+    expect(vendorInput.required).toBe(true);
+    const button = screen.getByRole("button", { name: "建立正式帳號" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(screen.queryByRole("checkbox", { name: "廠商專案" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "可用網路搜尋" })).toBeNull();
+
+    fireEvent.change(vendorInput, { target: { value: " 合作廠商 " } });
+    expect(screen.queryByRole("checkbox", { name: "內部專案" })).toBeNull();
+    expect(button.disabled).toBe(true);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "廠商專案" }));
+    expect(button.disabled).toBe(false);
+    fireEvent.click(button);
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith({
+      username: "vendor-alice",
+      password: "example-password",
+      preset: "vendor_editor",
+      project_ids: ["project-v"],
+      vendor_name: "合作廠商",
+    }));
+  });
+
+  it("uses the preset description for RD and hides custom vendor and project inputs", async () => {
+    authState.account = { id: "root-1", username: "root", role: "root" };
+    render(<Accounts />);
+    await screen.findByRole("option", { name: "創智研發" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "權限組合" }), { target: { value: "rd" } });
+
+    expect(screen.getByText("研發管理員權限")).toBeTruthy();
+    expect(screen.queryByLabelText(/廠商名稱|所屬廠商|角色/)).toBeNull();
+    expect(screen.queryByRole("region", { name: "授權專案" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "可用網路搜尋" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("帳號"), { target: { value: "engineer" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "example-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "建立正式帳號" }));
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith({
+      username: "engineer",
+      password: "example-password",
+      preset: "rd",
+      project_ids: [],
+    }));
+  });
+
+  it("allows a BD account without projects and uses its server label in management", async () => {
+    authState.account.account_management_access = true;
+    const account: Account = {
+      id: "bd-1", username: "bd-staff", role: "user", disabled: false,
+      created_at: "2026-11-20T00:00:00Z", preset: "bd", preset_label: "BD",
+    };
+    vi.mocked(createAccount).mockResolvedValue(account);
+    vi.mocked(listAccounts).mockResolvedValueOnce([]).mockResolvedValueOnce([account]);
+    render(<Accounts />);
+    await screen.findByRole("option", { name: "BD" });
+    const rdOption = screen.getByRole("option", { name: /創智研發/ }) as HTMLOptionElement;
+    expect(rdOption.disabled).toBe(true);
+    fireEvent.change(screen.getByRole("combobox", { name: "權限組合" }), { target: { value: "bd" } });
+    expect(await screen.findByRole("checkbox", { name: "專案 A" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("帳號"), { target: { value: "bd-staff" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "example-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "建立正式帳號" }));
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith({
+      username: "bd-staff", password: "example-password", preset: "bd", project_ids: [],
+    }));
+    fireEvent.click(await screen.findByRole("button", { name: "前往編輯／管理查看" }));
+    const row = (await screen.findByText("bd-staff")).closest("article") as HTMLElement;
+    expect(within(row).getByText("權限組合")).toBeTruthy();
+    expect(within(row).getByText("BD")).toBeTruthy();
   });
 
   it("opens management directly from its URL", async () => {
@@ -613,7 +708,11 @@ describe("Accounts", () => {
       role: "root",
     };
     // 後端給管理員的是生效值（一律為真）；降級時不能因此把 AI 整理排版一起帶給一般帳號。
-    const admin = { ...formalAccount("admin-b", "operator", "admin"), ai_cleanup_access: true };
+    const admin = {
+      ...formalAccount("admin-b", "operator", "admin"),
+      ai_cleanup_access: true,
+      web_search_access: true,
+    };
     vi.mocked(listAccounts).mockResolvedValue([admin]);
     vi.mocked(updateAccountRole).mockResolvedValue({
       ...formalAccount("admin-b", "operator", "user"),
@@ -627,6 +726,7 @@ describe("Accounts", () => {
     );
     const submit = screen.getByRole("button", { name: "確認變更角色" });
     await waitFor(() => expect(submit.hasAttribute("disabled")).toBe(false));
+    expect((screen.getByRole("checkbox", { name: "可用網路搜尋" }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(submit);
 
     await waitFor(() => expect(updateAccountRole).toHaveBeenCalledWith(
@@ -654,6 +754,7 @@ describe("Accounts", () => {
           admin_portal_access: false,
           kiosk: false,
           ai_cleanup_access: false,
+          web_search_access: true,
         },
       },
     ));

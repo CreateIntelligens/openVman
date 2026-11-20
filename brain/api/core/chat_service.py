@@ -26,6 +26,7 @@ from core.llm_client import (
 )
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
+from core.reply_modes import resolve_mode
 from core.turn_decisions import (
     TurnDecision,
     resolve_retrieval_language,
@@ -56,6 +57,7 @@ from protocol.message_envelope import (
 from safety.guardrails import enforce_guardrails, enforce_session_limits
 from safety.observability import timed_node
 from tools.context import (
+    WEB_TOOLS,
     active_retrieval_language,
     active_speech_language,
     active_turn_decision_unavailable,
@@ -107,6 +109,7 @@ def prepare_generation(
     cfg = get_settings()
     persona_id = envelope.context.persona_id
     project_id = envelope.context.project_id
+    mode = resolve_mode(reply_mode)
 
     if not cleaned_message:
         raise ValueError("message 不可為空")
@@ -139,6 +142,8 @@ def prepare_generation(
             tool.get("function", {}).get("name")
             for tool in get_tool_registry().build_openai_tools()
         }
+        if not mode.allow_web_search:
+            registered.difference_update(WEB_TOOLS)
         with timed_node("chat_turn_decision", trace_id=trace_id):
             turn_decision = run_turn_decision(
                 user_text=stored_user_message,
@@ -155,7 +160,9 @@ def prepare_generation(
                 preferred_language=preferred_language or "",
             )
         if active_vendor_chat.get():
-            turn_decision = vendor_turn_decision(turn_decision)
+            turn_decision = vendor_turn_decision(
+                turn_decision, allow_web_search="search_web" in registered,
+            )
         else:
             turn_decision = without_disabled_recall(turn_decision, session.session_id, project_id)
 
@@ -186,6 +193,7 @@ def prepare_generation(
                 turn_decision and turn_decision.dependency_unavailable
             ),
             preferred_language=preferred_language,
+            allow_web_search=mode.allow_web_search,
         )
 
     return GenerationContext(

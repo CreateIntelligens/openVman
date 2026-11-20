@@ -35,6 +35,8 @@ from .schema_migrations import (
     _ROOT_ACCOUNT_SCHEMA_VERSION,
     _TEMPORARY_USERNAME_MIGRATION_NAME,
     _TEMPORARY_USERNAME_SCHEMA_VERSION,
+    _WEB_SEARCH_ACCESS_MIGRATION_NAME,
+    _WEB_SEARCH_ACCESS_SCHEMA_VERSION,
 )
 
 _BUSY_TIMEOUT_MS = 5000
@@ -174,6 +176,32 @@ class AuthDatabase:
         self._add_project_engine_order()
         self._add_ai_cleanup_access()
         self._add_vendor_access()
+        self._add_web_search_access()
+
+    def _add_web_search_access(self) -> None:
+        with self.transaction(write=True) as connection:
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_WEB_SEARCH_ACCESS_SCHEMA_VERSION,),
+            ).fetchone():
+                return
+            for table in ("users", "embed_keys"):
+                connection.execute(
+                    f"ALTER TABLE {table} ADD COLUMN web_search_access "
+                    "INTEGER NOT NULL DEFAULT 0 CHECK (web_search_access IN (0, 1))"
+                )
+            connection.execute(
+                "UPDATE users SET web_search_access = 1 "
+                "WHERE vendor_name IS NULL OR trim(vendor_name) = ''"
+            )
+            connection.execute("UPDATE embed_keys SET web_search_access = 1")
+            connection.execute(
+                "INSERT INTO schema_migrations(version, details_json) VALUES (?, ?)",
+                (
+                    _WEB_SEARCH_ACCESS_SCHEMA_VERSION,
+                    json.dumps({"name": _WEB_SEARCH_ACCESS_MIGRATION_NAME}),
+                ),
+            )
 
     def _add_vendor_access(self) -> None:
         with self.transaction(write=True) as connection:

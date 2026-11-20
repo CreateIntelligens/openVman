@@ -401,14 +401,16 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 | `filter_products` | 依產品規格表篩選、排序產品 | 專案有 `knowledge/products/<商品線>/_catalog.yaml` |
 | `search_memory` | 檢索 `memories` 表 | |
 | `save_memory` | 寫入長期記憶 | 僅在使用者本輪明確要求記住時執行，由決策供應鏈判斷（失敗時用關鍵字規則） |
-| `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | `URL2MD_SEARCH_ENABLED`；`fast` 模式不提供 |
-| `read_web_page` | 透過 2md 將網頁、PDF 等轉成 Markdown，參數 `urls` 一次帶多個 | `URL2MD_READ_ENABLED`；只接受公開位址；`fast` 模式不提供 |
+| `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | 全站 `URL2MD_SEARCH_ENABLED` 與呼叫者皆允許，且回覆模式支援網路工具 |
+| `read_web_page` | 透過 2md 將網頁、PDF 等轉成 Markdown，參數 `urls` 一次帶多個 | 全站 `URL2MD_READ_ENABLED` 與呼叫者皆允許，且回覆模式支援網路工具。只接受公開位址 |
 | `publish_wiki` | 發布長篇報告到 David888 Wiki，只回傳公開 `shareUrl` | `WIKI_PUBLISH_ENABLED` |
 | `graph_query`、`graph_explain`、`graph_status` | 查詢專案知識圖譜 | |
 | `request_action` | 向使用者提議動作卡片（第 9.4 節），工具本身不執行 | |
 | `query_faq`、`query_order` | 示範用工具，讀 `tools/mock_data.py` 的假資料 | |
 
-停用的網路與 Wiki 工具不會註冊給 HTTP Chat，也不會宣告給 Gemini Live；修改開關後需重啟 Brain。2md 端點順序、重試與 circuit 規則見 `brain/README.md`「網路工具（2md）」。
+全站停用的網路與 Wiki 工具不會註冊給 HTTP Chat 或宣告給 Gemini Live。修改全站開關後需重啟 Brain。2md 端點順序、重試與 circuit 規則見 [Brain 的網路工具說明](../../brain/README.md#網路工具2md)。
+
+HTTP Chat、SSE 與 Gemini Live 依已驗證的 `X-OpenVMan-Web-Search` 控制 `search_web`、`read_web_page`。`0` 時，工具從系統提示及模型宣告排除，預取跳過，工具執行也會拒絕。`1` 時仍須符合全站開關及適用的回覆模式。未帶標頭的內部呼叫（例如 A2A、排程）沿用全站開關。廠商回合必須明確收到 `1` 才開放網路工具，其他工具仍受廠商允許清單限制。
 
 #### 9.4 Action Request Flow（操作者確認型動作）
 
@@ -675,7 +677,7 @@ LIVE_AUDIO_LANGUAGE_ID_MODEL=gemini-3.5-flash-lite
 
 ### 18. 與 Backend 層的介面約定 (Interface with Backend Layer)
 
-所有 HTTP 路徑前綴 `/brain`，Backend 對外以 `/api/v1/*` 代理；完整端點清單見 `brain/README.md`「HTTP 介面」與 Brain 的 OpenAPI（`/brain/docs`，需內部存取）。`POST /brain/chat` 一次回傳完整結果；`POST /brain/chat/stream` 以 SSE 逐句送出同一份回答；即時語音走 Live WebSocket。
+所有 HTTP 路徑前綴 `/brain`，Backend 對外以 `/api/v1/*` 代理；完整端點清單見 `brain/README.md`「HTTP 介面」與 Brain 的 OpenAPI（`/brain/docs`，需內部存取）。`POST /brain/chat` 一次回傳完整結果；`POST /brain/chat/stream` 以 SSE 逐句送出同一份回答；即時語音走 Live WebSocket。對外憑證的網路搜尋權限由 Backend 驗證，並在 HTTP 及 Live 握手送入可信 `X-OpenVMan-Web-Search` 標頭。
 
 **對話（`POST /brain/chat`）**：
 ```

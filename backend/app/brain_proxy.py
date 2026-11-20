@@ -18,9 +18,11 @@ from starlette.responses import Response
 from app.ai_cleanup_guard import AiCleanupRefused, guard_ai_cleanup
 from app.auth import brain_project_access
 from app.auth.dependencies import (
+    WEB_SEARCH_HEADER,
     CurrentAccount,
     authenticate_request,
     get_current_account,
+    web_search_header_value,
 )
 from app.auth.policy import is_vendor_account
 from app.auth.resources import ResourceNotFoundError
@@ -332,6 +334,7 @@ def _trusted_upstream_headers(
 ) -> dict[str, str]:
     headers = _filter_external_request_headers(request.headers)
     headers[_INTERNAL_TOKEN_HEADER] = get_tts_config().gateway_internal_token
+    headers[WEB_SEARCH_HEADER] = web_search_header_value(current)
     if request_id := current_request_id():
         # 同一個 id 帶到 Brain，兩邊的 log 才串得起來。
         headers[REQUEST_ID_HEADER] = request_id

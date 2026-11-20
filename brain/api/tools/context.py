@@ -8,6 +8,14 @@ VENDOR_KNOWLEDGE_TOOLS = frozenset({"search_knowledge", "get_document"})
 active_vendor_chat: ContextVar[bool] = ContextVar("brain_active_vendor_chat", default=False)
 MEMORY_TOOLS = frozenset({"search_memory", "save_memory"})
 GRAPH_TOOLS = frozenset({"graph_query", "graph_explain", "graph_status", "graphify:run"})
+_WEB_TOOL_FLAGS = {
+    "search_web": "url2md_search_enabled",
+    "read_web_page": "url2md_read_enabled",
+}
+WEB_TOOLS = frozenset(_WEB_TOOL_FLAGS)
+active_web_search_allowed: ContextVar[bool | None] = ContextVar(
+    "brain_active_web_search_allowed", default=None,
+)
 
 
 def is_graph_tool(name: str) -> bool:
@@ -37,6 +45,27 @@ def bind_vendor_chat(vendor: bool):
         yield
     finally:
         active_vendor_chat.reset(token)
+
+
+@contextmanager
+def bind_web_search(allowed: bool | None):
+    token = active_web_search_allowed.set(allowed)
+    try:
+        yield
+    finally:
+        active_web_search_allowed.reset(token)
+
+
+def web_search_permitted(allowed: bool | None, *, vendor: bool = False) -> bool:
+    return allowed if allowed is not None else not vendor
+
+
+def enabled_web_tools(
+    config: Any, *, allowed: bool | None = None, vendor: bool = False,
+) -> set[str]:
+    if not web_search_permitted(allowed, vendor=vendor):
+        return set()
+    return {name for name, flag in _WEB_TOOL_FLAGS.items() if getattr(config, flag, True)}
 
 
 def mode_settings() -> Any:

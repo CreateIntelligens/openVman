@@ -33,7 +33,7 @@ def _supports_thinking_level(model: str) -> bool:
 
 def build_setup_message(
     config: BrainSettings, system_instruction: str, *, vendor: bool = False,
-    include_memory: bool = True,
+    include_memory: bool = True, web_search_allowed: bool | None = None,
 ) -> dict[str, Any]:
     setup: dict[str, Any] = {
         "model": f"models/{config.live_gemini_model}",
@@ -76,7 +76,9 @@ def build_setup_message(
     if config.live_gemini_tools_enabled:
         setup["tools"] = [
             {"functionDeclarations": [
-                tool for tool in build_gemini_tool_declarations(vendor=vendor)
+                tool for tool in build_gemini_tool_declarations(
+                    vendor=vendor, web_search_allowed=web_search_allowed, config=config,
+                )
                 if include_memory or tool["name"] not in MEMORY_TOOLS
             ]}
         ]
@@ -124,6 +126,7 @@ def pcm_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
 
 def build_user_turn_message(
     user_text: str, decision: TurnDecision | None, prefetched_reads: dict[str, dict[str, Any]],
+    *, include_web: bool = True,
 ) -> dict[str, Any]:
     """Build the bounded trusted decision envelope for a finalized text turn."""
     text = user_text
@@ -132,7 +135,7 @@ def build_user_turn_message(
         required_reads = [
             name for name, required in (
                 ("search_knowledge", policy.needs_knowledge is True),
-                ("search_web", policy.needs_web is True),
+                ("search_web", include_web and policy.needs_web is True),
                 ("search_memory", policy.needs_memory is True),
             ) if required and name not in prefetched_reads
         ]
@@ -144,9 +147,12 @@ def build_user_turn_message(
             }
             for name, result in prefetched_reads.items()
         ]
+        policy_fields = policy.to_prompt_fields()
+        if not include_web:
+            policy_fields.pop("needs_web")
         text = json.dumps({
             "openvman_turn_envelope": 1,
-            "policy": policy.to_prompt_fields(),
+            "policy": policy_fields,
             "required_reads": required_reads,
             "satisfied_reads": sorted(prefetched_reads),
             "prefetched_reads": prefetched,

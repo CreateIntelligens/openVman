@@ -123,9 +123,11 @@ def test_generate_reply_allocates_unique_session_id_when_none(client):
     })
 
     posted_bodies: list[dict] = []
+    posted_headers: list[dict] = []
 
     async def fake_post(url, json=None, **kw):
         posted_bodies.append(json or {})
+        posted_headers.append(kw["headers"])
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json = MagicMock(return_value={"reply": "你好！"})
@@ -145,6 +147,7 @@ def test_generate_reply_allocates_unique_session_id_when_none(client):
     assert resp.json()["session_id"]
     assert resp.json()["session_id"] != "vision-text"
     assert posted_bodies[0]["session_id"] == resp.json()["session_id"]
+    assert posted_headers[0]["X-OpenVMan-Web-Search"] == "0"
     assert cam.describe_frame.await_args.args[2] == resp.json()["session_id"]
 
 

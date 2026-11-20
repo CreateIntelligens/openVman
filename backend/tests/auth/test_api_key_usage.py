@@ -14,7 +14,7 @@ from app.usage_ledger_client import usage_scope_for
 @pytest.mark.parametrize("key_id", ["key-a", "key-b"])
 def test_api_key_proxy_and_media_scopes_preserve_owner(key_id):
     current = CurrentAccount(
-        user=SimpleNamespace(id="owner-1", role=AccountRole.ADMIN),
+        user=SimpleNamespace(id="owner-1", role=AccountRole.ADMIN, web_search_access=False),
         transport=AuthTransport.API_KEY,
         api_key=SimpleNamespace(key_id=key_id, user_id="owner-1"),
     )
@@ -34,6 +34,7 @@ def test_api_key_proxy_and_media_scopes_preserve_owner(key_id):
     assert headers["X-Principal-Id"] == key_id
     assert headers["X-OpenVMan-User-ID"] == "owner-1"
     assert headers["X-OpenVMan-Role"] == "admin"
+    assert headers["X-OpenVMan-Web-Search"] == "0"
     assert "authorization" not in {name.lower() for name in headers}
 
     scope = usage_scope_for(

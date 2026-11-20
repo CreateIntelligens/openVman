@@ -135,7 +135,7 @@ def _persist_account_access(
     user_id: str,
     granted_by: str | None,
     normalized_grants: Sequence[tuple[ResourceType, str]],
-    normalized_defaults: tuple[str, ...],
+    normalized_defaults: tuple[str, ...] | None,
     now: str,
     clear_existing: bool = False,
     project_permissions: Mapping[str, ProjectWritePermissions] | None = None,
@@ -232,6 +232,9 @@ def _persist_account_access(
             for resource_type, resource_id in normalized_grants
         ],
     )
+
+    if normalized_defaults is None:
+        return
 
     project_id = normalized_defaults[0]
     character_id = normalized_defaults[1]
