@@ -102,3 +102,17 @@ docker compose -f compose.yaml -f compose.real-project.yaml run --rm client --lo
 前台須有完整測試 avatar：將你明確選定的 dev 測試 fixture 中 `01.webm` 與 `combined_data.json.gz` 以 tar pipe 傳入隔離 Backend 的 `python /experiments/browser_fixture.py`。腳本只讀兩個指定名稱，不解開任意 tar 路徑、不複製 metadata，並將 avatar 與 Edge 聲線設為合成專案的資源。請勿使用真實專案或正式 avatar 素材。
 
 瀏覽器入口為 `http://127.0.0.1:18889/` 與 `/admin/`。Edge TTS 是實際外部服務，可能受網路／微軟限制；502 不算語音驗收成功。做容量比較可用 `--load-only` 保留既有資料，搭配 `WORKER_COUNT` 與 `WORKER_THREAD_POOL_SIZE`；結果會記錄 `--settle-seconds`，它只在負載前等待，不重試失敗的聊天。
+
+## 1 秒 N 題的逐段計時
+
+`burst_nodes.py` 照前台的做法送題：打 `/api/v1/chat/stream`，收到第一句就送 `/api/v1/tts/stream`（`format=pcm16k`）。每題記下送出、回應標頭、文字第一句、TTS 送出、第一段音訊、回答完成的時間（epoch 秒），以及 `done` 帶回的 `trace_id`。`node_report.py` 用 `trace_id` 對 Brain 的 log，拆出 Brain 前置、當輪決策、知識庫檢索、LLM 判斷輪與 LLM 首字，再彙整成中位數／p95；給 `resource_monitor.py` 的 jsonl 時一併列出各容器 CPU、記憶體與網路收發的平均和尖峰。
+
+```bash
+python3 resource_monitor.py <容器名稱前綴> res.jsonl &          # 每秒一筆
+LOAD_TOKEN=<bearer> python3 burst_nodes.py --base <網址> --project <專案> \
+  --count 100 --window 1 --tts-provider gemini-tts --label <名稱> --out run.json
+python3 node_report.py run.json --brain <Brain 對話容器> --resources res.jsonl \
+  --containers backend,api-chat,api-1,embedding,admin --out report.json
+```
+
+對話以 `burst-<run>-<n>` 為 session id，測完可依前綴刪除。Brain 與 client 要在同一台主機，兩邊的時間才對得上。
