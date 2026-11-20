@@ -80,6 +80,10 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 - `backend/tests/` — 12 subdirectories covering adapters, API, avatar, config, embed, gateway, ingestion, live, plugins, TTS
 - Brain integration tests require ML models (bge-m3) and external services — deselect with `-m "not integration"`
 - Backend tests are pure unit tests; no special markers
+- Known unstable tests (as of 2026-11-20). Rerun them alone before treating a failure as a regression; none of these touch the code paths changed in that period:
+  - **Real order dependence (bug, not yet fixed):** `brain/api/tests/test_project_features.py::test_daily_summary_and_maintenance_skip_disabled_projects` passes alone but fails when the whole Brain suite runs serially, on `main` too. Some earlier test leaves state behind.
+  - **Timing-sensitive under `-n auto` or high host load:** Brain `tests/session/test_gemini_live_session.py` (setup timeout), `tests/core/test_answer_path_timeouts.py`, `tests/services/test_usage_ledger_writer.py`; Backend `tests/test_upstream_timeouts.py`, `tests/test_asr_r2t2_stream.py`, `tests/api/test_metrics_observability.py`; admin `pnpm test` timeouts in `KnowledgeBase.import` and `Personas.form` when the host load is high.
+  - Inside a network-restricted sandbox, socket/DNS tests (A2A transport, web tools, upstream timeouts) fail with `EPERM`; that is the sandbox, not the code.
 
 ## Key Gotchas
 
