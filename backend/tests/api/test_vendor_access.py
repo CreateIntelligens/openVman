@@ -960,3 +960,30 @@ def test_vendor_live_requires_project_initialization_before_relay(env, vendor_ac
         with pytest.raises(WebSocketDisconnect) as exc:
             socket.receive_json()
     assert exc.value.code == 1008
+
+
+@pytest.mark.parametrize("account", ["vendor-editor", "vendor-reader"])
+def test_vendor_can_read_qa_sync_status(env, vendor_accounts, account):
+    headers = env.headers(vendor_accounts[account])
+    response = env.client.get(
+        "/api/v1/knowledge/qa/sync-status",
+        params={"project_id": _PROJECT},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    request = env.received[-1]
+    assert request.url.path == "/brain/knowledge/qa/sync-status"
+    assert request.headers["X-OpenVMan-Vendor"] == "1"
+    assert dict(request.url.params) == {"project_id": _PROJECT}
+    before = len(env.received)
+    assert env.client.get(
+        "/api/v1/knowledge/qa/sync-status",
+        params={"project_id": _UNGRANTED},
+        headers=headers,
+    ).status_code == 404
+    assert env.client.post(
+        "/api/v1/knowledge/qa/sync-status",
+        params={"project_id": _PROJECT},
+        headers=headers,
+    ).status_code == 403
+    assert len(env.received) == before

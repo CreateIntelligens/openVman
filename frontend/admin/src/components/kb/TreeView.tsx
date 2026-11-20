@@ -1,6 +1,7 @@
 import { useId, useRef } from "react";
 import type { DragEvent, KeyboardEvent, ReactNode } from "react";
 
+import type { QaSyncState } from "../../api/knowledge";
 import ActionMenu, { type ActionMenuGroup, type ActionMenuItem } from "../ActionMenu";
 import type { QaDropPosition, TreeNode } from "./helpers";
 import {
@@ -15,7 +16,7 @@ import {
   qaTreeNodePath,
   splitFileNameForDisplay,
 } from "./helpers";
-import StatusDot, { documentStatusLabel } from "./StatusDot";
+import StatusDot, { documentStatusLabel, QaSyncStatusDot } from "./StatusDot";
 
 // 操作按鈕佔自己的寬度，名稱不會被蓋住，也就不會按名稱卻按到按鈕。
 const TOUCH_TARGET_CLASS = "[@media(hover:none)]:p-1.5";
@@ -60,6 +61,7 @@ interface TreeViewProps {
   multiSelect?: boolean;
   checkedPaths?: ReadonlySet<string>;
   onToggleChecked?: (paths: string[], checked: boolean) => void;
+  qaSyncStatuses?: Readonly<Record<string, QaSyncState>>;
 }
 
 type SharedTreeProps = Omit<TreeViewProps, "node">;
@@ -276,7 +278,7 @@ function RowName({
   return (
     <span
       title={node.name}
-      className={`ml-1.5 flex min-w-0 flex-1 text-sm ${emphasized ? "font-semibold" : ""} ${
+      className={`flex min-w-0 text-sm ${emphasized ? "font-semibold" : ""} ${
         node.qaHidden ? "opacity-60" : ""
       }`}
     >
@@ -336,6 +338,7 @@ function TreeBranch({
   const isQaNode = node.treeKind === "qa-node";
   const isQaEntry = node.treeKind === "qa-entry";
   const qaNodeId = node.qaNodeId;
+  const qaSyncStatus = isQaNode && qaNodeId ? shared.qaSyncStatuses?.[qaNodeId] : undefined;
   const draggingQaNodeId = draggingPath ? parseQaNodeDragPath(draggingPath) : null;
   const draggingQaEntry = draggingPath ? parseQaEntryDragPath(draggingPath) : null;
   const qaNodeDropTargetKey = qaNodeId ? qaTreeNodePath(qaNodeId) : node.path;
@@ -721,7 +724,10 @@ function TreeBranch({
           </div>
         )}
 
-        <RowName node={node} emphasized={isSection || isSelected} />
+        <div className="ml-1.5 flex min-w-0 flex-1 items-center gap-1.5">
+          <RowName node={node} emphasized={isSection || isSelected} />
+          {qaSyncStatus && <QaSyncStatusDot status={qaSyncStatus} />}
+        </div>
 
         {node.qaLanguageCategory && !categoryControl && (
           <span aria-hidden="true" className="ml-1 shrink-0 whitespace-nowrap rounded bg-surface-sunken px-1 text-xs text-content-muted">

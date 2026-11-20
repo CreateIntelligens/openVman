@@ -30,7 +30,7 @@ describe("language category names", () => {
   });
 
   it("match the names Brain files imported tables under", () => {
-    const source = readFileSync(resolve(REPO_ROOT, "brain/api/knowledge/qa_nodes.py"), "utf8");
+    const source = readFileSync(resolve(REPO_ROOT, "brain/api/knowledge/qa_category_depth.py"), "utf8");
     expect(LANGUAGE_CATEGORY_LABELS).toEqual(labelsIn(source, /LANGUAGE_LABELS[^=]*=\s*\{(.*?)\}/s));
   });
 

@@ -464,7 +464,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
 | 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
 | 專案知識與回答設定 | `GET /knowledge/settings` 讀取全部設定，`PUT /knowledge/settings` 更新語言分流與 `reply_seconds`，`PATCH /knowledge/features` 更新記憶與圖譜擴展 |
-| QA 知識 | `GET /knowledge/qa`、`GET /knowledge/qa/questions`（所有題目清單，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
+| QA 知識 | `GET /knowledge/qa`、`GET /knowledge/qa/questions`（所有題目清單，見下）、`GET /knowledge/qa/sync-status`（各分類索引同步狀態，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |
 | 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar` |
 | 工具與技能 | `GET /tools`、`POST /skills`、`PATCH /skills/{id}/toggle`、`GET/PUT /skills/{id}/files`、`DELETE /skills/{id}`、`POST /skills/reload` |
@@ -477,6 +477,13 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 
 - `categories`：照樹上順序的分類，`{ node_id, label, path, parent_id, hidden }`；`path` 是第一層到自己的名稱，`hidden` 是自己或上層被隱藏。
 - `questions`：`{ id, question, answer, image, image_kind?, url, language, source: { kind, path, label }, category_ids, category_hidden, hidden_in_file, off_menu, no_answer, document_enabled }`。`image_kind`（`qr`／`image`）只在圖片已判定過時出現，讀自 `knowledge/.qa_image_kinds.json`，列清單時不會現場判斷。`language` 先看 CSV 的 `language` 欄，認不得或沒填就用文件語言，只在選單上的題目是 `null`。`source.kind` 為 `file`、`manual`（後台自己輸入，`manual_*` 文件）或 `menu_only`。`off_menu` 是 `detached`（刻意拿下）、`never`（從沒放進分類）或 `null`。`category_hidden` 是掛著的分類全部被隱藏。只在選單上的題目本來就沒有答案，`no_answer` 為 false。掛在選單上、文件裡已找不到的題目照樣列出，答案為空。
+
+`GET /knowledge/qa/sync-status?project_id=` 回傳 `{"categories": {"<node_id>": "synced" | "updating" | "failed"}}`（`knowledge/qa_sync_status.py`），供後台顯示每個快速問答分類的搜尋索引同步狀態：
+
+- **範圍與去重**：每個分類只看直接掛在該分類上的 `qa_entries`（不往下合併子分類），去掉重複 `source_path` 並略過沒有 `source_path` 的選單專用題；只檢查可索引（`is_indexable_document` 且非符號連結／硬連結）且在 `.doc_meta.json` 未停用的文件。同一份文件被多個分類引用時，單次請求只算一次 SHA-256 指紋並共用結果。
+- **三種狀態**：全部需檢查的文件指紋皆與 `load_index_state` 一致（或沒有需檢查的文件）時為 `synced`。有文件不在索引裡或指紋不同時，若專案背景重建狀態（`routes/knowledge.py` 的記憶體 `_reindex_state`，含 `running`、`last_error`、`finished_at`，由 `reindex_status` 讀取）為 `pending` 或 `running` 則回 `updating`；否則若最近一次重建失敗留下了 `last_error`（下次成功時清除）則回 `failed`。
+- **自我修復**：有文件未同步且專案既無 `pending`／`running` 也無 `last_error`（例如服務剛重啟清空記憶體狀態，或外部流程直接改了檔案但未排重建）時，刻意補呼叫一次 `schedule_reindex(project_id)` 並回 `updating`；同專案重建本來就會合併請求，重複呼叫不會執行兩次。
+- **廠商過濾**：帶 `X-OpenVMan-Vendor` 標頭時以 `visible_workspace_path(..., "knowledge")` 過濾 `qa_entries` 的來源路徑（與 `_vendor_node` 相同）；只含隱藏來源（例如 `knowledge/.hidden/`）的分類過濾後沒有可見文件，一律回 `synced`，不洩漏失敗狀態或隱藏題目存在，也不因隱藏文件觸發補排重建。
 
 `POST /chat` 一次回傳完整結果；`POST /chat/stream` 以 SSE 逐句送出同一份回答（見「逐句串流」）；即時語音走 Live WebSocket。
 

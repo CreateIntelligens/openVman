@@ -42,6 +42,7 @@ import { useMobileTreeDrawer } from "../hooks/useMobileTreeDrawer";
 import { useQaNodeModals } from "../hooks/useQaNodeModals";
 import { useQaNodeSelection } from "../hooks/useQaNodeSelection";
 import { QA_REFRESH_FAILED_MESSAGE, useQaNodes } from "../hooks/useQaNodes";
+import { useQaSyncStatus } from "../hooks/useQaSyncStatus";
 import { useQuestionBank } from "../hooks/useQuestionBank";
 import { useUploadLimits } from "../hooks/useUploadLimits";
 import { isVendorUser } from "../utils/accountPermissions";
@@ -113,12 +114,12 @@ export default function KnowledgeBase() {
     setExpandedDirs,
     handleTreeSelect,
     handleSave,
-    handleReindex,
+    handleReindex: reindexDocuments,
     handleRenormalize,
-    handleApplyNormalizationPreview,
-    handleCrawl,
+    handleApplyNormalizationPreview: applyNormalizationPreview,
+    handleCrawl: crawlDocumentUrl,
     handleDeleteConfirm,
-    handleMove,
+    handleMove: moveDocument,
     handleToggleEnabled,
     handleChangeLanguage: handleDocumentLanguage,
     handleCreateNote,
@@ -166,6 +167,7 @@ export default function KnowledgeBase() {
   const [openQuestion, setOpenQuestion] = useState<OpenQuestion | null>(null);
   const questionOpener = useRef<HTMLElement | null>(null);
   const questionBank = useQuestionBank(projectId, mergedRefreshKey);
+  const { statuses: qaSyncStatuses, refresh: refreshQaSyncStatus } = useQaSyncStatus(projectId);
   const documentLabels = useMemo(() => vendor ? vendorDocumentLabels(documents) : undefined, [vendor, documents]);
   const qaLabels = useMemo(() => vendor ? vendorQaCategoryLabels(rawNodesTree, documentLabels) : undefined, [vendor, rawNodesTree, documentLabels]);
   const nodesTree = useMemo(() => qaLabels?.size ? relabelQaNodes(rawNodesTree, qaLabels) : rawNodesTree, [qaLabels, rawNodesTree]);
@@ -211,26 +213,61 @@ export default function KnowledgeBase() {
   }, [activeTab]);
 
   const refreshQuestions = questionBank.refresh;
+  const refreshQuestionsWithSync = useCallback(async (afterWrite = false) => {
+    await refreshQuestions(afterWrite);
+    if (afterWrite) void refreshQaSyncStatus();
+  }, [refreshQaSyncStatus, refreshQuestions]);
+  const handleReindex = useCallback(async () => {
+    await reindexDocuments();
+    void refreshQaSyncStatus();
+  }, [refreshQaSyncStatus, reindexDocuments]);
+  const handleApplyNormalizationPreview = useCallback(async () => {
+    await applyNormalizationPreview();
+    void refreshQaSyncStatus();
+  }, [applyNormalizationPreview, refreshQaSyncStatus]);
+  const handleCrawl = useCallback(async () => {
+    await crawlDocumentUrl();
+    void refreshQaSyncStatus();
+  }, [crawlDocumentUrl, refreshQaSyncStatus]);
+  const handleMove = useCallback(async (sourcePath: string, targetDir: string) => {
+    await moveDocument(sourcePath, targetDir);
+    void refreshQaSyncStatus();
+  }, [moveDocument, refreshQaSyncStatus]);
   const createNode: typeof createQaNode = useCallback(async (...args) => {
     const result = await createQaNode(...args);
-    await refreshQuestions(true);
+    await refreshQuestionsWithSync(true);
     return result;
-  }, [createQaNode, refreshQuestions]);
+  }, [createQaNode, refreshQuestionsWithSync]);
   const updateNode: typeof updateQaNode = useCallback(async (...args) => {
     const result = await updateQaNode(...args);
-    await refreshQuestions(true);
+    await refreshQuestionsWithSync(true);
     return result;
-  }, [updateQaNode, refreshQuestions]);
+  }, [updateQaNode, refreshQuestionsWithSync]);
   const deleteNode: typeof deleteQaNode = useCallback(async (...args) => {
     const result = await deleteQaNode(...args);
-    await refreshQuestions(true);
+    await refreshQuestionsWithSync(true);
     return result;
-  }, [deleteQaNode, refreshQuestions]);
+  }, [deleteQaNode, refreshQuestionsWithSync]);
   const reorderNode: typeof reorderQaNode = useCallback(async (...args) => {
     const result = await reorderQaNode(...args);
-    await refreshQuestions(true);
+    await refreshQuestionsWithSync(true);
     return result;
-  }, [reorderQaNode, refreshQuestions]);
+  }, [reorderQaNode, refreshQuestionsWithSync]);
+  const saveMergedQaWithSync: typeof saveMergedQa = useCallback(async (...args) => {
+    const result = await saveMergedQa(...args);
+    void refreshQaSyncStatus();
+    return result;
+  }, [refreshQaSyncStatus, saveMergedQa]);
+  const adoptSourceWithSync: typeof adoptSource = useCallback(async (...args) => {
+    const result = await adoptSource(...args);
+    void refreshQaSyncStatus();
+    return result;
+  }, [adoptSource, refreshQaSyncStatus]);
+  const ingestSourceWithSync: typeof ingestSource = useCallback(async (...args) => {
+    const result = await ingestSource(...args);
+    void refreshQaSyncStatus();
+    return result;
+  }, [ingestSource, refreshQaSyncStatus]);
   const [noteComposerFormat, setNoteComposerFormat] = useState<KnowledgeNoteFormat>("text");
   const uploadLimits = useUploadLimits();
 
@@ -270,10 +307,11 @@ export default function KnowledgeBase() {
     (parentId: string | null) => {
       revealQaNode(parentId);
       bumpMergedRefresh();
+      void refreshQaSyncStatus();
       const parentLabel = parentId ? findQaNode(nodesTree, parentId)?.label : "最上層";
       setStatus({ type: "success", message: `已移到 ${parentLabel ?? "新的分類"}` });
     },
-    [bumpMergedRefresh, nodesTree, revealQaNode, setStatus],
+    [bumpMergedRefresh, nodesTree, refreshQaSyncStatus, revealQaNode, setStatus],
   );
 
   const qaModals = useQaNodeModals({
@@ -294,9 +332,9 @@ export default function KnowledgeBase() {
     moveNode,
     reorderNode,
     fetchMergedQa,
-    saveMergedQa,
-    adoptSource,
-    ingestSource,
+    saveMergedQa: saveMergedQaWithSync,
+    adoptSource: adoptSourceWithSync,
+    ingestSource: ingestSourceWithSync,
     loadDocuments,
     handleMove,
     setMergedRefreshKey,
@@ -545,9 +583,13 @@ export default function KnowledgeBase() {
 
   // 匯入可能剛好更新開著的分類：只有這個時機要連右側一起重讀，平常重抓樹不用。
   const refreshQaAfterImport = useCallback(async () => {
-    await fetchQaTree();
-    setMergedRefreshKey((key) => key + 1);
-  }, [fetchQaTree]);
+    try {
+      await fetchQaTree();
+      setMergedRefreshKey((key) => key + 1);
+    } finally {
+      void refreshQaSyncStatus();
+    }
+  }, [fetchQaTree, refreshQaSyncStatus]);
 
   const uploadLimitBytes = uploadLimits.document_max_upload_bytes;
   const importer = useKnowledgeImport({
@@ -609,20 +651,23 @@ export default function KnowledgeBase() {
     await handleDeleteConfirm();
     await fetchQaTree();
     await refreshQuestions();
-  }, [handleDeleteConfirm, fetchQaTree, refreshQuestions]);
+    void refreshQaSyncStatus();
+  }, [handleDeleteConfirm, fetchQaTree, refreshQaSyncStatus, refreshQuestions]);
 
   const handleComposerCreate = useCallback(
     (title: string, content: string, format: KnowledgeNoteFormat) => {
       void (async () => {
         const result = await handleCreateNote(title, content, format);
-        if (!result?.qaNodeId) return;
+        if (!result) return;
+        void refreshQaSyncStatus();
+        if (!result.qaNodeId) return;
         // QA 筆記建立即成為問答樹節點，直接切到該節點的問答面板
         await fetchQaTree();
         setMergedRefreshKey((key) => key + 1);
         selectQaNode(result.qaNodeId);
       })();
     },
-    [fetchQaTree, handleCreateNote, selectQaNode],
+    [fetchQaTree, handleCreateNote, refreshQaSyncStatus, selectQaNode],
   );
 
   const hasMatchingTreeNodes = Boolean(documentSection?.children.length);
@@ -761,6 +806,7 @@ export default function KnowledgeBase() {
                 multiSelectDisabled={batch.batchRunning}
                 checkedPaths={batch.checkedPathSet}
                 onToggleChecked={batch.handleToggleChecked}
+                qaSyncStatuses={qaSyncStatuses}
                 batchBar={
                   <BatchActionBar
                     vendor={vendor}
@@ -770,7 +816,10 @@ export default function KnowledgeBase() {
                     serverDirs={serverDirs}
                     onClearSelection={() => batch.setCheckedFilePaths([])}
                     onSelectionChange={batch.setCheckedFilePaths}
-                    onFinished={batch.handleBatchFinished}
+                    onFinished={async (action, succeeded, targetPathOf) => {
+                      await batch.handleBatchFinished(action, succeeded, targetPathOf);
+                      if (succeeded.length > 0) void refreshQaSyncStatus();
+                    }}
                     onStatus={setStatus}
                     onRunningChange={batch.setBatchRunning}
                   />
@@ -784,12 +833,13 @@ export default function KnowledgeBase() {
                   <QuestionBank key={projectId} projectId={projectId} vendor={vendor} documentLabels={documentLabels}
                     rows={questionRows} categories={visibleCategories} availableCategories={availableCategories}
                     language={language} category={selectedQaNodeId}
+                    categorySyncStatus={selectedQaNodeId ? qaSyncStatuses[selectedQaNodeId] : undefined}
                     categoryEntries={selectedQaNodeId ? findQaNode(nodesTree, selectedQaNodeId)?.qa_entries : undefined} loading={questionBank.loading} error={questionBank.error}
                     api={qaApi} open={openQuestion}
                     onOpen={handleOpenQuestion} onCreate={handleCreateQuestion}
                     onClose={() => requestNavigation(closeQuestion)} onCloseAfterChange={closeQuestion}
                     onSelectCategory={handleSelectQaNode} onAllCategories={showAllQuestions}
-                    onRefresh={refreshQuestions}
+                    onRefresh={refreshQuestionsWithSync}
                     onTest={(question, questionLanguage) => openChatTest({ question, language: questionLanguage ?? testLanguage })}
                     onOpenDocument={handleOpenQuestionDocument} />
                 )}
@@ -836,6 +886,7 @@ export default function KnowledgeBase() {
                     await fetchQaTree().catch(() => undefined);
                     await refreshQuestions();
                   }
+                  void refreshQaSyncStatus();
                 }}
                 onCloseFileView={closeFileView}
                 onDeleteFile={(path) => setDeleteTarget({ type: "file", value: path })}
@@ -843,10 +894,12 @@ export default function KnowledgeBase() {
                 onToggleEnabled={async (document) => {
                   await handleToggleEnabled(document);
                   if (document.source_type === "qa") await refreshQuestions();
+                  void refreshQaSyncStatus();
                 }}
                 onChangeLanguage={async (document, next) => {
                   await handleDocumentLanguage(document, next);
                   if (document.source_type === "qa") await refreshQuestions();
+                  void refreshQaSyncStatus();
                 }}
                 onRenormalize={allowAiCleanup ? handleRenormalize : undefined}
                 renormalizing={renormalizing || previewingNormalization}

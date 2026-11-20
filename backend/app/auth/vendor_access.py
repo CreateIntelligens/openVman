@@ -20,8 +20,8 @@ _GET = frozenset({
     "/personas", "/personas/soul", "/personas/agents", "/personas/guardrails",
     "/chat/history", "/chat/modes", "/sessions", "/sessions/export",
     "/knowledge/base/documents", "/knowledge/base/document", "/knowledge/qa",
-    "/knowledge/qa/questions", "/knowledge/qa/nodes", "/knowledge/settings",
-    "/knowledge/raw/pending", "/knowledge/raw/commit/status",
+    "/knowledge/qa/questions", "/knowledge/qa/nodes", "/knowledge/qa/sync-status",
+    "/knowledge/settings", "/knowledge/raw/pending", "/knowledge/raw/commit/status",
 })
 _POST = frozenset({
     "/auth/logout", "/auth/password",

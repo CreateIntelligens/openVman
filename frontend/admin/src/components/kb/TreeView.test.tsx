@@ -1097,4 +1097,44 @@ describe("TreeView", () => {
       expect(props.onToggle).toHaveBeenCalledWith(qaTreeNodePath("returns"));
     });
   });
+
+  describe("category sync status dots", () => {
+    it("shows status dots only on updating and failed categories, not synced", () => {
+      const qaRoot: TreeNode = {
+        name: "快速回覆",
+        path: QUICK_QA_TREE_PATH,
+        type: "folder",
+        treeKind: "qa-root",
+        virtual: true,
+        children: [
+          categoryNode({ name: "退換貨", path: qaTreeNodePath("returns"), qaNodeId: "returns" }),
+          categoryNode({ name: "運送", path: qaTreeNodePath("shipping"), qaNodeId: "shipping" }),
+          categoryNode({ name: "帳務", path: qaTreeNodePath("billing"), qaNodeId: "billing" }),
+        ],
+      };
+
+      renderTreeView({
+        node: qaRoot,
+        expandedDirs: new Set([QUICK_QA_TREE_PATH]),
+        qaSyncStatuses: {
+          returns: "synced",
+          shipping: "updating",
+          billing: "failed",
+        },
+      });
+
+      const returnsRow = screen.getByRole("treeitem", { name: "退換貨" });
+      const shippingRow = screen.getByRole("treeitem", { name: "運送" });
+      const billingRow = screen.getByRole("treeitem", { name: "帳務" });
+
+      expect(within(returnsRow).queryByRole("img")).toBeNull();
+      expect(returnsRow.querySelector("[aria-label]")).toBeNull();
+
+      const updatingDot = within(shippingRow).getByRole("img", { name: "更新中" });
+      expect(updatingDot.getAttribute("aria-label")).toBe("更新中");
+
+      const failedDot = within(billingRow).getByRole("img", { name: "同步失敗" });
+      expect(failedDot.getAttribute("aria-label")).toBe("同步失敗");
+    });
+  });
 });

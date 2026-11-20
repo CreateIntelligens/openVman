@@ -5,6 +5,7 @@ import {
   commitRawKnowledge,
   createKnowledgeNote,
   discardRawPending,
+  fetchQaSyncStatus,
   fetchRawPending,
   previewRenormalizedKnowledgeDocument,
   uploadRawKnowledgeDocuments,
@@ -170,6 +171,21 @@ describe("knowledge api", () => {
       note_format: "qa",
       target_dir: "",
     });
+  });
+
+  it("fetches QA category sync status for the active or given project", async () => {
+    const f = mockFetch({
+      categories: { returns: "synced", shipping: "updating", billing: "failed" },
+    });
+
+    const defaultResult = await fetchQaSyncStatus();
+    expect(f.mock.calls[0][0]).toBe("/api/v1/knowledge/qa/sync-status?project_id=default");
+    expect(defaultResult).toEqual({
+      categories: { returns: "synced", shipping: "updating", billing: "failed" },
+    });
+
+    await fetchQaSyncStatus("clinic");
+    expect(f.mock.calls[1][0]).toBe("/api/v1/knowledge/qa/sync-status?project_id=clinic");
   });
 });
 

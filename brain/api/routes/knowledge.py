@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 
@@ -80,9 +81,39 @@ _REINDEX_DEBOUNCE_SECONDS = 2.0
 _reindex_state: dict[str, dict[str, Any]] = {}
 
 
+def _short_error(exc: Exception) -> str:
+    detail = " ".join(str(exc).split())
+    if not detail:
+        return type(exc).__name__
+    return f"{type(exc).__name__}: {detail}"[:200]
+
+
+def reindex_status(project_id: str) -> dict[str, Any]:
+    """Return the in-memory reindex state for ``project_id``."""
+    state = _reindex_state.get(project_id)
+    if not state:
+        return {"pending": False, "running": False, "last_error": None}
+    task = state.get("task")
+    pending = bool(state.get("dirty")) or (task is not None and not task.done())
+    return {
+        "pending": pending,
+        "running": bool(state.get("running")),
+        "last_error": state.get("last_error"),
+    }
+
+
 def schedule_reindex(project_id: str) -> None:
     """Coalesce reindex requests: debounce rapid edits, never run two at once."""
-    state = _reindex_state.setdefault(project_id, {"task": None, "dirty": False})
+    state = _reindex_state.setdefault(
+        project_id,
+        {
+            "task": None,
+            "dirty": False,
+            "running": False,
+            "last_error": None,
+            "finished_at": None,
+        },
+    )
     state["dirty"] = True
     task = state["task"]
     if task is not None and not task.done():
@@ -96,11 +127,18 @@ async def _reindex_worker(project_id: str, state: dict[str, Any]) -> None:
     while state["dirty"]:
         await asyncio.sleep(_REINDEX_DEBOUNCE_SECONDS)
         state["dirty"] = False
+        state["running"] = True
         try:
             result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
         except Exception as exc:
+            state["last_error"] = _short_error(exc)
             log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
             continue
+        else:
+            state["last_error"] = None
+        finally:
+            state["running"] = False
+            state["finished_at"] = datetime.now(UTC).isoformat()
         log_event("knowledge_reindex_auto", project_id=project_id, **result)
     # 關掉圖譜的專案不在每次存檔後自動重建；要重建仍可手動呼叫 /knowledge/graph/rebuild。
     if load_kb_settings(project_id)["graph_enabled"]:

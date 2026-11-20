@@ -132,7 +132,7 @@
   * **一般文件**：轉成文字（`knowledge/converters.py`：`.md`、`.txt`、`.csv`、`.docx`、`.xlsx`、`.pdf`），再逐段以 LLM 整理成乾淨的 Markdown（`knowledge/normalizer.py`；修正 OCR 錯字與誤判的標題，不新增內容，不翻譯；輸出語言和原文不同或失敗的段落保留原文），寫入 `knowledge/`。`normalize: false` 時略過 LLM；API 不帶時預設 `true`，後台匯入畫面預設送 `false`，使用者選了 AI 整理才送 `true`。
   * **進度與結果**：`GET /brain/knowledge/raw/commit/status` 回傳逐檔狀態、`results`（目標文件、種類、語言、是否更新既有文件、所屬分類與題數、混語言表的各語言題數、要人回頭看的白話提示 `notes`）與 `skip_reasons`（沒匯入的原因）。單一檔案失敗不影響其他檔案，沒匯入的留在 `raw/`，可用 `GET`、`DELETE /brain/knowledge/raw/pending` 查看或移除。欄位定義見 `brain/README.md`。
 * **既有文件重新整理**：`POST /brain/knowledge/renormalize[/preview|/apply]`，整理前的版本存到 `.normalization-backups/`。Brain 不檢查帳號；「AI 整理排版」逐帳號開放由 Backend 轉發前把關（見 `01_BACKEND_SPEC.md`）。
-* 文件新增、儲存、搬移或刪除後都會排程重建：同一專案的請求以 2 秒 debounce 合併、不會同時跑兩個，索引重建完成後接著重建知識圖譜。也可呼叫 `POST /brain/knowledge/reindex` 手動重建。
+* 文件新增、儲存、搬移或刪除後都會排程重建：同一專案的請求以 2 秒 debounce 合併、不會同時跑兩個，索引重建完成後接著重建知識圖譜；背景重建在單一 admin worker 的記憶體 `_reindex_state` 記錄 `running`、`last_error`（下次成功時清除）與 `finished_at`（透過 `reindex_status` 查詢）。也可呼叫 `POST /brain/knowledge/reindex` 手動重建。
 
 #### 4.2 切段與索引
 
@@ -176,6 +176,7 @@
 | `DELETE /nodes/{id}/entries` | 只把題目拿下這個節點，文件的題目留在檔案裡、仍可被檢索，也不會被同步放回去 |
 | `DELETE /nodes/{id}` | 只拿掉分類與掛載，文件留著、仍可被檢索，裡面的題目也不會跑到別的節點 |
 | `GET /questions` | 只讀：所有題目一題一列（來源文件＋題目文字為身分，換行符號不算差異），附分類、語言與狀態；圖片已判定過的列帶 `image_kind`；契約見 `brain/README.md` |
+| `GET /sync-status` | 回傳 `{"categories": {"<node_id>": "synced" \| "updating" \| "failed"}}`（`knowledge/qa_sync_status.py`）。每個分類只看直接掛載的 `qa_entries`（不合併子分類），去掉重複 `source_path`、略過選單專用題，只比對可索引且未停用的文件指紋（每份文件單次請求只算一次）。全部已同步或無需檢查的文件回 `synced`；有文件未同步時，專案 `pending` 或 `running` 回 `updating`，否則有 `last_error` 回 `failed`，兩者皆無（例如重啟清空記憶體狀態或外部改檔）則刻意補排一次 `schedule_reindex` 自我修復並回 `updating`。廠商請求以 `visible_workspace_path` 過濾來源（同 `_vendor_node`），只含隱藏來源的分類過濾後沒有可見文件而回 `synced`，不洩漏失敗也不觸發重建 |
 | `GET /nodes` | 不會替沒掛節點的 QA 文件建節點；要進選單用 `POST /nodes/adopt-source`（把文件拖進問答樹） |
 | 刪除文件 | 移除所有引用，只有因此變空且沒有子節點的節點會一起刪除 |
 | 重傳同名問答表 | 合併進現有文件：新題加入，新檔沒有的舊題留著，要刪到編輯畫面刪；隱藏狀態與各分類的位置不動。同一題的答案、或兩邊都有值的圖片與連結不同時，整份不匯入並列出衝突；舊檔沒填的圖片或連結會補上。分類已刪除的文件只更新內容，不回選單，表裡有 `path` 也一樣；分類還在但題目都拿掉了，題目會接回那個分類。換行符號不同不算內容不同 |

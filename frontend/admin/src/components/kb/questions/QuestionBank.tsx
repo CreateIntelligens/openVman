@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { fetchAllQuestions, type KnowledgeLanguage, type QaCategorySummary, type QaQuestionRow } from "../../../api/knowledge";
+import { fetchAllQuestions, type KnowledgeLanguage, type QaCategorySummary, type QaQuestionRow, type QaSyncState } from "../../../api/knowledge";
 import type { MergedQaItem, QaEntry } from "../../../hooks/useQaNodes";
 import { useNavigationGuard } from "../../../context/NavigationGuardContext";
 import ConfirmModal from "../../ConfirmModal";
 import QaImagePreview from "../QaImagePreview";
+import { QaSyncStatusBadge } from "../StatusDot";
 import { fileNameOf } from "../helpers";
 import MountQaEntryModal from "../qa/MountQaEntryModal";
 import { categoryScopes, EMPTY_FILTERS, facetOptions, filterQuestions, languageKey, languageLabel, rowStates, STATE_LABELS } from "./allQuestions";
@@ -29,6 +30,7 @@ interface Props {
   availableCategories: ReadonlySet<string>;
   language: string;
   category: string | null;
+  categorySyncStatus?: QaSyncState;
   categoryEntries?: QaEntry[];
   loading: boolean;
   error: boolean;
@@ -103,7 +105,7 @@ function moveMessage(move: PendingMove) {
 }
 
 export default function QuestionBank({
-  projectId, vendor, documentLabels, rows, categories, availableCategories, language, category, categoryEntries, loading, error,
+  projectId, vendor, documentLabels, rows, categories, availableCategories, language, category, categorySyncStatus, categoryEntries, loading, error,
   api, open, onOpen, onCreate, onClose, onCloseAfterChange, onSelectCategory, onAllCategories, onRefresh, onTest, onOpenDocument,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -421,7 +423,10 @@ export default function QuestionBank({
         <div className="space-y-3 border-b border-border px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="break-words text-base font-semibold">{categoriesById.get(category ?? "")?.path.join(" › ") ?? "全部分類"}</h2>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <h2 className="break-words text-base font-semibold">{categoriesById.get(category ?? "")?.path.join(" › ") ?? "全部分類"}</h2>
+                {category && categorySyncStatus && <QaSyncStatusBadge status={categorySyncStatus} />}
+              </div>
               <p role="status" className="text-sm text-content-muted">{loading && !rows.length ? "正在讀取題目…" : `${filtered.length} 題`}</p>
             </div>
             <div className="flex flex-wrap gap-2">

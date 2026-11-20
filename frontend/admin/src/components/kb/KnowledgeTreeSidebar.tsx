@@ -1,4 +1,5 @@
 import { useMemo, type FormEvent, type ReactNode, type RefObject } from "react";
+import type { QaSyncState } from "../../api/knowledge";
 import TreeView from "./TreeView";
 import type { QaDropPosition, TreeNode } from "./helpers";
 import {
@@ -67,6 +68,7 @@ interface KnowledgeTreeSidebarProps {
   checkedPaths: ReadonlySet<string>;
   onToggleChecked: (paths: string[], checked: boolean) => void;
   batchBar?: ReactNode;
+  qaSyncStatuses?: Readonly<Record<string, QaSyncState>>;
 }
 
 export default function KnowledgeTreeSidebar({
@@ -123,6 +125,7 @@ export default function KnowledgeTreeSidebar({
   checkedPaths,
   onToggleChecked,
   batchBar,
+  qaSyncStatuses,
 }: KnowledgeTreeSidebarProps) {
   const namedTree = useMemo(
     () => vendor ? vendorDocumentTree(displayTree, documentLabels) : displayTree,
@@ -301,6 +304,7 @@ export default function KnowledgeTreeSidebar({
               checkedPaths={checkedPaths}
               onToggleChecked={onToggleChecked}
               documentsToolbar={documentsToolbar}
+              qaSyncStatuses={qaSyncStatuses}
             />
             {/* 樹沒有填滿時，拖到樹下面的空白也能放回文件最上層。 */}
             {showDocumentsRootDropZone && (

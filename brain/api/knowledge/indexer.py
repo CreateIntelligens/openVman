@@ -11,6 +11,7 @@ import json
 import math
 from pathlib import Path
 import re
+import threading
 from typing import Any
 
 from config import get_settings
@@ -74,8 +75,26 @@ def has_stale_documents(project_id: str = "default") -> bool:
     return current != previous
 
 
+_rebuild_locks: dict[str, threading.RLock] = {}
+_rebuild_locks_guard = threading.Lock()
+
+
+def _rebuild_lock(project_id: str) -> threading.RLock:
+    with _rebuild_locks_guard:
+        return _rebuild_locks.setdefault(project_id, threading.RLock())
+
+
 def rebuild_knowledge_index(project_id: str = "default") -> dict[str, Any]:
-    """Incrementally rebuild the knowledge table from indexable workspace documents."""
+    """Incrementally rebuild the knowledge table from indexable workspace documents.
+
+    同一專案一次只跑一個：存檔後的背景重建、手動重建、圖譜前的補索引與同步狀態的自我修復
+    各自觸發，同時跑會共用同一份 checkpoint 暫存檔，指紋可能互相蓋掉。
+    """
+    with _rebuild_lock(project_id):
+        return _rebuild_knowledge_index(project_id)
+
+
+def _rebuild_knowledge_index(project_id: str) -> dict[str, Any]:
     workspace_root = ensure_workspace_scaffold(project_id)
     store = CheckpointStore(resolve_embedding_index_state_path(project_id))
     live_fingerprints = _current_document_fingerprints(project_id, workspace_root)

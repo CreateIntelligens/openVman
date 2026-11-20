@@ -3,7 +3,7 @@ import type { QaNode } from "../../../hooks/useQaNodes";
 
 /**
  * 第一層分類叫這些名字，就是語言分類：匯入的同語言問答表會自動放進來，前台訪客選單
- * 也靠這個名字切換語言。要和 Brain 的 knowledge/qa_nodes.py 與前台
+ * 也靠這個名字切換語言。要和 Brain 的 knowledge/qa_category_depth.py 與前台
  * frontend/app/src/components/controls/quickQaText.ts 的 LANGUAGE_LABELS 一致，有測試比對。
  * 比對時忽略大小寫與前後空白。
  */

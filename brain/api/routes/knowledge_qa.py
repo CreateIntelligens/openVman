@@ -67,7 +67,7 @@ from knowledge.qa_nodes import (
     update_node,
 )
 
-from routes.knowledge import schedule_reindex
+from routes.knowledge import reindex_status, schedule_reindex
 from safety.internal_auth import require_internal_token
 
 logger = logging.getLogger(__name__)
@@ -200,6 +200,34 @@ def list_all_questions_route(project_id: str = "default", vendor: VendorRequest 
             project_id, visible=lambda path: visible_workspace_path(project_id, path, "knowledge"),
         )
     return list_all_questions(project_id)
+
+
+@router.get("/sync-status")
+async def get_qa_sync_status_route(
+    project_id: str = "default", vendor: VendorRequest = False,
+) -> dict[str, dict[str, str]]:
+    """Return each Q&A category's indexing sync state (synced / updating / failed)."""
+    from knowledge.qa_sync_status import compute_qa_sync_status
+
+    pid = project_id or "default"
+    visible = (
+        (lambda path: visible_workspace_path(pid, path, "knowledge"))
+        if vendor
+        else None
+    )
+    status = reindex_status(pid)
+    categories, needs_reindex = await asyncio.to_thread(
+        compute_qa_sync_status,
+        pid,
+        status=status,
+        visible=visible,
+    )
+    if needs_reindex:
+        # 刻意的自我修復：有可索引且啟用的文件指紋與索引不同，但記憶體沒有
+        # pending／running／last_error（例如剛重啟或外部改檔沒排重建），補排一次背景重建；
+        # schedule_reindex 會合併同專案請求，重複呼叫不會跑兩次。
+        schedule_reindex(pid)
+    return {"categories": categories}
 
 
 def _vendor_node(node: dict[str, Any], project_id: str) -> dict[str, Any]:

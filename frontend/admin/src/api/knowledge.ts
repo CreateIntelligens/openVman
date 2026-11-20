@@ -557,3 +557,14 @@ export interface QaAllQuestions {
 export function fetchAllQuestions(projectId: string = getActiveProjectId()) {
   return get<QaAllQuestions>(knowledgePath("/qa/questions"), { project_id: projectId });
 }
+
+export type QaSyncState = "synced" | "updating" | "failed";
+
+export interface QaSyncStatusResponse {
+  categories: Record<string, QaSyncState>;
+}
+
+/** 每個快速問答分類的搜尋索引同步狀態。 */
+export function fetchQaSyncStatus(projectId: string = getActiveProjectId()) {
+  return get<QaSyncStatusResponse>(knowledgePath("/qa/sync-status"), { project_id: projectId });
+}
