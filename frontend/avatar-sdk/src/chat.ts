@@ -19,6 +19,17 @@ export interface AvatarConversationDeps {
   onSentence(index: number, text: string): void;
   playAudio(source: ArrayBuffer): Promise<void>;
   queueAudio(source: ArrayBuffer): Promise<void>;
+  pushPcm(chunk: Int16Array): Promise<void>;
+  untilIdle(): Promise<void>;
+}
+
+/**
+ * A segment that is synthesized and scheduled. `heard` is wrapped in an object
+ * on purpose: an async function returning a bare promise would wait for
+ * playback to end, and the next sentence could not be synthesized meanwhile.
+ */
+interface SpokenSegment {
+  heard: Promise<void>;
 }
 
 /** Thrown when the stream route is missing on this deployment. */
@@ -28,6 +39,7 @@ export class AvatarConversation {
   private sessionId: string | null = null;
   private turn: AbortController | null = null;
   private streamRouteMissing = false;
+  private speechStreamMissing = false;
 
   constructor(
     private readonly resourceBaseUrl: string,
@@ -110,8 +122,7 @@ export class AvatarConversation {
     }
 
     const speaker = new SentenceSpeaker(
-      (segment) => this.requestSpeech(segment, signal),
-      (audio) => this.deps.queueAudio(audio),
+      (segment) => this.speakSegment(segment, signal),
       () => signal.aborted,
     );
     const sentences: string[] = [];
@@ -165,20 +176,89 @@ export class AvatarConversation {
     });
   }
 
+  /**
+   * Speaks one segment and returns a promise for the moment it has been heard.
+   * Streams 16 kHz PCM so playback starts with the first chunk instead of
+   * after the whole sentence is synthesized; deployments without the stream
+   * route fall back to whole-sentence /v1/audio/speech.
+   */
+  private async speakSegment(
+    text: string,
+    signal: AbortSignal,
+  ): Promise<SpokenSegment | null> {
+    if (!this.speechStreamMissing) {
+      const response = await this.send(
+        `${this.resourceBaseUrl}/api/v1/tts/stream`,
+        omitUndefined({
+          ...this.speechOptions(),
+          format: "pcm16k",
+          text,
+        }),
+        "SPEECH_FAILED",
+        signal,
+        [404, 405],
+      );
+      if (!response) return null;
+      if (response.status === 404 || response.status === 405) {
+        this.speechStreamMissing = true;
+      } else {
+        if (!response.body) {
+          throw new OpenVmanAvatarError(
+            "SPEECH_FAILED",
+            "Speech stream response has no body.",
+          );
+        }
+        await this.pumpPcm(response.body, signal);
+        return signal.aborted ? null : { heard: this.deps.untilIdle() };
+      }
+    }
+    const audio = await this.requestSpeech(text, signal);
+    return audio ? { heard: this.deps.queueAudio(audio) } : null;
+  }
+
+  private async pumpPcm(
+    body: ReadableStream<Uint8Array>,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const reader = body.getReader();
+    // 網路切包不保證落在樣本邊界，留下奇數的那個 byte 接到下一包。
+    let carry: number | null = null;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done || signal.aborted) break;
+        if (!value || value.length === 0) continue;
+        const bytes: Uint8Array = carry === null ? value : prependByte(carry, value);
+        const usable: number = bytes.length - (bytes.length % 2);
+        carry = usable < bytes.length ? bytes[usable] : null;
+        if (usable === 0) continue;
+        await this.deps.pushPcm(littleEndianInt16(bytes, usable));
+      }
+    } catch (error) {
+      if (signal.aborted) return;
+      throw new OpenVmanAvatarError("SPEECH_FAILED", errorMessage(error));
+    } finally {
+      if (signal.aborted) void reader.cancel().catch(() => undefined);
+    }
+  }
+
+  private speechOptions(): Record<string, unknown> {
+    return {
+      provider: this.options.tts?.provider,
+      voice: this.options.tts?.voice,
+      // 同源 session 沒有 embed key 綁定專案，要靠這裡帶專案才套得到專案的聲音與分流。
+      project_id: this.options.projectId,
+      language: this.options.tts?.language,
+    };
+  }
+
   private async requestSpeech(
     text: string,
     signal: AbortSignal,
   ): Promise<ArrayBuffer | null> {
     const response = await this.send(
       `${this.resourceBaseUrl}/v1/audio/speech`,
-      omitUndefined({
-        input: text,
-        provider: this.options.tts?.provider,
-        voice: this.options.tts?.voice,
-        // 同源 session 沒有 embed key 綁定專案，要靠這裡帶專案才套得到專案的聲音與分流。
-        project_id: this.options.projectId,
-        language: this.options.tts?.language,
-      }),
+      omitUndefined({ ...this.speechOptions(), input: text }),
       "SPEECH_FAILED",
       signal,
     );
@@ -245,8 +325,8 @@ class SentenceSpeaker {
   private failure: unknown = null;
 
   constructor(
-    private readonly synthesize: (text: string) => Promise<ArrayBuffer | null>,
-    private readonly enqueue: (audio: ArrayBuffer) => Promise<void>,
+    // 合成並排進播放後回傳；被打斷時回 null。
+    private readonly speak: (text: string) => Promise<SpokenSegment | null>,
     private readonly cancelled: () => boolean,
   ) {}
 
@@ -270,10 +350,10 @@ class SentenceSpeaker {
       this.pending = [];
       if (!segment.trim()) continue;
       try {
-        const audio = await this.synthesize(segment);
-        if (!audio || this.cancelled()) break;
+        const spoken = await this.speak(segment);
+        if (!spoken || this.cancelled()) break;
         this.playbacks.push(
-          this.enqueue(audio).catch((error) => {
+          spoken.heard.catch((error) => {
             this.failure ??= error;
           }),
         );
@@ -363,6 +443,22 @@ function createSessionId(): string {
   return `sdk-${Date.now().toString(36)}-${
     Math.random().toString(36).slice(2, 10)
   }`;
+}
+
+function prependByte(first: number, rest: Uint8Array): Uint8Array {
+  const joined = new Uint8Array(rest.length + 1);
+  joined[0] = first;
+  joined.set(rest, 1);
+  return joined;
+}
+
+function littleEndianInt16(bytes: Uint8Array, length: number): Int16Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, length);
+  const samples = new Int16Array(length / 2);
+  for (let index = 0; index < samples.length; index += 1) {
+    samples[index] = view.getInt16(index * 2, true);
+  }
+  return samples;
 }
 
 function errorMessage(error: unknown): string {

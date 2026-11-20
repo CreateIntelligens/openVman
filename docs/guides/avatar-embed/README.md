@@ -74,7 +74,7 @@ const avatar = await OpenVmanAvatar.init({
 
 ## 對話模式
 
-設定對話選項後，`await avatar.ask(text)` 會完成一整輪：送出 `POST /api/v1/chat/stream`，回答每寫完一句就派送 `sentence` 事件，並以該句呼叫 `POST /v1/audio/speech` 合成、接在前一段後面播放，不必等整段回答。同時只送一個語音請求，合成期間到的句子會併進下一個請求。回答結束時派送一次 `reply` 事件（完整回答），Promise 在語音全部播完後 resolve，回傳回覆文字。需要知道開口時機請監聽 `speaking` 事件；一輪中若下一句還沒合成好，`speaking` 可能先 `stop` 再 `start`。
+設定對話選項後，`await avatar.ask(text)` 會完成一整輪：送出 `POST /api/v1/chat/stream`，回答每寫完一句就派送 `sentence` 事件，並以該句呼叫 `POST /api/v1/tts/stream`（`format: "pcm16k"`）串流合成：收到第一段 16 kHz PCM 就開始播放並驅動嘴形，不必等整句合成完，接在前一段後面播放。同時只送一個語音請求，合成期間到的句子會併進下一個請求；前一段還在播時下一段已經可以開始合成。部署沒有串流合成路由（回 404／405）時，該 instance 之後改用 `POST /v1/audio/speech` 整句合成。回答結束時派送一次 `reply` 事件（完整回答），Promise 在語音全部播完後 resolve，回傳回覆文字。需要知道開口時機請監聽 `speaking` 事件；一輪中若下一句還沒合成好，`speaking` 可能先 `stop` 再 `start`。
 
 同一個 instance 的每次 `ask()` 都會沿用同一組 `session_id`，因此後端看得到完整上下文。新的 `ask()`、`interrupt()` 或 `destroy()` 會連同上一輪的串流、還沒送出的合成與正在播的語音一起中止，不會兩段答案疊在一起；在回答結束前被中止的 `ask()` 會 resolve 為已收到的句子，不派送 `reply`，這一輪也不寫入對話紀錄；回答已結束、只剩語音在播時才中止，則 resolve 為完整回答（`reply` 已派送過）。
 
@@ -247,8 +247,9 @@ location /static/characters/ {
 | `/static/characters/<characterId>/combined_data.json.gz` | 角色驅動資料。專案專屬人物要帶 `X-Embed-Key`。 |
 | `/static/characters/<characterId>/01.webm` | 透明角色影片。專案專屬人物要帶 `X-Embed-Key`。 |
 | `/api/v1/chat` | 對話模式的回答端點（需 embed key 或 session）。 |
-| `/api/v1/chat/stream` | 同一個回答以 SSE 逐句送出（需 embed key 或 session；SDK 的 `ask()` 不使用，事件格式見[串接快速開始](../integration-quickstart.md)）。 |
-| `/v1/audio/speech` | 對話模式的語音合成端點（需 embed key 或 session）。 |
+| `/api/v1/chat/stream` | 同一個回答以 SSE 逐句送出，SDK 的 `ask()` 預設走這條（需 embed key 或 session；事件格式見[串接快速開始](../integration-quickstart.md)）。 |
+| `/api/v1/tts/stream` | 對話模式的語音合成端點，SDK 帶 `format: "pcm16k"` 邊收邊播（需 embed key 或 session）。 |
+| `/v1/audio/speech` | 整句語音合成；部署沒有 `/api/v1/tts/stream` 時 SDK 退回這條（需 embed key 或 session）。 |
 
 `/api/embed/*`、`/ws/embed/*`、`/embed/avatar`、`/vman-embed.js` 與 `<vman-avatar>` 都不是支援的串接面，且已全數回 404。除上表列出者外，openVman 內部使用的 `/api/v1/*` 其餘端點不屬於 Avatar SDK 公開契約；embed key 也只能存取上表所列路徑。
 

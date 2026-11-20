@@ -214,6 +214,8 @@ async function createInstance(
       emit("sentence", { index, text, type: "sentence" }),
     playAudio: (source) => audio.playAudio(source),
     queueAudio: (source) => audio.queueAudio(source),
+    pushPcm: (chunk) => audio.pushPcm(chunk),
+    untilIdle: () => audio.untilIdle(),
   });
 
   const instance: OpenVmanAvatarInstance = {

@@ -45,6 +45,7 @@ export class AvatarAudio {
   private idleTimer: number | null = null;
   private speakingTimer: number | null = null;
   private utteranceOpen = false;
+  private idleWaiters = new Set<() => void>();
 
   constructor(
     private readonly runtime: AvatarRuntime,
@@ -139,6 +140,27 @@ export class AvatarAudio {
     this.startPcm(chunk);
   }
 
+  /**
+   * Resolves once nothing is scheduled or held back any more (or playback is
+   * interrupted), so a caller that streamed PCM can wait for it to be heard.
+   */
+  untilIdle(): Promise<void> {
+    if (this.isIdle()) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      this.idleWaiters.add(resolve);
+    });
+  }
+
+  private isIdle(): boolean {
+    return this.sources.size === 0 && this.leadTimer === null && this.held.length === 0;
+  }
+
+  private settleIdleWaiters(): void {
+    const waiters = [...this.idleWaiters];
+    this.idleWaiters.clear();
+    for (const resolve of waiters) resolve();
+  }
+
   private startPcm(chunk: Int16Array): void {
     this.utteranceOpen = true;
     const samples = new Float32Array(chunk.length);
@@ -208,6 +230,7 @@ export class AvatarAudio {
     this.runtime.clearAudio();
     this.runtime.resetSpeaking();
     this.setSpeaking(false);
+    this.settleIdleWaiters();
   }
 
   destroy(): void {
@@ -227,6 +250,7 @@ export class AvatarAudio {
       this.runtime.clearAudio();
       this.runtime.endSpeaking();
       this.setSpeaking(false);
+      this.settleIdleWaiters();
     };
     if (this.leadMs > 0) this.idleTimer = window.setTimeout(finish, IDLE_GRACE_MS);
     else finish();

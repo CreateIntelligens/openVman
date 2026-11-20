@@ -17,10 +17,16 @@ async function loadSdk({
   manualStream = false,
   speechDelayMs = 0,
   speechStatus = 200,
+  // 串流合成（/api/v1/tts/stream）的狀態；404/405 讓 SDK 退回整句的 /v1/audio/speech。
+  speechStreamStatus = speechStatus,
+  // 刻意切在奇數 byte，確認跨包的樣本會接起來。
+  speechStreamChunks = [[0, 16, 0], [32, 0, 64, 0, 16]],
   streamEvents,
   streamStatus = chatStatus,
   withCryptoUuid = true,
   audioBlocked = false,
+  // 播放不會自己結束，測試用 releasePlayback() 放行，用來確認合成不必等播完。
+  holdPlayback = false,
 } = {}) {
   const source = await readFile(bundleUrl, "utf8");
   const script = { src: "https://avatar.example/static/sdk/openvman-avatar-sdk.js" };
@@ -29,6 +35,7 @@ async function loadSdk({
   const runtimeCalls = {
     clearAudio: 0,
     pushedAudio: 0,
+    pushedBytes: 0,
     sourceStarted: 0,
     sourceStopped: 0,
     speakerOutput: 0,
@@ -38,6 +45,7 @@ async function loadSdk({
   };
   let finishChat;
   let stream = null;
+  const heldSources = [];
   let context;
   const createElement = (tagName) => {
     const listeners = new Map();
@@ -95,8 +103,9 @@ async function loadSdk({
               _free() {},
               _malloc: () => 0,
               _processSecret() {},
-              _setAudioBuffer() {
+              _setAudioBuffer(_pointer, length) {
                 runtimeCalls.pushedAudio += 1;
+                runtimeCalls.pushedBytes += length;
               },
               stringToUTF8() {},
             });
@@ -201,6 +210,29 @@ async function loadSdk({
           finishChat = () => resolve(respond());
         });
       }
+      if (String(url).endsWith("/api/v1/tts/stream")) {
+        if (speechDelayMs) {
+          await new Promise((resolve) => setTimeout(resolve, speechDelayMs));
+        }
+        const pending = speechStreamChunks.map((bytes) => new Uint8Array(bytes));
+        return {
+          body: {
+            getReader: () => ({
+              cancel: async () => {},
+              read: async () => {
+                if (options.signal?.aborted) {
+                  throw new Error("The operation was aborted.");
+                }
+                const value = pending.shift();
+                return value ? { done: false, value } : { done: true, value: undefined };
+              },
+            }),
+          },
+          headers: makeHeaders({}),
+          ok: speechStreamStatus === 200,
+          status: speechStreamStatus,
+        };
+      }
       if (String(url).endsWith("/v1/audio/speech")) {
         if (speechDelayMs) {
           await new Promise((resolve) => setTimeout(resolve, speechDelayMs));
@@ -261,7 +293,8 @@ async function loadSdk({
         onended: null,
         start() {
           runtimeCalls.sourceStarted += 1;
-          queueMicrotask(() => source.onended?.());
+          if (holdPlayback) heldSources.push(source);
+          else queueMicrotask(() => source.onended?.());
         },
         stop() {
           runtimeCalls.sourceStopped += 1;
@@ -300,6 +333,9 @@ async function loadSdk({
   return {
     document: context.document,
     finishChat: () => finishChat?.(),
+    releasePlayback: () => {
+      for (const source of heldSources.splice(0)) source.onended?.();
+    },
     requests,
     stream: () => stream,
     runtimeCalls,
@@ -370,7 +406,15 @@ const wholeChatRequests = (requests) =>
 const chatRequests = (requests) =>
   [...streamRequests(requests), ...wholeChatRequests(requests)];
 const speechRequests = (requests) =>
+  requests.filter(({ url }) =>
+    String(url).endsWith("/v1/audio/speech") || String(url).endsWith("/api/v1/tts/stream"));
+const wholeSpeechRequests = (requests) =>
   requests.filter(({ url }) => String(url).endsWith("/v1/audio/speech"));
+// 串流合成送 text，整句合成送 input。
+const speechText = ({ options }) => {
+  const body = JSON.parse(options.body);
+  return body.text ?? body.input;
+};
 
 test("a legacy host makes no chat or speech request", async () => {
   const { requests, sdk } = await loadSdk();
@@ -431,13 +475,16 @@ test("a keyed host sends X-Embed-Key without credentials and speaks the reply", 
   const [speech] = speechRequests(requests);
   assert.equal(speech.options.headers["X-Embed-Key"], "ovk_demo");
   assert.equal(speech.options.credentials, "omit");
+  assert.ok(String(speech.url).endsWith("/api/v1/tts/stream"));
   assert.deepEqual(JSON.parse(speech.options.body), {
-    input: "你好，我是 openVman。",
     provider: "voxcpm",
     voice: "zh-female",
     project_id: "alpha",
     language: "nan",
+    format: "pcm16k",
+    text: "你好，我是 openVman。",
   });
+  assert.equal(wholeSpeechRequests(requests).length, 0);
 
   assert.ok(runtimeCalls.pushedAudio > 0);
   assert.ok(runtimeCalls.sourceStarted > 0);
@@ -457,9 +504,10 @@ test("a same-origin session host sends credentials and no embed key", async () =
   const chatPayload = JSON.parse(chatRequests(requests)[0].options.body);
   assert.equal("persona_id" in chatPayload, false);
   assert.deepEqual(JSON.parse(speechRequests(requests)[0].options.body), {
-    input: "你好，我是 openVman。",
     // 沒有 embed key 綁專案，語音請求要自己帶專案。
     project_id: "alpha",
+    format: "pcm16k",
+    text: "你好，我是 openVman。",
   });
 });
 
@@ -601,7 +649,7 @@ test("a silent instance drives lip sync without asking the browser for audio", a
 
   assert.equal(reply, "你好，我是 openVman。");
   assert.ok(runtimeCalls.pushedAudio > 0);
-  assert.ok(runtimeCalls.offlineDecodes > 0);
+  // 串流 PCM 不用解碼；靜音模式也不能為了解碼去建 AudioContext。
   assert.equal(runtimeCalls.audioContexts, 0);
   assert.equal(runtimeCalls.speakerOutput, 0);
   assert.deepEqual(speaking, ["start", "stop", "start", "stop"]);
@@ -636,7 +684,7 @@ test("ask streams the reply and speaks the first sentence before done", async ()
   await flush();
   // done 還沒到就已經在合成第一句。
   assert.deepEqual(
-    speechRequests(requests).map(({ options }) => JSON.parse(options.body).input),
+    speechRequests(requests).map(speechText),
     ["第一句。"],
   );
   assert.deepEqual(replies, []);
@@ -649,7 +697,7 @@ test("ask streams the reply and speaks the first sentence before done", async ()
   assert.deepEqual(sentences, [[0, "第一句。"], [1, "第二句。"]]);
   assert.deepEqual(replies, ["第一句。第二句。"]);
   assert.equal(
-    speechRequests(requests).map(({ options }) => JSON.parse(options.body).input).join(""),
+    speechRequests(requests).map(speechText).join(""),
     "第一句。第二句。",
   );
   assert.equal(wholeChatRequests(requests).length, 0);
@@ -669,9 +717,7 @@ test("sentences arriving during synthesis join the next speech request", async (
 
   await avatar.ask("數數");
 
-  const inputs = speechRequests(requests).map(
-    ({ options }) => JSON.parse(options.body).input,
-  );
+  const inputs = speechRequests(requests).map(speechText);
   assert.deepEqual(inputs, ["一。", "二。三。"]);
 });
 
@@ -683,7 +729,7 @@ test("a stream without sentences still speaks the final reply", async () => {
 
   assert.equal(await avatar.ask("你好"), "只有完整回答。");
   assert.deepEqual(
-    speechRequests(requests).map(({ options }) => JSON.parse(options.body).input),
+    speechRequests(requests).map(speechText),
     ["只有完整回答。"],
   );
 });
@@ -848,4 +894,60 @@ test("an invalid audioLeadMs is rejected at init", async () => {
     sdk.init({ audioLeadMs: -1, characterId: "000" }),
     (error) => error.code === "INVALID_OPTIONS",
   );
+});
+
+
+test("streamed speech keeps samples split across network chunks", async () => {
+  const { runtimeCalls, sdk } = await loadSdk();
+  const avatar = await sdk.init({ audioLeadMs: 0, characterId: "000" });
+
+  await avatar.ask("你好");
+
+  // 測資兩包 3 + 5 bytes，共 4 個樣本；奇數 byte 沒接起來就只剩 6 bytes。
+  assert.equal(runtimeCalls.pushedBytes, 8);
+});
+
+test("the next sentence is synthesized while the previous one is still playing", async () => {
+  const { releasePlayback, requests, sdk, stream } = await loadSdk({
+    holdPlayback: true,
+    manualStream: true,
+  });
+  const avatar = await sdk.init({ audioLeadMs: 0, characterId: "000" });
+  let settled = false;
+
+  const pending = avatar.ask("數數").then((reply) => {
+    settled = true;
+    return reply;
+  });
+  await flush();
+  stream().push("sentence", { index: 0, text: "一。" });
+  await flush();
+  stream().push("sentence", { index: 1, text: "二。" });
+  stream().push("done", { reply: "一。二。" });
+  stream().end();
+  await flush();
+
+  // 第一句的聲音還沒播完，第二句已經送出合成。
+  assert.deepEqual(speechRequests(requests).map(speechText), ["一。", "二。"]);
+  assert.equal(settled, false, "ask waits until the reply has been heard");
+
+  releasePlayback();
+  assert.equal(await pending, "一。二。");
+});
+
+test("a deployment without streamed speech falls back to whole-sentence speech", async () => {
+  const { requests, sdk } = await loadSdk({ speechStreamStatus: 404 });
+  const avatar = await sdk.init({ characterId: "000", projectId: "alpha" });
+
+  assert.equal(await avatar.ask("第一句"), "你好，我是 openVman。");
+  assert.equal(await avatar.ask("第二句"), "你好，我是 openVman。");
+
+  const streamed = speechRequests(requests).filter(
+    ({ url }) => String(url).endsWith("/api/v1/tts/stream"),
+  );
+  assert.equal(streamed.length, 1, "the missing route is not retried");
+  assert.deepEqual(wholeSpeechRequests(requests).map(speechText), [
+    "你好，我是 openVman。",
+    "你好，我是 openVman。",
+  ]);
 });
