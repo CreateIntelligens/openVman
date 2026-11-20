@@ -235,3 +235,25 @@ def test_becoming_a_vendor_account_turns_web_search_off(env):
     )
     assert moved.status_code == 200, moved.text
     assert moved.json()["web_search_access"] is False
+
+
+def test_an_admin_without_web_search_can_resave_an_account_that_has_it(env):
+    root_headers = env.headers(env.root.id)
+    assert env.client.put(
+        f"/api/v1/users/{env.admin.id}/access", headers=root_headers,
+        json={"web_search_access": True},
+    ).status_code == 200
+    child = env.create(
+        "child-with-web", actor_id=env.admin.id, access={"web_search_access": True},
+    ).json()
+    assert child["web_search_access"] is True
+    assert env.client.put(
+        f"/api/v1/users/{env.admin.id}/access", headers=root_headers,
+        json={"web_search_access": False},
+    ).status_code == 200
+
+    resaved = env.client.put(
+        f"/api/v1/users/{child['id']}/access", headers=env.headers(env.admin.id),
+        json={"web_search_access": True},
+    )
+    assert resaved.status_code == 200, resaved.text

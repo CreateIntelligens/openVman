@@ -300,3 +300,25 @@ def test_an_admin_without_web_search_cannot_turn_it_on_for_a_key(admin_client):
     assert client.patch(
         f"/api/v1/embed-keys/{key['key_id']}", json={"web_search_access": False},
     ).status_code == 200
+
+
+def test_an_admin_without_web_search_can_still_edit_a_key_that_has_it(admin_client):
+    _module, client = admin_client
+    _allow_web_search()
+    key = client.post(
+        "/api/v1/embed-keys", json=_create_payload(web_search_access=True),
+    ).json()
+    from app.auth.runtime import get_auth_runtime
+
+    with get_auth_runtime().database.transaction(write=True) as connection:
+        connection.execute(
+            "UPDATE users SET web_search_access = 0 WHERE username = 'test-admin'",
+        )
+
+    # 表單把原本開著的值一起送回來，只改名稱不算新的授權。
+    renamed = client.patch(
+        f"/api/v1/embed-keys/{key['key_id']}",
+        json={"label": "Renamed", "web_search_access": True},
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["label"] == "Renamed"

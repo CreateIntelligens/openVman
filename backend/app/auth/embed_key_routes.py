@@ -197,9 +197,11 @@ async def create_embed_key(
     return _serialize(record, 0)
 
 
-def _require_web_search_grant(current: CurrentAccount, requested: bool | None) -> None:
+def _require_web_search_grant(
+    current: CurrentAccount, requested: bool | None, *, currently: bool = False,
+) -> None:
     try:
-        ensure_can_grant_web_search(current.user, requested)
+        ensure_can_grant_web_search(current.user, requested, currently=currently)
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
@@ -211,8 +213,10 @@ async def update_embed_key(
     current: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict[str, object]:
-    _manageable_key(runtime, current, key_id)
-    _require_web_search_grant(current, payload.web_search_access)
+    existing = _manageable_key(runtime, current, key_id)
+    _require_web_search_grant(
+        current, payload.web_search_access, currently=existing.web_search_access,
+    )
     changes = payload.model_dump(exclude_none=True)
     if "allowed_origins" in changes:
         changes["allowed_origins"] = _normalize_origins(changes["allowed_origins"])

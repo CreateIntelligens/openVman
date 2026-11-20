@@ -151,7 +151,11 @@ def update_account_access(
 ) -> AdminAccountProfile:
     access = body if isinstance(body, UpdateAccountAccessRequest) else None
     try:
-        ensure_can_grant_web_search(admin.user, body.web_search_access)
+        target = runtime.users.get_by_id(user_id)
+        ensure_can_grant_web_search(
+            admin.user, body.web_search_access,
+            currently=bool(target and target.web_search_access),
+        )
         runtime.account_access.replace(
             user_id=user_id,
             granted_by=admin.user.id,

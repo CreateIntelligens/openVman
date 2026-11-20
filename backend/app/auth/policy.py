@@ -44,10 +44,13 @@ def can_manage_vendor_accounts(actor: UserRecord) -> bool:
     )
 
 
-def ensure_can_grant_web_search(actor: UserRecord, requested: bool | None) -> None:
+def ensure_can_grant_web_search(
+    actor: UserRecord, requested: bool | None, *, currently: bool = False,
+) -> None:
     """Only an account that may search the web can turn it on for another account or key."""
     # 委派鏈上每一層的範圍只會更窄：自己被關掉的人，開子帳號或嵌入金鑰也拿不回來。
-    if requested and not has_web_search_access(actor):
+    # 只擋「從關變開」：編輯表單會把原本就開著的值一起送回來，那不是新的授權。
+    if requested and not currently and not has_web_search_access(actor):
         raise AccountPolicyError("你的帳號沒有網路搜尋權限，不能替其他帳號或嵌入金鑰開啟。")
 
 
