@@ -138,6 +138,7 @@ STEPS = [
     ("tts_first_audio", "TTS 請求 → 收到第一段音訊"),
     ("heard", "送出 → 前端收到第一段音訊（聽到第一句）"),
     ("done", "送出 → 回答完整結束"),
+    ("heard_end", "送出 → 整段回答唸完（users_e2e.py 才有）"),
     ("brain_total", "Brain 開始 → Brain 寫完這輪"),
 ]
 
@@ -164,6 +165,8 @@ def main() -> None:
         send = record["send"]
         values["first_sentence"].append(record.get("first_sentence", send) - send if "first_sentence" in record else None)
         values["done"].append(record["done"] - send)
+        if "heard_end" in record:
+            values["heard_end"].append(record["heard_end"] - send)
         if "tts_first_byte" in record:
             values["heard"].append(record["tts_first_byte"] - send)
             values["tts_first_audio"].append(record["tts_first_byte"] - record["tts_send"])

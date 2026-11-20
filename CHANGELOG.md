@@ -4,6 +4,7 @@
 
 ### Added
 
+- **[2026-11-20]** **多人端到端模擬工具**：`scripts/experiments/brain-worker-split/users_e2e.py` 照 SDK `ask()` 的協定模擬 N 個人各問 M 題（逐句串流合成、唸完停 2～3 秒再問），每題記錄與 `burst_nodes.py` 同格式，`node_report.py` 多一欄「整段回答唸完」。
 - **[2026-11-20]** **SDK 的 `reply` 事件帶出 `sessionId` 與 `traceId`**：嵌入頁面可以把每一輪對到後端 log 與對話紀錄，壓測與除錯時不必再用時間和題目去猜。
 - **[2026-11-20]** **壓測逐段計時工具**：`scripts/experiments/brain-worker-split/burst_nodes.py` 與 `node_report.py`，把「1 秒 N 題」拆成 Backend 轉送、Brain 前置、決策、知識庫、LLM 首字、文字第一句、TTS 首段、聽到第一句與完成；`resource_monitor.py` 加上各容器網路收發。
 - **[2026-11-20]** **正式帳號權限預設與網路搜尋開關**。建立帳號可選創智研發、BD、廠商編輯或自訂，帳號與選取專案的授權一併寫入。帳號列表依現有權限顯示適用預設。新增帳號與網站嵌入金鑰的「可用網路搜尋」，帳號 API 金鑰沿用所屬帳號權限。文字對話與 Gemini Live 同時依呼叫者權限和全站開關控制網路搜尋及讀取公開網頁。新帳號與新嵌入金鑰預設關閉，創智研發與 BD 預設開啟。升級時既有內部帳號與嵌入金鑰保留開啟，既有廠商帳號關閉。
