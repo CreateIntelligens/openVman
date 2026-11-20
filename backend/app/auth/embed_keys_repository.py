@@ -229,10 +229,21 @@ class EmbedKeyRepository:
             ).fetchone()
         return int(row["requests"]) if row is not None else 0
 
-    def increment_daily(self, key_id: str, *, day: str | None = None) -> int:
+    def record_use(self, key_id: str, *, day: str | None = None) -> int:
+        """Stamp last use and count one request in one write; return the day's total."""
+        return self.increment_daily(key_id, day=day, touch=True)
+
+    def increment_daily(
+        self, key_id: str, *, day: str | None = None, touch: bool = False,
+    ) -> int:
         """Count one request and return the running total for that day."""
         target_day = day or utc_day()
         with self.database.transaction(write=True) as connection:
+            if touch:
+                connection.execute(
+                    "UPDATE embed_keys SET last_used_at = ? WHERE key_id = ?",
+                    (now_iso(), key_id.strip()),
+                )
             connection.execute(
                 """
                 INSERT INTO embed_key_daily_usage(key_id, day, requests)

@@ -798,7 +798,7 @@ session cookie 與 `X-Embed-Key` 時一律以金鑰為準；embed 主體不會�
 或請求的角色不是金鑰的預設／額外允許角色，皆回 403；超過
 `rate_limit_per_minute`（行程內滑動視窗）或 `daily_request_quota`
 （存在 auth 資料庫的每日計數）回 429 並附上 `Retry-After`。preflight 只驗身分與
-來源，不計入用量，否則一次真實請求會扣掉兩次額度。
+來源，不計入用量，否則一次真實請求會扣掉兩次額度。每個請求的最後使用時間與每日計數在同一次寫入完成；auth 資料庫被其他寫入佔住、等不到鎖時，這筆記帳略過並記 `embed_key_bookkeeping_skipped` 警告，請求照常放行（每分鐘上限不受影響）。
 
 **CORS。** 只有 embed 主體的回應，以及帶著有效金鑰與白名單 `Origin` 的
 allowlisted preflight（回 204），才會帶上 `Access-Control-Allow-Origin`、

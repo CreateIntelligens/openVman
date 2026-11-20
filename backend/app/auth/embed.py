@@ -8,7 +8,9 @@ persisted daily counter bound how much it can spend.
 
 from __future__ import annotations
 
+import logging
 import re
+import sqlite3
 import time
 import uuid
 from collections import defaultdict, deque
@@ -21,6 +23,8 @@ from app.project_ids import canonical_project_id
 
 from .embed_keys_repository import utc_day
 from .models import AccountRole, AccountType, EmbedKeyRecord, UserRecord
+
+logger = logging.getLogger("backend.embed")
 
 EMBED_KEY_HEADER = "X-Embed-Key"
 EMBED_USER_ID_PREFIX = "embed:"
@@ -240,8 +244,13 @@ def authorize_embed_request(
     if retry_after:
         raise _rate_limited("Embed key rate limit exceeded", retry_after)
 
-    repository.touch(key.key_id)
-    used_today = repository.increment_daily(key.key_id)
+    try:
+        used_today = repository.record_use(key.key_id)
+    except sqlite3.OperationalError as exc:
+        # 最後使用時間與每日用量只是記帳：大量同時請求搶不到 SQLite 寫入鎖時放行並記警告，
+        # 不讓整個請求變成 500。每分鐘上限由前面的 limiter 擋，不受影響。
+        logger.warning("embed_key_bookkeeping_skipped key_id=%s error=%s", key.key_id, exc)
+        return
     if used_today > key.daily_request_quota:
         raise _rate_limited(
             "Embed key daily quota exceeded",

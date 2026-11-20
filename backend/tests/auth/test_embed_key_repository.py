@@ -168,3 +168,13 @@ def test_limiter_counts_each_key_separately():
     assert limiter.check("a", 1, now=0.0) == 0
     assert limiter.check("b", 1, now=0.0) == 0
     assert limiter.check("a", 1, now=0.0) > 0
+
+
+def test_record_use_stamps_last_use_and_counts_in_one_call(repository):
+    record = _create(repository)
+
+    assert repository.record_use(record.key_id) == 1
+    assert repository.record_use(record.key_id) == 2
+
+    assert repository.get(record.key_id).last_used_at is not None
+    assert repository.requests_today(record.key_id) == 2
