@@ -28,6 +28,87 @@ LANGUAGE_LABELS: dict[str, str] = {
     "한국어": "ko",
 }
 
+QA_CATEGORY_DEPTH_LIMIT = 2
+QA_CATEGORY_DEPTH_ERROR = "快速回覆最多兩層分類（語言分類不計），放到這裡會超過限制。"
+
+
+def language_label_code(label: str) -> str | None:
+    """Return the language code if ``label`` matches a language category name."""
+    return LANGUAGE_LABELS.get(str(label).strip().lower())
+
+
+def is_language_label(label: str) -> bool:
+    """Whether ``label`` is a language category name (matches ``find_language_category``)."""
+    return language_label_code(label) is not None
+
+
+def _is_root(nodes: dict[str, dict[str, Any]], node: dict[str, Any]) -> bool:
+    return not any(parent_id in nodes for parent_id in node.get("parent_ids", []))
+
+
+def category_depth(nodes: dict[str, dict[str, Any]], node_id: str) -> int:
+    """Deepest category depth of ``node_id`` (0 for top-level language categories, -1 if absent).
+
+    規則與前端 ``qaCategoryDepth`` 一致：最上層語言分類算第 0 層，其他最上層算第 1 層，
+    往下每層加 1；掛在多處時取最深的位置。
+    """
+    if node_id not in nodes:
+        return -1
+
+    def visit(current_id: str, depth: int, visited: set[str]) -> int:
+        if current_id == node_id:
+            return depth
+        if current_id in visited:
+            return -1
+        next_visited = visited | {current_id}
+        best = -1
+        for cid in nodes[current_id].get("child_ids", []):
+            if cid in nodes:
+                best = max(best, visit(cid, depth + 1, next_visited))
+        return best
+
+    best = -1
+    for rid, root in nodes.items():
+        if _is_root(nodes, root):
+            start_depth = 0 if is_language_label(root.get("label", "")) else 1
+            best = max(best, visit(rid, start_depth, set()))
+    return best
+
+
+def _subtree_height(
+    nodes: dict[str, dict[str, Any]], node_id: str, visited: set[str] | None = None
+) -> int:
+    seen = (visited or set()) | {node_id}
+    node = nodes.get(node_id)
+    if not node:
+        return 0
+    best = 0
+    for cid in node.get("child_ids", []):
+        if cid in nodes and cid not in seen:
+            best = max(best, 1 + _subtree_height(nodes, cid, seen))
+    return best
+
+
+def _move_exceeds_depth(
+    nodes: dict[str, dict[str, Any]], node_id: str, new_parent_ids: list[str]
+) -> bool:
+    """Whether placing ``node_id`` under ``new_parent_ids`` pushes it or any descendant past the limit."""
+    node = nodes[node_id]
+    old_parents = set(node.get("parent_ids", []))
+    height = _subtree_height(nodes, node_id)
+    if not new_parent_ids:
+        if not old_parents:
+            return False
+        start = -1 if is_language_label(node.get("label", "")) else 0
+        return start + 1 + height > QA_CATEGORY_DEPTH_LIMIT
+    for pid in new_parent_ids:
+        if pid in old_parents:
+            continue
+        start = category_depth(nodes, pid)
+        if start + 1 + height > QA_CATEGORY_DEPTH_LIMIT:
+            return True
+    return False
+
 
 def _get_nodes_file_path(project_id: str = "default") -> Path:
     return ensure_workspace_scaffold(project_id) / "knowledge" / ".qa_nodes.json"
@@ -115,8 +196,8 @@ def find_language_category(language: str, project_id: str = "default") -> str | 
     candidates = [
         (bool(node.get("hidden", False)), node.get("order", 1.0), node_id)
         for node_id, node in nodes.items()
-        if LANGUAGE_LABELS.get(str(node.get("label", "")).strip().lower()) == language
-        and not any(parent_id in nodes for parent_id in node.get("parent_ids", []))
+        if language_label_code(node.get("label", "")) == language
+        and _is_root(nodes, node)
     ]
     return min(candidates)[2] if candidates else None
 
@@ -208,6 +289,17 @@ def create_node(
         for cid in child_ids or []:
             if cid not in data["nodes"]:
                 raise ValueError(f"Child node '{cid}' does not exist in the database.")
+
+        if parent_ids:
+            new_depth = max(category_depth(data["nodes"], pid) for pid in parent_ids) + 1
+        else:
+            new_depth = 0 if is_language_label(label) else 1
+        child_height = max(
+            (1 + _subtree_height(data["nodes"], cid) for cid in (child_ids or [])),
+            default=0,
+        )
+        if new_depth + child_height > QA_CATEGORY_DEPTH_LIMIT:
+            raise ValueError(QA_CATEGORY_DEPTH_ERROR)
 
         # 沒指定就排在同層最後；固定給 1.0 會跟排序後的第一項同分，新分類掉到第二個。
         if order is None:
@@ -388,6 +480,9 @@ def move_node(
                 raise ValueError(f"Parent node '{pid}' does not exist in the database.")
             if pid in descendants:
                 raise ValueError("Cannot move a node to itself or any of its descendants.")
+
+        if _move_exceeds_depth(data["nodes"], node_id, new_parent_ids):
+            raise ValueError(QA_CATEGORY_DEPTH_ERROR)
 
         node = data["nodes"][node_id]
         old_parents = set(node.get("parent_ids", []))
@@ -720,16 +815,18 @@ def place_questions_by_path(
     """Mount each question on the node its ``path`` names, creating nodes as needed.
 
     已經掛在某處的題目不搬：工作人員可能拖過。刻意拿下選單的也不放回去。
+    照文件順序掛入，和表格的「順序」欄一致。
     回傳因為分類裡已有同名題目而放不進去的題目，呼叫端要告訴使用者。
     """
-    by_question = {entry["question"]: entry for entry in _build_entries_for_source(source_path, project_id)}
+    entries = _build_entries_for_source(source_path, project_id)
     clashes: list[str] = []
     with _lock:
         data = _load_nodes_data(project_id)
         detached = set(data.get("detached", {}).get(source_path, []))
-        for question, parts in paths.items():
-            entry = by_question.get(question)
-            if not entry or not parts or question in detached or _is_mounted(data, source_path, question):
+        for entry in entries:
+            question = entry["question"]
+            parts = paths.get(question)
+            if not parts or question in detached or _is_mounted(data, source_path, question):
                 continue
             node = data["nodes"][_ensure_path(data, parts)]
             if any(existing["question"] == question for existing in node.get("qa_entries", [])):

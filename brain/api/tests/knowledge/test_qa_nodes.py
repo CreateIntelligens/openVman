@@ -412,8 +412,8 @@ def test_move_node_cycle_prevented(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     _configure_workspace(monkeypatch, tmp_path)
     qa_nodes = _import("knowledge.qa_nodes")
 
-    # Create A -> B -> C tree
-    qa_nodes.create_node("node_a", "Node A")
+    # Create language root A -> B -> C tree (within 2 category levels)
+    qa_nodes.create_node("node_a", "中文")
     qa_nodes.create_node("node_b", "Node B", parent_ids=["node_a"])
     qa_nodes.create_node("node_c", "Node C", parent_ids=["node_b"])
 
@@ -490,3 +490,102 @@ def test_language_labels_match_the_frontend_quick_qa_panel():
     frontend_labels = dict(re.findall(r'"([^"]+)"\s*:\s*"([^"]+)"', block.group(1)))
 
     assert frontend_labels == _import("knowledge.qa_nodes").LANGUAGE_LABELS
+
+
+def test_category_depth_allows_two_levels_under_language_category_and_blocks_third(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    qa_nodes.create_node("zh", "中文")
+    qa_nodes.create_node("a", "A", parent_ids=["zh"])
+    qa_nodes.create_node("b", "B", parent_ids=["a"])
+
+    nodes = qa_nodes.list_nodes()
+    assert qa_nodes.category_depth(nodes, "zh") == 0
+    assert qa_nodes.category_depth(nodes, "a") == 1
+    assert qa_nodes.category_depth(nodes, "b") == 2
+
+    before = (root / "knowledge" / ".qa_nodes.json").read_bytes()
+    with pytest.raises(ValueError, match=re.escape(qa_nodes.QA_CATEGORY_DEPTH_ERROR)):
+        qa_nodes.create_node("c", "C", parent_ids=["b"])
+    assert (root / "knowledge" / ".qa_nodes.json").read_bytes() == before
+
+
+def test_category_depth_without_language_category_allows_two_levels_and_blocks_third(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    qa_nodes.create_node("a", "A")
+    qa_nodes.create_node("b", "B", parent_ids=["a"])
+
+    nodes = qa_nodes.list_nodes()
+    assert qa_nodes.category_depth(nodes, "a") == 1
+    assert qa_nodes.category_depth(nodes, "b") == 2
+
+    before = (root / "knowledge" / ".qa_nodes.json").read_bytes()
+    with pytest.raises(ValueError, match=re.escape(qa_nodes.QA_CATEGORY_DEPTH_ERROR)):
+        qa_nodes.create_node("c", "C", parent_ids=["b"])
+    assert (root / "knowledge" / ".qa_nodes.json").read_bytes() == before
+
+
+def test_move_node_blocks_subtree_exceeding_depth_limit_without_modifying_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    qa_nodes.create_node("zh", "中文")
+    qa_nodes.create_node("a", "A", parent_ids=["zh"])
+    qa_nodes.create_node("b", "B", parent_ids=["a"])
+    qa_nodes.create_node("x", "X")
+    qa_nodes.create_node("x_child", "X 子分類", parent_ids=["x"])
+
+    nodes_file = root / "knowledge" / ".qa_nodes.json"
+    before = nodes_file.read_bytes()
+
+    with pytest.raises(ValueError, match=re.escape(qa_nodes.QA_CATEGORY_DEPTH_ERROR)):
+        qa_nodes.move_node("x", ["b"])
+    assert nodes_file.read_bytes() == before
+
+    # 帶子分類的 X 搬到第 1 層底下，子分類會變第 3 層，同樣要擋。
+    with pytest.raises(ValueError, match=re.escape(qa_nodes.QA_CATEGORY_DEPTH_ERROR)):
+        qa_nodes.move_node("x", ["a"])
+    assert nodes_file.read_bytes() == before
+
+
+def test_move_node_allows_leaf_under_first_level_and_noop_under_existing_parent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    qa_nodes.create_node("zh", "中文")
+    qa_nodes.create_node("a", "A", parent_ids=["zh"])
+    qa_nodes.create_node("x", "X")
+
+    moved = qa_nodes.move_node("x", ["a"])
+    assert moved["parent_ids"] == ["a"]
+    assert qa_nodes.category_depth(qa_nodes.list_nodes(), "x") == 2
+
+    # 搬到原本的上層底下不算超限。
+    still = qa_nodes.move_node("x", ["a"])
+    assert still["parent_ids"] == ["a"]
+
+
+def test_category_depth_uses_deepest_position_for_multi_parent_node(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    qa_nodes.create_node("zh", "中文")
+    qa_nodes.create_node("a", "A", parent_ids=["zh"])
+    qa_nodes.create_node("shared", "共用", parent_ids=["zh", "a"])
+
+    assert qa_nodes.category_depth(qa_nodes.list_nodes(), "shared") == 2
+    with pytest.raises(ValueError, match=re.escape(qa_nodes.QA_CATEGORY_DEPTH_ERROR)):
+        qa_nodes.create_node("under_shared", "子分類", parent_ids=["shared"])

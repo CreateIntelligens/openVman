@@ -135,6 +135,15 @@ def _refuse_unclear_questions(entries: list[dict[str, Any]]) -> None:
         raise _ImportRefused("；".join(problems) + "。改好後重新上傳")
 
 
+def _refuse_category_problems(csv_bytes: bytes) -> None:
+    """Refuse QA tables with invalid category columns before touching any file or tree."""
+    from knowledge.qa_import_review import category_column_problems
+
+    problems = category_column_problems(csv_bytes)
+    if problems:
+        raise _ImportRefused("；".join(problems) + "。改好後重新上傳")
+
+
 def _render_qa_document(csv_bytes: bytes, target: Path) -> str:
     """Render a QA table in ``target``'s format, refusing what the format cannot hold.
 
@@ -265,6 +274,7 @@ def _commit_raw_file(
         )
 
     if is_qa:
+        _refuse_category_problems(qa_csv)
         content = _render_qa_document(qa_csv, target_rel)
     else:
         text = convert_to_text(src)
@@ -306,8 +316,8 @@ def _commit_raw_file(
             refill_emptied_node(target, target_rel.stem, project_id)
         elif is_qa:
             category = find_language_category(language, project_id)
-            if mixed or any(row["path"] for row in extras.values()):
-                # 同一份表裡沒填 path 的題目，不論第一次匯入或重傳，都放以檔名命名的分類；
+            if mixed or any(row["path"] or row["levels"] for row in extras.values()):
+                # 同一份表裡沒填 path 與 levels 的題目，不論第一次匯入或重傳，都放以檔名命名的分類；
                 # 混了語言的表，每題放進自己語言的分類。語言分類不自動建立，沒有就放最上層。
                 paths, missing_categories, by_language = question_paths(
                     extras, languages if mixed else {}, category, target_rel.stem, project_id,

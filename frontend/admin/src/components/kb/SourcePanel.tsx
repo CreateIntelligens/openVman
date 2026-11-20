@@ -138,7 +138,7 @@ export default function SourcePanel({
           <div className="space-y-2 text-sm text-content-muted">
             <p>
               <strong className="text-content">問答表</strong>　有「問題」和「答案」兩欄的試算表會放進快速回覆。
-              可加「分類」欄指定位置，例如「中文/產品/保養」。系統會辨識每題語言，沒有對應的語言分類時先放在最上層。
+              可加「第一層」「第二層」兩欄指定分類，會放在該題語言的分類底下。系統會辨識每題語言，沒有對應的語言分類時先放在最上層。
               同名問答表重傳時只會加新題目。只要有題目和既有的同名但答案不同，整份都不會匯入，畫面會列出是哪幾題，改好再傳一次。
             </p>
             <p>
@@ -150,7 +150,7 @@ export default function SourcePanel({
           <ul className="list-disc space-y-1 pl-5 text-sm text-content-muted">
             <li>有「問題」「答案」欄位的 Excel 或 CSV，會放進快速問答。</li>
             <li>同名的問答表再傳一次是加上新題目，原本的題目都留著。只要有一題的答案和現有的不同，整份都不會匯入，畫面會列出是哪幾題。</li>
-            <li>想指定放在哪個分類，加一欄「分類」，用斜線分層，例如「中文/產品/保養」。沒填就放在以檔名命名的分類。</li>
+            <li>想指定放在哪個分類，可加「第一層」「第二層」兩欄，會放在該題語言的分類底下。沒填就放在以檔名命名的分類。</li>
             <li>中文、英文、西文混在同一張表也可以。系統會辨識每題語言，沒有對應的語言分類時先放在最上層。</li>
             <li>一般文件會保留原文供 AI 回答時查閱。選 AI 整理時會以原本的語言整理。</li>
             <li>可以上傳 {IMPORT_FORMATS_LABEL}，每個檔案 {maxUploadLabel} 以內。</li>

@@ -32,7 +32,7 @@ logger = logging.getLogger("brain.knowledge.converters")
 _PAIR_SEP = " ｜ "
 _KV_SEP = ": "
 # 問答表帶進問答文件的欄位，順序就是輸出 CSV 的欄位順序；其他欄位（備註等）不帶。
-_QA_TABLE_FIELDS = ("q", "a", "img", "url", "display", "language", "path")
+_QA_TABLE_FIELDS = ("q", "a", "img", "url", "display", "language", "path", "level1", "level2")
 
 
 def _cell_text(row: Sequence[object], index: int) -> str:

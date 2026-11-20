@@ -50,6 +50,7 @@ from knowledge.qa_merged import (
     save_merged_rows,
 )
 from knowledge.qa_nodes import (
+    QA_CATEGORY_DEPTH_ERROR,
     add_qa_entry_to_node,
     cleanup_unused_images,
     create_node,
@@ -488,8 +489,9 @@ def move_qa_node_route(
             raise HTTPException(status_code=404, detail=_CATEGORY_NOT_FOUND)
         return _vendor_node(node, project_id) if vendor else node
     except ValueError as exc:
-        # move_node 的訊息帶內部編號，這句會直接顯示在「移到…」對話框。
-        raise HTTPException(status_code=400, detail=_MOVE_REFUSED) from exc
+        # move_node 其他錯誤帶內部編號，改回固定說明；層數上限本身已經是給人看的訊息。
+        detail = str(exc) if str(exc) == QA_CATEGORY_DEPTH_ERROR else _MOVE_REFUSED
+        raise HTTPException(status_code=400, detail=detail) from exc
 
 
 @router.post("/nodes/{id}/reorder")

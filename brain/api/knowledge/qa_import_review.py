@@ -16,6 +16,7 @@ from knowledge.qa_csv import (
     label_qa_csv_languages,
     normalize_row_language,
     parse_qa_csv,
+    qa_csv_row_categories,
     qa_csv_row_extras,
 )
 
@@ -152,8 +153,9 @@ def question_paths(
 ) -> tuple[dict[str, list[str]], dict[str, int], bool]:
     """Where each question goes, languages with no category yet, and whether any went by language.
 
-    有填 path 的照填的放。沒填的放進以檔名命名的分類，上層是語言分類：``languages`` 有值（混語言的表）
-    時用每題自己的語言，否則用整份的分類。語言分類不自動建立，沒有就放最上層；專案有其他語言分類時，
+    有填 path 的照填的放。有填 levels（第一層／第二層）或都沒填的，都掛在語言分類底下：
+    ``languages`` 有值（混語言的表）時用每題自己的語言，否則用整份的分類；沒填 levels 時
+    放進以檔名命名的分類。語言分類不自動建立，沒有就放最上層；專案有其他語言分類時，
     缺的那些回報給使用者。
     """
     from knowledge.qa_nodes import LANGUAGE_LABELS, find_language_category, node_label
@@ -174,8 +176,43 @@ def question_paths(
         if code in nameable and chosen is None and has_language_categories and report_missing:
             missing[code] += 1
         by_language = by_language or bool(code and chosen)
-        paths[question] = [*([node_label(chosen, project_id)] if chosen else []), stem]
+        tail = row["levels"] or [stem]
+        paths[question] = [*([node_label(chosen, project_id)] if chosen else []), *tail]
     return paths, dict(missing), by_language
+
+
+def category_column_problems(qa_csv: bytes) -> list[str]:
+    """Category format errors that refuse the whole QA table before any file is written.
+
+    檢查三種錯誤：
+    1. 同一列同時填了「分類」（path）與「第一層」或「第二層」。
+    2. 只填第二層、沒填第一層。
+    3. ``path`` 去掉開頭的語言分類名稱後超過兩段。
+    """
+    from knowledge.qa_nodes import QA_CATEGORY_DEPTH_LIMIT, is_language_label
+
+    mixed_columns: list[str] = []
+    missing_level1: list[str] = []
+    too_deep: list[str] = []
+    for question, path_parts, level1, level2 in qa_csv_row_categories(qa_csv):
+        has_path = bool(path_parts)
+        has_levels = bool(level1 or level2)
+        if has_path and has_levels and question not in mixed_columns:
+            mixed_columns.append(question)
+        if level2 and not level1 and question not in missing_level1:
+            missing_level1.append(question)
+        effective = path_parts[1:] if path_parts and is_language_label(path_parts[0]) else path_parts
+        if len(effective) > QA_CATEGORY_DEPTH_LIMIT and question not in too_deep:
+            too_deep.append(question)
+
+    problems: list[str] = []
+    if mixed_columns:
+        problems.append(f"{_listing(mixed_columns, None)}同時填了「分類」和「第一層／第二層」，請只用一種")
+    if missing_level1:
+        problems.append(f"{_listing(missing_level1, None)}有第二層但沒有第一層")
+    if too_deep:
+        problems.append(f"{_listing(too_deep, None)}的分類超過兩層")
+    return problems
 
 
 def missing_language_category(language: str, category: str | None, project_id: str) -> dict[str, int]:

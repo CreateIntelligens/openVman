@@ -81,6 +81,8 @@ _FIELD_ALIASES: dict[str, list[str]] = {
     "display": ["display", "d", "顯示"],
     "language": ["language", "lang", "語言", "语言"],
     "path": ["path", "路徑", "路径", "分類", "分类"],
+    "level1": ["level1", "第一層", "第一层"],
+    "level2": ["level2", "第二層", "第二层"],
 }
 
 _ROW_LANGUAGES: dict[str, str] = {
@@ -466,8 +468,31 @@ def rewrite_qa_markdown(
     return "\n\n".join([preamble, *(block[1] for block in placed)] if preamble else [block[1] for block in placed])
 
 
+def _split_path(raw: str | None) -> list[str]:
+    return [part.strip() for part in _PATH_SEPARATORS.split(raw or "") if part.strip()]
+
+
+def qa_csv_row_categories(file_bytes: bytes) -> list[tuple[str, list[str], str, str]]:
+    """Return ``(question, path_parts, level1, level2)`` for every row with a question."""
+    parsed = _parse_csv_rows(file_bytes)
+    if parsed is None:
+        return []
+    result: list[tuple[str, list[str], str, str]] = []
+    for row in parsed[1]:
+        question = (row.get("q") or "").strip()
+        if not question:
+            continue
+        result.append((
+            question,
+            _split_path(row.get("path")),
+            (row.get("level1") or "").strip(),
+            (row.get("level2") or "").strip(),
+        ))
+    return result
+
+
 def qa_csv_row_extras(file_bytes: bytes) -> dict[str, dict[str, Any]]:
-    """Each question's ``path`` parts and ``language`` label from an uploaded table."""
+    """Each question's ``path`` parts, ``levels``, and ``language`` label from an uploaded table."""
     parsed = _parse_csv_rows(file_bytes)
     if parsed is None:
         return {}
@@ -475,12 +500,11 @@ def qa_csv_row_extras(file_bytes: bytes) -> dict[str, dict[str, Any]]:
     for row in parsed[1]:
         question = (row.get("q") or "").strip()
         if question:
+            level1 = (row.get("level1") or "").strip()
+            level2 = (row.get("level2") or "").strip()
             extras[question] = {
-                "path": [
-                    part.strip()
-                    for part in _PATH_SEPARATORS.split(row.get("path") or "")
-                    if part.strip()
-                ],
+                "path": _split_path(row.get("path")),
+                "levels": [level for level in (level1, level2) if level],
                 "language": (row.get("language") or "").strip(),
             }
     return extras

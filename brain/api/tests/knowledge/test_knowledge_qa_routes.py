@@ -1603,3 +1603,44 @@ def test_non_vendor_can_remove_qa_entry_from_hidden_source(client, tmp_path):
     assert response.status_code == 200
     assert response.json()["qa_entries"] == []
     assert _read_qa_nodes_json(root)["nodes"]["n1"]["qa_entries"] == []
+
+
+def test_create_and_move_node_routes_return_400_when_exceeding_two_levels(client, tmp_path):
+    root = tmp_path / "workspace"
+    expected_detail = "快速回覆最多兩層分類（語言分類不計），放到這裡會超過限制。"
+
+    assert client.post("/brain/knowledge/qa/nodes", json={"node_id": "zh", "label": "中文"}).status_code == 200
+    assert client.post(
+        "/brain/knowledge/qa/nodes",
+        json={"node_id": "lvl1", "label": "A", "parent_ids": ["zh"]},
+    ).status_code == 200
+    assert client.post(
+        "/brain/knowledge/qa/nodes",
+        json={"node_id": "lvl2", "label": "B", "parent_ids": ["lvl1"]},
+    ).status_code == 200
+
+    # 語言 › A › B 底下再建一層：回 400 且檔案不變。
+    nodes_file = root / "knowledge" / ".qa_nodes.json"
+    before_create = nodes_file.read_bytes()
+    create_resp = client.post(
+        "/brain/knowledge/qa/nodes",
+        json={"node_id": "lvl3", "label": "C", "parent_ids": ["lvl2"]},
+    )
+    assert create_resp.status_code == 400
+    assert create_resp.json()["detail"] == expected_detail
+    assert nodes_file.read_bytes() == before_create
+
+    # 搬有子分類的 X 到 B 底下：回 400 且檔案不變。
+    assert client.post("/brain/knowledge/qa/nodes", json={"node_id": "x", "label": "X"}).status_code == 200
+    assert client.post(
+        "/brain/knowledge/qa/nodes",
+        json={"node_id": "x_child", "label": "X1", "parent_ids": ["x"]},
+    ).status_code == 200
+    before_move = nodes_file.read_bytes()
+    move_resp = client.post(
+        "/brain/knowledge/qa/nodes/x/move",
+        json={"new_parent_ids": ["lvl2"]},
+    )
+    assert move_resp.status_code == 400
+    assert move_resp.json()["detail"] == expected_detail
+    assert nodes_file.read_bytes() == before_move

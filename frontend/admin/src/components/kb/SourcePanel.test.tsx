@@ -201,5 +201,49 @@ describe("SourcePanel", () => {
 
     expect(screen.getByText(/只要有一題的答案和現有的不同，整份都不會匯入/)).toBeTruthy();
   });
+
+  it("guides users to use level1 and level2 columns under language categories in both vendor and internal modes", () => {
+    const { rerender } = render(
+      <SourcePanel
+        vendor
+        onPickFiles={vi.fn()}
+        maxUploadLabel="100 MB"
+        targetDir="knowledge"
+        targetOptions={[{ value: "knowledge", label: "文件（最上層）" }]}
+        onTargetDirChange={vi.fn()}
+        skipNormalize
+        onSkipNormalizeChange={vi.fn()}
+        crawlUrlValue=""
+        setCrawlUrlValue={vi.fn()}
+        crawling={false}
+        onCrawl={vi.fn()}
+        onOpenComposer={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/可加「第一層」「第二層」兩欄指定分類，會放在該題語言的分類底下/)).toBeTruthy();
+    expect(screen.queryByText(/中文\/產品\/保養/)).toBeNull();
+
+    rerender(
+      <SourcePanel
+        vendor={false}
+        onPickFiles={vi.fn()}
+        maxUploadLabel="100 MB"
+        targetDir="knowledge"
+        targetOptions={[{ value: "knowledge", label: "文件（最上層）" }]}
+        onTargetDirChange={vi.fn()}
+        skipNormalize
+        onSkipNormalizeChange={vi.fn()}
+        crawlUrlValue=""
+        setCrawlUrlValue={vi.fn()}
+        crawling={false}
+        onCrawl={vi.fn()}
+        onOpenComposer={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/可加「第一層」「第二層」兩欄，會放在該題語言的分類底下/)).toBeTruthy();
+    expect(screen.queryByText(/中文\/產品\/保養/)).toBeNull();
+  });
 });
 

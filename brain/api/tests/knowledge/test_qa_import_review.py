@@ -342,3 +342,239 @@ def test_every_question_markdown_cannot_hold_is_listed(workspace: Path):
 
     assert "「題一」" in reason and "「題三 換行」" in reason and "「題四」" in reason
     assert "題二" not in reason
+
+
+# --- level1 / level2 columns and pre-write category validation ------------------
+
+
+def _tree_paths_of_questions() -> dict[str, list[str]]:
+    """Map each mounted question to its category label path from the root."""
+    result: dict[str, list[str]] = {}
+
+    def walk(node: dict, prefix: list[str]) -> None:
+        here = [*prefix, node["label"]]
+        for entry in node.get("qa_entries", []):
+            result[entry["question"]] = here
+        for child in node.get("children", []):
+            walk(child, here)
+
+    for root in qa_nodes.get_node_tree("default"):
+        walk(root, [])
+    return result
+
+
+def test_level1_and_level2_place_chinese_table_under_language_category(workspace: Path):
+    _languages()
+    table = (
+        "語言,第一層,第二層,問題,答案\n"
+        "中文,服務,營業時間,服務中心的營業時間是幾點？,早上九點到下午六點。\n"
+        "中文,購買,現場購買,可以現場購買商品嗎？,現場只展示樣品。\n"
+    )
+
+    result = _import(workspace, "faq.csv", table)
+
+    assert _tree_paths_of_questions() == {
+        "服務中心的營業時間是幾點？": ["中文", "服務", "營業時間"],
+        "可以現場購買商品嗎？": ["中文", "購買", "現場購買"],
+    }
+    assert "notes" not in result
+
+
+def test_excel_with_level1_and_level2_places_questions_without_ignored_notes(workspace: Path):
+    _languages()
+    _workbook(
+        workspace / "raw" / "faq.xlsx",
+        [
+            ["語言", "第一層", "第二層", "問題", "答案"],
+            ["中文", "服務", "營業時間", "幾點開門？", "早上九點。"],
+        ],
+    )
+
+    summary = commit_raw_documents("default")
+    result = summary["results"]["faq.xlsx"]
+
+    assert _tree_paths_of_questions() == {"幾點開門？": ["中文", "服務", "營業時間"]}
+    assert "notes" not in result
+
+
+def test_mixed_language_table_with_levels_places_each_under_its_own_language(workspace: Path):
+    _languages()
+    table = (
+        "語言,第一層,第二層,問題,答案\n"
+        "中文,服務,營業時間,營業時間是幾點？,早上九點到下午六點。\n"
+        "English,Service,Hours,What are the opening hours?,Nine to six.\n"
+    )
+
+    result = _import(workspace, "faq.csv", table)
+
+    assert result["languages"] == {"zh": 1, "en": 1}
+    assert _tree_paths_of_questions() == {
+        "營業時間是幾點？": ["中文", "服務", "營業時間"],
+        "What are the opening hours?": ["English", "Service", "Hours"],
+    }
+
+
+def test_level1_only_places_question_under_language_then_level1(workspace: Path):
+    _languages()
+    table = "語言,第一層,第二層,問題,答案\n中文,服務,,有停車位嗎？,後方有停車場。\n"
+
+    _import(workspace, "faq.csv", table)
+
+    assert _tree_paths_of_questions() == {"有停車位嗎？": ["中文", "服務"]}
+
+
+def test_levels_without_language_categories_place_at_top_level(workspace: Path):
+    table = (
+        "第一層,第二層,問題,答案\n"
+        "服務,營業時間,營業時間是幾點？,早上九點到下午六點。\n"
+    )
+
+    _import(workspace, "faq.csv", table)
+
+    assert _tree_paths_of_questions() == {"營業時間是幾點？": ["服務", "營業時間"]}
+
+
+def test_refuses_row_with_both_path_and_levels_without_writing(workspace: Path):
+    _languages()
+    nodes_file = workspace / "knowledge" / ".qa_nodes.json"
+    nodes_before = nodes_file.read_bytes()
+    table = (
+        "分類,第一層,第二層,問題,答案\n"
+        "中文/產品,服務,,題目一,答案一\n"
+        "中文/產品,,保固,題目二,答案二\n"
+        ",服務,營業時間,題目三,答案三\n"
+    )
+    _raw(workspace, "faq.csv", table)
+
+    summary = commit_raw_documents("default")
+
+    assert summary["committed"] == []
+    assert summary["skipped"] == ["faq.csv"]
+    reason = summary["skip_reasons"]["faq.csv"]
+    assert "「題目一」、「題目二」同時填了「分類」和「第一層／第二層」，請只用一種" in reason
+    assert "題目三" not in reason
+    assert not (workspace / "knowledge" / "qa").exists()
+    assert nodes_file.read_bytes() == nodes_before
+    assert (workspace / "raw" / "faq.csv").exists()
+
+
+def test_refuses_row_with_level2_without_level1_without_writing(workspace: Path):
+    _languages()
+    nodes_file = workspace / "knowledge" / ".qa_nodes.json"
+    nodes_before = nodes_file.read_bytes()
+    table = (
+        "第一層,第二層,問題,答案\n"
+        ",保養,題目一,答案一\n"
+        ",保固,題目二,答案二\n"
+        "產品,保養,題目三,答案三\n"
+    )
+    _raw(workspace, "faq.csv", table)
+
+    summary = commit_raw_documents("default")
+
+    assert summary["committed"] == []
+    assert summary["skipped"] == ["faq.csv"]
+    reason = summary["skip_reasons"]["faq.csv"]
+    assert "「題目一」、「題目二」有第二層但沒有第一層" in reason
+    assert "題目三" not in reason
+    assert not (workspace / "knowledge" / "qa").exists()
+    assert nodes_file.read_bytes() == nodes_before
+    assert (workspace / "raw" / "faq.csv").exists()
+
+
+def test_refuses_path_exceeding_two_levels_after_language_prefix_without_writing(workspace: Path):
+    _languages()
+    nodes_file = workspace / "knowledge" / ".qa_nodes.json"
+    nodes_before = nodes_file.read_bytes()
+    table = (
+        "分類,問題,答案\n"
+        "中文/A/B/C,題目一,答案一\n"
+        "A/B/C,題目二,答案二\n"
+        "中文/A/B,題目三,答案三\n"
+    )
+    _raw(workspace, "faq.csv", table)
+
+    summary = commit_raw_documents("default")
+
+    assert summary["committed"] == []
+    assert summary["skipped"] == ["faq.csv"]
+    reason = summary["skip_reasons"]["faq.csv"]
+    assert "「題目一」、「題目二」的分類超過兩層" in reason
+    assert "題目三" not in reason
+    assert not (workspace / "knowledge" / "qa").exists()
+    assert nodes_file.read_bytes() == nodes_before
+    assert (workspace / "raw" / "faq.csv").exists()
+
+
+def test_legacy_path_column_within_two_levels_still_works(workspace: Path):
+    _languages()
+    table = (
+        "分類,問題,答案\n"
+        "中文/產品/保養,如何保養？,保持乾燥。\n"
+        "服務/停車,有停車位嗎？,後方有停車場。\n"
+    )
+
+    _import(workspace, "faq.csv", table)
+
+    assert _tree_paths_of_questions() == {
+        "如何保養？": ["中文", "產品", "保養"],
+        "有停車位嗎？": ["服務", "停車"],
+    }
+
+
+def test_import_mounts_questions_in_index_order_across_categories(workspace: Path):
+    _languages()
+    table = (
+        "順序,第一層,問題,答案\n"
+        "3,產品,產品第三題,答案三\n"
+        "1,產品,產品第一題,答案一\n"
+        "2,產品,產品第二題,答案二\n"
+        "3,服務,服務第三題,答案三\n"
+        "1,服務,服務第一題,答案一\n"
+        "2,服務,服務第二題,答案二\n"
+    )
+
+    _import(workspace, "ordered.csv", table)
+
+    nodes = qa_nodes.list_nodes("default")
+    by_label = {node["label"]: node for node in nodes.values()}
+    assert [e["question"] for e in by_label["產品"]["qa_entries"]] == [
+        "產品第一題",
+        "產品第二題",
+        "產品第三題",
+    ]
+    assert [e["question"] for e in by_label["服務"]["qa_entries"]] == [
+        "服務第一題",
+        "服務第二題",
+        "服務第三題",
+    ]
+
+
+def test_reupload_keeps_mounted_order_and_appends_new_questions_in_index_order(workspace: Path):
+    _languages()
+    first = (
+        "順序,第一層,問題,答案\n"
+        "2,產品,既有二,A2\n"
+        "1,產品,既有一,A1\n"
+        "1,服務,服務題,B1\n"
+    )
+    _import(workspace, "ordered.csv", first)
+
+    # 模擬工作人員把「產品」裡的既有順序調成 [既有二, 既有一]。
+    nodes = qa_nodes.list_nodes("default")
+    product_id = next(nid for nid, node in nodes.items() if node["label"] == "產品")
+    entries = list(nodes[product_id]["qa_entries"])
+    qa_nodes.update_node(product_id, {"qa_entries": list(reversed(entries))})
+
+    second = (
+        "順序,第一層,問題,答案\n"
+        "1,產品,既有一,A1\n"
+        "2,產品,既有二,A2\n"
+        "4,產品,新增四,A4\n"
+        "3,產品,新增三,A3\n"
+        "1,服務,服務題,B1\n"
+    )
+    _import(workspace, "ordered.csv", second)
+
+    after = qa_nodes.get_node(product_id)["qa_entries"]
+    assert [e["question"] for e in after] == ["既有二", "既有一", "新增三", "新增四"]
