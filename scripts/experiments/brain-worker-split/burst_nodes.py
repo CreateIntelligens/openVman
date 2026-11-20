@@ -49,9 +49,12 @@ async def speak(client, base, headers, args, text) -> dict:
         record["tts_provider"] = response.headers.get("x-tts-provider", "")
         size = 0
         async for chunk in response.aiter_bytes():
-            if chunk and "tts_first_byte" not in record:
+            # 錯誤回應的內容不是聲音，不能算成「聽到第一句」。
+            if chunk and response.status_code < 400 and "tts_first_byte" not in record:
                 record["tts_first_byte"] = time.time()
             size += len(chunk)
+        if response.status_code >= 400:
+            record["tts_error"] = f"http {response.status_code}"
         record["tts_done"] = time.time()
         record["tts_bytes"] = size
     return record

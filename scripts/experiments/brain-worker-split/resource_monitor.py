@@ -107,11 +107,15 @@ def host_memory_gib():
 
 
 def gpus():
-    result = subprocess.run(
-        ["nvidia-smi", "--query-gpu=index,utilization.gpu,memory.used",
-         "--format=csv,noheader,nounits"],
-        capture_output=True, text=True, check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=index,utilization.gpu,memory.used",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, check=False, timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        # 沒有 NVIDIA 工具的主機照樣記其他資源，GPU 欄位留空。
+        return {}
     rows = {}
     for line in result.stdout.splitlines():
         parts = [part.strip() for part in line.split(",")]
