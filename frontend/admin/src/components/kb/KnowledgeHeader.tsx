@@ -1,15 +1,33 @@
-import { useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
+import { exportQaExcel } from "../../api/knowledge";
 import type { ImportProgress } from "../../hooks/useKnowledgeImport";
 import ActionMenu from "../ActionMenu";
 import { PageHeader, PageTabs } from "../app/PageHeader";
 import ConfirmModal from "../ConfirmModal";
+import StatusAlert from "../StatusAlert";
 import LanguageRoutesButton from "./LanguageRoutesButton";
 
 const KNOWLEDGE_TABS = [
   { id: "documents", label: "題庫" },
   { id: "graph", label: "圖譜" },
 ] as const;
+
+const EXPORT_FAILED_MESSAGE = "匯出失敗，請稍後再試。";
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 // 手機要把四顆按鈕排在同一列，內距收小；.btn 不會斷行，字不會被擠成一字一行。
 const COMPACT_BUTTON = "max-sm:px-2";
@@ -55,6 +73,33 @@ export default function KnowledgeHeader({
   projectId,
 }: KnowledgeHeaderProps) {
   const [confirmingCleanup, setConfirmingCleanup] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    setExportError(null);
+  }, [projectId, activeTab]);
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const { blob, filename } = await exportQaExcel(projectId);
+      if (!mountedRef.current) return;
+      triggerBlobDownload(blob, filename);
+    } catch {
+      if (mountedRef.current) setExportError(EXPORT_FAILED_MESSAGE);
+    } finally {
+      if (mountedRef.current) setExporting(false);
+    }
+  }
 
   const maintenanceItems = [
     {
@@ -134,6 +179,14 @@ export default function KnowledgeHeader({
             </button>
             <button
               type="button"
+              onClick={() => void handleExport()}
+              disabled={exporting}
+              className={`btn btn-ghost ${COMPACT_BUTTON}`}
+            >
+              {exporting ? "匯出中…" : "匯出"}
+            </button>
+            <button
+              type="button"
               onClick={onAddData}
               className={`btn btn-primary ${COMPACT_BUTTON}`}
             >
@@ -151,6 +204,16 @@ export default function KnowledgeHeader({
           />
         )}
       />
+
+      {exportError && (
+        <div className="fixed left-1/2 top-[4rem] z-[60] w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl bg-surface-raised shadow-lg">
+          <StatusAlert
+            type="error"
+            message={exportError}
+            onDismiss={() => setExportError(null)}
+          />
+        </div>
+      )}
 
       <ConfirmModal
         open={confirmingCleanup}

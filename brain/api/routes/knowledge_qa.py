@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from config import get_settings
@@ -228,6 +228,33 @@ async def get_qa_sync_status_route(
         # schedule_reindex 會合併同專案請求，重複呼叫不會跑兩次。
         schedule_reindex(pid)
     return {"categories": categories}
+
+
+@router.get("/export")
+def export_qa_route(
+    project_id: str = "default",
+    vendor: VendorRequest = False,
+) -> Response:
+    """Export quick Q&A questions as an Excel workbook matching the import format."""
+    from knowledge.qa_export import (
+        XLSX_MEDIA_TYPE,
+        build_qa_export_workbook,
+        content_disposition_attachment,
+        export_filename,
+    )
+
+    visible = (
+        (lambda path: visible_workspace_path(project_id, path, "knowledge"))
+        if vendor
+        else None
+    )
+    content = build_qa_export_workbook(project_id, visible=visible)
+    filename = export_filename()
+    return Response(
+        content=content,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": content_disposition_attachment(filename)},
+    )
 
 
 def _vendor_node(node: dict[str, Any], project_id: str) -> dict[str, Any]:

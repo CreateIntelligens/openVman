@@ -117,6 +117,19 @@ def env(monkeypatch):
             return httpx.Response(200, json=_project(path.split("/")[-1]))
         if path == "/brain/knowledge/settings" and request.method == "GET":
             return httpx.Response(200, json={"memory_enabled": False, "graph_enabled": False})
+        if path == "/brain/knowledge/qa/export" and request.method == "GET":
+            return httpx.Response(
+                200,
+                content=b"PK\x03\x04fake-xlsx",
+                headers={
+                    "Content-Type": (
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ),
+                    "Content-Disposition": (
+                        "attachment; filename*=UTF-8''%E5%BF%AB%E9%80%9F%E5%9B%9E%E8%A6%86_20261120.xlsx"
+                    ),
+                },
+            )
         return httpx.Response(200, json={"status": "ok"})
 
     upstream = httpx.AsyncClient(transport=httpx.MockTransport(brain))
@@ -986,4 +999,44 @@ def test_vendor_can_read_qa_sync_status(env, vendor_accounts, account):
         params={"project_id": _PROJECT},
         headers=headers,
     ).status_code == 403
+    assert len(env.received) == before
+
+
+@pytest.mark.parametrize("account", ["vendor-editor", "vendor-reader", "internal-editor"])
+def test_qa_export_allows_vendor_and_internal_get_and_preserves_download_headers(
+    env, vendor_accounts, account,
+):
+    is_vendor = account.startswith("vendor-")
+    headers = env.headers(vendor_accounts[account])
+    response = env.client.get(
+        "/api/v1/knowledge/qa/export",
+        params={"project_id": _PROJECT},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.content == b"PK\x03\x04fake-xlsx"
+    assert response.headers.get_list("content-type") == [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ]
+    assert response.headers["content-disposition"] == (
+        "attachment; filename*=UTF-8''%E5%BF%AB%E9%80%9F%E5%9B%9E%E8%A6%86_20261120.xlsx"
+    )
+    upstream = env.received[-1]
+    assert upstream.url.path == "/brain/knowledge/qa/export"
+    assert upstream.url.params["project_id"] == _PROJECT
+    assert upstream.headers.get("X-OpenVMan-Vendor") == ("1" if is_vendor else None)
+
+    before = len(env.received)
+    for hidden_project in (_UNGRANTED, _OTHER):
+        assert env.client.get(
+            "/api/v1/knowledge/qa/export",
+            params={"project_id": hidden_project},
+            headers=headers,
+        ).status_code == 404
+    if is_vendor:
+        assert env.client.post(
+            "/api/v1/knowledge/qa/export",
+            params={"project_id": _PROJECT},
+            headers=headers,
+        ).status_code == 403
     assert len(env.received) == before

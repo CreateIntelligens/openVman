@@ -464,7 +464,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
 | 文件匯入 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`GET/DELETE /knowledge/raw/pending`（見「文件匯入」）、`POST /knowledge/renormalize[/preview\|/apply]` |
 | 專案知識與回答設定 | `GET /knowledge/settings` 讀取全部設定，`PUT /knowledge/settings` 更新語言分流與 `reply_seconds`，`PATCH /knowledge/features` 更新記憶與圖譜擴展 |
-| QA 知識 | `GET /knowledge/qa`、`GET /knowledge/qa/questions`（所有題目清單，見下）、`GET /knowledge/qa/sync-status`（各分類索引同步狀態，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
+| QA 知識 | `GET /knowledge/qa`、`GET /knowledge/qa/questions`（所有題目清單，見下）、`GET /knowledge/qa/sync-status`（各分類索引同步狀態，見下）、`GET /knowledge/qa/export`（匯出 Excel，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |
 | 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar` |
 | 工具與技能 | `GET /tools`、`POST /skills`、`PATCH /skills/{id}/toggle`、`GET/PUT /skills/{id}/files`、`DELETE /skills/{id}`、`POST /skills/reload` |
@@ -484,6 +484,13 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 - **三種狀態**：全部需檢查的文件指紋皆與 `load_index_state` 一致（或沒有需檢查的文件）時為 `synced`。有文件不在索引裡或指紋不同時，若專案背景重建狀態（`routes/knowledge.py` 的記憶體 `_reindex_state`，含 `running`、`last_error`、`finished_at`，由 `reindex_status` 讀取）為 `pending` 或 `running` 則回 `updating`；否則若最近一次重建失敗留下了 `last_error`（下次成功時清除）則回 `failed`。
 - **自我修復**：有文件未同步且專案既無 `pending`／`running` 也無 `last_error`（例如服務剛重啟清空記憶體狀態，或外部流程直接改了檔案但未排重建）時，刻意補呼叫一次 `schedule_reindex(project_id)` 並回 `updating`；同專案重建本來就會合併請求，重複呼叫不會執行兩次。
 - **廠商過濾**：帶 `X-OpenVMan-Vendor` 標頭時以 `visible_workspace_path(..., "knowledge")` 過濾 `qa_entries` 的來源路徑（與 `_vendor_node` 相同）；只含隱藏來源（例如 `knowledge/.hidden/`）的分類過濾後沒有可見文件，一律回 `synced`，不洩漏失敗狀態或隱藏題目存在，也不因隱藏文件觸發補排重建。
+
+`GET /knowledge/qa/export?project_id=` 匯出專案的快速回覆為與匯入同格式的 Excel（`knowledge/qa_export.py`，`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`，`Content-Disposition` 使用 `attachment; filename*=UTF-8''...`，檔名為台北時間日期的 `快速回覆_YYYYMMDD.xlsx`，工作表名稱「快速回覆」）：
+
+- 欄位與順序固定為：`語言`、`第一層`、`第二層`、`問題`、`答案`、`圖片`、`連結`、`顯示`（顯示中寫 `是`、隱藏寫 `否`）、`順序`（該分類內由 1 開始）。答案、圖片、連結與顯示以文件為準。
+- 一列一題一個位置：照分類樹順序走訪，同一題掛在多個分類時每個位置各輸出一列。最上層符合 `qa_nodes.is_language_label` 時填入 `語言`，其餘填入 `第一層`、`第二層`；若遇到超過兩層的舊資料，第二層以下名稱以 ` / ` 串接放在 `第二層`。
+- 未分類的題目（`list_all_questions` 中沒有任何分類掛載的列）排在最後，`語言`、`第一層`、`第二層` 與 `順序` 留空。
+- 廠商呼叫（`X-OpenVMan-Vendor: 1`）只輸出廠商可見來源的題目（以 `visible_workspace_path(project_id, source, "knowledge")` 過濾，規則與 `_vendor_node` 相同）；選單專用題照常輸出。
 
 `POST /chat` 一次回傳完整結果；`POST /chat/stream` 以 SSE 逐句送出同一份回答（見「逐句串流」）；即時語音走 Live WebSocket。
 

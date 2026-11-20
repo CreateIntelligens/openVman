@@ -21,6 +21,7 @@ _GET = frozenset({
     "/chat/history", "/chat/modes", "/sessions", "/sessions/export",
     "/knowledge/base/documents", "/knowledge/base/document", "/knowledge/qa",
     "/knowledge/qa/questions", "/knowledge/qa/nodes", "/knowledge/qa/sync-status",
+    "/knowledge/qa/export",
     "/knowledge/settings", "/knowledge/raw/pending", "/knowledge/raw/commit/status",
 })
 _POST = frozenset({

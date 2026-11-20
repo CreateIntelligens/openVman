@@ -1,12 +1,15 @@
 import { validateUploadFiles } from "../utils/uploadLimits";
 
 import {
+  ApiError,
+  apiFetch,
   apiUrl,
   del,
   fetchJson,
   get,
   getActiveProjectId,
   knowledgePath,
+  parseErrorMessage,
   patch,
   post,
   projectUrl,
@@ -567,4 +570,53 @@ export interface QaSyncStatusResponse {
 /** 每個快速問答分類的搜尋索引同步狀態。 */
 export function fetchQaSyncStatus(projectId: string = getActiveProjectId()) {
   return get<QaSyncStatusResponse>(knowledgePath("/qa/sync-status"), { project_id: projectId });
+}
+
+export const DEFAULT_QA_EXPORT_FILENAME = "快速回覆.xlsx";
+
+export interface QaExportResult {
+  blob: Blob;
+  filename: string;
+}
+
+function sanitizeDownloadFilename(name: string): string {
+  return name.replace(/[/\\]+/g, "_").trim();
+}
+
+/** 從 Content-Disposition 取出檔名（優先 RFC 5987 filename*=UTF-8''...），取不到時用預設值。 */
+export function parseContentDispositionFilename(
+  header: string | null,
+  fallback = DEFAULT_QA_EXPORT_FILENAME,
+): string {
+  if (!header) return fallback;
+  const extMatch = header.match(/filename\*\s*=\s*utf-8'[^']*'([^;]+)/i);
+  if (extMatch?.[1]) {
+    const raw = extMatch[1].trim().replace(/^"(.*)"$/, "$1");
+    try {
+      const decoded = sanitizeDownloadFilename(decodeURIComponent(raw));
+      if (decoded) return decoded;
+    } catch {
+      // 百分比編碼格式不正確時改走下一個 fallback
+    }
+  }
+  const plainMatch = header.match(/(?:^|;)\s*filename\s*=\s*(?:"((?:\\.|[^"])*)"|([^;]+))/i);
+  const plain = plainMatch?.[1]?.replace(/\\(.)/g, "$1") ?? plainMatch?.[2];
+  if (plain) {
+    const cleaned = sanitizeDownloadFilename(plain);
+    if (cleaned) return cleaned;
+  }
+  return fallback;
+}
+
+/** 匯出專案的快速問答 Excel（.xlsx），與匯入格式一致。 */
+export async function exportQaExcel(
+  projectId: string = getActiveProjectId(),
+): Promise<QaExportResult> {
+  const res = await apiFetch(projectUrl(knowledgePath("/qa/export"), { project_id: projectId }));
+  if (!res.ok) {
+    throw new ApiError(await parseErrorMessage(res), res.status);
+  }
+  const blob = await res.blob();
+  const filename = parseContentDispositionFilename(res.headers?.get("content-disposition") ?? null);
+  return { blob, filename };
 }

@@ -4,9 +4,12 @@ import {
   applyRenormalizedKnowledgeDocument,
   commitRawKnowledge,
   createKnowledgeNote,
+  DEFAULT_QA_EXPORT_FILENAME,
   discardRawPending,
   fetchQaSyncStatus,
+  exportQaExcel,
   fetchRawPending,
+  parseContentDispositionFilename,
   previewRenormalizedKnowledgeDocument,
   uploadRawKnowledgeDocuments,
   uploadKnowledgeDocuments,
@@ -186,6 +189,51 @@ describe("knowledge api", () => {
 
     await fetchQaSyncStatus("clinic");
     expect(f.mock.calls[1][0]).toBe("/api/v1/knowledge/qa/sync-status?project_id=clinic");
+  });
+
+  it("exports QA Excel with project_id, credentials, and decoded UTF-8 filename", async () => {
+    const payload = new Blob(["xlsx-data"], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const f = vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      blob: async () => payload,
+      headers: new Headers({
+        "content-disposition": "attachment; filename*=UTF-8''%E5%BF%AB%E9%80%9F%E5%9B%9E%E8%A6%86_20261120.xlsx",
+      }),
+    } as Response);
+
+    const result = await exportQaExcel("proj-a");
+
+    expect(f).toHaveBeenCalledWith(
+      "/api/v1/knowledge/qa/export?project_id=proj-a",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    expect(result.blob).toBe(payload);
+    expect(result.filename).toBe("快速回覆_20261120.xlsx");
+  });
+
+  it("falls back to default filename when Content-Disposition is absent or invalid", async () => {
+    const payload = new Blob(["xlsx-data"]);
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      blob: async () => payload,
+      headers: new Headers(),
+    } as Response);
+
+    const result = await exportQaExcel();
+
+    expect(result.filename).toBe(DEFAULT_QA_EXPORT_FILENAME);
+    expect(parseContentDispositionFilename("attachment; filename*=UTF-8''%ZZ")).toBe(DEFAULT_QA_EXPORT_FILENAME);
+    expect(parseContentDispositionFilename('attachment; filename="qa_backup.xlsx"')).toBe("qa_backup.xlsx");
+  });
+
+  it("rejects exportQaExcel when the server returns an error status", async () => {
+    mockFetch({ detail: "export failed" }, false, 500);
+
+    await expect(exportQaExcel()).rejects.toThrow("export failed");
   });
 });
 

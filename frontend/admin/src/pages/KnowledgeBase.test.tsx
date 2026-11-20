@@ -162,7 +162,7 @@ vi.mock("../context/NavigationContext", () => ({
 const authMocks = vi.hoisted(() => ({
   account: { id: "admin", username: "admin", role: "admin", disabled: false, created_at: "" } as {
     id: string; username: string; role: "admin" | "user"; disabled: boolean; created_at: string;
-    ai_cleanup_access?: boolean;
+    ai_cleanup_access?: boolean; vendor_name?: string | null;
   },
 }));
 
@@ -1731,6 +1731,162 @@ describe("KnowledgeBase route views", () => {
     fireEvent.click(within(languages).getByRole("button", { name: /^English/ }));
     fireEvent.click(screen.getByRole("button", { name: "到對話頁測試" }));
     expect(navigationMocks.openChatTest).toHaveBeenCalledWith({ language: "en" });
+  });
+});
+
+describe("KnowledgeBase QA export", () => {
+  const adminAccount = authMocks.account;
+  let originalCreateObjectURL: typeof URL.createObjectURL;
+  let originalRevokeObjectURL: typeof URL.revokeObjectURL;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    navigationMocks.currentSubView = undefined;
+    authMocks.account = adminAccount;
+    originalCreateObjectURL = URL.createObjectURL;
+    originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:qa-export");
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    authMocks.account = adminAccount;
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    vi.restoreAllMocks();
+  });
+
+  function stubFetchForExport(
+    onExport: (url: string, init?: RequestInit) => Promise<Response>,
+  ) {
+    return vi.spyOn(global, "fetch").mockImplementation((input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("/knowledge/qa/export")) {
+        return onExport(url, init);
+      }
+      if (url.includes("/knowledge/settings")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ "content-type": "application/json" }),
+          json: async () => ({ language_routes: ["zh"], reply_seconds: 20 }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({ document_max_upload_bytes: 1024 * 1024 }),
+      } as Response);
+    });
+  }
+
+  it("calls /knowledge/qa/export, disables the button with 匯出中… while pending, and downloads the file", async () => {
+    let resolveExport!: (res: Response) => void;
+    const exportCalls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetchForExport((url, init) => {
+      exportCalls.push({ url, init });
+      return new Promise<Response>((resolve) => { resolveExport = resolve; });
+    });
+
+    const clickedDownloads: Array<{ href: string; download: string }> = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clickedDownloads.push({ href: this.href, download: this.download });
+    });
+
+    render(<KnowledgeBase />);
+
+    const exportButton = screen.getByRole("button", { name: "匯出" }) as HTMLButtonElement;
+    const uploadButton = screen.getByRole("button", { name: "上傳" });
+    expect(exportButton.parentElement).toBe(uploadButton.parentElement);
+    expect(exportButton.nextElementSibling).toBe(uploadButton);
+
+    fireEvent.click(exportButton);
+
+    expect(exportCalls).toHaveLength(1);
+    expect(exportCalls[0].url).toBe("/api/v1/knowledge/qa/export?project_id=default");
+    expect(exportCalls[0].init).toMatchObject({ credentials: "include" });
+    expect(exportButton.disabled).toBe(true);
+    expect(exportButton.textContent).toBe("匯出中…");
+
+    // 下載中重複點擊不會發出第二次請求
+    fireEvent.click(exportButton);
+    expect(exportCalls).toHaveLength(1);
+
+    const blob = new Blob(["xlsx-bytes"], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    resolveExport({
+      ok: true,
+      status: 200,
+      headers: new Headers({
+        "content-disposition": "attachment; filename*=UTF-8''%E5%BF%AB%E9%80%9F%E5%9B%9E%E8%A6%86_20261120.xlsx",
+      }),
+      blob: async () => blob,
+    } as Response);
+
+    await waitFor(() => expect(exportButton.disabled).toBe(false));
+    expect(exportButton.textContent).toBe("匯出");
+    expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
+    expect(clickedDownloads).toEqual([{ href: "blob:qa-export", download: "快速回覆_20261120.xlsx" }]);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:qa-export");
+  });
+
+  it("shows an error alert without calling alert() and re-enables the button when export fails", async () => {
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+    stubFetchForExport(() => Promise.resolve({
+      ok: false,
+      status: 500,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ detail: "internal error" }),
+    } as Response));
+
+    render(<KnowledgeBase />);
+
+    const exportButton = screen.getByRole("button", { name: "匯出" }) as HTMLButtonElement;
+    fireEvent.click(exportButton);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("匯出失敗，請稍後再試。");
+    expect(exportButton.disabled).toBe(false);
+    expect(exportButton.textContent).toBe("匯出");
+    expect(alertSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "關閉提示" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the export button in vendor mode too", async () => {
+    authMocks.account = {
+      ...adminAccount,
+      id: "vendor-1",
+      username: "vendor",
+      role: "user",
+      vendor_name: "合作廠商",
+    };
+    const exportCalls: string[] = [];
+    stubFetchForExport((url) => {
+      exportCalls.push(url);
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        blob: async () => new Blob(["xlsx-bytes"]),
+      } as Response);
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    render(<KnowledgeBase />);
+
+    expect(screen.queryByRole("button", { name: "維護" })).toBeNull();
+    const exportButton = screen.getByRole("button", { name: "匯出" }) as HTMLButtonElement;
+    const uploadButton = screen.getByRole("button", { name: "上傳" });
+    expect(exportButton.parentElement).toBe(uploadButton.parentElement);
+
+    fireEvent.click(exportButton);
+    await waitFor(() => expect(exportButton.disabled).toBe(false));
+    expect(exportCalls).toEqual(["/api/v1/knowledge/qa/export?project_id=default"]);
   });
 });
 
