@@ -589,3 +589,18 @@ def test_category_depth_uses_deepest_position_for_multi_parent_node(
     assert qa_nodes.category_depth(qa_nodes.list_nodes(), "shared") == 2
     with pytest.raises(ValueError, match=re.escape(qa_nodes.QA_CATEGORY_DEPTH_ERROR)):
         qa_nodes.create_node("under_shared", "子分類", parent_ids=["shared"])
+
+
+def test_taiwanese_category_does_not_count_as_a_level_like_the_admin_ui(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """後台 categoryLanguage 把「台語」當語言分類；後端層數算法要一致，不然後台允許的位置存不進去。"""
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    qa_nodes.create_node("nan", "台語")
+    qa_nodes.create_node("a", "A", parent_ids=["nan"])
+    qa_nodes.create_node("b", "B", parent_ids=["a"])
+
+    assert qa_nodes.category_depth(qa_nodes.list_nodes(), "b") == 2
+    assert qa_nodes.find_language_category("nan") is None

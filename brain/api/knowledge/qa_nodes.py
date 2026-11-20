@@ -38,8 +38,10 @@ def language_label_code(label: str) -> str | None:
 
 
 def is_language_label(label: str) -> bool:
-    """Whether ``label`` is a language category name (matches ``find_language_category``)."""
-    return language_label_code(label) is not None
+    """Whether ``label`` is a language category name, for the depth limit and import paths."""
+    # 台語沒有固定的分類代碼（不在 LANGUAGE_LABELS），但後台 categoryLanguage 把它當語言分類，
+    # 層數也不算它；這裡不跟著算，後台允許的「台語 › A › B」會被後端擋掉。
+    return language_label_code(label) is not None or str(label).strip().lower() == "台語"
 
 
 def _is_root(nodes: dict[str, dict[str, Any]], node: dict[str, Any]) -> bool:
