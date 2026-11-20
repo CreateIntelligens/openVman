@@ -209,7 +209,7 @@ async function createInstance(
 
   const conversation = new AvatarConversation(resourceBaseUrl, options, {
     interrupt: () => audio.interrupt(),
-    onReply: (text) => emit("reply", { text, type: "reply" }),
+    onReply: (text, details) => emit("reply", { text, type: "reply", ...details }),
     onSentence: (index, text) =>
       emit("sentence", { index, text, type: "sentence" }),
     playAudio: (source) => audio.playAudio(source),

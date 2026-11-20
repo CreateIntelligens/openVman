@@ -455,7 +455,11 @@ test("a keyed host sends X-Embed-Key without credentials and speaks the reply", 
     tts: { provider: "voxcpm", voice: "zh-female", language: "nan" },
   });
   const replies = [];
-  avatar.on("reply", (event) => replies.push(event.text));
+  const replyEvents = [];
+  avatar.on("reply", (event) => {
+    replies.push(event.text);
+    replyEvents.push(event);
+  });
 
   const reply = await avatar.ask("你好");
 
@@ -950,4 +954,25 @@ test("a deployment without streamed speech falls back to whole-sentence speech",
     "你好，我是 openVman。",
     "你好，我是 openVman。",
   ]);
+});
+
+
+test("the reply event names the session and trace so the host can match backend logs", async () => {
+  const { requests, sdk } = await loadSdk({
+    streamEvents: [
+      { data: { index: 0, text: "你好。" }, event: "sentence" },
+      { data: { reply: "你好。", trace_id: "trace-123" }, event: "done" },
+    ],
+  });
+  const avatar = await sdk.init({ characterId: "000" });
+  const events = [];
+  avatar.on("reply", (event) => events.push(event));
+
+  await avatar.ask("你好");
+
+  const sessionId = JSON.parse(chatRequests(requests)[0].options.body).session_id;
+  assert.equal(events.length, 1);
+  assert.equal(events[0].traceId, "trace-123");
+  assert.equal(events[0].sessionId, sessionId);
+  assert.ok(sessionId);
 });

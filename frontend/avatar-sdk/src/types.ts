@@ -44,7 +44,8 @@ export interface OpenVmanAvatarEventMap {
     type: "error";
   };
   ready: { type: "ready" };
-  reply: { text: string; type: "reply" };
+  // sessionId／traceId 讓宿主頁面把這一輪對到 openVman 後端的對話紀錄與 log；後端沒給時為空字串。
+  reply: { text: string; type: "reply"; sessionId: string; traceId: string };
   // 串流回答每到一句派送一次，index 從 0 起算；整段回答以 reply 為準。
   sentence: { index: number; text: string; type: "sentence" };
   speaking: { state: "start" | "stop"; type: "speaking" };

@@ -211,7 +211,7 @@ for await (const chunk of pcmStream) {
 |---|---|---|
 | `ready` | `{ type: "ready" }` | runtime 與角色已可用；在 init 完成後訂閱也會收到。 |
 | `speaking` | `{ type, state: "start" \| "stop" }` | 音訊播放狀態。`start` 在第一段音訊真正開始播時才派送；佇列播完後再等 300 ms 沒有新音訊才派送 `stop`（`audioLeadMs: 0` 時播完立即派送），照播放速度送 PCM 的空檔不會斷成好幾段。 |
-| `reply` | `{ type, text }` | 對話模式取得回覆文字，於語音合成前派送。 |
+| `reply` | `{ type, text, sessionId, traceId }` | 對話模式取得回覆文字，於語音合成前派送。`sessionId` 是這個 instance 的對話 ID，`traceId` 是後端這一輪的追蹤 ID（後端沒給時為空字串），可用來對照後端 log 與對話紀錄。 |
 | `error` | `{ type, code, message, retryAfterSeconds? }` | 音訊、資源、autoplay 或對話錯誤；`retryAfterSeconds` 只在 `RATE_LIMITED` 出現。 |
 | `destroyed` | `{ type: "destroyed" }` | instance 已清理。 |
 

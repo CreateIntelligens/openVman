@@ -4,6 +4,12 @@ import type { OpenVmanAvatarOptions } from "./types";
 
 interface ChatResponseBody {
   reply?: unknown;
+  trace_id?: unknown;
+}
+
+export interface ReplyDetails {
+  sessionId: string;
+  traceId: string;
 }
 
 interface StreamErrorBody {
@@ -15,7 +21,7 @@ type ConversationFailureCode = "CHAT_FAILED" | "SPEECH_FAILED";
 
 export interface AvatarConversationDeps {
   interrupt(): void;
-  onReply(text: string): void;
+  onReply(text: string, details: ReplyDetails): void;
   onSentence(index: number, text: string): void;
   playAudio(source: ArrayBuffer): Promise<void>;
   queueAudio(source: ArrayBuffer): Promise<void>;
@@ -93,7 +99,7 @@ export class AvatarConversation {
     }
     const reply = requireReply(body);
     if (signal.aborted) return reply;
-    this.deps.onReply(reply);
+    this.deps.onReply(reply, this.replyDetails(body));
     const audio = await this.requestSpeech(reply, signal);
     if (audio) await this.deps.playAudio(audio);
     return reply;
@@ -127,6 +133,7 @@ export class AvatarConversation {
     );
     const sentences: string[] = [];
     let reply: string | null = null;
+    let doneBody: ChatResponseBody | null = null;
     try {
       for await (const { event, data } of readSseEvents(response.body)) {
         if (signal.aborted) break;
@@ -137,7 +144,8 @@ export class AvatarConversation {
           sentences.push(sentence);
           speaker.add(sentence);
         } else if (event === "done") {
-          reply = requireReply(data as ChatResponseBody);
+          doneBody = data as ChatResponseBody;
+          reply = requireReply(doneBody);
           break;
         } else if (event === "error") {
           throw streamError(data as StreamErrorBody);
@@ -162,7 +170,7 @@ export class AvatarConversation {
 
     // 整輪沒有任何句子事件時，整段回答一次合成，不能讓數位人不出聲。
     if (sentences.length === 0) speaker.add(reply);
-    this.deps.onReply(reply);
+    this.deps.onReply(reply, this.replyDetails(doneBody));
     await speaker.finish();
     return reply;
   }
@@ -304,6 +312,14 @@ export class AvatarConversation {
       throw httpError(response.status, failureCode, retryAfterHeader(response));
     }
     return response;
+  }
+
+  private replyDetails(body: ChatResponseBody | null): ReplyDetails {
+    const traceId = body?.trace_id;
+    return {
+      sessionId: this.sessionId ?? "",
+      traceId: typeof traceId === "string" ? traceId : "",
+    };
   }
 
   private ensureSessionId(): string {
