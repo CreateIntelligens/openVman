@@ -3,7 +3,7 @@
 An embed key is a public identifier handed to a third-party page, so every
 protection lives on the server: the key names exactly one project, the routes
 it may reach are enumerated here, and both a per-minute sliding window and a
-persisted daily counter bound how much it can spend.
+daily counter bound how much it can spend.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 from collections import Counter, defaultdict, deque
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
@@ -24,7 +25,7 @@ from fastapi import HTTPException, status
 
 from app.project_ids import canonical_project_id
 
-from .embed_keys_repository import utc_day
+from .embed_keys_repository import TAIPEI_TZ, taipei_day
 from .models import AccountRole, AccountType, EmbedKeyRecord, UserRecord
 
 logger = logging.getLogger("backend.embed")
@@ -207,6 +208,107 @@ def get_rate_limiter() -> SlidingWindowRateLimiter | RedisSlidingWindowRateLimit
     return _limiter
 
 
+# 鍵不存在時才需要 SQLite 的筆數當起點，所以拆成兩段：先只 INCR，nil 才補種子。
+_REDIS_DAILY_INCR_SCRIPT = """
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  return redis.call('INCR', KEYS[1])
+end
+return false
+"""
+# SET NX：兩個 process 同時補種子時只有一個生效，另一個的種子被丟掉但仍會 INCR。
+_REDIS_DAILY_SEED_SCRIPT = """
+redis.call('SET', KEYS[1], ARGV[1], 'NX', 'EX', tonumber(ARGV[2]))
+return redis.call('INCR', KEYS[1])
+"""
+_DAILY_KEY_TTL_SECONDS = 2 * 24 * 3600
+
+SeedReader = Callable[[], int]
+
+
+class LocalDailyCounter:
+    """Per-process daily count, seeded from SQLite the first time a key/day is used."""
+
+    def __init__(self) -> None:
+        self._counts: dict[tuple[str, str], int] = {}
+        self._lock = Lock()
+
+    def count_use(self, key_id: str, day: str, seed: SeedReader) -> int:
+        """Count this use and return the day's total including it."""
+        with self._lock:
+            known = (key_id, day) in self._counts
+        # 讀 SQLite 不放在鎖內，慢磁碟不會擋住別的 key；
+        # 兩個執行緒同時種同一個起點時，下面 setdefault 只有第一個生效。
+        seeded = 0 if known else _read_seed(key_id, seed)
+        with self._lock:
+            for stale in [k for k in self._counts if k[0] == key_id and k[1] != day]:
+                del self._counts[stale]
+            total = self._counts.setdefault((key_id, day), seeded) + 1
+            self._counts[(key_id, day)] = total
+            return total
+
+    def reset(self) -> None:
+        with self._lock:
+            self._counts.clear()
+
+
+class RedisDailyCounter:
+    """The daily count shared by every Backend process through Redis."""
+
+    def __init__(self, client) -> None:
+        self._redis = client
+        self._local = LocalDailyCounter()
+
+    def count_use(self, key_id: str, day: str, seed: SeedReader) -> int:
+        key = f"vman:embed-daily:{key_id}:{day}"
+        try:
+            total = self._redis.eval(_REDIS_DAILY_INCR_SCRIPT, 1, key)
+            if total is None:
+                total = self._redis.eval(
+                    _REDIS_DAILY_SEED_SCRIPT, 1, key,
+                    _read_seed(key_id, seed), _DAILY_KEY_TTL_SECONDS,
+                )
+            return int(total)
+        except Exception as exc:  # noqa: BLE001 - Redis 掛掉時退回這個 process 自己計數
+            logger.warning("embed_daily_counter_redis_failed key_id=%s error=%s", key_id, exc)
+            return self._local.count_use(key_id, day, seed)
+
+    def reset(self) -> None:
+        self._local.reset()
+        try:
+            for key in self._redis.scan_iter(match="vman:embed-daily:*"):
+                self._redis.delete(key)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _read_seed(key_id: str, seed: SeedReader) -> int:
+    try:
+        return int(seed())
+    except sqlite3.OperationalError as exc:
+        logger.warning("embed_key_quota_read_skipped key_id=%s error=%s", key_id, exc)
+        return 0
+
+
+_daily_counter: LocalDailyCounter | RedisDailyCounter | None = None
+
+
+def get_daily_counter() -> LocalDailyCounter | RedisDailyCounter:
+    global _daily_counter
+    if _daily_counter is None:
+        from app.config import get_tts_config
+
+        cfg = get_tts_config()
+        if getattr(cfg, "backend_workers", 1) > 1:
+            import redis
+
+            _daily_counter = RedisDailyCounter(redis.Redis.from_url(
+                cfg.redis_url, socket_timeout=0.5, socket_connect_timeout=0.5,
+            ))
+        else:
+            _daily_counter = LocalDailyCounter()
+    return _daily_counter
+
+
 class EmbedBookkeeper:
     """Writes an embed key's last use and daily count off the request path.
 
@@ -217,17 +319,13 @@ class EmbedBookkeeper:
     """
 
     def __init__(self) -> None:
-        self._queue: queue.SimpleQueue[tuple[Any, str] | None] = queue.SimpleQueue()
+        self._queue: queue.SimpleQueue[tuple[Any, str, str] | None] = queue.SimpleQueue()
         self._pending: Counter[str] = Counter()
         self._lock = threading.Lock()
         self._idle = threading.Condition(self._lock)
         self._thread: threading.Thread | None = None
 
-    def pending(self, key_id: str) -> int:
-        with self._lock:
-            return self._pending[key_id]
-
-    def record(self, repository, key_id: str) -> None:
+    def record(self, repository, key_id: str, day: str) -> None:
         with self._lock:
             self._pending[key_id] += 1
             if self._thread is None or not self._thread.is_alive():
@@ -235,7 +333,7 @@ class EmbedBookkeeper:
                     target=self._run, name="embed-bookkeeper", daemon=True,
                 )
                 self._thread.start()
-        self._queue.put((repository, key_id))
+        self._queue.put((repository, key_id, day))
 
     def drain(self, timeout: float = 10.0) -> bool:
         """Wait until every recorded use is written (tests, shutdown)."""
@@ -247,9 +345,10 @@ class EmbedBookkeeper:
             item = self._queue.get()
             if item is None:
                 return
-            repository, key_id = item
+            repository, key_id, day = item
             try:
-                repository.record_use(key_id)
+                # 帶著請求當下的日期，午夜前後排隊的寫入才不會記到隔天。
+                repository.record_use(key_id, day=day)
             except Exception as exc:  # noqa: BLE001 - 記帳失敗不能影響請求
                 logger.warning("embed_key_bookkeeping_skipped key_id=%s error=%s", key_id, exc)
             finally:
@@ -289,6 +388,8 @@ def authorize_embed_request(
     repository,
     limiter: SlidingWindowRateLimiter | RedisSlidingWindowRateLimiter | None = None,
     bookkeeper: EmbedBookkeeper | None = None,
+    daily_counter: LocalDailyCounter | RedisDailyCounter | None = None,
+    now: datetime | None = None,
 ) -> None:
     """Run every embed gate in spec order, raising the first failure."""
     if key is None or key.disabled:
@@ -311,31 +412,27 @@ def authorize_embed_request(
     if retry_after:
         raise _rate_limited("Embed key rate limit exceeded", retry_after)
 
-    # 讀今天的用量不搶寫入鎖（WAL）；加上這個程序還沒寫進去的筆數與這一筆。
-    # 多個 worker 程序之間各自只看得到自己的待寫筆數，配額最多晚幾筆才擋。
-    keeper = bookkeeper or get_bookkeeper()
-    try:
-        used_today = repository.requests_today(key.key_id) + keeper.pending(key.key_id) + 1
-    except sqlite3.OperationalError as exc:
-        logger.warning("embed_key_quota_read_skipped key_id=%s error=%s", key.key_id, exc)
-        used_today = 0
-    # 超過配額的請求照樣記一筆（最後使用時間、當天請求數），跟以前一樣。
-    keeper.record(repository, key.key_id)
+    moment = now or datetime.now(timezone.utc)
+    day = taipei_day(moment)
+    # 計數與保留在同一個原子步驟，併發請求不會一起通過最後一筆額度。
+    # 超過配額的請求照樣計入並記一筆（最後使用時間、當天請求數），跟以前一樣。
+    used_today = (daily_counter or get_daily_counter()).count_use(
+        key.key_id, day, lambda: repository.requests_today(key.key_id, day=day),
+    )
+    (bookkeeper or get_bookkeeper()).record(repository, key.key_id, day)
     if used_today > key.daily_request_quota:
         raise _rate_limited(
             "Embed key daily quota exceeded",
-            _seconds_until_next_utc_day(),
+            _seconds_until_next_taipei_day(moment),
         )
 
 
-def _seconds_until_next_utc_day() -> int:
-    now = datetime.now(timezone.utc)
+def _seconds_until_next_taipei_day(now: datetime | None = None) -> int:
+    local = (now or datetime.now(timezone.utc)).astimezone(TAIPEI_TZ)
     tomorrow = datetime.combine(
-        (now + timedelta(days=1)).date(),
-        datetime.min.time(),
-        tzinfo=timezone.utc,
+        (local + timedelta(days=1)).date(), datetime.min.time(), tzinfo=TAIPEI_TZ,
     )
-    return max(1, int((tomorrow - now).total_seconds()))
+    return max(1, int((tomorrow - local).total_seconds()))
 
 
 def enforce_project_binding(key: EmbedKeyRecord, supplied_project_id: str) -> None:
@@ -350,15 +447,18 @@ __all__ = [
     "EMBED_KEY_HEADER",
     "EMBED_USER_ID_PREFIX",
     "EmbedAuthError",
+    "LocalDailyCounter",
+    "RedisDailyCounter",
     "RedisSlidingWindowRateLimiter",
     "SlidingWindowRateLimiter",
     "authorize_embed_request",
     "cors_headers",
     "embed_user_record",
     "enforce_project_binding",
+    "get_daily_counter",
     "get_rate_limiter",
     "is_allowlisted",
     "is_preflight_target",
     "static_character_id",
-    "utc_day",
+    "taipei_day",
 ]

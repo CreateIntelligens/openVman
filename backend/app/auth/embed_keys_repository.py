@@ -8,6 +8,7 @@ import secrets
 import sqlite3
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from ._repository_base import now_iso
 from .database import AuthDatabase
@@ -41,9 +42,13 @@ def generate_embed_key_id() -> str:
     return f"{EMBED_KEY_PREFIX}{raw.rstrip('=').lower()[:EMBED_KEY_RANDOM_CHARS]}"
 
 
-def utc_day(now: datetime | None = None) -> str:
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
+
+
+def taipei_day(now: datetime | None = None) -> str:
+    """The day a request counts toward; matches the admin usage page (Taipei)."""
     moment = now or datetime.now(timezone.utc)
-    return moment.astimezone(timezone.utc).strftime("%Y-%m-%d")
+    return moment.astimezone(TAIPEI_TZ).strftime("%Y-%m-%d")
 
 
 def _string_tuple(payload: str) -> tuple[str, ...]:
@@ -225,7 +230,7 @@ class EmbedKeyRepository:
                 SELECT requests FROM embed_key_daily_usage
                 WHERE key_id = ? AND day = ?
                 """,
-                (key_id.strip(), day or utc_day()),
+                (key_id.strip(), day or taipei_day()),
             ).fetchone()
         return int(row["requests"]) if row is not None else 0
 
@@ -237,7 +242,7 @@ class EmbedKeyRepository:
         self, key_id: str, *, day: str | None = None, touch: bool = False,
     ) -> int:
         """Count one request and return the running total for that day."""
-        target_day = day or utc_day()
+        target_day = day or taipei_day()
         with self.database.transaction(write=True) as connection:
             if touch:
                 connection.execute(

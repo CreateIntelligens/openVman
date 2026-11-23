@@ -66,13 +66,14 @@ def embed_env(monkeypatch, tmp_path):
     # 建立 admin 會順便註冊 default 專案與 hayley 音色資源。
     _authenticated_client(module)
 
-    from app.auth.embed import get_rate_limiter
+    from app.auth.embed import get_daily_counter, get_rate_limiter
     from app.auth.runtime import get_auth_runtime
 
     runtime = get_auth_runtime()
     _register_character(runtime, "aria")
     _register_character(runtime, "secret")
     get_rate_limiter().reset()
+    get_daily_counter().reset()
 
     key = runtime.embed_keys.create(
         label="Partner site",

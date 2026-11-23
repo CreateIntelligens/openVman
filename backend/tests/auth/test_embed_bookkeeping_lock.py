@@ -19,10 +19,10 @@ def _key() -> EmbedKeyRecord:
 
 
 class _LockedRepository:
-    def requests_today(self, key_id):
+    def requests_today(self, key_id, day=None):
         raise sqlite3.OperationalError("database is locked")
 
-    def record_use(self, key_id):
+    def record_use(self, key_id, day=None):
         raise sqlite3.OperationalError("database is locked")
 
 
@@ -31,16 +31,16 @@ class _CountingRepository:
         self.used = used
         self.recorded = 0
 
-    def requests_today(self, key_id):
+    def requests_today(self, key_id, day=None):
         return self.used
 
-    def record_use(self, key_id):
+    def record_use(self, key_id, day=None):
         self.recorded += 1
         return self.used + self.recorded
 
 
 class _SlowRepository(_CountingRepository):
-    def record_use(self, key_id):
+    def record_use(self, key_id, day=None):
         import time
 
         time.sleep(1.0)
@@ -53,12 +53,13 @@ class _NoLimit:
 
 
 def test_a_locked_database_lets_the_request_through():
-    from app.auth.embed import EmbedBookkeeper
+    from app.auth.embed import EmbedBookkeeper, LocalDailyCounter
 
     keeper = EmbedBookkeeper()
     authorize_embed_request(
         _key(), method="POST", path="/api/v1/chat/stream", origin="https://ok.example",
         repository=_LockedRepository(), limiter=_NoLimit(), bookkeeper=keeper,
+        daily_counter=LocalDailyCounter(),
     )
     assert keeper.drain(timeout=5)
 
@@ -66,7 +67,7 @@ def test_a_locked_database_lets_the_request_through():
 def test_a_slow_bookkeeping_write_does_not_hold_the_request():
     import time
 
-    from app.auth.embed import EmbedBookkeeper
+    from app.auth.embed import EmbedBookkeeper, LocalDailyCounter
 
     keeper = EmbedBookkeeper()
     repository = _SlowRepository(0)
@@ -74,29 +75,33 @@ def test_a_slow_bookkeeping_write_does_not_hold_the_request():
     authorize_embed_request(
         _key(), method="POST", path="/api/v1/chat/stream", origin="https://ok.example",
         repository=repository, limiter=_NoLimit(), bookkeeper=keeper,
+        daily_counter=LocalDailyCounter(),
     )
     assert time.perf_counter() - started < 0.5
     assert keeper.drain(timeout=5)
     assert repository.recorded == 1
 
 
-def test_uses_not_written_yet_count_toward_the_daily_quota():
+def test_the_daily_quota_does_not_wait_for_slow_bookkeeping_writes():
     import pytest
     from fastapi import HTTPException
 
-    from app.auth.embed import EmbedBookkeeper
+    from app.auth.embed import EmbedBookkeeper, LocalDailyCounter
 
     keeper = EmbedBookkeeper()
-    repository = _SlowRepository(8)  # 已寫入 8 筆，上限 10
+    counter = LocalDailyCounter()
+    repository = _SlowRepository(8)  # 已寫入 8 筆，上限 10；寫入很慢，配額仍照計數器判斷
     for _ in range(2):
         authorize_embed_request(
             _key(), method="POST", path="/api/v1/chat/stream", origin="https://ok.example",
             repository=repository, limiter=_NoLimit(), bookkeeper=keeper,
+            daily_counter=counter,
         )
     with pytest.raises(HTTPException) as caught:
         authorize_embed_request(
             _key(), method="POST", path="/api/v1/chat/stream", origin="https://ok.example",
             repository=repository, limiter=_NoLimit(), bookkeeper=keeper,
+            daily_counter=counter,
         )
     assert caught.value.status_code == 429
     assert keeper.drain(timeout=10)
@@ -106,9 +111,12 @@ def test_the_daily_quota_still_applies_when_bookkeeping_succeeds():
     import pytest
     from fastapi import HTTPException
 
+    from app.auth.embed import LocalDailyCounter
+
     with pytest.raises(HTTPException) as caught:
         authorize_embed_request(
             _key(), method="POST", path="/api/v1/chat/stream", origin="https://ok.example",
             repository=_CountingRepository(10), limiter=_NoLimit(),
+            daily_counter=LocalDailyCounter(),
         )
     assert caught.value.status_code == 429

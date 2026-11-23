@@ -12,7 +12,7 @@ from app.auth.embed_keys_repository import (
     EmbedKeyNotFoundError,
     EmbedKeyRepository,
     generate_embed_key_id,
-    utc_day,
+    taipei_day,
 )
 
 
@@ -136,9 +136,9 @@ def test_list_all_returns_every_key(repository):
     assert {record.key_id for record in repository.list_all()} == created
 
 
-def test_utc_day_is_an_iso_date():
-    assert len(utc_day()) == len("2026-01-01")
-    assert utc_day().count("-") == 2
+def test_taipei_day_is_an_iso_date():
+    assert len(taipei_day()) == len("2026-01-01")
+    assert taipei_day().count("-") == 2
 
 
 # --- Sliding window limiter -----------------------------------------------
