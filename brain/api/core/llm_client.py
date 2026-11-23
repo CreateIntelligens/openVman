@@ -30,6 +30,7 @@ from core.key_pool import (
     FAILURE_AUTH_FORBIDDEN,
     FAILURE_AUTH_INVALID,
     FAILURE_QUOTA_EXHAUSTED,
+    FAILURE_REQUEST_INVALID,
     FAILURE_TIMEOUT_CONNECT,
     FAILURE_TIMEOUT_FIRST_TOKEN,
     FAILURE_TIMEOUT_STALL,
@@ -41,6 +42,12 @@ from core.key_pool import (
 )
 from core.provider_health import FailureKind, provider_health
 from core.provider_router import LLMRoute, get_provider_router
+from core.tool_call_fields import (
+    extract_thought_signature as _extract_thought_signature,
+    normalize_tool_arguments as _normalize_tool_arguments,
+    tool_call_extra_content as _extract_tool_call_extra_content,
+)
+from core.tool_names import decode_reply, encode_tool_names
 from core.turn_budget import (
     current_trace_id,
     current_turn_budget,
@@ -360,12 +367,13 @@ def generate_chat_turn(
     max_tokens: int | None = None,
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
+    request = _encode_request(messages, tools, forced_tool_name)
     response = _create_sync_completion(
-        messages,
-        tools=tools,
+        request.messages,
+        tools=request.tools,
         trace_id=trace_id,
         model_override=model_override,
-        forced_tool_name=forced_tool_name,
+        forced_tool_name=request.forced_tool_name,
         max_tokens=max_tokens,
     )
     assert response is not None
@@ -374,7 +382,7 @@ def generate_chat_turn(
     tool_calls = [
         LLMToolCall(
             id=tool_call.id,
-            name=tool_call.function.name,
+            name=request.codec.decode(tool_call.function.name),
             arguments=_normalize_tool_arguments(tool_call.function.arguments),
             extra_content=_extract_tool_call_extra_content(tool_call),
         )
@@ -406,6 +414,39 @@ def stream_chat_turn(
     Reuses the provider fallback chain and key-pool infrastructure. *text_listener*
     sees the text deltas while they arrive.
     """
+    request = _encode_request(messages, tools, forced_tool_name)
+    reply = _stream_chat_turn(
+        request.messages,
+        request.tools,
+        trace_id=trace_id,
+        model_override=model_override,
+        forced_tool_name=request.forced_tool_name,
+        max_tokens=max_tokens,
+        text_listener=text_listener,
+    )
+    return decode_reply(reply, request.codec)
+
+
+def _encode_request(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
+    forced_tool_name: str | None,
+):
+    return encode_tool_names(
+        messages, tools, forced_tool_name, passthrough=frozenset({REQUIRE_ANY_TOOL}),
+    )
+
+
+def _stream_chat_turn(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
+    *,
+    trace_id: str,
+    model_override: str | None,
+    forced_tool_name: str | None,
+    max_tokens: int | None,
+    text_listener: TextDeltaListener | None,
+) -> LLMReply:
     _require_api_key()
     cfg = get_settings()
     router = get_provider_router()
@@ -543,9 +584,14 @@ def _record_hop_failure(
     reason = classify_failure(exc)
     router = get_provider_router()
     router.mark_failure(hop.api_key, hop.model, exc)
-    provider_health().record_failure(
-        health_id(hop.provider, hop.model, hop.api_key), _HEALTH_KINDS.get(reason, "transient"), reason,
-    )
+    if reason != FAILURE_REQUEST_INVALID:
+        # 請求本身被拒（400）不是這站壞了：換下一站答這一題，但不讓它冷卻，
+        # 否則一題格式有問題的請求會把這站從其他請求的備援裡拿掉。
+        provider_health().record_failure(
+            health_id(hop.provider, hop.model, hop.api_key),
+            _HEALTH_KINDS.get(reason, "transient"),
+            reason,
+        )
 
     record_route_attempt(
         trace_id=trace_id,
@@ -943,46 +989,3 @@ def _build_create_kwargs(
 def _now_ms() -> float:
     """Return monotonic time in milliseconds."""
     return monotonic() * 1000
-
-
-def _normalize_tool_arguments(raw: str | None) -> str:
-    """Gemini 的 OpenAI 相容端點拒收歷史裡 arguments 為空字串的 tool call（400
-    INVALID_ARGUMENT），而模型偶爾會吐出不帶參數的呼叫；這筆一旦寫回對話歷史，
-    下一輪整個請求就失敗。統一成 "{}"，參數缺漏交給工具的 schema 驗證回報。"""
-    return raw if raw and raw.strip() else "{}"
-
-
-def _extract_thought_signature(obj: Any) -> str | None:
-    """Extract Google thought_signature from a tool call or delta object."""
-    if not obj:
-        return None
-    if isinstance(obj, dict):
-        if sig := obj.get("thought_signature") or obj.get("thought"):
-            return str(sig)
-        if google := obj.get("google"):
-            if isinstance(google, dict) and (sig := google.get("thought_signature")):
-                return str(sig)
-        if extra := obj.get("extra_content"):
-            return _extract_thought_signature(extra)
-        return None
-
-    if hasattr(obj, "thought_signature") and (sig := getattr(obj, "thought_signature", None)):
-        return str(sig)
-
-    for attr in ("extra_content", "model_extra"):
-        val = getattr(obj, attr, None)
-        if val and (sig := _extract_thought_signature(val)):
-            return sig
-
-    if hasattr(obj, "function"):
-        fn = getattr(obj, "function", None)
-        if fn and (sig := _extract_thought_signature(fn)):
-            return sig
-
-    return None
-
-
-def _extract_tool_call_extra_content(tool_call: Any) -> dict[str, Any] | None:
-    if sig := _extract_thought_signature(tool_call):
-        return {"thought_signature": sig}
-    return None

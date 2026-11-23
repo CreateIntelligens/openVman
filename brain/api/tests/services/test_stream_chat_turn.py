@@ -318,3 +318,96 @@ class TestStreamChatTurnEmptyResponse:
                     [{"role": "user", "content": "hi"}],
                     trace_id="t-empty",
                 )
+
+
+# ---------------------------------------------------------------------------
+# Provider-safe tool names
+# ---------------------------------------------------------------------------
+
+def _named_tool(name: str) -> dict:
+    return {"type": "function", "function": {"name": name, "parameters": {"type": "object"}}}
+
+
+class TestToolNamesOnTheWire:
+    """OpenAI 拒收 ^[a-zA-Z0-9_-]+$ 以外的工具名（tools 與歷史都算），技能工具名帶冒號。"""
+
+    _history = [
+        {"role": "user", "content": "講個笑話再查天氣"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{
+                "id": "c1", "type": "function",
+                "function": {"name": "joke:get_joke", "arguments": "{}"},
+            }],
+        },
+        {"role": "tool", "tool_call_id": "c1", "name": "joke:get_joke", "content": "哈"},
+    ]
+
+    def _assert_wire(self, kwargs: dict) -> None:
+        assert [t["function"]["name"] for t in kwargs["tools"]] == [
+            "joke__get_joke", "weather__get_current_weather",
+        ]
+        sent = kwargs["messages"]
+        assert sent[1]["tool_calls"][0]["function"]["name"] == "joke__get_joke"
+        assert sent[2]["name"] == "joke__get_joke"
+
+    def test_stream_sends_safe_names_and_maps_the_call_back(self, monkeypatch: pytest.MonkeyPatch):
+        llm_client = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, llm_client, model="m1")
+        tools = [_named_tool("joke:get_joke"), _named_tool("weather:get_current_weather")]
+
+        with patch("core.llm_client.OpenAI") as mock_openai:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = iter(
+                _tool_chunks(name="weather__get_current_weather", args='{"city": "台北"}')
+            )
+            mock_openai.return_value = mock_client
+
+            reply = llm_client.stream_chat_turn(list(self._history), tools, trace_id="t-names")
+
+        self._assert_wire(mock_client.chat.completions.create.call_args.kwargs)
+        assert reply.tool_calls[0].name == "weather:get_current_weather"
+        assert tools[0]["function"]["name"] == "joke:get_joke"
+
+    def test_forced_tool_choice_uses_the_safe_name(self, monkeypatch: pytest.MonkeyPatch):
+        llm_client = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, llm_client, model="m1")
+        tools = [_named_tool("joke:get_joke"), _named_tool("weather:get_current_weather")]
+
+        with patch("core.llm_client.OpenAI") as mock_openai:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = iter(
+                _tool_chunks(name="joke__get_joke", args="{}")
+            )
+            mock_openai.return_value = mock_client
+
+            reply = llm_client.stream_chat_turn(
+                list(self._history), tools, trace_id="t-forced", forced_tool_name="joke:get_joke",
+            )
+
+        kwargs = mock_client.chat.completions.create.call_args.kwargs
+        assert kwargs["tool_choice"] == {"type": "function", "function": {"name": "joke__get_joke"}}
+        assert reply.tool_calls[0].name == "joke:get_joke"
+
+    def test_non_stream_sends_safe_names_and_maps_the_call_back(self, monkeypatch: pytest.MonkeyPatch):
+        llm_client = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, llm_client, model="m1")
+        tools = [_named_tool("joke:get_joke"), _named_tool("weather:get_current_weather")]
+
+        call = MagicMock()
+        call.id = "c2"
+        call.function.name = "weather__get_current_weather"
+        call.function.arguments = "{}"
+        message = MagicMock(content="", tool_calls=[call])
+        response = MagicMock(choices=[MagicMock(message=message)], model="m1")
+
+        with patch("core.llm_client.OpenAI") as mock_openai:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = response
+            mock_openai.return_value = mock_client
+
+            reply = llm_client.generate_chat_turn(list(self._history), tools, trace_id="t-sync")
+
+        self._assert_wire(mock_client.chat.completions.create.call_args.kwargs)
+        assert reply.tool_calls[0].name == "weather:get_current_weather"

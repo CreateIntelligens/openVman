@@ -23,6 +23,8 @@ FAILURE_QUOTA_EXHAUSTED = "quota_exhausted"
 FAILURE_RATE_LIMITED = "rate_limited"
 FAILURE_PROVIDER_ERROR = "provider_error"
 FAILURE_TRANSIENT_ERROR = "transient_error"
+# 400：這個請求本身被拒（例如工具名不合格式）。換下一站答，但金鑰與這站都不扣分。
+FAILURE_REQUEST_INVALID = "request_invalid"
 # 逾時跟其他暫時性錯誤分開記，log 才看得出是哪一段在等：連線、第一個字、串流中斷、整段。
 # 斷路器仍把它們當暫時性失敗（provider_health 的 transient、key pool 的短冷卻）。
 FAILURE_TIMEOUT_CONNECT = "timeout_connect"
@@ -70,6 +72,11 @@ _DISABLE_FAILURES = frozenset({FAILURE_AUTH_INVALID, FAILURE_AUTH_FORBIDDEN})
 _LONG_COOLDOWN_FAILURES = frozenset({FAILURE_QUOTA_EXHAUSTED})
 
 
+def _mentions_api_key(exc: APIStatusError) -> bool:
+    text = f"{exc} {getattr(exc, 'body', '')}".lower()
+    return "api key" in text or "api_key" in text
+
+
 def classify_failure(exc: Exception) -> str:
     """Classify an LLM exception into a failure category."""
     if isinstance(exc, LLMTimeoutError):
@@ -102,6 +109,9 @@ def classify_failure(exc: Exception) -> str:
         logging.getLogger(__name__).warning(
             "LLM API %d: %s", exc.status_code, getattr(exc, "body", exc)
         )
+        # Gemini 的相容端點對無效金鑰回 400 而不是 401，那是金鑰的問題，照舊冷卻。
+        if exc.status_code == 400 and not _mentions_api_key(exc):
+            return FAILURE_REQUEST_INVALID
         return FAILURE_TRANSIENT_ERROR
 
     if isinstance(exc, (APIConnectionError, APITimeoutError)):
@@ -218,6 +228,8 @@ class KeyPoolManager:
 
     def mark_failure(self, api_key: str, reason: str) -> None:
         """Record a failure and apply cooldown or disable based on classification."""
+        if reason == FAILURE_REQUEST_INVALID:
+            return
         with self._lock:
             old = self._states.get(api_key)
             if old is None:

@@ -658,3 +658,64 @@ def test_llm_hop_failure_feeds_the_provider_circuit_breaker(monkeypatch):
 
     [entry] = provider_health().snapshot()
     assert (entry["hop"], entry["status"], entry["reason"]) == ("gemini", "blocked", "auth_invalid")
+
+
+def _bad_request(message: str):
+    import httpx
+    import openai
+
+    return openai.BadRequestError(
+        message,
+        response=httpx.Response(400, request=httpx.Request("POST", "https://example.test")),
+        body={"message": message, "type": "invalid_request_error"},
+    )
+
+
+def test_bad_request_moves_on_without_cooling_the_hop(monkeypatch):
+    """400 是這個請求被拒：換下一站，但這站與金鑰都不能被冷卻。"""
+    fc, _, events = _stub_deps(monkeypatch)
+    _stub_config(monkeypatch, chain="gemini:g", gemini_key="gk", disable_discovery=True)
+    llm_client = importlib.import_module("core.llm_client")
+    from core.key_pool import FAILURE_REQUEST_INVALID, classify_failure
+    from core.provider_health import provider_health
+    from core.provider_router import get_provider_router
+
+    error = _bad_request("Invalid 'tools[0].function.name': string does not match pattern.")
+    assert classify_failure(error) == FAILURE_REQUEST_INVALID
+
+    hop = fc.RouteHop("openai", "gpt-4.1-mini", "gk", "", 0, "t")
+    errors: list[str] = []
+    reason = llm_client._record_hop_failure(hop, error, 5.0, [hop], errors, "t")
+
+    assert reason == FAILURE_REQUEST_INVALID
+    assert provider_health().snapshot() == []
+    state = get_provider_router()._ensure_pool().get_state("gk")
+    assert state is None or state.is_available()
+    [attempt] = [e for e in events if e["event"] == "llm_route_attempt"]
+    assert attempt["reason"] == FAILURE_REQUEST_INVALID
+    assert "does not match pattern" in attempt["error"]
+    assert "does not match pattern" in errors[0]
+
+
+def test_bad_request_about_the_api_key_still_counts_against_the_key(monkeypatch):
+    """Gemini 相容端點對無效金鑰回 400，那仍是金鑰的問題。"""
+    _stub_deps(monkeypatch)
+    from core.key_pool import FAILURE_TRANSIENT_ERROR, KeyPoolManager, classify_failure
+
+    error = _bad_request("API key not valid. Please pass a valid API key.")
+    reason = classify_failure(error)
+    assert reason == FAILURE_TRANSIENT_ERROR
+
+    pool = KeyPoolManager(["k"])
+    pool.mark_failure("k", reason)
+    assert not pool.get_state("k").is_available()
+
+
+def test_key_pool_ignores_request_invalid():
+    from core.key_pool import FAILURE_REQUEST_INVALID, KeyPoolManager
+
+    pool = KeyPoolManager(["k"])
+    for _ in range(5):
+        pool.mark_failure("k", FAILURE_REQUEST_INVALID)
+    state = pool.get_state("k")
+    assert state.is_available() and state.consecutive_failures == 0
