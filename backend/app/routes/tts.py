@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import logging
 from collections.abc import AsyncIterator
+from urllib.parse import quote
 from dataclasses import dataclass
 from time import monotonic
 from typing import Literal
@@ -325,7 +326,7 @@ async def create_speech(
     }
     if output.fallback:
         headers["X-TTS-Fallback"] = "true"
-        headers["X-TTS-Fallback-Reason"] = output.fallback_reason
+        headers["X-TTS-Fallback-Reason"] = header_safe(output.fallback_reason)
 
     if cache_key is not None:
         asyncio.create_task(cache_put(cache_key, _to_cached_tts_entry(output.result), cfg.tts_cache_ttl_seconds))
@@ -649,8 +650,19 @@ def _buffered_audio(
     # 看不出第一站為什麼失敗。
     if getattr(output, "fallback", False):
         response.headers["X-TTS-Fallback"] = "true"
-        response.headers["X-TTS-Fallback-Reason"] = getattr(output, "fallback_reason", "")
+        response.headers["X-TTS-Fallback-Reason"] = header_safe(
+            getattr(output, "fallback_reason", ""),
+        )
     return response
+
+
+def header_safe(value: str) -> str:
+    """Percent-encode what an HTTP header cannot carry (non-ASCII, ``%``).
+
+    上游的錯誤訊息常是中文（CosyVoice「找不到語音…」）；直接放進標頭會讓已經
+    由備援合成好的回應整個變成 500。前端（shared/speech/tts/fallback.ts）會解回來。
+    """
+    return quote(value[:300], safe=" !\"#$&'()*+,-./:;<=>?@[\\]^_`{|}~")
 
 
 @router.post("/api/v1/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
@@ -817,8 +829,10 @@ async def tts_stream_endpoint(
             output = await asyncio.to_thread(
                 svc.synthesize,
                 SynthesizeRequest(
+                    # character 是 IndexTTS 的角色名（hayley…），CosyVoice 不認得；
+                    # 沒指定聲音就讓 CosyVoice 用自己的預設。
                     text=cleaned, locale=locale,
-                    voice_hint=voice or character, usage_scope=scope,
+                    voice_hint=voice or "", usage_scope=scope,
                 ),
                 provider=provider,
                 edge_fallback_voice=edge_fallback_voice,

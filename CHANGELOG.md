@@ -137,6 +137,9 @@
 
 ### Fixed
 
+- **[2026-11-23]** **網站嵌入金鑰的請求不再被 auth 資料庫寫入卡住數秒**：每個 embed key 請求轉給 Brain 前，都要先寫一筆最後使用時間與每日計數；這台主機的虛擬硬碟偶爾 fsync 要好幾秒，期間寫入鎖被佔著，對話第一個位元組實測慢 4～10 秒（閒聊「你好」最常碰到）。記帳改由每個 worker 程序的背景執行緒寫入，每日配額改以「已寫入的計數＋還沒寫入的筆數」判斷（最多晚幾筆才擋）；外部網站的來源紀錄也改在回應送出後背景寫入；Auth DB 改用 `synchronous=NORMAL`（WAL 下不會損毀，斷電時可能少最後幾筆）。
+- **[2026-11-23]** **TTS 備援已經合成好卻回 500**：第一站的錯誤訊息是中文時（例如 CosyVoice 的「找不到語音…」），放進 `X-TTS-Fallback-Reason` 標頭會讓整個回應變成 500。標頭裡的非 ASCII 字元與 `%` 改做百分比編碼，前端（`frontend/shared/speech/tts/fallback.ts`）解回來顯示。
+- **[2026-11-23]** **指定 CosyVoice 但沒帶聲音時改用 CosyVoice 自己的預設聲音**：原本會把 IndexTTS 的角色名（`hayley`）送給 CosyVoice，新節點不認得，回錯誤後走備援。
 - **[2026-11-23]** **嵌入 SDK 在 openVman 連不上時仍顯示得出人物，載入失敗也能直接重試**：播放程式與人物檔第一次下載後存進嵌入頁面網域的 Cache Storage（`cacheAssets`，預設開），之後開頁面不必再下載：用存檔前先等 openVman 回應標頭（最多 3 秒），401／403／404 清掉存檔且不顯示，連不上、逾時、5xx 或回網頁（captive portal）才用存檔；`Last-Modified`／`Content-Length` 沒變就中斷下載，有變背景整組換新。30 天沒用的存檔會清掉。`init()` 改成檔案都拿到才建立 runtime，連不上、逾時、5xx、下載中斷自動重試兩次，失敗後頁面上不留東西、可以再呼叫 `init()`，不必重新整理。新增 `avatar.assetsFromCache`。SDK 本體與播放程式的 nginx 標頭加上 `stale-while-revalidate=2592000`，openVman 連不上時瀏覽器仍可用舊檔（Chromium 實測）。角色檔的 nginx 回應改成只送一個 `Access-Control-Allow-Origin`（原本後端與 nginx 各送一個，瀏覽器的 fetch 會拒收）。代價是第一次開頁面要等人物影片整檔下載完才出畫面。
 - **[2026-11-23]** **embedding 服務掛掉時知識庫改用全文檢索，不再整個查不到**：查詢 embedding 逾時或失敗時，`search_knowledge` 原本放棄那條查詢，那一輪回答完全不帶知識庫；現在改用已建好的全文索引查同一句，同一次呼叫的其他查詢也直接用全文檢索、不再等 embedding。全文索引對中文照空白與標點切詞，型號、英文與被標點隔開的詞查得到，連在一起的中文詞多半比對不到，所以這是降級而不是等效替代。LanceDB 本身的錯誤照舊往外拋。
 - **[2026-11-23]** **OpenAI 備援站不再因工具名稱整個失敗**：技能工具名帶冒號（如 `weather:get_current_weather`），OpenAI 只收英數、底線與連字號，每個帶工具的請求都回 400，gpt-4.1-mini 這站自 11/13 起沒有成功過，Gemini 一逾時就直接落到 groq。Brain 送出前把 tools、強制工具與對話歷史裡的名稱改成合法形式（`:` 換 `__`），回傳的工具呼叫再對回原名（`core/tool_names.py`）。400 改記 `request_invalid`：只換下一站答這一題，不再冷卻那一站或那把 key，log 裡照舊帶 provider 的錯誤訊息。

@@ -7,6 +7,8 @@ Embed key 原本就有自己的 CORS（每把 key 的網域白名單，在 auth 
 
 from __future__ import annotations
 
+import asyncio
+
 import logging
 from urllib.parse import urlsplit
 
@@ -83,6 +85,26 @@ async def record_request_origin(request: Request, call_next):
     if not origin or origin == "null" or _is_own_site(origin, request):
         return response
     principal_type, principal_id, user_id = _principal(request)
+    # 不等寫入完成就回應：寫入要搶 auth 資料庫的寫入鎖，磁碟慢時會卡好幾秒，
+    # 串流回應（chat/stream）的第一個位元組會跟著被拖住。
+    task = asyncio.create_task(_record_origin(
+        origin=origin,
+        principal_type=principal_type,
+        principal_id=principal_id,
+        user_id=user_id,
+        path=request.url.path,
+    ))
+    _pending_records.add(task)
+    task.add_done_callback(_pending_records.discard)
+    return response
+
+
+_pending_records: set[asyncio.Task] = set()
+
+
+async def _record_origin(
+    *, origin: str, principal_type: str, principal_id: str, user_id: str | None, path: str,
+) -> None:
     try:
         await run_in_threadpool(
             get_auth_runtime().request_origins.record,
@@ -90,8 +112,7 @@ async def record_request_origin(request: Request, call_next):
             principal_type=principal_type,
             principal_id=principal_id,
             user_id=user_id,
-            path=request.url.path,
+            path=path,
         )
     except Exception as exc:  # noqa: BLE001 - 記錄失敗不能影響請求本身
         logger.warning("request origin record failed: %s", exc)
-    return response

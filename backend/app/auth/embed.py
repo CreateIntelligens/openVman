@@ -9,13 +9,16 @@ persisted daily counter bound how much it can spend.
 from __future__ import annotations
 
 import logging
+import queue
 import re
 import sqlite3
+import threading
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from threading import Lock
+from typing import Any
 
 from fastapi import HTTPException, status
 
@@ -204,6 +207,69 @@ def get_rate_limiter() -> SlidingWindowRateLimiter | RedisSlidingWindowRateLimit
     return _limiter
 
 
+class EmbedBookkeeper:
+    """Writes an embed key's last use and daily count off the request path.
+
+    The write needs the auth database's write lock; when the disk is slow a
+    commit can hold that lock for seconds, and every embed request used to wait
+    for it before reaching Brain. One worker thread per process writes in order;
+    ``pending`` lets the daily quota count requests not written yet.
+    """
+
+    def __init__(self) -> None:
+        self._queue: queue.SimpleQueue[tuple[Any, str] | None] = queue.SimpleQueue()
+        self._pending: Counter[str] = Counter()
+        self._lock = threading.Lock()
+        self._idle = threading.Condition(self._lock)
+        self._thread: threading.Thread | None = None
+
+    def pending(self, key_id: str) -> int:
+        with self._lock:
+            return self._pending[key_id]
+
+    def record(self, repository, key_id: str) -> None:
+        with self._lock:
+            self._pending[key_id] += 1
+            if self._thread is None or not self._thread.is_alive():
+                self._thread = threading.Thread(
+                    target=self._run, name="embed-bookkeeper", daemon=True,
+                )
+                self._thread.start()
+        self._queue.put((repository, key_id))
+
+    def drain(self, timeout: float = 10.0) -> bool:
+        """Wait until every recorded use is written (tests, shutdown)."""
+        with self._idle:
+            return self._idle.wait_for(lambda: not +self._pending, timeout=timeout)
+
+    def _run(self) -> None:
+        while True:
+            item = self._queue.get()
+            if item is None:
+                return
+            repository, key_id = item
+            try:
+                repository.record_use(key_id)
+            except Exception as exc:  # noqa: BLE001 - 記帳失敗不能影響請求
+                logger.warning("embed_key_bookkeeping_skipped key_id=%s error=%s", key_id, exc)
+            finally:
+                with self._idle:
+                    self._pending[key_id] -= 1
+                    if self._pending[key_id] <= 0:
+                        del self._pending[key_id]
+                    self._idle.notify_all()
+
+
+_bookkeeper: EmbedBookkeeper | None = None
+
+
+def get_bookkeeper() -> EmbedBookkeeper:
+    global _bookkeeper
+    if _bookkeeper is None:
+        _bookkeeper = EmbedBookkeeper()
+    return _bookkeeper
+
+
 def cors_headers(origin: str) -> dict[str, str]:
     """The CORS headers an embed response carries; never a credentials flag."""
     return {
@@ -222,6 +288,7 @@ def authorize_embed_request(
     origin: str,
     repository,
     limiter: SlidingWindowRateLimiter | RedisSlidingWindowRateLimiter | None = None,
+    bookkeeper: EmbedBookkeeper | None = None,
 ) -> None:
     """Run every embed gate in spec order, raising the first failure."""
     if key is None or key.disabled:
@@ -244,13 +311,16 @@ def authorize_embed_request(
     if retry_after:
         raise _rate_limited("Embed key rate limit exceeded", retry_after)
 
+    # 讀今天的用量不搶寫入鎖（WAL）；加上這個程序還沒寫進去的筆數與這一筆。
+    # 多個 worker 程序之間各自只看得到自己的待寫筆數，配額最多晚幾筆才擋。
+    keeper = bookkeeper or get_bookkeeper()
     try:
-        used_today = repository.record_use(key.key_id)
+        used_today = repository.requests_today(key.key_id) + keeper.pending(key.key_id) + 1
     except sqlite3.OperationalError as exc:
-        # 最後使用時間與每日用量只是記帳：大量同時請求搶不到 SQLite 寫入鎖時放行並記警告，
-        # 不讓整個請求變成 500。每分鐘上限由前面的 limiter 擋，不受影響。
-        logger.warning("embed_key_bookkeeping_skipped key_id=%s error=%s", key.key_id, exc)
-        return
+        logger.warning("embed_key_quota_read_skipped key_id=%s error=%s", key.key_id, exc)
+        used_today = 0
+    # 超過配額的請求照樣記一筆（最後使用時間、當天請求數），跟以前一樣。
+    keeper.record(repository, key.key_id)
     if used_today > key.daily_request_quota:
         raise _rate_limited(
             "Embed key daily quota exceeded",

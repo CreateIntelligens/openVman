@@ -58,6 +58,9 @@ class AuthDatabase:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        # WAL 下 NORMAL 不會讓資料庫損毀，只有主機斷電時可能少最後幾筆；FULL 每次 commit
+        # 都要 fsync，虛擬硬碟偶爾一次就要好幾秒，期間寫入鎖一直被佔著。
+        connection.execute("PRAGMA synchronous = NORMAL")
         return connection
 
     @contextmanager

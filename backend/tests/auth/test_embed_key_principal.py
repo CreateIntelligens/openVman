@@ -324,6 +324,9 @@ def test_daily_quota_returns_429_and_still_touches_last_used(embed_env):
     assert first.status_code == 200
     assert second.status_code == 429
     assert int(second.headers["Retry-After"]) >= 1
+    from app.auth.embed import get_bookkeeper
+
+    assert get_bookkeeper().drain(timeout=5)
     assert runtime.embed_keys.get(key.key_id).last_used_at is not None
     assert runtime.embed_keys.requests_today(key.key_id) == 2
 

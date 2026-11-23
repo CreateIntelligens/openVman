@@ -59,7 +59,7 @@ Backend 支援 `Authorization: Bearer ovk_<key_id>.<secret>`，與 JWT／登入 
 
 **跨網域（2026-10-14）**：`CORS_ALLOWED_ORIGINS`（逗號分隔的完整來源，或 `*`；留空不開放）列出的網站，瀏覽器前端可以直接帶 API key 呼叫。CORS 在 auth middleware 裡處理：帶 `Access-Control-Request-Method` 的 preflight 在驗證之前回 204，實際回應與 401／403／429 錯誤都補上 `Access-Control-Allow-Origin`（回請求的 Origin）、`Allow-Headers: Authorization, Content-Type, X-Embed-Key`、`Expose-Headers`（`X-TTS-Provider` 等）。不送 `Allow-Credentials`，跨網域只能靠 Authorization 或 X-Embed-Key，別的網站借不到使用者已登入的後台 Cookie。Embed key 的回應已帶自己的 CORS（金鑰白名單）時不覆蓋，部署清單也不會擋掉 Embed key 允許的網域。
 
-**來源紀錄**：每個帶外部 Origin 的請求（preflight 與自己網域除外）依「來源 × 主體（`api_key`／`embed_key`／`user`／`anonymous`）× 主體 ID」彙總寫入 Auth DB `request_origins`（migration 21），記第一次／最後一次時間、最後路徑與次數；不設外鍵，key 撤銷後紀錄仍在。ROOT 以 `GET /api/v1/admin/request-origins?limit=` 查詢。
+**來源紀錄**：每個帶外部 Origin 的請求（preflight 與自己網域除外）依「來源 × 主體（`api_key`／`embed_key`／`user`／`anonymous`）× 主體 ID」彙總寫入 Auth DB `request_origins`（migration 21），記第一次／最後一次時間、最後路徑與次數；不設外鍵，key 撤銷後紀錄仍在。寫入在回應送出後於背景進行，不拖慢回應（串流的第一個位元組不等它）。ROOT 以 `GET /api/v1/admin/request-origins?limit=` 查詢。
 
 **限流**：每把帳號 API key 每分鐘最多 `API_KEY_RATE_LIMIT_PER_MINUTE`（預設 300，0 不限）個請求，超過回 429 與 `Retry-After`。計數掛在 API key 驗證上，60 秒滑動視窗；登入 session 與免驗證的公開路由（`GET /api/v1/characters` 等）不計。單一 process 時計數放記憶體、重啟歸零；`BACKEND_WORKERS` 大於 1 時放 Redis，各 process 共用。Embed key 沿用自己的每分鐘與每日額度。OpenAPI 由 `app/openapi.py` 在每個 `AccountBearer` 操作補上 429（`SessionBearer` 的 `/api/v1/api-keys` 與公開路由不補）。
 
@@ -798,7 +798,7 @@ session cookie 與 `X-Embed-Key` 時一律以金鑰為準；embed 主體不會�
 或請求的角色不是金鑰的預設／額外允許角色，皆回 403；超過
 `rate_limit_per_minute`（行程內滑動視窗）或 `daily_request_quota`
 （存在 auth 資料庫的每日計數）回 429 並附上 `Retry-After`。preflight 只驗身分與
-來源，不計入用量，否則一次真實請求會扣掉兩次額度。每個請求的最後使用時間與每日計數在同一次寫入完成；auth 資料庫被其他寫入佔住、等不到鎖時，這筆記帳略過並記 `embed_key_bookkeeping_skipped` 警告，請求照常放行（每分鐘上限不受影響）。
+來源，不計入用量，否則一次真實請求會扣掉兩次額度。每個請求的最後使用時間與每日計數在同一次寫入完成，由每個 worker 程序的一條背景執行緒依序寫入，請求不等它（磁碟慢時一次 commit 可能佔住寫入鎖好幾秒）。每日配額以「已寫入的當天計數（WAL 下讀取不搶寫入鎖）＋這個程序還沒寫入的筆數＋這一筆」判斷，多個 worker 之間各自只看得到自己的待寫筆數，最多晚幾筆才擋。寫入失敗記 `embed_key_bookkeeping_skipped` 警告。Auth DB 連線用 `PRAGMA synchronous = NORMAL`（WAL 下不會損毀，主機斷電時可能少最後幾筆）。
 
 **CORS。** 只有 embed 主體的回應，以及帶著有效金鑰與白名單 `Origin` 的
 allowlisted preflight（回 204），才會帶上 `Access-Control-Allow-Origin`、

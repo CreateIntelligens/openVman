@@ -120,6 +120,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             upstream_probe.cancel()
         if a2a_daemon:
             await a2a_daemon.stop()
+        # 背景還沒寫進去的 embed key 記帳先寫完再關（最多等 3 秒）。
+        from app.auth.embed import get_bookkeeper
+
+        await asyncio.to_thread(get_bookkeeper().drain, 3.0)
         clients = [
             _brain_proxy_http, _internal_http, _forward_http,
             _crawl_http, _health_http, _vision_http, _asr_http,

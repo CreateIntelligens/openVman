@@ -15,13 +15,23 @@ export interface HeaderSource {
   get(name: string): string | null
 }
 
+// 後端把標頭放不下的字（中文、%）做了百分比編碼。
+function decodeHeader(value: string | undefined): string | undefined {
+  if (!value) return value
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 export function parseTtsFallback(
   headers: HeaderSource | null | undefined,
 ): TtsFallbackInfo | null {
   if (!headers) return null
 
   const fallbackFlag = headers.get('X-TTS-Fallback') === 'true'
-  const fallbackReason = headers.get('X-TTS-Fallback-Reason')?.trim()
+  const fallbackReason = decodeHeader(headers.get('X-TTS-Fallback-Reason')?.trim())
   const actualProvider = headers.get('X-TTS-Provider')?.trim() ?? ''
 
   if (!fallbackReason && !fallbackFlag) {

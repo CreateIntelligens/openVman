@@ -151,3 +151,18 @@ def test_stream_route_marks_fallback_on_buffered_audio() -> None:
 
     direct = _buffered_audio(SynthesisOutput(result=_ok_result("cosyvoice")), "", "cosyvoice")
     assert "X-TTS-Fallback" not in direct.headers
+
+
+def test_a_chinese_fallback_reason_does_not_turn_the_audio_into_a_500() -> None:
+    """上游錯誤訊息是中文時，備援已經合成好的音訊仍要送出，原因編碼後可以解回來。"""
+    from urllib.parse import unquote
+
+    from app.routes.tts import _buffered_audio
+    from app.service import SynthesisOutput
+
+    reason = 'cosyvoice: CosyVoice HTTP 400: {"message":"找不到語音 hayley。"} 100%'
+    output = SynthesisOutput(result=_ok_result("voxcpm"), fallback=True, fallback_reason=reason)
+    response = _buffered_audio(output, "", "cosyvoice")
+    header = response.headers["X-TTS-Fallback-Reason"]
+    header.encode("latin-1")
+    assert unquote(header) == reason

@@ -188,7 +188,7 @@ Brain 在同一交易內檢查版本並寫入兩則訊息，未確認的答案�
 * `tts/pcm-stream.ts`：WAV 標頭解析、跨 chunk 奇數 byte 拼接、串流線性插值重採樣至 16 kHz。
 * `tts/scheduler.ts`：`PcmScheduler`，PCM 排程播放與 RMS 音量監聽。
 * `tts/selection.ts`：語音引擎與聲音的成對驗證。
-* `tts/fallback.ts`：`X-TTS-Fallback-Reason` 解析與提示組裝。
+* `tts/fallback.ts`：`X-TTS-Fallback-Reason` 解析（後端把中文等非 ASCII 字元百分比編碼，這裡解回）與提示組裝。
 * `tts/cache.ts`：以 SHA-256 為鍵的 LRU 快取。
 * `storage.ts`：帳號範圍的偏好儲存（6.7）。
 

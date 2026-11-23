@@ -30,4 +30,20 @@ describe('fallback (D10)', () => {
   it('formatTtsFallbackMessage 支援未指定 provider 時的提示格式', () => {
     expect(formatTtsFallbackMessage('', '服務超時')).toBe('語音引擎已自動切換（原因：服務超時）')
   })
+
+  it('解回後端百分比編碼過的中文原因', () => {
+    const headers = new Map<string, string>([
+      ['X-TTS-Fallback', 'true'],
+      ['X-TTS-Provider', 'voxcpm'],
+      ['X-TTS-Fallback-Reason', 'cosyvoice: %E6%89%BE%E4%B8%8D%E5%88%B0%E8%AA%9E%E9%9F%B3 100%25'],
+    ])
+    const info = parseTtsFallback({ get: (name: string) => headers.get(name) ?? null })
+    expect(info?.reason).toBe('cosyvoice: 找不到語音 100%')
+  })
+
+  it('不是合法編碼的原因照原文顯示', () => {
+    const headers = new Map<string, string>([['X-TTS-Fallback-Reason', 'down 100% now']])
+    const info = parseTtsFallback({ get: (name: string) => headers.get(name) ?? null })
+    expect(info?.reason).toBe('down 100% now')
+  })
 })

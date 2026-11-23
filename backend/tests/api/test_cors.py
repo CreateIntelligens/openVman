@@ -108,7 +108,12 @@ def test_external_site_is_recorded_with_the_key_that_called(cors_env) -> None:
     for _ in range(2):
         client.get("/api/v1/auth/me", headers={"Origin": PARTNER + "/", "Authorization": f"Bearer {secret}"})
     _preflight(client, PARTNER)  # 預檢不算一次
-    rows = [r for r in runtime.request_origins.list_recent() if r.origin == PARTNER]
+    rows = [
+        r for r in _recorded(
+            runtime, lambda rows: any(r.origin == PARTNER and r.request_count == 2 for r in rows),
+        )
+        if r.origin == PARTNER
+    ]
     assert len(rows) == 1
     assert rows[0].principal_type == "api_key"
     assert rows[0].principal_id == record.key_id
@@ -123,10 +128,22 @@ def test_own_site_and_server_calls_are_not_recorded(cors_env) -> None:
     assert runtime.request_origins.list_recent() == []
 
 
+def _recorded(runtime, ready=bool, timeout: float = 3.0):
+    """Origin records are written after the response (in the background)."""
+    import time
+
+    deadline = time.monotonic() + timeout
+    while True:
+        rows = runtime.request_origins.list_recent()
+        if ready(rows) or time.monotonic() > deadline:
+            return rows
+        time.sleep(0.02)
+
+
 def test_unauthenticated_calls_are_recorded_as_anonymous(cors_env) -> None:
     client, runtime, *_ = cors_env
     client.get("/api/v1/auth/me", headers={"Origin": "https://scanner.example"})
-    rows = runtime.request_origins.list_recent()
+    rows = _recorded(runtime)
     assert rows[0].origin == "https://scanner.example"
     assert rows[0].principal_type == "anonymous"
 

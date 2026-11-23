@@ -105,7 +105,7 @@ curl -s https://api.example.com/api/v1/tts/stream \
 | 華語、英文 | 不帶或帶 `zh`、`en` | 合成走 IndexTTS（沒指定 provider 與 voice 時） |
 | 其他語言 | `preferred_language`：`es`、`ja`、`ko` | 用指定或預設聲音 |
 
-回應標頭 `X-TTS-Provider` 是最後真正念的引擎。台語引擎有備援鏈 CosyVoice → VoxCPM → IndexTTS → Edge，發生備援時另帶 `X-TTS-Fallback: true` 與 `X-TTS-Fallback-Reason`。台語合成是整段合成，第一聲約 1.8 到 3 秒，比華語的逐句串流慢。
+回應標頭 `X-TTS-Provider` 是最後真正念的引擎。台語引擎有備援鏈 CosyVoice → VoxCPM → IndexTTS → Edge，發生備援時另帶 `X-TTS-Fallback: true` 與 `X-TTS-Fallback-Reason`（非 ASCII 字元與 `%` 經百分比編碼，以 `decodeURIComponent` 解回）。台語合成是整段合成，第一聲約 1.8 到 3 秒，比華語的逐句串流慢。
 
 ## 錯誤碼與限流
 

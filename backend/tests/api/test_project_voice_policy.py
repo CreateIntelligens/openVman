@@ -929,3 +929,12 @@ def test_gemini_live_batch_cannot_be_the_taiwanese_engine(env):
     )
     with pytest.raises(InvalidProjectPolicyError, match="taiwanese_asr_engine"):
         _policy(env, taiwanese_asr_engine="gemini-live-batch")
+
+
+def test_cosyvoice_without_a_voice_uses_its_own_default(env, tts_client, monkeypatch):
+    # 沒帶聲音時不能把 IndexTTS 的角色名（hayley）送給 CosyVoice，它不認得。
+    # 不受聲音限制的帳號（ROOT）才會走到這裡：授權結果是 None。
+    monkeypatch.setattr(tts.voice_access, "resolve_tts_voice", lambda *a, **k: None)
+    response = _stream(tts_client, provider="cosyvoice")
+    assert response.status_code == 200, response.text
+    assert tts_client.service.calls[0][:2] == ("cosyvoice", "")
