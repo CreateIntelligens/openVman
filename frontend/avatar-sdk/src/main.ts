@@ -1,4 +1,5 @@
 import { AvatarAudio, DEFAULT_AUDIO_LEAD_MS } from "./audio";
+import { loadAvatarAssets } from "./avatarAssets";
 import { AvatarConversation } from "./chat";
 import { createAvatarDom, removeAvatarDom } from "./dom";
 import { OpenVmanAvatarError } from "./errors";
@@ -56,6 +57,7 @@ function signature(options: OpenVmanAvatarOptions): string {
     assetsBaseUrl: options.assetsBaseUrl,
     audioLeadMs: options.audioLeadMs,
     audioOutput: options.audioOutput ?? "speaker",
+    cacheAssets: options.cacheAssets ?? true,
     characterId: options.characterId,
     container: containerId(options.container),
     embedKey: options.embedKey,
@@ -135,6 +137,24 @@ async function listCharacters(): Promise<OpenVmanAvatarCharacter[]> {
 async function createInstance(
   options: OpenVmanAvatarOptions,
 ): Promise<OpenVmanAvatarInstance> {
+  const assetsBaseUrl = new URL(
+    options.assetsBaseUrl ?? "/static/characters/",
+    `${resourceBaseUrl}/`,
+  ).toString().replace(/\/$/, "");
+  // 先把檔案都拿到（快取或網路）才建立 runtime：網路失敗時頁面上什麼都還沒建，可以直接再 init()。
+  const assets = await loadAvatarAssets(
+    resourceBaseUrl,
+    assetsBaseUrl,
+    options.characterId ?? "000",
+    options.cacheAssets ?? true,
+  ).catch((error: unknown) => {
+    throw error instanceof OpenVmanAvatarError
+      ? error
+      : new OpenVmanAvatarError(
+        "RESOURCE_LOAD_FAILED",
+        error instanceof Error ? error.message : String(error),
+      );
+  });
   const dom = createAvatarDom(options);
   const handlers = new Map<
     OpenVmanAvatarEventType,
@@ -144,12 +164,8 @@ async function createInstance(
 
   let runtime: AvatarRuntime | null = null;
   try {
-    runtime = await AvatarRuntime.create(resourceBaseUrl);
-    const assetsBaseUrl = new URL(
-      options.assetsBaseUrl ?? "/static/characters/",
-      `${resourceBaseUrl}/`,
-    ).toString().replace(/\/$/, "");
-    await runtime.loadCharacter(options.characterId ?? "000", assetsBaseUrl);
+    runtime = await AvatarRuntime.create(assets);
+    await runtime.loadCharacter(assets);
   } catch (error) {
     if (runtime) {
       runtime.dispose();
@@ -219,6 +235,7 @@ async function createInstance(
   });
 
   const instance: OpenVmanAvatarInstance = {
+    assetsFromCache: assets.fromCache,
     async ask(text) {
       try {
         return await conversation.ask(text);

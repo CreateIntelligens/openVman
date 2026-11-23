@@ -4,6 +4,7 @@ import {
   installFrameSyncMarkerRepair,
   type FrameSyncMarkerRepair,
 } from "../../shared/avatar/avatarFrameSyncRepair";
+import type { AvatarAssets } from "./avatarAssets";
 import { OpenVmanAvatarError } from "./errors";
 import {
   installIdleLipSyncBypass,
@@ -26,6 +27,7 @@ declare global {
     createQtAppInstance?: (options: {
       locateFile(path: string): string;
       onRuntimeInitialized(): void;
+      wasmBinary?: ArrayBuffer;
     }) => Promise<AvatarRuntimeInstance>;
   }
 }
@@ -35,6 +37,7 @@ export class AvatarRuntime {
   private readonly instance: AvatarRuntimeInstance;
   private readonly idleLipSyncBypass: IdleLipSyncBypass | null;
   private readonly frameSyncMarkerRepair: FrameSyncMarkerRepair | null;
+  private videoObjectUrl = "";
 
   private constructor(
     instance: AvatarRuntimeInstance,
@@ -46,8 +49,8 @@ export class AvatarRuntime {
     this.frameSyncMarkerRepair = frameSyncMarkerRepair;
   }
 
-  static async create(baseUrl: string): Promise<AvatarRuntime> {
-    await loadRuntimeScript(`${baseUrl}/static/sdk/runtime/OpenVmanAvatarRuntime.js`);
+  static async create(assets: AvatarAssets): Promise<AvatarRuntime> {
+    await loadRuntimeScriptFrom(assets);
     const idleLipSyncBypass = installIdleLipSyncBypass();
     const frameSyncMarkerRepair = installFrameSyncMarkerRepair();
     if (!window.createQtAppInstance) {
@@ -60,10 +63,10 @@ export class AvatarRuntime {
     }
     try {
       const instance = await window.createQtAppInstance({
-        locateFile: (path) => path.endsWith(".wasm")
-          ? `${baseUrl}/static/sdk/runtime/OpenVmanAvatarRuntime.wasm`
-          : path,
+        // 已經拿到的 wasm 直接交給 runtime，不必再下載；locateFile 只是保底。
+        locateFile: (path) => path.endsWith(".wasm") ? assets.runtimeWasmUrl : path,
         onRuntimeInitialized() {},
+        wasmBinary: assets.runtimeWasm,
       });
       return new AvatarRuntime(instance, idleLipSyncBypass, frameSyncMarkerRepair);
     } catch (error) {
@@ -73,18 +76,8 @@ export class AvatarRuntime {
     }
   }
 
-  async loadCharacter(characterId: string, assetsBaseUrl: string): Promise<void> {
-    const characterBaseUrl = `${assetsBaseUrl}/${encodeURIComponent(characterId)}`;
-    const dataUrl = `${characterBaseUrl}/combined_data.json.gz`;
-    const response = await fetch(dataUrl);
-    if (!response.ok) {
-      throw new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        `Character data request failed with HTTP ${response.status}.`,
-      );
-    }
-
-    const payload = new Uint8Array(await response.arrayBuffer());
+  async loadCharacter(assets: AvatarAssets): Promise<void> {
+    const payload = assets.characterData;
     const text = isGzip(payload)
       ? inflate(payload, { to: "string" })
       : new TextDecoder().decode(payload);
@@ -104,13 +97,18 @@ export class AvatarRuntime {
         "Avatar character video was not created by the runtime.",
       );
     }
-    video.src = `${characterBaseUrl}/01.webm`;
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
-    const ready = waitForVideoReady(video, video.src);
-    video.load();
-    await ready;
+    this.videoObjectUrl = URL.createObjectURL(assets.video);
+    try {
+      await loadVideo(video, this.videoObjectUrl);
+    } catch {
+      // 頁面的 CSP（media-src）不允許 blob: 時改從原網址播（這時離線就播不到）。
+      URL.revokeObjectURL(this.videoObjectUrl);
+      this.videoObjectUrl = "";
+      await loadVideo(video, assets.videoUrl);
+    }
     try {
       await video.play();
     } catch (error) {
@@ -156,6 +154,8 @@ export class AvatarRuntime {
   }
 
   dispose(): void {
+    if (this.videoObjectUrl) URL.revokeObjectURL(this.videoObjectUrl);
+    this.videoObjectUrl = "";
     this.idleLipSyncBypass?.resetSpeaking();
     this.idleLipSyncBypass?.restore();
     this.frameSyncMarkerRepair?.restore();
@@ -171,6 +171,13 @@ export class AvatarRuntime {
       this.instance._free(pointer);
     }
   }
+}
+
+function loadVideo(video: HTMLVideoElement, src: string): Promise<void> {
+  video.src = src;
+  const ready = waitForVideoReady(video, src);
+  video.load();
+  return ready;
 }
 
 function isGzip(payload: Uint8Array): boolean {
@@ -227,6 +234,19 @@ function waitForVideoReady(
       handleCanPlay();
     }
   });
+}
+
+async function loadRuntimeScriptFrom(assets: AvatarAssets): Promise<void> {
+  if (window.createQtAppInstance) return;
+  const objectUrl = URL.createObjectURL(assets.runtimeScript);
+  try {
+    await loadRuntimeScript(objectUrl);
+  } catch {
+    // 頁面的 CSP 不允許 blob: 腳本時改從網址載（這時離線就載不到）。
+    await loadRuntimeScript(assets.runtimeScriptUrl);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 async function loadRuntimeScript(src: string): Promise<void> {

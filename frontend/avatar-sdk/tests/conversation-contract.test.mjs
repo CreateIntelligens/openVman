@@ -157,6 +157,7 @@ async function loadSdk({
     HTMLMediaElement: { HAVE_CURRENT_DATA: 2 },
     TextDecoder,
     TextEncoder,
+    Blob,
     URL,
     Uint8Array,
     console,
@@ -200,6 +201,7 @@ async function loadSdk({
       if (String(url).endsWith("/api/v1/chat")) {
         const respond = () => ({
           arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
+        blob: async () => new Blob([new TextEncoder().encode("{}")]),
           headers: makeHeaders(chatHeaders),
           json: async () => chatBody,
           ok: chatStatus === 200,
@@ -254,6 +256,7 @@ async function loadSdk({
       }
       return {
         arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
+        blob: async () => new Blob([new TextEncoder().encode("{}")]),
         headers: makeHeaders({}),
         ok: true,
         status: 200,

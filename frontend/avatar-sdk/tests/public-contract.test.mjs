@@ -5,10 +5,12 @@ import vm from "node:vm";
 
 const bundleUrl = new URL("../dist/openvman-avatar-sdk.js", import.meta.url);
 
-async function loadSdk({
+export async function loadSdk({
   audioState = "running",
+  cacheStorage,
+  fetchHook,
   autoEnd = true,
-  characterStatus = 200,
+  characterStatus: initialCharacterStatus = 200,
   charactersBody = { characters: [{ char_id: "000", label: "Default" }] },
   charactersStatus = 200,
   deferDecode = false,
@@ -17,6 +19,7 @@ async function loadSdk({
   videoLoadSucceeds = true,
   videoPlaySucceeds = true,
 } = {}) {
+  let characterStatus = initialCharacterStatus;
   const source = await readFile(bundleUrl, "utf8");
   const script = { src: "https://avatar.example/static/sdk/openvman-avatar-sdk.js" };
   const elements = new Map();
@@ -155,6 +158,7 @@ async function loadSdk({
     HTMLMediaElement: { HAVE_CURRENT_DATA: 2 },
     TextDecoder,
     TextEncoder,
+    Blob,
     URL,
     Uint8Array,
     console,
@@ -171,6 +175,8 @@ async function loadSdk({
         resumeCalled: runtimeCalls.resumeCalled,
         url,
       });
+      const hooked = await fetchHook?.(url, options);
+      if (hooked !== undefined) return hooked;
       if (url.endsWith("/characters")) {
         return {
           json: async () => charactersBody,
@@ -181,10 +187,13 @@ async function loadSdk({
       const isCharacter = url.includes("combined_data.json.gz");
       return {
         arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
+        blob: async () => new Blob([new TextEncoder().encode("{}")]),
         ok: !isCharacter || characterStatus === 200,
         status: isCharacter ? characterStatus : 200,
       };
     },
+    Response,
+    ...(cacheStorage ? { caches: cacheStorage } : {}),
     queueMicrotask,
     performance: {
       now: () => renderingTime,
@@ -251,6 +260,9 @@ async function loadSdk({
     requests,
     runtimeCalls,
     sdk: context.window.OpenVmanAvatar,
+    setCharacterStatus(value) {
+      characterStatus = value;
+    },
     setRenderingTime(value) {
       renderingTime = value;
     },
@@ -429,17 +441,18 @@ test("different container is treated as a different init", async () => {
   );
 });
 
-test("character failure disposes the created runtime for the page lifetime", async () => {
-  const { sdk } = await loadSdk({ characterStatus: 404 });
+test("a failed character download leaves nothing behind and init can run again", async () => {
+  const { document, sdk, setCharacterStatus } = await loadSdk({ characterStatus: 404 });
 
   await assert.rejects(
     sdk.init({ characterId: "000" }),
     (error) => error.code === "RESOURCE_LOAD_FAILED",
   );
-  await assert.rejects(
-    sdk.init({ characterId: "000" }),
-    (error) => error.code === "RUNTIME_DISPOSED",
-  );
+  assert.equal(document.getElementById("canvas_video"), null);
+
+  setCharacterStatus(200);
+  const avatar = await sdk.init({ characterId: "000" });
+  assert.equal(typeof avatar.playAudio, "function");
 });
 
 test("does not resolve init before the character video can render", async () => {
@@ -602,4 +615,185 @@ test("a lost WebGL lip-sync canvas reports an error and keeps the avatar alive",
   // 不 preventDefault 的話，瀏覽器不會再給這個畫布 context。
   assert.equal(event.defaultPrevented, true);
   avatar.destroy();
+});
+
+function fakeCaches() {
+  const store = new Map();
+  const cache = {
+    async match(key) {
+      const response = store.get(String(key));
+      return response ? response.clone() : undefined;
+    },
+    async put(key, response) {
+      store.set(String(key), response);
+    },
+    async delete(key) {
+      return store.delete(String(key));
+    },
+  };
+  return { storage: { open: async () => cache }, store };
+}
+
+function assetResponse({ status = 200, lastModified = "", onBodyRead } = {}) {
+  const headers = new Map([
+    ["content-length", "2"],
+    ["last-modified", lastModified],
+  ]);
+  return {
+    arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
+    blob: async () => {
+      onBodyRead?.();
+      return new Blob([new TextEncoder().encode("{}")]);
+    },
+    headers: { get: (name) => headers.get(name.toLowerCase()) ?? null },
+    ok: status >= 200 && status < 300,
+    status,
+  };
+}
+
+const isAsset = (url) => String(url).includes("/static/");
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+const storedKeys = (store, fragment) => [...store.keys()].filter((key) => key.includes(fragment));
+
+test("starts from the browser's copy when the server is unreachable", async () => {
+  const { storage, store } = fakeCaches();
+  const first = await loadSdk({ cacheStorage: storage });
+  assert.equal((await first.sdk.init({ characterId: "000" })).assetsFromCache, false);
+  await settle();
+  assert.equal(storedKeys(store, "openvman-avatar.cache/manifest").length, 2);
+
+  const offline = await loadSdk({
+    cacheStorage: storage,
+    fetchHook: (url) => {
+      if (isAsset(url)) throw new TypeError("Failed to fetch");
+    },
+  });
+  const avatar = await offline.sdk.init({ characterId: "000" });
+  await settle();
+  assert.equal(avatar.assetsFromCache, true);
+  // 背景檢查連不上只代表暫時斷線，存著的檔案要留著。
+  assert.equal(storedKeys(store, "openvman-avatar.cache/manifest").length, 2);
+});
+
+test("a refused character is not shown from the stored copy and is dropped", async () => {
+  const { storage, store } = fakeCaches();
+  await (await loadSdk({ cacheStorage: storage })).sdk.init({ characterId: "000" });
+  await settle();
+
+  const revoked = await loadSdk({
+    cacheStorage: storage,
+    fetchHook: (url) => (String(url).includes("/characters/") ? assetResponse({ status: 403 }) : undefined),
+  });
+  await assert.rejects(
+    revoked.sdk.init({ characterId: "000" }),
+    (error) => error.code === "RESOURCE_LOAD_FAILED",
+  );
+  assert.equal(revoked.document.getElementById("canvas_video"), null);
+  assert.deepEqual(storedKeys(store, "/characters/"), []);
+  assert.equal(storedKeys(store, "/runtime/").length, 2);
+});
+
+test("a page served instead of the file never replaces the stored copy", async () => {
+  const { storage, store } = fakeCaches();
+  const stamp = "Mon, 23 Nov 2026 03:00:00 GMT";
+  await (await loadSdk({
+    cacheStorage: storage,
+    fetchHook: (url) => (isAsset(url) ? assetResponse({ lastModified: stamp }) : undefined),
+  })).sdk.init({ characterId: "000" });
+  await settle();
+  const before = [...store.keys()].sort();
+
+  const portal = await loadSdk({
+    cacheStorage: storage,
+    fetchHook: (url) => {
+      if (!isAsset(url)) return undefined;
+      const page = assetResponse({ lastModified: "Tue, 24 Nov 2026 00:00:00 GMT" });
+      const get = page.headers.get;
+      page.headers = { get: (name) => (name.toLowerCase() === "content-type" ? "text/html; charset=utf-8" : get(name)) };
+      return page;
+    },
+  });
+  assert.equal((await portal.sdk.init({ characterId: "000" })).assetsFromCache, true);
+  await settle();
+  assert.deepEqual([...store.keys()].sort(), before);
+});
+
+test("a download cut off midway is retried", async () => {
+  let cut = 0;
+  const { sdk } = await loadSdk({
+    fetchHook: (url) => {
+      if (!String(url).endsWith("01.webm") || cut > 0) return undefined;
+      cut += 1;
+      const response = assetResponse();
+      response.blob = async () => { throw new TypeError("network error"); };
+      return response;
+    },
+  });
+  assert.equal(typeof (await sdk.init({ characterId: "000" })).ask, "function");
+  assert.equal(cut, 1);
+});
+
+test("a server that never answers does not keep a stored avatar from showing", async () => {
+  const { storage } = fakeCaches();
+  await (await loadSdk({ cacheStorage: storage })).sdk.init({ characterId: "000" });
+  await settle();
+
+  const hung = await loadSdk({
+    cacheStorage: storage,
+    fetchHook: (url, options) => (isAsset(url)
+      ? new Promise((_resolve, reject) => options.signal.addEventListener("abort", () => reject(new Error("aborted"))))
+      : undefined),
+  });
+  const started = Date.now();
+  assert.equal((await hung.sdk.init({ characterId: "000" })).assetsFromCache, true);
+  assert.ok(Date.now() - started < 6000);
+});
+
+test("an unchanged file stops downloading once its headers match", async () => {
+  const { storage } = fakeCaches();
+  const stamp = "Mon, 23 Nov 2026 03:00:00 GMT";
+  await (await loadSdk({
+    cacheStorage: storage,
+    fetchHook: (url) => (isAsset(url) ? assetResponse({ lastModified: stamp }) : undefined),
+  })).sdk.init({ characterId: "000" });
+  await settle();
+
+  let bodiesRead = 0;
+  const signals = [];
+  const again = await loadSdk({
+    cacheStorage: storage,
+    fetchHook: (url, options) => {
+      if (!isAsset(url)) return undefined;
+      signals.push(options?.signal);
+      return assetResponse({ lastModified: stamp, onBodyRead: () => { bodiesRead += 1; } });
+    },
+  });
+  assert.equal((await again.sdk.init({ characterId: "000" })).assetsFromCache, true);
+  await settle();
+  assert.equal(signals.length, 4);
+  assert.ok(signals.every((signal) => signal?.aborted));
+  assert.equal(bodiesRead, 0);
+});
+
+test("retries a dropped connection before giving up", async () => {
+  let failures = 0;
+  const { sdk } = await loadSdk({
+    fetchHook: (url) => {
+      if (String(url).endsWith("combined_data.json.gz") && failures === 0) {
+        failures += 1;
+        throw new TypeError("Failed to fetch");
+      }
+    },
+  });
+  const avatar = await sdk.init({ characterId: "000" });
+  assert.equal(failures, 1);
+  assert.equal(typeof avatar.ask, "function");
+});
+
+test("cacheAssets false never touches Cache Storage", async () => {
+  const { storage, store } = fakeCaches();
+  const { sdk } = await loadSdk({ cacheStorage: storage });
+  await sdk.init({ cacheAssets: false, characterId: "000" });
+  await settle();
+  assert.equal(store.size, 0);
 });

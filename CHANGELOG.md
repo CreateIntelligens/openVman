@@ -137,6 +137,7 @@
 
 ### Fixed
 
+- **[2026-11-23]** **嵌入 SDK 在 openVman 連不上時仍顯示得出人物，載入失敗也能直接重試**：播放程式與人物檔第一次下載後存進嵌入頁面網域的 Cache Storage（`cacheAssets`，預設開），之後開頁面不必再下載：用存檔前先等 openVman 回應標頭（最多 3 秒），401／403／404 清掉存檔且不顯示，連不上、逾時、5xx 或回網頁（captive portal）才用存檔；`Last-Modified`／`Content-Length` 沒變就中斷下載，有變背景整組換新。30 天沒用的存檔會清掉。`init()` 改成檔案都拿到才建立 runtime，連不上、逾時、5xx、下載中斷自動重試兩次，失敗後頁面上不留東西、可以再呼叫 `init()`，不必重新整理。新增 `avatar.assetsFromCache`。SDK 本體與播放程式的 nginx 標頭加上 `stale-while-revalidate=2592000`，openVman 連不上時瀏覽器仍可用舊檔（Chromium 實測）。角色檔的 nginx 回應改成只送一個 `Access-Control-Allow-Origin`（原本後端與 nginx 各送一個，瀏覽器的 fetch 會拒收）。代價是第一次開頁面要等人物影片整檔下載完才出畫面。
 - **[2026-11-23]** **embedding 服務掛掉時知識庫改用全文檢索，不再整個查不到**：查詢 embedding 逾時或失敗時，`search_knowledge` 原本放棄那條查詢，那一輪回答完全不帶知識庫；現在改用已建好的全文索引查同一句，同一次呼叫的其他查詢也直接用全文檢索、不再等 embedding。全文索引對中文照空白與標點切詞，型號、英文與被標點隔開的詞查得到，連在一起的中文詞多半比對不到，所以這是降級而不是等效替代。LanceDB 本身的錯誤照舊往外拋。
 - **[2026-11-23]** **OpenAI 備援站不再因工具名稱整個失敗**：技能工具名帶冒號（如 `weather:get_current_weather`），OpenAI 只收英數、底線與連字號，每個帶工具的請求都回 400，gpt-4.1-mini 這站自 11/13 起沒有成功過，Gemini 一逾時就直接落到 groq。Brain 送出前把 tools、強制工具與對話歷史裡的名稱改成合法形式（`:` 換 `__`），回傳的工具呼叫再對回原名（`core/tool_names.py`）。400 改記 `request_invalid`：只換下一站答這一題，不再冷卻那一站或那把 key，log 裡照舊帶 provider 的錯誤訊息。
 - **[2026-11-20]** **網站嵌入金鑰在大量同時請求下不再回 500**：每個 embed key 請求原本要開兩次 SQLite 寫入（最後使用時間、每日用量），50 人同時使用時搶不到寫入鎖，就回 `database is locked` 的 500，排隊等鎖也拖慢每個請求。現在合成一次寫入；真的搶不到鎖時記警告並放行，每分鐘上限照舊由 limiter 擋，只在極端爭用時每日用量可能少記幾筆。

@@ -63,6 +63,7 @@ const avatar = await OpenVmanAvatar.init({
 | `zIndex` | 否 | `2147483000` | 覆寫 root 的 stacking order。 |
 | `container` | 否 | `document.body` | 指定時改為填滿該容器，不使用 viewport 懸浮位置。 |
 | `assetsBaseUrl` | 否 | SDK origin 的 `/static/characters` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
+| `cacheAssets` | 否 | `true` | 把播放程式與人物檔存進瀏覽器（見下方「素材存在瀏覽器」）。設 `false` 則每次都從網路下載、不寫入瀏覽器。 |
 | `audioLeadMs` | 否 | `150` | `pushPcm` 每段話開頭先扣住的毫秒數（0～2000）：收滿這段時間的 PCM 再一起送進嘴型模型並開始播，照播放速度送 PCM 時嘴才張得開。這段期間 `speaking` 不會先發 `start`。設 `0` 則收到就播（舊行為）。宿主若已自己扣住開頭，請設 `0`，避免延遲疊加。 |
 | `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。`silent` 以頁面時鐘排程、不建立 AudioContext，沒被使用者點過的視窗（開機後的 kiosk、`window.open` 開出的視窗）也能對嘴，不會丟 `AUTOPLAY_BLOCKED`。 |
 | `embedKey` | 否 | 無 | 對話模式用的 embed key。設定後 `ask()` 會帶 `X-Embed-Key` 且不送 cookie；未設定則以同源 session cookie 呼叫。 |
@@ -70,7 +71,27 @@ const avatar = await OpenVmanAvatar.init({
 | `personaId` | 否 | 後端預設 | `ask()` 使用的人格 ID。 |
 | `tts` | 否 | 後端預設 | `{ provider, voice, language }`，指定 `ask()` 合成語音的 TTS 供應商與音色；`language` 是回答要唸的語言（`zh`、`en`、`nan`…），`nan` 且專案開了台語分流時改用台語引擎。 |
 
+`init()` 先把播放程式與人物檔都拿到（瀏覽器存檔或網路），才建立 runtime 與畫面。連不上、逾時或 5xx 時自動再試兩次（間隔 1 秒、3 秒）；仍失敗就回 `RESOURCE_LOAD_FAILED`，頁面上沒有留下任何東西，可以直接再呼叫 `init()`，不必重新整理。人物影片解碼或播放失敗（檔案已拿到之後）仍會讓這一頁不能再建 runtime（`RUNTIME_DISPOSED`）。
+
 同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`embedKey`、`projectId`、`personaId` 與 `tts` 一併計入設定比對，因此只改對話選項再次 `init()` 同樣會被拒絕。`destroy()` 後必須重新載入頁面才能再次初始化。
+
+### 素材存在瀏覽器
+
+預設（`cacheAssets: true`）播放程式（`OpenVmanAvatarRuntime.js`／`.wasm`）與人物檔（`combined_data.json.gz`、`01.webm`）第一次下載後存進嵌入頁面網域的 Cache Storage，之後開頁面不必再下載，openVman 暫時連不上時人物也照樣出現。對話與語音（`ask()`）每次都要連到 openVman，連不上時照常回錯誤。
+
+- 用存檔前先向 openVman 確認（只等回應標頭，最多 3 秒）：
+  - 回 401、403、404（金鑰撤銷、人物取消指派或刪除、換了沒有權限的帳號）：清掉那組存檔，`init()` 失敗，不會先顯示。
+  - 連不上、逾時、5xx，或回的是網頁而不是檔案（登入頁、captive portal）：當作暫時離線，用存檔。
+  - `Last-Modified` 與 `Content-Length` 都跟存檔相同：立刻中斷那個請求，不下載內容。
+  - 有變：這次照樣用存檔，背景下載新版，整組（播放程式兩支一組、人物兩支一組）換好後下一次開頁面生效。
+- 因此有存檔時，每次開頁面仍多一次往返（等標頭）；openVman 連不上時要等到逾時（最多 3 秒）才用存檔。
+- 離線期間存檔會一直留著，登出也不會清：同一台瀏覽器之前看過的專案人物，openVman 連不上時仍顯示得出來。30 天沒用到的那組會在之後的載入時清掉。
+- 第一次下載時連不上、逾時（等標頭 15 秒、下載 120 秒）、5xx 或下載到一半中斷，自動再試兩次。
+- `avatar.assetsFromCache` 為 `true` 表示這次 `init()` 完全沒有下載。
+- 嵌入頁面必須是 https（或 localhost）才有 Cache Storage；隱私模式、使用者清除網站資料、瀏覽器空間不足時存檔會不見，就回到第一次下載。這些情況與快取出錯都只會改走網路，不會讓 `init()` 失敗。
+- 存檔的播放程式與人物影片以 `blob:` 網址載入。頁面的 CSP 不允許 `blob:` 腳本（`script-src`）或媒體（`media-src`）時，那一項改從原網址載入，此時 openVman 連不上就載不到。播放程式本身仍需要 `'unsafe-eval'` 與 `'wasm-unsafe-eval'`（跟以前一樣）。
+- SDK 本體（`openvman-avatar-sdk.js`）由瀏覽器的 HTTP 快取處理：`max-age=300` 加上 `stale-while-revalidate=2592000`，播放程式兩支同樣加上。Chromium 實測：過期後 openVman 連不上，仍用舊的 SDK 載起來；Safari、Firefox 尚未驗證。SDK 換版後，訪客要再開一次頁面才會拿到新版。
+- 第一次開頁面要等人物影片整檔下載完才出畫面（以前邊下載邊播），影片 1～13 MB。
 
 ## 對話模式
 
@@ -259,7 +280,7 @@ location /static/characters/ {
 |---|---|
 | `INVALID_OPTIONS` | 初始化選項無效。 |
 | `INSTANCE_EXISTS` | 同頁已有不同設定的 runtime。 |
-| `RUNTIME_DISPOSED` | runtime 已 destroy，必須重新載入頁面。 |
+| `RUNTIME_DISPOSED` | runtime 已 destroy，或人物影片在 runtime 建立後解碼／播放失敗，必須重新載入頁面。 |
 | `DOM_CONFLICT` | 宿主頁已占用 vendor 固定 DOM ID。 |
 | `RESOURCE_LOAD_FAILED` | vendor JS、WASM 或角色資源載入失敗。 |
 | `AUDIO_PLAYBACK_FAILED` | 音訊讀取、解碼或播放失敗。 |

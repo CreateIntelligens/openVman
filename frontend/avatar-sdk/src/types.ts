@@ -22,6 +22,8 @@ export interface OpenVmanAvatarOptions {
   audioLeadMs?: number;
   // 宿主自行播放音訊時，可用 silent 只驅動嘴型。
   audioOutput?: OpenVmanAvatarAudioOutput;
+  // 預設 true：人物與播放程式存在瀏覽器裡，之後開頁面不再下載，伺服器暫時連不上也顯示得出來。
+  cacheAssets?: boolean;
   characterId?: string;
   container?: HTMLElement;
   // 設定後 ask() 以 embed key 驗證，未設定則沿用同源 session cookie。
@@ -57,6 +59,8 @@ export type OpenVmanAvatarEventHandler<T extends OpenVmanAvatarEventType> = (
 
 export interface OpenVmanAvatarInstance {
   ask(text: string): Promise<string>;
+  /** True when this init downloaded nothing (every file came from the browser's cache). */
+  readonly assetsFromCache: boolean;
   destroy(): void;
   interrupt(): void;
   off<T extends OpenVmanAvatarEventType>(
