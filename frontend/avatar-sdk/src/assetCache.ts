@@ -87,12 +87,21 @@ function errorText(error: unknown): string {
 }
 
 /** Fetches *url* and waits for its headers only; the body is read later or aborted. */
-async function requestHeaders(url: string, timeoutMs: number): Promise<PendingResponse> {
+async function requestHeaders(
+  url: string,
+  timeoutMs: number,
+  { revalidate = false }: { revalidate?: boolean } = {},
+): Promise<PendingResponse> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
-    response = await fetch(url, { signal: controller.signal });
+    // 檢查存檔時一定要問到伺服器：瀏覽器的 HTTP 快取（max-age）會直接回 200，看不到撤銷。
+    // no-cache 讓瀏覽器帶條件請求，沒變時伺服器回 304，也不必重抓。
+    response = await fetch(
+      url,
+      revalidate ? { cache: "no-cache", signal: controller.signal } : { signal: controller.signal },
+    );
   } catch (error) {
     throw new TransientAssetError(`Unable to load ${url}: ${errorText(error)}.`);
   } finally {
@@ -259,7 +268,7 @@ async function checkGroup(
   manifest: Manifest,
 ): Promise<Map<string, PendingResponse> | null> {
   const results = await Promise.allSettled(
-    group.urls.map((url) => requestHeaders(url, CHECK_TIMEOUT_MS)),
+    group.urls.map((url) => requestHeaders(url, CHECK_TIMEOUT_MS, { revalidate: true })),
   );
   const abortAll = (): void => {
     for (const result of results) {
@@ -296,6 +305,8 @@ async function updateGroup(
   for (const [url, pending] of changed) {
     fresh.set(url, { blob: await readBody(url, pending), response: pending.response });
   }
+  // 下載期間另一個分頁可能因 401／403／404 清掉了這組；不能再寫回去。
+  if (!(await readManifest(cache, group.key))) return;
   await writeGroup(cache, group, fresh, manifest);
 }
 

@@ -772,6 +772,7 @@ test("an unchanged file stops downloading once its headers match", async () => {
   await settle();
   assert.equal(signals.length, 4);
   assert.ok(signals.every((signal) => signal?.aborted));
+  assert.ok(again.requests.filter(({ url }) => isAsset(url)).every(({ options }) => options?.cache === "no-cache"));
   assert.equal(bodiesRead, 0);
 });
 
