@@ -188,23 +188,28 @@ class RedisSlidingWindowRateLimiter:
             pass
 
 
+# 延遲初始化要上鎖：多個執行緒同時第一次呼叫會各建一個實例，
+# 各自從同一個起點計數，限流與配額就會一起放行。
+_singleton_lock = Lock()
 _limiter: SlidingWindowRateLimiter | RedisSlidingWindowRateLimiter | None = None
 
 
 def get_rate_limiter() -> SlidingWindowRateLimiter | RedisSlidingWindowRateLimiter:
     global _limiter
     if _limiter is None:
-        from app.config import get_tts_config
+        with _singleton_lock:
+            if _limiter is None:
+                from app.config import get_tts_config
 
-        cfg = get_tts_config()
-        if getattr(cfg, "backend_workers", 1) > 1:
-            import redis
+                cfg = get_tts_config()
+                if getattr(cfg, "backend_workers", 1) > 1:
+                    import redis
 
-            _limiter = RedisSlidingWindowRateLimiter(redis.Redis.from_url(
-                cfg.redis_url, socket_timeout=0.5, socket_connect_timeout=0.5,
-            ))
-        else:
-            _limiter = SlidingWindowRateLimiter()
+                    _limiter = RedisSlidingWindowRateLimiter(redis.Redis.from_url(
+                        cfg.redis_url, socket_timeout=0.5, socket_connect_timeout=0.5,
+                    ))
+                else:
+                    _limiter = SlidingWindowRateLimiter()
     return _limiter
 
 
@@ -295,17 +300,19 @@ _daily_counter: LocalDailyCounter | RedisDailyCounter | None = None
 def get_daily_counter() -> LocalDailyCounter | RedisDailyCounter:
     global _daily_counter
     if _daily_counter is None:
-        from app.config import get_tts_config
+        with _singleton_lock:
+            if _daily_counter is None:
+                from app.config import get_tts_config
 
-        cfg = get_tts_config()
-        if getattr(cfg, "backend_workers", 1) > 1:
-            import redis
+                cfg = get_tts_config()
+                if getattr(cfg, "backend_workers", 1) > 1:
+                    import redis
 
-            _daily_counter = RedisDailyCounter(redis.Redis.from_url(
-                cfg.redis_url, socket_timeout=0.5, socket_connect_timeout=0.5,
-            ))
-        else:
-            _daily_counter = LocalDailyCounter()
+                    _daily_counter = RedisDailyCounter(redis.Redis.from_url(
+                        cfg.redis_url, socket_timeout=0.5, socket_connect_timeout=0.5,
+                    ))
+                else:
+                    _daily_counter = LocalDailyCounter()
     return _daily_counter
 
 
@@ -365,7 +372,9 @@ _bookkeeper: EmbedBookkeeper | None = None
 def get_bookkeeper() -> EmbedBookkeeper:
     global _bookkeeper
     if _bookkeeper is None:
-        _bookkeeper = EmbedBookkeeper()
+        with _singleton_lock:
+            if _bookkeeper is None:
+                _bookkeeper = EmbedBookkeeper()
     return _bookkeeper
 
 

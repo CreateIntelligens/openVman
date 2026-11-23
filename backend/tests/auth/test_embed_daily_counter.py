@@ -241,3 +241,28 @@ def test_an_unreadable_sqlite_seed_counts_from_zero():
 
     assert LocalDailyCounter().count_use("ovk_test", "2026-11-20", locked) == 1
     assert RedisDailyCounter(_FakeRedis()).count_use("ovk_test", "2026-11-20", locked) == 1
+
+
+@pytest.mark.parametrize(
+    ("getter", "attr"),
+    [
+        (embed.get_daily_counter, "_daily_counter"),
+        (embed.get_rate_limiter, "_limiter"),
+        (embed.get_bookkeeper, "_bookkeeper"),
+    ],
+)
+def test_concurrent_first_calls_share_one_instance(monkeypatch, getter, attr):
+    monkeypatch.setattr(embed, attr, None)
+    barrier = threading.Barrier(16)
+    seen: list[object] = []
+
+    def worker():
+        barrier.wait()
+        seen.append(getter())
+
+    threads = [threading.Thread(target=worker) for _ in range(16)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert len({id(item) for item in seen}) == 1
