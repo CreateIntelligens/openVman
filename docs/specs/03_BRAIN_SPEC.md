@@ -345,7 +345,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 | 整輪 | `CHAT_TURN_BUDGET_SECONDS`（30，從收到請求起算） | 第 2 輪起不再開新的 LLM／工具輪，以 `ToolPhaseError` 的退路用已取得的工具結果作答（退路那次 LLM 呼叫有自己的跨站預算）；工具時限取 min(工具時限, 剩餘預算)，至少 1 秒 |
 | `search_knowledge` | `KNOWLEDGE_SEARCH_TIMEOUT_SECONDS`（6） | 整個工具逾時：該輪不帶知識庫作答。到 80% 時不再查下一條查詢、不做圖譜擴展；某條查詢逾時後其餘查詢略過 |
 | 圖譜鄰居擴展 | `KNOWLEDGE_GRAPH_TIMEOUT_SECONDS`（1） | 逐個鄰居檢查，超過即回傳已抓到的鄰居 |
-| 查詢 embedding | `EMBEDDING_QUERY_TIMEOUT_SECONDS`（2）、`EMBEDDING_QUERY_MAX_RETRIES`（1） | 該條查詢失敗；退避上限為時限的 1/4 |
+| 查詢 embedding | `EMBEDDING_QUERY_TIMEOUT_SECONDS`（2）、`EMBEDDING_QUERY_MAX_RETRIES`（1） | 改用全文檢索（FTS only，`search_records` 的 `query_vector=None`），同一次 `search_knowledge` 其餘查詢不再呼叫 embedding；另記一筆 `node=rag_lexical_fallback`（embedder 自己的 `rag_embed_query` 失敗照記，不重複）。退避上限為時限的 1/4 |
 | 向量／全文檢索、RRF 融合 | 無獨立時限 | LanceDB 在本機執行、無法中途打斷；記時間，由 `search_knowledge` 時限把關 |
 | 整個請求 | 回合預算＋2×跨站預算＋`LLM_REQUEST_TIMEOUT_SECONDS`＋10（90） | 設取消旗標，回 504 `GATEWAY_TIMEOUT`（串流為 `error` 事件） |
 
@@ -355,7 +355,7 @@ LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/
 * **工具名稱**：送給 provider 的工具名一律符合 `^[a-zA-Z0-9_-]{1,64}$`。`core/tool_names.py` 在每次請求把 tools、`tool_choice` 與歷史訊息（assistant `tool_calls`、`role=tool` 的 `name`）裡的技能工具名（`技能:工具`）改寫成 `技能__工具`，回傳的工具呼叫對回原名；只影響送出的副本。
 * **串流中途失敗**：已有句子送出的站逾時，仍換下一站重答，`ReplyStream.finish` 補送完整答案，並記 `llm_restart_after_partial_text`。
 * **回合準備階段的時間**：`chat_thread_wait`（等工作執行緒）、`chat_register_turn`、`chat_prepare`、`chat_guardrails`、`chat_session_load`、`chat_turn_decision`、`chat_build_prompt`、`chat_execute`、`chat_agent_setup`、`chat_prefetch_knowledge` 也各記一筆 `node_attempt`，事件帶毫秒 `ts_ms`。
-* **事件**：每次節點嘗試一筆。LLM 為 `llm_route_attempt`（`node=llm_hop`、`provider`、`model`、`hop_index`、`outcome`、`elapsed_ms`、`mode`、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`、`error`）；檢索與其他節點為 `node_attempt`（`node` 為 `rag_embed_query`／`rag_query`／`rag_vector`／`rag_lexical`／`rag_graph`／`auto_recall`，`outcome` 為 `ok`／`empty`／`timeout`／`error`／`skipped`，加 `component`、`elapsed_ms`、`timeout_s`、`error_type`）。另有 `llm_chain_budget_exhausted`、`turn_budget_exhausted`、`tool_timeout`、`chat_deadline_exceeded`，以及逾時後仍在跑的工具或 auto recall 執行緒跑完時的 `node_orphan_finished`。所有事件帶本輪 `trace_id`；`str(exc)` 為空時 `error` 用例外型別名稱。
+* **事件**：每次節點嘗試一筆。LLM 為 `llm_route_attempt`（`node=llm_hop`、`provider`、`model`、`hop_index`、`outcome`、`elapsed_ms`、`mode`、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`、`error`）；檢索與其他節點為 `node_attempt`（`node` 為 `rag_embed_query`／`rag_query`／`rag_vector`／`rag_lexical`／`rag_lexical_fallback`／`rag_graph`／`auto_recall`，`outcome` 為 `ok`／`empty`／`timeout`／`error`／`skipped`，加 `component`、`elapsed_ms`、`timeout_s`、`error_type`）。另有 `llm_chain_budget_exhausted`、`turn_budget_exhausted`、`tool_timeout`、`chat_deadline_exceeded`，以及逾時後仍在跑的工具或 auto recall 執行緒跑完時的 `node_orphan_finished`。所有事件帶本輪 `trace_id`；`str(exc)` 為空時 `error` 用例外型別名稱。
 
 ### 9. 工具調用 (Tool Calling)
 

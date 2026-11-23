@@ -41,7 +41,7 @@ def get_search_table(
 
 def search_records(
     table_name: str,
-    query_vector: list[float],
+    query_vector: list[float] | None,
     top_k: int = 5,
     query_text: str | None = None,
     query_type: str = "vector",
@@ -62,6 +62,8 @@ def search_records(
     When *query_text* is provided, attempts hybrid search: vector 與 FTS
     各自檢索後以 RRF 融合,並輸出 min-max 正規化的 _score ∈ [0, 1]
     (越高越相關)。FTS 不可用時退回 vector-only。
+
+    *query_vector* 為 None 時只跑 FTS（查詢 embedding 服務失敗時的退路）。
 
     *expansion_terms*(語意擴展詞,通常由 memory.query_expansion 產生)
     每個詞會額外跑 vector + FTS 檢索,所有名次表一起進 RRF 融合。
@@ -156,7 +158,7 @@ def search_records(
 
 def _safe_search(
     table: Any,
-    query_vector: list[float],
+    query_vector: list[float] | None,
     query_text: str = "",
     query_type: str = "vector",
     limit: int = 10,
@@ -172,6 +174,8 @@ def _safe_search(
     保持空的，呼叫端就當作還沒查完。
     """
     try:
+        if query_vector is None:
+            return _lexical_only_search(table, query_text, limit, rrf_k, window)
         if query_type == "hybrid":
             return _hybrid_search(
                 table,
@@ -247,6 +251,23 @@ def _hybrid_search(
     return min_max_normalize(fused, source_field="_rrf_score", out_field="_score")[
         :limit
     ]
+
+
+def _lexical_only_search(
+    table: Any,
+    query_text: str,
+    limit: int,
+    rrf_k: int,
+    window: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """沒有查詢向量時只用字面命中排序；語意擴展詞也要編碼，一併略過。"""
+    started = monotonic()
+    fts_records = _try_fts_search(table, query_text, limit)
+    _record_search_node("rag_lexical", started, len(fts_records), limit)
+    if window is not None:
+        window.update(_window_bounds([], fts_records, limit))
+    fused = rrf_fuse([fts_records], k=rrf_k)
+    return min_max_normalize(fused, source_field="_rrf_score", out_field="_score")[:limit]
 
 
 def _window_bounds(

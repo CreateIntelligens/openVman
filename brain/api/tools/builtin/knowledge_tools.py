@@ -44,6 +44,12 @@ def _is_timeout(exc: BaseException) -> bool:
     return False
 
 
+class _EmbeddingUnavailable(Exception):
+    def __init__(self, cause: BaseException) -> None:
+        super().__init__(str(cause) or type(cause).__name__)
+        self.cause = cause
+
+
 def _search_one(
     table_name: str,
     query: str,
@@ -51,27 +57,74 @@ def _search_one(
     persona_id: str,
     project_id: str,
     language: str | None = None,
-) -> tuple[list[dict[str, Any]], str, list[float]]:
+    *,
+    lexical_only: bool = False,
+) -> tuple[list[dict[str, Any]], str, list[float] | None]:
     from memory.embedder import encode_query_with_fallback
     from memory.retrieval import search_records
 
-    embedding_route = encode_query_with_fallback(
-        query,
-        project_id=project_id,
-        table_names=(table_name,),
-    )
+    if lexical_only:
+        version, vector = get_settings().resolved_embedding_active_version, None
+    else:
+        try:
+            embedding_route = encode_query_with_fallback(
+                query,
+                project_id=project_id,
+                table_names=(table_name,),
+            )
+        except Exception as exc:
+            raise _EmbeddingUnavailable(exc) from exc
+        version, vector = embedding_route.version, embedding_route.vector
     results = search_records(
         table_name=table_name,
-        query_vector=embedding_route.vector,
+        query_vector=vector,
         top_k=top_k,
         query_text=query,
         query_type="hybrid",
         persona_id=persona_id,
         project_id=project_id,
-        embedding_version=embedding_route.version,
+        embedding_version=version,
         language=language,
     )
-    return results, embedding_route.version, embedding_route.vector
+    return results, version, vector
+
+
+def _search_one_with_fallback(
+    table_name: str,
+    query: str,
+    top_k: int,
+    persona_id: str,
+    project_id: str,
+    language: str | None,
+    *,
+    lexical_only: bool,
+) -> tuple[list[dict[str, Any]], str, list[float] | None]:
+    """embedding 服務壞掉或逾時時改用全文檢索，知識庫不會整個查不到。
+
+    全文索引對中文是照空白與標點切詞，連在一起的中文詞多半比對不到；型號、英文、
+    被標點隔開的詞查得到。檢索本身（LanceDB）的錯誤照樣往外拋。
+    """
+    if not lexical_only:
+        embed_started = monotonic()
+        try:
+            return _search_one(table_name, query, top_k, persona_id, project_id, language)
+        except _EmbeddingUnavailable as exc:
+            # embedder 自己已記一筆 rag_embed_query 失敗；這裡另記退路，失敗數才不會算兩次。
+            record_node_attempt(
+                "rag_lexical_fallback",
+                outcome="timeout" if _is_timeout(exc.cause) else "error",
+                elapsed_ms=(monotonic() - embed_started) * 1000,
+                component=table_name,
+                exc=exc.cause,
+            )
+            logger.warning(
+                "query embedding failed, falling back to lexical search table=%s err=%s",
+                table_name,
+                str(exc.cause) or type(exc.cause).__name__,
+            )
+    return _search_one(
+        table_name, query, top_k, persona_id, project_id, language, lexical_only=True,
+    )
 
 
 def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -104,6 +157,8 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     grouped: list[tuple[str, list[dict[str, Any]]]] = []
     embedding_versions: set[str] = set()
     primary_vector: list[float] | None = None
+    # 查詢 embedding 服務失敗後，這次呼叫剩下的查詢都只用字面比對，不再等它。
+    lexical_only = False
     for index, query in enumerate(queries):
         if index > 0 and monotonic() > soft_deadline:
             record_node_attempt(
@@ -117,14 +172,16 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
             break
         query_started = monotonic()
         try:
-            records, version, vector = _search_one(
+            records, version, vector = _search_one_with_fallback(
                 table_name,
                 query,
                 top_k,
                 persona_id,
                 project_id,
                 language,
+                lexical_only=lexical_only,
             )
+            lexical_only = lexical_only or vector is None
             record_node_attempt(
                 "rag_query",
                 outcome="ok" if records else "empty",
@@ -154,7 +211,6 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
                 str(exc) or type(exc).__name__,
             )
             if timed_out:
-                # embedding 服務逾時時，下一條查詢多半一樣逾時，不要每條都等滿。
                 break
 
     merged = merge_search_results(grouped, limit=fused_limit(top_k, mode_settings()))

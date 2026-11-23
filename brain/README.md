@@ -233,7 +233,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 | 整輪（準備、檢索、工具輪） | `CHAT_TURN_BUDGET_SECONDS` 30 秒 | 不再開下一輪工具，用已拿到的工具結果作答；工具逾時也不超過剩下的預算（至少 1 秒） |
 | `search_knowledge`（含伺服器先查） | `KNOWLEDGE_SEARCH_TIMEOUT_SECONDS` 6 秒 | 這輪不帶知識庫作答；用到 8 成時就不再查下一條查詢、不做圖譜擴展，帶已查到的段落 |
 | 圖譜鄰居擴展 | `KNOWLEDGE_GRAPH_TIMEOUT_SECONDS` 1 秒 | 只用直接命中的段落與已抓到的鄰居 |
-| 查詢 embedding | `EMBEDDING_QUERY_TIMEOUT_SECONDS` 2 秒、`EMBEDDING_QUERY_MAX_RETRIES` 1 次 | 這條查詢放棄，後面的查詢也不再等 |
+| 查詢 embedding | `EMBEDDING_QUERY_TIMEOUT_SECONDS` 2 秒、`EMBEDDING_QUERY_MAX_RETRIES` 1 次 | 逾時或失敗都改用全文檢索查這條，後面的查詢也直接用全文檢索、不再等 embedding（另記一筆 `rag_lexical_fallback`）。全文索引對中文照空白與標點切詞，型號、英文查得到，連在一起的中文詞多半比對不到 |
 | 其他工具 | `TOOL_CALL_TIMEOUT_SECONDS` 30 秒（網路搜尋最長約 20 秒） | 工具回錯誤，模型照常作答 |
 | 整個請求（保險） | 回合預算＋2×跨站預算＋串流整段＋10 秒，預設 90 秒 | 設下取消旗標、回 504 `GATEWAY_TIMEOUT`（串流是 `error` 事件），記 `chat_deadline_exceeded` |
 
