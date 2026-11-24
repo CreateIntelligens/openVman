@@ -1,8 +1,8 @@
 """Send N chat questions within a window (default 100 in 1 second) and time every step.
 
 Each question goes through Backend `/api/v1/chat/stream` the way the avatar front end
-does: when the first sentence arrives it is sent to `/api/v1/tts/stream` and the
-first audio byte is timed. All timestamps are epoch seconds, so `node_report.py`
+does: sentences are only timed, and when `done` arrives the whole reply is sent to
+`/api/v1/tts/stream` once and the first audio byte is timed. All timestamps are epoch seconds, so `node_report.py`
 can line them up with Backend and Brain log lines (same host clock) by `trace_id`.
 
     python3 burst_nodes.py --base https://example --project <id> --out run.json
@@ -89,12 +89,13 @@ async def ask(client, base, headers, args, run_id, index, question, start_at) ->
                     data = json.loads(line[5:]) if line[5:].strip() else {}
                     if event == "sentence" and "first_sentence" not in record:
                         record["first_sentence"] = time.time()
-                        if not args.no_tts:
-                            tts_task = asyncio.create_task(
-                                speak(client, base, headers, args, data.get("tts_text") or data.get("text", "")),
-                            )
                     elif event == "done":
                         record["done"] = time.time()
+                        if not args.no_tts and data.get("reply"):
+                            # 跟前端一樣：整段回答到了才打一次 TTS，送 reply 原文（Backend 自己整理念法）。
+                            tts_task = asyncio.create_task(
+                                speak(client, base, headers, args, data["reply"]),
+                            )
                         record["trace_id"] = data.get("trace_id", "")
                         record["answer_source"] = data.get("answer_source", "")
                         record["no_answer"] = data.get("no_answer")

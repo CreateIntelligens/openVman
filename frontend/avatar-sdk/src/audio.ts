@@ -34,7 +34,6 @@ export class AvatarAudio {
   private nextStartTime = 0;
   private playbackGeneration = 0;
   // 讓排隊中的片段依呼叫順序解碼、排上時間軸。
-  private queueTail: Promise<void> = Promise.resolve();
   private settlers = new Set<() => void>();
   private sources = new Set<ScheduledPlay>();
   private speaking = false;
@@ -71,21 +70,6 @@ export class AvatarAudio {
       ? await (source as Blob).arrayBuffer()
       : source as ArrayBuffer;
     const scheduled = await this.decodeAndSchedule(encoded, generation);
-    if (scheduled) await this.untilFinished(scheduled);
-  }
-
-  /**
-   * Plays encoded audio right after whatever is already scheduled, without
-   * interrupting it. Resolves when this segment ends or playback is
-   * interrupted, so a reply can be spoken one segment at a time without gaps.
-   */
-  async queueAudio(source: ArrayBuffer): Promise<void> {
-    const generation = this.playbackGeneration;
-    const step = this.queueTail.then(() =>
-      this.decodeAndSchedule(source, generation)
-    );
-    this.queueTail = step.then(() => undefined, () => undefined);
-    const scheduled = await step;
     if (scheduled) await this.untilFinished(scheduled);
   }
 

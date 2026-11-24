@@ -7,7 +7,7 @@ import {
   type SendMessageResult,
   type UtteranceContext,
 } from "./useAvatarChat";
-import { createReplySpeechQueue } from "./replySpeechQueue";
+import { createReplySpeech } from "./replySpeech";
 import { useTtsStreamer, type TtsProvider } from "./useTtsStreamer";
 import { useTypewriter } from "./useTypewriter";
 import type { useAvatarStage } from "./useAvatarStage";
@@ -100,8 +100,8 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   let subtitleFinal = false;
   let streamedText = "";
   let replySpeakOptions: ReturnType<typeof languageRoutesSpeakOptions> | undefined;
-  // 回覆已到、TTS 還在合成第一段聲音（約 2 秒）：這段空檔也算在回答，否則講完自動
-  // 恢復收音會在開口前就打開麥克風，收到虛擬人自己的聲音。
+  // 回答的句子已經開始到、TTS 還沒出第一段聲音（等整段回答、再等合成約 1 秒）：
+  // 這段空檔也算在回答，否則講完自動恢復收音會在開口前就打開麥克風，收到虛擬人自己的聲音。
   const ttsPending = ref(false);
   const spokenReply = ref("");
 
@@ -152,7 +152,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     typewriter.append(text);
   }
 
-  const speechQueue = createReplySpeechQueue({
+  const replySpeech = createReplySpeech({
     speak: (segment) => {
       pendingText = segment;
       ttsPending.value = true;
@@ -161,10 +161,13 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
         ttsPending.value = false;
       });
     },
+    onWaiting: (waiting) => {
+      ttsPending.value = waiting;
+    },
   });
 
   function beginReply(context: UtteranceContext): void {
-    speechQueue.cancel();
+    replySpeech.cancel();
     isFinalReceived = true;
     clearUnderrunTimer();
     audio.resetSchedule();
@@ -176,10 +179,11 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     replySpeakOptions = languageRoutesSpeakOptions(context.speechLanguage);
   }
 
-  function speakSentence(text: string): void {
+  /** 串流到的句子先累積成字幕文字；聲音等整段回答到了才合成（replySpeech.finish）。 */
+  function collectSentence(text: string): void {
     streamedText += text;
     spokenReply.value = streamedText;
-    speechQueue.push(text);
+    replySpeech.collect(text);
   }
 
   /** TTS 參數：使用者真的講台語（且有台語分流）才換 CosyVoice，後端會再核對一次。 */
@@ -211,6 +215,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     },
     onDisconnect: () => {
       isStarted.value = false;
+      ttsPending.value = false;
       motionAudio.cancel();
       audio.flush();
     },
@@ -224,7 +229,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       turnTiming.interrupted();
       motionAudio.cancel();
       ttsPending.value = false;
-      speechQueue.cancel();
+      replySpeech.cancel();
       ttsStreamer.cancel();
       audio.flush();
       wasm.clearAudio();
@@ -238,18 +243,21 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       beginReply(context);
       turnTiming.mark("reply_done");
       turnTiming.replyText(fullText);
-      speakSentence(fullText);
+      streamedText = fullText;
+      spokenReply.value = fullText;
+      replySpeech.speak(fullText);
     },
-    // 逐句串流：第一句到就開始合成，後面的句子依序排隊，播放與對嘴不中斷。
+    // 逐句串流：句子到就顯示，整段回答到了才念。
     chatStreamEndpoint: DEFAULT_TEXT_CHAT_STREAM_ENDPOINT,
     onReplyStart: (context) => {
       beginReply(context);
       turnTiming.mark("first_sentence");
     },
-    onReplySentence: speakSentence,
+    onReplySentence: collectSentence,
     onReplyEnd: (fullText) => {
       turnTiming.mark("reply_done");
       turnTiming.replyText(fullText);
+      replySpeech.finish(fullText);
       spokenReply.value = fullText;
       if (!fullText.trim() || fullText.trim() === streamedText.trim()) return;
       subtitleFinal = true;
@@ -261,6 +269,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     },
     onServerError: (code, message, retryAfterMs) => {
       turnTiming.finish("error");
+      ttsPending.value = false;
       if (code === 'RATE_LIMITED' && typeof retryAfterMs === 'number' && retryAfterMs > 0) {
         statusToastRef.value?.showCountdown('已達上限，請等待', retryAfterMs);
         return;

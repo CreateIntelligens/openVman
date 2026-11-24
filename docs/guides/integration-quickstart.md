@@ -106,7 +106,7 @@
 |---|---|---|
 | 能力探索 | `GET /api/v1/me/capabilities` | 上述 JSON |
 | 批次辨識 | `POST /api/v1/asr/transcribe`；multipart `file`，選填 `project_id`、`provider`、`language_routes` | JSON `text`、實際 `provider`、`language` 等 |
-| 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `preferred_language`、`metadata.speech_language` | JSON `reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer` 等；通常會建立對話紀錄。要邊生成邊念改用 `POST /api/v1/chat/stream`（見「逐句串流」） |
+| 對話 | `POST /api/v1/chat`；JSON `message`、`project_id`、`session_id`，選填 `preferred_language`、`metadata.speech_language` | JSON `reply`、`citations`、`answer_source`、`knowledge_searched`、`no_answer` 等；通常會建立對話紀錄。要邊生成邊顯示改用 `POST /api/v1/chat/stream`（見「逐句串流」） |
 | 念回答 | `POST /api/v1/tts/stream`；JSON `text`，選填 `project_id`、`provider`、`voice`、`speech_language`、`format` | 音訊 bytes，以實際 `Content-Type` 判斷格式；`format=pcm16k` 時固定為 16 kHz raw PCM |
 
 選填 batch ASR `provider` 必須在已授權且已設定的 `asr.batch`。`gemini-live-batch` 用 Gemini Live 辨識整檔，比 `openai` 慢（英文短句實測中位約 1.4 秒對 0.88 秒），只有選了才用、不當備援；要即時回應請改用 WSS 串流 `gemini-live`。非批次引擎回 422、未授權回 403、未設定回 503；指定引擎失敗回 502，不備援、不讓台語分流改用其他辨識引擎。省略或空白時沿用帳號偏好、部署預設與既有備援，備援限授權候選及原部署預設相容例外。舊流程失敗可能仍回 HTTP 200，必須檢查非空 `provider`、有效 `text`，避免把「（音訊轉錄失敗）」當成問題送入 Chat。
@@ -166,9 +166,9 @@ ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流
 
 重開一段對話不需要刪除：換一個新的 `session_id` 即可。列出、匯出、刪除對話（`GET /api/v1/sessions`、`GET /api/v1/sessions/export`、`DELETE /api/v1/sessions/{id}`、`POST /api/v1/sessions/batch-delete`）都需要專案編輯權，只有讀取授權的帳號會收到 403；接續自己的對話用 `GET /api/v1/chat/history?session_id=...`，要知道 `session_id` 才讀得到。
 
-### 邊生成邊念：逐句串流（SSE）
+### 逐句串流（SSE）
 
-`POST /api/v1/chat` 要等整段回答寫完才回應。想讓數位人早一點開口，改用 `POST /api/v1/chat/stream`：請求 body、驗證方式與 `/chat` 完全相同（含 `preferred_language`、`metadata`、`turn_id`／`turn_revision`），回應是 `text/event-stream`，每個事件是 `event: <名稱>\ndata: <JSON>\n\n`：
+`POST /api/v1/chat` 要等整段回答寫完才回應。想讓字幕早一點出現，改用 `POST /api/v1/chat/stream`：請求 body、驗證方式與 `/chat` 完全相同（含 `preferred_language`、`metadata`、`turn_id`／`turn_revision`），回應是 `text/event-stream`，每個事件是 `event: <名稱>\ndata: <JSON>\n\n`：
 
 | 事件 | `data` | 說明 |
 |---|---|---|
@@ -178,7 +178,7 @@ ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流
 
 句尾的判斷：中日文 `。！？；…`；英文 `. ! ?` 後面接空白或文字結束；換行。`3.5`、`HIPPO-50.html` 這類小數、型號與網址不會被切開，最後一段沒有句尾符號的文字在結束前補送。句子保留原文的空白與換行（換行後的那句以換行開頭），所有 `sentence.text` 依序接起來就等於 `done.reply`；送 TTS 前可以自己 trim。
 
-建議做法：收到第一個 `sentence` 就送 `POST /api/v1/tts/stream`，之後每句排進佇列依序合成、依序播放；附圖、引用與 `no_answer` 等 `done` 再處理。`no_answer` 是 true 時要改念固定拒答句的話，請先等 `done` 再念，或接受已經念出前幾句。
+建議做法：`sentence` 用來逐句顯示字幕；收到 `done` 後以 `reply`（或 `tts_text`）整段送一次 `POST /api/v1/tts/stream`。不要逐句合成：逐句時下一段要等上一段下載完才能接上，第一句短時中間會斷音，每段的語氣也各自不同。Gemini、VoxCPM、Edge、IndexTTS 的第一段聲音跟文字長短無關，整段送只多等其餘句子生完的時間；CosyVoice（台語）要整段合成完才出聲，字數越多第一聲越晚。等到 `done` 再念，`no_answer` 是 true 時也能直接改念固定拒答句。
 
 其他行為與 `/chat` 相同：會寫入對話紀錄、計入用量；帶 `turn_id` 時一樣暫存、要 `POST /api/v1/chat/accept`。中途中斷（`AbortController.abort()`、關閉連線）時 Brain 停止生成、不寫入這一輪，跟「打斷對話」一樣。串流開始前就能判斷的錯誤（401、403、404、422、429）照一般 HTTP 狀態碼回應，不會開始串流；之後的錯誤才以 `error` 事件回報。
 

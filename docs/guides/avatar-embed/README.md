@@ -95,9 +95,9 @@ const avatar = await OpenVmanAvatar.init({
 
 ## 對話模式
 
-設定對話選項後，`await avatar.ask(text)` 會完成一整輪：送出 `POST /api/v1/chat/stream`，回答每寫完一句就派送 `sentence` 事件，並以該句呼叫 `POST /api/v1/tts/stream`（`format: "pcm16k"`）串流合成：收到第一段 16 kHz PCM 就開始播放並驅動嘴形，不必等整句合成完，接在前一段後面播放。同時只送一個語音請求，合成期間到的句子會併進下一個請求；前一段還在播時下一段已經可以開始合成。部署沒有串流合成路由（回 404／405）時，該 instance 之後改用 `POST /v1/audio/speech` 整句合成。回答結束時派送一次 `reply` 事件（完整回答），Promise 在語音全部播完後 resolve，回傳回覆文字。需要知道開口時機請監聽 `speaking` 事件；一輪中若下一句還沒合成好，`speaking` 可能先 `stop` 再 `start`。
+設定對話選項後，`await avatar.ask(text)` 會完成一整輪：送出 `POST /api/v1/chat/stream`，回答每寫完一句就派送 `sentence` 事件。回答結束時派送一次 `reply` 事件（完整回答），再以整段回答呼叫一次 `POST /api/v1/tts/stream`（`format: "pcm16k"`）串流合成：收到第一段 16 kHz PCM 就開始播放並驅動嘴形，不必等整段合成完。不逐句合成：逐句時下一段要等上一段下載完才送，第一句短時中間會斷音，每段的語氣也各自不同；多數引擎的第一段聲音跟文字長短無關，整段合成只多等其餘句子生完的時間。CosyVoice（台語）要整段合成完才出聲，字數越多第一聲越晚。部署沒有串流合成路由（回 404／405）時，該 instance 之後改用 `POST /v1/audio/speech` 整段合成。Promise 在語音播完後 resolve，回傳回覆文字。需要知道開口時機請監聽 `speaking` 事件。
 
-同一個 instance 的每次 `ask()` 都會沿用同一組 `session_id`，因此後端看得到完整上下文。新的 `ask()`、`interrupt()` 或 `destroy()` 會連同上一輪的串流、還沒送出的合成與正在播的語音一起中止，不會兩段答案疊在一起；在回答結束前被中止的 `ask()` 會 resolve 為已收到的句子，不派送 `reply`，這一輪也不寫入對話紀錄；回答已結束、只剩語音在播時才中止，則 resolve 為完整回答（`reply` 已派送過）。
+同一個 instance 的每次 `ask()` 都會沿用同一組 `session_id`，因此後端看得到完整上下文。新的 `ask()`、`interrupt()` 或 `destroy()` 會連同上一輪的串流、合成與正在播的語音一起中止，不會兩段答案疊在一起；在回答結束前被中止的 `ask()` 會 resolve 為已收到的句子，不派送 `reply`，這一輪也不寫入對話紀錄；回答已結束、只剩語音在播時才中止，則 resolve 為完整回答（`reply` 已派送過）。
 
 部署沒有串流路由（回 404／405）而 `POST /api/v1/chat` 可用時，該 instance 之後的 `ask()` 都直接走 `/api/v1/chat`，等整段回答後再合成。
 

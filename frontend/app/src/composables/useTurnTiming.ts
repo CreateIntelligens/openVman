@@ -13,7 +13,7 @@ export type TurnMark =
   | 'speech_end'
   | 'asr_done'
   | 'sent'
-  // 逐句串流的第一句：TTS 從這裡開始，不必等 reply_done。
+  // 逐句串流的第一句：字幕從這裡開始；TTS 等 reply_done 後整段合成。
   | 'first_sentence'
   | 'reply_done'
   | 'tts_start'

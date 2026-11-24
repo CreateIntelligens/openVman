@@ -1,9 +1,8 @@
 """Simulate N people using an embedded avatar page: ask, listen to the whole reply, pause, ask again.
 
 Each simulated person follows the SDK `ask()` protocol without drawing the avatar:
-`/api/v1/chat/stream`, and every sentence spoken through `/api/v1/tts/stream`
-(`format=pcm16k`), one speech request at a time with sentences that arrive meanwhile
-joined into the next request. A reply counts as heard to the end when its last audio
+`/api/v1/chat/stream`, and once `done` arrives the whole reply is spoken with one
+`/api/v1/tts/stream` request (`format=pcm16k`). A reply counts as heard to the end when its last audio
 would finish playing (16 kHz s16le: 32,000 bytes per second, measured from the first
 audio byte); the person then waits 2-3 seconds and asks the next question.
 
@@ -32,44 +31,25 @@ from burst_nodes import login
 PCM_BYTES_PER_SECOND = 16000 * 2
 
 
-async def speak_reply(client, base, headers, args, sentences: asyncio.Queue, record: dict) -> None:
-    """Synthesize sentences in order, joining those that queue up while a request runs."""
-    pending: list[str] = []
-    finished = False
+async def speak_reply(client, base, headers, args, text: str, record: dict) -> None:
+    """Synthesize the whole reply with one request, the way the SDK does after `done`."""
+    payload = {"text": text, "project_id": args.project, "format": "pcm16k"}
+    if args.tts_provider:
+        payload["provider"] = args.tts_provider
+    if args.tts_voice:
+        payload["voice"] = args.tts_voice
+    record["tts_requests"] = 1
+    record["tts_send"] = time.time()
     total_bytes = 0
-    record["tts_requests"] = 0
-    while True:
-        if not pending:
-            item = await sentences.get()
-            if item is None:
-                break
-            pending.append(item)
-        while not sentences.empty():
-            item = sentences.get_nowait()
-            if item is None:
-                finished = True
-                break
-            pending.append(item)
-        text, pending = "".join(pending), []
-        payload = {"text": text, "project_id": args.project, "format": "pcm16k"}
-        if args.tts_provider:
-            payload["provider"] = args.tts_provider
-        if args.tts_voice:
-            payload["voice"] = args.tts_voice
-        record["tts_requests"] += 1
-        sent = time.time()
-        record.setdefault("tts_send", sent)
-        async with client.stream("POST", f"{base}/api/v1/tts/stream", headers=headers, json=payload) as response:
-            record.setdefault("tts_status", response.status_code)
-            record.setdefault("tts_provider", response.headers.get("x-tts-provider", ""))
-            if response.status_code >= 400:
-                record["tts_error"] = f"http {response.status_code}"
-            async for chunk in response.aiter_bytes():
-                if chunk and response.status_code < 400:
-                    record.setdefault("tts_first_byte", time.time())
-                    total_bytes += len(chunk)
-        if finished:
-            break
+    async with client.stream("POST", f"{base}/api/v1/tts/stream", headers=headers, json=payload) as response:
+        record["tts_status"] = response.status_code
+        record["tts_provider"] = response.headers.get("x-tts-provider", "")
+        if response.status_code >= 400:
+            record["tts_error"] = f"http {response.status_code}"
+        async for chunk in response.aiter_bytes():
+            if chunk and response.status_code < 400:
+                record.setdefault("tts_first_byte", time.time())
+                total_bytes += len(chunk)
     record["audio_seconds"] = round(total_bytes / PCM_BYTES_PER_SECOND, 2)
     if "tts_first_byte" in record:
         # 播放從第一段音訊開始，照音訊長度推算唸完的時間；合成比播放慢時以最後收到的時間為準。
@@ -79,8 +59,7 @@ async def speak_reply(client, base, headers, args, sentences: asyncio.Queue, rec
 async def ask(client, base, headers, args, session_id, question, user, round_index) -> dict:
     record: dict = {"user": user, "round": round_index, "session_id": session_id,
                     "question": question, "send": time.time(), "ok": False}
-    sentences: asyncio.Queue = asyncio.Queue()
-    speaker = asyncio.create_task(speak_reply(client, base, headers, args, sentences, record))
+    reply = ""
     try:
         async with client.stream(
             "POST", f"{base}/api/v1/chat/stream", headers=headers,
@@ -99,21 +78,20 @@ async def ask(client, base, headers, args, session_id, question, user, round_ind
                         data = json.loads(line[5:]) if line[5:].strip() else {}
                         if event == "sentence":
                             record.setdefault("first_sentence", time.time())
-                            await sentences.put(data.get("tts_text") or data.get("text", ""))
                         elif event == "done":
                             record["done"] = time.time()
                             record["trace_id"] = data.get("trace_id", "")
                             record["ok"] = True
-                            if "first_sentence" not in record and data.get("reply"):
-                                record["first_sentence"] = time.time()
-                                await sentences.put(data["reply"])
+                            reply = data.get("reply") or ""
+                            record.setdefault("first_sentence", record["done"])
                         elif event == "error":
                             record["error"] = json.dumps(data, ensure_ascii=False)[:300]
     except Exception as error:  # noqa: BLE001 — every failure is data
         record["error"] = f"{type(error).__name__}: {error}"[:300]
-    await sentences.put(None)
+    if not reply:
+        return record
     try:
-        await speaker
+        await speak_reply(client, base, headers, args, reply, record)
     except Exception as error:  # noqa: BLE001
         record["tts_error"] = f"{type(error).__name__}: {error}"[:300]
     return record

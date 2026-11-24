@@ -125,19 +125,19 @@
 
 #### 5.2 文字模式逐句串流
 
-文字模式由 `useAvatarTextTurn.ts` 送 `POST /api/v1/chat/stream`（SSE；request body 與 `/api/v1/chat` 相同；事件定義見 [整合指南](../guides/integration-quickstart.md) 的「邊生成邊念：逐句串流（SSE）」）。request body 帶 `message`、`persona_id`、`project_id`、`session_id`、`turn_id`、`turn_revision`、`mode`（回覆深度，見 5.5）、`decision_debug`，ASR 判斷出語言時另帶 `metadata.speech_language`。
+文字模式由 `useAvatarTextTurn.ts` 送 `POST /api/v1/chat/stream`（SSE；request body 與 `/api/v1/chat` 相同；事件定義見 [整合指南](../guides/integration-quickstart.md) 的「逐句串流（SSE）」）。request body 帶 `message`、`persona_id`、`project_id`、`session_id`、`turn_id`、`turn_revision`、`mode`（回覆深度，見 5.5）、`decision_debug`，ASR 判斷出語言時另帶 `metadata.speech_language`。
 
 | 階段 | 前台行為 |
 |---|---|
 | 送出 | 以 `fetch` + `ReadableStream` 讀事件（`chatSseStream.ts`；EventSource 不能送 POST body）；`state` 為 `THINKING`，可合併補句 |
 | 第一個 `sentence` | 關閉合併視窗、`state` 改 `SPEAKING`，`onReplyStart` 重設播放排程，延遲量測記 `first_sentence` |
-| 每個 `sentence` | 交給 `replySpeechQueue`（第 7.3 節），聲音依序進同一個播放佇列 |
-| 字幕 | 每段的第一個聲音出來時才把該段文字接到同一個 AI 氣泡（`useTypewriter.append`），字幕跟著聲音一段一段出現 |
-| `done` | 與 `/chat` 回應相同：版本檢查與 `accept`、`session_id`、決策除錯、附圖與連結（補到已出現的氣泡上），`state` 回 `IDLE`。`onReplyEnd` 以 `done.reply` 為準；串流句子與它不一致時字幕直接換成 `done.reply`，已念出的部分不收回 |
-| `error` | 依 `detail.error_code`（沒有就 `BRAIN_ERROR`）與 `retry_after_ms` 走錯誤處理，這輪不確認。串流沒有 `done` 就結束、`accept` 被拒也視為錯誤；已開口的回答會停掉 |
-| 停止、插話或新的一句 | `stopActiveResponse()` 中止這個 fetch（Brain 停止生成、不寫這輪）、清空句子佇列並停止 TTS 與播放；晚到的事件以 request ID 丟棄 |
+| 每個 `sentence` | 交給 `replySpeech.collect`（第 7.3 節）累積，還不合成；`ttsPending` 為 true，麥克風維持關閉 |
+| 字幕 | 整段回答的第一個聲音出來時才交給打字機（`useTypewriter`），字幕跟著聲音出現 |
+| `done` | 與 `/chat` 回應相同：版本檢查與 `accept`、`session_id`、決策除錯、附圖與連結（補到已出現的氣泡上），`state` 回 `IDLE`。`onReplyEnd` 以 `done.reply` 呼叫 `replySpeech.finish` 合成一次（確認完才開口）；串流句子與它不一致時字幕直接換成 `done.reply`，念的也是 `done.reply` |
+| `error` | 依 `detail.error_code`（沒有就 `BRAIN_ERROR`）與 `retry_after_ms` 走錯誤處理，這輪不確認。串流沒有 `done` 就結束、`accept` 被拒也視為錯誤；已收到的句子不會念出 |
+| 停止、插話或新的一句 | `stopActiveResponse()` 中止這個 fetch（Brain 停止生成、不寫這輪）、丟棄已收到的句子並停止 TTS 與播放；晚到的事件以 request ID 丟棄 |
 
-串流路由回 404 或 405 時，同一個請求改送 `POST /api/v1/chat`。`/chat` 也回 404 或 405 表示專案或角色不存在，下一輪仍先試串流；否則視為部署沒有串流路由，之後整個頁面直接走 `/chat`，整段回答到齊後才合成。視覺事件的回答以 `onUtteranceComplete` 一次念整段，同樣經過句子佇列。
+串流路由回 404 或 405 時，同一個請求改送 `POST /api/v1/chat`。`/chat` 也回 404 或 405 表示專案或角色不存在，下一輪仍先試串流；否則視為部署沒有串流路由，之後整個頁面直接走 `/chat`，整段回答到齊後才合成。視覺事件的回答以 `onUtteranceComplete` 一次念整段（`replySpeech.speak`）。
 
 #### 5.3 補句合併與接收確認
 
@@ -271,9 +271,9 @@ VAD 模型與 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 由 `vad-reco
 * 回應帶 `X-TTS-Fallback` 或 `X-TTS-Fallback-Reason` 時，以 toast 告知實際使用的引擎（`X-TTS-Provider`）與原因。
 * 一段合成失敗時，該段文字照樣顯示在字幕上。
 
-#### 7.3 句子佇列
+#### 7.3 整段合成
 
-`replySpeechQueue.ts` 同時只跑一個 TTS 請求，讓聲音依序進入播放器。前一段還在合成時到的句子併成下一個請求，避免短句各等一次 TTS 首包。一段合成失敗不擋後面的句子。
+`replySpeech.ts` 每一輪只打一次 TTS：串流到的句子先收著（`collect`），`done` 到了以 `done.reply` 合成（`finish`；`done.reply` 是空字串時才念收到的句子）。不逐句合成：逐句時下一段要等上一段下載完才送，第一句短時中間會斷音，每段的語氣也各自不同；Gemini、VoxCPM、Edge、IndexTTS 的首包跟文字長短無關，CosyVoice 要整段合成完才出聲，字數越多越晚。等待期間 `onWaiting` 讓 `ttsPending` 為 true；沒有東西可念、被取消時回 false。
 
 ### 8. Live 模式（WebSocket）
 

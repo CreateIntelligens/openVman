@@ -21,7 +21,7 @@
 ### 2. 關鍵時序圖 (Sequence Diagrams)
 
 #### 2.1 文字對話流 (Text Chat Flow)
-前端以 SSE 接收逐句回覆，每收到一句就排進語音合成佇列（一次一個請求，期間到達的句子併入下一個請求），依供應商呼叫 `/api/v1/tts/stream` 或 `/v1/audio/speech` 並播放；音訊 PCM 同時交給 avatar runtime 驅動嘴型。Chat 代理只轉送 Brain 的 SSE，不切句也不合成。
+前端以 SSE 接收逐句回覆，句子只用來顯示字幕；收到 `done` 後以整段 `reply` 呼叫一次 `/api/v1/tts/stream`（沒有串流路由時用 `/v1/audio/speech`）並播放；音訊 PCM 同時交給 avatar runtime 驅動嘴型。Chat 代理只轉送 Brain 的 SSE，不切句也不合成。
 
 ```mermaid
 sequenceDiagram

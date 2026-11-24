@@ -24,18 +24,8 @@ export interface AvatarConversationDeps {
   onReply(text: string, details: ReplyDetails): void;
   onSentence(index: number, text: string): void;
   playAudio(source: ArrayBuffer): Promise<void>;
-  queueAudio(source: ArrayBuffer): Promise<void>;
   pushPcm(chunk: Int16Array): Promise<void>;
   untilIdle(): Promise<void>;
-}
-
-/**
- * A segment that is synthesized and scheduled. `heard` is wrapped in an object
- * on purpose: an async function returning a bare promise would wait for
- * playback to end, and the next sentence could not be synthesized meanwhile.
- */
-interface SpokenSegment {
-  heard: Promise<void>;
 }
 
 /** Thrown when the stream route is missing on this deployment. */
@@ -127,10 +117,6 @@ export class AvatarConversation {
       );
     }
 
-    const speaker = new SentenceSpeaker(
-      (segment) => this.speakSegment(segment, signal),
-      () => signal.aborted,
-    );
     const sentences: string[] = [];
     let reply: string | null = null;
     let doneBody: ChatResponseBody | null = null;
@@ -142,7 +128,6 @@ export class AvatarConversation {
           if (!sentence) continue;
           this.deps.onSentence(sentences.length, sentence);
           sentences.push(sentence);
-          speaker.add(sentence);
         } else if (event === "done") {
           doneBody = data as ChatResponseBody;
           reply = requireReply(doneBody);
@@ -153,25 +138,23 @@ export class AvatarConversation {
       }
     } catch (error) {
       if (signal.aborted) return sentences.join("");
-      // 出錯就停掉已經開口的部分與還沒送出的合成。
-      this.interrupt();
       throw error instanceof OpenVmanAvatarError
         ? error
         : new OpenVmanAvatarError("CHAT_FAILED", errorMessage(error));
     }
     if (signal.aborted) return sentences.join("");
     if (reply === null) {
-      this.interrupt();
       throw new OpenVmanAvatarError(
         "CHAT_FAILED",
         "Chat stream ended without a final reply.",
       );
     }
 
-    // 整輪沒有任何句子事件時，整段回答一次合成，不能讓數位人不出聲。
-    if (sentences.length === 0) speaker.add(reply);
     this.deps.onReply(reply, this.replyDetails(doneBody));
-    await speaker.finish();
+    // 句子事件只拿來顯示；聲音等 done 用整段回答打一次 TTS。分句打會讓第二段
+    // 要等第一段下載完才送，第一句短時中間就斷音，而且每段的語氣各自不同。
+    // 唸 done.reply 而不是句子拼接：模型中途改寫時，收回的句子不在 reply 裡。
+    await this.speak(reply, signal);
     return reply;
   }
 
@@ -185,15 +168,12 @@ export class AvatarConversation {
   }
 
   /**
-   * Speaks one segment and returns a promise for the moment it has been heard.
-   * Streams 16 kHz PCM so playback starts with the first chunk instead of
-   * after the whole sentence is synthesized; deployments without the stream
-   * route fall back to whole-sentence /v1/audio/speech.
+   * Speaks the reply and resolves once it has been heard. Streams 16 kHz PCM
+   * so playback starts with the first chunk instead of after the whole reply
+   * is synthesized; deployments without the stream route fall back to
+   * /v1/audio/speech.
    */
-  private async speakSegment(
-    text: string,
-    signal: AbortSignal,
-  ): Promise<SpokenSegment | null> {
+  private async speak(text: string, signal: AbortSignal): Promise<void> {
     if (!this.speechStreamMissing) {
       const response = await this.send(
         `${this.resourceBaseUrl}/api/v1/tts/stream`,
@@ -206,7 +186,7 @@ export class AvatarConversation {
         signal,
         [404, 405],
       );
-      if (!response) return null;
+      if (!response) return;
       if (response.status === 404 || response.status === 405) {
         this.speechStreamMissing = true;
       } else {
@@ -217,11 +197,12 @@ export class AvatarConversation {
           );
         }
         await this.pumpPcm(response.body, signal);
-        return signal.aborted ? null : { heard: this.deps.untilIdle() };
+        if (!signal.aborted) await this.deps.untilIdle();
+        return;
       }
     }
     const audio = await this.requestSpeech(text, signal);
-    return audio ? { heard: this.deps.queueAudio(audio) } : null;
+    if (audio) await this.deps.playAudio(audio);
   }
 
   private async pumpPcm(
@@ -325,60 +306,6 @@ export class AvatarConversation {
   private ensureSessionId(): string {
     this.sessionId ??= createSessionId();
     return this.sessionId;
-  }
-}
-
-/**
- * Speaks a streamed reply in order. One speech request runs at a time;
- * sentences that arrive meanwhile are joined into the next request, which
- * keeps the request count (and the embed key's quota) low and avoids the
- * pause each extra request would add before its audio.
- */
-class SentenceSpeaker {
-  private pending: string[] = [];
-  private draining: Promise<void> | null = null;
-  private playbacks: Promise<void>[] = [];
-  private failure: unknown = null;
-
-  constructor(
-    // 合成並排進播放後回傳；被打斷時回 null。
-    private readonly speak: (text: string) => Promise<SpokenSegment | null>,
-    private readonly cancelled: () => boolean,
-  ) {}
-
-  add(text: string): void {
-    if (this.failure || this.cancelled()) return;
-    this.pending.push(text);
-    this.draining ??= this.drain();
-  }
-
-  /** Resolves when everything added has been spoken; rejects on the first failure. */
-  async finish(): Promise<void> {
-    while (this.draining) await this.draining;
-    await Promise.all(this.playbacks);
-    if (this.failure) throw this.failure;
-  }
-
-  private async drain(): Promise<void> {
-    while (this.pending.length && !this.failure && !this.cancelled()) {
-      // 句子保留原本的空白與換行，接起來才跟完整回答一致。
-      const segment = this.pending.join("");
-      this.pending = [];
-      if (!segment.trim()) continue;
-      try {
-        const spoken = await this.speak(segment);
-        if (!spoken || this.cancelled()) break;
-        this.playbacks.push(
-          spoken.heard.catch((error) => {
-            this.failure ??= error;
-          }),
-        );
-      } catch (error) {
-        this.failure = error;
-      }
-    }
-    this.pending = [];
-    this.draining = null;
   }
 }
 

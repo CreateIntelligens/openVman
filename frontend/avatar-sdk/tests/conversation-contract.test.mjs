@@ -672,7 +672,7 @@ test("a speaker instance still reports a blocked browser", async () => {
   );
 });
 
-test("ask streams the reply and speaks the first sentence before done", async () => {
+test("ask streams sentences but speaks the whole reply once after done", async () => {
   const { requests, sdk, stream } = await loadSdk({ manualStream: true });
   const avatar = await sdk.init({ characterId: "000", embedKey: "ovk_demo" });
   const sentences = [];
@@ -689,12 +689,9 @@ test("ask streams the reply and speaks the first sentence before done", async ()
 
   stream().push("sentence", { index: 0, text: "第一句。" });
   await flush();
-  // done 還沒到就已經在合成第一句。
-  assert.deepEqual(
-    speechRequests(requests).map(speechText),
-    ["第一句。"],
-  );
-  assert.deepEqual(replies, []);
+  // 句子先派送給字幕，聲音要等 done。
+  assert.deepEqual(sentences, [[0, "第一句。"]]);
+  assert.equal(speechRequests(requests).length, 0);
 
   stream().push("sentence", { index: 1, text: "第二句。" });
   stream().push("done", { reply: "第一句。第二句。" });
@@ -703,29 +700,23 @@ test("ask streams the reply and speaks the first sentence before done", async ()
   assert.equal(await pending, "第一句。第二句。");
   assert.deepEqual(sentences, [[0, "第一句。"], [1, "第二句。"]]);
   assert.deepEqual(replies, ["第一句。第二句。"]);
-  assert.equal(
-    speechRequests(requests).map(speechText).join(""),
-    "第一句。第二句。",
-  );
+  assert.deepEqual(speechRequests(requests).map(speechText), ["第一句。第二句。"]);
   assert.equal(wholeChatRequests(requests).length, 0);
 });
 
-test("sentences arriving during synthesis join the next speech request", async () => {
+test("the final reply is spoken, not the streamed sentences", async () => {
+  // 模型中途改寫時，已送出的句子不在 done.reply 裡，不能念出來。
   const { requests, sdk } = await loadSdk({
-    speechDelayMs: 5,
     streamEvents: [
-      { data: { index: 0, text: "一。" }, event: "sentence" },
-      { data: { index: 1, text: "二。" }, event: "sentence" },
-      { data: { index: 2, text: "三。" }, event: "sentence" },
-      { data: { reply: "一。二。三。" }, event: "done" },
+      { data: { index: 0, text: "先寫的。" }, event: "sentence" },
+      { data: { index: 1, text: "收回的。" }, event: "sentence" },
+      { data: { reply: "最後的回答。" }, event: "done" },
     ],
   });
   const avatar = await sdk.init({ characterId: "000" });
 
-  await avatar.ask("數數");
-
-  const inputs = speechRequests(requests).map(speechText);
-  assert.deepEqual(inputs, ["一。", "二。三。"]);
+  assert.equal(await avatar.ask("你好"), "最後的回答。");
+  assert.deepEqual(speechRequests(requests).map(speechText), ["最後的回答。"]);
 });
 
 test("a stream without sentences still speaks the final reply", async () => {
@@ -914,7 +905,7 @@ test("streamed speech keeps samples split across network chunks", async () => {
   assert.equal(runtimeCalls.pushedBytes, 8);
 });
 
-test("the next sentence is synthesized while the previous one is still playing", async () => {
+test("ask resolves only after the reply has been heard", async () => {
   const { releasePlayback, requests, sdk, stream } = await loadSdk({
     holdPlayback: true,
     manualStream: true,
@@ -928,14 +919,12 @@ test("the next sentence is synthesized while the previous one is still playing",
   });
   await flush();
   stream().push("sentence", { index: 0, text: "一。" });
-  await flush();
   stream().push("sentence", { index: 1, text: "二。" });
   stream().push("done", { reply: "一。二。" });
   stream().end();
   await flush();
 
-  // 第一句的聲音還沒播完，第二句已經送出合成。
-  assert.deepEqual(speechRequests(requests).map(speechText), ["一。", "二。"]);
+  assert.deepEqual(speechRequests(requests).map(speechText), ["一。二。"]);
   assert.equal(settled, false, "ask waits until the reply has been heard");
 
   releasePlayback();
