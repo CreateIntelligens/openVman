@@ -12,8 +12,9 @@ MatesX 之類只吃 16 kHz raw PCM 的對嘴引擎不必自己處理各家格式
   adapter 的契約；RFC 2586 的 L16 是 big-endian，但上游實際送 LE）。
 * 其餘（MP3 等）→ 串流餵給 ffmpeg 子程序解碼。
 
-前兩條的重採樣用純 Python 的有狀態 polyphase FIR，濾波器歷史與相位跨 chunk
-保留，所以 chunk 邊界不會有爆音；不引入 numpy 等新相依。
+前兩條的重採樣用有狀態的 polyphase FIR，濾波器歷史與相位跨 chunk 保留，所以
+chunk 邊界不會有爆音。計算用 numpy 向量化：純 Python 版處理 1 秒 24 kHz 音訊
+要數十 ms CPU，高併發時會佔滿 worker 的事件迴圈與執行緒。
 """
 
 from __future__ import annotations
@@ -26,7 +27,9 @@ import shutil
 import sys
 from array import array
 from collections.abc import AsyncIterator, Sequence
-from operator import mul
+
+import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 
 logger = logging.getLogger("backend.tts_pcm")
 
@@ -35,6 +38,7 @@ PCM16K_RATE = 16000
 PCM16K_CONTENT_TYPE = "audio/l16;rate=16000;channels=1"
 
 _BIG_ENDIAN = sys.byteorder == "big"
+_MAX_PHASE_LOOP = 8
 _FFMPEG_READ_SIZE = 8192
 BUFFERED_CHUNK_SIZE = 8192
 
@@ -54,14 +58,12 @@ def _bessel_i0(x: float) -> float:
     return total
 
 
-def _clip_pack(values: Sequence[float]) -> bytes:
-    out = array("h", [
-        32767 if v >= 32766.5 else -32768 if v <= -32767.5 else round(v)
-        for v in values
-    ])
-    if _BIG_ENDIAN:
-        out.byteswap()
-    return out.tobytes()
+def _clip_pack(values: np.ndarray) -> bytes:
+    # 與舊版逐樣本寫法同一套規則：>= 32766.5 與 <= -32767.5 夾到邊界，其餘 half-even 取整。
+    rounded = np.rint(values)
+    rounded[values >= 32766.5] = 32767
+    rounded[values <= -32767.5] = -32768
+    return rounded.astype("<i2").tobytes()
 
 
 def _pack_ints(values: Sequence[int]) -> bytes:
@@ -106,45 +108,56 @@ class StreamingResampler:
             window = _bessel_i0(beta * math.sqrt(max(0.0, 1.0 - r * r))) / i0_beta
             proto.append(sinc * window * up)
         # phases[p] 依輸入由舊到新排列，可以直接和 buffer 切片做內積。
-        self._phases = [
-            [proto[p + k * up] for k in reversed(range(taps))] for p in range(up)
-        ]
+        self._phases = np.array(
+            [[proto[p + k * up] for k in reversed(range(taps))] for p in range(up)],
+            dtype=np.float64,
+        )
         self._delay = (length - 1) // 2
-        self._buf: list[int] = [0] * (taps - 1)
+        self._buf = np.zeros(taps - 1, dtype=np.float64)
         self._buf_start = -(taps - 1)
         self._n_in = 0
         self._j = 0
         self._flushed = False
 
-    def _run(self, last_index: int, limit: int | None) -> list[float]:
+    def _run(self, last_index: int, limit: int | None) -> np.ndarray:
         up, down, delay, taps = self._up, self._down, self._delay, self._taps
-        phases, buf, start = self._phases, self._buf, self._buf_start
-        out: list[float] = []
-        append = out.append
-        j = self._j
-        while limit is None or j < limit:
-            t = j * down + delay
-            n_hi = t // up
-            if n_hi > last_index:
-                break
-            s = n_hi - taps + 1 - start
-            append(sum(map(mul, phases[t % up], buf[s:s + taps])))
-            j += 1
-        self._j = j
-        keep_from = (j * down + delay) // up - taps + 1
+        start = self._buf_start
+        j0 = self._j
+        # n_hi = (j*down + delay)//up <= last_index 的最大 j，一次算出這批所有輸出。
+        j_end = (last_index * up + up - 1 - delay) // down + 1
+        if limit is not None:
+            j_end = min(j_end, limit)
+        out = np.empty(0, dtype=np.float64)
+        if j_end > j0:
+            t = np.arange(j0, j_end, dtype=np.int64) * down + delay
+            offsets = t // up - taps + 1 - start
+            windows = sliding_window_view(self._buf, taps)
+            phase = t % up
+            if up <= _MAX_PHASE_LOOP:
+                out = np.empty(len(t), dtype=np.float64)
+                # 同一相位共用一組係數，整批用矩陣乘向量，比逐列 einsum 快數倍。
+                for p in range(up):
+                    picked = phase == p
+                    out[picked] = windows[offsets[picked]] @ self._phases[p]
+            else:
+                # 22.05k→16k 這類比值相位數上百，逐相位迴圈反而慢；改逐列內積。
+                out = np.einsum("ij,ij->i", windows[offsets], self._phases[phase])
+            self._j = j_end
+        keep_from = (self._j * down + delay) // up - taps + 1
         drop = keep_from - start
         if drop > 0:
-            del buf[:drop]
+            self._buf = self._buf[drop:]
             self._buf_start = keep_from
         return out
 
-    def process(self, samples: Sequence[int]) -> bytes:
+    def process(self, samples: Sequence[int] | np.ndarray) -> bytes:
         if self._flushed:
             raise RuntimeError("resampler already flushed")
-        if not samples:
+        if len(samples) == 0:
             return b""
-        self._buf.extend(samples)
-        self._n_in += len(samples)
+        chunk = np.asarray(samples, dtype=np.float64)
+        self._buf = np.concatenate((self._buf, chunk))
+        self._n_in += len(chunk)
         return _clip_pack(self._run(self._n_in - 1, None))
 
     def flush(self) -> bytes:
@@ -157,7 +170,7 @@ class StreamingResampler:
         need = ((total - 1) * self._down + self._delay) // self._up
         pad = need - (self._buf_start + len(self._buf) - 1)
         if pad > 0:
-            self._buf.extend([0] * pad)
+            self._buf = np.concatenate((self._buf, np.zeros(pad, dtype=np.float64)))
         return _clip_pack(self._run(need, total))
 
 
@@ -424,7 +437,7 @@ async def _aclose(source: AsyncIterator[bytes]) -> None:
 
 
 def _slices(data: bytes, size: int = BUFFERED_CHUNK_SIZE):
-    # 純 Python 重採樣每秒音訊約 70–100 ms CPU；大 chunk 切小塊轉，輸出早點送出，
+    # 大 chunk 切小塊轉，輸出早點送出，
     # 也不會一次佔住 event loop 太久。
     if len(data) <= size:
         yield data
@@ -548,7 +561,7 @@ async def convert_to_pcm16k(
         unsupported: UnsupportedWav | None = None
         async for piece in pieces:
             try:
-                # 純 Python 重採樣每塊約 10–17 ms CPU；丟到執行緒算，event loop 才能同時
+                # 丟到執行緒算，event loop 才能同時
                 # 服務其他請求與其他路串流，不會被一路 TTS 卡住。
                 out = await asyncio.to_thread(converter.feed, piece)
             except UnsupportedWav as exc:

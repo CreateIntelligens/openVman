@@ -5,11 +5,15 @@ from __future__ import annotations
 import asyncio
 import math
 import shutil
+import random
 import struct
 import subprocess
+import time
 from array import array
 
+import numpy as np
 import pytest
+from _reference_resampler import ReferenceResampler
 
 from app.tts_pcm import (
     PcmToPcm16k,
@@ -308,3 +312,88 @@ def test_resampling_does_not_hold_the_event_loop() -> None:
     out, worst_gap = asyncio.run(main())
     assert len(out) > 0
     assert worst_gap < 0.05
+
+
+def _signal(kind: str, rate: int, seconds: float = 0.4) -> list[int]:
+    n = int(rate * seconds)
+    rng = random.Random(7)
+    if kind == "full_scale":
+        return [32767 if (i // 5) % 2 == 0 else -32768 for i in range(n)]
+    if kind == "silence":
+        return [0] * n
+    if kind == "sine":
+        return _sine(rate, seconds, freq=1234.0, amp=30000)
+    return [rng.randint(-32768, 32767) for _ in range(n)]
+
+
+def _chunk_sizes(plan: str, taps: int) -> list[int]:
+    rng = random.Random(11)
+    if plan == "whole":
+        return [10**9]
+    if plan == "single":
+        return [1]
+    if plan == "random":
+        return [rng.randint(1, 900) for _ in range(5000)]
+    return [taps - 1, taps, taps + 1, 2 * taps]
+
+
+def _run_chunked(resampler, signal: list[int], sizes: list[int]) -> bytes:
+    out, i, k = b"", 0, 0
+    while i < len(signal):
+        n = sizes[k % len(sizes)]
+        out += resampler.process(signal[i:i + n])
+        i += n
+        k += 1
+    return out + resampler.flush()
+
+
+@pytest.mark.parametrize("rate", [24000, 22050, 48000, 16000])
+@pytest.mark.parametrize("kind", ["full_scale", "silence", "sine", "noise"])
+@pytest.mark.parametrize("plan", ["whole", "single", "random", "taps_boundary"])
+def test_numpy_resampler_matches_reference_within_one_lsb(rate, kind, plan):
+    signal = _signal(kind, rate, seconds=0.05 if plan == "single" else 0.4)
+    taps = ReferenceResampler(rate)._taps
+    expected = _samples(_run_chunked(ReferenceResampler(rate), signal, [10**9]))
+    actual = _samples(_run_chunked(StreamingResampler(rate), signal, _chunk_sizes(plan, taps)))
+    assert len(actual) == len(expected)
+    assert max((abs(a - b) for a, b in zip(actual, expected)), default=0) <= 1
+
+
+def test_numpy_resampler_accepts_array_list_and_ndarray():
+    signal = _sine(24000, 0.1)
+    outs = []
+    for wrap in (list, lambda v: array("h", v), lambda v: np.array(v, dtype=np.int16)):
+        r = StreamingResampler(24000)
+        outs.append(r.process(wrap(signal)) + r.flush())
+    assert outs[0] == outs[1] == outs[2]
+
+
+def test_resampler_state_survives_many_process_calls():
+    signal = _sine(24000, 0.3)
+    whole = StreamingResampler(24000)
+    expected = whole.process(signal) + whole.flush()
+    pieced = StreamingResampler(24000)
+    assert _run_chunked(pieced, signal, [4800, 1, 123]) == expected
+
+
+def test_resampler_rejects_process_after_flush_and_flushes_once():
+    r = StreamingResampler(24000)
+    r.process(_sine(24000, 0.05))
+    assert r.flush() != b""
+    assert r.flush() == b""
+    with pytest.raises(RuntimeError):
+        r.process([1, 2, 3])
+
+
+def test_resampling_one_second_of_24k_is_fast():
+    signal = np.array(_sine(24000, 1.0), dtype=np.int16)
+    best = float("inf")
+    for _ in range(5):
+        r = StreamingResampler(24000)
+        t0 = time.perf_counter()
+        for i in range(0, len(signal), 4800):
+            r.process(signal[i:i + 4800])
+        r.flush()
+        best = min(best, time.perf_counter() - t0)
+    # 實測約 1 ms；斷言放寬到 10 ms，CI 機器慢也不會誤報。
+    assert best < 0.010
