@@ -101,3 +101,43 @@ def test_lag_entry_shape():
     entry = lag_entry(0.5, 0.45, 0.25)
     assert entry["event"] == "event_loop_lag"
     assert (entry["lag_ms"], entry["loop_cpu_ms"], entry["interval_ms"]) == (500, 450, 250)
+
+
+@pytest.mark.asyncio
+async def test_a_wait_that_ends_in_a_stall_timeout_is_counted():
+    # 上游送了一包就停住，一路等到 stall 逾時：卡最久的那次一定要記到。
+    clear_recent_attempts()
+
+    async def upstream():
+        yield b"a"
+        await asyncio.sleep(5)
+        yield b"never"
+
+    async for _ in guard_stream(
+        upstream(), kind="tts_stream", node="gemini-tts", host="g", stall_seconds=0.3,
+        started=time.monotonic(),
+    ):
+        pass
+    [attempt] = _stream_attempts()
+    assert attempt["outcome"] == "timeout_read"
+    assert attempt["max_wait_ms"] >= 280
+
+
+@pytest.mark.asyncio
+async def test_a_send_cut_short_by_the_consumer_is_counted():
+    # 交出一包後下游一直沒來拿，最後關掉：這段等待也要算進 max_send_ms。
+    clear_recent_attempts()
+
+    async def upstream():
+        yield b"a"
+        yield b"b"
+
+    stream = guard_stream(
+        upstream(), kind="tts_stream", node="gemini-tts", host="g", stall_seconds=5,
+        started=time.monotonic(),
+    )
+    await stream.__anext__()
+    await asyncio.sleep(0.2)
+    await stream.aclose()
+    [attempt] = _stream_attempts()
+    assert attempt["max_send_ms"] >= 180

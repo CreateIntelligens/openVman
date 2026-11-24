@@ -645,6 +645,9 @@ async def guard_stream(
     outcome, error, total_bytes = OK, "", 0
     chunks, max_wait, max_send = 0, 0.0, 0.0
     have_audio = bool(first)
+    # 還沒結束的那次等待：逾時、斷線時也要算進最長等待，不然卡最久的那次反而記不到。
+    waiting_since: float | None = None
+    handed_since: float | None = None
     first_ms = round((monotonic() - started) * 1000) if first is not None else None
     if not hasattr(stream, "__aiter__"):
         # StreamingResponse 也收同步 iterator（在 threadpool 裡跑）；這裡比照辦理。
@@ -656,11 +659,12 @@ async def guard_stream(
         if first:
             total_bytes += len(first)
             chunks += 1
-            handed = monotonic()
+            handed_since = monotonic()
             yield first
-            max_send = max(max_send, monotonic() - handed)
+            max_send = max(max_send, monotonic() - handed_since)
+            handed_since = None
         while True:
-            waiting = monotonic()
+            waiting_since = monotonic() if have_audio else None
             try:
                 async with asyncio.timeout(stall_seconds):
                     chunk = await iterator.__anext__()
@@ -672,16 +676,18 @@ async def guard_stream(
                 break
             if not chunk:
                 continue
-            if have_audio:
-                max_wait = max(max_wait, monotonic() - waiting)
+            if waiting_since is not None:
+                max_wait = max(max_wait, monotonic() - waiting_since)
+            waiting_since = None
             have_audio = True
             if first_ms is None:
                 first_ms = round((monotonic() - started) * 1000)
             total_bytes += len(chunk)
             chunks += 1
-            handed = monotonic()
+            handed_since = monotonic()
             yield chunk
-            max_send = max(max_send, monotonic() - handed)
+            max_send = max(max_send, monotonic() - handed_since)
+            handed_since = None
     except asyncio.CancelledError:
         outcome, error = ERROR, "client disconnected"
         raise
@@ -692,8 +698,13 @@ async def guard_stream(
     except Exception as exc:  # noqa: BLE001 - 上游中途出錯：收尾，不讓 ASGI 炸出 traceback
         outcome, error = classify_outcome(exc)
     finally:
+        now = monotonic()
+        if waiting_since is not None:
+            max_wait = max(max_wait, now - waiting_since)
+        if handed_since is not None:
+            max_send = max(max_send, now - handed_since)
         emit_attempt(
-            kind, node, outcome, (monotonic() - started) * 1000,
+            kind, node, outcome, (now - started) * 1000,
             host=host, error=error, first_byte_ms=first_ms, bytes=total_bytes,
             chunks=chunks, max_wait_ms=round(max_wait * 1000), max_send_ms=round(max_send * 1000),
             **extra,
