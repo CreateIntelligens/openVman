@@ -33,7 +33,6 @@ export class AvatarAudio {
   private destroyed = false;
   private nextStartTime = 0;
   private playbackGeneration = 0;
-  // 讓排隊中的片段依呼叫順序解碼、排上時間軸。
   private settlers = new Set<() => void>();
   private sources = new Set<ScheduledPlay>();
   private speaking = false;

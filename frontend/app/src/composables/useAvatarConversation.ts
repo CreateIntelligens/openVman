@@ -96,8 +96,6 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   let pendingText = "";
   // 這一輪的字幕氣泡已經開了：後面的句子接在同一個氣泡後面。
   let subtitleStarted = false;
-  // 串流句子跟最終回答不一致（極少見）時，字幕直接換成最終回答，後面的段落不再追加。
-  let subtitleFinal = false;
   let streamedText = "";
   let replySpeakOptions: ReturnType<typeof languageRoutesSpeakOptions> | undefined;
   // 回答的句子已經開始到、TTS 還沒出第一段聲音（等整段回答、再等合成約 1 秒）：
@@ -142,7 +140,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     },
   });
   function showSubtitle(text: string): void {
-    if (!text || subtitleFinal) return;
+    if (!text) return;
     if (!subtitleStarted) {
       subtitleStarted = true;
       typewriter.start(text);
@@ -173,7 +171,6 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     audio.resetSchedule();
     pendingText = "";
     subtitleStarted = false;
-    subtitleFinal = false;
     streamedText = "";
     spokenReply.value = "";
     replySpeakOptions = languageRoutesSpeakOptions(context.speechLanguage);
@@ -257,15 +254,10 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     onReplyEnd: (fullText) => {
       turnTiming.mark("reply_done");
       turnTiming.replyText(fullText);
+      // 念的、字幕打的都是最終回答：模型中途改寫時，收回的句子不在 fullText 裡。
+      // 字幕在第一段聲音出來時才開始打（pendingText），跟聲音同步。
+      spokenReply.value = fullText.trim() ? fullText : streamedText;
       replySpeech.finish(fullText);
-      spokenReply.value = fullText;
-      if (!fullText.trim() || fullText.trim() === streamedText.trim()) return;
-      subtitleFinal = true;
-      typewriter.stop();
-      if (!subtitleStarted) chat.beginAssistantMessage();
-      subtitleStarted = true;
-      chat.setAssistantText(fullText);
-      isTyping.value = false;
     },
     onServerError: (code, message, retryAfterMs) => {
       turnTiming.finish("error");

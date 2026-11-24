@@ -270,7 +270,7 @@ async function createInstance(
       activeInstance = null;
     },
     interrupt() {
-      // 連同進行中的對話串流與還沒合成的句子一起停，否則句子會繼續到、繼續念。
+      // 連同進行中的對話串流與合成一起停，否則回答會繼續到、繼續念。
       conversation.interrupt();
     },
     off(type, handler) {

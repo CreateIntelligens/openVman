@@ -150,7 +150,7 @@ const reply = await avatar.ask("今天有哪些待辦？");
 
 ### 對話事件與錯誤
 
-`ask()` 期間會派送 `sentence`、`reply`、`speaking` 與 `error` 事件；`error` 事件與 `ask()` reject 的錯誤內容相同，方便集中處理。`sentence`（`{ index, text }`）適合逐句顯示字幕，所有句子依序接起來等於 `reply` 的 `text`。
+`ask()` 期間會派送 `sentence`、`reply`、`speaking` 與 `error` 事件；`error` 事件與 `ask()` reject 的錯誤內容相同，方便集中處理。`sentence`（`{ index, text }`）適合逐句顯示字幕，通常所有句子依序接起來等於 `reply` 的 `text`；模型中途改寫時已送出的句子不在 `reply` 裡，最終文字與語音都以 `reply` 為準。
 
 ```js
 avatar.on("sentence", ({ text }) => appendToBubble(text));

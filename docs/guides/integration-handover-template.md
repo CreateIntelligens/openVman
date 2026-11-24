@@ -80,7 +80,7 @@ curl -sN https://api.example.com/api/v1/chat/stream \
 # event: error     data: {"status": 429, "detail": {...}}
 ```
 
-`sentence` 一到就可以送去合成，不必等 `done`；顯示的文字以 `done.reply` 為準。`no_answer: true` 代表知識庫沒答案，要改念固定拒答句由呼叫端自己做。`metadata.speech_language` 照抄第 1 步回的 `language`（台語時是 `nan`）。
+`sentence` 用來逐句顯示字幕；語音等 `done` 再以 `reply` 整段合成一次（逐句合成時第一句短就容易斷音，語氣也接不起來）。顯示與念的文字都以 `done.reply` 為準。`no_answer: true` 代表知識庫沒答案，要改念固定拒答句由呼叫端自己做。`metadata.speech_language` 照抄第 1 步回的 `language`（台語時是 `nan`）。
 
 3. 念出 `POST /api/v1/tts/stream`（JSON：`text` 必填，`project_id`、`speech_language`、`language`、`provider`、`voice`、`format` 選填）：
 

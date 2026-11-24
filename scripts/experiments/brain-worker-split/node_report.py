@@ -134,7 +134,7 @@ STEPS = [
     ("knowledge", "知識庫檢索（embedding＋向量＋關鍵字＋圖譜）"),
     ("llm_first_token_after_send", "送出 → LLM 寫回答的首字"),
     ("first_sentence", "送出 → 前端收到文字第一句"),
-    ("tts_send_delay", "第一句 → 送出 TTS 請求"),
+    ("tts_send_delay", "第一句 → 送出 TTS 請求（2026-11-24 起等整段回答）"),
     ("tts_first_audio", "TTS 請求 → 收到第一段音訊"),
     ("heard", "送出 → 前端收到第一段音訊（聽到第一句）"),
     ("done", "送出 → 回答完整結束"),

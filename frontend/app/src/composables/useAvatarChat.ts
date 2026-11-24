@@ -422,6 +422,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
        // ── Disconnect ─────────────────────────────────────────
        function disconnect(): void {
               clearDecisionDebug()
+              // 斷線會靜默丟掉進行中的文字回合；先讓呼叫端停掉這一輪的聲音與收到一半的句子，
+              // 否則等整段回答的狀態（ttsPending）沒有人收尾，麥克風會一直關著。
+              if (responsePlaybackActive || textTurn.hasActiveRequest()) options.onStopAudio?.()
+              responsePlaybackActive = false
               textTurn.cancel()
               textTurn.forgetPending()
               transport.close()

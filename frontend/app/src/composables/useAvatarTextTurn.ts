@@ -3,8 +3,8 @@
  * turn revisions for merged re-sends and the /accept delivery acknowledgement.
  *
  * With `chatStreamEndpoint` set, turns use POST /api/v1/chat/stream (SSE):
- * each `sentence` is handed to TTS as it arrives and `done` carries the same
- * JSON as /chat. Deployments without the stream route (404/405) fall back to
+ * each `sentence` is shown as it arrives, and `done` carries the same JSON as
+ * /chat; the caller speaks the whole reply after `done`. Deployments without the stream route (404/405) fall back to
  * POST /api/v1/chat for the rest of the page's life.
  */
 import type { Ref } from 'vue'
@@ -48,7 +48,7 @@ interface TextTurnContext {
        replyStarted: (context: UtteranceContext) => void
        replySentence: (text: string) => void
        replyFinished: (text: string) => void
-       /** A streamed reply that already started speaking failed (error event, accept rejected). */
+       /** A streamed reply that already started (sentences shown) failed (error event, accept rejected). */
        abandonReply: () => void
 }
 
@@ -176,7 +176,7 @@ export function useAvatarTextTurn(context: TextTurnContext) {
                                                  : ''
                                           if (!sentence) continue
                                           if (spokenSentences === 0) {
-                                                 // 已經開口就不再合併：使用者這時補的話是下一輪。
+                                                 // 回答已經開始出來就不再合併：使用者這時補的話是下一輪。
                                                  awaitingReply = null
                                                  state.value = 'SPEAKING'
                                                  context.replyStarted(replyContext)
