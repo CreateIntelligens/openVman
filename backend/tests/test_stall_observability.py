@@ -59,6 +59,35 @@ async def test_stream_attempt_records_the_longest_upstream_and_downstream_waits(
 
 
 @pytest.mark.asyncio
+async def test_stream_attempt_records_end_reason_only_when_available():
+    clear_recent_attempts()
+
+    class FinishedStream:
+        end_reason = ""
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            self.end_reason = "finish:STOP"
+            raise StopAsyncIteration
+
+    async def upstream():
+        yield b"a"
+
+    for stream in (FinishedStream(), upstream()):
+        async for _ in guard_stream(
+            stream, kind="tts_stream", node="gemini-tts", host="g", stall_seconds=5,
+            started=time.monotonic(),
+        ):
+            pass
+
+    finished, plain = _stream_attempts()
+    assert finished["end_reason"] == "finish:STOP"
+    assert "end_reason" not in plain
+
+
+@pytest.mark.asyncio
 async def test_first_byte_wait_is_not_counted_as_a_mid_stream_gap():
     clear_recent_attempts()
     async def upstream():

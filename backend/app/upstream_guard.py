@@ -649,6 +649,7 @@ async def guard_stream(
     waiting_since: float | None = None
     handed_since: float | None = None
     first_ms = round((monotonic() - started) * 1000) if first is not None else None
+    original_stream = stream
     if not hasattr(stream, "__aiter__"):
         # StreamingResponse 也收同步 iterator（在 threadpool 裡跑）；這裡比照辦理。
         from starlette.concurrency import iterate_in_threadpool
@@ -707,6 +708,7 @@ async def guard_stream(
             kind, node, outcome, (now - started) * 1000,
             host=host, error=error, first_byte_ms=first_ms, bytes=total_bytes,
             chunks=chunks, max_wait_ms=round(max_wait * 1000), max_send_ms=round(max_send * 1000),
+            end_reason=getattr(original_stream, "end_reason", ""),
             **extra,
         )
         aclose = getattr(iterator, "aclose", None)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import json
@@ -154,22 +155,42 @@ def test_pcm_media_type_is_case_insensitive():
     assert project_gemini_tts.audio_chunks(audio_payload(mime="audio/L16;rate=24000")) == [PCM]
 
 
+@pytest.mark.parametrize("payload,chunks,reason", [
+    (audio_payload(), [PCM], ""),
+    ({"candidates": [
+        {"finishReason": ""}, {"finishReason": 1},
+        {"finishReason": "STOP"}, {"finishReason": "MAX_TOKENS"},
+    ]}, [], "STOP"),
+])
+def test_parse_event(payload, chunks, reason):
+    assert project_gemini_tts.parse_event(json.dumps(payload)) == (chunks, reason)
+
+
+@pytest.mark.parametrize("data", ["{", "[]", json.dumps({"error": {"message": KEY}})])
+def test_parse_event_rejects_invalid_data_without_leaking_secrets(data):
+    with pytest.raises(RuntimeError, match="^Gemini TTS stream failed$"):
+        project_gemini_tts.parse_event(data)
+
+
 class TrackedStream(httpx.AsyncByteStream):
-    def __init__(self, content):
+    def __init__(self, content, *, stall=False):
         self.content = content.encode()
         self.closed = False
+        self.stall = stall
 
     async def __aiter__(self):
         yield self.content
+        if self.stall:
+            await asyncio.sleep(30)
 
     async def aclose(self):
         self.closed = True
 
 
-def mock_stream(monkeypatch, content, status=200, transport_error=None):
+def mock_stream(monkeypatch, content, status=200, transport_error=None, *, stall=False):
     sent = []
     clients = []
-    stream = TrackedStream(content)
+    stream = TrackedStream(content, stall=stall)
     client_type = httpx.AsyncClient
 
     def respond(upstream):
@@ -195,12 +216,54 @@ async def test_sse_returns_pcm_with_project_header_and_closes_resources(monkeypa
     )
     stream = await project_gemini_tts.open_stream(request(), credential(), "tts-model")
     assert b"".join([chunk async for chunk in stream]) == PCM
+    assert stream.end_reason == "done"
     assert sent[0].headers["x-goog-api-key"] == KEY
     assert sent[0].url.params["alt"] == "sse"
     assert sent[0].url.path.endswith(":streamGenerateContent")
     assert KEY not in str(sent[0].url)
     assert clients[0].is_closed
     assert upstream.closed
+
+
+@pytest.mark.asyncio
+async def test_finish_reason_ends_stream_even_if_upstream_stays_open(monkeypatch):
+    _, clients, upstream = mock_stream(
+        monkeypatch,
+        event(audio_payload(PCM[:16])) + event(audio_payload(PCM[16:]))
+        + event({"candidates": [{"finishReason": "STOP"}]}),
+        stall=True,
+    )
+    stream = await project_gemini_tts.open_stream(request(), credential(), "tts-model")
+    assert stream.end_reason == ""
+    async with asyncio.timeout(1):
+        assert [chunk async for chunk in stream] == [PCM[:16], PCM[16:]]
+    assert stream.end_reason == "finish:STOP"
+    assert clients[0].is_closed
+    assert upstream.closed
+
+
+@pytest.mark.asyncio
+async def test_finish_event_audio_is_delivered_before_stream_ends(monkeypatch):
+    payload = audio_payload(PCM[16:])
+    payload["candidates"][0]["finishReason"] = "STOP"
+    mock_stream(monkeypatch, event(audio_payload(PCM[:16])) + event(payload), stall=True)
+    stream = await project_gemini_tts.open_stream(request(), credential(), "tts-model")
+    async with asyncio.timeout(1):
+        assert [chunk async for chunk in stream] == [PCM[:16], PCM[16:]]
+    assert stream.end_reason == "finish:STOP"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("trailing,reason", [
+    ("", "eof"),
+    (event({"candidates": [{"finishReason": "STOP"}]}).rstrip("\n"), "finish:STOP"),
+    ("data: [DONE]", "done"),
+])
+async def test_sse_records_reason_at_eof(monkeypatch, trailing, reason):
+    mock_stream(monkeypatch, event(audio_payload()) + trailing)
+    stream = await project_gemini_tts.open_stream(request(), credential(), "tts-model")
+    assert [chunk async for chunk in stream] == [PCM]
+    assert stream.end_reason == reason
 
 
 @pytest.mark.asyncio

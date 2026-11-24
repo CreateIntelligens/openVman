@@ -8,12 +8,13 @@ import io
 import json
 import wave
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from time import monotonic
 
 import httpx
 
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
-from app.upstream_guard import knob, HopTimeout
+from app.upstream_guard import HopTimeout, knob
 
 GOOGLE_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 SAMPLE_RATE = 24000
@@ -88,14 +89,23 @@ def audio_chunks(payload: dict) -> list[bytes]:
     return chunks
 
 
-def event_chunks(data: str) -> list[bytes]:
+def parse_event(data: str) -> tuple[list[bytes], str]:
     try:
         payload = json.loads(data)
     except ValueError:
         raise RuntimeError("Gemini TTS stream failed") from None
     if not isinstance(payload, dict) or "error" in payload:
         raise RuntimeError("Gemini TTS stream failed")
-    return audio_chunks(payload)
+    chunks = audio_chunks(payload)
+    for candidate in payload.get("candidates", []):
+        reason = candidate.get("finishReason")
+        if isinstance(reason, str) and reason:
+            return chunks, reason
+    return chunks, ""
+
+
+def event_chunks(data: str) -> list[bytes]:
+    return parse_event(data)[0]
 
 
 def synthesize(
@@ -138,6 +148,11 @@ def synthesize(
     )
 
 
+@dataclass
+class _StreamState:
+    end_reason: str = ""
+
+
 class _ProjectGeminiStream:
     """Yield the primed first chunk, then the rest; any end path releases upstream.
 
@@ -145,12 +160,19 @@ class _ProjectGeminiStream:
     上游連線與 client 會留著不關。
     """
 
-    def __init__(self, first: bytes, chunks, response, client) -> None:
+    def __init__(
+        self, first: bytes, chunks, response, client, state: _StreamState,
+    ) -> None:
         self._first: bytes | None = first
         self._chunks = chunks
         self._response = response
         self._client = client
+        self._state = state
         self._closed = False
+
+    @property
+    def end_reason(self) -> str:
+        return self._state.end_reason
 
     def __aiter__(self) -> _ProjectGeminiStream:
         return self
@@ -182,7 +204,7 @@ class _ProjectGeminiStream:
 
 async def open_stream(
     request: SynthesizeRequest, credential, model: str,
-) -> AsyncIterator[bytes]:
+) -> _ProjectGeminiStream:
     from app.config import get_tts_config
 
     cfg = get_tts_config()
@@ -194,6 +216,7 @@ async def open_stream(
     ))
     response = None
     chunks = None
+    state = _StreamState()
     started = monotonic()
     try:
         upstream = client.build_request(
@@ -222,22 +245,30 @@ async def open_stream(
 
         async def audio() -> AsyncIterator[bytes]:
             event: list[str] = []
+            lines = response.aiter_lines()
             try:
-                async for line in response.aiter_lines():
-                    if line.startswith("data:"):
+                while True:
+                    line = await anext(lines, None)
+                    if line and line.startswith("data:"):
                         event.append(line[5:].lstrip())
                     elif not line and event:
+                        # EOF 也可能是最後一個 SSE 事件的邊界。
                         data = "\n".join(event)
                         event.clear()
                         if data == "[DONE]":
+                            state.end_reason = "done"
                             return
-                        for chunk in event_chunks(data):
+                        event_audio, finish_reason = parse_event(data)
+                        for chunk in event_audio:
                             yield chunk
+                        if finish_reason:
+                            state.end_reason = f"finish:{finish_reason}"
+                            return
+                    if line is None:
+                        break
             except httpx.HTTPError:
                 raise RuntimeError("Gemini TTS stream failed") from None
-            if event and "\n".join(event) != "[DONE]":
-                for chunk in event_chunks("\n".join(event)):
-                    yield chunk
+            state.end_reason = "eof"
 
         chunks = audio()
         try:
@@ -258,4 +289,4 @@ async def open_stream(
         await client.aclose()
         raise
 
-    return _ProjectGeminiStream(first, chunks, response, client)
+    return _ProjectGeminiStream(first, chunks, response, client, state)
