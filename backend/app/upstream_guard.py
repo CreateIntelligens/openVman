@@ -637,8 +637,14 @@ async def guard_stream(
 
     header 已經送出去了，換引擎來不及，只能把串流收掉、記一筆，讓前台當作正常結束
     （少了尾巴，總比轉圈圈好）。整條串流只記一筆 attempt。
+
+    這一筆另外記兩個最長等待，用來分辨前台斷音是誰慢：``max_wait_ms`` 是有了第一包之後，
+    等上游下一包最久等了多久（上游一陣一陣送）；``max_send_ms`` 是交出一包後，等下游來拿
+    下一包最久等了多久（Backend 或前台來不及收）。
     """
     outcome, error, total_bytes = OK, "", 0
+    chunks, max_wait, max_send = 0, 0.0, 0.0
+    have_audio = bool(first)
     first_ms = round((monotonic() - started) * 1000) if first is not None else None
     if not hasattr(stream, "__aiter__"):
         # StreamingResponse 也收同步 iterator（在 threadpool 裡跑）；這裡比照辦理。
@@ -649,8 +655,12 @@ async def guard_stream(
     try:
         if first:
             total_bytes += len(first)
+            chunks += 1
+            handed = monotonic()
             yield first
+            max_send = max(max_send, monotonic() - handed)
         while True:
+            waiting = monotonic()
             try:
                 async with asyncio.timeout(stall_seconds):
                     chunk = await iterator.__anext__()
@@ -662,10 +672,16 @@ async def guard_stream(
                 break
             if not chunk:
                 continue
+            if have_audio:
+                max_wait = max(max_wait, monotonic() - waiting)
+            have_audio = True
             if first_ms is None:
                 first_ms = round((monotonic() - started) * 1000)
             total_bytes += len(chunk)
+            chunks += 1
+            handed = monotonic()
             yield chunk
+            max_send = max(max_send, monotonic() - handed)
     except asyncio.CancelledError:
         outcome, error = ERROR, "client disconnected"
         raise
@@ -678,7 +694,9 @@ async def guard_stream(
     finally:
         emit_attempt(
             kind, node, outcome, (monotonic() - started) * 1000,
-            host=host, error=error, first_byte_ms=first_ms, bytes=total_bytes, **extra,
+            host=host, error=error, first_byte_ms=first_ms, bytes=total_bytes,
+            chunks=chunks, max_wait_ms=round(max_wait * 1000), max_send_ms=round(max_send * 1000),
+            **extra,
         )
         aclose = getattr(iterator, "aclose", None)
         if aclose is not None:

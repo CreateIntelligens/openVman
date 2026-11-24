@@ -303,6 +303,7 @@ Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/health` 探
 | `BRAIN_PROXY_READ_TIMEOUT_SECONDS` | 120 | 兩個 chunk 之間的上限；LLM 跑工具時句子之間會停很久，維持原值 |
 | `UPSTREAM_BREAKER_FAILURES`／`UPSTREAM_BREAKER_COOLDOWN_SECONDS` | 2／60 | 同 Brain `provider_health`：逾時或 5xx 連續兩次冷卻一分鐘 |
 | `UPSTREAM_PROBE_INTERVAL_SECONDS`／`UPSTREAM_PROBE_TIMEOUT_SECONDS` | 10／1.5 | 背景健康探測的週期與單次上限；0 表示不探測 |
+| `EVENT_LOOP_LAG_THRESHOLD_SECONDS` | 0.25 | 每個 worker 每 0.25 秒量一次事件迴圈，晚醒超過這個值就記一行 `event_loop_lag`；0 表示不量 |
 
 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20）仍是 r2t2-dev 這一站的上限，連線另用 `ASR_CONNECT_TIMEOUT_SECONDS`。OpenAI 轉寫改成這一站的預算、`max_retries=0`（SDK 預設 600 秒並重試兩次）。
 
@@ -321,6 +322,8 @@ Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/health` 探
 **斷路器**（每個 worker 各記各的，重啟清空）：連不上（connect 失敗）立刻冷卻；逾時與 5xx 連續 `UPSTREAM_BREAKER_FAILURES` 次才冷卻；成功或 4xx 歸零。冷卻中的引擎在自動備援裡跳過（記 `skipped_breaker`），全部都在冷卻時照樣全部試。被指名的引擎照試：`provider` 指定、後台試聽帶 `model_id`、`/tts/stream` 指名 VoxCPM 都不跳過；專案引擎順位裡的引擎被跳過時，回應標 `X-TTS-Fallback: true`，`X-TTS-Fallback-Reason` 寫「`<引擎>: skipped: cooling down (…s left)`」。批次 ASR 只剩一家（使用者指定、不備援）時照試。詞表查詢失敗與 VoxCPM 自己的健康檢查（已有 10 秒快取）不計入斷路器。
 
 **背景健康探測**：lifespan 啟動一個背景 task，每 `UPSTREAM_PROBE_INTERVAL_SECONDS` 探一次有設定網址的節點，單次上限 `UPSTREAM_PROBE_TIMEOUT_SECONDS`，永遠不在請求路徑上。TTS 用 `health_payloads.py` 的既有探測（VoxCPM `/api/v1/health`、CosyVoice `/health`、IndexTTS `/health`、nurse `/health`，回 ready 才算正常）；Gemini 轉接服務（`TTS_GEMINI_URL`，有設就探，不論目前路線）與批次 ASR（breeze、r2t2、r2t2-dev、sensevoice）沒有確認過的 health 格式，打 `<網址>/health`，有 HTTP 回應且不是 5xx 就算活著。不探 Edge、OpenAI 與 Google 的雲端 API。探測失敗把節點標成 down（維持三個週期，探測停了也會自己過期），自動備援直接跳過它；探測成功解除 down，也解除「連不上」造成的冷卻，但**不**解除逾時／5xx 造成的冷卻：/health 會綠、合成卻卡住的情況真的發生過（VoxCPM worker 被 OOM 殺掉、health 照回 ok）。只在狀態改變時記一行 `upstream_probe`（`node`、`host`、`state`、`elapsed_ms`、`error`）。
+
+**串流與事件迴圈的停頓紀錄**：音訊串流（`guard_stream`）的那一行 `upstream_attempt` 另帶 `chunks`、`max_wait_ms`（有了第一包之後，等上游下一包最久等了多久）與 `max_send_ms`（交出一包後，等下游來拿下一包最久等了多久），用來分辨前台斷音是上游一陣一陣送，還是 Backend 或前台來不及收。每個 worker 另有一個背景 task（`backend/app/loop_lag.py`）每 0.25 秒醒來一次，晚醒超過 `EVENT_LOOP_LAG_THRESHOLD_SECONDS` 就記一行 `event_loop_lag`（`lag_ms`、`loop_cpu_ms`、`interval_ms`、`pid`）：`loop_cpu_ms` 接近 `lag_ms` 代表事件迴圈被計算卡住，接近 0 代表被同步的 I/O、鎖或 DNS 之類的等待卡住。
 
 **嘗試紀錄**：logger `upstream_attempt`（自己的 stderr handler，不開 root INFO），每一站一行 JSON：
 

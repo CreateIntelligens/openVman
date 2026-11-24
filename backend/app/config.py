@@ -480,6 +480,11 @@ class TTSRouterConfig(BaseSettings):
     upstream_probe_timeout_seconds: float = Field(
         default=1.5, gt=0, validation_alias="UPSTREAM_PROBE_TIMEOUT_SECONDS",
     )
+    # 事件迴圈延遲：每個 worker 每 0.25 秒量一次，晚醒超過這麼久就記一筆 event_loop_lag
+    # （含這段時間的 CPU，分辨是被計算還是被等待卡住）。0 表示不量。
+    event_loop_lag_threshold_seconds: float = Field(
+        default=0.25, ge=0, validation_alias="EVENT_LOOP_LAG_THRESHOLD_SECONDS",
+    )
     # <<< 上游逾時、鏈期限與斷路器
 
     # --- Camera ---

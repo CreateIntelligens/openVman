@@ -26,6 +26,7 @@ from app.gateway.worker import (
     reset_plugins,
 )
 from app.internal_routes import _http as _internal_http
+from app.loop_lag import run_loop_lag_monitor
 from app.openapi import _health_http
 from app.providers.edge_tts_probe import run_edge_tts_probe_loop
 from app.upstream_guard import knob
@@ -33,6 +34,9 @@ from app.upstream_probe import run_upstream_probe_loop
 from app.providers.voice_catalog import _http as _voice_catalog_http
 from app.routes import admin as admin_routes
 from app.system_resources import sync_asr_engines, sync_system_resources
+
+# 量事件迴圈延遲的間隔；門檻在設定裡（event_loop_lag_threshold_seconds）。
+LOOP_LAG_INTERVAL_SECONDS = 0.25
 
 logger = logging.getLogger("backend")
 
@@ -110,6 +114,14 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if probe_interval > 0
         else None
     )
+    lag_threshold = knob(cfg, "event_loop_lag_threshold_seconds")
+    loop_lag = (
+        asyncio.create_task(
+            run_loop_lag_monitor(LOOP_LAG_INTERVAL_SECONDS, lag_threshold), name="loop-lag",
+        )
+        if lag_threshold > 0
+        else None
+    )
     logger.info("backend startup complete")
     try:
         yield
@@ -118,6 +130,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             edge_probe.cancel()
         if upstream_probe:
             upstream_probe.cancel()
+        if loop_lag:
+            loop_lag.cancel()
         if a2a_daemon:
             await a2a_daemon.stop()
         # 背景還沒寫進去的 embed key 記帳先寫完再關（最多等 3 秒）。

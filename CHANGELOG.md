@@ -4,6 +4,7 @@
 
 ### Added
 
+- **[2026-11-24]** **Backend 停頓紀錄**：11/24 的 100 題壓測，Backend 四個 worker 同時停了約 2 秒（沒有 log、CPU 幾乎是 0，連打同網段節點的健康探測都失敗），事後從 log 看不出卡在哪。每個 worker 新增事件迴圈延遲 watchdog（`backend/app/loop_lag.py`），每 0.25 秒醒來一次，晚醒超過 `EVENT_LOOP_LAG_THRESHOLD_SECONDS`（預設 0.25 秒，0 關閉）就記一行 `event_loop_lag`，附這段時間事件迴圈用掉的 CPU，分辨是被計算還是被等待卡住。音訊串流的 `upstream_attempt` 另帶 `chunks`、`max_wait_ms`（等上游最久）與 `max_send_ms`（等下游最久），分辨斷音是上游一陣一陣送，還是 Backend 或前台來不及收。
 - **[2026-11-20]** **多人端到端模擬工具**：`scripts/experiments/brain-worker-split/users_e2e.py` 照 SDK `ask()` 的協定模擬 N 個人各問 M 題（逐句串流合成、唸完停 2～3 秒再問），每題記錄與 `burst_nodes.py` 同格式，`node_report.py` 多一欄「整段回答唸完」。
 - **[2026-11-20]** **SDK 的 `reply` 事件帶出 `sessionId` 與 `traceId`**：嵌入頁面可以把每一輪對到後端 log 與對話紀錄，壓測與除錯時不必再用時間和題目去猜。
 - **[2026-11-20]** **壓測逐段計時工具**：`scripts/experiments/brain-worker-split/burst_nodes.py` 與 `node_report.py`，把「1 秒 N 題」拆成 Backend 轉送、Brain 前置、決策、知識庫、LLM 首字、文字第一句、TTS 首段、聽到第一句與完成；`resource_monitor.py` 加上各容器網路收發。
