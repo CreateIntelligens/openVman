@@ -80,3 +80,36 @@ test("a failed TTS request still lets idle resolve", async () => {
   await reply.idle();
   assert.deepEqual(spoken, ["壞掉。"]);
 });
+
+test("a cancelled reply that settles late does not clear the next reply's waiting state", async () => {
+  // PR Agent 回報的競態：舊回合的 TTS 被打斷後才結束，不能把新回合的 ttsPending 清成 false。
+  const finishers = [];
+  const { reply, waiting } = harness(() => new Promise((resolve) => finishers.push(resolve)));
+  reply.speak("舊回答。");
+  assert.equal(waiting.at(-1), true, "speaking keeps the mic closed");
+  reply.cancel();
+  reply.collect("新回答的第一句。");
+  assert.equal(waiting.at(-1), true);
+  finishers[0]();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(waiting.at(-1), true, "the old reply settling late leaves the new reply waiting");
+  reply.finish("新回答的第一句。");
+  finishers[1]();
+  await reply.idle();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(waiting.at(-1), false, "the current reply ending clears it");
+});
+
+test("speaking twice without cancel lets only the latest reply clear the state", async () => {
+  const finishers = [];
+  const { reply, waiting } = harness(() => new Promise((resolve) => finishers.push(resolve)));
+  reply.speak("第一段。");
+  reply.speak("第二段。");
+  finishers[0]();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(waiting.at(-1), true);
+  finishers[1]();
+  await reply.idle();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(waiting.at(-1), false);
+});

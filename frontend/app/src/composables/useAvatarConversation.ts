@@ -153,12 +153,10 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   const replySpeech = createReplySpeech({
     speak: (segment) => {
       pendingText = segment;
-      ttsPending.value = true;
       turnTiming.mark("tts_start");
-      return ttsStreamer.speak(segment, replySpeakOptions).finally(() => {
-        ttsPending.value = false;
-      });
+      return ttsStreamer.speak(segment, replySpeakOptions);
     },
+    // 合成中、念完的 ttsPending 由 replySpeech 依回合管理：被取消的舊回合晚結束時不會清掉新回合的狀態。
     onWaiting: (waiting) => {
       ttsPending.value = waiting;
     },

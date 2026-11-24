@@ -273,7 +273,7 @@ VAD 模型與 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 由 `vad-reco
 
 #### 7.3 整段合成
 
-`replySpeech.ts` 每一輪只打一次 TTS：串流到的句子先收著（`collect`），`done` 到了以 `done.reply` 合成（`finish`；`done.reply` 是空字串時才念收到的句子）。不逐句合成：逐句時下一段要等上一段下載完才送，第一句短時中間會斷音，每段的語氣也各自不同；Gemini、VoxCPM、Edge、IndexTTS 的首包跟文字長短無關，CosyVoice 要整段合成完才出聲，字數越多越晚。等待期間 `onWaiting` 讓 `ttsPending` 為 true；沒有東西可念、被取消時回 false。
+`replySpeech.ts` 每一輪只打一次 TTS：串流到的句子先收著（`collect`），`done` 到了以 `done.reply` 合成（`finish`；`done.reply` 是空字串時才念收到的句子）。不逐句合成：逐句時下一段要等上一段下載完才送，第一句短時中間會斷音，每段的語氣也各自不同；Gemini、VoxCPM、Edge、IndexTTS 的首包跟文字長短無關，CosyVoice 要整段合成完才出聲，字數越多越晚。從第一句收進來到這一輪的 TTS 回應結束，`onWaiting` 讓 `ttsPending` 為 true（第一段聲音出來時前台另外先清掉）；沒有東西可念、被取消時回 false。每一輪有自己的代號，被取消的舊回合晚結束時不回報，不會清掉新回合的狀態。
 
 ### 8. Live 模式（WebSocket）
 

@@ -36,7 +36,8 @@ test("the stream is closed rather than left idle while the avatar speaks", () =>
 test("the gap while TTS synthesises still counts as answering", () => {
   const block = app.match(/const avatarSpeaking = computed\(\(\) =>([\s\S]*?)\);/);
   assert.match(block[1], /ttsPending\.value/);
-  assert.match(app, /ttsPending\.value = true;\s*turnTiming\.mark\("tts_start"\);\s*return ttsStreamer\.speak/);
+  // 從收到句子到這一輪 TTS 結束都算在回答；狀態由 replySpeech 依回合回報（行為見 replySpeech.test.mjs）。
+  assert.match(app, /onWaiting: \(waiting\) => \{\s*ttsPending\.value = waiting;/);
 });
 
 test("turning the microphone off by hand is not undone after the reply", () => {

@@ -11,7 +11,11 @@
 export interface ReplySpeechOptions {
   /** Synthesize the reply and hand its audio to the player; resolves when the TTS response ends. */
   speak: (text: string) => Promise<void>;
-  /** True while sentences have arrived but speech has not started; false once the reply is spoken or dropped. */
+  /**
+   * True from the first collected sentence until this reply's TTS response ends;
+   * false when there is nothing to say or the reply is dropped. A cancelled
+   * reply that settles late never reports, so it cannot clear a newer reply's state.
+   */
   onWaiting?: (waiting: boolean) => void;
 }
 
@@ -27,16 +31,21 @@ export function createReplySpeech(options: ReplySpeechOptions) {
   /** Speak a complete reply now. */
   function speak(text: string): void {
     collected = "";
+    generation += 1;
+    const current = generation;
     if (!text.trim()) {
+      running = null;
       setWaiting(false);
       return;
     }
-    const current = generation;
+    setWaiting(true);
     // 失敗由 speak 自己回報；這裡只負責記錄是否還在念。
     running = options.speak(text)
       .catch(() => undefined)
       .finally(() => {
-        if (current === generation) running = null;
+        if (current !== generation) return;
+        running = null;
+        setWaiting(false);
       });
   }
 
