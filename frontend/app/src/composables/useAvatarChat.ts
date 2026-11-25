@@ -62,6 +62,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let activeSourcePath: string | undefined = undefined
        let activeSourcePathContent: string | undefined = undefined
        let activeImageId: string | undefined = undefined
+       let activeContactImageId: string | undefined = undefined
        let activeUrl: string | undefined = undefined
 
        let currentPersonaId = options.personaId ?? 'default'
@@ -149,6 +150,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      ?? optionalString(primary?.url)
                      ?? optionalString(primary?.source_url)
               if (imageId) activeImageId = imageId
+              const contactImageId = optionalString(data.contact_image_id)
+              if (contactImageId) activeContactImageId = contactImageId
               if (url) activeUrl = url
        }
 
@@ -164,22 +167,22 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        function consumeActiveMetadata(): Pick<
               ChatMessage,
-              'sourcePath' | 'sourcePathContent' | 'imageId' | 'url' | 'projectId'
+              'sourcePath' | 'sourcePathContent' | 'imageId' | 'contactImageId' | 'url' | 'projectId'
        > {
               const source: Pick<
                      ChatMessage,
-                     'sourcePath' | 'sourcePathContent' | 'imageId' | 'url' | 'projectId'
+                     'sourcePath' | 'sourcePathContent' | 'imageId' | 'contactImageId' | 'url' | 'projectId'
               > = {}
               if (activeSourcePath) source.sourcePath = activeSourcePath
               if (activeSourcePathContent) source.sourcePathContent = activeSourcePathContent
-              if (activeImageId) {
-                     source.imageId = activeImageId
-                     source.projectId = currentProjectId
-              }
+              if (activeImageId) source.imageId = activeImageId
+              if (activeContactImageId) source.contactImageId = activeContactImageId
+              if (activeImageId || activeContactImageId) source.projectId = currentProjectId
               if (activeUrl) source.url = activeUrl
               activeSourcePath = undefined
               activeSourcePathContent = undefined
               activeImageId = undefined
+              activeContactImageId = undefined
               activeUrl = undefined
               return source
        }
@@ -359,6 +362,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
               activeSourcePath = sourcePath
               activeSourcePathContent = sourcePathContent
               activeImageId = undefined
+              activeContactImageId = undefined
               activeUrl = undefined
               if (currentMode === 'text') {
                      if (merge) {

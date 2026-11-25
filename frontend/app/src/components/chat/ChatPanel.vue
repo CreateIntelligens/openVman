@@ -22,7 +22,7 @@
               :is-typing="isTyping && msg === messages[messages.length - 1]"
             />
           </p>
-          <div v-if="msg.role === 'ai' && (msg.imageId || safeHttpUrl(msg.url))" class="chat-msg__media">
+          <div v-if="msg.role === 'ai' && (msg.imageId || msg.contactImageId || safeHttpUrl(msg.url))" class="chat-msg__media">
             <img
               v-if="msg.imageId && !failedImages[mediaKey(i, msg)]"
               :src="qaImageUrl(msg)"
@@ -30,6 +30,14 @@
               loading="lazy"
               decoding="async"
               @error="failedImages[mediaKey(i, msg)] = true"
+            />
+            <img
+              v-if="msg.contactImageId && !failedImages[`${mediaKey(i, msg)}:contact`]"
+              :src="qaImageUrl(msg, msg.contactImageId)"
+              alt="掃描 QR code 洽詢專人"
+              loading="lazy"
+              decoding="async"
+              @error="failedImages[`${mediaKey(i, msg)}:contact`] = true"
             />
             <a
               v-if="safeHttpUrl(msg.url)"
@@ -311,10 +319,10 @@ function mediaKey(index: number, message: ChatMessage): string {
   return `${index}:${message.imageId || ""}`
 }
 
-function qaImageUrl(message: ChatMessage): string {
-  if (!message.imageId) return ""
+function qaImageUrl(message: ChatMessage, imageId = message.imageId): string {
+  if (!imageId) return ""
   const params = new URLSearchParams({ project_id: message.projectId || "default" })
-  return `/api/v1/knowledge/qa/images/${encodeURIComponent(message.imageId)}?${params}`
+  return `/api/v1/knowledge/qa/images/${encodeURIComponent(imageId)}?${params}`
 }
 
 function safeHttpUrl(value?: string): string | null {

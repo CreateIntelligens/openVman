@@ -175,3 +175,35 @@ test("media from done is attached to the subtitle bubble already on screen", asy
   assert.equal(bubble.imageId, "img-1");
   assert.equal(bubble.url, "https://example.test/p");
 });
+
+test("a persona contact image is kept next to the cited picture on the same bubble", async (t) => {
+  const { chat, requests, open, accepted } = await harness(t);
+  chat.sendMessage("EG 刀組是什麼材質");
+  const stream = open(0);
+  stream.sentence(0, "AISI 440C。"); await tick();
+  chat.beginAssistantMessage();
+  chat.appendAssistantText("AISI 440C。");
+  stream.done(doneFor(requests[0], { reply: "AISI 440C。", image_id: "eg.webp", contact_image_id: "qr.png" }));
+  await tick();
+  accepted(1); await tick();
+  const bubble = chat.messages.value.at(-1);
+  assert.equal(bubble.imageId, "eg.webp");
+  assert.equal(bubble.contactImageId, "qr.png");
+  assert.ok(bubble.projectId);
+});
+
+test("a reply with only a contact image still shows it", async (t) => {
+  const { chat, requests, open, accepted } = await harness(t);
+  chat.sendMessage("保固多久");
+  const stream = open(0);
+  stream.sentence(0, "查不到。"); await tick();
+  chat.beginAssistantMessage();
+  chat.appendAssistantText("查不到。");
+  stream.done(doneFor(requests[0], { reply: "查不到。", no_answer: true, contact_image_id: "qr.png" }));
+  await tick();
+  accepted(1); await tick();
+  const bubble = chat.messages.value.at(-1);
+  assert.equal(bubble.imageId, undefined);
+  assert.equal(bubble.contactImageId, "qr.png");
+  assert.ok(bubble.projectId);
+});

@@ -24,6 +24,8 @@ export interface ChatMessage {
        sourcePath?: string
        sourcePathContent?: string
        imageId?: string
+       /** 人設的聯絡圖片（例如展場 QR code），跟引用的 imageId 是兩張圖。 */
+       contactImageId?: string
        url?: string
        projectId?: string
 }
@@ -34,6 +36,7 @@ export interface ChatResponse {
        session_id?: string
        citations?: unknown
        image_id?: unknown
+       contact_image_id?: unknown
        url?: unknown
        requires_accept?: boolean
        turn_id?: string
