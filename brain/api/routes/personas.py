@@ -29,6 +29,7 @@ from personas.personas import (
     list_personas,
     normalize_persona_id,
     set_persona_avatar,
+    set_persona_contact_image,
     set_persona_language_settings,
 )
 from protocol.schemas import (
@@ -321,3 +322,26 @@ def get_persona_greeting_route(
     if greeting is None:
         raise HTTPException(status_code=404, detail="這個語言沒有設定開場白。")
     return greeting
+
+
+class PersonaContactImagePut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    persona_id: str
+    project_id: str = "default"
+    image_id: str | None
+
+
+@router.put("/personas/contact-image", summary="設定人設每則回覆都附的聯絡圖片（例如 QR code）")
+def put_persona_contact_image_route(payload: PersonaContactImagePut):
+    try:
+        result = set_persona_contact_image(payload.persona_id, payload.image_id, payload.project_id)
+    except ValueError as exc:
+        raise _language_settings_error(exc) from exc
+    log_event(
+        "persona_contact_image_set",
+        persona_id=result["persona_id"],
+        project_id=payload.project_id,
+        has_image=bool(result["contact_image_id"]),
+    )
+    return result

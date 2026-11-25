@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 
 import pytest
@@ -152,3 +154,71 @@ def test_requests_without_the_internal_token_are_refused(root):
     assert anonymous.get(_URL).status_code in {401, 403}
     assert anonymous.get("/brain/personas/greeting", params={"language": "en"}).status_code in {401, 403}
     assert personas.get_persona_language_settings("guide")["greetings"] == {}
+
+
+_QR = "0f1e2d3c-4b5a-4968-8776-655443322110.png"
+
+
+def _qr_file(root: Path) -> None:
+    images = root / "knowledge" / ".qa_images"
+    images.mkdir(parents=True, exist_ok=True)
+    (images / _QR).write_bytes(b"\x89PNG\r\n\x1a\n")
+
+
+def test_contact_image_is_set_read_back_and_cleared(root, client):
+    _qr_file(root)
+    response = client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
+    assert response.status_code == 200
+    assert response.json() == {"persona_id": "guide", "contact_image_id": _QR}
+    assert personas.persona_contact_image("guide") == _QR
+
+    assert client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": None}).status_code == 200
+    assert personas.persona_contact_image("guide") is None
+
+
+def test_contact_image_keeps_greetings_and_avatar(root, client):
+    _qr_file(root)
+    _put(client, greetings={"en": "Hello"})
+    personas.set_persona_avatar("guide", "char-1", "default")
+    client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
+    settings = client.get(_URL, params={"persona_id": "guide"}).json()
+    assert settings["greetings"] == {"en": "Hello"}
+    assert personas._read_avatar_meta("guide", "default", is_default=False)["avatar_char_id"] == "char-1"
+
+
+@pytest.mark.parametrize("image_id", ["../SOUL.md", "qr.png", "0f1e2d3c-4b5a-4968-8776-655443322110.svg"])
+def test_contact_image_only_accepts_uploaded_qa_image_ids(root, client, image_id):
+    _qr_file(root)
+    response = client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": image_id})
+    assert response.status_code == 400
+    assert personas.persona_contact_image("guide") is None
+
+
+def test_contact_image_must_exist(root, client):
+    response = client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
+    assert response.status_code == 400
+
+
+def test_contact_image_lookup_never_raises_for_unknown_personas(root):
+    assert personas.persona_contact_image("nobody") is None
+    assert personas.persona_contact_image("../etc") is None
+
+
+def test_image_cleanup_keeps_a_persona_contact_image(root, client, monkeypatch):
+    from knowledge import qa_nodes
+
+    _qr_file(root)
+    stray = root / "knowledge" / ".qa_images" / "11111111-2222-4333-8444-555555555555.png"
+    stray.write_bytes(b"\x89PNG\r\n\x1a\n")
+    client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
+    # 清除只動十分鐘前的檔案；把兩張都調成舊檔，才看得出是「有在用」才保住。
+    old = time.time() - 3600
+    for path in (root / "knowledge" / ".qa_images").iterdir():
+        os.utime(path, (old, old))
+    monkeypatch.setattr(qa_nodes, "ensure_workspace_scaffold", lambda project_id="default": root)
+
+    deleted = qa_nodes.cleanup_unused_images("default")
+
+    assert (root / "knowledge" / ".qa_images" / _QR).exists()
+    assert not stray.exists()
+    assert str(stray) in deleted

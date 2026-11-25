@@ -111,6 +111,10 @@ class ChatResponse(BaseModel):
     image_kind: str | None = Field(
         None, description="圖片類型：qr 是整張以 QR code 為主，image 是一般圖片；判斷不了時不出現",
     )
+    contact_image_id: str | None = Field(
+        None, description="人設設定的聯絡圖片（例如 QR code），每則回覆都附；跟 image_id 是不同的兩張圖",
+    )
+    contact_image_kind: str | None = Field(None, description="聯絡圖片的類型（qr／image），規則同 image_kind")
     url: str | None = Field(None, description="第一個引用的來源網址（有才出現）")
     tool_steps: list[dict[str, Any]] = Field(default_factory=list, description="這一輪呼叫過的工具")
     response_time_s: float | None = Field(None, description="生成耗時（秒）")

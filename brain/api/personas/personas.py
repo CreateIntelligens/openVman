@@ -383,6 +383,52 @@ def get_persona_greeting(
     return {"language": language, "text": text, "voice": settings["voices"].get(language)}
 
 
+# QA 圖片上傳產生的代號：uuid 加副檔名。只收這種，人設不能指到工作區裡的任意檔案。
+_CONTACT_IMAGE_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpe?g|webp|gif|bmp|avif)"
+)
+
+
+def set_persona_contact_image(
+    persona_id: str, image_id: str | None, project_id: str = "default",
+) -> dict[str, Any]:
+    """Attach (or clear with None) the image every reply of this persona carries, such as a QR code."""
+    from knowledge.qa_images import resolve_qa_image_path
+
+    normalized, meta_path, meta = _existing_persona_meta(persona_id, project_id)
+    if image_id is None:
+        meta.pop("contact_image_id", None)
+    else:
+        if not _CONTACT_IMAGE_RE.fullmatch(image_id):
+            raise ValueError("聯絡圖片必須是 QA 圖片上傳後拿到的圖片代號。")
+        if resolve_qa_image_path(image_id, project_id) is None:
+            raise ValueError("找不到這張圖片，請先上傳到 QA 圖片。")
+        meta["contact_image_id"] = image_id
+    if normalized == "default":
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+    workspace.write_text_atomic(meta_path, json.dumps(meta, ensure_ascii=False))
+    return {"persona_id": normalized, "contact_image_id": meta.get("contact_image_id")}
+
+
+def persona_contact_image(persona_id: str, project_id: str = "default") -> str | None:
+    """The persona's contact image id, or None; never raises (it runs on every chat reply)."""
+    try:
+        _, _, meta = _existing_persona_meta(persona_id, project_id)
+    except ValueError:
+        return None
+    value = meta.get("contact_image_id")
+    return value if isinstance(value, str) and _CONTACT_IMAGE_RE.fullmatch(value) else None
+
+
+def persona_contact_image_ids(project_id: str = "default") -> set[str]:
+    """Contact images of every persona in the project, so image cleanup keeps them."""
+    ids = set()
+    for persona in list_personas(project_id):
+        if image_id := persona_contact_image(persona["persona_id"], project_id):
+            ids.add(image_id)
+    return ids
+
+
 def _avatar_meta_path(persona_id: str, project_id: str, *, is_default: bool) -> Path:
     if is_default:
         return workspace.get_workspace_root(project_id) / AVATAR_META_FILENAME

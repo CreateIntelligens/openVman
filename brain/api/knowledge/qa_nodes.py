@@ -850,6 +850,11 @@ def cleanup_unused_images(project_id: str = "default") -> list[str]:
                 if image_id:
                     used_image_ids.add(image_id)
 
+        # 人設的聯絡圖片（例如每則回覆都附的 QR code）沒有掛在任何 QA 上，也算用到。
+        from personas.personas import persona_contact_image_ids
+
+        used_image_ids |= persona_contact_image_ids(project_id)
+
         images_dir = ensure_workspace_scaffold(project_id) / "knowledge" / ".qa_images"
         if not images_dir.exists() or not images_dir.is_dir():
             return []

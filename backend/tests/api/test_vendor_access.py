@@ -843,6 +843,7 @@ def test_vendor_cannot_read_or_write_core_files_through_document_apis(env, vendo
     ("GET", "personas/language-settings", None),
     ("PUT", "personas/language-settings", {"persona_id": "default", "greetings": {}, "voices": {}}),
     ("GET", "personas/greeting", None),
+    ("PUT", "personas/contact-image", {"persona_id": "default", "image_id": None}),
     ("POST", "search", {"query": "工作區", "table": "knowledge"}),
     ("GET", "identity", None),
     ("GET", "memories", None),

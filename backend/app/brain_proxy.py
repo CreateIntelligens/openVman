@@ -102,6 +102,7 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/personas/language-settings", "methods": ["GET"], "tags": _TAG_PERSONAS, "summary": "Read persona greetings and voices per language"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas/language-settings", "methods": ["PUT"], "tags": _TAG_PERSONAS, "summary": "Replace persona greetings and voices per language"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas/greeting", "methods": ["GET"], "tags": _TAG_PERSONAS, "summary": "Get persona greeting and voice for a language"},
+    {"path": f"{_PUBLIC_API_PREFIX}/personas/contact-image", "methods": ["PUT"], "tags": _TAG_PERSONAS, "summary": "Set the contact image every reply of a persona carries"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat/stream", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat (SSE sentence stream)", "response_class": "event_stream"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat/accept", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Accept Chat Turn"},

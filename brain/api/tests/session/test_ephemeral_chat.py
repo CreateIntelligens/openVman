@@ -113,3 +113,38 @@ def test_finalize_returns_and_persists_primary_citation_media():
     assert response["history"][-1]["image_id"] == "B1-4"
     assert assistant_metadata["image_id"] == "B1-4"
     assert assistant_metadata["url"] == "https://example.com/line"
+
+
+def test_finalize_adds_the_persona_contact_image_next_to_the_cited_picture():
+    tool_steps = [{
+        "name": "search_knowledge",
+        "result": json.dumps({"status": "ok", "data": {"citations": [{
+            "uri": "knowledge/qa/catalog.csv", "title": "EG", "text": "刀組 AISI 440C",
+            "distance": 0.1, "image_id": "eg.webp",
+        }]}}),
+    }]
+    kinds = {"eg.webp": "image", "qr.png": "qr"}
+    with (
+        patch.object(chat_service, "append_session_message_with_id", return_value=(None, "id")),
+        patch.object(chat_service, "archive_session_turn"),
+        patch.object(chat_service, "_schedule_memory_writes"),
+        patch.object(chat_service, "persona_contact_image", return_value="qr.png"),
+        patch.object(chat_service, "qa_image_kind", side_effect=lambda image_id, _p: kinds.get(image_id)),
+    ):
+        response = chat_service.finalize_generation(_ctx(), "刀組是 AISI 440C。", tool_steps)
+
+    # 產品圖照舊放 image_id，QR 放另一個欄位，兩張都在。
+    assert (response["image_id"], response["image_kind"]) == ("eg.webp", "image")
+    assert (response["contact_image_id"], response["contact_image_kind"]) == ("qr.png", "qr")
+
+
+def test_finalize_without_a_contact_image_adds_no_field():
+    with (
+        patch.object(chat_service, "append_session_message_with_id", return_value=(None, "id")),
+        patch.object(chat_service, "archive_session_turn"),
+        patch.object(chat_service, "_schedule_memory_writes"),
+        patch.object(chat_service, "persona_contact_image", return_value=None),
+    ):
+        response = chat_service.finalize_generation(_ctx(), "你好。", [])
+
+    assert "contact_image_id" not in response

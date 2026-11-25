@@ -268,6 +268,7 @@ def test_chat_accept_requires_login():
     ("GET", "personas/language-settings", ResourceAccess.READ),
     ("PUT", "personas/language-settings", ResourceAccess.EDIT_KNOWLEDGE),
     ("GET", "personas/greeting", ResourceAccess.READ),
+    ("PUT", "personas/contact-image", ResourceAccess.EDIT_KNOWLEDGE),
 ])
 def test_persona_language_routes_require_login_and_project_access(method, path, access):
     from app.auth.brain_project_access import _project_access, requires_project_context

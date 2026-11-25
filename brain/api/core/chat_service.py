@@ -46,6 +46,7 @@ from memory.memory import (
     update_session_message_metadata,
 )
 from memory.memory_governance import write_summary_and_reindex
+from personas.personas import persona_contact_image
 from privacy.filter import PiiDetectionReport, scan_text_for_pii
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
@@ -506,6 +507,11 @@ def finalize_generation(
     if image_id := primary_media.get("image_id"):
         if image_kind := qa_image_kind(image_id, context.project_id):
             primary_media["image_kind"] = image_kind
+    # 人設設了聯絡圖片（例如展場的 QR code）時每則回覆都附上，跟引用的產品圖分開放，兩張都能顯示。
+    if contact_image_id := persona_contact_image(context.persona_id, context.project_id):
+        primary_media["contact_image_id"] = contact_image_id
+        if contact_kind := qa_image_kind(contact_image_id, context.project_id):
+            primary_media["contact_image_kind"] = contact_kind
     meta: dict[str, Any] = {}
     if tool_steps:
         meta["tool_steps"] = tool_steps
