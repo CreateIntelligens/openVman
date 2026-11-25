@@ -518,7 +518,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 |---|---|
 | `GET /personas/language-settings?persona_id=&project_id=` | 回 `{persona_id, greetings, voices}` |
 | `PUT /personas/language-settings` | body `{persona_id, project_id, greetings, voices}`，整份取代這兩個欄位；格式不合回 400（白話中文訊息），人設不存在回 404；`default` 人設也能設 |
-| `GET /personas/greeting?persona_id=&project_id=&language=` | 回 `{language, text, voice}`，沒設聲音時 `voice` 為 `null`；該語言沒有開場白回 404 |
+| `GET /personas/greeting?persona_id=&project_id=&language=` | 回 `{language, text, voice}`，沒設聲音時 `voice` 為 `null`；該語言沒有開場白回 404。有 `X-OpenVMan-Project-ID` 標頭（Backend 依登入身分或嵌入金鑰算出的專案）時以標頭為準，跟網址的 `project_id` 不同回 400；網站嵌入金鑰可呼叫 |
 | `PUT /personas/contact-image` | body `{persona_id, project_id, image_id}`，設定這個人設每則回覆都附的聯絡圖片（例如展場的 QR code），`image_id` 為 `null` 時清除。只收 `POST /knowledge/qa/images` 上傳後拿到的圖片代號，且檔案要存在，否則 400；人設不存在 404。回覆以 `contact_image_id`／`contact_image_kind` 帶出，跟引用的 `image_id` 是兩張不同的圖；「清除未使用的 QA 圖片」會保留人設引用的聯絡圖片 |
 
 三個路徑與其他 `/personas` 路徑一樣要內部 token；專案權限由 Backend 代理檢查（讀取需讀取權、寫入需「改知識庫與人設」），Brain 不另做帳號判斷，也不開放廠商模式。

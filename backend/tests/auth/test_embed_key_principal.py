@@ -572,3 +572,52 @@ def test_character_list_hides_public_characters_the_key_cannot_load(embed_env, t
     assert sorted(c["char_id"] for c in anonymous) == ["public-allowed", "public-other"]
     assert sorted(c["char_id"] for c in embedded) == ["proj-own", "public-allowed"]
     assert blocked.status_code == 403
+
+
+def _capture_brain_project(monkeypatch):
+    """Record the requests the proxy really sends to Brain, after its own checks."""
+    import httpx
+
+    import app.brain_proxy as brain_proxy
+    seen: list[tuple[str | None, str | None]] = []
+
+    class _Client:
+        def build_request(self, method, url, **kwargs):
+            return httpx.Request(method, url, headers=kwargs.get("headers"), content=kwargs.get("content"), params=kwargs.get("params"))
+
+        async def send(self, request, **_kwargs):
+            seen.append((request.url.params.get("project_id"), request.headers.get("X-OpenVMan-Project-ID")))
+            return httpx.Response(200, json={"language": "en", "text": "Hello", "voice": None}, request=request)
+
+    monkeypatch.setattr(brain_proxy._http, "get", lambda: _Client())
+    return seen
+
+def test_embed_key_reads_its_own_projects_greeting(embed_env, monkeypatch):
+    _module, client, key, _runtime = embed_env
+    seen = _capture_brain_project(monkeypatch)
+
+    without = client.get("/api/v1/personas/greeting?language=en", headers=_headers(key.key_id))
+    matching = client.get("/api/v1/personas/greeting?language=en&project_id=default", headers=_headers(key.key_id))
+
+    assert (without.status_code, matching.status_code) == (200, 200)
+    # 沒帶專案時代理也要把金鑰綁定的專案寫進網址與標頭，Brain 才不會退回別的專案。
+    assert len(seen) == 2
+    assert {query for query, _ in seen} == {header for _, header in seen} == {seen[0][1]}
+    assert seen[0][1]
+
+
+def test_embed_key_cannot_read_another_projects_greeting(embed_env, monkeypatch):
+    _module, client, key, _runtime = embed_env
+    seen = _capture_brain_project(monkeypatch)
+
+    response = client.get("/api/v1/personas/greeting?language=en&project_id=another-project", headers=_headers(key.key_id))
+
+    assert response.status_code == 403
+    assert seen == []
+
+
+def test_embed_key_still_cannot_change_persona_settings(embed_env):
+    _module, client, key, _runtime = embed_env
+
+    for method, path in (("PUT", "/api/v1/personas/language-settings"), ("PUT", "/api/v1/personas/contact-image"), ("GET", "/api/v1/personas/language-settings")):
+        assert client.request(method, path, json={}, headers=_headers(key.key_id)).status_code == 403

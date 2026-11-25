@@ -42,6 +42,8 @@ _ALLOWLISTED_ROUTES = frozenset(
         ("POST", "/api/v1/chat"),
         ("POST", "/api/v1/chat/stream"),
         ("GET", "/api/v1/characters"),
+        # 開場白只讀，專案由代理層依金鑰綁定（Brain 以 X-OpenVMan-Project-ID 為準）。
+        ("GET", "/api/v1/personas/greeting"),
         ("GET", "/api/v1/tts/providers"),
         ("POST", "/api/v1/tts/stream"),
         ("POST", "/v1/audio/speech"),

@@ -44,7 +44,7 @@
 
 - 台語不納入 `language`（台語轉文字是中文字，鎖定規則跟其他語言不同），之後有需要再說。
 - 鶴記 Kiosk 與官網各用哪個前台、能不能帶 `language`，等 PM 回覆（VH-445）。
-- 網站嵌入金鑰目前不在 `/api/v1/personas/greeting` 的白名單裡，SDK 的 `greet()` 在 embed key 模式會被擋（403）；要不要放行，下一階段決定。
+- 網站嵌入金鑰可以呼叫 `GET /api/v1/personas/greeting`（2026-11-25 使用者決定放行）：專案由代理依金鑰綁定，Brain 以 `X-OpenVMan-Project-ID` 為準，網址沒帶專案也不會退回 default。
 - 西文 TTS 用哪個聲音，等 PM 回覆。
 
 ## 驗收

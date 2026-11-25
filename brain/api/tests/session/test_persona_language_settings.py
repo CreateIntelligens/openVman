@@ -222,3 +222,16 @@ def test_image_cleanup_keeps_a_persona_contact_image(root, client, monkeypatch):
     assert (root / "knowledge" / ".qa_images" / _QR).exists()
     assert not stray.exists()
     assert str(stray) in deleted
+
+
+def test_greeting_uses_the_project_the_backend_resolved(root, client, monkeypatch):
+    # 嵌入金鑰的請求網址沒帶專案時，Backend 把金鑰綁的專案放在標頭；不能退回 default。
+    seen = []
+    monkeypatch.setattr(persona_routes, "get_persona_greeting", lambda pid, lang, project: seen.append(project) or {"language": lang, "text": "hi", "voice": None})
+    header = {"X-OpenVMan-Project-ID": "proj-bound"}
+
+    assert client.get("/brain/personas/greeting", params={"language": "en"}, headers=header).status_code == 200
+    assert client.get("/brain/personas/greeting", params={"language": "en", "project_id": "proj-bound"}, headers=header).status_code == 200
+    assert client.get("/brain/personas/greeting", params={"language": "en", "project_id": "proj-other"}, headers=header).status_code == 400
+    assert client.get("/brain/personas/greeting", params={"language": "en", "project_id": "proj-direct"}).status_code == 200
+    assert seen == ["proj-bound", "proj-bound", "proj-direct"]

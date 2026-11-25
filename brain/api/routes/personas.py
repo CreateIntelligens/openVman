@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from knowledge.workspace import (
@@ -38,7 +38,7 @@ from protocol.schemas import (
     PersonaCreateRequest,
     PersonaDeleteRequest,
 )
-from safety.internal_auth import require_internal_token
+from safety.internal_auth import PROJECT_ID_HEADER, require_internal_token
 from safety.observability import log_event
 from safety.vendor_access import (
     VENDOR_PERSONA_DOCUMENTS,
@@ -313,8 +313,16 @@ def put_persona_language_settings_route(payload: PersonaLanguageSettingsPut):
 
 @router.get("/personas/greeting", summary="取得某語言的開場白與聲音")
 def get_persona_greeting_route(
-    language: str, persona_id: str = "default", project_id: str = "default",
+    language: str,
+    persona_id: str = "default",
+    project_id: str | None = None,
+    trusted_project_id: str = Header("", alias=PROJECT_ID_HEADER),
 ):
+    # Backend 依登入身分或嵌入金鑰算出的專案放在標頭，以它為準；網址沒帶專案時不能
+    # 退回 default，否則嵌入金鑰的頁面會讀到別的專案的開場白。
+    if trusted_project_id and project_id and trusted_project_id != project_id:
+        raise HTTPException(status_code=400, detail="project_id 跟登入的專案不一致。")
+    project_id = trusted_project_id or project_id or "default"
     try:
         greeting = get_persona_greeting(persona_id, language, project_id)
     except ValueError as exc:

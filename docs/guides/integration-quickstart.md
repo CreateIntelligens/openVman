@@ -119,7 +119,7 @@
 
 `preferred_language` 是使用者在你的介面選的語言（`zh` 華語、`nan` 台語、`en`、`es`、`ja`、`ko`；其他值回 422）。它是參考，不會鎖定回答語言：使用者這句話看得出是哪種語言（英文句、中文句），或明講「請用英文回答」時，照使用者；只有「ok」、型號這類看不出語言的輸入，才用選的語言回答（原本是用專案主要語言）。選 `nan` 時，中文字的句子會優先查台語文件、回答用繁體中文，跟 ASR 聽出台語（`metadata.speech_language: "nan"`）一樣。Brain 不記住這個值，整段對話每次請求都要帶。
 
-要把整場對話鎖在一種語言，改帶 `language`（`zh`、`en`、`es`、`ja`、`ko`，不收 `nan`，其他值回 422）。它跟 `preferred_language` 不同：使用者之後改講別種語言、或要求換語言，仍一律用指定的語言回答，而且知識庫只查該語言的內容，查不到就回沒有答案，不改查別的語言。兩個都帶時以 `language` 為準。同樣每次請求都要帶；`POST /api/v1/chat/stream` 一樣支援。人設可以先在 `PUT /api/v1/personas/language-settings` 設定各語言的開場白與聲音，整合方用 `GET /api/v1/personas/greeting?persona_id=&project_id=&language=` 取得（該語言沒設定回 404）。用 SDK 的話，`init({ language })` 之後每次 `ask()` 都會帶 `language`，`await avatar.greet()` 會念出開場白（見 `docs/guides/avatar-embed/README.md`）。這幾個路徑需要登入，網站嵌入金鑰目前不能呼叫 `/personas/greeting`。
+要把整場對話鎖在一種語言，改帶 `language`（`zh`、`en`、`es`、`ja`、`ko`，不收 `nan`，其他值回 422）。它跟 `preferred_language` 不同：使用者之後改講別種語言、或要求換語言，仍一律用指定的語言回答，而且知識庫只查該語言的內容，查不到就回沒有答案，不改查別的語言。兩個都帶時以 `language` 為準。同樣每次請求都要帶；`POST /api/v1/chat/stream` 一樣支援。人設可以先在 `PUT /api/v1/personas/language-settings` 設定各語言的開場白與聲音，整合方用 `GET /api/v1/personas/greeting?persona_id=&project_id=&language=` 取得（該語言沒設定回 404）。用 SDK 的話，`init({ language })` 之後每次 `ask()` 都會帶 `language`，`await avatar.greet()` 會念出開場白（見 `docs/guides/avatar-embed/README.md`）。這幾個路徑需要登入；網站嵌入金鑰可以呼叫 `GET /personas/greeting`（只讀，專案一律是金鑰綁定的那個，帶別的 `project_id` 回 403），設定類路徑仍不開放。
 
 回應的回答來源欄位只看這一輪的知識庫查詢（`search_knowledge`）：
 
