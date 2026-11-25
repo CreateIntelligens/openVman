@@ -53,4 +53,4 @@
 
 ## 追加：人設的聯絡圖片（2026-11-25）
 
-鶴記 Kiosk 要每題都放 EVAK QR code，同時保留 QA 的產品圖；一題只有一個圖片欄放不下兩張。改成人設設定一張聯絡圖片（`PUT /personas/contact-image`），每則回覆以 `contact_image_id` 另外帶出。答不出來時回應本來就有 `no_answer: true`，加上聯絡圖片後前台不必另外判斷就有 QR 可顯示。官方前台與 SDK 還沒顯示這個欄位。
+鶴記 Kiosk 要每題都放 EVAK QR code，同時保留 QA 的產品圖；一題只有一個圖片欄放不下兩張。改成人設設定一張聯絡圖片（`PUT /personas/contact-image`），每則回覆以 `contact_image_id` 另外帶出。答不出來時回應本來就有 `no_answer: true`，加上聯絡圖片後前台不必另外判斷就有 QR 可顯示。官方前台會在回覆氣泡顯示這張圖（2026-11-25 上線，鶴記 kiosk 人設已設 EVAK QR）；SDK 還沒顯示，整合方從回應的 `contact_image_id` 自行顯示。
