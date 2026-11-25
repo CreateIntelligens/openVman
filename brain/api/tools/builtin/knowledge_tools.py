@@ -12,6 +12,7 @@ from tools.context import (
     active_persona_id,
     active_project_id,
     active_retrieval_language,
+    active_retrieval_language_strict,
     active_speech_language,
     active_user_message,
     active_vendor_chat,
@@ -59,6 +60,7 @@ def _search_one(
     language: str | None = None,
     *,
     lexical_only: bool = False,
+    strict_language: bool = False,
 ) -> tuple[list[dict[str, Any]], str, list[float] | None]:
     from memory.embedder import encode_query_with_fallback
     from memory.retrieval import search_records
@@ -85,6 +87,7 @@ def _search_one(
         project_id=project_id,
         embedding_version=version,
         language=language,
+        strict_language=strict_language,
     )
     return results, version, vector
 
@@ -98,6 +101,7 @@ def _search_one_with_fallback(
     language: str | None,
     *,
     lexical_only: bool,
+    strict_language: bool = False,
 ) -> tuple[list[dict[str, Any]], str, list[float] | None]:
     """embedding 服務壞掉或逾時時改用全文檢索，知識庫不會整個查不到。
 
@@ -107,7 +111,10 @@ def _search_one_with_fallback(
     if not lexical_only:
         embed_started = monotonic()
         try:
-            return _search_one(table_name, query, top_k, persona_id, project_id, language)
+            return _search_one(
+                table_name, query, top_k, persona_id, project_id, language,
+                strict_language=strict_language,
+            )
         except _EmbeddingUnavailable as exc:
             # embedder 自己已記一筆 rag_embed_query 失敗；這裡另記退路，失敗數才不會算兩次。
             record_node_attempt(
@@ -123,7 +130,9 @@ def _search_one_with_fallback(
                 str(exc.cause) or type(exc.cause).__name__,
             )
     return _search_one(
-        table_name, query, top_k, persona_id, project_id, language, lexical_only=True,
+        table_name, query, top_k, persona_id, project_id, language,
+        lexical_only=True,
+        strict_language=strict_language,
     )
 
 
@@ -147,6 +156,10 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 前台 ASR 聽出是台語時，Breeze 已把它翻成華語文字；照聽到的語言查。
     if table_name == "knowledge" and not active_retrieval_language.get() and active_speech_language.get() == "nan":
         language = "nan"
+
+    strict_language = bool(
+        table_name == "knowledge" and language and active_retrieval_language_strict.get(),
+    )
 
     # 2. Execute searches and collect unique embedding versions
     # 工具本身有硬逾時（knowledge_search_timeout_seconds，整個呼叫作廢）；這裡提早一點收手，
@@ -180,6 +193,7 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
                 project_id,
                 language,
                 lexical_only=lexical_only,
+                strict_language=strict_language,
             )
             lexical_only = lexical_only or vector is None
             record_node_attempt(
@@ -226,7 +240,9 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
         deadline = min(monotonic() + graph_budget, soft_deadline)
         related = _expand_via_graph(merged, project_id, primary_vector, deadline=deadline)
         # 有分流時相關段落只留命中段落有的語言；只有一條分流就不篩。
-        if route_language(language, project_id):
+        if strict_language and language:
+            related = _only_language(related, language, project_id)
+        elif route_language(language, project_id):
             related = _same_language_as(merged, related, project_id)
 
     # Preserve the result shape for clients while making the trust boundary
@@ -247,6 +263,16 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
         "related": marked_related,
         "citations": build_citations(marked_results + marked_related),
     }
+
+
+def _only_language(
+    related: list[dict[str, Any]], language: str, project_id: str,
+) -> list[dict[str, Any]]:
+    """指定語言時，概念圖鄰居也只留該語言（判斷方式與檢索的嚴格過濾相同）。"""
+    from memory.retrieval import record_language_resolver
+
+    language_of = record_language_resolver(related, project_id)
+    return [r for r in related if language_of(r) == language]
 
 
 def _same_language_as(

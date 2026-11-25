@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -21,10 +22,14 @@ from personas.personas import (
     clone_persona_scaffold,
     create_persona_scaffold,
     delete_persona_scaffold,
+    PersonaNotFoundError,
     extract_heading_or_name,
+    get_persona_greeting,
+    get_persona_language_settings,
     list_personas,
     normalize_persona_id,
     set_persona_avatar,
+    set_persona_language_settings,
 )
 from protocol.schemas import (
     PersonaAvatarRequest,
@@ -262,3 +267,57 @@ async def set_persona_avatar_route(payload: PersonaAvatarRequest):
         project_id=payload.project_id,
     )
     return result
+
+
+class PersonaLanguageSettingsPut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    persona_id: str
+    project_id: str = "default"
+    greetings: Any
+    voices: Any
+
+
+def _language_settings_error(exc: ValueError) -> HTTPException:
+    # 找不到人設是 404；其餘（代號、語言、字數、聲音代號不合法）是 400，訊息本身就是白話。
+    status = 404 if isinstance(exc, PersonaNotFoundError) else 400
+    return HTTPException(status_code=status, detail=str(exc))
+
+
+@router.get("/personas/language-settings", summary="讀取人設各語言的開場白與聲音")
+def get_persona_language_settings_route(persona_id: str = "default", project_id: str = "default"):
+    try:
+        return get_persona_language_settings(persona_id, project_id)
+    except ValueError as exc:
+        raise _language_settings_error(exc) from exc
+
+
+@router.put("/personas/language-settings", summary="整份取代人設各語言的開場白與聲音")
+def put_persona_language_settings_route(payload: PersonaLanguageSettingsPut):
+    try:
+        result = set_persona_language_settings(
+            payload.persona_id, payload.greetings, payload.voices, payload.project_id,
+        )
+    except ValueError as exc:
+        raise _language_settings_error(exc) from exc
+    log_event(
+        "persona_language_settings_set",
+        persona_id=result["persona_id"],
+        project_id=payload.project_id,
+        greeting_languages=sorted(result["greetings"]),
+        voice_languages=sorted(result["voices"]),
+    )
+    return result
+
+
+@router.get("/personas/greeting", summary="取得某語言的開場白與聲音")
+def get_persona_greeting_route(
+    language: str, persona_id: str = "default", project_id: str = "default",
+):
+    try:
+        greeting = get_persona_greeting(persona_id, language, project_id)
+    except ValueError as exc:
+        raise _language_settings_error(exc) from exc
+    if greeting is None:
+        raise HTTPException(status_code=404, detail="這個語言沒有設定開場白。")
+    return greeting

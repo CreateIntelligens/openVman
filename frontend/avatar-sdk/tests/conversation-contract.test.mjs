@@ -14,6 +14,8 @@ async function loadSdk({
   chatHeaders = {},
   chatStatus = 200,
   deferChat = false,
+  greetingBody = { language: "en", text: "Hello, I am your guide.", voice: "en-voice-1" },
+  greetingStatus = 200,
   manualStream = false,
   speechDelayMs = 0,
   speechStatus = 200,
@@ -159,6 +161,7 @@ async function loadSdk({
     TextEncoder,
     Blob,
     URL,
+    URLSearchParams,
     Uint8Array,
     console,
     document: {
@@ -170,6 +173,14 @@ async function loadSdk({
     },
     fetch: async (url, options) => {
       requests.push({ options, url });
+      if (String(url).includes("/api/v1/personas/greeting")) {
+        return {
+          headers: makeHeaders({}),
+          json: async () => greetingBody,
+          ok: greetingStatus === 200,
+          status: greetingStatus,
+        };
+      }
       if (String(url).endsWith("/api/v1/chat/stream")) {
         const respond = () => {
           if (streamStatus !== 200) {
@@ -418,6 +429,9 @@ const speechText = ({ options }) => {
   const body = JSON.parse(options.body);
   return body.text ?? body.input;
 };
+
+const greetingRequests = (requests) =>
+  requests.filter(({ url }) => String(url).includes("/api/v1/personas/greeting"));
 
 test("a legacy host makes no chat or speech request", async () => {
   const { requests, sdk } = await loadSdk();
@@ -967,4 +981,119 @@ test("the reply event names the session and trace so the host can match backend 
   assert.equal(events[0].traceId, "trace-123");
   assert.equal(events[0].sessionId, sessionId);
   assert.ok(sessionId);
+});
+
+test("ask sends language when it is set and omits it otherwise", async () => {
+  const locked = await loadSdk();
+  const lockedAvatar = await locked.sdk.init({ characterId: "000", language: "en" });
+  await lockedAvatar.ask("你好");
+  assert.equal(JSON.parse(chatRequests(locked.requests)[0].options.body).language, "en");
+
+  const plain = await loadSdk();
+  const plainAvatar = await plain.sdk.init({ characterId: "000" });
+  await plainAvatar.ask("你好");
+  assert.equal("language" in JSON.parse(chatRequests(plain.requests)[0].options.body), false);
+});
+
+test("language takes part in the instance signature", async () => {
+  const { sdk } = await loadSdk();
+  await sdk.init({ characterId: "000", language: "en" });
+  await assert.rejects(
+    sdk.init({ characterId: "000", language: "es" }),
+    (error) => error.code === "INSTANCE_EXISTS",
+  );
+});
+
+test("greet plays the greeting with the response voice and later replies keep that voice", async () => {
+  const { requests, runtimeCalls, sdk } = await loadSdk();
+  const avatar = await sdk.init({
+    characterId: "000",
+    embedKey: "ovk_demo",
+    language: "en",
+    personaId: "guide",
+    projectId: "alpha",
+  });
+  const sentences = [];
+  const replies = [];
+  avatar.on("sentence", (event) => sentences.push(event.text));
+  avatar.on("reply", (event) => replies.push(event.text));
+
+  await avatar.greet();
+
+  const [greeting] = greetingRequests(requests);
+  assert.equal(greeting.options.method, "GET");
+  assert.equal(greeting.options.headers["X-Embed-Key"], "ovk_demo");
+  assert.equal("body" in greeting.options, false);
+  const url = new URL(String(greeting.url));
+  assert.equal(url.pathname, "/api/v1/personas/greeting");
+  assert.deepEqual(Object.fromEntries(url.searchParams), {
+    language: "en", persona_id: "guide", project_id: "alpha",
+  });
+  assert.deepEqual(sentences, ["Hello, I am your guide."]);
+  assert.deepEqual(replies, ["Hello, I am your guide."]);
+  assert.equal(chatRequests(requests).length, 0);
+  assert.deepEqual(speechRequests(requests).map(speechText), ["Hello, I am your guide."]);
+  assert.equal(JSON.parse(speechRequests(requests)[0].options.body).voice, "en-voice-1");
+  assert.ok(runtimeCalls.pushedAudio > 0);
+
+  await avatar.ask("hi");
+  assert.equal(JSON.parse(speechRequests(requests)[1].options.body).voice, "en-voice-1");
+});
+
+test("an explicit tts.voice wins over the greeting voice", async () => {
+  const { requests, sdk } = await loadSdk();
+  const avatar = await sdk.init({
+    characterId: "000", language: "en", tts: { voice: "mine" },
+  });
+
+  await avatar.greet();
+  await avatar.ask("hi");
+
+  for (const request of speechRequests(requests)) {
+    assert.equal(JSON.parse(request.options.body).voice, "mine");
+  }
+});
+
+test("a greeting without a voice leaves the voice unset", async () => {
+  const { requests, sdk } = await loadSdk({
+    greetingBody: { language: "en", text: "Hello.", voice: null },
+  });
+  const avatar = await sdk.init({ characterId: "000", language: "en" });
+
+  await avatar.greet();
+
+  assert.equal("voice" in JSON.parse(speechRequests(requests)[0].options.body), false);
+});
+
+test("a missing greeting plays nothing, does not throw and warns once", async () => {
+  const { requests, sdk } = await loadSdk({ greetingStatus: 404 });
+  const avatar = await sdk.init({ characterId: "000", language: "en" });
+  const warnings = [];
+  const original = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  try {
+    await avatar.greet();
+    await avatar.greet();
+  } finally {
+    console.warn = original;
+  }
+
+  assert.equal(greetingRequests(requests).length, 2);
+  assert.equal(speechRequests(requests).length, 0);
+  assert.equal(warnings.length, 1);
+});
+
+test("greet without a language fails clearly and requests nothing", async () => {
+  const { requests, sdk } = await loadSdk();
+  const avatar = await sdk.init({ characterId: "000" });
+
+  await assert.rejects(avatar.greet(), (error) => error.code === "INVALID_OPTIONS");
+  assert.equal(greetingRequests(requests).length, 0);
+});
+
+test("a rejected greeting request maps to UNAUTHORIZED", async () => {
+  const { sdk } = await loadSdk({ greetingStatus: 401 });
+  const avatar = await sdk.init({ characterId: "000", language: "en" });
+
+  await assert.rejects(avatar.greet(), (error) => error.code === "UNAUTHORIZED");
 });

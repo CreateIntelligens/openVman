@@ -706,6 +706,8 @@ Content-Type: application/json
 
 `preferred_language`（選填，`zh|en|es|nan|ja|ko`，其他值 422）是使用者在整合方介面選的語言，只是參考、不鎖定回答語言：使用者這句話看得出語言或明講要哪種語言時照使用者；看不出語言的短句與型號用它取代專案主要語言來決定回答語言、訊息語言標籤與檢索語言，並以 `user_preferred_language` 放進每輪決策 evidence。值為 `nan` 時，中文字的句子與看不出語言的短句跟 `speech_language=nan` 一樣讓 `search_knowledge` 以台語文件優先、回答用繁體中文；看得出是其他語言的句子照那個語言。只作用在當次請求，不存進 session。Live 不支援。
 
+`language`（選填，`zh|en|es|ja|ko`，不收 `nan`，其他值 422）是鎖定：整輪回覆語言與檢索語言固定為它，不看使用者這句話的語言與決策的 `requested_response_language`，決策關閉或失敗時也一樣，prompt 明寫「一律用該語言回答，即使使用者用其他語言」，evidence 記 `locked_language`。`search_knowledge` 只回語言等於 `language` 的段落（嚴格過濾，不是排序優先），查不到就回空。與 `preferred_language` 同時帶時以 `language` 為準；只帶 `preferred_language` 時行為不變。人設的各語言開場白與聲音見 `brain/README.md`「人設的開場白與各語言聲音」。Live 與 WebSocket 還不支援。
+
 處理順序：解析 slash command → 建立 envelope 與 guardrails（第 6 節）→ 載入 session 與歷史、組 prompt（第 7 節）→ agent loop（第 9 節）→ 寫入對話、每日日誌，背景執行記憶治理與 PII 掃描。
 
 回應欄位：`status`、`trace_id`、`session_id`、`request_context`、`reply`、`history`（含本輪 user／assistant）、`citations`、`pii_pending`、`answer_source`、`knowledge_searched`、`no_answer`、`tool_steps`、`response_time_s`、`usage`；附圖由決策鏈從這輪前 5 筆附圖檢索結果中挑選（見 9.1「回答附圖」），選中時附 `image_id`／`url`；決策關閉、逾時或失敗時沿用第一筆 citation 的圖片或網址。生成失敗時：驗證不通過回 400，LLM 失敗或空回覆回 502（`LLM_OVERLOAD`，`retry_after_ms`）。

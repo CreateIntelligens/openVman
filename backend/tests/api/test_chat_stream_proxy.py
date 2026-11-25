@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -66,9 +67,11 @@ def _upstream(body) -> tuple[MagicMock, MagicMock]:
     return upstream, client
 
 
-async def _serve(app: FastAPI, *, on_body, leave: asyncio.Event) -> list[dict[str, Any]]:
+async def _serve(
+    app: FastAPI, *, on_body, leave: asyncio.Event, body: bytes = b'{"message":"hi"}',
+) -> list[dict[str, Any]]:
     sent: list[dict[str, Any]] = []
-    pending = [{"type": "http.request", "body": b'{"message":"hi"}', "more_body": False}]
+    pending = [{"type": "http.request", "body": body, "more_body": False}]
 
     async def receive() -> dict[str, Any]:
         if pending:
@@ -144,6 +147,30 @@ def test_each_event_is_forwarded_before_brain_sends_the_next() -> None:
     bodies = [m["body"] for m in sent if m["type"] == "http.response.body" and m.get("body")]
     assert bodies == [_FIRST_OUT, _DONE_OUT]
     upstream.aclose.assert_awaited()
+
+
+def test_language_field_reaches_brain_unchanged() -> None:
+    async def run() -> dict[str, Any]:
+        async def brain_events():
+            yield _DONE
+
+        _, client = _upstream(brain_events())
+        with (
+            patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
+            patch("app.brain_proxy._http.get", return_value=client),
+        ):
+            await _serve(
+                _proxy_app(), on_body=lambda _m: None, leave=asyncio.Event(),
+                body=b'{"message":"hi","language":"en","preferred_language":"zh"}',
+            )
+        return client.build_request.call_args.kwargs
+
+    upstream_request = asyncio.run(run())
+
+    forwarded = json.loads(upstream_request["content"])
+    assert forwarded["language"] == "en"
+    assert forwarded["preferred_language"] == "zh"
+    assert forwarded["message"] == "hi"
 
 
 def test_client_leaving_mid_stream_closes_the_brain_stream() -> None:

@@ -69,6 +69,7 @@ const avatar = await OpenVmanAvatar.init({
 | `embedKey` | 否 | 無 | 對話模式用的 embed key。設定後 `ask()` 會帶 `X-Embed-Key` 且不送 cookie；未設定則以同源 session cookie 呼叫。 |
 | `projectId` | 否 | 後端預設 | `ask()` 使用的專案 ID。使用 embed key 時必須與該金鑰綁定的專案一致，否則回 403。 |
 | `personaId` | 否 | 後端預設 | `ask()` 使用的人格 ID。 |
+| `language` | 否 | 無 | `zh`、`en`、`es`、`ja`、`ko`。設定後每次 `ask()` 的請求都帶 `language`：整場對話一律用這個語言回答，知識也只查這個語言（使用者改講別種語言也一樣）；`greet()` 用它挑開場白。不設就不帶，行為與之前相同。不支援台語。 |
 | `tts` | 否 | 後端預設 | `{ provider, voice, language }`，指定 `ask()` 合成語音的 TTS 供應商與音色；`language` 是回答要唸的語言（`zh`、`en`、`nan`…），`nan` 且專案開了台語分流時改用台語引擎。 |
 
 `init()` 先把播放程式與人物檔都拿到（瀏覽器存檔或網路），才建立 runtime 與畫面。連不上、逾時或 5xx 時自動再試兩次（間隔 1 秒、3 秒）；仍失敗就回 `RESOURCE_LOAD_FAILED`，頁面上沒有留下任何東西，可以直接再呼叫 `init()`，不必重新整理。人物影片解碼或播放失敗（檔案已拿到之後）仍會讓這一頁不能再建 runtime（`RUNTIME_DISPOSED`）。
@@ -96,6 +97,8 @@ const avatar = await OpenVmanAvatar.init({
 ## 對話模式
 
 設定對話選項後，`await avatar.ask(text)` 會完成一整輪：送出 `POST /api/v1/chat/stream`，回答每寫完一句就派送 `sentence` 事件。回答結束時派送一次 `reply` 事件（完整回答），再以整段回答呼叫一次 `POST /api/v1/tts/stream`（`format: "pcm16k"`）串流合成：收到第一段 16 kHz PCM 就開始播放並驅動嘴形，不必等整段合成完。不逐句合成：逐句時下一段要等上一段下載完才送，第一句短時中間會斷音，每段的語氣也各自不同；多數引擎的第一段聲音跟文字長短無關，整段合成只多等其餘句子生完的時間。CosyVoice（台語）要整段合成完才出聲，字數越多第一聲越晚。部署沒有串流合成路由（回 404／405）時，該 instance 之後改用 `POST /v1/audio/speech` 整段合成。Promise 在語音播完後 resolve，回傳回覆文字。需要知道開口時機請監聽 `speaking` 事件。
+
+`await avatar.greet()` 念出人設在 `language` 下設定的開場白：送出 `GET /api/v1/personas/greeting?language=&persona_id=&project_id=`（後兩個有設才帶，驗證方式與 `ask()` 相同），拿到文字後以 `sentence`、`reply` 事件與 TTS、嘴形播出，跟回答走同一條播放流程，但不進對話、不呼叫模型。沒設 `language` 時丟 `INVALID_OPTIONS`；該語言沒有開場白（404）時什麼都不播、Promise 正常 resolve，並在 console 警告一次。回應有 `voice` 時，這個 instance 之後的語音（含開場白與之後每次回答）都用它，`tts.voice` 有給則以 `tts.voice` 為準。`greet()` 也會中止上一輪還在播的內容。開場白與聲音在後台以 `PUT /api/v1/personas/language-settings` 設定。
 
 同一個 instance 的每次 `ask()` 都會沿用同一組 `session_id`，因此後端看得到完整上下文。新的 `ask()`、`interrupt()` 或 `destroy()` 會連同上一輪的串流、合成與正在播的語音一起中止，不會兩段答案疊在一起；在回答結束前被中止的 `ask()` 會 resolve 為已收到的句子，不派送 `reply`，這一輪也不寫入對話紀錄；回答已結束、只剩語音在播時才中止，則 resolve 為完整回答（`reply` 已派送過）。
 

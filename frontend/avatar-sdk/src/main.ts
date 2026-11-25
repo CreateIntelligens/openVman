@@ -62,6 +62,7 @@ function signature(options: OpenVmanAvatarOptions): string {
     container: containerId(options.container),
     embedKey: options.embedKey,
     height: options.height,
+    language: options.language,
     personaId: options.personaId,
     position: options.position,
     projectId: options.projectId,
@@ -238,6 +239,27 @@ async function createInstance(
     async ask(text) {
       try {
         return await conversation.ask(text);
+      } catch (error) {
+        const publicError = error instanceof OpenVmanAvatarError
+          ? error
+          : new OpenVmanAvatarError(
+            "CHAT_FAILED",
+            error instanceof Error ? error.message : String(error),
+          );
+        emit("error", {
+          code: publicError.code,
+          message: publicError.message,
+          ...(publicError.retryAfterSeconds === undefined
+            ? {}
+            : { retryAfterSeconds: publicError.retryAfterSeconds }),
+          type: "error",
+        });
+        throw publicError;
+      }
+    },
+    async greet() {
+      try {
+        await conversation.greet();
       } catch (error) {
         const publicError = error instanceof OpenVmanAvatarError
           ? error

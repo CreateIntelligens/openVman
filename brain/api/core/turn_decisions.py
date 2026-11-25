@@ -240,6 +240,7 @@ def build_turn_evidence(
     project_language: str,
     available_tools: tuple[str, ...] | list[str],
     preferred_language: str = "",
+    locked_language: str = "",
 ) -> dict[str, Any]:
     eligible_history = [
         {"role": str(message["role"]), "content": _history_content(message)}
@@ -266,6 +267,8 @@ def build_turn_evidence(
     # 只在整合方有帶時才加：沒帶的請求證據跟以前一字不差。
     if preferred_language in LANGUAGES:
         evidence["user_preferred_language"] = preferred_language
+    if locked_language in LANGUAGES:
+        evidence["locked_language"] = locked_language
     return evidence
 
 
@@ -353,6 +356,7 @@ def run_turn_decision(
     cancel_event: Event | None = None,
     capture_debug: bool = False,
     preferred_language: str = "",
+    locked_language: str = "",
 ) -> TurnDecision:
     started = monotonic()
 
@@ -381,7 +385,10 @@ def run_turn_decision(
 
     include_memory = memory_enabled(project_id)
     include_web = "search_web" in available_tools
-    baseline = _baseline_policy(user_text, project_language, speech_language, preferred_language)
+    baseline = _lock_policy(
+        _baseline_policy(user_text, project_language, speech_language, preferred_language),
+        locked_language,
+    )
     if not include_memory:
         baseline = replace(baseline, auto_recall=False)
     groups = {
@@ -406,6 +413,7 @@ def run_turn_decision(
             else [name for name in available_tools if name != "search_memory"]
         ),
         preferred_language=preferred_language,
+        locked_language=locked_language,
     )
     try:
         result: DecisionResult = decide(
@@ -426,6 +434,7 @@ def run_turn_decision(
             include_memory=include_memory,
             include_web=include_web,
         )
+        policy = _lock_policy(policy, locked_language)
     except DecisionProviderCancelled:
         raise
     except Exception as exc:  # The optional classification never fails the turn.
@@ -583,6 +592,15 @@ def resolve_retrieval_language(
     if preferred_language == TAIWANESE and detected == "zh":
         return TAIWANESE
     return detected
+
+
+def _lock_policy(policy: TurnPolicy, locked_language: str) -> TurnPolicy:
+    """指定語言（ChatRequest.language）鎖死回覆與檢索語言，決策與偵測都不能改。"""
+    if locked_language not in REPLY_LANGUAGES:
+        return policy
+    return replace(
+        policy, response_language=locked_language, retrieval_language=locked_language,
+    )
 
 
 def _baseline_policy(

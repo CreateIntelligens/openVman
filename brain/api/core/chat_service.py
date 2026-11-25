@@ -59,6 +59,7 @@ from safety.observability import timed_node
 from tools.context import (
     WEB_TOOLS,
     active_retrieval_language,
+    active_retrieval_language_strict,
     active_speech_language,
     active_turn_decision_unavailable,
     active_vendor_chat,
@@ -90,11 +91,12 @@ class GenerationContext:
     input_language: str | None = None
     media_choice: ReplyMediaChoice | None = None
     preferred_language: str | None = None
+    locked_language: str | None = None
 
 
 def prepare_generation(
     envelope: MessageEnvelope, *, reply_mode: str = "", decision_debug: bool = False,
-    preferred_language: str | None = None,
+    preferred_language: str | None = None, locked_language: str | None = None,
 ) -> GenerationContext:
     """Build prompt inputs and update the user side of the session.
 
@@ -103,6 +105,8 @@ def prepare_generation(
 
     *preferred_language* is the caller's language hint (``ChatRequest``): it replaces
     the project's primary language only where the message shows no language itself.
+    *locked_language* is the caller's fixed language (``ChatRequest.language``): reply
+    and retrieval language follow it whatever the message or the decision says.
     """
     cleaned_message = envelope.content.strip()
     stored_user_message = read_text(envelope.context.metadata, METADATA_ORIGINAL_USER_MESSAGE) or cleaned_message
@@ -158,6 +162,7 @@ def prepare_generation(
                 cancel_event=current_cancel_event(),
                 capture_debug=decision_debug,
                 preferred_language=preferred_language or "",
+                locked_language=locked_language or "",
             )
         if active_vendor_chat.get():
             turn_decision = vendor_turn_decision(
@@ -194,6 +199,7 @@ def prepare_generation(
             ),
             preferred_language=preferred_language,
             allow_web_search=mode.allow_web_search,
+            locked_language=locked_language,
         )
 
     return GenerationContext(
@@ -211,6 +217,7 @@ def prepare_generation(
         turn_decision=turn_decision,
         input_language=input_language,
         preferred_language=preferred_language,
+        locked_language=locked_language,
     )
 
 
@@ -614,7 +621,9 @@ def execute_generation(
     speech_token = active_speech_language.set(
         speech_language if isinstance(speech_language, str) else "",
     )
-    if context.turn_decision is not None:
+    if context.locked_language:
+        retrieval_language = context.locked_language
+    elif context.turn_decision is not None:
         retrieval_language = context.turn_decision.policy.retrieval_language
     elif context.preferred_language:
         # 沒跑當輪決策（視覺事件）時也要照整合方帶的語言提示查，跟有決策時一致。
@@ -629,6 +638,7 @@ def execute_generation(
     else:
         retrieval_language = ""
     retrieval_token = active_retrieval_language.set(retrieval_language or "")
+    strict_token = active_retrieval_language_strict.set(bool(context.locked_language))
     unavailable_token = active_turn_decision_unavailable.set(bool(
         context.turn_decision and context.turn_decision.dependency_unavailable
     ))
@@ -677,6 +687,7 @@ def execute_generation(
     finally:
         active_speech_language.reset(speech_token)
         active_retrieval_language.reset(retrieval_token)
+        active_retrieval_language_strict.reset(strict_token)
         active_turn_decision_unavailable.reset(unavailable_token)
 
 

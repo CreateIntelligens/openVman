@@ -436,7 +436,7 @@ def test_knowledge_search_degrades_when_a_query_times_out(monkeypatch) -> None:
 
     calls: list[str] = []
 
-    def search_one(table, query, *args):
+    def search_one(table, query, *args, **_kwargs):
         calls.append(query)
         if len(calls) == 1:
             return [{"text": "九點開門", "path": "a.md"}], "gemma", [0.1]

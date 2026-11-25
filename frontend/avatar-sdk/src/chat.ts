@@ -36,6 +36,9 @@ export class AvatarConversation {
   private turn: AbortController | null = null;
   private streamRouteMissing = false;
   private speechStreamMissing = false;
+  // greet() 拿到的人設聲音；init 的 tts.voice 有給就以 init 的為準。
+  private greetingVoice: string | undefined;
+  private warnedMissingGreeting = false;
 
   constructor(
     private readonly resourceBaseUrl: string,
@@ -63,6 +66,75 @@ export class AvatarConversation {
     } finally {
       if (this.turn === turn) this.turn = null;
     }
+  }
+
+  /** Plays the persona's greeting in `options.language`; nothing goes to the chat. */
+  async greet(): Promise<void> {
+    const language = this.options.language;
+    if (!language) {
+      throw new OpenVmanAvatarError(
+        "INVALID_OPTIONS",
+        "greet() needs the language option to pick the greeting.",
+      );
+    }
+    this.interrupt();
+    const turn = new AbortController();
+    this.turn = turn;
+    try {
+      const greeting = await this.fetchGreeting(language, turn.signal);
+      if (!greeting) return;
+      if (greeting.voice) this.greetingVoice = greeting.voice;
+      this.deps.onSentence(0, greeting.text);
+      this.deps.onReply(greeting.text, this.replyDetails(null));
+      await this.speak(greeting.text, turn.signal);
+    } finally {
+      if (this.turn === turn) this.turn = null;
+    }
+  }
+
+  private async fetchGreeting(
+    language: string,
+    signal: AbortSignal,
+  ): Promise<{ text: string; voice?: string } | null> {
+    const query = new URLSearchParams({ language });
+    if (this.options.personaId) query.set("persona_id", this.options.personaId);
+    if (this.options.projectId) query.set("project_id", this.options.projectId);
+    const response = await this.send(
+      `${this.resourceBaseUrl}/api/v1/personas/greeting?${query}`,
+      null,
+      "CHAT_FAILED",
+      signal,
+      [404],
+    );
+    if (!response) return null;
+    if (response.status === 404) {
+      if (!this.warnedMissingGreeting) {
+        this.warnedMissingGreeting = true;
+        console.warn(
+          `[openvman-avatar] No greeting is set for language "${language}".`,
+        );
+      }
+      return null;
+    }
+    let body: { text?: unknown; voice?: unknown };
+    try {
+      body = (await response.json()) as typeof body;
+    } catch (error) {
+      if (signal.aborted) return null;
+      throw new OpenVmanAvatarError("CHAT_FAILED", errorMessage(error));
+    }
+    if (typeof body?.text !== "string" || body.text.length === 0) {
+      throw new OpenVmanAvatarError(
+        "CHAT_FAILED",
+        "Greeting response did not contain text.",
+      );
+    }
+    return {
+      text: body.text,
+      ...(typeof body.voice === "string" && body.voice
+        ? { voice: body.voice }
+        : {}),
+    };
   }
 
   interrupt(): void {
@@ -164,6 +236,7 @@ export class AvatarConversation {
       persona_id: this.options.personaId,
       project_id: this.options.projectId,
       session_id: this.ensureSessionId(),
+      language: this.options.language,
     });
   }
 
@@ -234,7 +307,7 @@ export class AvatarConversation {
   private speechOptions(): Record<string, unknown> {
     return {
       provider: this.options.tts?.provider,
-      voice: this.options.tts?.voice,
+      voice: this.options.tts?.voice ?? this.greetingVoice,
       // 同源 session 沒有 embed key 綁定專案，要靠這裡帶專案才套得到專案的聲音與分流。
       project_id: this.options.projectId,
       language: this.options.tts?.language,
@@ -263,24 +336,24 @@ export class AvatarConversation {
   /** Returns null when the turn was interrupted before a response arrived. */
   private async send(
     url: string,
-    payload: Record<string, unknown>,
+    payload: Record<string, unknown> | null,
     failureCode: ConversationFailureCode,
     signal: AbortSignal,
     passThroughStatuses: readonly number[] = [],
   ): Promise<Response | null> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    const headers: Record<string, string> = payload
+      ? { "Content-Type": "application/json" }
+      : {};
     if (this.options.embedKey) headers["X-Embed-Key"] = this.options.embedKey;
 
     let response: Response;
     try {
       response = await fetch(url, {
-        body: JSON.stringify(payload),
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
         // embed key 是跨站呼叫，帶 cookie 只會踩到 CORS；session 模式則相反。
         credentials: this.options.embedKey ? "omit" : "include",
         headers,
-        method: "POST",
+        method: payload ? "POST" : "GET",
         signal,
       });
     } catch (error) {

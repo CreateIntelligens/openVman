@@ -118,6 +118,7 @@ def _prepare_chat_context(request: Request, payload: ChatRequest) -> Any:
     return prepare_generation(
         envelope, reply_mode=payload.mode, decision_debug=_decision_debug_requested(request, payload),
         preferred_language=payload.preferred_language,
+        locked_language=payload.language,
     )
 
 

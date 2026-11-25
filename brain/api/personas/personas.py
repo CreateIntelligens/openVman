@@ -283,6 +283,106 @@ def set_persona_avatar(
     }
 
 
+GREETING_LANGUAGES = ("zh", "en", "es", "ja", "ko")
+GREETING_MAX_CHARS = 500
+VOICE_ID_MAX_CHARS = 128
+_VOICE_ID_RE = re.compile(r"[A-Za-z0-9._:-]+")
+
+
+class PersonaNotFoundError(ValueError):
+    """The persona has no workspace folder (route answers 404, not 400)."""
+
+
+def _existing_persona_meta(persona_id: str, project_id: str) -> tuple[str, Path, dict[str, Any]]:
+    normalized = normalize_persona_id(persona_id)
+    is_default = normalized == "default"
+    if not is_default and not (get_persona_directory(normalized, project_id) / "SOUL.md").exists():
+        raise PersonaNotFoundError("persona 不存在")
+    meta_path = _avatar_meta_path(normalized, project_id, is_default=is_default)
+    return normalized, meta_path, _read_avatar_meta(normalized, project_id, is_default=is_default)
+
+
+def _stored_map(meta: dict[str, Any], key: str) -> dict[str, str]:
+    value = meta.get(key)
+    if not isinstance(value, dict):
+        return {}
+    return {
+        lang: text for lang, text in value.items()
+        if lang in GREETING_LANGUAGES and isinstance(text, str) and text
+    }
+
+
+def _validated_greetings(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        raise ValueError("開場白格式不正確，必須是「語言: 文字」的對照。")
+    result: dict[str, str] = {}
+    for lang, text in raw.items():
+        if lang not in GREETING_LANGUAGES:
+            raise ValueError(f"開場白的語言只能是 {', '.join(GREETING_LANGUAGES)}。")
+        if not isinstance(text, str):
+            raise ValueError("開場白必須是文字。")
+        cleaned = text.strip()
+        if not cleaned:
+            raise ValueError("開場白不可以是空白。")
+        if len(cleaned) > GREETING_MAX_CHARS:
+            raise ValueError(f"開場白最多 {GREETING_MAX_CHARS} 個字。")
+        result[lang] = cleaned
+    return result
+
+
+def _validated_voices(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        raise ValueError("聲音格式不正確，必須是「語言: 聲音代號」的對照。")
+    result: dict[str, str] = {}
+    for lang, voice in raw.items():
+        if lang not in GREETING_LANGUAGES:
+            raise ValueError(f"聲音的語言只能是 {', '.join(GREETING_LANGUAGES)}。")
+        if not isinstance(voice, str) or not voice or len(voice) > VOICE_ID_MAX_CHARS:
+            raise ValueError(f"聲音代號必須是 1 到 {VOICE_ID_MAX_CHARS} 個字元。")
+        if not _VOICE_ID_RE.fullmatch(voice):
+            raise ValueError("聲音代號只能用英數字與 . _ : - 這幾個符號。")
+        result[lang] = voice
+    return result
+
+
+def get_persona_language_settings(persona_id: str, project_id: str = "default") -> dict[str, Any]:
+    normalized, _, meta = _existing_persona_meta(persona_id, project_id)
+    return {
+        "persona_id": normalized,
+        "greetings": _stored_map(meta, "greetings"),
+        "voices": _stored_map(meta, "voices"),
+    }
+
+
+def set_persona_language_settings(
+    persona_id: str,
+    greetings: Any,
+    voices: Any,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    """Replace the persona's per-language greetings and voices, keeping other meta fields."""
+    cleaned_greetings = _validated_greetings(greetings)
+    cleaned_voices = _validated_voices(voices)
+    normalized, meta_path, meta = _existing_persona_meta(persona_id, project_id)
+    if normalized == "default":
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta["greetings"] = cleaned_greetings
+    meta["voices"] = cleaned_voices
+    workspace.write_text_atomic(meta_path, json.dumps(meta, ensure_ascii=False))
+    return {"persona_id": normalized, "greetings": cleaned_greetings, "voices": cleaned_voices}
+
+
+def get_persona_greeting(
+    persona_id: str, language: str, project_id: str = "default",
+) -> dict[str, Any] | None:
+    """The greeting text and voice for *language*, or None when none is set."""
+    settings = get_persona_language_settings(persona_id, project_id)
+    text = settings["greetings"].get(language)
+    if not text:
+        return None
+    return {"language": language, "text": text, "voice": settings["voices"].get(language)}
+
+
 def _avatar_meta_path(persona_id: str, project_id: str, *, is_default: bool) -> Path:
     if is_default:
         return workspace.get_workspace_root(project_id) / AVATAR_META_FILENAME

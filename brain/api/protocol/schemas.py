@@ -117,6 +117,9 @@ class ChatResponse(BaseModel):
     usage: dict[str, Any] = Field(default_factory=dict, description="這一輪的模型用量摘要")
 
 
+LOCKABLE_LANGUAGES = ("zh", "en", "es", "ja", "ko")
+
+
 class ChatRequest(BaseModel):
     decision_debug: bool = Field(False, strict=True, description="Return transient decision diagnostics for this turn")
     message: str = Field(..., description="User message content")
@@ -138,6 +141,16 @@ class ChatRequest(BaseModel):
         ),
     )
 
+    # 整合方指定的語言：跟 preferred_language 不同，這是鎖定——回覆、檢索都只用它，
+    # 不看使用者這句話的語言。兩個都帶時以這個為準。不收台語（nan）。
+    language: str | None = Field(
+        None,
+        description=(
+            "Fixed language for this turn (zh, en, es, ja or ko): the reply is always in it "
+            "and knowledge search only returns records in it. Wins over preferred_language."
+        ),
+    )
+
     @field_validator("preferred_language")
     @classmethod
     def _known_preferred_language(cls, value: str | None) -> str | None:
@@ -145,6 +158,13 @@ class ChatRequest(BaseModel):
 
         if value is not None and value not in LANGUAGES:
             raise ValueError(f"preferred_language 只能是 {', '.join(LANGUAGES)}")
+        return value
+
+    @field_validator("language")
+    @classmethod
+    def _known_locked_language(cls, value: str | None) -> str | None:
+        if value is not None and value not in LOCKABLE_LANGUAGES:
+            raise ValueError(f"language 只能是 {', '.join(LOCKABLE_LANGUAGES)}")
         return value
 
     @model_validator(mode="after")

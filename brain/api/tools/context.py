@@ -30,6 +30,10 @@ active_user_message: ContextVar[str] = ContextVar("brain_active_user_message", d
 # 前台 ASR 聽出的語言（例如台語 "nan"）；轉錄後的文字看不出來，查知識庫要靠它。
 active_speech_language: ContextVar[str] = ContextVar("brain_active_speech_language", default="")
 active_retrieval_language: ContextVar[str] = ContextVar("brain_active_retrieval_language", default="")
+# 整合方指定了語言（ChatRequest.language）：知識檢索只留該語言，不只是排序優先。
+active_retrieval_language_strict: ContextVar[bool] = ContextVar(
+    "brain_active_retrieval_language_strict", default=False,
+)
 active_turn_decision_unavailable: ContextVar[bool] = ContextVar(
     "brain_active_turn_decision_unavailable", default=False,
 )

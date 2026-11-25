@@ -79,6 +79,7 @@ def build_chat_messages(
     decision_dependency_unavailable: bool = False,
     preferred_language: str | None = None,
     allow_web_search: bool = True,
+    locked_language: str | None = None,
 ) -> list[dict[str, str]]:
     """Build the system and conversation messages for the LLM call.
 
@@ -164,6 +165,7 @@ def build_chat_messages(
             project_id, user_message, _speech_language(request_context),
             resolved_language=turn_policy.response_language if turn_policy else None,
             preferred_language=preferred_language or "",
+            locked_language=locked_language or "",
         ),
         _tone_delivery_line(turn_policy.tone if turn_policy else None),
         _previous_picture_line(turn_policy, session_messages),

@@ -6,6 +6,9 @@ export type OpenVmanAvatarEventType =
   | "sentence"
   | "speaking";
 
+// 對話鎖定的語言；不含台語（nan），台語沒有穩定的書寫形式可鎖。
+export type OpenVmanAvatarLanguage = "en" | "es" | "ja" | "ko" | "zh";
+
 export type OpenVmanAvatarAudioOutput = "speaker" | "silent";
 
 export interface OpenVmanAvatarTtsOptions {
@@ -29,6 +32,9 @@ export interface OpenVmanAvatarOptions {
   // 設定後 ask() 以 embed key 驗證，未設定則沿用同源 session cookie。
   embedKey?: string;
   height?: string;
+  // 指定後每次 ask() 都帶 language：整場對話一律用這個語言回答，知識也只查這個語言。
+  // greet() 也用它挑開場白。
+  language?: OpenVmanAvatarLanguage;
   personaId?: string;
   position?: "bottom-left" | "bottom-right";
   projectId?: string;
@@ -62,6 +68,11 @@ export interface OpenVmanAvatarInstance {
   /** True when this init downloaded nothing (every file came from the browser's cache). */
   readonly assetsFromCache: boolean;
   destroy(): void;
+  /**
+   * 念出這個人設在 `language` 下設定的開場白（字幕、語音、嘴形），不進對話、不呼叫模型。
+   * 沒設 `language` 會丟錯；這個語言沒有開場白時什麼都不做。
+   */
+  greet(): Promise<void>;
   interrupt(): void;
   off<T extends OpenVmanAvatarEventType>(
     type: T,

@@ -434,6 +434,88 @@ class TestLanguageRouting:
         assert self._search("nan")[0] == "chunk-nan.md"
 
 
+class TestStrictLanguage:
+    """指定語言（ChatRequest.language）：只留該語言，不是排序優先。"""
+
+    LANGS = {"zh.md": "zh", "en.md": "en", "en-2.md": "en", "es.md": "es"}
+
+    @pytest.fixture()
+    def table(self, patched, monkeypatch):
+        routes = {"value": ["zh", "en", "es"]}
+        monkeypatch.setattr(
+            retrieval, "project_language_routes", lambda project_id="default": routes["value"],
+        )
+        monkeypatch.setattr(
+            retrieval,
+            "resolve_document_languages",
+            lambda paths, project_id: {p: self.LANGS.get(p, "zh") for p in paths},
+        )
+
+        def use(entries, routes_value=None):
+            if routes_value is not None:
+                routes["value"] = routes_value
+            patched(_FakeTable(vector_records=[
+                _rec(f"chunk-{i}-{name}", 0.1 + i / 100, metadata=json.dumps(
+                    {"path": name, **({"language": row} if row else {})},
+                ))
+                for i, (name, row) in enumerate(entries)
+            ]))
+        return use
+
+    @staticmethod
+    def _search(language="en", strict=True, top_k=5, query_type="vector"):
+        return [
+            r["text"] for r in retrieval.search_records(
+                "knowledge", query_vector=[0.1, 0.2], top_k=top_k,
+                query_text="pump", query_type=query_type, language=language,
+                strict_language=strict,
+            )
+        ]
+
+    def test_only_the_locked_language_comes_back(self, table):
+        table([("zh.md", None), ("en.md", None), ("es.md", None)])
+        assert self._search("en") == ["chunk-1-en.md"]
+        assert self._search("es") == ["chunk-2-es.md"]
+        assert self._search("zh") == ["chunk-0-zh.md"]
+
+    def test_a_mixed_language_csv_row_beats_the_document_language(self, table):
+        # 同一份 CSV 每題各有語言：row 的 language 優先，沒標才看文件路徑。
+        table([
+            ("mixed.csv", "es"), ("mixed.csv", "en"), ("zh.md", None),
+            ("en.md", "zh"), ("es.md", None),
+        ])
+        assert self._search("en") == ["chunk-1-mixed.csv"]
+        assert self._search("es") == ["chunk-0-mixed.csv", "chunk-4-es.md"]
+        assert self._search("zh") == ["chunk-2-zh.md", "chunk-3-en.md"]
+
+    @pytest.mark.parametrize("query_type", ["vector", "hybrid"])
+    def test_filter_happens_before_top_k_so_others_do_not_crowd_it_out(self, table, query_type):
+        table([("es.md", None)] * 20 + [("en.md", None), ("en-2.md", None)])
+        assert self._search("en", top_k=2, query_type=query_type) == [
+            "chunk-20-en.md", "chunk-21-en-2.md",
+        ]
+
+    def test_single_route_project_is_filtered_too(self, table):
+        table([("zh.md", None), ("en.md", None)], routes_value=["zh"])
+        assert self._search("en") == ["chunk-1-en.md"]
+        # 不鎖時只有一條分流不排序，照原樣全部回來。
+        assert self._search("en", strict=False) == ["chunk-0-zh.md", "chunk-1-en.md"]
+
+    def test_no_record_in_the_language_returns_nothing(self, table):
+        table([("zh.md", None), ("es.md", None)])
+        assert self._search("en") == []
+
+    def test_not_strict_matches_the_ranking_behaviour(self, table):
+        table([("zh.md", None), ("en.md", None), ("es.md", None)])
+        assert self._search("en", strict=False) == [
+            "chunk-1-en.md", "chunk-0-zh.md", "chunk-2-es.md",
+        ]
+
+    def test_strict_without_a_language_changes_nothing(self, table):
+        table([("zh.md", None), ("en.md", None)])
+        assert self._search(None) == ["chunk-0-zh.md", "chunk-1-en.md"]
+
+
 class TestLanguageWindowStopsEarly:
     """同語言段落不夠時，候選窗不必每次都擴到整張表。
 

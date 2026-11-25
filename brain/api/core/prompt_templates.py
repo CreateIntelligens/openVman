@@ -183,6 +183,7 @@ def supported_languages_line(project_id: str) -> str:
 def reply_language_line(
     project_id: str, user_message: str, speech_language: str = "",
     *, resolved_language: str | None = None, preferred_language: str = "",
+    locked_language: str = "",
 ) -> str:
     """Tell the model which language this turn's reply must be in.
 
@@ -192,6 +193,15 @@ def reply_language_line(
     使用者這句話看得出語言或明講要哪種語言時仍照使用者。
     """
     from memory.language_detect import TAIWANESE, detect_language, is_short_text
+
+    if locked_language in PRIMARY_LANGUAGE_NAMES:
+        # 整合方指定的語言（ChatRequest.language）：不看使用者這句話、也不看決策結果。
+        name = PRIMARY_LANGUAGE_NAMES[locked_language]
+        return (
+            f"這一輪的回答語言：一律用{name}回答，即使使用者用其他語言提問或要求換語言，"
+            f"也只用{name}；整段回答不要夾雜其他語言。"
+            + reply_length_line(locked_language, _reply_seconds(project_id))
+        )
 
     primary = (
         preferred_language if preferred_language in PRIMARY_LANGUAGE_NAMES

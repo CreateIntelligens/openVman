@@ -264,6 +264,37 @@ def test_chat_accept_requires_login():
     upstream.assert_not_called()
 
 
+@pytest.mark.parametrize(("method", "path", "access"), [
+    ("GET", "personas/language-settings", ResourceAccess.READ),
+    ("PUT", "personas/language-settings", ResourceAccess.EDIT_KNOWLEDGE),
+    ("GET", "personas/greeting", ResourceAccess.READ),
+])
+def test_persona_language_routes_require_login_and_project_access(method, path, access):
+    from app.auth.brain_project_access import _project_access, requires_project_context
+    from app.brain_proxy import _BRAIN_ROUTE_DEFS, _PUBLIC_BRAIN_PATHS, router
+
+    public_path = f"/api/v1/{path}"
+    assert any(
+        d["path"] == public_path and method in d["methods"] for d in _BRAIN_ROUTE_DEFS
+    )
+    assert public_path not in _PUBLIC_BRAIN_PATHS
+    assert requires_project_context(path)
+    # 讀取比照 personas/soul，寫入比照 personas/avatar。
+    assert _project_access(path, method) is access
+    assert _project_access("personas/avatar", "POST") is ResourceAccess.EDIT_KNOWLEDGE
+
+    app = FastAPI()
+    app.include_router(router)
+    with patch("app.brain_proxy._http.get") as upstream, TestClient(app) as client:
+        response = client.request(
+            method, public_path, params={"project_id": "p1", "persona_id": "default", "language": "en"},
+            json={"persona_id": "default", "project_id": "p1", "greetings": {}, "voices": {}}
+            if method == "PUT" else None,
+        )
+    assert response.status_code == 401
+    upstream.assert_not_called()
+
+
 def test_explicit_brain_routes_still_forward_options(client: TestClient):
     upstream = _make_response(body=b"", content_type="text/plain")
     mock_client = MagicMock()

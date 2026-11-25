@@ -51,6 +51,7 @@ def search_records(
     min_similarity: float | None = None,
     expansion_terms: list[str] | None = None,
     language: str | None = None,
+    strict_language: bool = False,
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
 
@@ -58,6 +59,10 @@ def search_records(
     查得到，語言只決定誰先進 top_k——使用者語言的文件優先，不夠再用主要語言
     （分流排第一的）補，最後才是其他語言。鶴記這種準備了中英西版本的專案因此
     用同語言的原文回答；只有別的語言寫到的內容也不會漏掉。只有一條分流不排序。
+
+    *strict_language*（要同時給 *language*，只對 knowledge 有效）：使用者指定了
+    語言（ChatRequest.language）時改成只留該語言的紀錄，不論分流有幾條；過濾在
+    top_k 截斷之前，查不到同語言的就回空，不退回別的語言。
 
     When *query_text* is provided, attempts hybrid search: vector 與 FTS
     各自檢索後以 RRF 融合,並輸出 min-max 正規化的 _score ∈ [0, 1]
@@ -89,10 +94,11 @@ def search_records(
     )
     routes = project_language_routes(project_id) if table_name == "knowledge" else []
     # 只有一條分流就不排語言，行為與分流功能出現前相同。
-    prefer = language if language and len(routes) > 1 else None
+    strict = bool(strict_language and language and table_name == "knowledge")
+    prefer = language if language and (strict or len(routes) > 1) else None
     # 有勾的語言才往後擴查：其他語言的版本可能佔滿候選窗，把同語言的原文擠出去。
     # 沒勾的語言（例如只勾英西時的中文提問）不值得為它掃完整個知識庫。
-    expand = prefer in routes
+    expand = strict or prefer in routes
     search_limit = limit * (4 if disabled_paths or prefer else 2)
     record_count = table.count_rows() if expand else 0
     expansion_vectors: dict[str, list[float] | None] = {}
@@ -124,8 +130,13 @@ def search_records(
         # RRF 會合併重複候選，輸出少於 limit 不代表底層已搜完。
         exhausted = search_limit >= record_count
         rank = (
-            _language_rank(visible, prefer, routes[0], project_id) if prefer else None
+            _language_rank(
+                visible, prefer, routes[0] if routes else prefer, project_id,
+            ) if prefer else None
         )
+        if strict and rank is not None:
+            # rank 0 就是 language 本身；先濾再排，別的語言不會擠掉同語言的結果。
+            visible = [record for record in visible if rank(record) == 0]
         if rank is not None:
             # sorted 是穩定排序：同一語言內仍照相關度。去重留排前面的，所以
             # 同一段內容的其他語言版本會讓給使用者語言的原文。
@@ -424,22 +435,36 @@ def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _language_rank(
-    records: list[dict[str, Any]], language: str, primary: str, project_id: str,
-) -> Callable[[dict[str, Any]], int]:
-    """Rank a record 0 in the user's language, 1 in the primary language, else 2."""
+def record_language_resolver(
+    records: list[dict[str, Any]], project_id: str,
+) -> Callable[[dict[str, Any]], str]:
+    """Return a function giving each record's language.
+
+    混語言的 CSV 每題有自己的語言，比文件的語言準；沒標才看文件。
+    """
     def path_of(record: dict[str, Any]) -> str:
         return str(parse_record_metadata(record).get("path", "")).strip()
 
     languages = resolve_document_languages(
         (path_of(record) for record in records), project_id,
     )
-    order = {primary: 1, language: 0}
+
+    def language_of(record: dict[str, Any]) -> str:
+        row_language = parse_record_metadata(record).get("language")
+        return row_language or languages.get(path_of(record), DEFAULT_LANGUAGE)
+
+    return language_of
+
+
+def _language_rank(
+    records: list[dict[str, Any]], language: str, primary: str, project_id: str,
+) -> Callable[[dict[str, Any]], int]:
+    """Rank a record 0 in the user's language, 1 in the primary language, else 2."""
+    language_of = record_language_resolver(records, project_id)
+    order = {primary: 1, language: 0}  # 兩者相同時 language 勝出（後寫的鍵）
 
     def rank(record: dict[str, Any]) -> int:
-        # 混語言的 CSV 每題有自己的語言，比文件的語言準；沒標才看文件。
-        row_language = parse_record_metadata(record).get("language")
-        return order.get(row_language or languages.get(path_of(record), DEFAULT_LANGUAGE), 2)
+        return order.get(language_of(record), 2)
 
     return rank
 

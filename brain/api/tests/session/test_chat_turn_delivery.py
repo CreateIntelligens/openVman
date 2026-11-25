@@ -296,3 +296,26 @@ def test_preferred_language_reaches_generation_and_bad_codes_are_rejected(delive
     assert seen == ["nan"]
     bad = client.post("/brain/chat", json={"message": "ok", "session_id": "s1", "preferred_language": "de"})
     assert bad.status_code == 422
+
+
+def test_locked_language_reaches_generation_and_nan_or_unknown_codes_are_rejected(delivery, monkeypatch):
+    client, _, _, _ = delivery
+    seen: list[tuple[str | None, str | None]] = []
+    original = chat_routes._prepare_chat_context
+
+    def prepare(request, payload):
+        seen.append((payload.language, payload.preferred_language))
+        return original(request, payload)
+
+    monkeypatch.setattr(chat_routes, "_prepare_chat_context", prepare)
+    ok = client.post(
+        "/brain/chat",
+        json={"message": "ok", "session_id": "s1", "language": "es", "preferred_language": "nan"},
+    )
+    assert ok.status_code == 200
+    assert seen == [("es", "nan")]
+    for bad_code in ("nan", "fr", ""):
+        bad = client.post("/brain/chat", json={"message": "ok", "session_id": "s1", "language": bad_code})
+        assert bad.status_code == 422
+        assert "language 只能是 zh, en, es, ja, ko" in bad.text
+    assert len(seen) == 1
