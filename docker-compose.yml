@@ -318,7 +318,8 @@ services:
       - TZ=Asia/Taipei
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --label-enable --interval 3600 --cleanup
+    # 每 5 分鐘查一次新 image：只用 HEAD 比對摘要，不算 Docker Hub 的拉取限流。
+    command: --label-enable --interval 300 --cleanup
 
 volumes:
   hf-cache:

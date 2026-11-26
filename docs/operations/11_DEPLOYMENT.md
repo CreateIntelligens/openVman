@@ -267,8 +267,9 @@ compose 同時保留 `image` 與 `build`，因此會先拉取 `.env` 指定的
 repository 目前都是 public，新主機不需要 `docker login`。
 
 Watchtower 由同一份 compose 啟動，使用 Docker API `1.44`（相容 Docker Engine 29），
-只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 container，每 3600 秒檢查
-一次（每次檢查都會向 Docker Hub 查詢，間隔太短容易碰上請求限流）。推上 `main` 後最慢一小時換版；
+只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 container，每 300 秒檢查
+一次（只用 HEAD 比對 image 摘要，Docker Hub 不把 HEAD 算進拉取限流；8 個 image 每小時約 96 次）。
+推上 `main` 後，Docker Publish 建完 image 再等最多 5 分鐘換版；
 急需上線時在主機上跑一次性的 watchtower（重啟常駐的 watchtower 不會立刻檢查，要等滿一個間隔）：
 `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock nickfedor/watchtower:1.24.0 --run-once --label-enable --cleanup`。
 
