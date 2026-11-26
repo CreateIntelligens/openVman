@@ -39,11 +39,13 @@ interface SchedulerDeps {
   current: () => GreetingKey | null
   fetch: (key: GreetingKey) => Promise<Greeting | null>
   play: (greeting: Greeting) => void | Promise<void>
+  /** 訪客送出過的句數；抓開場白期間增加了，就表示已經開始對話，這次開場白不播。 */
+  activity?: () => number
 }
 
 const identity = (key: GreetingKey) => `${key.language}|${key.personaId}|${key.projectId}`
 
-export function createGreetingScheduler({ current, fetch, play }: SchedulerDeps) {
+export function createGreetingScheduler({ current, fetch, play, activity = () => 0 }: SchedulerDeps) {
   const handled = new Set<string>()
 
   /** 狀態改變時呼叫：這一組還沒處理過才取開場白並播出；失敗一律靜默。 */
@@ -53,6 +55,7 @@ export function createGreetingScheduler({ current, fetch, play }: SchedulerDeps)
     const id = identity(key)
     if (handled.has(id)) return
     handled.add(id)
+    const activityBefore = activity()
     let greeting: Greeting | null
     try {
       greeting = await fetch(key)
@@ -68,6 +71,8 @@ export function createGreetingScheduler({ current, fetch, play }: SchedulerDeps)
       handled.delete(id)
       return
     }
+    // 抓的期間訪客已經問了問題：開場白晚到會打斷回答，這組就算處理過，不播也不補播。
+    if (activity() !== activityBefore) return
     try {
       await play(greeting)
     } catch (error) {

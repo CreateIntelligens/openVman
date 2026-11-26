@@ -101,6 +101,24 @@ test("nothing plays until the avatar is ready, and a stale answer is dropped", a
   assert.deepEqual(played, [], "the language changed while the request was in flight");
 });
 
+test("a greeting that arrives after the visitor already asked something is dropped", async () => {
+  let asked = 0;
+  let release;
+  const played = [];
+  const s = createGreetingScheduler({
+    current: () => KEY,
+    fetch: () => new Promise((resolve) => { release = () => resolve({ text: "Hola" }); }),
+    play: (greeting) => { played.push(greeting.text); },
+    activity: () => asked,
+  });
+  const pending = s.sync();
+  asked = 1; // 開場白還在路上，訪客先送出了問題
+  release();
+  await pending;
+  await s.sync();
+  assert.deepEqual(played, [], "不播，也不在之後補播，免得打斷回答");
+});
+
 test("reset lets the same set play again for the next visitor", async () => {
   const { s, played } = scheduler();
   await s.sync();

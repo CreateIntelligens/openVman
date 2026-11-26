@@ -340,6 +340,7 @@ const greeting = useAvatarGreeting({
     return { language, personaId: settings.personaId, projectId: settings.projectId };
   },
   play: conversation.playGreeting,
+  activity: () => conversation.chat.messages.value.filter((message) => message.role === "user").length,
 });
 async function handleVisitorStart(): Promise<void> {
   started.value = true;

@@ -54,6 +54,8 @@ export default function PersonaLanguageSettings({
   const [savedLabel, setSavedLabel] = useState(persona.label);
   const [labelDraft, setLabelDraft] = useState(persona.label);
   const latest = useRef(0);
+  // 讀到過一次就不再重讀：收合再展開時保留還沒存的草稿（元件依人設與專案重建）。
+  const loaded = useRef(false);
 
   const languageDirty = JSON.stringify(draft) !== JSON.stringify(savedDraft);
   const labelDirty = labelDraft.trim() !== savedLabel;
@@ -65,7 +67,7 @@ export default function PersonaLanguageSettings({
   );
 
   useEffect(() => {
-    if (!opened) return;
+    if (!opened || loaded.current) return;
     const request = ++latest.current;
     setLoading(true);
     setLoadFailed(false);
@@ -78,6 +80,7 @@ export default function PersonaLanguageSettings({
         }
         setDraft(next);
         setSavedDraft(next);
+        loaded.current = true;
       })
       .catch((error) => {
         if (request !== latest.current) return;

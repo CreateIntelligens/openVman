@@ -86,6 +86,23 @@ describe("PersonaLanguageSettings", () => {
     await waitFor(() => expect(guardDirty).toBe(false));
   });
 
+  it("keeps unsaved edits when the section is collapsed and opened again", async () => {
+    renderSettings();
+    await waitFor(() => expect((screen.getByLabelText("English 開場白") as HTMLTextAreaElement).value).toBe("Hello"));
+    fireEvent.change(screen.getByLabelText("Español 開場白"), { target: { value: "Hola" } });
+
+    const details = document.querySelector("details") as HTMLDetailsElement;
+    details.open = false;
+    fireEvent(details, new Event("toggle"));
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+
+    // 不重讀伺服器，草稿與未存檔提示都留著。
+    await waitFor(() => expect(guardDirty).toBe(true));
+    expect(fetchPersonaLanguageSettings).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText("Español 開場白") as HTMLTextAreaElement).value).toBe("Hola");
+  });
+
   it("renames the persona, the default one included", async () => {
     vi.mocked(setPersonaLabel).mockResolvedValue({ persona_id: "default", label: "Mr. Walter" });
     const onSaved = renderSettings();
