@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import fcntl
 import json
 import sqlite3
@@ -61,6 +62,24 @@ class AuthDatabase:
         # connect() 切成 WAL，有別的連線開著時 SQLite 不肯切。
         if self._keeper is None:
             self._keeper = self._open(check_same_thread=False)
+            # 一般腳本結束時靠這個收尾；uvicorn worker 與 arq 不會跑 atexit，由各自的關機流程呼叫 close()。
+            atexit.register(self.close)
+
+    def close(self) -> None:
+        """Write the WAL back into the database file and drop the kept connection.
+
+        停服務時不這樣做，`-wal` 會留著；之後照文件拿備份蓋掉主檔，下次開啟時舊的 WAL 會被
+        重播回去，還原等於白做。
+        """
+        keeper, self._keeper = self._keeper, None
+        if keeper is None:
+            return
+        try:
+            keeper.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.Error:
+            pass
+        finally:
+            keeper.close()
 
     def _open(self, *, check_same_thread: bool = True) -> sqlite3.Connection:
         connection = sqlite3.connect(

@@ -48,3 +48,22 @@ def test_a_new_database_still_switches_to_wal(tmp_path):
     check = sqlite3.connect(db.path)
     assert check.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     check.close()
+
+
+def test_close_writes_the_wal_back_so_a_restored_file_is_not_overwritten(tmp_path):
+    db = AuthDatabase(tmp_path / "auth.db")
+    db.initialize()
+    with db.transaction(write=True) as connection:
+        connection.execute("CREATE TABLE IF NOT EXISTS probe (value TEXT)")
+        connection.execute("INSERT INTO probe VALUES ('kept')")
+
+    db.close()
+
+    # 停服務後 WAL 已寫回主檔：只看主檔（不帶 -wal）也讀得到剛寫的資料。
+    assert not _wal(db).exists() or _wal(db).stat().st_size == 0
+    copy = tmp_path / "copy.db"
+    copy.write_bytes(db.path.read_bytes())
+    check = sqlite3.connect(copy)
+    assert check.execute("SELECT value FROM probe").fetchall() == [("kept",)]
+    check.close()
+    db.close()  # 重複呼叫無害

@@ -141,7 +141,7 @@ with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True) as connection:
 PYTHON
 ```
 
-還原前先停止所有會寫入該資料庫的服務，包括 `api`、`api-chat` 與 Backend／gateway-worker；不要在資料庫仍使用舊 WAL 時覆蓋主檔。Auth DB 與 `.env` 的加密 secret 必須同時保留，規則見本節前段。
+還原前先停止所有會寫入該資料庫的服務，包括 `api`、`api-chat` 與 Backend／gateway-worker；不要在資料庫仍使用舊 WAL 時覆蓋主檔。覆蓋主檔時把同名的 `-wal`、`-shm` 一併刪掉：服務被強制停止（例如 SIGKILL）時 `-wal` 可能還留著，下次開啟會把它重播到剛還原的主檔上。Auth DB 與 `.env` 的加密 secret 必須同時保留，規則見本節前段。
 
 ### 依流量配 worker 數
 

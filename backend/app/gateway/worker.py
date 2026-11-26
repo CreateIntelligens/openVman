@@ -241,10 +241,19 @@ def reset_plugins() -> None:
     _web_crawler_plugin = None
 
 
+async def close_auth_database(_ctx: dict) -> None:
+    """Write the auth DB's WAL back on shutdown, if this worker ever opened it."""
+    from app.auth.runtime import get_auth_runtime
+
+    if get_auth_runtime.cache_info().currsize:
+        get_auth_runtime().database.close()
+
+
 class WorkerSettings:
     """Arq worker settings — used when running arq as a standalone worker."""
 
     functions = [process_media, process_camera, process_api_tool, process_web_crawler]
+    on_shutdown = close_auth_database
     redis_settings = get_arq_redis_settings()
     queue_name = GATEWAY_QUEUE_NAME
     max_jobs = 10

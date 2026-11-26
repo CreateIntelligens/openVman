@@ -138,6 +138,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         from app.auth.embed import get_bookkeeper
 
         await asyncio.to_thread(get_bookkeeper().drain, 3.0)
+        # 記帳寫完才關：把 Auth DB 的 WAL 寫回主檔，停機後拿備份還原才不會被舊 WAL 蓋回去。
+        runtime.database.close()
         clients = [
             _brain_proxy_http, _internal_http, _forward_http,
             _crawl_http, _health_http, _vision_http, _asr_http,

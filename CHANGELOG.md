@@ -150,7 +150,7 @@
 
 ### Fixed
 
-- **[2026-11-26]** **Backend 所有 worker 同時卡 1～2 秒**：11/24 14:08（約 2.2 秒）與 11/26 月會 16:36:57（3 個 worker 同時卡 1.1～1.3 秒，期間幾乎沒用 CPU）是同一件事。每個請求在 event loop 上同步讀 Auth DB，每次開新連線、用完就關；最後一條連線關閉時 SQLite 會做 checkpoint、拿整個資料庫檔的獨佔鎖並 fsync，正式站虛擬硬碟的 fsync 偶爾要一秒多，其他 worker 的讀取就跟著等。現在每個 Backend process 常駐一條不做事的 Auth DB 連線，WAL 不再被反覆拆掉，checkpoint 改由寫入時自動進行、不擋讀取。`-wal` 檔因此一直存在，線上備份照文件用 `sqlite3.Connection.backup`。根因是由紀錄特徵與重現實驗推得，紀錄中沒有直接量到 checkpoint 的耗時；之後若再出現同樣卡頓，要再補 event loop 卡住時的堆疊紀錄。
+- **[2026-11-26]** **Backend 所有 worker 同時卡 1～2 秒**：11/24 14:08（約 2.2 秒）與 11/26 月會 16:36:57（3 個 worker 同時卡 1.1～1.3 秒，期間幾乎沒用 CPU）是同一件事。每個請求在 event loop 上同步讀 Auth DB，每次開新連線、用完就關；最後一條連線關閉時 SQLite 會做 checkpoint、拿整個資料庫檔的獨佔鎖並 fsync，正式站虛擬硬碟的 fsync 偶爾要一秒多，其他 worker 的讀取就跟著等。現在每個 Backend process 常駐一條不做事的 Auth DB 連線，WAL 不再被反覆拆掉，checkpoint 改由寫入時自動進行、不擋讀取。`-wal` 檔在服務運作時一直存在，線上備份照文件用 `sqlite3.Connection.backup`；Backend lifespan 收尾與 gateway-worker（arq `on_shutdown`）關機時會把 WAL 寫回主檔再關連線，停機後拿備份還原才不會被舊 WAL 蓋回去，被強制停止時則照文件連同 `-wal`、`-shm` 一起刪。根因是由紀錄特徵與重現實驗推得，紀錄中沒有直接量到 checkpoint 的耗時；之後若再出現同樣卡頓，要再補 event loop 卡住時的堆疊紀錄。
 
 - **[2026-11-26]** **iPhone 第二次開頁人物影片載不出來**：11/26 月會有 69 次開頁失敗，全是 iPhone，都是「第一次可以、之後一直失敗」。iOS Safari 播不了直接從 Cache Storage 讀出的影片 blob；SDK 現在把存檔的人物影片先複製到記憶體再交給 `<video>`，仍播不了就清掉那組人物存檔、重新下載影片再試，最後才改從原網址載入（本機 blob 等 8 秒、原網址 15 秒）。影片被瀏覽器擋下不准自己播（`NotAllowedError`，iOS 省電模式或頁面還沒被點過）時 `init()` 不再失敗：人物停在第一格，新屬性 `avatar.videoAwaitingGesture` 為 `true`，訂閱 `error` 會收到 `AUTOPLAY_BLOCKED`，使用者點一下或按鍵就開始播。新增 `OpenVmanAvatar.clearAssetCache()` 清掉這個網域存的播放程式與人物檔，頁面不必依賴內部快取名稱。真機驗證待正式站部署後以 iPhone 進行。
 
