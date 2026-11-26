@@ -944,3 +944,18 @@ test("a page that forbids blob: video keeps its stored copy and stops downloadin
   assert.deepEqual(visits[3].sources, ["blob", "url"]);
   assert.ok(visits[2].downloads < visits[1].downloads, JSON.stringify(visits));
 });
+
+test("files are stored only after the avatar actually loaded", async () => {
+  const { storage, store } = fakeCaches();
+  const broken = await loadSdk({ cacheStorage: storage, videoLoadSucceeds: false });
+  await assert.rejects(broken.sdk.init({ characterId: "000" }), (error) => error.code === "RESOURCE_LOAD_FAILED");
+  await settle();
+  // 播不起來的那份不留下來，下次開頁重新下載，而不是一直讀到同一份壞檔。
+  assert.equal(store.size, 0);
+
+  const working = await loadSdk({ cacheStorage: storage });
+  await working.sdk.init({ characterId: "000" });
+  await settle();
+  assert.equal(storedKeys(store, "/characters/").length, 2);
+  assert.equal(storedKeys(store, "/runtime/").length, 2);
+});

@@ -168,6 +168,8 @@ async function createInstance(
   try {
     runtime = await AvatarRuntime.create(assets);
     await runtime.loadCharacter(assets);
+    // 播得出來才存：載不起來的那份不留到下次開頁（存檔失敗只是下次再下載）。
+    void assets.saveToCache().catch(() => {});
   } catch (error) {
     if (runtime) {
       runtime.dispose();

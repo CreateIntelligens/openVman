@@ -27,6 +27,8 @@ export interface AvatarAssets {
     download: () => Promise<Blob>;
     forget: () => Promise<void>;
   };
+  /** Keeps freshly downloaded files for the next visit; call once the avatar is showing. */
+  saveToCache: () => Promise<void>;
 }
 
 /**
@@ -87,7 +89,7 @@ export async function loadAvatarAssets(
   const runtime = runtimeUrls(resourceBaseUrl);
   const character = characterUrls(assetsBaseUrl, characterId);
   const characterGroup = `character:${character.data}`;
-  const [runtimeFiles, characterFiles] = await Promise.all([
+  const [runtimeGroup, characterGroupFiles] = await Promise.all([
     withRetry(() => loadAssetGroup(
       { key: `runtime:${resourceBaseUrl}`, urls: [runtime.script, runtime.wasm] },
       { useCache },
@@ -97,6 +99,8 @@ export async function loadAvatarAssets(
       { useCache },
     )),
   ]);
+  const runtimeFiles = runtimeGroup.files;
+  const characterFiles = characterGroupFiles.files;
   const all = [...runtimeFiles.values(), ...characterFiles.values()];
   const video = pick(characterFiles, character.video);
   return {
@@ -108,6 +112,9 @@ export async function loadAvatarAssets(
     runtimeWasmUrl: runtime.wasm,
     video: video.fromCache ? await inMemory(video.blob, "video/webm") : video.blob,
     videoUrl: character.video,
+    saveToCache: async () => {
+      await Promise.all([runtimeGroup.save(), characterGroupFiles.save()]);
+    },
     ...(video.fromCache
       ? {
         storedVideo: {

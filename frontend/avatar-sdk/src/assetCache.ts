@@ -343,10 +343,22 @@ export async function clearAssetCache(): Promise<boolean> {
  * the background for the next visit. Cache errors never fail the load; they
  * only turn caching off.
  */
+export interface LoadedGroup {
+  files: Map<string, LoadedAsset>;
+  /**
+   * Stores a fresh download in the browser. Called only after the files proved
+   * usable (the runtime started, the video loaded), so a file that cannot play
+   * is never kept for the next visit. A no-op for files that came from the cache.
+   */
+  save: () => Promise<void>;
+}
+
+const NOTHING_TO_SAVE = async (): Promise<void> => {};
+
 export async function loadAssetGroup(
   group: AssetGroup,
   { useCache }: { useCache: boolean },
-): Promise<Map<string, LoadedAsset>> {
+): Promise<LoadedGroup> {
   const cache = useCache ? await openCache() : null;
   const stored = cache ? await readCachedGroup(cache, group).catch(() => null) : null;
   if (cache && stored) {
@@ -362,7 +374,7 @@ export async function loadAssetGroup(
     } else {
       void touch(cache, group, stored.manifest).catch(() => {});
     }
-    return stored.files;
+    return { files: stored.files, save: NOTHING_TO_SAVE };
   }
 
   const fresh = new Map<string, { blob: Blob; response: Response }>();
@@ -377,12 +389,12 @@ export async function loadAssetGroup(
     }
     throw error;
   }
-  if (cache) {
-    void (async () => {
-      await writeGroup(cache, group, fresh, await readManifest(cache, group.key));
-    })().catch(() => {});
-  }
-  return new Map(
-    [...fresh].map(([url, { blob }]) => [url, { blob, fromCache: false }]),
-  );
+  return {
+    files: new Map([...fresh].map(([url, { blob }]) => [url, { blob, fromCache: false }])),
+    save: cache
+      ? async () => {
+        await writeGroup(cache, group, fresh, await readManifest(cache, group.key)).catch(() => {});
+      }
+      : NOTHING_TO_SAVE,
+  };
 }
