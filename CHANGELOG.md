@@ -150,6 +150,10 @@
 
 ### Fixed
 
+- **[2026-11-26]** **iPhone 第二次開頁人物影片載不出來**：11/26 月會有 69 次開頁失敗，全是 iPhone，都是「第一次可以、之後一直失敗」。iOS Safari 播不了直接從 Cache Storage 讀出的影片 blob；SDK 現在把存檔的人物影片先複製到記憶體再交給 `<video>`，仍播不了就清掉那組人物存檔、重新下載影片再試，最後才改從原網址載入（本機 blob 等 8 秒、原網址 15 秒）。影片被瀏覽器擋下不准自己播（`NotAllowedError`，iOS 省電模式或頁面還沒被點過）時 `init()` 不再失敗：人物停在第一格，新屬性 `avatar.videoAwaitingGesture` 為 `true`，訂閱 `error` 會收到 `AUTOPLAY_BLOCKED`，使用者點一下或按鍵就開始播。新增 `OpenVmanAvatar.clearAssetCache()` 清掉這個網域存的播放程式與人物檔，頁面不必依賴內部快取名稱。真機驗證待正式站部署後以 iPhone 進行。
+
+- **[2026-11-26]** **SDK 與 runtime 下載改用 gzip**：`/static/sdk/` 的 SDK、runtime JS 與 5 MB 的 runtime wasm 以前不壓縮，月會冷啟動尖峰（約 146 Mbps）八成是 wasm。這三個 location 開 gzip（level 5，只壓 `application/javascript`、`application/wasm`，API 與 SSE 不受影響），wasm 約減半。即時壓縮不送 `Content-Length`，SDK 既有的存檔在上線後第一次開頁會在背景重新下載一次，之後照常比對。
+
 - **[2026-11-26]** **開場白與人設語言設定的兩個小修**：官方前台抓開場白的期間訪客已經送出問題時，這次開場白不播也不補播（以前會在回答進行中晚到並打斷回答）；後台人設頁「各語言開場白」收合再展開不再重讀伺服器資料，還沒存的草稿與未存檔提示都保留。
 
 - **[2026-11-24]** **Gemini TTS 直連串流收到結束訊號就收尾**。Google 送完音訊偶爾不關連線，Backend 原本要等滿 10 秒才收掉。現在收到 `finishReason` 就送完該事件的音訊並立即結束。`upstream_attempt` 新增 `end_reason`，區分 `finish:<原因>`、`done`（收到 `[DONE]`）與 `eof`（上游關閉連線且未送結束訊號）。

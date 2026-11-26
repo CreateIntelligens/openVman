@@ -1,4 +1,5 @@
 import { AvatarAudio, DEFAULT_AUDIO_LEAD_MS } from "./audio";
+import { clearAssetCache } from "./assetCache";
 import { loadAvatarAssets } from "./avatarAssets";
 import { AvatarConversation } from "./chat";
 import { createAvatarDom, removeAvatarDom } from "./dom";
@@ -234,8 +235,16 @@ async function createInstance(
     untilIdle: () => audio.untilIdle(),
   });
 
+  const videoBlockedEvent = {
+    code: "AUTOPLAY_BLOCKED",
+    message: "The character video starts after a tap or key press on the page.",
+    type: "error",
+  } as const;
   const instance: OpenVmanAvatarInstance = {
     assetsFromCache: assets.fromCache,
+    get videoAwaitingGesture() {
+      return runtime.videoAwaitingGesture;
+    },
     async ask(text) {
       try {
         return await conversation.ask(text);
@@ -309,6 +318,12 @@ async function createInstance(
       if (type === "ready" && !destroyed) {
         queueMicrotask(() => handler({ type: "ready" } as never));
       }
+      // init() 時影片被擋下來的話，訂閱 error 的頁面才知道要請使用者點一下。
+      if (type === "error" && !destroyed && runtime.videoAwaitingGesture) {
+        queueMicrotask(() => {
+          if (runtime.videoAwaitingGesture) handler(videoBlockedEvent as never);
+        });
+      }
     },
     async playAudio(source) {
       await runAudio(() => audio.playAudio(source));
@@ -323,4 +338,4 @@ async function createInstance(
   return instance;
 }
 
-window.OpenVmanAvatar = Object.freeze({ init, listCharacters, resourceBaseUrl });
+window.OpenVmanAvatar = Object.freeze({ init, listCharacters, clearAssetCache, resourceBaseUrl });

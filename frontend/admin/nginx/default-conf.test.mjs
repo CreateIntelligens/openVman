@@ -75,6 +75,21 @@ describe("nginx default config", () => {
     expect(source.match(/proxy_hide_header Access-Control-Allow-Origin;/g)).toHaveLength(2);
   });
 
+  it("compresses the SDK and runtime downloads, and nothing else", () => {
+    for (const path of [
+      "/static/sdk/openvman-avatar-sdk.js",
+      "/static/sdk/runtime/OpenVmanAvatarRuntime.js",
+      "/static/sdk/runtime/OpenVmanAvatarRuntime.wasm",
+    ]) {
+      const body = locationBody(path);
+      expect(body, path).toContain("gzip on;");
+      expect(body, path).toMatch(/gzip_types[^;]*application\/wasm/);
+      expect(body, path).toContain("gzip_proxied any;");
+    }
+    // API 與 SSE 不能被壓縮緩衝住，所以 gzip 只開在這三個 location。
+    expect(source.match(/gzip on;/g)).toHaveLength(3);
+  });
+
   it("proxies public and authorized character files without unsafe shared caching", () => {
     const characters = locationBody("/static/characters/");
 

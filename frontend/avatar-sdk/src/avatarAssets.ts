@@ -1,4 +1,10 @@
-import { isTransientAssetError, loadAssetGroup, type LoadedAsset } from "./assetCache";
+import {
+  downloadAsset,
+  forgetAssetGroup,
+  isTransientAssetError,
+  loadAssetGroup,
+  type LoadedAsset,
+} from "./assetCache";
 
 // 伺服器短暫連不上（重啟、換版）時先等一下再試；明確拒絕（401／403／404）不重試。
 const RETRY_DELAYS_MS = [1_000, 3_000];
@@ -13,6 +19,20 @@ export interface AvatarAssets {
   runtimeWasmUrl: string;
   video: Blob;
   videoUrl: string;
+  /**
+   * Forgets the stored character files and downloads the video again; set only
+   * when the video came from the browser's copy (a fresh download needs no retry).
+   */
+  reloadVideo?: () => Promise<Blob>;
+}
+
+/**
+ * Safari on iOS will not play a video from a blob URL whose blob is backed by a
+ * Cache Storage file (first visit works, every later visit fails). A copy held in
+ * memory plays like a fresh download.
+ */
+async function inMemory(blob: Blob, fallbackType: string): Promise<Blob> {
+  return new Blob([await blob.arrayBuffer()], { type: blob.type || fallbackType });
 }
 
 export function runtimeUrls(resourceBaseUrl: string): { script: string; wasm: string } {
@@ -63,17 +83,19 @@ export async function loadAvatarAssets(
 ): Promise<AvatarAssets> {
   const runtime = runtimeUrls(resourceBaseUrl);
   const character = characterUrls(assetsBaseUrl, characterId);
+  const characterGroup = `character:${character.data}`;
   const [runtimeFiles, characterFiles] = await Promise.all([
     withRetry(() => loadAssetGroup(
       { key: `runtime:${resourceBaseUrl}`, urls: [runtime.script, runtime.wasm] },
       { useCache },
     )),
     withRetry(() => loadAssetGroup(
-      { key: `character:${character.data}`, urls: [character.data, character.video] },
+      { key: characterGroup, urls: [character.data, character.video] },
       { useCache },
     )),
   ]);
   const all = [...runtimeFiles.values(), ...characterFiles.values()];
+  const video = pick(characterFiles, character.video);
   return {
     characterData: new Uint8Array(await pick(characterFiles, character.data).blob.arrayBuffer()),
     fromCache: all.every((asset) => asset.fromCache),
@@ -81,7 +103,15 @@ export async function loadAvatarAssets(
     runtimeScriptUrl: runtime.script,
     runtimeWasm: await pick(runtimeFiles, runtime.wasm).blob.arrayBuffer(),
     runtimeWasmUrl: runtime.wasm,
-    video: pick(characterFiles, character.video).blob,
+    video: video.fromCache ? await inMemory(video.blob, "video/webm") : video.blob,
     videoUrl: character.video,
+    ...(video.fromCache
+      ? {
+        reloadVideo: async () => {
+          await forgetAssetGroup(characterGroup);
+          return downloadAsset(character.video);
+        },
+      }
+      : {}),
   };
 }

@@ -38,6 +38,7 @@ export class AvatarRuntime {
   private readonly idleLipSyncBypass: IdleLipSyncBypass | null;
   private readonly frameSyncMarkerRepair: FrameSyncMarkerRepair | null;
   private videoObjectUrl = "";
+  private stopAwaitingGesture: (() => void) | null = null;
 
   private constructor(
     instance: AvatarRuntimeInstance,
@@ -100,23 +101,65 @@ export class AvatarRuntime {
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
-    this.videoObjectUrl = URL.createObjectURL(assets.video);
-    try {
-      await loadVideo(video, this.videoObjectUrl);
-    } catch {
-      // 頁面的 CSP（media-src）不允許 blob: 時改從原網址播（這時離線就播不到）。
-      URL.revokeObjectURL(this.videoObjectUrl);
-      this.videoObjectUrl = "";
-      await loadVideo(video, assets.videoUrl);
-    }
+    await this.loadVideoSource(video, assets);
     try {
       await video.play();
     } catch (error) {
-      throw new OpenVmanAvatarError(
-        "RESOURCE_LOAD_FAILED",
-        `Avatar character video could not start: ${errorMessage(error)}.`,
-      );
+      if (!isAutoplayBlocked(error)) {
+        throw new OpenVmanAvatarError(
+          "RESOURCE_LOAD_FAILED",
+          `Avatar character video could not start: ${errorMessage(error)}.`,
+        );
+      }
+      // 影片已經載好，只是瀏覽器不准自己播（iOS 省電模式、還沒互動過）：不讓 init() 失敗，
+      // 停在第一格，等使用者第一次點擊或按鍵再播。
+      this.awaitGesture(video);
     }
+  }
+
+  /** True while the character video is loaded but waits for a tap or key press to play. */
+  get videoAwaitingGesture(): boolean {
+    return this.stopAwaitingGesture !== null;
+  }
+
+  private async loadVideoSource(video: HTMLVideoElement, assets: AvatarAssets): Promise<void> {
+    if (await this.tryBlobVideo(video, assets.video)) return;
+    // 存在瀏覽器的那份播不了：清掉重新下載，下次開頁也會換成新存的。
+    const fresh = assets.reloadVideo ? await assets.reloadVideo().catch(() => null) : null;
+    if (fresh && await this.tryBlobVideo(video, fresh)) return;
+    // 頁面的 CSP（media-src）不允許 blob: 時改從原網址播（這時離線就播不到）。
+    await loadVideo(video, assets.videoUrl, VIDEO_URL_TIMEOUT_MS);
+  }
+
+  private async tryBlobVideo(video: HTMLVideoElement, blob: Blob): Promise<boolean> {
+    this.releaseVideoUrl();
+    this.videoObjectUrl = URL.createObjectURL(blob);
+    try {
+      await loadVideo(video, this.videoObjectUrl, VIDEO_BLOB_TIMEOUT_MS);
+      return true;
+    } catch {
+      this.releaseVideoUrl();
+      return false;
+    }
+  }
+
+  private releaseVideoUrl(): void {
+    if (this.videoObjectUrl) URL.revokeObjectURL(this.videoObjectUrl);
+    this.videoObjectUrl = "";
+  }
+
+  private awaitGesture(video: HTMLVideoElement): void {
+    // iOS 只認手勢處理函式裡「同步」呼叫的 play()，所以在事件裡直接呼叫。
+    const retry = (): void => {
+      void video.play().then(() => this.stopAwaitingGesture?.()).catch(() => {});
+    };
+    for (const type of GESTURE_EVENTS) {
+      window.addEventListener(type, retry, { capture: true, passive: true });
+    }
+    this.stopAwaitingGesture = () => {
+      for (const type of GESTURE_EVENTS) window.removeEventListener(type, retry, { capture: true });
+      this.stopAwaitingGesture = null;
+    };
   }
 
   clearAudio(): void {
@@ -154,8 +197,8 @@ export class AvatarRuntime {
   }
 
   dispose(): void {
-    if (this.videoObjectUrl) URL.revokeObjectURL(this.videoObjectUrl);
-    this.videoObjectUrl = "";
+    this.stopAwaitingGesture?.();
+    this.releaseVideoUrl();
     this.idleLipSyncBypass?.resetSpeaking();
     this.idleLipSyncBypass?.restore();
     this.frameSyncMarkerRepair?.restore();
@@ -173,9 +216,18 @@ export class AvatarRuntime {
   }
 }
 
-function loadVideo(video: HTMLVideoElement, src: string): Promise<void> {
+// 本機的 blob 很快就能解碼；卡住多半是 Safari 不肯播這份 blob，不必等滿網路的逾時。
+const VIDEO_BLOB_TIMEOUT_MS = 8_000;
+const VIDEO_URL_TIMEOUT_MS = 15_000;
+const GESTURE_EVENTS = ["pointerdown", "touchend", "keydown"] as const;
+
+function isAutoplayBlocked(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === "NotAllowedError";
+}
+
+function loadVideo(video: HTMLVideoElement, src: string, timeoutMs: number): Promise<void> {
   video.src = src;
-  const ready = waitForVideoReady(video, src);
+  const ready = waitForVideoReady(video, src, timeoutMs);
   video.load();
   return ready;
 }
@@ -191,6 +243,7 @@ function errorMessage(error: unknown): string {
 function waitForVideoReady(
   video: HTMLVideoElement,
   src: string,
+  timeoutMs: number,
 ): Promise<void> {
   if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
     return Promise.resolve();
@@ -203,7 +256,7 @@ function waitForVideoReady(
         "RESOURCE_LOAD_FAILED",
         `Avatar character video timed out while loading ${src}.`,
       ));
-    }, 15_000);
+    }, timeoutMs);
 
     const cleanup = (): void => {
       window.clearTimeout(timeout);

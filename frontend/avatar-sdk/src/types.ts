@@ -67,6 +67,13 @@ export interface OpenVmanAvatarInstance {
   ask(text: string): Promise<string>;
   /** True when this init downloaded nothing (every file came from the browser's cache). */
   readonly assetsFromCache: boolean;
+  /**
+   * True while the character video is loaded but the browser refused to start it
+   * (iOS Low Power Mode, no interaction yet). It starts on the next tap or key
+   * press anywhere on the page; an `error` event with `AUTOPLAY_BLOCKED` is sent
+   * to every `error` handler while this is true.
+   */
+  readonly videoAwaitingGesture: boolean;
   destroy(): void;
   /**
    * 念出這個人設在 `language` 下設定的開場白（字幕、語音、嘴形），不進對話、不呼叫模型。
@@ -94,5 +101,10 @@ export interface OpenVmanAvatarCharacter {
 export interface OpenVmanAvatarGlobal {
   init(options: OpenVmanAvatarOptions): Promise<OpenVmanAvatarInstance>;
   listCharacters(): Promise<OpenVmanAvatarCharacter[]>;
+  /**
+   * Removes the runtime and character files stored in this site's Cache Storage;
+   * the next init() downloads them again. Resolves false when nothing was stored.
+   */
+  clearAssetCache(): Promise<boolean>;
   readonly resourceBaseUrl: string;
 }

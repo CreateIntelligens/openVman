@@ -17,6 +17,8 @@ export async function loadSdk({
   deferVideoReady = false,
   resumeSucceeds = true,
   videoLoadSucceeds = true,
+  videoLoadResult,
+  videoPlayBlocked = false,
   videoPlaySucceeds = true,
 } = {}) {
   let characterStatus = initialCharacterStatus;
@@ -32,8 +34,12 @@ export async function loadSdk({
     scheduledStarts: [],
     sourceStarted: 0,
     sourceStopped: 0,
+    videoPlays: 0,
     videoRemoved: 0,
+    videoSources: [],
   };
+  let playBlocked = videoPlayBlocked;
+  const windowListeners = new Map();
   let finishDecode;
   let finishVideoReady;
   let renderingTime = 0;
@@ -83,9 +89,14 @@ export async function loadSdk({
               },
               error: null,
               load() {
+                runtimeCalls.videoSources.push(this.src);
+                const succeeds = videoLoadResult
+                  ? videoLoadResult(this.src, runtimeCalls.videoSources.length - 1)
+                  : videoLoadSucceeds;
+                this.readyState = 0;
                 const finish = () => {
-                  const type = videoLoadSucceeds ? "canplay" : "error";
-                  if (videoLoadSucceeds) this.readyState = 3;
+                  const type = succeeds ? "canplay" : "error";
+                  if (succeeds) this.readyState = 3;
                   for (const handler of videoListeners.get(type) ?? []) {
                     handler();
                   }
@@ -97,9 +108,15 @@ export async function loadSdk({
                 }
               },
               play: async () => {
+                if (playBlocked) {
+                  const error = new Error("The request is not allowed by the user agent");
+                  error.name = "NotAllowedError";
+                  throw error;
+                }
                 if (!videoPlaySucceeds) {
                   throw new Error("playback rejected");
                 }
+                runtimeCalls.videoPlays += 1;
               },
               readyState: 0,
               remove() {
@@ -199,7 +216,15 @@ export async function loadSdk({
       now: () => renderingTime,
     },
     window: {
+      addEventListener(type, handler) {
+        const handlers = windowListeners.get(type) ?? new Set();
+        handlers.add(handler);
+        windowListeners.set(type, handlers);
+      },
       clearTimeout,
+      removeEventListener(type, handler) {
+        windowListeners.get(type)?.delete(handler);
+      },
       setTimeout,
     },
   };
@@ -257,6 +282,12 @@ export async function loadSdk({
     document: context.document,
     finishDecode: () => finishDecode?.(),
     finishVideoReady: () => finishVideoReady?.(),
+    /** A tap or key press on the page; the browser lets playback start from here on. */
+    gesture(type = "touchend") {
+      playBlocked = false;
+      for (const handler of [...(windowListeners.get(type) ?? [])]) handler({ type });
+    },
+    gestureListeners: () => [...windowListeners.values()].reduce((sum, set) => sum + set.size, 0),
     requests,
     runtimeCalls,
     sdk: context.window.OpenVmanAvatar,
@@ -631,7 +662,17 @@ function fakeCaches() {
       return store.delete(String(key));
     },
   };
-  return { storage: { open: async () => cache }, store };
+  return {
+    storage: {
+      open: async () => cache,
+      delete: async () => {
+        const had = store.size > 0;
+        store.clear();
+        return had;
+      },
+    },
+    store,
+  };
 }
 
 function assetResponse({ status = 200, lastModified = "", onBodyRead } = {}) {
@@ -797,4 +838,70 @@ test("cacheAssets false never touches Cache Storage", async () => {
   await sdk.init({ cacheAssets: false, characterId: "000" });
   await settle();
   assert.equal(store.size, 0);
+});
+
+test("a video the browser will not start waits for a tap instead of failing init", async () => {
+  const { gesture, gestureListeners, runtimeCalls, sdk } = await loadSdk({ videoPlayBlocked: true });
+  const avatar = await sdk.init({ characterId: "000" });
+  assert.equal(avatar.videoAwaitingGesture, true);
+
+  const errors = [];
+  avatar.on("error", (event) => errors.push(event.code));
+  await new Promise((resolve) => setImmediate(resolve));
+  // 頁面晚一步才訂閱 error 也要知道該請使用者點一下。
+  assert.deepEqual(errors, ["AUTOPLAY_BLOCKED"]);
+
+  gesture("touchend");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(runtimeCalls.videoPlays, 1);
+  assert.equal(avatar.videoAwaitingGesture, false);
+  assert.equal(gestureListeners(), 0);
+});
+
+test("other video start failures still reject init", async () => {
+  const { sdk } = await loadSdk({ videoPlaySucceeds: false });
+  await assert.rejects(sdk.init({ characterId: "000" }), (error) => error.code === "RESOURCE_LOAD_FAILED");
+});
+
+test("a stored video that will not play is dropped and downloaded again", async () => {
+  const { storage, store } = fakeCaches();
+  await (await loadSdk({ cacheStorage: storage })).sdk.init({ characterId: "000" });
+  await settle();
+  assert.equal(storedKeys(store, "/characters/").length, 2);
+
+  // 第二次開頁：從瀏覽器拿出的那份播不了（iOS 的情形），重新下載的那份可以。
+  const second = await loadSdk({
+    cacheStorage: storage,
+    videoLoadResult: (_src, nth) => nth > 0,
+  });
+  const avatar = await second.sdk.init({ characterId: "000" });
+  assert.equal(avatar.assetsFromCache, true);
+  assert.equal(second.runtimeCalls.videoSources.length, 2);
+  assert.ok(second.runtimeCalls.videoSources.every((src) => src.startsWith("blob:")));
+  assert.ok(
+    second.requests.some(({ url, options }) => String(url).endsWith("/01.webm") && !options?.headers?.["If-None-Match"]),
+    "the video is downloaded again",
+  );
+  assert.deepEqual(storedKeys(store, "/characters/"), [], "the unplayable stored copy is gone");
+});
+
+test("a freshly downloaded video that will not play falls back to its URL without a second download", async () => {
+  const { requests, runtimeCalls, sdk } = await loadSdk({
+    videoLoadResult: (src) => !src.startsWith("blob:"),
+  });
+  await sdk.init({ characterId: "000" });
+  assert.equal(runtimeCalls.videoSources.length, 2);
+  assert.match(runtimeCalls.videoSources[1], /\/01\.webm$/);
+  assert.equal(requests.filter(({ url }) => String(url).endsWith("/01.webm")).length, 1);
+});
+
+test("clearAssetCache removes every stored file", async () => {
+  const { storage, store } = fakeCaches();
+  const { sdk } = await loadSdk({ cacheStorage: storage });
+  await sdk.init({ characterId: "000" });
+  await settle();
+  assert.ok(store.size > 0);
+  assert.equal(await sdk.clearAssetCache(), true);
+  assert.equal(store.size, 0);
+  assert.equal(await (await loadSdk()).sdk.clearAssetCache(), false, "no Cache Storage resolves false");
 });

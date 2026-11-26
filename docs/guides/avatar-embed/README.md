@@ -72,7 +72,7 @@ const avatar = await OpenVmanAvatar.init({
 | `language` | 否 | 無 | `zh`、`en`、`es`、`ja`、`ko`。設定後每次 `ask()` 的請求都帶 `language`：整場對話一律用這個語言回答，知識也只查這個語言（使用者改講別種語言也一樣）；`greet()` 用它挑開場白。不設就不帶，行為與之前相同。不支援台語。 |
 | `tts` | 否 | 後端預設 | `{ provider, voice, language }`，指定 `ask()` 合成語音的 TTS 供應商與音色；`language` 是回答要唸的語言（`zh`、`en`、`nan`…），`nan` 且專案開了台語分流時改用台語引擎。 |
 
-`init()` 先把播放程式與人物檔都拿到（瀏覽器存檔或網路），才建立 runtime 與畫面。連不上、逾時或 5xx 時自動再試兩次（間隔 1 秒、3 秒）；仍失敗就回 `RESOURCE_LOAD_FAILED`，頁面上沒有留下任何東西，可以直接再呼叫 `init()`，不必重新整理。人物影片解碼或播放失敗（檔案已拿到之後）仍會讓這一頁不能再建 runtime（`RUNTIME_DISPOSED`）。
+`init()` 先把播放程式與人物檔都拿到（瀏覽器存檔或網路），才建立 runtime 與畫面。連不上、逾時或 5xx 時自動再試兩次（間隔 1 秒、3 秒）；仍失敗就回 `RESOURCE_LOAD_FAILED`，頁面上沒有留下任何東西，可以直接再呼叫 `init()`，不必重新整理。人物影片解碼失敗（檔案已拿到之後）仍會讓這一頁不能再建 runtime（`RUNTIME_DISPOSED`）。瀏覽器不准影片自己播（iOS 省電模式、頁面還沒被點過）時 `init()` 照樣成功：人物停在第一格，`avatar.videoAwaitingGesture` 為 `true`，訂閱 `error` 會收到一次 `AUTOPLAY_BLOCKED`；使用者在頁面任何地方點一下或按鍵，影片就開始播。
 
 同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`embedKey`、`projectId`、`personaId` 與 `tts` 一併計入設定比對，因此只改對話選項再次 `init()` 同樣會被拒絕。`destroy()` 後必須重新載入頁面才能再次初始化。
 
@@ -89,6 +89,8 @@ const avatar = await OpenVmanAvatar.init({
 - 離線期間存檔會一直留著，登出也不會清：同一台瀏覽器之前看過的專案人物，openVman 連不上時仍顯示得出來。30 天沒用到的那組會在之後的載入時清掉。
 - 第一次下載時連不上、逾時（等標頭 15 秒、下載 120 秒）、5xx 或下載到一半中斷，自動再試兩次。
 - `avatar.assetsFromCache` 為 `true` 表示這次 `init()` 完全沒有下載。
+- 存檔的人物影片先複製到記憶體再交給 `<video>`：iOS Safari 播不了直接從 Cache Storage 讀出的影片（第一次開可以、之後每次失敗）。複製後仍播不了，就清掉那組人物存檔、重新下載影片再試；還是不行才改從原網址載入。
+- `await OpenVmanAvatar.clearAssetCache()` 清掉這個網域存的所有播放程式與人物檔，下次 `init()` 重新下載；沒有東西可清或瀏覽器沒有 Cache Storage 時回 `false`。
 - 嵌入頁面必須是 https（或 localhost）才有 Cache Storage；隱私模式、使用者清除網站資料、瀏覽器空間不足時存檔會不見，就回到第一次下載。這些情況與快取出錯都只會改走網路，不會讓 `init()` 失敗。
 - 存檔的播放程式與人物影片以 `blob:` 網址載入。頁面的 CSP 不允許 `blob:` 腳本（`script-src`）或媒體（`media-src`）時，那一項改從原網址載入，此時 openVman 連不上就載不到。播放程式本身仍需要 `'unsafe-eval'` 與 `'wasm-unsafe-eval'`（跟以前一樣）。
 - SDK 本體（`openvman-avatar-sdk.js`）由瀏覽器的 HTTP 快取處理：`max-age=300` 加上 `stale-while-revalidate=2592000`，播放程式兩支同樣加上。Chromium 實測：過期後 openVman 連不上，仍用舊的 SDK 載起來；Safari、Firefox 尚未驗證。SDK 換版後，訪客要再開一次頁面才會拿到新版。
@@ -175,6 +177,10 @@ avatar.on("error", ({ code, retryAfterSeconds }) => {
 若初始化時設定 `audioOutput: "silent"`，`ask()` 一樣會驅動嘴型並正常 resolve，只是 SDK 不出聲，適合宿主自行播放同一段語音的情境。
 
 ## JavaScript API
+
+### `await OpenVmanAvatar.clearAssetCache()`
+
+清掉 SDK 存在這個網域 Cache Storage 的播放程式與人物檔，下次 `init()` 會重新下載。可在 `init()` 前呼叫，不需要 instance；有清到東西回 `true`。人物顯示異常、想讓訪客「回到第一次開」時使用，不必依賴 SDK 內部的快取名稱。
 
 ### `await OpenVmanAvatar.listCharacters()`
 
@@ -287,7 +293,7 @@ location /static/characters/ {
 | `DOM_CONFLICT` | 宿主頁已占用 vendor 固定 DOM ID。 |
 | `RESOURCE_LOAD_FAILED` | vendor JS、WASM 或角色資源載入失敗。 |
 | `AUDIO_PLAYBACK_FAILED` | 音訊讀取、解碼或播放失敗。 |
-| `AUTOPLAY_BLOCKED` | 瀏覽器要求先有 click／tap 等 user gesture（只有 `audioOutput: "speaker"` 會發生）。 |
+| `AUTOPLAY_BLOCKED` | 瀏覽器要求先有 click／tap 等 user gesture。播音訊時（只有 `audioOutput: "speaker"` 會發生）讓呼叫失敗；人物影片被擋時只透過 `error` 事件通知、不讓 `init()` 失敗，使用者點一下影片就開始播（見 `avatar.videoAwaitingGesture`）。 |
 | `WEBGL_CONTEXT_LOST` | 瀏覽器丟掉了嘴型用的 WebGL 畫布。人物影片照常播放、不再貼嘴型，直到重新載入頁面；這個錯誤只透過 `error` 事件通知，不會讓呼叫失敗。 |
 | `UNAUTHORIZED` | 對話請求回 401 或 403。 |
 | `RATE_LIMITED` | 對話請求回 429，可能帶 `retryAfterSeconds`。 |

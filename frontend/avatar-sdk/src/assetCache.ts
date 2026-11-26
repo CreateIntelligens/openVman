@@ -311,6 +311,33 @@ async function updateGroup(
 }
 
 /**
+ * Drops one group's stored files, so the next load downloads them again.
+ * Used when a stored copy turns out unplayable; never throws.
+ */
+export async function forgetAssetGroup(groupKey: string): Promise<void> {
+  const cache = await openCache();
+  if (cache) await purgeGroup(cache, groupKey).catch(() => {});
+}
+
+/** Downloads *url* without reading or writing the browser's copy. */
+export async function downloadAsset(url: string): Promise<Blob> {
+  return readBody(url, await requestHeaders(url, HEADERS_TIMEOUT_MS));
+}
+
+/**
+ * Removes every runtime and character file the SDK stored in this site's Cache
+ * Storage; the next init() downloads them again. Resolves false when there was
+ * nothing to remove or the browser has no Cache Storage.
+ */
+export async function clearAssetCache(): Promise<boolean> {
+  try {
+    return typeof caches === "undefined" ? false : await caches.delete(CACHE_NAME);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Returns every file of *group*. A stored copy is used only after the server
  * has not refused it (or cannot be reached); changed files are downloaded in
  * the background for the next visit. Cache errors never fail the load; they
