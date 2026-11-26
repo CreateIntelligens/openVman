@@ -179,6 +179,27 @@ describe("useChatSession TTS prefetch", () => {
     vi.useRealTimers();
   });
 
+  it("only locks the reply language when the tester ticks it and the language can be locked", async () => {
+    fetchChatMock.mockResolvedValue({ session_id: "s", reply: "ok", knowledge_results: [], memory_results: [], history: [] });
+    const request = (language: string) => ({ language, startFresh: false, takeQuestion: () => undefined }) as never;
+
+    const es = renderHook(() => useChatSession(false, request("es")));
+    await act(async () => { await es.result.current.submit("hola"); });
+    act(() => es.result.current.setLockTestLanguage(true));
+    await act(async () => { await es.result.current.submit("hola otra vez"); });
+    // 第一句沒勾：只當提示；第二句勾了：preferred_language 與 language 都帶。
+    expect(fetchChatMock.mock.calls[0][5]).toBe("es");
+    expect(fetchChatMock.mock.calls[0][6]).toBeUndefined();
+    expect(fetchChatMock.mock.calls[1][5]).toBe("es");
+    expect(fetchChatMock.mock.calls[1][6]).toBe("es");
+
+    fetchChatMock.mockClear();
+    const nan = renderHook(() => useChatSession(false, request("nan")));
+    act(() => nan.result.current.setLockTestLanguage(true));
+    await act(async () => { await nan.result.current.submit("你好"); });
+    expect(fetchChatMock.mock.calls[0][6]).toBeUndefined();
+  });
+
   it("prefetches the finished assistant reply after streaming completes", async () => {
     fetchChatMock.mockResolvedValue({
       session_id: "sess-1",
@@ -407,6 +428,7 @@ describe("useChatSession TTS prefetch", () => {
         undefined,
         expect.any(AbortSignal),
         "standard",
+        undefined,
         undefined,
       );
     });

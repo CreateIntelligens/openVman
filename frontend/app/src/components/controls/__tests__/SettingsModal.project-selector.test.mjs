@@ -115,6 +115,7 @@ test("every custom select has an accessible name matching its visible field", ()
     draftTtsVoice: "聲音",
     draftTtsProvider: "語音引擎",
     draftAsrProvider: "語音辨識",
+    draftLockedLanguage: "回答語言",
   };
   const selects = [...source.matchAll(/<CustomSelect\s+([\s\S]*?)\/>/g)];
   assert.equal(selects.length, Object.keys(expectedNames).length);

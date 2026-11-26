@@ -366,6 +366,40 @@ def test_clone_persona_scaffold_copies_core_docs_from_source(
     assert (root / "personas" / "default_copy" / "MEMORY.md").read_text(encoding="utf-8") == "global memory"
 
 
+def test_clone_persona_scaffold_carries_language_settings_but_not_the_avatar(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+    personas.create_persona_scaffold("walter", "Walter")
+    personas.set_persona_language_settings(
+        "walter", {"en": "Hello", "es": "Hola"}, {"en": "voice-en"},
+    )
+    personas.set_persona_avatar("walter", "char-1")
+
+    personas.clone_persona_scaffold("walter", "walter_copy")
+
+    settings = personas.get_persona_language_settings("walter_copy")
+    assert settings["greetings"] == {"en": "Hello", "es": "Hola"}
+    assert settings["voices"] == {"en": "voice-en"}
+    copied = json.loads((root / "personas" / "walter_copy" / "AVATAR.json").read_text(encoding="utf-8"))
+    assert "avatar_char_id" not in copied
+
+
+def test_clone_persona_scaffold_without_language_settings_writes_no_avatar_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+    personas.create_persona_scaffold("plain", "Plain")
+
+    personas.clone_persona_scaffold("plain", "plain_copy")
+
+    assert not (root / "personas" / "plain_copy" / "AVATAR.json").exists()
+
+
 def test_save_uploaded_document_can_target_persona_knowledge_directory(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

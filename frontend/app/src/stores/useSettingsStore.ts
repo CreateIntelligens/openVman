@@ -4,6 +4,7 @@ import {
   normalizeAvatarBackgroundFit,
   normalizeAvatarBackgroundId,
 } from "../types/avatarBackground"
+import { normalizeLockedLanguage } from "../types/lockedLanguage"
 import { normalizeReplyMode } from "../types/replyMode"
 import { normalizeVoiceMode } from "../types/voiceMode"
 import {
@@ -35,6 +36,7 @@ function loadState() {
     backgroundFit: normalizeAvatarBackgroundFit(readPref(STORAGE_KEYS.BACKGROUND_FIT, "cover")),
     cameraPreviewScale: normalizeCameraPreviewScale(readPref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, "1")),
     replyMode: normalizeReplyMode(readPref(STORAGE_KEYS.REPLY_MODE, "fast")),
+    lockedLanguage: normalizeLockedLanguage(readPref(STORAGE_KEYS.LOCKED_LANGUAGE, "")),
   }
 }
 
@@ -52,6 +54,7 @@ const PREF_KEYS: Record<keyof SettingsState, string> = {
   backgroundFit: STORAGE_KEYS.BACKGROUND_FIT,
   cameraPreviewScale: STORAGE_KEYS.CAMERA_PREVIEW_SCALE,
   replyMode: STORAGE_KEYS.REPLY_MODE,
+  lockedLanguage: STORAGE_KEYS.LOCKED_LANGUAGE,
 }
 
 /*

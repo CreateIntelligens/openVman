@@ -14,6 +14,7 @@ import {
 import { LANGUAGE_ROUTE_LABELS } from "../../composables/useLanguageRoutes";
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
+import { LOCKED_LANGUAGES } from "../../types/lockedLanguage";
 import { REPLY_MODES, type ReplyMode } from "../../types/replyMode";
 import { LIVE_VOICE_MODE_AVAILABLE } from "../../types/voiceMode";
 import {
@@ -68,6 +69,10 @@ const props = defineProps<{
   personasLoading?: boolean
   voiceMode?: 'live' | 'text'
   replyMode: ReplyMode
+  /** 設定裡選的回答語言；空字串是不指定。 */
+  lockedLanguage?: string
+  /** 網址 ?lang= 指定的語言；有的話優先於上面的設定，這裡不能改。 */
+  urlLockedLanguage?: string
   backgroundId: AvatarBackgroundId
   backgroundUrl: string
   backgroundFit: AvatarBackgroundFit
@@ -91,6 +96,7 @@ const emit = defineEmits<{
   personaChange: [personaId: string]
   voiceModeChange: [mode: 'live' | 'text']
   replyModeChange: [mode: ReplyMode]
+  lockedLanguageChange: [language: string]
   backgroundChange: [
     backgroundId: AvatarBackgroundId,
     backgroundUrl: string,
@@ -126,6 +132,7 @@ type DraftFields = {
   asrProvider: string
   voiceMode: 'live' | 'text'
   replyMode: ReplyMode
+  lockedLanguage: string
   backgroundId: AvatarBackgroundId
   backgroundUrl: string
   backgroundFit: AvatarBackgroundFit
@@ -160,6 +167,7 @@ const draftAsrProvider = draftField('asrProvider', () => props.asrProvider)
 const draftTtsVoice = draftField('ttsVoice', () => props.ttsVoice)
 const draftVoiceMode = draftField('voiceMode', () => props.voiceMode ?? 'text')
 const draftReplyMode = draftField('replyMode', () => props.replyMode)
+const draftLockedLanguage = draftField('lockedLanguage', () => props.lockedLanguage ?? '')
 const draftBackgroundId = draftField('backgroundId', () => props.backgroundId)
 const draftBackgroundUrl = draftField('backgroundUrl', () => props.backgroundUrl)
 const draftBackgroundFit = draftField('backgroundFit', () => props.backgroundFit)
@@ -225,6 +233,11 @@ const projectOptions = computed(() =>
   props.projects.map((p) => ({ value: p.project_id, label: p.label || p.project_id }))
 )
 
+const lockedLanguageOptions = [
+  { value: '', label: '不指定' },
+  ...LOCKED_LANGUAGES,
+]
+
 const personaOptions = computed(() =>
   props.personas.map((p) => ({
     value: p.persona_id,
@@ -258,6 +271,7 @@ const needsReconnect = computed(() =>
   draftAsrProvider.value !== props.asrProvider ||
   draftTtsVoice.value !== props.ttsVoice ||
   draftVoiceMode.value !== (props.voiceMode ?? 'text') ||
+  draftLockedLanguage.value !== (props.lockedLanguage ?? '') ||
   draftReplyMode.value !== props.replyMode
 )
 const isBackgroundDirty = computed(() =>
@@ -328,6 +342,9 @@ function applyAndClose(): void {
   }
   if (draftReplyMode.value !== props.replyMode) {
     emit('replyModeChange', draftReplyMode.value)
+  }
+  if (draftLockedLanguage.value !== (props.lockedLanguage ?? '')) {
+    emit('lockedLanguageChange', draftLockedLanguage.value)
   }
   if (isBackgroundDirty.value) {
     emit(
@@ -583,6 +600,21 @@ function handleDialogClick(event: MouseEvent): void {
                   </span>
                 </label>
               </div>
+            </div>
+
+            <div class="field-card field-card--full">
+              <span class="field-card__label">回答語言</span>
+              <CustomSelect
+                v-model="draftLockedLanguage"
+                aria-label="回答語言"
+                :options="lockedLanguageOptions"
+                :disabled="disabled || Boolean(urlLockedLanguage)"
+              />
+              <small class="field-card__hint">
+                {{ urlLockedLanguage
+                  ? `網址已指定語言（${urlLockedLanguage}），優先於這個設定。`
+                  : '指定後，虛擬人只用這個語言回答，也只查這個語言的知識。' }}
+              </small>
             </div>
 
             <div class="field-card field-card--full">

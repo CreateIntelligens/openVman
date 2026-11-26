@@ -619,5 +619,5 @@ def test_embed_key_cannot_read_another_projects_greeting(embed_env, monkeypatch)
 def test_embed_key_still_cannot_change_persona_settings(embed_env):
     _module, client, key, _runtime = embed_env
 
-    for method, path in (("PUT", "/api/v1/personas/language-settings"), ("PUT", "/api/v1/personas/contact-image"), ("GET", "/api/v1/personas/language-settings")):
+    for method, path in (("PUT", "/api/v1/personas/language-settings"), ("PUT", "/api/v1/personas/label"), ("GET", "/api/v1/knowledge/reply-links"), ("PUT", "/api/v1/knowledge/reply-links"), ("GET", "/api/v1/personas/language-settings")):
         assert client.request(method, path, json={}, headers=_headers(key.key_id)).status_code == 403

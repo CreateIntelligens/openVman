@@ -26,6 +26,8 @@ export interface ChatMessage {
        imageId?: string
        /** 人設的聯絡圖片（例如展場 QR code），跟引用的 imageId 是兩張圖。 */
        contactImageId?: string
+       /** 專案的型錄網址，跟引用來源的 url 是兩個欄位。 */
+       catalogUrl?: string
        url?: string
        projectId?: string
 }
@@ -37,6 +39,7 @@ export interface ChatResponse {
        citations?: unknown
        image_id?: unknown
        contact_image_id?: unknown
+       catalog_url?: unknown
        url?: unknown
        requires_accept?: boolean
        turn_id?: string
@@ -105,6 +108,8 @@ export interface ChatOptions {
        /** 每次送出時讀取的回覆深度（fast / standard / deep）。用 getter 而不是
         *  固定值，使用者在設定裡改完下一句就生效。 */
        replyMode?: () => string
+       /** 每次送出時讀取的鎖定回答語言（zh/en/es/ja/ko），空字串表示不鎖定。 */
+       language?: () => string
        /** Override live-mode WebSocket URL creation. */
        wsUrlBuilder?: (clientId: string) => string
        /** Surface name sent in client_init capabilities. */

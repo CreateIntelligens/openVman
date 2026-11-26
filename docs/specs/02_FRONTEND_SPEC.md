@@ -281,7 +281,7 @@ VAD 模型與 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 由 `vad-reco
 
 Live 模式的行為（`useAvatarTransport.ts`、`useAvatarChat.ts`）：
 
-* 連線 `ws(s)://<host>/api/v1/ws/<client_id>`，開啟後送 `client_init`（`capabilities` 含 `mode: "gemini_live"`、`project_id`、`persona_id`、`surface`）。收到 `server_init_ack` 才算連上，接著送 `set_lip_sync_mode` 與 `set_decision_debug`。`set_lip_sync_mode` 固定為 `webgl`，不影響前台渲染。
+* 連線 `ws(s)://<host>/api/v1/ws/<client_id>`，開啟後送 `client_init`（`capabilities` 含 `mode: "gemini_live"`、`project_id`、`persona_id`、`surface`，指定回答語言時另帶 `language`：`zh|en|es|ja|ko`）。收到 `server_init_ack` 才算連上，接著送 `set_lip_sync_mode` 與 `set_decision_debug`。`set_lip_sync_mode` 固定為 `webgl`，不影響前台渲染。
 * 連線逾時 10 秒。非主動斷線時以指數退避重連：基準 `1000 × 2^n` 毫秒、上限 30 秒，乘上 0.75–1.25 的隨機係數，最多 6 次；用完進入 `ERROR` 並顯示常駐提示。成功連上後重設次數。
 * 使用者訊息送 `user_speak`（含 `turn_id`，必要時 `speech_language`）；回答為 `server_stream_chunk`（`audio_base64` 或二進位 PCM frame，文字累積到 `is_final`）；`server_stop_audio` 停止播放並回 `IDLE`；停止回答送 `client_interrupt`。
 * 其他事件：`ping`（回 `pong`）、`user_transcription`、`server_search_results`、`server_decision_debug`、`server_camera_frame_status`、`gateway_status`、`server_error`。

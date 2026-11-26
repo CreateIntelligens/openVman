@@ -268,7 +268,9 @@ def test_chat_accept_requires_login():
     ("GET", "personas/language-settings", ResourceAccess.READ),
     ("PUT", "personas/language-settings", ResourceAccess.EDIT_KNOWLEDGE),
     ("GET", "personas/greeting", ResourceAccess.READ),
-    ("PUT", "personas/contact-image", ResourceAccess.EDIT_KNOWLEDGE),
+    ("PUT", "personas/label", ResourceAccess.EDIT_KNOWLEDGE),
+    ("GET", "knowledge/reply-links", ResourceAccess.READ),
+    ("PUT", "knowledge/reply-links", ResourceAccess.EDIT_KNOWLEDGE),
 ])
 def test_persona_language_routes_require_login_and_project_access(method, path, access):
     from app.auth.brain_project_access import _project_access, requires_project_context
@@ -294,6 +296,14 @@ def test_persona_language_routes_require_login_and_project_access(method, path, 
         )
     assert response.status_code == 401
     upstream.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["personas/contact-image", "personas/reference-link"])
+def test_persona_level_reply_attachments_are_gone(path):
+    """聯絡圖片與型錄網址改成專案層級（knowledge/reply-links），人設層級的路徑不留相容層。"""
+    from app.brain_proxy import _BRAIN_ROUTE_DEFS
+
+    assert not any(d["path"] == f"/api/v1/{path}" for d in _BRAIN_ROUTE_DEFS)
 
 
 def test_explicit_brain_routes_still_forward_options(client: TestClient):

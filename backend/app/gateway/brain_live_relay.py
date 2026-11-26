@@ -125,6 +125,8 @@ class BrainLiveRelay:
             chat_session_id = str(self.session.metadata.get("chat_session_id", "")).strip()
             if chat_session_id:
                 relay_init["chat_session_id"] = chat_session_id
+            if language := str(self.session.metadata.get("language", "")).strip():
+                relay_init["language"] = language
             await self._send_json(relay_init)
 
             if self._event_sink is not None and self._listener_task is None:

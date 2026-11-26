@@ -153,6 +153,8 @@
       :personas-loading="personasLoading"
       :voice-mode="settings.voiceMode"
       :reply-mode="settings.replyMode"
+      :locked-language="settings.lockedLanguage"
+      :url-locked-language="urlLockedLanguage()"
       :background-id="settings.backgroundId"
       :background-url="settings.backgroundUrl"
       :background-fit="settings.backgroundFit"
@@ -170,6 +172,7 @@
       @persona-change="handlePersonaChange"
       @voice-mode-change="handleVoiceModeChange"
       @reply-mode-change="handleReplyModeChange"
+      @locked-language-change="handleLockedLanguageChange"
       @background-change="handleBackgroundChange"
       @apply="handleSettingsApply"
       :kiosk-source="visitor.kioskSource.value"
@@ -226,6 +229,8 @@ import { useAvatarVoiceInput } from "./composables/useAvatarVoiceInput";
 import { useAvatarCamera } from "./composables/useAvatarCamera";
 import { useImmersiveView } from "./composables/useImmersiveView";
 import { useAvatarSettings } from "./composables/useAvatarSettings";
+import { useAvatarGreeting } from "./composables/useAvatarGreeting";
+import { activeLockedLanguage, urlLockedLanguage } from "./types/lockedLanguage";
 import { useLanguageRoutes } from "./composables/useLanguageRoutes";
 import { useTurnTiming } from "./composables/useTurnTiming";
 import { useVisitorMode } from "./composables/useVisitorMode";
@@ -327,6 +332,15 @@ const stageTitle = computed(() => {
 });
 // 只有訪客模式要先點一下：瀏覽器沒被點過不肯出聲，來賓也需要一個明確的開始。
 const started = ref(!visitor.kiosk.value);
+// 指定了語言才播開場白：人物就緒（訪客模式還要點過開始）後播一次，語言或人設換了再播一次。
+const greeting = useAvatarGreeting({
+  current: () => {
+    const language = activeLockedLanguage(settings.lockedLanguage);
+    if (!language || !started.value || rendererDisabled.value || !settings.projectId) return null;
+    return { language, personaId: settings.personaId, projectId: settings.projectId };
+  },
+  play: conversation.playGreeting,
+});
 async function handleVisitorStart(): Promise<void> {
   started.value = true;
   const ready = await handleStart();
@@ -345,6 +359,7 @@ useIdleReset({
     if (activeAsr.value.isListening.value) handleAsrToggle();
     resetForNextVisitor();
     started.value = false;
+    greeting.reset();
   },
 });
 // 設定裡切成展示機台：關掉設定，回到開始畫面，等來賓點一下。
@@ -354,10 +369,11 @@ function handleEnterKiosk(): void {
   resetForNextVisitor();
   visitor.enterDeviceKiosk();
   started.value = false;
+  greeting.reset();
 }
 const { handleTtsChange, handleTtsVoiceChange,
   handleProjectChange, handlePersonaChange, handleVoiceModeChange,
-  handleReplyModeChange } = useAvatarSettings(settings, bootstrap, showSettings, stage.syncCharacter);
+  handleReplyModeChange, handleLockedLanguageChange } = useAvatarSettings(settings, bootstrap, showSettings, stage.syncCharacter);
 const { applyAdminHandoff } = useAdminHandoff({ settings, bootstrap, stage, visitor, handleProjectChange });
 
 onMounted(async () => {

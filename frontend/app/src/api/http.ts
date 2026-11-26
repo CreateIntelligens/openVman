@@ -41,6 +41,8 @@ const LOCAL_FORBIDDEN_PREFIXES = [
   "/api/v1/tts/",
   "/v1/audio/speech",
   "/api/v1/asr/",
+  // 開場白取不到就靜默略過，不能因為它 403 把整頁換成「權限不足」。
+  "/api/v1/personas/greeting",
 ]
 
 function requestPath(input: RequestInfo | URL): string {

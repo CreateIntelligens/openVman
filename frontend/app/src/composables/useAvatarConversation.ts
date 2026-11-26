@@ -16,6 +16,8 @@ import type { useTurnTiming } from "./useTurnTiming";
 import type { useSettingsStore } from "../stores/useSettingsStore";
 import type StatusToast from "../components/StatusToast.vue";
 import { serverErrorText } from "../utils/serverErrorText";
+import { activeLockedLanguage } from "../types/lockedLanguage";
+import type { Greeting } from "./greeting";
 
 interface ConversationOptions {
   settings: ReturnType<typeof useSettingsStore>;
@@ -203,6 +205,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     personaId: settings.personaId,
     mode: settings.voiceMode,
     replyMode: () => settings.replyMode,
+    language: () => activeLockedLanguage(settings.lockedLanguage),
     onAudioChunk: (data) => {
       // Live 模式由 Gemini 直接出聲音，沒有另外的 TTS。
       turnTiming.mark("first_audio");
@@ -326,6 +329,24 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
    * 訪客模式的「點一下開始」：瀏覽器要使用者先點過才肯出聲，趁這一下解鎖音訊並先連線，
    * 第一句話就不用等連線。失敗不擋畫面，送第一句時會再試一次。
    */
+  /**
+   * 人設開場白：走跟回答一樣的字幕、TTS 與嘴型，但不經過聊天請求，不進對話紀錄。
+   * 有 voice 就用它合成；沒有就用目前設定的聲音。
+   */
+  async function playGreeting(greeting: Greeting): Promise<void> {
+    try {
+      await audio.resumeContext();
+    } catch {
+      // 瀏覽器還沒允許出聲時照樣顯示字幕，聲音等使用者互動後的下一句。
+    }
+    beginReply({ source: "text", speechLanguage: null });
+    chat.beginLocalPlayback();
+    if (greeting.voice && replySpeakOptions) replySpeakOptions.voice = greeting.voice;
+    streamedText = greeting.text;
+    spokenReply.value = greeting.text;
+    replySpeech.speak(greeting.text);
+  }
+
   async function handleStart(): Promise<boolean> {
     try {
       await audio.resumeContext();
@@ -450,5 +471,5 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
 
   onUnmounted(() => { motionAudio.cancel(); clearUnderrunTimer(); });
 
-  return { chat, audio, isStarted, isTyping, avatarSpeaking, avatarResponding, spokenReply, canSend, handleStart, resetForNextVisitor, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
+  return { chat, audio, isStarted, isTyping, avatarSpeaking, avatarResponding, spokenReply, canSend, handleStart, playGreeting, resetForNextVisitor, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
 }

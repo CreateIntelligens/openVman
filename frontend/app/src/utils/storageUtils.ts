@@ -19,6 +19,7 @@ export const STORAGE_KEYS = {
   BACKGROUND_FIT: "avatar.background_fit",
   CAMERA_PREVIEW_SCALE: "avatar.camera_preview_scale",
   REPLY_MODE: "avatar.reply_mode",
+  LOCKED_LANGUAGE: "avatar.locked_language",
   LOGIN_MODE: "avatar.login_mode",
   // 前台臨時關掉的語言分流，依專案分開存：{"proj-x": ["es"]}。
   LANGUAGE_ROUTES_OFF: "avatar.language_routes_off",

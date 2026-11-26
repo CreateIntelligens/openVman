@@ -88,7 +88,7 @@ def set_my_asr_provider(
 PREFERENCE_KEYS = frozenset({
     "ttsProvider", "characterId", "projectId", "personaId", "voiceMode",
     "ttsVoice", "backgroundId", "backgroundUrl", "backgroundFit",
-    "cameraPreviewScale", "replyMode",
+    "cameraPreviewScale", "replyMode", "lockedLanguage",
 })
 # 前台拿掉 3D 模式後不再用的欄位。舊版前台快取可能還會送，寫入時直接丟掉，
 # 不回 422，免得整份設定存不進去。

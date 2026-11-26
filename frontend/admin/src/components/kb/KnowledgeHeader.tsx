@@ -7,6 +7,7 @@ import { PageHeader, PageTabs } from "../app/PageHeader";
 import ConfirmModal from "../ConfirmModal";
 import StatusAlert from "../StatusAlert";
 import LanguageRoutesButton from "./LanguageRoutesButton";
+import ReplyAttachmentsButton from "./ReplyAttachmentsButton";
 
 const KNOWLEDGE_TABS = [
   { id: "documents", label: "題庫" },
@@ -165,6 +166,7 @@ export default function KnowledgeHeader({
               目錄
             </button>
             <LanguageRoutesButton projectId={projectId} />
+            {!vendor && <ReplyAttachmentsButton projectId={projectId} />}
             {!vendor && <ActionMenu
               label="知識庫維護"
               triggerLabel={reindexing ? "重建中…" : "維護"}

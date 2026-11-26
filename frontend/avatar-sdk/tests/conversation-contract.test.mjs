@@ -16,6 +16,8 @@ async function loadSdk({
   deferChat = false,
   greetingBody = { language: "en", text: "Hello, I am your guide.", voice: "en-voice-1" },
   greetingStatus = 200,
+  // 依序給每次 greet 的回應，用完才退回 greetingBody。
+  greetingQueue = [],
   manualStream = false,
   speechDelayMs = 0,
   speechStatus = 200,
@@ -176,7 +178,7 @@ async function loadSdk({
       if (String(url).includes("/api/v1/personas/greeting")) {
         return {
           headers: makeHeaders({}),
-          json: async () => greetingBody,
+          json: async () => (greetingQueue.length ? greetingQueue.shift() : greetingBody),
           ok: greetingStatus === 200,
           status: greetingStatus,
         };
@@ -1063,6 +1065,25 @@ test("a greeting without a voice leaves the voice unset", async () => {
   await avatar.greet();
 
   assert.equal("voice" in JSON.parse(speechRequests(requests)[0].options.body), false);
+});
+
+test("a later greeting without a voice clears the earlier greeting voice", async () => {
+  const { requests, sdk } = await loadSdk({
+    greetingQueue: [
+      { language: "en", text: "Hello.", voice: "en-voice-1" },
+      { language: "en", text: "Hi again.", voice: null },
+    ],
+  });
+  const avatar = await sdk.init({ characterId: "000", language: "en" });
+
+  await avatar.greet();
+  await avatar.greet();
+  await avatar.ask("hi");
+
+  const bodies = speechRequests(requests).map((request) => JSON.parse(request.options.body));
+  assert.equal(bodies[0].voice, "en-voice-1");
+  assert.equal("voice" in bodies[1], false);
+  assert.equal("voice" in bodies[2], false);
 });
 
 test("a missing greeting plays nothing, does not throw and warns once", async () => {

@@ -146,3 +146,41 @@ export function fetchGuardrails(projectId?: string) {
 }
 
 export const GUARDRAILS_PATH = "GUARDRAILS.md";
+
+export type GreetingLanguage = "zh" | "en" | "es" | "ja" | "ko";
+
+export interface PersonaLanguageSettings {
+  persona_id: string;
+  greetings: Partial<Record<GreetingLanguage, string>>;
+  voices: Partial<Record<GreetingLanguage, string>>;
+}
+
+export function fetchPersonaLanguageSettings(personaId: string, projectId?: string) {
+  return get<PersonaLanguageSettings>(personaPath("/language-settings"), {
+    persona_id: personaId, project_id: inProject(projectId),
+  });
+}
+
+/** 整份取代：沒寫在 greetings／voices 裡的語言就是清掉。 */
+export function savePersonaLanguageSettings(
+  personaId: string,
+  greetings: PersonaLanguageSettings["greetings"],
+  voices: PersonaLanguageSettings["voices"],
+  projectId?: string,
+) {
+  return put<PersonaLanguageSettings>(personaPath("/language-settings"), {
+    persona_id: personaId,
+    project_id: inProject(projectId),
+    greetings,
+    voices,
+  });
+}
+
+/** 改人設的顯示名稱；預設人設也可以。 */
+export function setPersonaLabel(personaId: string, label: string, projectId?: string) {
+  return put<{ persona_id: string; label: string }>(personaPath("/label"), {
+    persona_id: personaId,
+    project_id: inProject(projectId),
+    label,
+  });
+}

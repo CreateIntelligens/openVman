@@ -194,3 +194,32 @@ async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send
         "client_audio_chunk",
         "client_audio_end",
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("language", "expected"), [("es", {"language": "es"}), ("", {})])
+async def test_brain_live_relay_init_carries_locked_language_only_when_set(language, expected):
+    session = Session(client_id="client-lang")
+    session.metadata.update({"language": language, "persona_id": "p1", "project_id": "proj"})
+    websocket = ConnectableFakeWebSocket()
+
+    async def websocket_factory(*_args, **_kwargs):
+        return websocket
+
+    config = type(
+        "Config",
+        (),
+        {
+            "brain_url": "http://brain:8100",
+            "resolved_brain_chat_url": "http://brain:8100",
+            "gateway_internal_token": "internal-secret",
+        },
+    )()
+    relay = BrainLiveRelay(session, config=config, websocket_factory=websocket_factory)
+
+    await relay.send_event({"event": "client_audio_end"})
+    await relay.close()
+
+    init = websocket.sent_messages[0]
+    assert init["event"] == "relay_init"
+    assert {k: v for k, v in init.items() if k == "language"} == expected

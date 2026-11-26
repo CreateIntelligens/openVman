@@ -114,6 +114,12 @@ def _get_dreaming_scheduler():
     return scheduler
 
 
+def _locked_language(value: Any) -> str:
+    from protocol.schemas import LOCKABLE_LANGUAGES
+
+    return value if isinstance(value, str) and value in LOCKABLE_LANGUAGES else ""
+
+
 def _build_live_session(
     relay_session_id: str,
     *,
@@ -127,6 +133,7 @@ def _build_live_session(
     principal_id: str = "",
     vendor: bool = False,
     web_search_allowed: bool | None = None,
+    language: str = "",
     event_sink,
 ):
     from live.gemini_live import GeminiLiveSession
@@ -134,6 +141,7 @@ def _build_live_session(
     system_instruction = _build_live_system_instruction(
         persona_id, project_id, session_id,
         vendor=vendor, web_search_allowed=web_search_allowed,
+        language=language,
     )
     system_instruction(memory_enabled(project_id))
     return GeminiLiveSession(
@@ -148,6 +156,7 @@ def _build_live_session(
         principal_id=principal_id,
         vendor=vendor,
         web_search_allowed=web_search_allowed,
+        language=language,
         system_instruction=system_instruction,
         event_sink=event_sink,
     )
@@ -156,9 +165,11 @@ def _build_live_session(
 def _build_live_system_instruction(
     persona_id: str, project_id: str, session_id: str = "", *,
     vendor: bool = False, web_search_allowed: bool | None = None,
+    language: str = "",
 ) -> Callable[[bool], str]:
     from config import get_settings
     from core.prompt_templates import (
+        PRIMARY_LANGUAGE_NAMES,
         primary_language_line,
         supported_languages_line,
         web_tool_usage,
@@ -201,6 +212,13 @@ def _build_live_system_instruction(
         supported_languages_line(project_id),
         primary_language_line(project_id),
     )
+    if language:
+        # 語音輪沒有 turn envelope，鎖定語言只能靠系統指令守住。
+        name = PRIMARY_LANGUAGE_NAMES[language]
+        languages = (
+            f"回答語言已被指定：一律用{name}回答，即使使用者用其他語言提問或要求換語言，"
+            f"也只用{name}；整段回答不要夾雜其他語言。這條優先於上面第 8 點。",
+        )
 
     @lru_cache(maxsize=1)
     def memory_part(include_memory: bool) -> tuple[str, str]:
@@ -439,6 +457,7 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
             "client_id": relay_session_id,
             "persona_id": "default",
             "project_id": "default",
+            "language": "",
             "user_id": websocket.headers.get("X-OpenVMan-User-ID", ""),
             "role": websocket.headers.get("X-OpenVMan-Role", ""),
             "principal_type": websocket.headers.get("X-Principal-Type", ""),
@@ -485,6 +504,7 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
             "client_id": str(payload.get("client_id", relay_id)) or relay_id,
             "persona_id": str(payload.get("persona_id", "default")) or "default",
             "project_id": str(payload.get("project_id", "default")) or "default",
+            "language": _locked_language(payload.get("language")),
         })
         if chat_id := str(payload.get("chat_session_id", "")).strip():
             state["session_id"] = chat_id

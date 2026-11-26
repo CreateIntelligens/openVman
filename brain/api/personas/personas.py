@@ -13,6 +13,7 @@ from knowledge import workspace
 AVATAR_META_FILENAME = "AVATAR.json"
 # 預設角色的 SOUL.md 標題是寫給模型看的（如「核心人格設定 (SOUL)」），清單上一律顯示這個名稱。
 DEFAULT_PERSONA_LABEL = "預設角色"
+PERSONA_LABEL_MAX_CHARS = 40
 
 PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
     "soul": "SOUL.md",
@@ -173,6 +174,7 @@ def clone_persona_scaffold(
         target_path = target_dir / source_path.name
         shutil.copyfile(source_path, target_path)
         copied_files.append(target_path.relative_to(ws).as_posix())
+    _copy_language_settings(source_persona_id, target_id, project_id)
 
     persona = _build_persona_summary(
         target_id,
@@ -186,6 +188,21 @@ def clone_persona_scaffold(
         "files": copied_files,
         "source_persona_id": normalize_persona_id(source_persona_id),
     }
+
+
+def _copy_language_settings(source_persona_id: str, target_id: str, project_id: str) -> None:
+    """複製人設時帶走各語言開場白與聲音；avatar_char_id 不帶（與以前一致）。"""
+    source = normalize_persona_id(source_persona_id)
+    meta = _read_avatar_meta(source, project_id, is_default=source == "default")
+    carried: dict[str, Any] = {
+        key: stored for key in ("greetings", "voices")
+        if (stored := _stored_map(meta, key))
+    }
+    if carried:
+        workspace.write_text_atomic(
+            _avatar_meta_path(target_id, project_id, is_default=False),
+            json.dumps(carried, ensure_ascii=False),
+        )
 
 
 def extract_persona_id_from_relative_path(relative_path: str) -> str:
@@ -211,9 +228,40 @@ def _build_default_persona_summary(project_id: str = "default") -> dict[str, Any
         "default",
         soul_path,
         is_default=True,
-        label=DEFAULT_PERSONA_LABEL,
+        label=default_persona_label(project_id),
         project_id=project_id,
     )
+
+
+def persona_label(persona_id: str, project_id: str = "default") -> str:
+    """Display name: AVATAR.json label when set, else the built-in name (default) or the SOUL.md title."""
+    is_default = persona_id == "default"
+    label = _read_avatar_meta(persona_id, project_id, is_default=is_default).get("label")
+    if isinstance(label, str) and 0 < len(label.strip()) <= PERSONA_LABEL_MAX_CHARS:
+        return label.strip()
+    if is_default:
+        return DEFAULT_PERSONA_LABEL
+    soul_path = get_persona_directory(persona_id, project_id) / "SOUL.md"
+    return extract_heading_or_name(soul_path, persona_id)
+
+
+def default_persona_label(project_id: str = "default") -> str:
+    return persona_label("default", project_id)
+
+
+def set_persona_label(persona_id: str, label: str, project_id: str = "default") -> dict[str, Any]:
+    """Rename a persona's display name; raises ValueError with a plain message."""
+    cleaned = label.strip() if isinstance(label, str) else ""
+    if not cleaned or len(cleaned) > PERSONA_LABEL_MAX_CHARS:
+        raise ValueError(f"名稱必須是 1 到 {PERSONA_LABEL_MAX_CHARS} 個字。")
+    if "\n" in cleaned or "\r" in cleaned:
+        raise ValueError("名稱不可以換行。")
+    normalized, meta_path, meta = _existing_persona_meta(persona_id, project_id)
+    # 名稱只存在 AVATAR.json；SOUL.md 是給模型的提示詞，改顯示名稱不能順便改到它。
+    meta["label"] = cleaned
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    workspace.write_text_atomic(meta_path, json.dumps(meta, ensure_ascii=False))
+    return {"persona_id": normalized, "label": cleaned}
 
 
 def _require_text(value: str | None, field_name: str) -> str:
@@ -235,7 +283,7 @@ def _build_persona_summary(
     meta = _read_avatar_meta(persona_id, project_id, is_default=is_default)
     return {
         "persona_id": persona_id,
-        "label": label or extract_heading_or_name(soul_path, persona_id),
+        "label": label or persona_label(persona_id, project_id),
         "path": soul_path.relative_to(ws).as_posix(),
         "preview": _read_preview(soul_path),
         "is_default": is_default,
@@ -383,49 +431,17 @@ def get_persona_greeting(
     return {"language": language, "text": text, "voice": settings["voices"].get(language)}
 
 
-# QA 圖片上傳產生的代號：uuid 加副檔名。只收這種，人設不能指到工作區裡的任意檔案。
-_CONTACT_IMAGE_RE = re.compile(
-    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpe?g|webp|gif|bmp|avif)"
-)
-
-
-def set_persona_contact_image(
-    persona_id: str, image_id: str | None, project_id: str = "default",
-) -> dict[str, Any]:
-    """Attach (or clear with None) the image every reply of this persona carries, such as a QR code."""
-    from knowledge.qa_images import resolve_qa_image_path
-
-    normalized, meta_path, meta = _existing_persona_meta(persona_id, project_id)
-    if image_id is None:
-        meta.pop("contact_image_id", None)
-    else:
-        if not _CONTACT_IMAGE_RE.fullmatch(image_id):
-            raise ValueError("聯絡圖片必須是 QA 圖片上傳後拿到的圖片代號。")
-        if resolve_qa_image_path(image_id, project_id) is None:
-            raise ValueError("找不到這張圖片，請先上傳到 QA 圖片。")
-        meta["contact_image_id"] = image_id
-    if normalized == "default":
-        meta_path.parent.mkdir(parents=True, exist_ok=True)
-    workspace.write_text_atomic(meta_path, json.dumps(meta, ensure_ascii=False))
-    return {"persona_id": normalized, "contact_image_id": meta.get("contact_image_id")}
-
-
-def persona_contact_image(persona_id: str, project_id: str = "default") -> str | None:
-    """The persona's contact image id, or None; never raises (it runs on every chat reply)."""
+def legacy_persona_contact_image_ids(project_id: str = "default") -> set[str]:
+    """Contact image ids left in persona AVATAR.json by the persona-level version; never raises."""
+    ids: set[str] = set()
     try:
-        _, _, meta = _existing_persona_meta(persona_id, project_id)
-    except ValueError:
-        return None
-    value = meta.get("contact_image_id")
-    return value if isinstance(value, str) and _CONTACT_IMAGE_RE.fullmatch(value) else None
-
-
-def persona_contact_image_ids(project_id: str = "default") -> set[str]:
-    """Contact images of every persona in the project, so image cleanup keeps them."""
-    ids = set()
-    for persona in list_personas(project_id):
-        if image_id := persona_contact_image(persona["persona_id"], project_id):
-            ids.add(image_id)
+        persona_ids = [persona["persona_id"] for persona in list_personas(project_id)]
+    except Exception:
+        return ids
+    for persona_id in persona_ids:
+        value = _read_avatar_meta(persona_id, project_id, is_default=persona_id == "default").get("contact_image_id")
+        if isinstance(value, str) and value:
+            ids.add(value)
     return ids
 
 

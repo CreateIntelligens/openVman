@@ -1,5 +1,6 @@
 import { watch, type Ref } from "vue";
 import { saveSettings, type useSettingsStore } from "../stores/useSettingsStore";
+import { normalizeLockedLanguage } from "../types/lockedLanguage";
 import type { ReplyMode } from "../types/replyMode";
 import type { useAvatarBootstrap } from "./useAvatarBootstrap";
 export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>, bootstrap: ReturnType<typeof useAvatarBootstrap>, showSettings: Ref<boolean>, syncStageCharacter?: () => void) {
@@ -39,10 +40,13 @@ export function useAvatarSettings(settings: ReturnType<typeof useSettingsStore>,
   function handleReplyModeChange(mode: ReplyMode): void {
     saveSettings({ replyMode: mode });
   }
+  function handleLockedLanguageChange(language: string): void {
+    saveSettings({ lockedLanguage: normalizeLockedLanguage(language) });
+  }
   watch(showSettings, () => {
     void fetchPersonas(settings.projectId, { syncSelected: true });
     void fetchBackgrounds();
   });
 
-  return { handleTtsChange, handleTtsVoiceChange, handleProjectChange, handlePersonaChange, handleVoiceModeChange, handleReplyModeChange };
+  return { handleTtsChange, handleTtsVoiceChange, handleProjectChange, handlePersonaChange, handleVoiceModeChange, handleReplyModeChange, handleLockedLanguageChange };
 }

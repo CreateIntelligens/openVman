@@ -82,6 +82,7 @@ class GeminiLiveTurns:
         return build_user_turn_message(
             user_text, self._turn_decision, self._prefetched_reads,
             include_web="search_web" in self._tools.web_tools,
+            locked_language=self._context.locked_language,
         )
 
     async def decide_text_turn(
@@ -157,6 +158,7 @@ class GeminiLiveTurns:
                 project_id=context.project_id,
                 project_language=primary_language(context.project_id),
                 speech_language=speech_language,
+                locked_language=context.locked_language,
                 available_tools=available_tools,
                 config=cfg,
                 turn_id=f"live:{context.relay_session_id}:{self._turn_revision}",

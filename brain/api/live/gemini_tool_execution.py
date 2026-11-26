@@ -35,6 +35,7 @@ class GeminiLiveToolExecutor:
         persona_id: str,
         vendor: bool = False,
         web_search_allowed: bool | None = None,
+        locked_language: str = "",
     ) -> None:
         self.config = config
         self.relay_session_id = relay_session_id
@@ -42,6 +43,7 @@ class GeminiLiveToolExecutor:
         self.persona_id = persona_id
         self.vendor = vendor
         self.web_search_allowed = web_search_allowed
+        self.locked_language = locked_language
 
     @property
     def web_tools(self) -> set[str]:
@@ -213,6 +215,8 @@ class GeminiLiveToolExecutor:
         heard_language: str | None = None,
         retrieval_language: str | None = None,
     ) -> dict[str, Any]:
+        # 決策失敗或沒帶時也要守住鎖定語言，不退回依使用者原話偵測。
+        retrieval_language = retrieval_language or self.locked_language or None
         if retrieval_language is None:
             return await asyncio.to_thread(
                 self.search_sync, table, args, user_message, heard_language,
@@ -274,6 +278,10 @@ class GeminiLiveToolExecutor:
                     project_id=self.project_id,
                     embedding_version=embedding_route.version,
                     language=language,
+                    # 鎖定語言只留該語言的知識，查不到也不改查別的語言。
+                    strict_language=bool(
+                        table == "knowledge" and language and self.locked_language
+                    ),
                 )
             except Exception as exc:
                 logger.warning(

@@ -27,6 +27,7 @@ from memory.language_detect import (  # noqa: F401
     detect_language,
     project_has_taiwanese_route,
 )
+from protocol.schemas import LOCKABLE_LANGUAGES
 
 from .gemini_audio import GeminiLiveAudio
 from .gemini_context import EventSink, LiveSessionContext
@@ -76,11 +77,13 @@ class GeminiLiveSession:
         event_sink: EventSink | None = None,
         vendor: bool = False,
         web_search_allowed: bool | None = None,
+        language: str = "",
     ) -> None:
         self.relay_session_id = relay_session_id
         self.client_id = client_id
         self.persona_id = persona_id
         self.project_id = project_id
+        self.locked_language = language if language in LOCKABLE_LANGUAGES else ""
         self.session_id = session_id or relay_session_id
         self.user_id = user_id
         self.role = role
@@ -104,6 +107,7 @@ class GeminiLiveSession:
             event_sink=event_sink,
             gemini_credential=lambda: self._gemini_credential,
             vendor=vendor,
+            locked_language=self.locked_language,
         )
         self._tools = GeminiLiveToolExecutor(
             self.config,
@@ -112,6 +116,7 @@ class GeminiLiveSession:
             persona_id=persona_id,
             vendor=vendor,
             web_search_allowed=web_search_allowed,
+            locked_language=self.locked_language,
         )
         try:
             audio_language_id = project_has_taiwanese_route(project_id)

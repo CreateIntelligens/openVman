@@ -29,6 +29,8 @@ class LiveSessionContext:
     event_sink: EventSink | None = None
     gemini_credential: Callable[[], GeminiCredential | None] | None = None
     vendor: bool = False
+    # 整合方鎖定的回覆與檢索語言（zh/en/es/ja/ko）；空字串表示不鎖定。
+    locked_language: str = ""
 
     async def emit(self, event: dict[str, Any]) -> None:
         if self.event_sink is not None:

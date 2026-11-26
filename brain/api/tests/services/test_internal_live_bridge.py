@@ -533,3 +533,36 @@ def test_live_bridge_applies_account_policy_to_model_and_client(vendor, monkeypa
         assert events == [search, error, chunk]
         assert "search_memory" in declarations
         assert memory_reads == ["memories"]
+
+
+@pytest.mark.parametrize(("sent", "expected"), [("es", "es"), ("nan", ""), ("fr", ""), (None, ""), (5, "")])
+def test_internal_live_bridge_passes_only_supported_language_to_the_session(sent, expected):
+    with (
+        patch("internal_routes._build_live_session", return_value=FakeLiveSession()) as build_live_session,
+        patch(
+            "internal_routes.get_or_create_session",
+            return_value=type("Session", (), {"session_id": "relay-1"})(),
+        ),
+        patch("internal_routes.append_session_message"),
+    ):
+        with _client() as client:
+            with client.websocket_connect(
+                "/brain/internal/live/relay-1", headers=_internal_headers(),
+            ) as websocket:
+                init = {"event": "relay_init", "client_id": "c", "persona_id": "p", "project_id": "x"}
+                if sent is not None:
+                    init["language"] = sent
+                websocket.send_json(init)
+                websocket.send_json({"event": "user_speak", "text": "hola"})
+
+    assert build_live_session.call_args.kwargs["language"] == expected
+
+
+def test_live_system_instruction_names_the_locked_language():
+    from internal_routes import _build_live_system_instruction
+
+    locked = _build_live_system_instruction("default", "default", language="es")(False)
+    free = _build_live_system_instruction("default", "default")(False)
+
+    assert "回答語言已被指定" in locked and "Español" in locked
+    assert "回答語言已被指定" not in free

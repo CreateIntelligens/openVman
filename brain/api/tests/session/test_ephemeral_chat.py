@@ -128,7 +128,7 @@ def test_finalize_adds_the_persona_contact_image_next_to_the_cited_picture():
         patch.object(chat_service, "append_session_message_with_id", return_value=(None, "id")),
         patch.object(chat_service, "archive_session_turn"),
         patch.object(chat_service, "_schedule_memory_writes"),
-        patch.object(chat_service, "persona_contact_image", return_value="qr.png"),
+        patch.object(chat_service, "load_reply_links", return_value={"contact_image_id": "qr.png", "catalog_url": None}),
         patch.object(chat_service, "qa_image_kind", side_effect=lambda image_id, _p: kinds.get(image_id)),
     ):
         response = chat_service.finalize_generation(_ctx(), "刀組是 AISI 440C。", tool_steps)
@@ -143,8 +143,59 @@ def test_finalize_without_a_contact_image_adds_no_field():
         patch.object(chat_service, "append_session_message_with_id", return_value=(None, "id")),
         patch.object(chat_service, "archive_session_turn"),
         patch.object(chat_service, "_schedule_memory_writes"),
-        patch.object(chat_service, "persona_contact_image", return_value=None),
+        patch.object(chat_service, "load_reply_links", return_value={"contact_image_id": None, "catalog_url": None}),
     ):
         response = chat_service.finalize_generation(_ctx(), "你好。", [])
 
     assert "contact_image_id" not in response
+
+
+def _finalize_with(*, no_answer, contact="qr.png", catalog="https://example.com/catalog"):
+    with (
+        patch.object(chat_service, "append_session_message_with_id", return_value=(None, "id")),
+        patch.object(chat_service, "archive_session_turn"),
+        patch.object(chat_service, "_schedule_memory_writes"),
+        patch.object(chat_service, "load_reply_links", return_value={
+            "contact_image_id": contact, "catalog_url": catalog,
+        }),
+        patch.object(chat_service, "qa_image_kind", return_value="qr"),
+        patch.object(chat_service, "answer_source_fields", return_value={
+            "knowledge_searched": True, "no_answer": no_answer,
+        }),
+    ):
+        return chat_service.finalize_generation(_ctx(), "回答。", [])
+
+
+def test_project_reply_links_ride_every_reply_whether_or_not_it_was_answered():
+    for no_answer in (True, False):
+        response = _finalize_with(no_answer=no_answer)
+        assert response["contact_image_id"] == "qr.png"
+        assert response["contact_image_kind"] == "qr"
+        assert response["catalog_url"] == "https://example.com/catalog"
+        assert response["history"][-1]["catalog_url"] == "https://example.com/catalog"
+
+
+def test_unset_reply_links_add_no_fields():
+    response = _finalize_with(no_answer=False, contact=None, catalog=None)
+    assert "contact_image_id" not in response and "catalog_url" not in response
+
+
+def test_catalog_url_never_replaces_the_cited_source_url():
+    tool_steps = [{
+        "name": "search_knowledge",
+        "result": json.dumps({"status": "ok", "data": {"citations": [{
+            "uri": "knowledge/a.md", "title": "A", "text": "t", "distance": 0.1,
+            "url": "https://example.com/cited",
+        }]}}),
+    }]
+    with (
+        patch.object(chat_service, "append_session_message_with_id", return_value=(None, "id")),
+        patch.object(chat_service, "archive_session_turn"),
+        patch.object(chat_service, "_schedule_memory_writes"),
+        patch.object(chat_service, "load_reply_links", return_value={
+            "contact_image_id": None, "catalog_url": "https://example.com/catalog",
+        }),
+    ):
+        response = chat_service.finalize_generation(_ctx(), "好的。", tool_steps)
+    assert response["url"] == "https://example.com/cited"
+    assert response["catalog_url"] == "https://example.com/catalog"

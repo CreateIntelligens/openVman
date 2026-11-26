@@ -850,10 +850,15 @@ def cleanup_unused_images(project_id: str = "default") -> list[str]:
                 if image_id:
                     used_image_ids.add(image_id)
 
-        # 人設的聯絡圖片（例如每則回覆都附的 QR code）沒有掛在任何 QA 上，也算用到。
-        from personas.personas import persona_contact_image_ids
+        # 專案的聯絡圖片（例如每則回覆都附的 QR code）沒有掛在任何 QA 上，也算用到。
+        from knowledge.kb_settings import load_reply_links
 
-        used_image_ids |= persona_contact_image_ids(project_id)
+        if contact_image_id := load_reply_links(project_id)["contact_image_id"]:
+            used_image_ids.add(contact_image_id)
+        # 舊版把聯絡圖片設在人設 AVATAR.json；還沒改設成專案層級前不能被清掉，否則就設不回來了。
+        from personas.personas import legacy_persona_contact_image_ids
+
+        used_image_ids |= legacy_persona_contact_image_ids(project_id)
 
         images_dir = ensure_workspace_scaffold(project_id) / "knowledge" / ".qa_images"
         if not images_dir.exists() or not images_dir.is_dir():

@@ -19,6 +19,7 @@ import PersonaCreateForm from "../components/personas/PersonaCreateForm";
 import PersonaEditor from "../components/personas/PersonaEditor";
 import PersonaEmptyState from "../components/personas/PersonaEmptyState";
 import PersonaForm from "../components/personas/PersonaForm";
+import PersonaLanguageSettings from "../components/personas/PersonaLanguageSettings";
 import SegmentedControl from "../components/SegmentedControl";
 import PersonaList from "../components/personas/PersonaList";
 import { useNavigationGuard, useUnsavedChanges } from "../context/NavigationGuardContext";
@@ -521,6 +522,12 @@ export default function Personas() {
                                                  characters={avatarChars}
                                                  persona={selectedPersona}
                                                  onBind={onBindAvatar}
+                                          />}
+                                          {canManagePersonas && <PersonaLanguageSettings
+                                                 key={`${projectId}:${selectedPersona.persona_id}`}
+                                                 persona={selectedPersona}
+                                                 projectId={projectId}
+                                                 onSaved={() => void loadPersonas(selectedPersona.persona_id)}
                                           />}
                                           {viewMode === "form" ? (
                                           <PersonaForm

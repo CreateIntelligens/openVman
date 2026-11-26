@@ -163,6 +163,8 @@ function appendActionRequestToLastAssistant(
   });
 }
 
+const LOCKABLE_TEST_LANGUAGES: ReadonlySet<string> = new Set(["zh", "en", "es", "ja", "ko"]);
+
 export function useChatSession(vendor = false, chatTest?: ChatTestRequest) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -382,6 +384,11 @@ export function useChatSession(vendor = false, chatTest?: ChatTestRequest) {
   }, [persistSessionId, prefetchTts, setMessages, vendor]);
 
   const testLanguage = chatTest?.language;
+  // 只有後端認得的五種語言能鎖定（台語不行）；預設不鎖定，維持原本只當提示的行為。
+  const [lockTestLanguage, setLockTestLanguage] = useState(false);
+  const lockedLanguage = lockTestLanguage && testLanguage && LOCKABLE_TEST_LANGUAGES.has(testLanguage)
+    ? testLanguage
+    : undefined;
   const submit = useCallback(async (value = input) => {
     const nextMessage = value.trim();
     if (!nextMessage || sending || loadingPersonas) {
@@ -410,6 +417,7 @@ export function useChatSession(vendor = false, chatTest?: ChatTestRequest) {
         controller.signal,
         replyMode,
         testLanguage,
+        lockedLanguage,
       );
       const response_time_s = Math.round((performance.now() - submitTime) / 10) / 100;
 
@@ -465,7 +473,7 @@ export function useChatSession(vendor = false, chatTest?: ChatTestRequest) {
       abortControllerRef.current = null;
       setSending(false);
     }
-  }, [applyChatResult, clearStopReplyTimer, input, loadSessions, loadingPersonas, persistSessionId, pushHistory, replyMode, selectedPersonaId, sending, sessionId, setError, setMessages, showStoppedReplyNotice, testLanguage]);
+  }, [applyChatResult, clearStopReplyTimer, input, loadSessions, loadingPersonas, persistSessionId, pushHistory, replyMode, selectedPersonaId, sending, sessionId, setError, setMessages, showStoppedReplyNotice, testLanguage, lockedLanguage]);
 
   submitRef.current = submit;
 
@@ -500,6 +508,8 @@ export function useChatSession(vendor = false, chatTest?: ChatTestRequest) {
   }, []);
 
   return {
+    lockTestLanguage,
+    setLockTestLanguage,
     messages,
     input,
     personas,

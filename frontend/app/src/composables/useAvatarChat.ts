@@ -63,6 +63,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let activeSourcePathContent: string | undefined = undefined
        let activeImageId: string | undefined = undefined
        let activeContactImageId: string | undefined = undefined
+       let activeCatalogUrl: string | undefined = undefined
        let activeUrl: string | undefined = undefined
 
        let currentPersonaId = options.personaId ?? 'default'
@@ -152,6 +153,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
               if (imageId) activeImageId = imageId
               const contactImageId = optionalString(data.contact_image_id)
               if (contactImageId) activeContactImageId = contactImageId
+              const catalogUrl = optionalString(data.catalog_url)
+              if (catalogUrl) activeCatalogUrl = catalogUrl
               if (url) activeUrl = url
        }
 
@@ -167,28 +170,31 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        function consumeActiveMetadata(): Pick<
               ChatMessage,
-              'sourcePath' | 'sourcePathContent' | 'imageId' | 'contactImageId' | 'url' | 'projectId'
+              'sourcePath' | 'sourcePathContent' | 'imageId' | 'contactImageId' | 'catalogUrl' | 'url' | 'projectId'
        > {
               const source: Pick<
                      ChatMessage,
-                     'sourcePath' | 'sourcePathContent' | 'imageId' | 'contactImageId' | 'url' | 'projectId'
+                     'sourcePath' | 'sourcePathContent' | 'imageId' | 'contactImageId' | 'catalogUrl' | 'url' | 'projectId'
               > = {}
               if (activeSourcePath) source.sourcePath = activeSourcePath
               if (activeSourcePathContent) source.sourcePathContent = activeSourcePathContent
               if (activeImageId) source.imageId = activeImageId
               if (activeContactImageId) source.contactImageId = activeContactImageId
+              if (activeCatalogUrl) source.catalogUrl = activeCatalogUrl
               if (activeImageId || activeContactImageId) source.projectId = currentProjectId
               if (activeUrl) source.url = activeUrl
               activeSourcePath = undefined
               activeSourcePathContent = undefined
               activeImageId = undefined
               activeContactImageId = undefined
+              activeCatalogUrl = undefined
               activeUrl = undefined
               return source
        }
 
        // ── Build client_init payload ──────────────────────────
        function _buildClientInit(): Record<string, unknown> {
+              const language = options.language?.() ?? ''
               return {
                      event: 'client_init',
                      client_id: transport.clientId(),
@@ -199,6 +205,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             surface,
                             voice_source: 'custom',
                             persona_id: currentPersonaId,
+                            ...(language ? { language } : {}),
                      },
                      timestamp: Date.now(),
               }
@@ -363,6 +370,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
               activeSourcePathContent = sourcePathContent
               activeImageId = undefined
               activeContactImageId = undefined
+              activeCatalogUrl = undefined
               activeUrl = undefined
               if (currentMode === 'text') {
                      if (merge) {
@@ -386,6 +394,14 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      ...(speechLanguage ? { speech_language: speechLanguage } : {}),
               })
               return { accepted: true }
+       }
+
+       /**
+        * 不經聊天請求、在本機播的回覆（人設開場白）也算正在播：送出新問題、按停止或斷線時
+        * 要跟一般回答一樣先停掉它，不然沒播完的字幕會接到下一則泡泡。
+        */
+       function beginLocalPlayback(): void {
+              responsePlaybackActive = true
        }
 
        // ── Interrupt ──────────────────────────────────────────
@@ -506,6 +522,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
               canSendVisualInput,
               resetVisualInput,
               interrupt,
+              beginLocalPlayback,
               reinit,
               setMode,
               setProject,

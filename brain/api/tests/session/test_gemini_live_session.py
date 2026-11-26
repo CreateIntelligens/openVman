@@ -1162,6 +1162,106 @@ def test_live_short_greeting_searches_in_the_primary_language(monkeypatch):
     assert seen and set(seen) == {"en"}
 
 
+def test_live_locked_language_search_is_strict_and_ignores_the_users_own_language(monkeypatch):
+    module, fake_config = _load_module()
+    seen: list[dict] = []
+    tools_module = importlib.import_module("live.gemini_tool_execution")
+    monkeypatch.setattr(
+        tools_module, "search_records",
+        lambda *args, **kwargs: seen.append(kwargs) or [],
+    )
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-lock",
+        client_id="client-lock",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        language="es",
+    )
+
+    # 決策沒給 retrieval_language（例如決策失敗）時，鎖定語言照樣守住。
+    session._tools.search_sync("knowledge", {"query": "價格"}, "請問價格是多少？", None, "es")
+    asyncio.run(session._tools.search("knowledge", {"query": "價格"}, "請問價格是多少？"))
+
+    assert seen and all(kw["language"] == "es" and kw["strict_language"] is True for kw in seen)
+
+
+def test_live_without_locked_language_keeps_non_strict_search(monkeypatch):
+    module, fake_config = _load_module()
+    seen: list[dict] = []
+    tools_module = importlib.import_module("live.gemini_tool_execution")
+    monkeypatch.setattr(
+        tools_module, "search_records",
+        lambda *args, **kwargs: seen.append(kwargs) or [],
+    )
+    monkeypatch.setattr(tools_module, "primary_language", lambda project_id: "zh")
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-free",
+        client_id="client-free",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+    )
+
+    session._tools.search_sync("knowledge", {"query": "price"}, "How much is it?")
+
+    assert seen and all(kw["strict_language"] is False for kw in seen)
+
+
+def test_live_locked_language_text_turn_envelope_even_when_decision_is_missing():
+    module, fake_config = _load_module()
+    locked = module.GeminiLiveSession(
+        relay_session_id="relay-env-lock", client_id="c", config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(), language="ko",
+    )
+    free = module.GeminiLiveSession(
+        relay_session_id="relay-env-free", client_id="c", config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+    )
+
+    envelope = json.loads(locked._turns.user_turn_message("hello")["realtimeInput"]["text"])
+
+    assert envelope["policy"]["response_language"] == "ko"
+    assert envelope["policy"]["retrieval_language"] == "ko"
+    assert envelope["user_text"] == "hello"
+    # 沒鎖定且沒有決策：維持原本直接送文字。
+    assert free._turns.user_turn_message("hello")["realtimeInput"]["text"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_live_decision_receives_locked_language(monkeypatch):
+    from core.turn_decisions import TurnDecision, TurnPolicy
+
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-decide-lock", client_id="c", config=fake_config, language="en",
+    )
+    captured: dict = {}
+
+    def fake_decision(**kwargs):
+        captured.update(kwargs)
+        return _resolved(TurnDecision(
+            turn_id="t", policy=TurnPolicy(response_language="en"), source="clef-primary",
+        ))
+
+    monkeypatch.setitem(sys.modules, "memory.memory", types.SimpleNamespace(
+        list_session_messages=lambda *args, **kwargs: [],
+        is_session_recall_disabled=lambda *args, **kwargs: False,
+    ))
+    monkeypatch.setattr(importlib.import_module("live.gemini_turns"), "run_turn_decision_async", fake_decision)
+
+    await session._turns._decide("hola", "")
+
+    assert captured["locked_language"] == "en"
+
+
+def test_live_ignores_unsupported_locked_language():
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-bad-lock", client_id="c", config=fake_config, language="nan",
+    )
+
+    assert session.locked_language == ""
+
+
 @pytest.mark.asyncio
 async def test_live_search_keeps_project_context_and_emits_citations(monkeypatch):
     module, fake_config = _load_module()

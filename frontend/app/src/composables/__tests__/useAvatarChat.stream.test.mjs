@@ -207,3 +207,50 @@ test("a reply with only a contact image still shows it", async (t) => {
   assert.equal(bubble.contactImageId, "qr.png");
   assert.ok(bubble.projectId);
 });
+
+test("the catalogue url rides next to the cited url without replacing it", async (t) => {
+  const { chat, requests, open, accepted } = await harness(t);
+  chat.sendMessage("有型錄嗎");
+  const stream = open(0);
+  stream.sentence(0, "有的。"); await tick();
+  chat.beginAssistantMessage();
+  chat.appendAssistantText("有的。");
+  stream.done(doneFor(requests[0], {
+    reply: "有的。", url: "https://example.com/cited", catalog_url: "https://example.com/catalog",
+  }));
+  await tick();
+  accepted(1); await tick();
+  const bubble = chat.messages.value.at(-1);
+  assert.equal(bubble.url, "https://example.com/cited");
+  assert.equal(bubble.catalogUrl, "https://example.com/catalog");
+});
+
+test("a reply without a catalogue link leaves the bubble without one", async (t) => {
+  const { chat, requests, open, accepted } = await harness(t);
+  chat.sendMessage("你好");
+  const stream = open(0);
+  stream.sentence(0, "你好。"); await tick();
+  chat.beginAssistantMessage();
+  chat.appendAssistantText("你好。");
+  stream.done(doneFor(requests[0], { reply: "你好。" }));
+  await tick();
+  accepted(1); await tick();
+  assert.equal(chat.messages.value.at(-1).catalogUrl, undefined);
+});
+
+test("an unanswered reply keeps both the contact image and the catalogue url", async (t) => {
+  const { chat, requests, open, accepted } = await harness(t);
+  chat.sendMessage("保固多久");
+  const stream = open(0);
+  stream.sentence(0, "查不到。"); await tick();
+  chat.beginAssistantMessage();
+  chat.appendAssistantText("查不到。");
+  stream.done(doneFor(requests[0], {
+    reply: "查不到。", no_answer: true, contact_image_id: "qr.png", catalog_url: "https://example.com/catalog",
+  }));
+  await tick();
+  accepted(1); await tick();
+  const bubble = chat.messages.value.at(-1);
+  assert.equal(bubble.contactImageId, "qr.png");
+  assert.equal(bubble.catalogUrl, "https://example.com/catalog");
+});

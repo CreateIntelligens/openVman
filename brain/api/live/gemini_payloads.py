@@ -7,7 +7,7 @@ import json
 import re
 from typing import Any
 
-from core.turn_decisions import TurnDecision
+from core.turn_decisions import TurnDecision, TurnPolicy
 
 from config import BrainSettings
 from tools.context import MEMORY_TOOLS
@@ -126,12 +126,21 @@ def pcm_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
 
 def build_user_turn_message(
     user_text: str, decision: TurnDecision | None, prefetched_reads: dict[str, dict[str, Any]],
-    *, include_web: bool = True,
+    *, include_web: bool = True, locked_language: str = "",
 ) -> dict[str, Any]:
-    """Build the bounded trusted decision envelope for a finalized text turn."""
+    """Build the bounded trusted decision envelope for a finalized text turn.
+
+    指定語言時一定要帶 envelope：決策停用、失敗（decision 為 None）都不能讓回覆語言鬆開。
+    """
     text = user_text
-    if decision is not None and decision.source != "baseline":
-        policy = decision.policy
+    locked = bool(locked_language)
+    if locked or (decision is not None and decision.source != "baseline"):
+        policy = (
+            decision.policy if decision is not None
+            else TurnPolicy(
+                retrieval_language=locked_language, response_language=locked_language,
+            )
+        )
         required_reads = [
             name for name, required in (
                 ("search_knowledge", policy.needs_knowledge is True),

@@ -35,6 +35,7 @@ logger = logging.getLogger("backend")
 router = APIRouter()
 _session_manager = SessionManager()
 _guard_agent = GuardAgent()
+LOCKED_LANGUAGES = frozenset({"zh", "en", "es", "ja", "ko"})
 CLOSED_WEBSOCKET_MESSAGES = (
     "WebSocket is not connected",
     'Cannot call "receive" once a disconnect message has been received',
@@ -169,6 +170,7 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
     previous_chat_session_id = str(session.metadata.get("chat_session_id", "")).strip()
     previous_persona_id = str(session.metadata.get("persona_id", "default")).strip()
     previous_project_id = session.metadata.get("project_id")
+    previous_language = str(session.metadata.get("language", ""))
 
     current = session.metadata.get("_current_account")
     if not isinstance(current, CurrentAccount):
@@ -184,6 +186,11 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
 
     persona_id = str(capabilities.get("persona_id", "default")).strip() or "default"
     session.metadata["persona_id"] = persona_id
+
+    # 只收 Brain 認得的鎖定語言；其他值當作沒帶，行為與以前一致。
+    language = str(capabilities.get("language", "")).strip().lower()
+    language = language if language in LOCKED_LANGUAGES else ""
+    session.metadata["language"] = language
 
     chat_mode = str(capabilities.get("chat_mode", "live")).strip() or "live"
     session.metadata["chat_mode"] = chat_mode
@@ -235,6 +242,7 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
         session.metadata["voice_source"] != previous_voice_source
         or chat_session_id != previous_chat_session_id
         or persona_id != previous_persona_id
+        or language != previous_language
         or project_id != previous_project_id
     )
     if relay_needs_refresh and existing_relay is not None:

@@ -374,7 +374,8 @@ workspace 缺少的核心文件由 `knowledge/workspace.py` 的 `WORKSPACE_TEMPL
 - 使用者訊息語言先以規則即時判斷，看不出語言的短句（ok、型號）歸主要語言，hi、hola 這類只有一種語言會用的招呼照該語言；`JEV_LANGUAGE_ENABLED` 時再於背景由決策供應鏈校正存檔的標籤。
 - 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。`AUDIO_LANGUAGE_DECISION_ENABLED=true` 時（預設關閉），這個端點與 Live 的台語判斷會同時問 Gemini Decisions（`AUDIO_LANGUAGE_DECISION_MODEL`，預設 `gemini-decision-1`）：一次問「是不是華語／英語／西語／日語／韓語」五題是非題，華語 ≥ 0.8 或英西 ≥ 0.75 判為該語言，華語 ≤ 0.65 且五題外語都 < 0.5 判為台語，其餘情況、失敗或逾時（`AUDIO_LANGUAGE_DECISION_TIMEOUT_SECONDS`，預設 2 秒）等原本的模型。金鑰與用量歸屬沿用專案的 Gemini 金鑰；每句分數記在 log 事件 `audio_language_decision`。
 - 使用者選的語言（`POST /brain/chat` 選填 `preferred_language`，`zh|en|es|nan|ja|ko`，其他值回 422）：整合方讓使用者一開始選台語／華語／英文時帶入，只是參考、不鎖定。它取代主要語言當退路：看不出語言的短句與型號用它回答、存訊息語言標籤、決定檢索語言，並以 `user_preferred_language` 放進每輪決策的 evidence；使用者這句話看得出語言（英文句、中文句）或明講要哪種語言時仍照使用者，提示詞不會要求硬用選的語言。選 `nan` 時，中文字的句子（含看不出語言的短句）跟 ASR 聽出台語一樣以台語文件優先檢索、回答用繁體中文；看得出是其他語言的句子照那個語言。只作用在當次請求，不存進 session，每次請求都要帶。Live 沒有這個欄位。
-- 指定語言（`POST /brain/chat`、`/brain/chat/stream` 選填 `language`，`zh|en|es|ja|ko`，不收 `nan`，其他值回 422）：與 `preferred_language` 不同，這是鎖定。整輪的回覆語言與檢索語言固定為它，不看使用者這句話的語言，也不看決策的 `requested_response_language`；決策關閉或失敗時照鎖，不退回偵測。prompt 寫明「一律用某語言回答，即使使用者用其他語言」，決策 evidence 多一個 `locked_language`。`search_knowledge` 同時改嚴格語言檢索（`active_retrieval_language_strict`）：`search_records(strict_language=True)` 只留語言等於 `language` 的段落（混語言 CSV 每題的 `language` 優先，否則看文件語言），不論專案有幾條分流都過濾，在 top_k 截斷之前做，候選窗會擴大到同語言夠多或掃完為止；該語言沒有紀錄就回空，不改查別的語言，圖譜帶入的相關段落也只留該語言。兩個欄位都帶時以 `language` 為準，只帶 `preferred_language` 時行為不變。快速問答沒有不經檢索的直接比對路徑，聊天時的題目都是索引後的段落，由同一個過濾涵蓋。只作用在當次請求；Live 與 WebSocket 還沒有這個欄位。
+- 指定語言（`POST /brain/chat`、`/brain/chat/stream` 選填 `language`，`zh|en|es|ja|ko`，不收 `nan`，其他值回 422）：與 `preferred_language` 不同，這是鎖定。整輪的回覆語言與檢索語言固定為它，不看使用者這句話的語言，也不看決策的 `requested_response_language`；決策關閉或失敗時照鎖，不退回偵測。prompt 寫明「一律用某語言回答，即使使用者用其他語言」，決策 evidence 多一個 `locked_language`。`search_knowledge` 同時改嚴格語言檢索（`active_retrieval_language_strict`）：`search_records(strict_language=True)` 只留語言等於 `language` 的段落（混語言 CSV 每題的 `language` 優先，否則看文件語言），不論專案有幾條分流都過濾，在 top_k 截斷之前做，候選窗會擴大到同語言夠多或掃完為止；該語言沒有紀錄就回空，不改查別的語言，圖譜帶入的相關段落也只留該語言。兩個欄位都帶時以 `language` 為準，只帶 `preferred_language` 時行為不變。快速問答沒有不經檢索的直接比對路徑，聊天時的題目都是索引後的段落，由同一個過濾涵蓋。只作用在當次請求。Live 見下一條。
+- Live 的指定語言：Backend 把 WebSocket `client_init` 的 `capabilities.language`（`zh|en|es|ja|ko`，其他值忽略）放進 `relay_init.language`，Brain 只接受這五個值，其他當作沒帶；語言改變時 Backend 會重建 relay。session 有鎖定語言時：每輪決策帶 `locked_language`；文字輪的 server envelope 一律帶 `policy.response_language`／`retrieval_language`（決策停用或失敗時也帶）；語音輪沒有 envelope，改由系統指令寫明回答語言；`search_knowledge`（預取與模型自己呼叫）用鎖定語言並走 `strict_language`，決策沒給檢索語言時也守住。沒帶時行為完全不變。
 - 分流兩條以上時，system prompt（文字對話與 Live 都有）列出專案會說的語言（國語、台語、英文…），模型被問到會說什麼語言時照實回答（`core/prompt_templates.supported_languages_line`）；只有一條分流不寫，免得模型拒絕用其他語言回答。
 - 每輪 system prompt 結尾指定回答語言，並依 `reply_seconds`（預設 20 秒，0 為不限制，上限 120）換算成字數上限：中日韓每秒 4 字，其他語言每秒 1.5 個單字（`core/prompt_templates.reply_length_line`）。只靠提示詞，不截斷輸出。
 - ASR 詞表：workspace 的 `ASR_PROMPT.md` 為選填，`#` 開頭為說明，其餘最多 800 字放進每輪 prompt，提醒模型訊息可能是語音辨識結果；可寫「常見誤聽：A→B」對照。`GET /brain/internal/asr-glossary` 只回正確詞（不含對照行）給 Backend 的辨識引擎：`terms` 是整串前文（最多 2000 字），`vocabulary` 是以頓號、逗號、分號或換行切開的逐詞清單（含空白的詞算一個，去重，最多 100 個），給 Gemini 串流的 `customVocabulary`。檔案缺失或讀取失敗時忽略；內容經 HTML 跳脫後放在 `<glossary>` 內，明確標示為參考資料而非指令。
@@ -475,7 +476,7 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | 專案知識與回答設定 | `GET /knowledge/settings` 讀取全部設定，`PUT /knowledge/settings` 更新語言分流與 `reply_seconds`，`PATCH /knowledge/features` 更新記憶與圖譜擴展 |
 | QA 知識 | `GET /knowledge/qa`、`GET/PUT /knowledge/qa/questions`（所有題目清單與單題直接存檔，見下）、`POST /knowledge/qa/questions/move`（單題或批次跨分類移動／掛載）、`GET /knowledge/qa/sync-status`（各分類索引同步狀態，見下）、`GET /knowledge/qa/export`（匯出 Excel，見下），以及 `/knowledge/qa/nodes*`（含 `POST`／`DELETE /knowledge/qa/nodes/{id}/entries` 掛載題目）、`/knowledge/qa/images*` |
 | 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |
-| 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar`、`GET/PUT /personas/language-settings`、`GET /personas/greeting`、`PUT /personas/contact-image`（見下） |
+| 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar`、`GET/PUT /personas/language-settings`、`GET /personas/greeting`、`PUT /personas/label`（見下） |
 | 工具與技能 | `GET /tools`、`POST /skills`、`PATCH /skills/{id}/toggle`、`GET/PUT /skills/{id}/files`、`DELETE /skills/{id}`、`POST /skills/reload` |
 | 用量與備份 | `/usage/*`（見上節）、`GET/POST /backups/sessions` |
 | Dreaming | `GET /dreaming/status`、`POST /dreaming/run`、`GET /dreaming/candidates`、`GET /dreaming/report` |
@@ -505,6 +506,19 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 - 未分類的題目（`list_all_questions` 中沒有任何分類掛載的列）排在最後，`語言`、`第一層`、`第二層` 與 `順序` 留空。
 - 廠商呼叫（`X-OpenVMan-Vendor: 1`）只輸出廠商可見來源的題目（以 `visible_workspace_path(project_id, source, "knowledge")` 過濾，規則與 `_vendor_node` 相同）；選單專用題照常輸出。
 
+複製人設（`POST /personas/clone`）會帶走來源的 `greetings` 與 `voices`；`avatar_char_id` 不帶。
+
+### 回覆附件（聯絡圖片與型錄網址）
+
+專案設定檔 `.kb_settings.json` 多兩個選填欄位（寫入時其他欄位原樣保留，`GET /knowledge/settings` 的回應不含它們）：`contact_image_id`（QA 圖片上傳代號，uuid 加副檔名，檔案要存在）與 `catalog_url`（https，1 到 500 字元，不含空白）。
+
+| 路徑 | 說明 |
+|---|---|
+| `GET /knowledge/reply-links?project_id=` | 回 `{contact_image_id, catalog_url}`，沒設或內容不合法時為 `null` |
+| `PUT /knowledge/reply-links` | body `{project_id, contact_image_id, catalog_url}`，兩個欄位整組取代，`null` 清除；不合法回 400（白話訊息），整筆不寫入。Backend 代理需「改知識庫與人設」，廠商與嵌入金鑰不開放 |
+
+每則回覆（`POST /chat`、`/chat/stream` 的 `done`）有設就帶 `contact_image_id`／`contact_image_kind` 與 `catalog_url`，不論 `no_answer` 是 true 或 false，跟引用來源的 `image_id`、`url` 分開，前台決定顯示什麼。「清除未使用的 QA 圖片」會保留專案的聯絡圖片。人設層級的聯絡圖片（`PUT /personas/contact-image`）已移除，舊 `AVATAR.json` 裡的 `contact_image_id` 不再被讀取。
+
 `POST /chat` 一次回傳完整結果；`POST /chat/stream` 以 SSE 逐句送出同一份回答（見「逐句串流」）；即時語音走 Live WebSocket。
 
 ### 人設的開場白與各語言聲音
@@ -519,9 +533,9 @@ Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 
 | `GET /personas/language-settings?persona_id=&project_id=` | 回 `{persona_id, greetings, voices}` |
 | `PUT /personas/language-settings` | body `{persona_id, project_id, greetings, voices}`，整份取代這兩個欄位；格式不合回 400（白話中文訊息），人設不存在回 404；`default` 人設也能設 |
 | `GET /personas/greeting?persona_id=&project_id=&language=` | 回 `{language, text, voice}`，沒設聲音時 `voice` 為 `null`；該語言沒有開場白回 404。有 `X-OpenVMan-Project-ID` 標頭（Backend 依登入身分或嵌入金鑰算出的專案）時以標頭為準，跟網址的 `project_id` 不同回 400；網站嵌入金鑰可呼叫 |
-| `PUT /personas/contact-image` | body `{persona_id, project_id, image_id}`，設定這個人設每則回覆都附的聯絡圖片（例如展場的 QR code），`image_id` 為 `null` 時清除。只收 `POST /knowledge/qa/images` 上傳後拿到的圖片代號，且檔案要存在，否則 400；人設不存在 404。回覆以 `contact_image_id`／`contact_image_kind` 帶出，跟引用的 `image_id` 是兩張不同的圖；「清除未使用的 QA 圖片」會保留人設引用的聯絡圖片 |
+| `PUT /personas/label` | body `{persona_id, project_id, label}`，去頭尾空白後 1 到 40 字、不可換行，否則 400；人設不存在 404。寫進人設 `AVATAR.json` 的 `label`（預設人設是專案根目錄那份），不改 `SOUL.md`；沒設時預設人設顯示「預設角色」、其他人設顯示 `SOUL.md` 的第一個標題。檔內其他欄位原樣保留 |
 
-三個路徑與其他 `/personas` 路徑一樣要內部 token；專案權限由 Backend 代理檢查（讀取需讀取權、寫入需「改知識庫與人設」），Brain 不另做帳號判斷，也不開放廠商模式。
+這幾個路徑與其他 `/personas` 路徑一樣要內部 token；專案權限由 Backend 代理檢查（讀取需讀取權、寫入需「改知識庫與人設」），Brain 不另做帳號判斷，也不開放廠商模式。
 
 ### 上傳限制
 

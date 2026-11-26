@@ -18,18 +18,17 @@ from knowledge.workspace import (
     write_text_atomic,
 )
 from personas.personas import (
-    DEFAULT_PERSONA_LABEL,
     clone_persona_scaffold,
     create_persona_scaffold,
     delete_persona_scaffold,
     PersonaNotFoundError,
-    extract_heading_or_name,
     get_persona_greeting,
     get_persona_language_settings,
     list_personas,
     normalize_persona_id,
+    persona_label,
     set_persona_avatar,
-    set_persona_contact_image,
+    set_persona_label,
     set_persona_language_settings,
 )
 from protocol.schemas import (
@@ -131,11 +130,8 @@ def _list_vendor_personas(project_id: str) -> list[dict]:
         try:
             if persona_id != normalize_persona_id(persona_id):
                 continue
-            path = _persona_soul_path(persona_id, project_id)
-            label = (
-                DEFAULT_PERSONA_LABEL if persona_id == "default"
-                else extract_heading_or_name(path, persona_id)
-            )
+            _persona_soul_path(persona_id, project_id)
+            label = persona_label(persona_id, project_id)
         except (HTTPException, OSError, ValueError):
             continue
         items.append({
@@ -332,24 +328,19 @@ def get_persona_greeting_route(
     return greeting
 
 
-class PersonaContactImagePut(BaseModel):
+class PersonaLabelPut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     persona_id: str
     project_id: str = "default"
-    image_id: str | None
+    label: str
 
 
-@router.put("/personas/contact-image", summary="設定人設每則回覆都附的聯絡圖片（例如 QR code）")
-def put_persona_contact_image_route(payload: PersonaContactImagePut):
+@router.put("/personas/label", summary="修改人設的顯示名稱（預設人設也可以）")
+def put_persona_label_route(payload: PersonaLabelPut):
     try:
-        result = set_persona_contact_image(payload.persona_id, payload.image_id, payload.project_id)
+        result = set_persona_label(payload.persona_id, payload.label, payload.project_id)
     except ValueError as exc:
         raise _language_settings_error(exc) from exc
-    log_event(
-        "persona_contact_image_set",
-        persona_id=result["persona_id"],
-        project_id=payload.project_id,
-        has_image=bool(result["contact_image_id"]),
-    )
+    log_event("persona_label_set", persona_id=result["persona_id"], project_id=payload.project_id)
     return result

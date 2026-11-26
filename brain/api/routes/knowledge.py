@@ -15,6 +15,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from pydantic import BaseModel, ConfigDict
 
 from core.chat_service import record_generation_failure
 from infra.project_context import resolve_project_context
@@ -381,6 +382,38 @@ async def put_knowledge_settings_route(payload: KnowledgeSettingsPutRequest):
         language_routes=payload.language_routes,
         reply_seconds=payload.reply_seconds,
     ))
+
+
+class ReplyLinksPutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = "default"
+    contact_image_id: str | None
+    catalog_url: str | None
+
+
+@router.get("/knowledge/reply-links", summary="取得每則回覆附的聯絡圖片與型錄網址")
+async def get_reply_links_route(project_id: str = "default"):
+    from knowledge.kb_settings import load_reply_links
+
+    return load_reply_links(project_id)
+
+
+@router.put("/knowledge/reply-links", summary="設定每則回覆附的聯絡圖片與型錄網址（null 清除）")
+async def put_reply_links_route(payload: ReplyLinksPutRequest):
+    from knowledge.kb_settings import save_reply_links
+
+    try:
+        result = save_reply_links(payload.project_id, payload.contact_image_id, payload.catalog_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_event(
+        "reply_links_set",
+        project_id=payload.project_id,
+        has_image=bool(result["contact_image_id"]),
+        has_catalog=bool(result["catalog_url"]),
+    )
+    return result
 
 
 @router.patch("/knowledge/features", summary="更新專案回答功能")

@@ -521,6 +521,21 @@ export function saveReplySeconds(projectId: string, replySeconds: number) {
   });
 }
 
+/** 每則回覆都附的專案層級附件：聯絡圖片（QA 圖片代號）與型錄網址；null 代表沒有。 */
+export interface ReplyLinks {
+  contact_image_id: string | null;
+  catalog_url: string | null;
+}
+
+export function fetchReplyLinks(projectId: string) {
+  return get<ReplyLinks>(knowledgePath("/reply-links"), { project_id: projectId });
+}
+
+/** 整組取代：兩個欄位都要帶，null 就是清除。 */
+export function saveReplyLinks(projectId: string, links: ReplyLinks) {
+  return put<ReplyLinks>(knowledgePath("/reply-links"), { project_id: projectId, ...links });
+}
+
 export function saveProjectFeatures(projectId: string, changes: Partial<ProjectFeatures>) {
   return patch<KnowledgeSettings>(knowledgePath("/features"), { project_id: projectId, ...changes });
 }

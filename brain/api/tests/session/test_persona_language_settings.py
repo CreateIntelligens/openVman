@@ -156,74 +156,6 @@ def test_requests_without_the_internal_token_are_refused(root):
     assert personas.get_persona_language_settings("guide")["greetings"] == {}
 
 
-_QR = "0f1e2d3c-4b5a-4968-8776-655443322110.png"
-
-
-def _qr_file(root: Path) -> None:
-    images = root / "knowledge" / ".qa_images"
-    images.mkdir(parents=True, exist_ok=True)
-    (images / _QR).write_bytes(b"\x89PNG\r\n\x1a\n")
-
-
-def test_contact_image_is_set_read_back_and_cleared(root, client):
-    _qr_file(root)
-    response = client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
-    assert response.status_code == 200
-    assert response.json() == {"persona_id": "guide", "contact_image_id": _QR}
-    assert personas.persona_contact_image("guide") == _QR
-
-    assert client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": None}).status_code == 200
-    assert personas.persona_contact_image("guide") is None
-
-
-def test_contact_image_keeps_greetings_and_avatar(root, client):
-    _qr_file(root)
-    _put(client, greetings={"en": "Hello"})
-    personas.set_persona_avatar("guide", "char-1", "default")
-    client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
-    settings = client.get(_URL, params={"persona_id": "guide"}).json()
-    assert settings["greetings"] == {"en": "Hello"}
-    assert personas._read_avatar_meta("guide", "default", is_default=False)["avatar_char_id"] == "char-1"
-
-
-@pytest.mark.parametrize("image_id", ["../SOUL.md", "qr.png", "0f1e2d3c-4b5a-4968-8776-655443322110.svg"])
-def test_contact_image_only_accepts_uploaded_qa_image_ids(root, client, image_id):
-    _qr_file(root)
-    response = client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": image_id})
-    assert response.status_code == 400
-    assert personas.persona_contact_image("guide") is None
-
-
-def test_contact_image_must_exist(root, client):
-    response = client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
-    assert response.status_code == 400
-
-
-def test_contact_image_lookup_never_raises_for_unknown_personas(root):
-    assert personas.persona_contact_image("nobody") is None
-    assert personas.persona_contact_image("../etc") is None
-
-
-def test_image_cleanup_keeps_a_persona_contact_image(root, client, monkeypatch):
-    from knowledge import qa_nodes
-
-    _qr_file(root)
-    stray = root / "knowledge" / ".qa_images" / "11111111-2222-4333-8444-555555555555.png"
-    stray.write_bytes(b"\x89PNG\r\n\x1a\n")
-    client.put("/brain/personas/contact-image", json={"persona_id": "guide", "image_id": _QR})
-    # 清除只動十分鐘前的檔案；把兩張都調成舊檔，才看得出是「有在用」才保住。
-    old = time.time() - 3600
-    for path in (root / "knowledge" / ".qa_images").iterdir():
-        os.utime(path, (old, old))
-    monkeypatch.setattr(qa_nodes, "ensure_workspace_scaffold", lambda project_id="default": root)
-
-    deleted = qa_nodes.cleanup_unused_images("default")
-
-    assert (root / "knowledge" / ".qa_images" / _QR).exists()
-    assert not stray.exists()
-    assert str(stray) in deleted
-
-
 def test_greeting_uses_the_project_the_backend_resolved(root, client, monkeypatch):
     # 嵌入金鑰的請求網址沒帶專案時，Backend 把金鑰綁的專案放在標頭；不能退回 default。
     seen = []
@@ -235,3 +167,78 @@ def test_greeting_uses_the_project_the_backend_resolved(root, client, monkeypatc
     assert client.get("/brain/personas/greeting", params={"language": "en", "project_id": "proj-other"}, headers=header).status_code == 400
     assert client.get("/brain/personas/greeting", params={"language": "en", "project_id": "proj-direct"}).status_code == 200
     assert seen == ["proj-bound", "proj-bound", "proj-direct"]
+
+
+_LABEL = "/brain/personas/label"
+
+
+def _rename(client, persona_id, label):
+    return client.put(_LABEL, json={"persona_id": persona_id, "label": label})
+
+
+def test_default_persona_shows_the_built_in_name_until_renamed(root, client):
+    assert personas.list_personas()[0]["label"] == "預設角色"
+    assert personas.default_persona_label("default") == "預設角色"
+
+
+def test_renaming_the_default_persona_writes_root_avatar_json_and_keeps_other_fields(root, client):
+    meta_path = root / "AVATAR.json"
+    meta_path.write_text(json.dumps({"avatar_char_id": "008", "greetings": {"en": "Hello"}}), encoding="utf-8")
+
+    response = _rename(client, "default", "  Mr. Walter  ")
+
+    assert response.status_code == 200
+    assert response.json() == {"persona_id": "default", "label": "Mr. Walter"}
+    assert personas.list_personas()[0]["label"] == "Mr. Walter"
+    assert json.loads(meta_path.read_text(encoding="utf-8")) == {
+        "avatar_char_id": "008", "greetings": {"en": "Hello"}, "label": "Mr. Walter",
+    }
+    # 語言設定與虛擬人綁定不被洗掉，SOUL.md 也沒動。
+    assert personas.get_persona_language_settings("default")["greetings"] == {"en": "Hello"}
+    assert (root / "SOUL.md").read_text(encoding="utf-8") == "# Global Soul"
+
+
+def test_renaming_another_persona_writes_its_avatar_json_and_leaves_soul_alone(root, client):
+    soul = root / "personas" / "guide" / "SOUL.md"
+    soul.write_text("# Old Name\n\n## 角色設定\n\n你是導覽員。\n", encoding="utf-8")
+    personas.set_persona_avatar("guide", "char-1", "default")
+
+    assert _rename(client, "guide", "新導覽員").status_code == 200
+
+    # SOUL.md 是給模型的提示詞，改顯示名稱不碰它。
+    assert soul.read_text(encoding="utf-8") == "# Old Name\n\n## 角色設定\n\n你是導覽員。\n"
+    meta = json.loads((root / "personas" / "guide" / "AVATAR.json").read_text(encoding="utf-8"))
+    assert meta == {"avatar_char_id": "char-1", "label": "新導覽員"}
+    listed = {item["persona_id"]: item for item in personas.list_personas()}
+    assert listed["guide"]["label"] == "新導覽員"
+    assert listed["guide"]["avatar_char_id"] == "char-1"
+
+
+def test_unnamed_persona_still_shows_its_soul_title(root):
+    soul = root / "personas" / "guide" / "SOUL.md"
+    soul.write_text("# 導覽員\n\n你是導覽員。\n", encoding="utf-8")
+    assert {item["persona_id"]: item["label"] for item in personas.list_personas()}["guide"] == "導覽員"
+
+
+@pytest.mark.parametrize("label", ["", "   ", "x" * 41, "兩\n行"])
+def test_label_must_be_one_to_forty_characters_on_one_line(root, client, label):
+    assert _rename(client, "default", label).status_code == 400
+    assert _rename(client, "guide", label).status_code == 400
+    assert personas.list_personas()[0]["label"] == "預設角色"
+
+
+def test_label_at_forty_characters_is_accepted_and_unknown_persona_is_404(root, client):
+    assert _rename(client, "default", "字" * 40).status_code == 200
+    assert _rename(client, "nobody", "名稱").status_code == 404
+
+
+def test_unreadable_default_label_falls_back(root):
+    (root / "AVATAR.json").write_text(json.dumps({"label": ["x"]}), encoding="utf-8")
+    assert personas.default_persona_label("default") == "預設角色"
+    (root / "AVATAR.json").write_text(json.dumps({"label": "字" * 41}), encoding="utf-8")
+    assert personas.default_persona_label("default") == "預設角色"
+
+
+@pytest.mark.parametrize("path", ["/brain/personas/contact-image", "/brain/personas/reference-link"])
+def test_persona_level_reply_attachment_routes_are_gone(client, path):
+    assert client.put(path, json={"persona_id": "guide", "image_id": None, "url": None}).status_code in {404, 405}

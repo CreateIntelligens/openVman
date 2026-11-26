@@ -29,14 +29,14 @@
    - 人設新增「語言對應 TTS 聲音」：`{ "en": "<voice_id>", … }`。
 2. Backend
    - `/api/v1/chat/stream` 照轉 `language`（現在是原樣代理）。（第一階段完成：測試證明原樣轉送；`/personas/language-settings`、`/personas/greeting` 已加進代理，需登入）
-   - WebSocket 的 `capabilities` 加 `language`，Live 與文字回合都帶進 Brain。
+   - WebSocket 的 `capabilities` 加 `language`，Live 與文字回合都帶進 Brain。（第二階段完成）
    - TTS：請求有 `language`、而人設有對應聲音時用那個聲音，否則照現在的預設。
 3. 前台與 SDK
    - SDK `init` 加 `language`，之後每次 `ask()` 都帶；新增 `greet()`：取開場白並用該語言的聲音念出來。（第一階段完成）
-   - 官方前台：網址參數或語言選擇器選定語言後，自動播開場白；之後的對話都帶 `language`。
+   - 官方前台：網址參數或語言選擇器選定語言後，自動播開場白；之後的對話都帶 `language`。（第二階段完成）
 4. 後台
-   - 人設頁加「開場白」區塊（每個語言一欄）與「各語言聲音」設定。
-   - 對話測試頁可以選鎖定語言。
+   - 人設頁加「開場白」區塊（每個語言一欄）與「各語言聲音」設定。（第二階段完成）
+   - 對話測試頁可以選鎖定語言。（第二階段完成：在「測試語言」旁勾選「鎖定語言」）
 5. 協定與文件
    - 更新 `contracts/schemas/v1/` 後重新產生契約；更新 `docs/specs/`、`brain/README.md`、整合指南、`CHANGELOG.md`。
 
@@ -51,6 +51,15 @@
 
 在鶴記dev 以 zh、en、es 各跑一次：開場白跟鶴記提供的文件一致、聲音是該語言設定的聲音、用別的語言提問仍以鎖定語言回答，且答案只引用該語言的知識。
 
-## 追加：人設的聯絡圖片（2026-11-25）
+## 追加：聯絡圖片與型錄網址（2026-11-25 起、2026-11-26 改為專案層級）
 
-鶴記 Kiosk 要每題都放 EVAK QR code，同時保留 QA 的產品圖；一題只有一個圖片欄放不下兩張。改成人設設定一張聯絡圖片（`PUT /personas/contact-image`），每則回覆以 `contact_image_id` 另外帶出。答不出來時回應本來就有 `no_answer: true`，加上聯絡圖片後前台不必另外判斷就有 QR 可顯示。官方前台會在回覆氣泡顯示這張圖（2026-11-25 上線，鶴記 kiosk 人設已設 EVAK QR）；SDK 還沒顯示，整合方從回應的 `contact_image_id` 自行顯示。
+鶴記 Kiosk 要每題都放 EVAK QR code，同時保留 QA 的產品圖；一題只有一個圖片欄放不下兩張。第一階段先做成人設層級的聯絡圖片（`PUT /personas/contact-image`），2026-11-26 改成專案層級並移除人設層級的版本（含路由與函式，不留相容層）：
+
+- 專案 `.kb_settings.json` 存 `contact_image_id`、`catalog_url`，用 `GET/PUT /brain/knowledge/reply-links` 讀寫（寫入保留其他欄位；圖片只收 QA 圖片上傳代號且檔案要存在，網址只收 https 1 到 500 字元）。
+- 每則回覆都帶，不論 `no_answer` 是 true 或 false：`contact_image_id`／`contact_image_kind`、`catalog_url`，跟引用來源的 `image_id`、`url` 分開；前台自己決定顯示什麼。官方前台顯示 QR 並在有 `catalog_url` 時顯示「查看型錄」；SDK 還沒顯示，整合方從回應自行處理。
+- 後台入口在知識庫頁首的「回覆附件」，不在人設頁。
+- 已在人設層級設過聯絡圖片的專案（鶴記 kiosk 人設的 EVAK QR）要在「回覆附件」重設一次。
+
+## 追加：預設人設的顯示名稱（2026-11-26）
+
+預設人設的名稱以前寫死為「預設角色」。現在人設 `AVATAR.json`（預設人設是專案根目錄那份）的 `label` 優先，沒有才用「預設角色」或 `SOUL.md` 的第一個標題；`PUT /brain/personas/label` 可改任何人設的名稱，只寫 `AVATAR.json`，不改 `SOUL.md`。

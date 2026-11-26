@@ -1073,6 +1073,53 @@ def test_handle_client_init_stores_voice_source_from_capabilities(monkeypatch):
     assert session.metadata["voice_source"] == "custom"
 
 
+@pytest.mark.parametrize(
+    ("requested", "stored"),
+    [("es", "es"), ("ES", "es"), ("nan", ""), ("fr", ""), (None, "")],
+)
+def test_handle_client_init_keeps_only_known_locked_language(monkeypatch, requested, stored):
+    import asyncio
+    from app.auth.dependencies import AuthTransport, CurrentAccount
+    from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+    from app.auth.passwords import hash_password
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("test-admin")
+    if not admin:
+        admin = runtime.users.create(
+            username="test-admin",
+            password_hash=hash_password("admin-password"),
+            role=AccountRole.ADMIN,
+        )
+    try:
+        runtime.resources.register(
+            resource_type=ResourceType.PROJECT,
+            resource_id="default",
+            owner_user_id=admin.id,
+            visibility=ResourceVisibility.PRIVATE,
+        )
+    except Exception:
+        pass
+    current = CurrentAccount(user=admin, transport=AuthTransport.BEARER)
+
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    session = types.SimpleNamespace(
+        session_id="session-lang",
+        metadata={"_current_account": current},
+    )
+    websocket = types.SimpleNamespace(send_json=AsyncMock(), close=AsyncMock())
+    capabilities = {} if requested is None else {"language": requested}
+
+    asyncio.run(
+        module.websocket_routes._handle_client_init(
+            {"event": "client_init", "capabilities": capabilities}, session, websocket,
+        )
+    )
+
+    assert session.metadata["language"] == stored
+
+
 def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()

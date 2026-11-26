@@ -22,7 +22,7 @@
               :is-typing="isTyping && msg === messages[messages.length - 1]"
             />
           </p>
-          <div v-if="msg.role === 'ai' && (msg.imageId || msg.contactImageId || safeHttpUrl(msg.url))" class="chat-msg__media">
+          <div v-if="msg.role === 'ai' && (msg.imageId || msg.contactImageId || safeHttpUrl(msg.url) || safeHttpUrl(msg.catalogUrl))" class="chat-msg__media">
             <img
               v-if="msg.imageId && !failedImages[mediaKey(i, msg)]"
               :src="qaImageUrl(msg)"
@@ -46,6 +46,15 @@
               rel="noopener noreferrer"
             >
               開啟相關連結
+            </a>
+            <a
+              v-if="safeHttpUrl(msg.catalogUrl)"
+              class="chat-msg__catalog-link"
+              :href="safeHttpUrl(msg.catalogUrl) || undefined"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              查看型錄
             </a>
           </div>
           <div v-if="!compact && showSources && msg.sourcePath" class="chat-msg__reference-container">

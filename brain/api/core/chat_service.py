@@ -36,7 +36,7 @@ from core.turn_decisions import (
 from core.reference_media import ReplyMediaChoice, choose_reference_media, earlier_pictures
 from core.turn_reads import vendor_turn_decision, without_disabled_recall
 from infra.learnings import record_error_event
-from knowledge.kb_settings import memory_enabled
+from knowledge.kb_settings import load_reply_links, memory_enabled
 from knowledge.qa_images import qa_image_kind
 from memory.memory import (
     append_session_message_with_id,
@@ -46,7 +46,6 @@ from memory.memory import (
     update_session_message_metadata,
 )
 from memory.memory_governance import write_summary_and_reindex
-from personas.personas import persona_contact_image
 from privacy.filter import PiiDetectionReport, scan_text_for_pii
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
@@ -507,11 +506,15 @@ def finalize_generation(
     if image_id := primary_media.get("image_id"):
         if image_kind := qa_image_kind(image_id, context.project_id):
             primary_media["image_kind"] = image_kind
-    # 人設設了聯絡圖片（例如展場的 QR code）時每則回覆都附上，跟引用的產品圖分開放，兩張都能顯示。
-    if contact_image_id := persona_contact_image(context.persona_id, context.project_id):
+    # 專案設了聯絡圖片（例如展場的 QR code）與型錄網址時每則回覆都附上，不論有沒有答案；
+    # 跟引用的產品圖、來源網址分開放，前台自己決定顯示什麼。
+    links = load_reply_links(context.project_id)
+    if contact_image_id := links["contact_image_id"]:
         primary_media["contact_image_id"] = contact_image_id
         if contact_kind := qa_image_kind(contact_image_id, context.project_id):
             primary_media["contact_image_kind"] = contact_kind
+    if links["catalog_url"]:
+        primary_media["catalog_url"] = links["catalog_url"]
     meta: dict[str, Any] = {}
     if tool_steps:
         meta["tool_steps"] = tool_steps

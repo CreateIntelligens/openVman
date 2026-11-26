@@ -104,6 +104,7 @@ export function useAvatarTextTurn(context: TextTurnContext) {
               const requestSessionId = sessionId.value
               const requestProjectId = context.projectId()
               const requestPersonaId = context.personaId()
+              const requestLanguage = options.language?.() ?? ''
 
               const replaceMessageIndex = mergedTurn?.messageIndex
               const replaced = replaceMessageIndex === undefined ? undefined : messages.value[replaceMessageIndex]
@@ -137,6 +138,7 @@ export function useAvatarTextTurn(context: TextTurnContext) {
                                    turn_id: turnId,
                                    turn_revision: revision,
                                    mode: options.replyMode?.() ?? '',
+                                   ...(requestLanguage ? { language: requestLanguage } : {}),
                                    decision_debug: decisionDebugEnabled.value,
                                    ...(speechLanguage ? { metadata: { speech_language: speechLanguage } } : {}),
                             }),

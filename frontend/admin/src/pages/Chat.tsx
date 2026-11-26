@@ -121,6 +121,8 @@ export default function Chat() {
     searchQuery,
     setSearchQuery,
     resetSearch,
+    lockTestLanguage,
+    setLockTestLanguage,
   } = useChatSession(vendor, chatTest);
   const visionAvailable = useVisionAvailable(!vendor);
 
@@ -350,9 +352,19 @@ export default function Chat() {
             onOpenQuickQa={() => setQuickQaOpen(true)}
           />
           {chatTest?.language && (
-            <p className="border-b border-border px-4 py-2 text-sm text-content-muted">
-              測試語言　{KNOWLEDGE_LANGUAGE_LABELS[chatTest.language]}
-            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-4 py-2 text-sm text-content-muted">
+              <span>測試語言　{KNOWLEDGE_LANGUAGE_LABELS[chatTest.language]}</span>
+              {chatTest.language !== "nan" && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={lockTestLanguage}
+                    onChange={(event) => setLockTestLanguage(event.target.checked)}
+                  />
+                  鎖定語言（一律用這個語言回答，只查這個語言的知識）
+                </label>
+              )}
+            </div>
           )}
 
           {mode === "live" && (

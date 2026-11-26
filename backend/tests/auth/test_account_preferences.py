@@ -51,6 +51,21 @@ def test_saving_merges_so_another_device_keeps_other_fields(setup):
     assert get_my_preferences(account=account, runtime=runtime).values == merged
 
 
+def test_locked_language_preference_is_allowed_and_comes_back(setup):
+    runtime, account = setup
+    saved = update_my_preferences(
+        MyPreferences(values={"lockedLanguage": "es", "replyMode": "fast"}),
+        account=account, runtime=runtime,
+    ).values
+    assert saved == {"lockedLanguage": "es", "replyMode": "fast"}
+    # 改回「不指定」存的是空字串，不是欄位消失。
+    cleared = update_my_preferences(
+        MyPreferences(values={"lockedLanguage": ""}), account=account, runtime=runtime,
+    ).values
+    assert cleared["lockedLanguage"] == ""
+    assert get_my_preferences(account=account, runtime=runtime).values["lockedLanguage"] == ""
+
+
 def test_unknown_keys_and_huge_values_are_rejected(setup):
     runtime, account = setup
     with pytest.raises(HTTPException) as unknown:

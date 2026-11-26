@@ -83,7 +83,8 @@ export class AvatarConversation {
     try {
       const greeting = await this.fetchGreeting(language, turn.signal);
       if (!greeting) return;
-      if (greeting.voice) this.greetingVoice = greeting.voice;
+      // 每次成功都覆寫：這次沒有聲音（voice 為 null）就清掉，不沿用上一個語言的聲音。
+      this.greetingVoice = greeting.voice;
       this.deps.onSentence(0, greeting.text);
       this.deps.onReply(greeting.text, this.replyDetails(null));
       await this.speak(greeting.text, turn.signal);

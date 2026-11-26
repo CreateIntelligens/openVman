@@ -119,7 +119,7 @@
 
 `preferred_language` 是使用者在你的介面選的語言（`zh` 華語、`nan` 台語、`en`、`es`、`ja`、`ko`；其他值回 422）。它是參考，不會鎖定回答語言：使用者這句話看得出是哪種語言（英文句、中文句），或明講「請用英文回答」時，照使用者；只有「ok」、型號這類看不出語言的輸入，才用選的語言回答（原本是用專案主要語言）。選 `nan` 時，中文字的句子會優先查台語文件、回答用繁體中文，跟 ASR 聽出台語（`metadata.speech_language: "nan"`）一樣。Brain 不記住這個值，整段對話每次請求都要帶。
 
-要把整場對話鎖在一種語言，改帶 `language`（`zh`、`en`、`es`、`ja`、`ko`，不收 `nan`，其他值回 422）。它跟 `preferred_language` 不同：使用者之後改講別種語言、或要求換語言，仍一律用指定的語言回答，而且知識庫只查該語言的內容，查不到就回沒有答案，不改查別的語言。兩個都帶時以 `language` 為準。同樣每次請求都要帶；`POST /api/v1/chat/stream` 一樣支援。人設可以先在 `PUT /api/v1/personas/language-settings` 設定各語言的開場白與聲音，整合方用 `GET /api/v1/personas/greeting?persona_id=&project_id=&language=` 取得（該語言沒設定回 404）。用 SDK 的話，`init({ language })` 之後每次 `ask()` 都會帶 `language`，`await avatar.greet()` 會念出開場白（見 `docs/guides/avatar-embed/README.md`）。這幾個路徑需要登入；網站嵌入金鑰可以呼叫 `GET /personas/greeting`（只讀，專案一律是金鑰綁定的那個，帶別的 `project_id` 回 403），設定類路徑仍不開放。
+要把整場對話鎖在一種語言，改帶 `language`（`zh`、`en`、`es`、`ja`、`ko`，不收 `nan`，其他值回 422）。它跟 `preferred_language` 不同：使用者之後改講別種語言、或要求換語言，仍一律用指定的語言回答，而且知識庫只查該語言的內容，查不到就回沒有答案，不改查別的語言。兩個都帶時以 `language` 為準。同樣每次請求都要帶；`POST /api/v1/chat/stream` 一樣支援。人設可以先在 `PUT /api/v1/personas/language-settings` 設定各語言的開場白與聲音，整合方用 `GET /api/v1/personas/greeting?persona_id=&project_id=&language=` 取得（該語言沒設定回 404）。WebSocket 即時對話在 `client_init` 的 `capabilities` 帶 `language`（同樣只收這五個值，其他值當作沒帶）：Live 的回覆語言與檢索語言整場固定，語言改變要重送 `client_init`（官方前台在套用設定時會重新連線）；沒帶時行為不變。用 SDK 的話，`init({ language })` 之後每次 `ask()` 都會帶 `language`，`await avatar.greet()` 會念出開場白（見 `docs/guides/avatar-embed/README.md`）。這幾個路徑需要登入；網站嵌入金鑰可以呼叫 `GET /personas/greeting`（只讀，專案一律是金鑰綁定的那個，帶別的 `project_id` 回 403），設定類路徑仍不開放。
 
 回應的回答來源欄位只看這一輪的知識庫查詢（`search_knowledge`）：
 
@@ -175,7 +175,7 @@ ASR 的 `provider` 是 form 欄位，TTS 的 `provider` 是 JSON 欄位，串流
 | 事件 | `data` | 說明 |
 |---|---|---|
 | `sentence` | `{"index": 0, "text": "營業時間是早上九點。"}` | 最終回答每完成一句就送一次，`index` 從 0 起算。查知識庫等工具輪的文字不會送出；另帶 `tts_text`（這一句念的版本，同 `/chat` 的欄位） |
-| `done` | 與 `/chat` 回應相同的 JSON（`reply`、`tts_text`、`citations`、`answer_source`、`knowledge_searched`、`no_answer`、`session_id`、`trace_id`、`history`、`pii_pending`、`image_id`／`image_kind`／`url`、`contact_image_id`／`contact_image_kind` 等） | 最後一個事件，之後串流結束。`image_kind` 只在回應帶圖時出現：`qr` 是整張以 QR code 為主，`image` 是一般圖片；判斷不了時不帶，照常顯示即可。`contact_image_id` 是人設設定的聯絡圖片（例如展場要每題都放的 QR code，用 `PUT /api/v1/personas/contact-image` 設定），每則回覆都帶，跟引用的產品圖 `image_id` 是兩張圖，兩張都要顯示 |
+| `done` | 與 `/chat` 回應相同的 JSON（`reply`、`tts_text`、`citations`、`answer_source`、`knowledge_searched`、`no_answer`、`session_id`、`trace_id`、`history`、`pii_pending`、`image_id`／`image_kind`／`url`、`contact_image_id`／`contact_image_kind` 等） | 最後一個事件，之後串流結束。`image_kind` 只在回應帶圖時出現：`qr` 是整張以 QR code 為主，`image` 是一般圖片；判斷不了時不帶，照常顯示即可。`contact_image_id` 是專案設定的聯絡圖片（例如展場要每題都放的 QR code）、`catalog_url` 是專案設定的型錄網址，兩者用 `PUT /api/v1/knowledge/reply-links` 設定（body `{project_id, contact_image_id, catalog_url}`，`null` 清除；圖片只收 QA 圖片上傳代號，網址只收 https），有設就每則回覆都帶，不論 `no_answer` 是否為 true，跟引用的產品圖 `image_id`、來源 `url` 是不同欄位，整合方自己決定顯示什麼 |
 | `error` | `{"status": 502, "detail": ...}` | `status` 與 `detail` 就是 `/chat` 遇到同一個錯誤時的 HTTP 狀態碼與錯誤 `detail`（可能是字串，也可能是含 `error_code`、`retry_after_ms` 的物件）。之後串流結束，不會再有 `done` |
 
 句尾的判斷：中日文 `。！？；…`；英文 `. ! ?` 後面接空白或文字結束；換行。`3.5`、`HIPPO-50.html` 這類小數、型號與網址不會被切開，最後一段沒有句尾符號的文字在結束前補送。句子保留原文的空白與換行（換行後的那句以換行開頭），所有 `sentence.text` 依序接起來就等於 `done.reply`；送 TTS 前可以自己 trim。

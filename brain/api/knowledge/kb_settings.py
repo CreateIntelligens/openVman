@@ -9,6 +9,7 @@ English）。只有一條就不分流，行為與以前相同。清單順序是�
 from __future__ import annotations
 
 import json
+import re
 from math import isfinite
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,12 @@ KB_SETTINGS_FILENAME = ".kb_settings.json"
 DEFAULT_REPLY_SECONDS = 20
 MAX_REPLY_SECONDS = 120
 _FEATURE_FIELDS = ("memory_enabled", "graph_enabled")
+# 每則回覆都附的專案層級附件：聯絡圖片（例如 QR code）與型錄網址。
+CATALOG_URL_MAX_CHARS = 500
+# QA 圖片上傳產生的代號：uuid 加副檔名。只收這種，設定不能指到工作區裡的任意檔案。
+_REPLY_IMAGE_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpe?g|webp|gif|bmp|avif)"
+)
 
 
 def _path(project_id: str) -> Path:
@@ -81,7 +88,10 @@ def _update_settings(project_id: str, updates: dict[str, Any]) -> dict[str, Any]
         raw = _read_settings(path)
         # 檔案損壞時讀到的是關閉；存別的欄位時把關閉寫明，不然缺欄位會被當成舊專案而打開。
         base = raw if raw is not None else {field: False for field in _FEATURE_FIELDS}
-        settings = {**base, **updates}
+        settings = {
+            key: value for key, value in {**base, **updates}.items()
+            if not (key in updates and updates[key] is None)
+        }
         atomic_write_text(path, json.dumps(settings, ensure_ascii=False, indent=2))
     return _normalize_settings(settings)
 
@@ -148,3 +158,60 @@ def primary_language(project_id: str = "default") -> str:
 def fallback_route(project_id: str = "default") -> str:
     """The route other languages fall back to: the first ticked one."""
     return language_routes(project_id)[0]
+
+
+def _valid_catalog_url(value: Any) -> str | None:
+    from urllib.parse import urlsplit
+
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if not cleaned or len(cleaned) > CATALOG_URL_MAX_CHARS or any(ch.isspace() for ch in cleaned):
+        return None
+    try:
+        parts = urlsplit(cleaned)
+        host = parts.hostname
+    except ValueError:
+        return None
+    return cleaned if parts.scheme == "https" and host else None
+
+
+def _valid_reply_image(value: Any) -> str | None:
+    return value if isinstance(value, str) and _REPLY_IMAGE_RE.fullmatch(value) else None
+
+
+def load_reply_links(project_id: str = "default") -> dict[str, str | None]:
+    """The project's contact image id and catalogue url; never raises (runs on every reply)."""
+    # 每則回覆都會跑：檔案被手改壞、專案代號不合法都只當作沒設，不能讓回覆失敗。
+    try:
+        raw = _read_settings(_path(project_id)) or {}
+    except Exception:
+        raw = {}
+    if not isinstance(raw, dict):
+        raw = {}
+    return {
+        "contact_image_id": _valid_reply_image(raw.get("contact_image_id")),
+        "catalog_url": _valid_catalog_url(raw.get("catalog_url")),
+    }
+
+
+def save_reply_links(
+    project_id: str, contact_image_id: str | None, catalog_url: str | None,
+) -> dict[str, str | None]:
+    """Replace both reply links; None clears one. Raises ValueError with a plain message."""
+    from knowledge.qa_images import resolve_qa_image_path
+
+    updates: dict[str, Any] = {"contact_image_id": None, "catalog_url": None}
+    if contact_image_id is not None:
+        if not _valid_reply_image(contact_image_id):
+            raise ValueError("聯絡圖片必須是 QA 圖片上傳後拿到的圖片代號。")
+        if resolve_qa_image_path(contact_image_id, project_id) is None:
+            raise ValueError("找不到這張圖片，請先上傳到 QA 圖片。")
+        updates["contact_image_id"] = contact_image_id
+    if catalog_url is not None:
+        valid = _valid_catalog_url(catalog_url)
+        if valid is None:
+            raise ValueError(f"型錄網址只收 https，長度 1 到 {CATALOG_URL_MAX_CHARS} 個字元。")
+        updates["catalog_url"] = valid
+    _update_settings(project_id, updates)
+    return load_reply_links(project_id)

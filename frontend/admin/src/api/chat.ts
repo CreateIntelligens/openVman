@@ -130,6 +130,7 @@ export async function fetchChat(
   signal?: AbortSignal,
   mode: ReplyMode = DEFAULT_REPLY_MODE,
   preferredLanguage?: KnowledgeLanguage,
+  language?: KnowledgeLanguage,
 ): Promise<ChatDoneEvent> {
   return fetchJson<ChatDoneEvent>(apiUrl("/chat"), {
     method: "POST",
@@ -141,6 +142,8 @@ export async function fetchChat(
       project_id: getActiveProjectId(),
       mode,
       preferred_language: preferredLanguage,
+      // 鎖定：回覆與檢索都只用這個語言；preferred_language 只是提示。
+      ...(language ? { language } : {}),
     }),
     signal,
   });
