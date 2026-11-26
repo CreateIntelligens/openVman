@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.cors import api_cors_headers, origin_allowed
@@ -103,12 +104,14 @@ class FailClosedAuthMiddleware(BaseHTTPMiddleware):
 
         # 瀏覽器的 preflight 不會帶自訂標頭（X-Embed-Key 正是它要先問能不能帶的
         # 東西），所以這裡驗不到金鑰，只能用 Origin 對照所有啟用中的金鑰白名單。
+        # 讀 Auth DB 與 Redis 都是同步呼叫：放到執行緒跑，資料庫偶爾卡住時只卡這一個請求，
+        # 不會讓整個 worker 的 event loop 停住（11/24、11/26 全部 worker 同時卡 1～2 秒）。
         if (
             not carries_embed_key
             and request.method.upper() == "OPTIONS"
             and request.headers.get("access-control-request-method")
             and is_preflight_target(request.scope["path"])
-            and _origin_allowed_by_any_key(runtime, origin)
+            and await run_in_threadpool(_origin_allowed_by_any_key, runtime, origin)
         ):
             return Response(status_code=204, headers=cors_headers(origin))
 
@@ -118,12 +121,14 @@ class FailClosedAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            current = authenticate_request(request, runtime)
+            current = await run_in_threadpool(authenticate_request, request, runtime)
         except HTTPException as exc:
             headers = dict(exc.headers or {})
             # 401/403/429 也要帶 CORS，否則瀏覽器會把回應整個擋掉，
             # SDK 讀不到狀態碼就無法區分金鑰失效與額度用盡。
-            if carries_embed_key and _embed_error_gets_cors(runtime, request, origin):
+            if carries_embed_key and await run_in_threadpool(
+                _embed_error_gets_cors, runtime, request, origin,
+            ):
                 headers.update(cors_headers(origin))
             return JSONResponse(
                 status_code=exc.status_code,

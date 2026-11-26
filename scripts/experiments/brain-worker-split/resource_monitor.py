@@ -124,6 +124,16 @@ def gpus():
     return rows
 
 
+def host_io_pressure():
+    """Cumulative microseconds some / all tasks waited on I/O (PSI); None without PSI."""
+    try:
+        with open("/proc/pressure/io") as fh:
+            totals = [int(line.rsplit("total=", 1)[1]) for line in fh if "total=" in line]
+        return totals[0], totals[1]
+    except (OSError, IndexError, ValueError):
+        return None
+
+
 def host_ticks():
     with open("/proc/stat") as fh:
         values = list(map(int, fh.readline().split()[1:]))
@@ -137,6 +147,7 @@ def main():
     names, refreshed = containers(prefix), time.time()
     pids = {cid: container_pid(cid) for cid in names.values()}
     prev_net, prev_disk, last_gpu, gpu_rows = host_net(), host_disk(), 0.0, {}
+    prev_io = host_io_pressure()
     with open(path, "a", encoding="utf-8") as out:
         while True:
             time.sleep(1)
@@ -158,7 +169,12 @@ def main():
                 "disk_write_mbs": round((disk[1] - prev_disk[1]) * 512 / 1e6, 2),
                 "load1": os.getloadavg()[0],
             }
-            prev_net, prev_disk = net, disk
+            # 這一秒內有程序／全部程序在等磁碟各幾毫秒：對得上單次卡頓，10 秒平均對不上。
+            io = host_io_pressure()
+            if io and prev_io:
+                row["host"]["io_some_ms"] = round((io[0] - prev_io[0]) / 1000)
+                row["host"]["io_full_ms"] = round((io[1] - prev_io[1]) / 1000)
+            prev_net, prev_disk, prev_io = net, disk, io
             # nvidia-smi 本身要 0.1～0.3 秒，隔一秒才叫一次，結果沿用到下一筆。
             if now - last_gpu >= 2:
                 gpu_rows, last_gpu = gpus(), now

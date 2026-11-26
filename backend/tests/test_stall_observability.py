@@ -118,6 +118,48 @@ async def test_a_blocked_loop_is_logged_with_little_cpu(lag_lines):
     assert lag["loop_cpu_ms"] < 100, "waiting, not computing"
 
 
+@pytest.fixture
+def stack_lines():
+    lines: list[dict] = []
+
+    class _Collect(logging.Handler):
+        def emit(self, record):
+            message = record.getMessage()
+            if message.startswith("{") and json.loads(message).get("event") == "event_loop_stall_stack":
+                lines.append(json.loads(message))
+
+    handler = _Collect()
+    target = logging.getLogger("upstream_attempt")
+    target.addHandler(handler)
+    yield lines
+    target.removeHandler(handler)
+
+
+def _blocking_auth_read():
+    time.sleep(0.5)  # 像同步讀資料庫時等鎖：卡住事件迴圈但不吃 CPU
+
+
+@pytest.mark.asyncio
+async def test_a_stalled_loop_logs_where_it_is_stuck_once(stack_lines):
+    monitor = asyncio.create_task(run_loop_lag_monitor(0.05, 0.1))
+    await asyncio.sleep(0.1)
+    _blocking_auth_read()
+    await asyncio.sleep(0.15)
+    monitor.cancel()
+
+    [entry] = stack_lines
+    assert entry["blocked_ms"] >= 200
+    assert any("_blocking_auth_read" in call for call in entry["stack"]), entry["stack"]
+
+
+@pytest.mark.asyncio
+async def test_an_idle_loop_logs_no_stack(stack_lines):
+    monitor = asyncio.create_task(run_loop_lag_monitor(0.05, 0.1))
+    await asyncio.sleep(0.4)
+    monitor.cancel()
+    assert stack_lines == []
+
+
 @pytest.mark.asyncio
 async def test_an_idle_loop_logs_nothing(lag_lines):
     monitor = asyncio.create_task(run_loop_lag_monitor(0.05, 0.1))

@@ -27,5 +27,9 @@ RUN apk add --no-cache tzdata
 
 COPY frontend/app/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
+# 嵌入 SDK 冷啟動要抓的 runtime（wasm 約 5 MB）先壓好，nginx 用 gzip_static 直接送，
+# 不必每個請求現場壓縮；-k 保留原檔給不收 gzip 的用戶端，壓縮檔沿用原檔的修改時間。
+RUN gzip -9 -k /usr/share/nginx/html/wasm/OpenVmanAvatarRuntime.wasm \
+    /usr/share/nginx/html/js/OpenVmanAvatarRuntime.js
 
 EXPOSE 80

@@ -150,6 +150,10 @@
 
 ### Fixed
 
+- **[2026-11-26]** **runtime 預先壓縮**：avatar image 建置時把 `OpenVmanAvatarRuntime.wasm`／`.js` 先壓成 `.gz`（`gzip -9 -k`），avatar nginx 開 `gzip_static`：收 gzip 的用戶端直接拿到壓縮檔（wasm 5,005,745 → 2,415,902 bytes），不必每個請求現場壓縮（約 0.2 秒 CPU），而且帶 `Content-Length`、`Last-Modified` 與原檔相同，SDK 的存檔比對照常運作。admin 那層的即時 gzip 只在上游沒壓時才作用。
+
+- **[2026-11-26]** **驗證請求不再佔用 Backend 的事件迴圈，卡住時記下卡在哪裡**：`FailClosedAuthMiddleware` 的 `authenticate_request`、preflight 的金鑰白名單比對與錯誤回應的 CORS 判斷都會同步讀 Auth DB（SQLite）與 Redis，現在改在 thread pool 執行；資料庫偶爾卡住時只拖慢那幾個請求，不再讓整個 worker 的串流一起停。`backend/app/loop_lag.py` 另開看門狗執行緒，事件迴圈停住超過門檻兩倍時記一行 `event_loop_stall_stack`（當下的呼叫堆疊），之後再有卡頓能直接看到原因。壓測用的 `resource_monitor.py` 每秒多記 `io_some_ms`／`io_full_ms`（`/proc/pressure/io`，這一秒內等磁碟的毫秒數）。
+
 - **[2026-11-26]** **人物檔確定載得起來才存進瀏覽器**：SDK 以前第一次下載完就立刻在背景寫進 Cache Storage，連播不起來的那份也存，下次開頁讀到同一份壞檔。現在第一次下載的播放程式與人物檔，要等 runtime 建好、人物影片確實載入成功（影片只是被擋不准自動播也算載入成功）才寫入；`init()` 失敗時什麼都不存，下次重新下載。已有存檔時背景下載的新版仍照舊先存，下次開頁若播不了，依「重新下載一份、播得了才換掉存檔」處理。
 
 - **[2026-11-26]** **Backend 所有 worker 同時卡 1～2 秒**：11/24 14:08（約 2.2 秒）與 11/26 月會 16:36:57（3 個 worker 同時卡 1.1～1.3 秒，期間幾乎沒用 CPU）是同一件事。每個請求在 event loop 上同步讀 Auth DB，每次開新連線、用完就關；最後一條連線關閉時 SQLite 會做 checkpoint、拿整個資料庫檔的獨佔鎖並 fsync，正式站虛擬硬碟的 fsync 偶爾要一秒多，其他 worker 的讀取就跟著等。現在每個 Backend process 常駐一條不做事的 Auth DB 連線，WAL 不再被反覆拆掉，checkpoint 改由寫入時自動進行、不擋讀取。`-wal` 檔在服務運作時一直存在，線上備份照文件用 `sqlite3.Connection.backup`；Backend lifespan 收尾與 gateway-worker（arq `on_shutdown`）關機時會把 WAL 寫回主檔再關連線，停機後拿備份還原才不會被舊 WAL 蓋回去，被強制停止時則照文件連同 `-wal`、`-shm` 一起刪。根因是由紀錄特徵與重現實驗推得，紀錄中沒有直接量到 checkpoint 的耗時；之後若再出現同樣卡頓，要再補 event loop 卡住時的堆疊紀錄。
