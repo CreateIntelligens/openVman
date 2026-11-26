@@ -89,7 +89,7 @@ const avatar = await OpenVmanAvatar.init({
 - 離線期間存檔會一直留著，登出也不會清：同一台瀏覽器之前看過的專案人物，openVman 連不上時仍顯示得出來。30 天沒用到的那組會在之後的載入時清掉。
 - 第一次下載時連不上、逾時（等標頭 15 秒、下載 120 秒）、5xx 或下載到一半中斷，自動再試兩次。
 - `avatar.assetsFromCache` 為 `true` 表示這次 `init()` 完全沒有下載。
-- 存檔的人物影片先複製到記憶體再交給 `<video>`：iOS Safari 播不了直接從 Cache Storage 讀出的影片（第一次開可以、之後每次失敗）。複製後仍播不了，就清掉那組人物存檔、重新下載影片再試；還是不行才改從原網址載入。
+- 存檔的人物影片先複製到記憶體再交給 `<video>`：iOS Safari 播不了直接從 Cache Storage 讀出的影片（第一次開可以、之後每次失敗）。複製後仍播不了，就重新下載一份影片再試：新的播得了才清掉那組人物存檔（下次開頁換成新存的）；新的也播不了表示頁面不准 `blob:` 影片（CSP），存檔留著、在 localStorage 記下 `openvman-avatar:blob-video-blocked`，之後開頁直接改從原網址載入。
 - `await OpenVmanAvatar.clearAssetCache()` 清掉這個網域存的所有播放程式與人物檔，下次 `init()` 重新下載；沒有東西可清或瀏覽器沒有 Cache Storage 時回 `false`。
 - 嵌入頁面必須是 https（或 localhost）才有 Cache Storage；隱私模式、使用者清除網站資料、瀏覽器空間不足時存檔會不見，就回到第一次下載。這些情況與快取出錯都只會改走網路，不會讓 `init()` 失敗。
 - 存檔的播放程式與人物影片以 `blob:` 網址載入。頁面的 CSP 不允許 `blob:` 腳本（`script-src`）或媒體（`media-src`）時，那一項改從原網址載入，此時 openVman 連不上就載不到。播放程式本身仍需要 `'unsafe-eval'` 與 `'wasm-unsafe-eval'`（跟以前一樣）。

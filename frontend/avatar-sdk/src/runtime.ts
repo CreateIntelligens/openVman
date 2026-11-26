@@ -124,9 +124,18 @@ export class AvatarRuntime {
 
   private async loadVideoSource(video: HTMLVideoElement, assets: AvatarAssets): Promise<void> {
     if (await this.tryBlobVideo(video, assets.video)) return;
-    // 存在瀏覽器的那份播不了：清掉重新下載，下次開頁也會換成新存的。
-    const fresh = assets.reloadVideo ? await assets.reloadVideo().catch(() => null) : null;
-    if (fresh && await this.tryBlobVideo(video, fresh)) return;
+    const stored = assets.storedVideo;
+    if (stored && !blobVideoBlocked()) {
+      // 存在瀏覽器的那份播不了：重新下載一份試試。新的播得了才表示是存檔壞了，這時才清掉，
+      // 下次開頁換成新存的；新的也播不了就是這個頁面不准 blob:（CSP），存檔留著並記下來，
+      // 之後直接走原網址，不必每次多下載一次。
+      const fresh = await stored.download().catch(() => null);
+      if (fresh && await this.tryBlobVideo(video, fresh)) {
+        void stored.forget();
+        return;
+      }
+      if (fresh) rememberBlobVideoBlocked();
+    }
     // 頁面的 CSP（media-src）不允許 blob: 時改從原網址播（這時離線就播不到）。
     await loadVideo(video, assets.videoUrl, VIDEO_URL_TIMEOUT_MS);
   }
@@ -220,6 +229,24 @@ export class AvatarRuntime {
 const VIDEO_BLOB_TIMEOUT_MS = 8_000;
 const VIDEO_URL_TIMEOUT_MS = 15_000;
 const GESTURE_EVENTS = ["pointerdown", "touchend", "keydown"] as const;
+
+const BLOB_VIDEO_BLOCKED_KEY = "openvman-avatar:blob-video-blocked";
+
+function blobVideoBlocked(): boolean {
+  try {
+    return window.localStorage?.getItem(BLOB_VIDEO_BLOCKED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberBlobVideoBlocked(): void {
+  try {
+    window.localStorage?.setItem(BLOB_VIDEO_BLOCKED_KEY, "1");
+  } catch {
+    // 沒有 localStorage（隱私模式、被封鎖）就每次多試一次，不影響播放。
+  }
+}
 
 function isAutoplayBlocked(error: unknown): boolean {
   return (error as { name?: unknown } | null)?.name === "NotAllowedError";

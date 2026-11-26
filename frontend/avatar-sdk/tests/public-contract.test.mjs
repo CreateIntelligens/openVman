@@ -5,6 +5,14 @@ import vm from "node:vm";
 
 const bundleUrl = new URL("../dist/openvman-avatar-sdk.js", import.meta.url);
 
+export function memoryStorage() {
+  const values = new Map();
+  return {
+    getItem: (key) => (values.has(key) ? values.get(key) : null),
+    setItem: (key, value) => values.set(key, String(value)),
+  };
+}
+
 export async function loadSdk({
   audioState = "running",
   cacheStorage,
@@ -20,6 +28,7 @@ export async function loadSdk({
   videoLoadResult,
   videoPlayBlocked = false,
   videoPlaySucceeds = true,
+  localStorage = memoryStorage(),
 } = {}) {
   let characterStatus = initialCharacterStatus;
   const source = await readFile(bundleUrl, "utf8");
@@ -222,6 +231,7 @@ export async function loadSdk({
         windowListeners.set(type, handlers);
       },
       clearTimeout,
+      localStorage,
       removeEventListener(type, handler) {
         windowListeners.get(type)?.delete(handler);
       },
@@ -875,6 +885,7 @@ test("a stored video that will not play is dropped and downloaded again", async 
     videoLoadResult: (_src, nth) => nth > 0,
   });
   const avatar = await second.sdk.init({ characterId: "000" });
+  await settle();
   assert.equal(avatar.assetsFromCache, true);
   assert.equal(second.runtimeCalls.videoSources.length, 2);
   assert.ok(second.runtimeCalls.videoSources.every((src) => src.startsWith("blob:")));
@@ -904,4 +915,32 @@ test("clearAssetCache removes every stored file", async () => {
   assert.equal(await sdk.clearAssetCache(), true);
   assert.equal(store.size, 0);
   assert.equal(await (await loadSdk()).sdk.clearAssetCache(), false, "no Cache Storage resolves false");
+});
+
+test("a page that forbids blob: video keeps its stored copy and stops downloading the video twice", async () => {
+  const { storage, store } = fakeCaches();
+  const localStorage = memoryStorage();
+  const blobBlocked = (src) => !src.startsWith("blob:");
+  const videoDownloads = (requests) => requests.filter(
+    ({ url, options }) => String(url).endsWith("/01.webm") && options?.method !== "HEAD",
+  ).length;
+  const visits = [];
+  for (let visit = 0; visit < 4; visit += 1) {
+    const page = await loadSdk({ cacheStorage: storage, localStorage, videoLoadResult: blobBlocked });
+    const avatar = await page.sdk.init({ characterId: "000" });
+    await settle();
+    visits.push({
+      fromCache: avatar.assetsFromCache,
+      sources: page.runtimeCalls.videoSources.map((src) => (src.startsWith("blob:") ? "blob" : "url")),
+      stored: storedKeys(store, "/characters/").length,
+      downloads: videoDownloads(page.requests),
+    });
+  }
+  // 存檔一直留著；第二次開頁發現新下載的也播不了之後就記住，之後不再多下載一次。
+  assert.deepEqual(visits.map((v) => v.stored), [2, 2, 2, 2]);
+  assert.deepEqual(visits.map((v) => v.fromCache), [false, true, true, true]);
+  assert.deepEqual(visits[1].sources, ["blob", "blob", "url"]);
+  assert.deepEqual(visits[2].sources, ["blob", "url"]);
+  assert.deepEqual(visits[3].sources, ["blob", "url"]);
+  assert.ok(visits[2].downloads < visits[1].downloads, JSON.stringify(visits));
 });

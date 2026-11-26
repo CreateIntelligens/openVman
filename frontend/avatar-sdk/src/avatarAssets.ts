@@ -20,10 +20,13 @@ export interface AvatarAssets {
   video: Blob;
   videoUrl: string;
   /**
-   * Forgets the stored character files and downloads the video again; set only
-   * when the video came from the browser's copy (a fresh download needs no retry).
+   * Set only when the video came from the browser's copy (a fresh download needs
+   * no retry): downloads the video again, and forgets the stored character files.
    */
-  reloadVideo?: () => Promise<Blob>;
+  storedVideo?: {
+    download: () => Promise<Blob>;
+    forget: () => Promise<void>;
+  };
 }
 
 /**
@@ -107,9 +110,9 @@ export async function loadAvatarAssets(
     videoUrl: character.video,
     ...(video.fromCache
       ? {
-        reloadVideo: async () => {
-          await forgetAssetGroup(characterGroup);
-          return downloadAsset(character.video);
+        storedVideo: {
+          download: () => downloadAsset(character.video),
+          forget: () => forgetAssetGroup(characterGroup),
         },
       }
       : {}),
