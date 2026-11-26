@@ -125,7 +125,7 @@ docker compose up -d --no-deps backend gateway-worker
 
 這會重建環境設定有變的兩個容器，將聊天與直連呼叫都改回 admin；只 restart 不會更新 env。`api-chat` 可以保留運行但不接上述流量。不要刪掉變數來回退：Compose 在未定義時會重新使用 chat 預設。直接啟動 Backend 的部署則可清空或移除 `BRAIN_CHAT_URL`。
 
-**SQLite WAL 與備份**：對話與用量資料庫使用 WAL、`synchronous=NORMAL`、5 秒 busy timeout。每日 JSON 對話備份的 exporter 以單一 SQLite SELECT 讀取一致性快照，會自動看見已提交的 WAL，不需額外複製 WAL 檔。人工備份使用中的 `.db` 請在容器內使用 `sqlite3.Connection.backup` 產生獨立快照，再備份快照檔；不要在線上逐檔複製 `.db`、`-wal`、`-shm`，三次複製不具原子性。以下目的檔使用專用目錄，請換成實際資料庫路徑與備份名稱：
+**SQLite WAL 與備份**：對話與用量資料庫使用 WAL、`synchronous=NORMAL`、5 秒 busy timeout。每日 JSON 對話備份的 exporter 以單一 SQLite SELECT 讀取一致性快照，會自動看見已提交的 WAL，不需額外複製 WAL 檔。人工備份使用中的 `.db` 請在容器內使用 `sqlite3.Connection.backup` 產生獨立快照，再備份快照檔；不要在線上逐檔複製 `.db`、`-wal`、`-shm`，三次複製不具原子性。Backend 的 Auth DB 每個 process 常駐一條連線，`-wal` 檔會一直存在、裡面可能有還沒寫回主檔的資料，只複製主檔一定會漏；同樣要用 backup API。以下目的檔使用專用目錄，請換成實際資料庫路徑與備份名稱：
 
 ```bash
 docker compose exec -T api python - <<'PYTHON'

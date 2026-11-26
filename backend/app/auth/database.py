@@ -47,13 +47,27 @@ class AuthDatabase:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
+        self._keeper: sqlite3.Connection | None = None
 
     def connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        return self._open()
+
+    def _keep_wal_open(self) -> None:
+        # 最後一條連線關閉時，SQLite 會做 checkpoint、拿整個資料庫檔的獨佔鎖並 fsync；虛擬硬碟
+        # 偶爾要一秒多，期間每個 worker 在 event loop 上讀 auth 都得等（11/24、11/26 全部 worker
+        # 同時卡 1～2 秒）。每個 process 留一條不做事的連線，WAL 就不會被反覆拆掉；一般的
+        # checkpoint 仍由寫入時自動進行，不擋讀取。只在 transaction() 開：initialize() 要先用
+        # connect() 切成 WAL，有別的連線開著時 SQLite 不肯切。
+        if self._keeper is None:
+            self._keeper = self._open(check_same_thread=False)
+
+    def _open(self, *, check_same_thread: bool = True) -> sqlite3.Connection:
         connection = sqlite3.connect(
             self.path,
             timeout=_BUSY_TIMEOUT_MS / 1000,
             isolation_level=None,
+            check_same_thread=check_same_thread,
         )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
@@ -65,6 +79,8 @@ class AuthDatabase:
 
     @contextmanager
     def transaction(self, *, write: bool = False) -> Iterator[sqlite3.Connection]:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._keep_wal_open()
         connection = self.connect()
         try:
             connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
