@@ -1,138 +1,12 @@
 # Changelog
 
-## [Unreleased]
-
-### Added
-
-- **[2026-11-26]** **指定語言第二階段：官方前台、後台、WebSocket 與 Live**：
-  - 官方前台（`frontend/app`）：語言來源優先順序為網址參數 `?lang=zh|en|es|ja|ko`（其他值忽略）＞ 設定視窗新增的「回答語言」＞ 不鎖定；偏好鍵 `lockedLanguage`（Backend `PREFERENCE_KEYS` 白名單同步加入，空字串代表不指定）。有語言時，`/api/v1/chat`、`/api/v1/chat/stream` 每次請求帶 `language`，WebSocket `client_init` 的 `capabilities.language` 帶同一個值。人物就緒（訪客模式要先點過開始）後，以及語言、人設、專案改變時，呼叫 `GET /api/v1/personas/greeting` 播開場白：走字幕、TTS、嘴型，有 `voice` 就用它合成，不進對話紀錄、不呼叫模型；404 或失敗靜默略過；同一次載入同一組（語言、人設、專案）只播一次，展示機台換下一位來賓時重置，讓下一位再聽一次。開場白還沒播完時送出問題、按停止或斷線，會跟一般回答一樣先停掉它，沒播完的字幕不會接到下一則泡泡。
-  - WebSocket 與 Live：`capabilities.language`（只收 `zh|en|es|ja|ko`，其他值忽略）經 `relay_init.language` 帶到 Brain 的 Live session；語言改變會重建 relay。Live 有鎖定時，每輪決策帶 `locked_language`，文字輪的 server envelope 一律帶 `policy.response_language`／`retrieval_language`（決策停用或失敗時也帶），語音輪由系統指令寫明回答語言；`search_knowledge` 預取與模型自己呼叫都用鎖定語言並走嚴格語言檢索（`strict_language`）。沒帶語言時行為完全不變。
-  - 後台人設頁新增「名稱與各語言開場白」摺疊區（zh/en/es/ja/ko 各一個最多 500 字的開場白與選填聲音代號，讀寫 `GET/PUT /api/v1/personas/language-settings`，失敗顯示後端訊息，含未存檔提示）；對話測試頁在「測試語言」旁新增「鎖定語言」核取方塊，勾選後除 `preferred_language` 外另送 `language`（台語不能鎖）。
-  - 複製人設（`POST /brain/personas/clone`）會帶走來源的 `greetings`、`voices`；`avatar_char_id` 維持不帶。
-  - SDK：每次 `greet()` 成功就用回應的 `voice` 覆寫快取，`voice` 為 `null` 時清掉，不再沿用上一個語言的聲音；`tts.voice` 有給仍以它為準。
-- **[2026-11-26]** **專案層級的回覆附件（聯絡圖片與型錄網址）**：專案設定檔 `.kb_settings.json` 新增 `contact_image_id`、`catalog_url`（寫入時保留其他欄位，`/knowledge/settings` 的回應不受影響）。新增 `GET/PUT /brain/knowledge/reply-links`（Backend 代理 `/api/v1/knowledge/reply-links`，需登入，讀取需讀取權、寫入需「改知識庫與人設」，廠商與嵌入金鑰不開放）：PUT body `{project_id, contact_image_id, catalog_url}` 整組取代，`null` 清除；`contact_image_id` 只收 QA 圖片上傳代號且檔案要存在，`catalog_url` 只收 https、1 到 500 字元，不合回 400。每則回覆（`/chat` 與串流 `done`）有設就帶 `contact_image_id`／`contact_image_kind` 與 `catalog_url`，不論 `no_answer` 是 true 或 false，跟引用來源的 `image_id`、`url` 分開；前台自己決定顯示什麼。「清除未使用的 QA 圖片」改保留專案的聯絡圖片。官方前台在回覆氣泡顯示 QR，有 `catalog_url` 時另顯示「查看型錄」連結（新分頁、`noopener noreferrer`、只收 http(s)）；後台知識庫頁首新增「回覆附件」，可挑已上傳的 QA 圖片或上傳新圖當聯絡圖片、填型錄網址，兩者都可清除。讀取時檔案損壞、手改出壞網址都當作沒設，不會讓回覆失敗；清除未使用的 QA 圖片時，舊版設在人設 `AVATAR.json` 的 `contact_image_id` 仍視為使用中，改設成專案層級前不會被清掉。
-- **[2026-11-26]** **人設可以自訂顯示名稱**：人設的 `AVATAR.json`（預設人設是專案根目錄那份）有 `label`（去頭尾空白後 1 到 40 字）時，清單（含廠商清單）顯示它；沒有時預設人設顯示「預設角色」、其他人設照舊顯示 `SOUL.md` 的第一個標題。新增 `PUT /brain/personas/label`（Backend 代理 `/api/v1/personas/label`，專案權限比照 `personas/language-settings` 的 PUT，廠商與嵌入金鑰不開放），body `{persona_id, project_id, label}`：名稱只寫進 `AVATAR.json` 的 `label`，不改 `SOUL.md`（那是給模型的提示詞，改顯示名稱不該動到它），其他欄位原樣保留；不合法回 400、人設不存在回 404。後台人設頁可改名稱，官方前台的人設切換器直接顯示新名稱。
-- **[2026-11-25]** **網站嵌入金鑰可以取開場白**：`GET /api/v1/personas/greeting` 加進嵌入金鑰白名單，SDK 的 `greet()` 在嵌入金鑰模式也能播開場白。專案一律是金鑰綁定的那個（帶別的 `project_id` 回 403）；Brain 的開場白路由改以 Backend 給的 `X-OpenVMan-Project-ID` 為準，跟網址的 `project_id` 不同回 400，網址沒帶專案也不會退回 default。設定類路徑（`language-settings`、`contact-image`）仍不開放。
-- **[2026-11-25]** **人設的聯絡圖片**：新增 `PUT /brain/personas/contact-image`（Backend 代理 `/api/v1/personas/contact-image`，需登入，專案權限比照 `personas/avatar`），設定某個人設每則回覆都附的圖片（例如展場 Kiosk 每題都要放的 QR code）。回覆（`/chat` 與串流 `done`）新增 `contact_image_id`／`contact_image_kind`，跟引用的產品圖 `image_id` 分開，兩張都能顯示。只收 QA 圖片上傳後的代號且檔案要存在；「清除未使用的 QA 圖片」會保留人設引用的聯絡圖片。官方前台在回覆氣泡裡把聯絡圖片顯示在產品圖下方，只有聯絡圖片（例如查不到答案）時也會顯示。
-- **[2026-11-25]** **指定語言鎖定、依語言的開場白與聲音（第一階段：Brain、後端代理、SDK）**：`POST /brain/chat` 與 `/brain/chat/stream` 新增選填 `language`（`zh|en|es|ja|ko`，不收 `nan`，其他值回 422）。有帶就鎖死：回覆語言與檢索語言都固定為它，不看使用者這句話的語言、不看決策的 `requested_response_language`，決策關閉或失敗時也一樣；prompt 明寫「一律用某語言回答，即使使用者用其他語言」，決策 evidence 另記 `locked_language`。兩個欄位都帶時以 `language` 為準；只帶 `preferred_language` 的行為完全不變。鎖定時 `search_knowledge` 走嚴格語言檢索：`search_records` 新增 `strict_language`，只留語言等於 `language` 的紀錄（混語言 CSV 每題的 `language` 優先，否則看文件語言），不論專案有幾條分流都過濾，過濾在 top_k 截斷之前，查不到就回空、不退回別的語言；圖譜帶入的相關段落也只留該語言。人設中繼資料（`AVATAR.json`）新增 `greetings`（每語言一段開場白，1 到 500 字）與 `voices`（每語言一個聲音代號，1 到 128 字元，限 `[A-Za-z0-9._:-]`），新增 `GET/PUT /brain/personas/language-settings`（整份取代，驗證失敗 400、人設不存在 404）與 `GET /brain/personas/greeting?language=`（回 `{language, text, voice}`，該語言沒有開場白回 404），Backend 代理為 `/api/v1/personas/language-settings`、`/api/v1/personas/greeting`，需登入，讀取比照 `personas/soul`、寫入比照 `personas/avatar` 的專案權限（廠商帳號不開放）。SDK `init` 新增 `language`，每次 `ask()` 都帶；新增 `greet()` 取開場白後以字幕、語音、嘴形播出，不進對話、不呼叫模型，並把回應的 `voice` 記為這個 instance 之後的 TTS 聲音（`tts.voice` 有給則以它為準）。Gemini Live 與 WebSocket、後台頁面、官方前台這次不做。計畫見 `docs/plans/language-lock-greeting.md`。
-- **[2026-11-24]** **Backend 停頓紀錄**：11/24 的 100 題壓測，Backend 四個 worker 同時停了約 2 秒（沒有 log、CPU 幾乎是 0，連打同網段節點的健康探測都失敗），事後從 log 看不出卡在哪。每個 worker 新增事件迴圈延遲 watchdog（`backend/app/loop_lag.py`），每 0.25 秒醒來一次，晚醒超過 `EVENT_LOOP_LAG_THRESHOLD_SECONDS`（預設 0.25 秒，0 關閉）就記一行 `event_loop_lag`，附這段時間事件迴圈用掉的 CPU，分辨是被計算還是被等待卡住。音訊串流的 `upstream_attempt` 另帶 `chunks`、`max_wait_ms`（等上游最久）與 `max_send_ms`（等下游最久），分辨斷音是上游一陣一陣送，還是 Backend 或前台來不及收。
-- **[2026-11-20]** **多人端到端模擬工具**：`scripts/experiments/brain-worker-split/users_e2e.py` 照 SDK `ask()` 的協定模擬 N 個人各問 M 題（逐句串流合成、唸完停 2～3 秒再問），每題記錄與 `burst_nodes.py` 同格式，`node_report.py` 多一欄「整段回答唸完」。
-- **[2026-11-20]** **SDK 的 `reply` 事件帶出 `sessionId` 與 `traceId`**：嵌入頁面可以把每一輪對到後端 log 與對話紀錄，壓測與除錯時不必再用時間和題目去猜。
-- **[2026-11-20]** **壓測逐段計時工具**：`scripts/experiments/brain-worker-split/burst_nodes.py` 與 `node_report.py`，把「1 秒 N 題」拆成 Backend 轉送、Brain 前置、決策、知識庫、LLM 首字、文字第一句、TTS 首段、聽到第一句與完成；`resource_monitor.py` 加上各容器網路收發。
-- **[2026-11-20]** **正式帳號權限預設與網路搜尋開關**。建立帳號可選創智研發、BD、廠商編輯或自訂，帳號與選取專案的授權一併寫入。帳號列表依現有權限顯示適用預設。新增帳號與網站嵌入金鑰的「可用網路搜尋」，帳號 API 金鑰沿用所屬帳號權限。文字對話與 Gemini Live 同時依呼叫者權限和全站開關控制網路搜尋及讀取公開網頁。新帳號與新嵌入金鑰預設關閉，創智研發與 BD 預設開啟。升級時既有內部帳號與嵌入金鑰保留開啟，既有廠商帳號關閉。
-- **[2026-11-20]** **快速問答各分類顯示索引同步狀態（已同步／更新中／同步失敗）**：Brain 的背景重建（`routes/knowledge.py` 的 `_reindex_state`）新增每專案的 `running`、`last_error`（下次成功後清除）與 `finished_at` 及 `reindex_status(project_id)`，並新增 `GET /brain/knowledge/qa/sync-status?project_id=`（邏輯在 `knowledge/qa_sync_status.py`），逐分類檢查直接掛載題目中可索引且未停用的去重來源文件指紋（同檔單次請求共用結果，略過選單專用題，不合併子分類），回傳 `synced`、`updating` 或 `failed`；遇到有文件未同步但記憶體無進行中或失敗紀錄（例如重啟或外部改檔）時自動補排一次 `schedule_reindex` 自我修復並回 `updating`。廠商請求依 `visible_workspace_path` 過濾隱藏來源（只含隱藏來源的分類回 `synced`，不洩漏失敗也不觸發重建）；Backend 廠商白名單放行 `GET /knowledge/qa/sync-status`。後台知識庫頁進頁與存檔、上傳、刪除、搬移後即時查詢，任一分類更新中時每 3 秒輪詢並在完成、切換專案或離開頁面時停止；選中分類名稱旁顯示色點與「已同步」「更新中」「同步失敗」（失敗時直接附上一行說明），左側分類樹只對「更新中」「同步失敗」的分類加色點與無障礙標籤。
-- **[2026-11-20]** **快速問答支援匯出 Excel（與匯入同格式）**：答案裡 Excel 存不下的控制字元會先清掉；重傳匯出檔的限制寫在 `docs/guides/qa-table-format.md`。後台知識庫頁首緊鄰上傳鈕新增「匯出」按鈕（內部帳號與廠商皆可使用），點擊後呼叫 Brain `GET /brain/knowledge/qa/export?project_id=`（經 Backend `/api/v1/knowledge/qa/export` 代理並開放廠商帳號讀取）下載工作表名為「快速回覆」、以台北時間命名的 `快速回覆_YYYYMMDD.xlsx`。欄位與順序固定為「語言、第一層、第二層、問題、答案、圖片、連結、顯示（是／否）、順序」，一列一題一個位置，答案、圖片、連結與顯示皆以文件為準，超過兩層的舊分類以 ` / ` 併入第二層，未分類題目排在最後且分類與順序留空；廠商帳號僅輸出可見來源的題目與選單專用題。同步更新 `brain/README.md`、`docs/specs/03_BRAIN_SPEC.md` 與 `docs/guides/qa-table-format.md`。
-- **[2026-11-20]** **快速問答新增單題直接存檔與跨分類批次移動 API**：Brain 新增 `PUT /brain/knowledge/qa/questions`（`qa_merged.save_question`）與 `POST /brain/knowledge/qa/questions/move`（`qa_entry_moves.move_qa_entries`），Backend 同步對具知識庫編輯權的內部帳號與廠商帳號開放（`/api/v1/knowledge/qa/questions`、`/api/v1/knowledge/qa/questions/move`）。`PUT /knowledge/qa/questions` 不經分類直接修改來源文件（CSV 或 Markdown）中的單一題目，保留原列位置、`index` 與其他列。只接受標記為 QA 的文件，並保留未分類題目的狀態。支援 `base_hash`（與 `GET /knowledge/document` 同算法的 `content_hash`，`GET /knowledge/qa/questions` 的文件題目列同步帶出 `content_hash`）版本檢查，檔案被改過回 409、找不到原題回 404、題目或答案空白回 400、改名撞到同檔既有題目（不論答案是否相同）或讓其他掛載分類重名皆回 400；寫檔與節點同步（`rename_questions_in_nodes`、`sync_entries_for_source`）全有或全無，且不重排任何分類的題目順序，成功後排程重建索引並回傳讀回的題目與新 `content_hash`。`POST /knowledge/qa/questions/move` 只讀寫一次 `.qa_nodes.json` 即可完成單題或批次跨分類移動與未分類題目掛載，任何一題不符（目標分類不存在、原分類沒有該題、目標分類已有其他來源的同名題、未分類題目來源不符合 QA 掛載條件，或同批題目文字重複）即整批不動並列出問題題目；目標已有同一題與同一來源時保留原位置，只從指定的其他分類移除，且搬移時即使某題不再掛於任何分類也不記進 `detached`。
-- **[2026-11-20]** **知識庫問答表匯入前檢查**：新上傳與等待匯入區的問答表先檢查，再由使用者確認匯入。純一般文件直接匯入，檢查失敗時顯示原因並將檔案留在等待匯入區。摘要列出新題目、答案相同、答案不同、檔案內重複與格式錯誤的數量。預覽與匯入共用格式檢查，格式錯誤會擋下整份檔案。答案並排比較會標出不同的字元，手機改為上下排，任一答案超過 2,000 字元時顯示原文。衝突題可選「覆蓋」「保留原本」「兩題都留（新的會先隱藏）」「稍後調整」，全部選完才能匯入。可按「重複的全部覆蓋」或「重複的全部保留原本」後再逐題調整。覆蓋會更新答案，新表的圖片或連結留白時保留原值。待處理結果可開啟原題編輯面板，旁邊附上新檔案的答案，結果清單也顯示封存的原始檔案路徑（廠商畫面不顯示）。畫面可補傳缺少的圖片、查看題目的分類預覽（廠商畫面沿用分類樹的遮蔽名稱，不顯示檔名），並透過 `POST /knowledge/raw/commit` 的選填 `decisions` 送出逐題決定及補傳的圖片。
-
-- **[2026-11-19]** **角色管理新增表格模式**：角色管理頁預設改成填空表格，只露出人設：「個性與說話方式」的「角色設定」「回應風格」、「工作規則」的「角色與任務」、以及回覆字數，每格附一句說明與範例。欄位對應 `SOUL.md`、`AGENTS.md` 裡固定的 `## 標題`，存檔寫回同一份文件，和原始文件模式改的是同一份：沒有這些標題時整份文件放進「角色設定」或「角色與任務」，開頭的 `#` 大標題（後台用它當角色名稱）與其他段落放進可展開的「其他內容」原樣保留，存檔時保留原文件的段落順序（已知欄位寫回原位，原本沒有的欄位照固定順序插在其他欄位旁，同名的第二段永遠是其他內容），沒改過的文件原樣寫回、空欄位不寫標題；程式碼區塊照 CommonMark 圍欄規則判斷，欄位裡有未收尾的區塊或會被當成另一欄的標題時先提示、不存。回覆字數就是知識庫的回答長度（秒數 × 每秒字數），整個專案共用；存檔只改長度、不動語言分流（`PUT /api/v1/knowledge/settings` 的 `language_routes` 改為可省略），換成秒數時無條件進位且至少 1 秒。存檔一開始就鎖定專案與角色，存檔中切換專案或角色會等存完；等待期間新打的字保留並仍標為未儲存；各份文件分開讀寫，一份失敗不影響其他份並逐份回報。保護規則存檔帶版本，別處改過就拒絕。內部帳號也依專案的 `can_edit_knowledge`（`GET /api/v1/projects` 現在對所有帳號回傳）決定能不能改。頁面下方灰底區顯示保護規則，有「改其他設定」的內部帳號可以直接改。廠商只有表格模式；內部帳號可切到「原始文件」編輯四份文件（含工具使用說明與長期記憶）。未存檔離開沿用原本的提醒。角色清單上的預設角色一律顯示「預設角色」，內部帳號與廠商相同（`GET /api/v1/personas` 的 `label`）；其他角色顯示 `SOUL.md` 的第一個 `#` 標題，沒有標題時顯示代號。
-
-- **[2026-11-19]** **每個專案新增保護規則 `GUARDRAILS.md`**：廠商改得到人設，平台的底線改放在工作區根目錄的保護規則，三段固定標題「範圍限制」「回覆格式」「知識庫規則」。只有新專案由範本產生（不越權、無關問題婉拒、敏感議題關懷；純文字、不用 emoji、不附網址；只依資料回答、查不到就說無法確認）；既有專案不會自動補這份檔案，回答方式維持不變，`SOUL.md`、`AGENTS.md` 也不會被搬動或改寫，要套用時由內部帳號在角色管理頁按「帶入建議內容」後依案子修改。文字對話與 Live 都把保護規則接在人設之後，用 `<guardrails>` 標籤包起來並標明衝突時優先；人設、記憶、對話摘要裡同名的標籤與標題一律移除，不能偽造。保護規則整份帶入、不被截斷（整體字數超過預算時壓縮其他內容），寫入時上限 5000 字，超過以白話說明拒絕。HTTP 仍在快取的固定前綴內；Live 每次組 setup 都重新讀，連線中改了規則下一次重連就生效。檔案沒有、空白或是符號連結／硬連結時不帶入（後台顯示為未設定、連結時說明原因且不能從頁面改）。新專案由建立流程明確寫入保護規則（先寫保護規則再寫人設，中斷重試會補上）；全新安裝以工作區目錄原本不存在判斷。既有專案缺 `SOUL.md`／`AGENTS.md` 時補的仍是升版前的範本。廠商只能用 `GET /api/v1/personas/guardrails` 讀，內部帳號以工作區文件 API 修改，需要「改其他設定」。新專案的 `SOUL.md` 範本改成「角色設定」「回應風格」兩段，`AGENTS.md` 加上「角色與任務」，原本寫在人設裡的範圍、格式與資料規則移到保護規則（`NEW_PROJECT_TEMPLATES`）。角色管理頁的人設 API 只對廠商擋符號連結與硬連結，內部帳號照一般工作區規則解析，但解析後仍須是角色的 `SOUL.md`／`AGENTS.md`；沒有 `SOUL.md` 的孤立角色資料夾讀寫都回 404。
-
-- **[2026-11-19]** **記憶與知識圖譜擴展可逐專案開關**。有「改其他設定」權限的內部帳號可在「專案管理 → 回答功能」調整，建立專案時也可以直接勾選。新專案預設關閉；設定檔裡沒有這兩個欄位的既有專案視為開啟，升版不需遷移。記憶關閉後停止對話自動回想、記憶工具、每日記憶日誌與其摘要索引，對話紀錄、匯出及備份照常可用。關閉圖譜擴展後，回答只引用檢索命中的文件，仍可從後台查看或重建圖譜。
-
-- **[2026-11-18]** **對外客服新增專案權限與所屬廠商**：正式帳號可逐專案授予「改知識庫與人設」及「改其他設定」，原有編輯授權升級後保留兩種。帳號與專案可設定「所屬廠商」，廠商帳號只讀得到明確授權的同廠商專案。最高管理員可替管理員開啟「管理廠商帳號」，讓專人建立、重設密碼、停用及替正式廠商一般帳號代發或撤銷 API 金鑰，包含其他人建立的帳號。
-
-- **[2026-11-16]** **決策鏈新增 Gemini Decisions，預設排第一站**：每輪決策、記憶過濾、答不出來判斷、回答選圖、個資掃描都先問 Gemini Decisions（模型 `gemini-decision-1`），失敗或逾時再照後台順序往下（Clef 主／備援、Jev、OpenAI）。金鑰用後台「模型供應商」的 Gemini 金鑰（沒存過就用 `.env` 的 `GEMINI_API_KEY`），以 `x-goog-api-key` 送出；題目與答案格式與 System One 相同，請求改用 `input` 陣列。實測單次 0.35～0.52 秒，每站時限至少 1 秒。之前在後台存過決策順序的部署，讀設定時自動把新的站插在目錄位置（最前面）並照預設開啟，其他站順序與開關不變；要改回去在後台調順序或關掉它。
-
-- **[2026-11-13]** **「AI 整理排版」逐帳號開放**：AI 整理會用到 AI 額度，現在最高管理員與管理員一律可以用，其他帳號預設不能用，由管理員在帳號設定勾「可以用 AI 整理排版」開放（正式帳號、建立帳號、角色調整、臨時帳號批次都可以設）。沒有權限的帳號在「新增資料」只看到「直接放進知識庫」，文件頁也沒有「AI 整理排版」；Backend 同樣會擋：要求整理回 403 並寫明原因，匯入沒指定時照直接放進知識庫處理。帳號資料表新增 `ai_cleanup_access` 欄位（schema 27），既有帳號一律從關閉開始。
-
-- **[2026-11-13]** **知識庫「所有題目」清單**：快速問答以前只能一個分類一個分類看，現在新增「所有題目」分頁（`/admin/knowledge/questions`），把全部題目攤成一張清單，可依語言、分類（含子分類）、狀態（隱藏、分類被隱藏、不在選單上、沒有答案、有圖片或連結、文件已停用）、來源篩選並搜尋題目與答案，每個選項旁顯示題數。點一題回到文件分頁打開它的分類並捲到那一題。Brain 新增只讀的 `GET /knowledge/qa/questions`。
+## [2026-11-27]
 
 ### Changed
 
+- **[2026-11-27]** **CHANGELOG 改成一天一段**：原本 `[Unreleased]` 與 `[2026-10-08]` 兩大段裡同一個分類重複出現好幾輪，改成每天一個 `## [YYYY-MM-DD]` 段、新的在上，段內 `Added`→`Changed`→`Security`→`Fixed`→`Removed` 各出現一次；舊段落的 `Documentation`、`Changed / Fixed`、`Breaking Changes` 併入 `Changed`，`Reliability` 併入 `Fixed`，`Experiments` 併入 `Added`。806 條條目內文不變，版本段落（`[0.10.0]` 以前）不動，唯一沒標日期的 Node.js 24.22.1 條目依 git 紀錄補上 `[2026-10-22]`。新增 `scripts/check_changelog.py`（`--fix` 會自動重排，並確認條目沒有增減），Contracts CI 會跑這個檢查與 `tests/test_changelog.py`；`AGENTS.md` 的寫法規則同步更新。
+
 - **[2026-11-27]** **主機 nginx 存取紀錄記下每個請求花多久**：`infra/nginx/native/` 的 vhost 新增 `log_format openvman_timed`（http 層），兩個 server 區塊改寫 `access_log /var/log/nginx/access.log openvman_timed`，每行多 `rt=$request_time urt=$upstream_response_time`，用來分辨 01.webm、wasm 這類大檔是伺服器送得慢還是用戶端收得慢（11/26 月會有 8 次 01.webm 沒傳完就斷）。要經 `infra/nginx/native/deploy.sh` 部署到主機才生效。
-
-- **[2026-11-24]** **回答改成整段合成一次，不再逐句打 TTS**：SDK 的 `ask()` 與官方前台的文字模式，`sentence` 事件只用來顯示字幕，`done` 到了才以 `done.reply` 打一次 `/api/v1/tts/stream`。逐句時下一段要等上一段下載完才送，第一句短、題數多時第二段的首包趕不上第一段播完，中間就斷音（11/24 重測 100 題時斷音的 2 題都是這種）；每段各自合成，語氣也接不起來。Gemini、VoxCPM、Edge、IndexTTS 的首包跟文字長短無關，整段打只多等其餘句子生完的時間（快速問答約 0.3 秒）；CosyVoice（台語）要整段合成完才出聲，字數越多第一聲越晚。順帶修正：模型中途改寫回答時，已送出、後來收回的句子不再被念出來。SDK 移除只用來接續多段的 `queueAudio`；官方前台的 `replySpeechQueue.ts` 改為 `replySpeech.ts`（`collect`／`finish`／`speak`），等整段回答時維持 `ttsPending`，麥克風不會在開口前打開。壓測腳本 `burst_nodes.py`、`users_e2e.py` 跟著改成 `done` 後才打 TTS，「聽到第一句」因此多含等整段回答的時間，不能直接跟之前的基準比。套用設定（斷線重連）時若回答剛開始出來，`useAvatarChat.disconnect()` 現在會先停掉這一輪，不再讓等念的狀態卡住、麥克風一直關著。被打斷的上一輪 TTS 晚結束時，也不會再把下一輪的 `ttsPending` 清成 false（PR Agent 回報；念完歸零改由 `replySpeech` 依回合管理）。arwin vman.html 用自己的朗讀流程，要另外改。
-- **[2026-11-20]** **快速問答的語言分類與層數判斷拆成獨立模組**：`brain/api/knowledge/qa_category_depth.py`，`qa_nodes.py` 回到千行以內；行為不變，原本從 `qa_nodes` 匯入的名稱照常可用。
-- **[2026-11-20]** **SDK 對話模式改成串流合成語音**：`ask()` 每句改打 `POST /api/v1/tts/stream`（`format: "pcm16k"`），收到第一段 PCM 就開始播放與對嘴，不再等整句合成完；前一段還在播時下一段已在合成。部署沒有這條路由（404／405）時，該 instance 之後退回 `/v1/audio/speech` 整句合成。
-- **[2026-11-20]** **後台未分類題目可直接編輯存檔，跨分類移動與批次移動改為一次完成**：知識庫單題編輯面板（`QuestionEditor.tsx`）對未分類題目開放編輯問題、答案、網址、前台顯示與圖片上傳，不再唯讀（保留「開啟來源文件」按鈕）；內容有變才呼叫 `saveQaQuestion`（帶 `base_hash`），有選分類就呼叫 `moveQaQuestions`（`from_node_ids: []`）掛入分類，第二步失敗時提示「題目內容已儲存，但放進分類未完成」、重試只補做掛載，遇 409 顯示衝突訊息並重新載入清單。沒有答案的未分類題目也能直接選分類掛載。編輯器會顯示來源文件驗證訊息。`QuestionBank.tsx` 的批次「移動到分類」單次呼叫 `moveQaQuestions`（全有或全無），移除部分移動（`"partial"`）狀態與文案；編輯已分類題目且同時變更分類時，維持先以原分類版本檢查存內容（`PUT /nodes/{id}/merged`）再呼叫一次 `moveQaQuestions` 搬移分類。
-- **[2026-11-20]** **快速問答匯入改用「第一層」「第二層」欄並保留表內題目順序**：問答表匯入新增 `level1`（別名「第一層」「第一层」）與 `level2`（別名「第二層」「第二层」）兩欄（CSV 與 Excel 皆支援，不再被列為未讀取欄位），自動掛在該題對應的語言分類底下（找不到語言分類則放最上層），舊的「分類」斜線欄仍相容；寫檔前檢查三種格式錯誤（同列同時填「分類」和「第一層／第二層」、只填第二層沒有第一層、`path` 去掉開頭語言分類名稱後超過兩層），違規時整份不匯入並一次列出所有問題題目。匯入掛題目（`place_questions_by_path`）改照文件排序（依「順序」／`index` 欄）掛入各分類，分到多個分類時也能保持表內順序（重傳時已掛題目位置不變，新題依序接在後面）。同步更新後台廠商／內部上傳提示、下載範例（CSV／Excel）、`docs/guides/qa-table-format.md`、`docs/specs/03_BRAIN_SPEC.md` 與 `brain/README.md`。
-
-- **[2026-11-19]** **知識庫改用分類樹、快速回覆表格與單題編輯面板**。可搜尋問題或答案直達編輯，依語言看題數與分類，調整前台顯示和分類內順序，批次移動、顯示、隱藏或永久刪除題目。題目可掛到多個分類，也可只從目前分類取下並保留來源。永久刪除前會確認最新的分類與來源影響範圍。在全部分類畫面批次移動同時放在好幾個分類的題目時，會先列出會被移出的分類，讓人選「只加入新分類（保留原本的）」或「移出原本所有分類」；只放在一個分類的題目直接移動。改分類時內容已存、移動卻失敗，再按儲存只重試移動，不再誤報有人同時修改。題庫剛載入時勾選的題目不會被清掉。分類移動維持兩層上限（語言分類不計）。編輯面板可直接上傳圖片，表格與面板的圖片類型照伺服器的判定結果顯示（Brain 的 `GET /knowledge/qa/questions` 與 `GET /knowledge/qa/nodes/{id}/merged` 新增唯讀 `image_kind`，只查已存的判斷結果，存檔不會清掉），也可把已儲存的問題帶到對話頁送出測試。原「所有題目」連結仍可開啟題庫總表，文件匯入及編輯沿用原有流程。廠商帳號隱藏圖譜、維護和檔名。窄畫面用「目錄」抽屜開啟分類和文件，題目分列堆疊，編輯面板接在題庫下方。
-
-- **[2026-11-19]** **admin 與 avatar 容器的 nginx 升到 1.31.9，修補 2026-11 的 nginx 漏洞**：1.9.5～1.31.8 受 HTTP/2 flow control 記憶體破壞（CVE-2026-123007，不需登入）、HTTP/2 UAF（CVE-2026-123633）、resolver UAF（CVE-2026-123634）、TLS 1.3 讀 body 無限迴圈（CVE-2026-118899）影響，修正版為 1.31.9+／1.30.7+。兩個映像的 runner 由 `nginx:1.31.8-alpine` 換成 `nginx:1.31.9-alpine`；admin 的 dev stage 把 Alpine 套件釘在 `nginx>=1.30.7-r0`，也讓舊的建置快取失效。HTTP/2 照舊開啟。主機 nginx 已是 1.31.9。
-
-- **[2026-11-19]** **壓測工具可調上游延遲並記錄資源**：`scripts/experiments/brain-worker-split/` 的假 LLM、假 TTS 延遲改由 `FAKE_LLM_FIRST_SECONDS`、`FAKE_LLM_GAP_SECONDS`、`FAKE_TTS_FIRST_CHUNK_SECONDS`、`FAKE_TTS_SECONDS_PER_CHAR` 設定（預設不變），設 0 即「上游秒回」，只量 Backend＋Brain；`load.py` 以 `LOAD_WARMUP` 控制正式計時前的暖身；新增 `resource_monitor.py` 每秒讀各容器 cgroup 的 CPU 與記憶體、`compose.real-project.yaml` 以真實專案資料壓測、`questions-industrial.json` 題庫。新增 `scripts/experiments/tts-relay/run.py` 比較直接打 TTS 節點與經 Backend 轉發的首音時間（`--direct-url` 必填）。
-
-- **[2026-11-19]** **廠商後台只開放四頁，角色只可改個性與工作規則**：廠商帳號在桌面和手機只看得到知識庫、角色管理、對話測試、對話紀錄（導覽名稱和內部帳號一致）。直接打開其他頁面顯示「沒有權限」，呼叫隱藏功能的 API 回 403。人設頁只讀取與儲存授權專案的 `SOUL.md`（個性與說話方式）與 `AGENTS.md`（工作規則，`GET`／`PUT /api/v1/personas/agents`），唯讀帳號只能瀏覽；`TOOLS.md`、`MEMORY.md`、`IDENTITY.md`、`.learnings/` 仍隱藏，Backend 與 Brain 都擋。知識庫文件操作限知識庫目錄，拒絕前後帶空白的路徑及檔案連結。通用工作區檔案與角色綁定僅供內部使用。文字、串流與即時對話只提供本專案的唯讀知識庫工具，工具診斷留在內部。即時對話須先驗證專案授權，知識庫上傳失敗以固定訊息回覆。廠商代發金鑰沿用相同的路由和專案限制。
-
-- **[2026-11-18]** **唯讀專案可看與匯出對話紀錄**：對話列表、單段歷史及匯出使用專案讀取權，刪除仍需「改其他設定」。一般帳號改由管理員代發 API 金鑰，既有金鑰照原本的期限與撤銷規則驗證。
-
-- **[2026-11-18]** **重啟後第一批題目不再整批慢半秒**：Brain 映像檔沒有 `.pyc`，第一題才建的 OpenAI client 會連帶 import `httpcore2`、openai 的 chat 資源，工具表也是第一題才載入，每個 worker 都在第一批題目上現場編譯這些模組，期間同一個 worker 的其他題目都在等。背景預熱現在先建好工具表，並對每個專案建好 Gemini client 與 LLM client（只建物件、不連線），第一題直接沿用。compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱拿不到模型設定與金鑰；這兩項現在在 readiness 放行後每 2 秒重試（最多約 2 分鐘），Backend 一回應就補完；只重試連不到 Backend 或它回 5xx 的項目，專案金鑰綁定壞掉之類的設定錯誤記 warning 後不再重試，補熱也不重建工具表。隔離環境（鶴記真實資料、LLM／TTS 用假服務、決策走真的 Jev）重啟後馬上 1 秒 100 題：聽到第一句中位數原本比第二批慢 0.6～0.9 秒，現在慢 0.2～0.3 秒；p95 仍比第二批慢 0.5～0.8 秒，原因還沒找到。
-
-- **[2026-11-18]** **Gemini 語音預設改為直連 Google，可在後台切換**：沒有綁專案金鑰的請求，以前一律經 `TTS_GEMINI_URL` 的轉接服務合成；現在預設用本系統的 Gemini 金鑰（後台 API 金鑰或 `GEMINI_API_KEY`）直接呼叫 Google，費用算在這把金鑰。ROOT 可在「模型供應商 → Gemini 語音」（`/admin/model-providers/voice`）改成經轉接服務，Backend 各 worker 約 3 秒內生效、不用重開；沒有 Gemini 金鑰時不能選直連，沒設 `TTS_GEMINI_URL` 時不能選轉接。沒在後台存過時照新的 `TTS_GEMINI_ROUTE`（`direct`／`relay`，預設 `direct`，其他值啟動時報錯）。專案綁了自己的金鑰時照舊一律用它直連。Gemini 聲音改為固定的 30 個 Google 預設聲音（不再向轉接服務查 `/api/voices`），任一條路線可用就登錄，切換路線不影響可選的聲音；有設 `TTS_GEMINI_URL` 就照舊背景探測。直連的整段合成也改用每站的時限，失敗訊息不再寫成「Project」。`PUT /api/v1/settings/model-providers` 新增選填欄位 `tts_gemini_route`，`GET` 回應新增 `tts_gemini`。
-
-- **[2026-11-18]** **部署文件補上主機參考規格**：`docs/operations/11_DEPLOYMENT.md` 依實測換算「1 秒內同時 100 題」需要的 CPU、記憶體、GPU 與硬碟，並說明每核可接的題數與量測主機的限制。
-
-- **[2026-11-18]** **Brain 每題 CPU 減少約一半**：1 秒內同時進來 100 題時，Brain 每題約用 0.3 核秒（原約 0.45～0.75）。同一把 Gemini 金鑰共用一個 client，不再每題重建 SSL context；向 Backend 讀模型設定改用共用連線；商品型錄同一秒內沿用上次確認的結果（後台改型錄最慢 1 秒生效），掃描時不再逐檔逐層檢查巢狀型錄；停用文件清單與知識庫設定在檔案沒變時不重新解析；workspace 目錄 5 秒內確認過就不再逐一 mkdir；檢索去重改用矩陣運算。隔離環境（鶴記真實資料、LLM／TTS 用假服務）量到聽到第一句中位數約快 0.8 秒。
-
-- **[2026-11-17]** **前後台操作與手機版修正**：前台快速問題切換知識庫時清除舊題目與答案快取，忽略切換前尚未完成的回應；手機與矮視窗的快速問題改依視窗配置高度，題目可捲動。中文等輸入法組字時按 Enter 不會提前送出，設定的下拉選單各有明確的無障礙名稱。後台技能草稿離開、關閉或切換技能前會提醒，技能檔案載入失敗時不能編輯或儲存（以免空白內容覆寫伺服器上的技能），儲存進行中關閉鈕停用、等存完再關；記憶分頁末頁不再重複，窄畫面按鈕可完整操作；網站嵌入金鑰表單改用原生對話框，支援鍵盤焦點與 Escape（下拉選單開著時 Escape 只關選單，不會連表單一起關掉），驗證及儲存錯誤直接顯示在表單內；儲存成功但清單刷新失敗時，表單照樣關閉，改提示「已建立／已更新 網站嵌入金鑰，但清單刷新失敗」。
-
-- **[2026-11-17]** **VoxCPM 滿載時先重試再換引擎**：即時串流打 VoxCPM 收到 429（`queue=reject` 沒空位）時，隔 `TTS_VOXCPM_BUSY_RETRY_SECONDS`（預設 0.5 秒）重試最多 `TTS_VOXCPM_BUSY_RETRIES` 次。預設 0（不重試）：實測單台 VoxCPM 每秒只消化約 2 句，重試 2 次只多保住 2～3 句、延遲多約 1 秒；節點變多後再調高。重試不會讓首音超過 `TTS_STREAM_FIRST_BYTE_SECONDS`（保留 1 秒給下一家），其他錯誤不重試。
-
-- **[2026-11-17]** **部署文件補上「依流量配 worker 數」**：`docs/operations/11_DEPLOYMENT.md` 新增 Brain 4／8／16 workers 在每秒 10、20 題的實測與換機器時的配法（約「尖峰每秒題數 ÷ 1.2」，最少 8）；更正 `api-chat` 的 `BRAIN_WORKERS` 預設為 16 與每個 worker 的資源用量。
-
-- **[2026-11-17]** **即時串流遇到 VoxCPM 滿載時不再排隊白等**：`/api/v1/tts/stream` 打 VoxCPM 時帶 `queue=reject`（`TTS_VOXCPM_STREAM_QUEUE`，預設 `reject`，設 `wait` 恢復舊行為）。節點同時處理數滿時立刻回 429，Backend 直接換下一家，不再排隊十幾秒、等滿首音逾時才換。VoxCPM360 從 c7a0a47 起支援 `queue`（正式節點已更新）；舊版節點不認得這個表單欄位，照舊排隊。整段合成（`/v1/audio/speech`）不帶，照節點預設排隊。
-- **[2026-11-16]** **A2A 支援 Backend 多 process**：拿掉 `A2A_ENABLED` 必須搭配 `BACKEND_WORKERS=1` 的啟動限制，讓 Backend 在預設 4 個 process 下也能同時開 A2A。收進來的 SSE inbox、SQLite WAL 佇列與憑證註冊／換發仍由取得 Redis leader 租約的單一 process 負責（`BACKEND_WORKERS > 1` 時連不上 Redis 一律不自認 leader，續約短暫失敗在本機租約到期時間扣除安全邊際前保留領導權、到期即讓出，且 `is_leader` 與 SSE 重連迴圈一致以本機 monotonic 到期時間防護、不無退避重連；以 `SET NX` 重取租約時不取消自身仍在執行的 Brain／回覆任務並執行 `requeue_processing_events`，跳過 `processing_owner` 為自己且仍在 `_active_event_ids` 的列、只重排其他過時或中斷列，若重排寫庫暫時失敗則設待補旗標於後續輪次自動補跑；`requeue_processing_events` 亦寫入 `first_failed_at` 且將超過 10 分鐘期限、`created_at` 逾期或無 `first_failed_at` 但 `attempts >= 5` 的舊卡住列直接標成 `FAILED`；已寫入 `reply_message` 與 `reply_task_id` 者直接沿用原 `taskId` 重送、不再重複呼叫 Brain，尚未完成 Brain 呼叫者重排後由新 leader 呼叫；leader 並每 30 秒回收 `processing_owner` 為自己但無本機活動任務的孤兒 `PROCESSING` 列，失去租約或未預期例外會記 log 並依持有者防護完成／抑制／失敗退回佇列；停機 `stop()` 切換 SQLite 250ms 短 `busy_timeout` 並將總時限壓在 8 秒內，先等進行中的回覆送完再釋放租約與關閉 client；呼叫 Brain 支援 `A2A_BRAIN_TIMEOUT_SECONDS` 讀取逾時以免共用 SSE client 無限阻塞；回覆遇本機限流或 Hub HTTP 429 每次重試仍受共用限流管理、不扣減 `attempts` 並依 `max(Retry-After, 2^attempts)`（支援秒數與 HTTP-date、上限 60 秒）寫入 `next_retry_at` 延後重試，5xx／網路／換憑證後仍失敗採指數退避（2、4、8…上限 60 秒），共用同一 10 分鐘總期限）；三個送出端點（`GET /api/v1/internal/a2a/peers`、`POST /api/v1/internal/a2a/tasks`、`POST /api/v1/internal/a2a/groups/messages`）與 leader 解耦，每個 process 依路徑 `.stat()`（`mtime_ns`、`ino`、`size`）懶載入原子寫入的加密憑證（開檔後另以 `os.fstat` 驗證 `0600` 權限），僅在 401／403 換憑證後的單次重試跳過限流（不額外扣額度也不繼承給背景 task），仍失敗回 503；回應皆附 `X-OpenVMan-Worker-ID` 標頭（僅 `/peers` 本文另外帶 `worker_id` 與 `is_leader`，`/tasks` 與 `/groups/messages` 本文不回 `worker_id` 以免 PID 進入 Brain LLM 上下文）；送出限流 `A2ARateLimiter` 改用 Redis Lua 滑動視窗跨 process 共用計數（超過回 429）。
-
-- **[2026-11-16]** **個資掃描改走整條決策鏈**：`PRIVACY_FILTER_ENABLED` 開啟時的個資偵測以前只問 Clef（`decide(providers={"clef"})`），不送 Jev、OpenAI 等外部服務；現在跟當輪決策一樣照後台設定的決策順序備援，Clef 不在或逾時時改問下一家。我們的資料沒有不能送外部服務的限制。逾時仍是 `PRIVACY_CLEF_TIMEOUT_SECONDS`（名稱不變），同時掃描上限、只偵測不改寫內容的行為都不變。
-
-- **[2026-11-16]** **只有 IndexTTS 會先打文字正規化**：`TTS_NORMALIZE_PROVIDERS` 預設從 `indextts,indextts-nurse,voxcpm,cosyvoice` 改為 `indextts,indextts-nurse`。VoxCPM、CosyVoice 改成跟 Gemini TTS、Edge 一樣只做本地清理（去 markdown／表情符號），送原文、不轉簡體。正規化服務會把每一句記下並排進它的審核佇列，我們的測試與壓測流量會一起灌進去，每句也多等 0.4～0.5 秒。沒指定引擎時可能落到 IndexTTS，照舊正規化。要恢復舊行為就在 `.env` 寫回原本的清單。
-
-- **[2026-11-16]** **dev 的 Backend 改成跟正式站一樣多 process**：以前 `ENV=dev` 一律用 `uvicorn --reload` 啟動，`--reload` 只能單一 process，所以就算 `BACKEND_WORKERS=4`，dev 也只有 1 個 process，限流、鎖、監控計數這類多 process 才會出的問題在 dev 測不到，壓測數字也偏低。現在 dev 照 `BACKEND_WORKERS`（預設 4）開 process、不自動重載，改 Backend 程式後要 `docker restart` 該容器；`BACKEND_WORKERS=1` 時維持自動重載。
-
-- **[2026-11-16]** **Brain 每個呼叫者的請求上限從每分鐘 90 調到 1,200**：上限是依呼叫者計算（每把 API key、Embed key、每個登入帳號各一份），一把 Embed key 常由整群 kiosk 共用，90（約每秒 1.5 題）只夠十幾台；1,200 約每秒 20 題，夠 100 台以上，仍擋得住失控的迴圈。`REQUEST_RATE_LIMIT_PER_MINUTE` 可覆寫。
-
-- **[2026-11-16]** **對話服務預設改為 16 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 8 改為 16。隔離環境量測（`docs/plans/brain-100-concurrency.md`「每個 process 的容量」）每個對話 worker 約撐每秒 1～1.25 題，8 個在每秒 10 題時聽到第一句 p95 5.7 秒，16 個為 2.7～3.5 秒；每個 worker 約 0.4～0.5 GB，閒置不吃 CPU。
-
-- **[2026-11-16]** **Gemini TTS、Edge 不再先打文字正規化**：`/api/v1/tts/stream` 與 `/v1/audio/speech` 以前不分引擎，每句中文都先呼叫 `NORMALIZE_API_URL`（數字念成中文、轉簡體），實測每句 0.36～0.54 秒。現在只有 `TTS_NORMALIZE_PROVIDERS` 列出的引擎（預設 `indextts,indextts-nurse,voxcpm,cosyvoice`）才打；Gemini TTS、Edge 自己會念數字，只做去 markdown／表情符號的本地清理，送原文（不轉簡體）。沒指定引擎時可能落到自架引擎，照舊正規化。Gemini 串流失敗時直接回錯誤、不會改由自架引擎接手，所以不會有未正規化的文字送進自架引擎。
-
-- **[2026-11-16]** **Avatar SDK 的 pushPcm 預設先緩衝 150 ms**：新增初始化選項 `audioLeadMs`（預設 150，0～2000）。每段話開頭先扣住這段時間的 PCM，再一起送進嘴型模型並開始播；以前照播放速度每 100 ms 送一包時，嘴型模型只拿到一小段音訊，嘴幾乎不張開，而且包與包之間的空檔會立刻清掉嘴型緩衝。佇列播完後再等 300 ms 沒有新音訊才結束說話，`speaking` 的 `start` 改在第一段音訊真正開始播時才派送。`audioLeadMs: 0` 完全維持舊行為；宿主已自行扣住開頭的請改設 0。
-
-- **[2026-11-16]** **Avatar SDK 的 silent 模式不再需要瀏覽器放行音訊**：`audioOutput: "silent"` 改用頁面時鐘排程每段音訊、以 OfflineAudioContext 解碼整段音檔，不建立 AudioContext；沒被使用者點過的視窗（kiosk 開機後、`window.open` 開出的視窗）也能 `pushPcm` 對嘴，不再丟 `AUTOPLAY_BLOCKED`。speaking 事件、`pushPcm`／`playAudio` 的 Promise 與嘴型時間軸不變；`speaker` 模式照舊。另外，嘴型用的 WebGL 畫布失效（`webglcontextlost`）時改為停止貼嘴型、只留人物影片，並以 `error` 事件 `WEBGL_CONTEXT_LOST` 通知，不再貼上半透明暗塊。
-
-- **[2026-11-16]** **Embed key 的人物清單只列讀得到的人物**：`GET /api/v1/characters` 帶 Embed key 時，全域公開人物也要在金鑰允許的人物內才列出。以前清單會列出所有全域公開人物，但 `/static/characters/*` 依金鑰白名單回 403，SDK 選到就讀不到素材。
-
-- **[2026-11-13]** **Backend 預設開 4 個 process**：`backend` 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動（Compose 預設 4，直接執行預設 1）。多 process 下原本只在記憶體的狀態改成共用：解鎖密碼失敗次數、API key 與 embed key 每分鐘上限放 Redis（以前多 process 時上限等於乘上 process 數）；文字模式攝影機的事件狀態放 Redis（以前同一位訪客可能每個 process 各打一次招呼）；帳號資料庫啟動 migration 以檔案鎖依序執行（以前全新資料庫同時啟動，搶輸的 process 起不來，已用四個 process 同時初始化的測試重現）；素材包工作登錄角色加 Redis 鎖；`/metrics/prometheus` 改 prometheus_client 多 process 模式、`/metrics` 的計數與耗時跨 process 加總，事件清單加上 1,000 筆上限。`A2A_ENABLED` 搭配多 process 時啟動失敗。隔離環境（假 LLM、假 TTS、8 個對話 worker）主機較閒時每秒 20 題聽到第一句 14.2 → 2.2 秒；完整驗收流程與跨 process 檢查（`scripts/experiments/brain-worker-split/multiprocess_checks.py`）通過。
-
-- **[2026-11-13]** **對話服務預設改為 8 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 4 改為 8（每個約 0.3 GB）。隔離環境假 LLM 實測，瞬間 100 人第一句 5.4 → 3.8 秒、瞬間 200 人 9.7 → 6.6 秒，每秒 20 題 p95 5.4 → 1.7 秒；結果見 `docs/plans/brain-100-concurrency.md`。已有 `.env` 寫明 `BRAIN_WORKERS` 的部署照舊。
-
-- **[2026-11-13]** **Backend 同時轉給 Brain 的對話不再卡在 100 段**：每段對話串流從開始到回答結束都佔一條連線，Backend 連 Brain 的 httpx 預設最多 100 條，等空連線的時限又跟連線逾時共用 2 秒，所以同一個 Backend process 同時超過 100 段對話時，多出來的直接回 504。上限改為 1,000 條（閒置保留 200），等空連線改為 30 秒，連線逾時仍是 `BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS`。隔離環境假 LLM 實測：瞬間 200 人原本 4／8／12 個對話 worker 分別有 40%／27%／23% 回 504，修正後 0；2 個 worker 每秒 20 題原本 43／600 失敗，修正後 0。
-
-- **[2026-11-13]** **台語判斷可以先問 Gemini Decisions（預設關閉）**：`AUDIO_LANGUAGE_DECISION_ENABLED=true` 時，`POST /brain/internal/audio-language` 與 Live 的台語判斷同時送出 Gemini Decisions（`gemini-decision-1`，一次問「是不是華語／英語／西語／日語／韓語」五題是非題）和原本的 `LIVE_AUDIO_LANGUAGE_ID_MODEL`。Decisions 有把握就直接回：華語 ≥ 0.8 或英西 ≥ 0.75 判為該語言，華語 ≤ 0.65 且英西日韓都 < 0.5 判為台語；其他情況（多半是日韓分數偏高，真人台語常被聽成韓語）或 Decisions 失敗、逾時（`AUDIO_LANGUAGE_DECISION_TIMEOUT_SECONDS`，預設 2 秒）時等原本的模型，最壞情況跟關閉時一樣。不直接問「是不是台語」：它把台灣腔、台灣情境也算進去，華語常給 0.4～0.6。50 句實測（真人台語連續劇 20 句、合成華語 10 句、合成英西日韓各 5 句）：Decisions 自己下判斷的句子零誤判，台語 12/20、華語 10/10、英西 10/10 不必等原本的模型（p50 約 0.4 秒，原本 1.8 秒），合併後台語 20/20（原本 19/20）。華語只有合成語音，帶台灣腔的真人華語未驗證，所以預設關閉。每句的分數與判定記在 log `audio_language_decision`，用量照 `audio_language` 記帳。實驗腳本見 `scripts/experiments/audio-language-decision/`。
-
-- **[2026-11-13]** **快速問答的分類點名稱就展開**：以前只有底下有子分類的才會展開，只有題目的分類要點小箭頭；現在點名稱就打開右邊的編輯畫面並展開，已經選著又開著的再點一次就收起。
-
-- **[2026-11-13]** **選型篩選的設定檔不出現在文件樹**：`knowledge/products/`（含底下各商品線資料夾）的 `_catalog.yaml` 不再由 `GET /knowledge/base/documents` 列出，後台的文件樹、文件數與批次全選都看不到；搜尋索引照舊。資料夾只剩這個設定檔時，刪除資料夾會說明裡面有選型設定、不能從後台刪，不會默默刪掉。
-
-- **[2026-11-13]** **搬文件不再讓圖譜重新抽取**：單一文件搬移與整個資料夾搬移都會把圖譜快取（指紋、抽取結果、現有圖譜的來源路徑）一起換成新路徑，下一次重建圖譜時搬過的文件不用再呼叫 LLM。
-
-- **[2026-11-13]** **產品規格表可以分商品線**：`filter_products` 改讀 `knowledge/products/<商品線>/_catalog.yaml`，同一個專案可放多份型錄，各自定義欄位。只有一份時工具說明與參數和以前一字不差；多份時多一個必填的 `catalog` 參數指定型錄。舊的 `knowledge/products/_catalog.yaml` 版面仍可讀，搬資料前後工具都不會消失。新增 `move_knowledge_folder`，整個資料夾一次搬完，索引只重建一次。
-
-- **[2026-11-13]** **watchtower 改為每小時檢查**：檢查間隔從 300 秒改為 3600 秒，減少對 Docker Hub 的查詢，避免請求限流擋住 CI 發布與換版。推上 `main` 後正式站最慢一小時換版。
-
-- **[2026-11-13]** **Brain 對話與後台管理分流**：新增 `api-chat` 對話角色與多 worker，後台與排程固定單程序；Backend 可用 `BRAIN_CHAT_URL` 分流並以空值回退。對話與用量 SQLite 使用 WAL，共用技能狀態、檔案與記憶表寫入鎖，跨程序共用限流及 PII 併發額度；Prometheus 彙總同一次容器啟動的各 worker。新增 admin 定時維護有新對話的專案，以及角色、分流與真實多程序回歸測試。部署、回退及仍維持 worker 獨立的斷路器限制見 `brain/README.md`。
-
-- **[2026-11-12]** **Backend 的 Pillow 升到 13**：10.x 的 libtiff 編碼器有記憶體外洩與當掉的漏洞（我們不輸出 TIFF，實際碰不到，但沒有理由留著）。Backend 全套測試在 Pillow 13 下與 10 結果相同。avatar-pipeline 的 protobuf 維持 4.25：mediapipe 0.10.14 只支援 protobuf 5 以下，換成 5.29.6 會讓人臉特徵點擷取載入失敗。
-
-- **[2026-11-11]** **語言優先搜尋不再白查整張知識庫**：使用者語言的段落不夠時，候選窗會逐次加倍；以前要等同語言結果湊滿或查完整張表才停，問「保固多久」「hi」這類同語言相關段落少的題目每次都查 8 輪。現在確定再擴大也不會改變結果時就停：字面命中已全部拿到、向量窗尾已超過相關度門檻、被截掉或還沒進向量窗口的段落都過不了門檻。結果與排序跟查完整張表完全相同（工業示範專案 70 題比對 0 筆不同），查詢輪數 213 減為 116。隔離環境 100 人同時提問各跑三輪：查滿 8 輪的提問 50 → 0，知識檢索 p95 3.8 → 2.2 秒，聽到第一句的中位數平均 5.5 → 4.5 秒。
-
-- **[2026-11-11]** **問答表混了不同語言時逐題分開**：客戶的表常常中英西混在一起，以前整份判成一種語言，英文題會跟著放進「中文」分類，搜尋也排錯。現在判出兩種以上語言時，系統逐題補上語言欄（人寫的不改），每題放進自己語言的分類；只有一種語言的表照舊。現有 145 份問答檔、1,370 題實測沒有一題被誤判成別的語言，中英西混成一張表時 279 題對 278 題。
-
-- **[2026-11-11]** **匯入後會提示要回頭看的地方**：匯入結果列出沒讀進去的欄位（例如「來源檔」「備註」）、看不懂的語言值、還沒有的語言分類、沒有答案的題目、找不到的圖片，以及表格為什麼被當成一般文件。整份被擋下時，一次列出所有沒有題目或答案衝突的題目，不用一次改一個。答案裡有 `##` 開頭的行、沒收尾的 ```` ``` ```` 或題目換行時，也一次列出所有這類題目。同一張表（含 Excel 同一張工作表）重複的欄名也會提示；表裡每題都自己填了分類時，不會說成已依語言分開。
-
-- **[2026-11-11]** **watchtower 改用社群維護的版本**：`containrrr/watchtower` 已停止維護，改用 `nickfedor/watchtower:1.24.0`（版本固定），不再需要 `--api-version` 參數；檢查間隔維持 5 分鐘。原本放在本機、未進版本控制的 `docker-compose.override.yml` 已刪除，設定都在 `docker-compose.yml`。
-
-- **[2026-11-11]** **Embedding 批次並行維持 1**：新增隔離 gateway 的並行 1／2 對照腳本與 Compose 設定，檢查吞吐、查詢／文件 p95、GPU 顯存與向量一致性。兩輪純查詢在並行 2 較慢，混合文件的聊天查詢延遲沒有穩定改善，因此不調整正式預設值。方法與結果見 `scripts/experiments/embedding-load/README.md`。
-
-- **[2026-11-11]** **Brain 重用重複問題的查詢向量**：新增每 worker 的有界 LRU 與同鍵請求合併，減少熱門題與同輪知識／記憶搜尋重複呼叫 embedding。快取依專案、gateway client 與完整 query identities 隔離；先確認可查詢資料表，只快取驗證成功的首選向量，錯誤與暫時回退不快取，等待者逾時不取消共用計算。新增入口、快取與實際 HTTP 次數指標，`EMBEDDING_QUERY_CACHE_SIZE=0` 可關閉。HTTP Chat 與 Gemini Live 共用，文件索引不變，規格與驗證方式見 `brain/README.md`。
-
-- **[2026-11-10]** **後台其他頁面改成不用懂系統也看得懂**：`Avatar` 頁改名「虛擬人」；語音辨識的「語言分流」改「辨識語言」，「試辨識」「串流試聽」改「比較辨識結果」「邊講邊聽寫」；系統狀態、用量、記憶、工具與技能、模型供應商的英文與工程詞換成白話，用量的事件類型顯示中文。`ROOT` 改「最高管理員」，「孤兒資源」改「沒有歸屬專案」，「Embed 金鑰」改「網站嵌入金鑰」，並寫明跟帳號 API 金鑰的差別。角色的分頁改叫個性與說話方式、工作規則、工具使用說明、長期記憶，不再顯示檔案路徑；人物、背景與角色的代號改選填，留空由系統產生。對話紀錄以最後一句話當標題，匯出、刪除有文字，篩選說明不再只靠滑鼠提示。工作區的新文件、上傳、重建都有文字，手機也有上傳與重建。寬螢幕第一次進後台時側欄預設展開。
-
-- **[2026-11-10]** **「文件」段落不再列出快速問答的問答文件**：已掛在快速問答的問答文件只在「快速問答」段落管理，文件頁尾顯示文件名稱而不是 `qa/檔名`。還沒掛上去的問答文件仍留在 `qa` 資料夾，找得到也刪得掉。
-
-- **[2026-11-10]** **小助理不再蓋住問題清單的按鈕**：每題的加圖片、加連結、隱藏、刪除改靠左。
 
 ### Security
 
@@ -143,20 +17,6 @@
   - 後台 `Content-Disposition` 檔名解析（`frontend/admin/src/api/knowledge.ts`）：移除可造成回溯的引號正則，改為線性掃描（#216）；`PersonaForm.test.tsx` 改用純字串子字串比對取代未錨定網址正則（#215）。
   - TTS relay 壓測腳本（`scripts/experiments/tts-relay/run.py`）：移除寫死的 `verify=False`，預設啟用 TLS 憑證驗證並新增 `--ca-cert` 供自簽憑證測試使用（#214）；預設網址 `https://localhost:28787` 是自簽憑證，要加 `--ca-cert infra/nginx/certs/openvman.crt`。
 
-- **[2026-11-19]** **知識索引不再收進符號連結與硬連結**：重建索引時，`knowledge/` 底下指向工作區其他檔案（例如 `AGENTS.md`）的符號連結會被當成知識收進去，廠商在對話裡就問得到工作規則。`iter_indexable_documents` 與 `iter_knowledge_documents` 現在略過符號連結、經過連結資料夾的檔案（解析後的位置必須和原本路徑相同，所以 `knowledge/` 底下的檔案解析後一定還在 `knowledge/`），以及有其他名稱的硬連結（記 warning）。知識庫清單與快速問答也跟著略過這些檔案；工作區裡一般的文件照舊進索引。
-
-- **[2026-11-18]** **代理層的輸入邊界再收緊**：重複的 `project_id`（query 寫兩次，或 JSON 裡同一個鍵出現兩次）一律回 422，不再取其中一個；轉送前重組 JSON 時改用跳脫輸出，內容含沒配對的 Unicode 代理字元不再變成 500；建立與刪除專案的 body 在 FastAPI 解析前先限制在 64 KiB，超過回 413，不必等整份讀完。
-
-- **[2026-11-18]** **刪除人設不再能刪掉整個專案工作區**：人設 ID 原本接受「..」這類只有點的字串，刪除時路徑會指到工作區本身，有專案編輯權的帳號就能把該專案的知識庫、人設等檔案全部刪掉。現在人設 ID 必須以英文字母或數字開頭，刪除前也確認目標確實是 `personas/` 底下的一層資料夾。另外，最高管理員啟用或停用共用技能時必須明寫一個 `scope=shared`；沒寫或重複時回 422，避免 Backend 當共用放行、Brain 卻切換到同名的專案技能。
-
-- **[2026-11-18]** **Brain 的 internal 路由不再經 catch-all 直通**：`/api/v1/internal/*`（斷路器重置、金鑰指紋、模型設定刷新）沒有對應的 Backend 路由時，catch-all 會帶著 internal token 轉給 Brain，任何登入帳號都能呼叫；對外入口的 nginx 原本就擋下這個前綴，但容器網路內仍可直達。現在 catch-all 一律回 404，後台改用 Backend 自己的路由呼叫這些功能。
-
-- **[2026-11-18]** **Backend 轉給 Brain 的路徑與授權時看到的不一致**：代理層對解碼過一次的路徑做所有授權判斷，轉送時卻原樣接進網址，Brain 會再解碼一次。網址裡經過特別編碼的路徑因此能避開專案授權、Backend 專屬路由（備份、用量、檔案上傳）與共用技能限制，讀寫沒有授權的專案資料；編碼過的 `?`／`#` 也能讓 Brain 收到另一組 query。另外驗證中介層與代理以重組後的網址判斷公開路徑，同樣可能把非公開路徑當成公開。Dev 已重現跨專案讀取。現在轉送前重新編碼路徑，Brain 收到的就是授權過的同一個字串；`?`、`#`、`%` 以字面送達（例如含 `#` 的對話 ID 不再 404）；query 用授權時解析的同一份原文；公開路徑判斷改看 ASGI 的原始路徑。以真的 uvicorn 與假 Brain 驗證 Brain 實際收到的路徑。
-
-- **[2026-11-18]** **Backend 授權一個專案，Brain 卻在另一個專案執行**：Backend 只從 query 與帶 JSON `Content-Type` 的 body 找 `project_id`，Brain 卻還會讀沒有 `Content-Type` 的 JSON body、空的或重複的 `project_id`（空值落到預設專案、重複取最後一個）、`message.project_id`，以及呼叫端自帶的 `X-Brain-Project` 標頭。有某個專案權限的帳號或 Embed key 因此能讀寫、對話於沒有授權的專案（含預設專案）；dev 已重現讀到別的專案的知識文件。現在代理先在大小上限內讀完 body，從所有來源找專案，空白、重複或不一致回 422；授權後轉給 Brain 的 query、JSON body 與可信標頭都只帶授權過的專案 ID，呼叫端的 `X-Brain-*` 標頭不再轉送，Brain 對話信封優先採用可信標頭。另外：先讀 body 再授權，超大的 JSON body 直接 413，不會為了找專案整個讀進記憶體；公開的 `/api/v1/health` 只接受讀取，其他方法要登入；Brain 的技能清單與「重新載入」也用正規化後的專案 ID。
-
-- **[2026-11-18]** **建立專案技能可以在 Brain 執行任意程式**：有專案編輯權的帳號建立技能時，技能 ID 直接當目錄名稱，能寫到共用技能或別的專案；名稱與說明被拼進 `main.py` 與 `skill.yaml`，技能載入時就會執行。現在技能 ID 只收英文字母、數字與底線且不能以數字開頭（Brain 的建立與所有技能路由、Backend 代理、後台表單同一條規則），目錄必須落在目標資料夾內；`skill.yaml` 以 `yaml.safe_dump` 產生，`main.py` 只放技能 ID。Brain 的技能路由也改用正規化後的專案 ID（與 Backend 授權的相同），拒絕 `.`、`..`。
-
 ### Fixed
 
 - **[2026-11-27]** **角色管理存檔不再蓋掉別人的修改，表格模式不再把文件拆錯**：
@@ -164,6 +24,23 @@
   - 表格拆欄（`personaSections`）：只認頂格、不在程式碼區塊與開頭 YAML front matter 裡的 `## ` 標題，清單裡縮排的標題與縮排的程式碼區塊不再拆成欄位或把真正的欄位擠到其他內容；front matter 裡的 `## 角色設定` 不再變成欄位。清空最後一個欄位時留下空標題，後面的自訂段落不會在下次讀回時被收進欄位；在「其他內容」裡調換段落順序會照新順序存。存檔前把寫出的文字再解析一次，欄位或其他內容讀回來不一樣就不存，並說明原因。
 
 - **[2026-11-27]** **角色管理表格模式不再為了一行標題顯示「其他內容」**：SOUL／AGENTS 開頭的 `# 標題` 只是檔名或舊版的角色名稱，扣掉它之後兩份文件都沒有表格以外的段落時，整塊「其他內容（一般不用改）」不顯示（保護規則區原本就這樣處理）；那一行照原樣保留在檔案裡。真的有表格以外的段落時照舊顯示。
+
+## [2026-11-26]
+
+### Added
+
+- **[2026-11-26]** **指定語言第二階段：官方前台、後台、WebSocket 與 Live**：
+  - 官方前台（`frontend/app`）：語言來源優先順序為網址參數 `?lang=zh|en|es|ja|ko`（其他值忽略）＞ 設定視窗新增的「回答語言」＞ 不鎖定；偏好鍵 `lockedLanguage`（Backend `PREFERENCE_KEYS` 白名單同步加入，空字串代表不指定）。有語言時，`/api/v1/chat`、`/api/v1/chat/stream` 每次請求帶 `language`，WebSocket `client_init` 的 `capabilities.language` 帶同一個值。人物就緒（訪客模式要先點過開始）後，以及語言、人設、專案改變時，呼叫 `GET /api/v1/personas/greeting` 播開場白：走字幕、TTS、嘴型，有 `voice` 就用它合成，不進對話紀錄、不呼叫模型；404 或失敗靜默略過；同一次載入同一組（語言、人設、專案）只播一次，展示機台換下一位來賓時重置，讓下一位再聽一次。開場白還沒播完時送出問題、按停止或斷線，會跟一般回答一樣先停掉它，沒播完的字幕不會接到下一則泡泡。
+  - WebSocket 與 Live：`capabilities.language`（只收 `zh|en|es|ja|ko`，其他值忽略）經 `relay_init.language` 帶到 Brain 的 Live session；語言改變會重建 relay。Live 有鎖定時，每輪決策帶 `locked_language`，文字輪的 server envelope 一律帶 `policy.response_language`／`retrieval_language`（決策停用或失敗時也帶），語音輪由系統指令寫明回答語言；`search_knowledge` 預取與模型自己呼叫都用鎖定語言並走嚴格語言檢索（`strict_language`）。沒帶語言時行為完全不變。
+  - 後台人設頁新增「名稱與各語言開場白」摺疊區（zh/en/es/ja/ko 各一個最多 500 字的開場白與選填聲音代號，讀寫 `GET/PUT /api/v1/personas/language-settings`，失敗顯示後端訊息，含未存檔提示）；對話測試頁在「測試語言」旁新增「鎖定語言」核取方塊，勾選後除 `preferred_language` 外另送 `language`（台語不能鎖）。
+  - 複製人設（`POST /brain/personas/clone`）會帶走來源的 `greetings`、`voices`；`avatar_char_id` 維持不帶。
+  - SDK：每次 `greet()` 成功就用回應的 `voice` 覆寫快取，`voice` 為 `null` 時清掉，不再沿用上一個語言的聲音；`tts.voice` 有給仍以它為準。
+
+- **[2026-11-26]** **專案層級的回覆附件（聯絡圖片與型錄網址）**：專案設定檔 `.kb_settings.json` 新增 `contact_image_id`、`catalog_url`（寫入時保留其他欄位，`/knowledge/settings` 的回應不受影響）。新增 `GET/PUT /brain/knowledge/reply-links`（Backend 代理 `/api/v1/knowledge/reply-links`，需登入，讀取需讀取權、寫入需「改知識庫與人設」，廠商與嵌入金鑰不開放）：PUT body `{project_id, contact_image_id, catalog_url}` 整組取代，`null` 清除；`contact_image_id` 只收 QA 圖片上傳代號且檔案要存在，`catalog_url` 只收 https、1 到 500 字元，不合回 400。每則回覆（`/chat` 與串流 `done`）有設就帶 `contact_image_id`／`contact_image_kind` 與 `catalog_url`，不論 `no_answer` 是 true 或 false，跟引用來源的 `image_id`、`url` 分開；前台自己決定顯示什麼。「清除未使用的 QA 圖片」改保留專案的聯絡圖片。官方前台在回覆氣泡顯示 QR，有 `catalog_url` 時另顯示「查看型錄」連結（新分頁、`noopener noreferrer`、只收 http(s)）；後台知識庫頁首新增「回覆附件」，可挑已上傳的 QA 圖片或上傳新圖當聯絡圖片、填型錄網址，兩者都可清除。讀取時檔案損壞、手改出壞網址都當作沒設，不會讓回覆失敗；清除未使用的 QA 圖片時，舊版設在人設 `AVATAR.json` 的 `contact_image_id` 仍視為使用中，改設成專案層級前不會被清掉。
+
+- **[2026-11-26]** **人設可以自訂顯示名稱**：人設的 `AVATAR.json`（預設人設是專案根目錄那份）有 `label`（去頭尾空白後 1 到 40 字）時，清單（含廠商清單）顯示它；沒有時預設人設顯示「預設角色」、其他人設照舊顯示 `SOUL.md` 的第一個標題。新增 `PUT /brain/personas/label`（Backend 代理 `/api/v1/personas/label`，專案權限比照 `personas/language-settings` 的 PUT，廠商與嵌入金鑰不開放），body `{persona_id, project_id, label}`：名稱只寫進 `AVATAR.json` 的 `label`，不改 `SOUL.md`（那是給模型的提示詞，改顯示名稱不該動到它），其他欄位原樣保留；不合法回 400、人設不存在回 404。後台人設頁可改名稱，官方前台的人設切換器直接顯示新名稱。
+
+### Fixed
 
 - **[2026-11-26]** **runtime 預先壓縮**：avatar image 建置時把 `OpenVmanAvatarRuntime.wasm`／`.js` 先壓成 `.gz`（`gzip -9 -k`），avatar nginx 開 `gzip_static`：收 gzip 的用戶端直接拿到壓縮檔（wasm 5,005,745 → 2,415,902 bytes），不必每個請求現場壓縮（約 0.2 秒 CPU），而且帶 `Content-Length`、`Last-Modified` 與原檔相同，SDK 的存檔比對照常運作。admin 那層的即時 gzip 只在上游沒壓時才作用。
 
@@ -179,22 +56,160 @@
 
 - **[2026-11-26]** **開場白與人設語言設定的兩個小修**：官方前台抓開場白的期間訪客已經送出問題時，這次開場白不播也不補播（以前會在回答進行中晚到並打斷回答）；後台人設頁「各語言開場白」收合再展開不再重讀伺服器資料，還沒存的草稿與未存檔提示都保留。
 
+### Removed
+
+- **[2026-11-26]** **移除人設層級的聯絡圖片**：刪除 `PUT /brain/personas/contact-image`、Backend 代理 `/api/v1/personas/contact-image` 與 `persona_contact_image*` 函式，改用專案層級的 `reply-links`（見上）；路徑直接 404，不留相容層。回覆欄位 `contact_image_id`／`contact_image_kind` 名稱不變，官方前台顯示 QR 的程式不用動。已在人設 `AVATAR.json` 設過 `contact_image_id` 的專案（例如鶴記 kiosk 人設的 EVAK QR）需在後台「回覆附件」重設一次，檔案裡舊的欄位不再被讀取。
+
+## [2026-11-25]
+
+### Added
+
+- **[2026-11-25]** **網站嵌入金鑰可以取開場白**：`GET /api/v1/personas/greeting` 加進嵌入金鑰白名單，SDK 的 `greet()` 在嵌入金鑰模式也能播開場白。專案一律是金鑰綁定的那個（帶別的 `project_id` 回 403）；Brain 的開場白路由改以 Backend 給的 `X-OpenVMan-Project-ID` 為準，跟網址的 `project_id` 不同回 400，網址沒帶專案也不會退回 default。設定類路徑（`language-settings`、`contact-image`）仍不開放。
+
+- **[2026-11-25]** **人設的聯絡圖片**：新增 `PUT /brain/personas/contact-image`（Backend 代理 `/api/v1/personas/contact-image`，需登入，專案權限比照 `personas/avatar`），設定某個人設每則回覆都附的圖片（例如展場 Kiosk 每題都要放的 QR code）。回覆（`/chat` 與串流 `done`）新增 `contact_image_id`／`contact_image_kind`，跟引用的產品圖 `image_id` 分開，兩張都能顯示。只收 QA 圖片上傳後的代號且檔案要存在；「清除未使用的 QA 圖片」會保留人設引用的聯絡圖片。官方前台在回覆氣泡裡把聯絡圖片顯示在產品圖下方，只有聯絡圖片（例如查不到答案）時也會顯示。
+
+- **[2026-11-25]** **指定語言鎖定、依語言的開場白與聲音（第一階段：Brain、後端代理、SDK）**：`POST /brain/chat` 與 `/brain/chat/stream` 新增選填 `language`（`zh|en|es|ja|ko`，不收 `nan`，其他值回 422）。有帶就鎖死：回覆語言與檢索語言都固定為它，不看使用者這句話的語言、不看決策的 `requested_response_language`，決策關閉或失敗時也一樣；prompt 明寫「一律用某語言回答，即使使用者用其他語言」，決策 evidence 另記 `locked_language`。兩個欄位都帶時以 `language` 為準；只帶 `preferred_language` 的行為完全不變。鎖定時 `search_knowledge` 走嚴格語言檢索：`search_records` 新增 `strict_language`，只留語言等於 `language` 的紀錄（混語言 CSV 每題的 `language` 優先，否則看文件語言），不論專案有幾條分流都過濾，過濾在 top_k 截斷之前，查不到就回空、不退回別的語言；圖譜帶入的相關段落也只留該語言。人設中繼資料（`AVATAR.json`）新增 `greetings`（每語言一段開場白，1 到 500 字）與 `voices`（每語言一個聲音代號，1 到 128 字元，限 `[A-Za-z0-9._:-]`），新增 `GET/PUT /brain/personas/language-settings`（整份取代，驗證失敗 400、人設不存在 404）與 `GET /brain/personas/greeting?language=`（回 `{language, text, voice}`，該語言沒有開場白回 404），Backend 代理為 `/api/v1/personas/language-settings`、`/api/v1/personas/greeting`，需登入，讀取比照 `personas/soul`、寫入比照 `personas/avatar` 的專案權限（廠商帳號不開放）。SDK `init` 新增 `language`，每次 `ask()` 都帶；新增 `greet()` 取開場白後以字幕、語音、嘴形播出，不進對話、不呼叫模型，並把回應的 `voice` 記為這個 instance 之後的 TTS 聲音（`tts.voice` 有給則以它為準）。Gemini Live 與 WebSocket、後台頁面、官方前台這次不做。計畫見 `docs/plans/language-lock-greeting.md`。
+
+## [2026-11-24]
+
+### Added
+
+- **[2026-11-24]** **Backend 停頓紀錄**：11/24 的 100 題壓測，Backend 四個 worker 同時停了約 2 秒（沒有 log、CPU 幾乎是 0，連打同網段節點的健康探測都失敗），事後從 log 看不出卡在哪。每個 worker 新增事件迴圈延遲 watchdog（`backend/app/loop_lag.py`），每 0.25 秒醒來一次，晚醒超過 `EVENT_LOOP_LAG_THRESHOLD_SECONDS`（預設 0.25 秒，0 關閉）就記一行 `event_loop_lag`，附這段時間事件迴圈用掉的 CPU，分辨是被計算還是被等待卡住。音訊串流的 `upstream_attempt` 另帶 `chunks`、`max_wait_ms`（等上游最久）與 `max_send_ms`（等下游最久），分辨斷音是上游一陣一陣送，還是 Backend 或前台來不及收。
+
+### Changed
+
+- **[2026-11-24]** **回答改成整段合成一次，不再逐句打 TTS**：SDK 的 `ask()` 與官方前台的文字模式，`sentence` 事件只用來顯示字幕，`done` 到了才以 `done.reply` 打一次 `/api/v1/tts/stream`。逐句時下一段要等上一段下載完才送，第一句短、題數多時第二段的首包趕不上第一段播完，中間就斷音（11/24 重測 100 題時斷音的 2 題都是這種）；每段各自合成，語氣也接不起來。Gemini、VoxCPM、Edge、IndexTTS 的首包跟文字長短無關，整段打只多等其餘句子生完的時間（快速問答約 0.3 秒）；CosyVoice（台語）要整段合成完才出聲，字數越多第一聲越晚。順帶修正：模型中途改寫回答時，已送出、後來收回的句子不再被念出來。SDK 移除只用來接續多段的 `queueAudio`；官方前台的 `replySpeechQueue.ts` 改為 `replySpeech.ts`（`collect`／`finish`／`speak`），等整段回答時維持 `ttsPending`，麥克風不會在開口前打開。壓測腳本 `burst_nodes.py`、`users_e2e.py` 跟著改成 `done` 後才打 TTS，「聽到第一句」因此多含等整段回答的時間，不能直接跟之前的基準比。套用設定（斷線重連）時若回答剛開始出來，`useAvatarChat.disconnect()` 現在會先停掉這一輪，不再讓等念的狀態卡住、麥克風一直關著。被打斷的上一輪 TTS 晚結束時，也不會再把下一輪的 `ttsPending` 清成 false（PR Agent 回報；念完歸零改由 `replySpeech` 依回合管理）。arwin vman.html 用自己的朗讀流程，要另外改。
+
+### Fixed
+
 - **[2026-11-24]** **Gemini TTS 直連串流收到結束訊號就收尾**。Google 送完音訊偶爾不關連線，Backend 原本要等滿 10 秒才收掉。現在收到 `finishReason` 就送完該事件的音訊並立即結束。`upstream_attempt` 新增 `end_reason`，區分 `finish:<原因>`、`done`（收到 `[DONE]`）與 `eof`（上游關閉連線且未送結束訊號）。
+
 - **[2026-11-24]** **pcm16k 重採樣改用 numpy 向量化**：`app/tts_pcm.py` 的 `StreamingResampler` 與 `_clip_pack` 由純 Python 逐樣本計算改為 numpy 批次計算，濾波器係數、延遲補償與跨 chunk 狀態不變，輸出與舊版逐樣本相差不超過 1 LSB（測試以保留在 `backend/tests/tts/_reference_resampler.py` 的舊版比對）。實測 1 秒 24 kHz 音訊（4800 樣本一段）CPU 由約 48 ms 降到約 2.3 ms（約二十分之一），100 題同時要 pcm16k 時 Backend 事件迴圈與執行緒不再被轉檔佔滿。`backend/requirements.txt` 直接列出 `numpy>=2.4.6,<3`（映像檔原本只是間接相依）。
+
+## [2026-11-23]
+
+### Fixed
+
 - **[2026-11-23]** **嵌入金鑰每日配額改用原子計數、台北午夜歸零**：配額由 Redis 原子計數（`BACKEND_WORKERS > 1`，鍵 `vman:embed-daily:{key_id}:{台北日期}`，鍵不存在時以資料庫該日筆數為起點；Redis 出錯退回程序內計數），多個 worker 共用，併發請求不再一起通過最後一筆額度，剛寫入資料庫的筆數也不會被算兩次而提早回 429。「每日」由 UTC 日改為台北日（與後台用量頁一致），`Retry-After` 為距離台北午夜的秒數。資料庫舊的每日列存的是 UTC 日期字串，上線當天的台北日計數以同日期的 UTC 列為起點，那一列不含當天台北 00:00～08:00 的請求（記在前一天的 UTC 日期下），所以上線當天會少算這段時間的用量；不做資料遷移，隔天起就是純台北日。
+
 - **[2026-11-23]** **網站嵌入金鑰的請求不再被 auth 資料庫寫入卡住數秒**：每個 embed key 請求轉給 Brain 前，都要先寫一筆最後使用時間與每日計數；這台主機的虛擬硬碟偶爾 fsync 要好幾秒，期間寫入鎖被佔著，對話第一個位元組實測慢 4～10 秒（閒聊「你好」最常碰到）。記帳改由每個 worker 程序的背景執行緒寫入（每日配額的判斷見下一條）；外部網站的來源紀錄也改在回應送出後背景寫入；Auth DB 改用 `synchronous=NORMAL`（WAL 下不會損毀，斷電時可能少最後幾筆）。
+
 - **[2026-11-23]** **TTS 備援已經合成好卻回 500**：第一站的錯誤訊息是中文時（例如 CosyVoice 的「找不到語音…」），放進 `X-TTS-Fallback-Reason` 標頭會讓整個回應變成 500。標頭裡的非 ASCII 字元與 `%` 改做百分比編碼，前端（`frontend/shared/speech/tts/fallback.ts`）解回來顯示。
+
 - **[2026-11-23]** **指定 CosyVoice 但沒帶聲音時改用 CosyVoice 自己的預設聲音**：原本會把 IndexTTS 的角色名（`hayley`）送給 CosyVoice，新節點不認得，回錯誤後走備援。
+
 - **[2026-11-23]** **嵌入 SDK 在 openVman 連不上時仍顯示得出人物，載入失敗也能直接重試**：播放程式與人物檔第一次下載後存進嵌入頁面網域的 Cache Storage（`cacheAssets`，預設開），之後開頁面不必再下載：用存檔前先等 openVman 回應標頭（最多 3 秒），401／403／404 清掉存檔且不顯示，連不上、逾時、5xx 或回網頁（captive portal）才用存檔；`Last-Modified`／`Content-Length` 沒變就中斷下載，有變背景整組換新。30 天沒用的存檔會清掉。`init()` 改成檔案都拿到才建立 runtime，連不上、逾時、5xx、下載中斷自動重試兩次，失敗後頁面上不留東西、可以再呼叫 `init()`，不必重新整理。新增 `avatar.assetsFromCache`。SDK 本體與播放程式的 nginx 標頭加上 `stale-while-revalidate=2592000`，openVman 連不上時瀏覽器仍可用舊檔（Chromium 實測）。角色檔的 nginx 回應改成只送一個 `Access-Control-Allow-Origin`（原本後端與 nginx 各送一個，瀏覽器的 fetch 會拒收）。代價是第一次開頁面要等人物影片整檔下載完才出畫面。
+
 - **[2026-11-23]** **embedding 服務掛掉時知識庫改用全文檢索，不再整個查不到**：查詢 embedding 逾時或失敗時，`search_knowledge` 原本放棄那條查詢，那一輪回答完全不帶知識庫；現在改用已建好的全文索引查同一句，同一次呼叫的其他查詢也直接用全文檢索、不再等 embedding。全文索引對中文照空白與標點切詞，型號、英文與被標點隔開的詞查得到，連在一起的中文詞多半比對不到，所以這是降級而不是等效替代。LanceDB 本身的錯誤照舊往外拋。
+
 - **[2026-11-23]** **OpenAI 備援站不再因工具名稱整個失敗**：技能工具名帶冒號（如 `weather:get_current_weather`），OpenAI 只收英數、底線與連字號，每個帶工具的請求都回 400，gpt-4.1-mini 這站自 11/13 起沒有成功過，Gemini 一逾時就直接落到 groq。Brain 送出前把 tools、強制工具與對話歷史裡的名稱改成合法形式（`:` 換 `__`），回傳的工具呼叫再對回原名（`core/tool_names.py`）。400 改記 `request_invalid`：只換下一站答這一題，不再冷卻那一站或那把 key，log 裡照舊帶 provider 的錯誤訊息。
+
+## [2026-11-20]
+
+### Added
+
+- **[2026-11-20]** **多人端到端模擬工具**：`scripts/experiments/brain-worker-split/users_e2e.py` 照 SDK `ask()` 的協定模擬 N 個人各問 M 題（逐句串流合成、唸完停 2～3 秒再問），每題記錄與 `burst_nodes.py` 同格式，`node_report.py` 多一欄「整段回答唸完」。
+
+- **[2026-11-20]** **SDK 的 `reply` 事件帶出 `sessionId` 與 `traceId`**：嵌入頁面可以把每一輪對到後端 log 與對話紀錄，壓測與除錯時不必再用時間和題目去猜。
+
+- **[2026-11-20]** **壓測逐段計時工具**：`scripts/experiments/brain-worker-split/burst_nodes.py` 與 `node_report.py`，把「1 秒 N 題」拆成 Backend 轉送、Brain 前置、決策、知識庫、LLM 首字、文字第一句、TTS 首段、聽到第一句與完成；`resource_monitor.py` 加上各容器網路收發。
+
+- **[2026-11-20]** **正式帳號權限預設與網路搜尋開關**。建立帳號可選創智研發、BD、廠商編輯或自訂，帳號與選取專案的授權一併寫入。帳號列表依現有權限顯示適用預設。新增帳號與網站嵌入金鑰的「可用網路搜尋」，帳號 API 金鑰沿用所屬帳號權限。文字對話與 Gemini Live 同時依呼叫者權限和全站開關控制網路搜尋及讀取公開網頁。新帳號與新嵌入金鑰預設關閉，創智研發與 BD 預設開啟。升級時既有內部帳號與嵌入金鑰保留開啟，既有廠商帳號關閉。
+
+- **[2026-11-20]** **快速問答各分類顯示索引同步狀態（已同步／更新中／同步失敗）**：Brain 的背景重建（`routes/knowledge.py` 的 `_reindex_state`）新增每專案的 `running`、`last_error`（下次成功後清除）與 `finished_at` 及 `reindex_status(project_id)`，並新增 `GET /brain/knowledge/qa/sync-status?project_id=`（邏輯在 `knowledge/qa_sync_status.py`），逐分類檢查直接掛載題目中可索引且未停用的去重來源文件指紋（同檔單次請求共用結果，略過選單專用題，不合併子分類），回傳 `synced`、`updating` 或 `failed`；遇到有文件未同步但記憶體無進行中或失敗紀錄（例如重啟或外部改檔）時自動補排一次 `schedule_reindex` 自我修復並回 `updating`。廠商請求依 `visible_workspace_path` 過濾隱藏來源（只含隱藏來源的分類回 `synced`，不洩漏失敗也不觸發重建）；Backend 廠商白名單放行 `GET /knowledge/qa/sync-status`。後台知識庫頁進頁與存檔、上傳、刪除、搬移後即時查詢，任一分類更新中時每 3 秒輪詢並在完成、切換專案或離開頁面時停止；選中分類名稱旁顯示色點與「已同步」「更新中」「同步失敗」（失敗時直接附上一行說明），左側分類樹只對「更新中」「同步失敗」的分類加色點與無障礙標籤。
+
+- **[2026-11-20]** **快速問答支援匯出 Excel（與匯入同格式）**：答案裡 Excel 存不下的控制字元會先清掉；重傳匯出檔的限制寫在 `docs/guides/qa-table-format.md`。後台知識庫頁首緊鄰上傳鈕新增「匯出」按鈕（內部帳號與廠商皆可使用），點擊後呼叫 Brain `GET /brain/knowledge/qa/export?project_id=`（經 Backend `/api/v1/knowledge/qa/export` 代理並開放廠商帳號讀取）下載工作表名為「快速回覆」、以台北時間命名的 `快速回覆_YYYYMMDD.xlsx`。欄位與順序固定為「語言、第一層、第二層、問題、答案、圖片、連結、顯示（是／否）、順序」，一列一題一個位置，答案、圖片、連結與顯示皆以文件為準，超過兩層的舊分類以 ` / ` 併入第二層，未分類題目排在最後且分類與順序留空；廠商帳號僅輸出可見來源的題目與選單專用題。同步更新 `brain/README.md`、`docs/specs/03_BRAIN_SPEC.md` 與 `docs/guides/qa-table-format.md`。
+
+- **[2026-11-20]** **快速問答新增單題直接存檔與跨分類批次移動 API**：Brain 新增 `PUT /brain/knowledge/qa/questions`（`qa_merged.save_question`）與 `POST /brain/knowledge/qa/questions/move`（`qa_entry_moves.move_qa_entries`），Backend 同步對具知識庫編輯權的內部帳號與廠商帳號開放（`/api/v1/knowledge/qa/questions`、`/api/v1/knowledge/qa/questions/move`）。`PUT /knowledge/qa/questions` 不經分類直接修改來源文件（CSV 或 Markdown）中的單一題目，保留原列位置、`index` 與其他列。只接受標記為 QA 的文件，並保留未分類題目的狀態。支援 `base_hash`（與 `GET /knowledge/document` 同算法的 `content_hash`，`GET /knowledge/qa/questions` 的文件題目列同步帶出 `content_hash`）版本檢查，檔案被改過回 409、找不到原題回 404、題目或答案空白回 400、改名撞到同檔既有題目（不論答案是否相同）或讓其他掛載分類重名皆回 400；寫檔與節點同步（`rename_questions_in_nodes`、`sync_entries_for_source`）全有或全無，且不重排任何分類的題目順序，成功後排程重建索引並回傳讀回的題目與新 `content_hash`。`POST /knowledge/qa/questions/move` 只讀寫一次 `.qa_nodes.json` 即可完成單題或批次跨分類移動與未分類題目掛載，任何一題不符（目標分類不存在、原分類沒有該題、目標分類已有其他來源的同名題、未分類題目來源不符合 QA 掛載條件，或同批題目文字重複）即整批不動並列出問題題目；目標已有同一題與同一來源時保留原位置，只從指定的其他分類移除，且搬移時即使某題不再掛於任何分類也不記進 `detached`。
+
+- **[2026-11-20]** **知識庫問答表匯入前檢查**：新上傳與等待匯入區的問答表先檢查，再由使用者確認匯入。純一般文件直接匯入，檢查失敗時顯示原因並將檔案留在等待匯入區。摘要列出新題目、答案相同、答案不同、檔案內重複與格式錯誤的數量。預覽與匯入共用格式檢查，格式錯誤會擋下整份檔案。答案並排比較會標出不同的字元，手機改為上下排，任一答案超過 2,000 字元時顯示原文。衝突題可選「覆蓋」「保留原本」「兩題都留（新的會先隱藏）」「稍後調整」，全部選完才能匯入。可按「重複的全部覆蓋」或「重複的全部保留原本」後再逐題調整。覆蓋會更新答案，新表的圖片或連結留白時保留原值。待處理結果可開啟原題編輯面板，旁邊附上新檔案的答案，結果清單也顯示封存的原始檔案路徑（廠商畫面不顯示）。畫面可補傳缺少的圖片、查看題目的分類預覽（廠商畫面沿用分類樹的遮蔽名稱，不顯示檔名），並透過 `POST /knowledge/raw/commit` 的選填 `decisions` 送出逐題決定及補傳的圖片。
+
+### Changed
+
+- **[2026-11-20]** **快速問答的語言分類與層數判斷拆成獨立模組**：`brain/api/knowledge/qa_category_depth.py`，`qa_nodes.py` 回到千行以內；行為不變，原本從 `qa_nodes` 匯入的名稱照常可用。
+
+- **[2026-11-20]** **SDK 對話模式改成串流合成語音**：`ask()` 每句改打 `POST /api/v1/tts/stream`（`format: "pcm16k"`），收到第一段 PCM 就開始播放與對嘴，不再等整句合成完；前一段還在播時下一段已在合成。部署沒有這條路由（404／405）時，該 instance 之後退回 `/v1/audio/speech` 整句合成。
+
+- **[2026-11-20]** **後台未分類題目可直接編輯存檔，跨分類移動與批次移動改為一次完成**：知識庫單題編輯面板（`QuestionEditor.tsx`）對未分類題目開放編輯問題、答案、網址、前台顯示與圖片上傳，不再唯讀（保留「開啟來源文件」按鈕）；內容有變才呼叫 `saveQaQuestion`（帶 `base_hash`），有選分類就呼叫 `moveQaQuestions`（`from_node_ids: []`）掛入分類，第二步失敗時提示「題目內容已儲存，但放進分類未完成」、重試只補做掛載，遇 409 顯示衝突訊息並重新載入清單。沒有答案的未分類題目也能直接選分類掛載。編輯器會顯示來源文件驗證訊息。`QuestionBank.tsx` 的批次「移動到分類」單次呼叫 `moveQaQuestions`（全有或全無），移除部分移動（`"partial"`）狀態與文案；編輯已分類題目且同時變更分類時，維持先以原分類版本檢查存內容（`PUT /nodes/{id}/merged`）再呼叫一次 `moveQaQuestions` 搬移分類。
+
+- **[2026-11-20]** **快速問答匯入改用「第一層」「第二層」欄並保留表內題目順序**：問答表匯入新增 `level1`（別名「第一層」「第一层」）與 `level2`（別名「第二層」「第二层」）兩欄（CSV 與 Excel 皆支援，不再被列為未讀取欄位），自動掛在該題對應的語言分類底下（找不到語言分類則放最上層），舊的「分類」斜線欄仍相容；寫檔前檢查三種格式錯誤（同列同時填「分類」和「第一層／第二層」、只填第二層沒有第一層、`path` 去掉開頭語言分類名稱後超過兩層），違規時整份不匯入並一次列出所有問題題目。匯入掛題目（`place_questions_by_path`）改照文件排序（依「順序」／`index` 欄）掛入各分類，分到多個分類時也能保持表內順序（重傳時已掛題目位置不變，新題依序接在後面）。同步更新後台廠商／內部上傳提示、下載範例（CSV／Excel）、`docs/guides/qa-table-format.md`、`docs/specs/03_BRAIN_SPEC.md` 與 `brain/README.md`。
+
+### Fixed
+
 - **[2026-11-20]** **網站嵌入金鑰在大量同時請求下不再回 500**：每個 embed key 請求原本要開兩次 SQLite 寫入（最後使用時間、每日用量），50 人同時使用時搶不到寫入鎖，就回 `database is locked` 的 500，排隊等鎖也拖慢每個請求。現在合成一次寫入；真的搶不到鎖時記警告並放行，每分鐘上限照舊由 limiter 擋，只在極端爭用時每日用量可能少記幾筆。
+
 - **[2026-11-20]** **同一專案的重建索引不再同時跑兩個**：存檔後的背景重建、手動重建、圖譜前的補索引與同步狀態的自我修復都改走同一把鎖，避免兩次重建共用 checkpoint 暫存檔、互相蓋掉指紋。
+
 - **[2026-11-20]** **網路搜尋權限只能往下委派**：自己沒有網路搜尋權限的管理員，不能再替子帳號、臨時帳號批次或網站嵌入金鑰開啟，也不能套用 BD 預設（回 403），但原本就開著的帳號與金鑰仍可照常編輯其他欄位；最高管理員一律可用，全新安裝時不會被鎖在關閉；內部帳號改設所屬廠商時自動關閉網路搜尋。
+
 - **[2026-11-20]** **快速問答後端加上最多兩層分類上限（語言分類不計）**：`knowledge/qa_nodes.py` 新增 `QA_CATEGORY_DEPTH_LIMIT = 2` 與深度計算（與前端 `qaCategoryDepth`／`qaMoveExceedsDepth` 規則一致，最上層語言分類算第 0 層，多上層取最深位置），`create_node` 與 `move_node`（包含搬移整棵子樹超過上限的情況；搬到原本上層底下不算）超過兩層時拒絕寫入並由 `POST /brain/knowledge/qa/nodes`、`POST /brain/knowledge/qa/nodes/{id}/move` 回傳 400。
+
 - **[2026-11-20]** **廠商移除快速問答題目補來源檢查與上傳提示修正**：廠商移除快速問答題目時也檢查來源文件是否可見；上傳提示改為說明答案衝突時整份不匯入。
+
+## [2026-11-19]
+
+### Added
+
+- **[2026-11-19]** **角色管理新增表格模式**：角色管理頁預設改成填空表格，只露出人設：「個性與說話方式」的「角色設定」「回應風格」、「工作規則」的「角色與任務」、以及回覆字數，每格附一句說明與範例。欄位對應 `SOUL.md`、`AGENTS.md` 裡固定的 `## 標題`，存檔寫回同一份文件，和原始文件模式改的是同一份：沒有這些標題時整份文件放進「角色設定」或「角色與任務」，開頭的 `#` 大標題（後台用它當角色名稱）與其他段落放進可展開的「其他內容」原樣保留，存檔時保留原文件的段落順序（已知欄位寫回原位，原本沒有的欄位照固定順序插在其他欄位旁，同名的第二段永遠是其他內容），沒改過的文件原樣寫回、空欄位不寫標題；程式碼區塊照 CommonMark 圍欄規則判斷，欄位裡有未收尾的區塊或會被當成另一欄的標題時先提示、不存。回覆字數就是知識庫的回答長度（秒數 × 每秒字數），整個專案共用；存檔只改長度、不動語言分流（`PUT /api/v1/knowledge/settings` 的 `language_routes` 改為可省略），換成秒數時無條件進位且至少 1 秒。存檔一開始就鎖定專案與角色，存檔中切換專案或角色會等存完；等待期間新打的字保留並仍標為未儲存；各份文件分開讀寫，一份失敗不影響其他份並逐份回報。保護規則存檔帶版本，別處改過就拒絕。內部帳號也依專案的 `can_edit_knowledge`（`GET /api/v1/projects` 現在對所有帳號回傳）決定能不能改。頁面下方灰底區顯示保護規則，有「改其他設定」的內部帳號可以直接改。廠商只有表格模式；內部帳號可切到「原始文件」編輯四份文件（含工具使用說明與長期記憶）。未存檔離開沿用原本的提醒。角色清單上的預設角色一律顯示「預設角色」，內部帳號與廠商相同（`GET /api/v1/personas` 的 `label`）；其他角色顯示 `SOUL.md` 的第一個 `#` 標題，沒有標題時顯示代號。
+
+- **[2026-11-19]** **每個專案新增保護規則 `GUARDRAILS.md`**：廠商改得到人設，平台的底線改放在工作區根目錄的保護規則，三段固定標題「範圍限制」「回覆格式」「知識庫規則」。只有新專案由範本產生（不越權、無關問題婉拒、敏感議題關懷；純文字、不用 emoji、不附網址；只依資料回答、查不到就說無法確認）；既有專案不會自動補這份檔案，回答方式維持不變，`SOUL.md`、`AGENTS.md` 也不會被搬動或改寫，要套用時由內部帳號在角色管理頁按「帶入建議內容」後依案子修改。文字對話與 Live 都把保護規則接在人設之後，用 `<guardrails>` 標籤包起來並標明衝突時優先；人設、記憶、對話摘要裡同名的標籤與標題一律移除，不能偽造。保護規則整份帶入、不被截斷（整體字數超過預算時壓縮其他內容），寫入時上限 5000 字，超過以白話說明拒絕。HTTP 仍在快取的固定前綴內；Live 每次組 setup 都重新讀，連線中改了規則下一次重連就生效。檔案沒有、空白或是符號連結／硬連結時不帶入（後台顯示為未設定、連結時說明原因且不能從頁面改）。新專案由建立流程明確寫入保護規則（先寫保護規則再寫人設，中斷重試會補上）；全新安裝以工作區目錄原本不存在判斷。既有專案缺 `SOUL.md`／`AGENTS.md` 時補的仍是升版前的範本。廠商只能用 `GET /api/v1/personas/guardrails` 讀，內部帳號以工作區文件 API 修改，需要「改其他設定」。新專案的 `SOUL.md` 範本改成「角色設定」「回應風格」兩段，`AGENTS.md` 加上「角色與任務」，原本寫在人設裡的範圍、格式與資料規則移到保護規則（`NEW_PROJECT_TEMPLATES`）。角色管理頁的人設 API 只對廠商擋符號連結與硬連結，內部帳號照一般工作區規則解析，但解析後仍須是角色的 `SOUL.md`／`AGENTS.md`；沒有 `SOUL.md` 的孤立角色資料夾讀寫都回 404。
+
+- **[2026-11-19]** **記憶與知識圖譜擴展可逐專案開關**。有「改其他設定」權限的內部帳號可在「專案管理 → 回答功能」調整，建立專案時也可以直接勾選。新專案預設關閉；設定檔裡沒有這兩個欄位的既有專案視為開啟，升版不需遷移。記憶關閉後停止對話自動回想、記憶工具、每日記憶日誌與其摘要索引，對話紀錄、匯出及備份照常可用。關閉圖譜擴展後，回答只引用檢索命中的文件，仍可從後台查看或重建圖譜。
+
+### Changed
+
+- **[2026-11-19]** **知識庫改用分類樹、快速回覆表格與單題編輯面板**。可搜尋問題或答案直達編輯，依語言看題數與分類，調整前台顯示和分類內順序，批次移動、顯示、隱藏或永久刪除題目。題目可掛到多個分類，也可只從目前分類取下並保留來源。永久刪除前會確認最新的分類與來源影響範圍。在全部分類畫面批次移動同時放在好幾個分類的題目時，會先列出會被移出的分類，讓人選「只加入新分類（保留原本的）」或「移出原本所有分類」；只放在一個分類的題目直接移動。改分類時內容已存、移動卻失敗，再按儲存只重試移動，不再誤報有人同時修改。題庫剛載入時勾選的題目不會被清掉。分類移動維持兩層上限（語言分類不計）。編輯面板可直接上傳圖片，表格與面板的圖片類型照伺服器的判定結果顯示（Brain 的 `GET /knowledge/qa/questions` 與 `GET /knowledge/qa/nodes/{id}/merged` 新增唯讀 `image_kind`，只查已存的判斷結果，存檔不會清掉），也可把已儲存的問題帶到對話頁送出測試。原「所有題目」連結仍可開啟題庫總表，文件匯入及編輯沿用原有流程。廠商帳號隱藏圖譜、維護和檔名。窄畫面用「目錄」抽屜開啟分類和文件，題目分列堆疊，編輯面板接在題庫下方。
+
+- **[2026-11-19]** **admin 與 avatar 容器的 nginx 升到 1.31.9，修補 2026-11 的 nginx 漏洞**：1.9.5～1.31.8 受 HTTP/2 flow control 記憶體破壞（CVE-2026-123007，不需登入）、HTTP/2 UAF（CVE-2026-123633）、resolver UAF（CVE-2026-123634）、TLS 1.3 讀 body 無限迴圈（CVE-2026-118899）影響，修正版為 1.31.9+／1.30.7+。兩個映像的 runner 由 `nginx:1.31.8-alpine` 換成 `nginx:1.31.9-alpine`；admin 的 dev stage 把 Alpine 套件釘在 `nginx>=1.30.7-r0`，也讓舊的建置快取失效。HTTP/2 照舊開啟。主機 nginx 已是 1.31.9。
+
+- **[2026-11-19]** **壓測工具可調上游延遲並記錄資源**：`scripts/experiments/brain-worker-split/` 的假 LLM、假 TTS 延遲改由 `FAKE_LLM_FIRST_SECONDS`、`FAKE_LLM_GAP_SECONDS`、`FAKE_TTS_FIRST_CHUNK_SECONDS`、`FAKE_TTS_SECONDS_PER_CHAR` 設定（預設不變），設 0 即「上游秒回」，只量 Backend＋Brain；`load.py` 以 `LOAD_WARMUP` 控制正式計時前的暖身；新增 `resource_monitor.py` 每秒讀各容器 cgroup 的 CPU 與記憶體、`compose.real-project.yaml` 以真實專案資料壓測、`questions-industrial.json` 題庫。新增 `scripts/experiments/tts-relay/run.py` 比較直接打 TTS 節點與經 Backend 轉發的首音時間（`--direct-url` 必填）。
+
+- **[2026-11-19]** **廠商後台只開放四頁，角色只可改個性與工作規則**：廠商帳號在桌面和手機只看得到知識庫、角色管理、對話測試、對話紀錄（導覽名稱和內部帳號一致）。直接打開其他頁面顯示「沒有權限」，呼叫隱藏功能的 API 回 403。人設頁只讀取與儲存授權專案的 `SOUL.md`（個性與說話方式）與 `AGENTS.md`（工作規則，`GET`／`PUT /api/v1/personas/agents`），唯讀帳號只能瀏覽；`TOOLS.md`、`MEMORY.md`、`IDENTITY.md`、`.learnings/` 仍隱藏，Backend 與 Brain 都擋。知識庫文件操作限知識庫目錄，拒絕前後帶空白的路徑及檔案連結。通用工作區檔案與角色綁定僅供內部使用。文字、串流與即時對話只提供本專案的唯讀知識庫工具，工具診斷留在內部。即時對話須先驗證專案授權，知識庫上傳失敗以固定訊息回覆。廠商代發金鑰沿用相同的路由和專案限制。
+
+### Security
+
+- **[2026-11-19]** **知識索引不再收進符號連結與硬連結**：重建索引時，`knowledge/` 底下指向工作區其他檔案（例如 `AGENTS.md`）的符號連結會被當成知識收進去，廠商在對話裡就問得到工作規則。`iter_indexable_documents` 與 `iter_knowledge_documents` 現在略過符號連結、經過連結資料夾的檔案（解析後的位置必須和原本路徑相同，所以 `knowledge/` 底下的檔案解析後一定還在 `knowledge/`），以及有其他名稱的硬連結（記 warning）。知識庫清單與快速問答也跟著略過這些檔案；工作區裡一般的文件照舊進索引。
+
+### Fixed
+
 - **[2026-11-19]** **廠商帳號的 AI 整理權限在管理畫面顯示正確、關掉圖譜的專案不再自動重建圖譜**：帳號管理清單與帳號詳情對廠商帳號回傳實際的 `ai_cleanup_access`（先前顯示成關閉，管理員存一次帳號設定就會把權限關掉）；廠商自己的 `/auth/me` 仍不帶這個欄位。知識文件存檔觸發的背景重建索引，只在專案開著知識圖譜時接著重建圖譜；`POST /api/v1/knowledge/graph/rebuild` 手動重建不受開關限制。
+
 - **[2026-11-19]** **角色管理存檔與權限的細節修正**：沒有固定標題的 `SOUL.md`／`AGENTS.md` 只改一格時照原本無標題的結構寫回，不再補出空的「## 角色設定」、存完內容也不會跳到「其他內容」；同時填了其他欄位、或欄位裡有其他 `## ` 標題時先提示改成 `###` 再存（會被拆成另一段）。新角色的 `SOUL.md` 範本改用「## 角色設定」「## 回應風格」。存檔中「捨棄修改」停用；存檔或重新整理的回應晚到時，不會把已切換的角色拉回去或丟掉新角色的草稿；原始文件模式存檔中切換會等存完，過期的錯誤不會顯示在別的角色上；側欄重新整理發現目前角色已被刪除時先問再切換。保護規則存檔後沒拿到新版本時提示重新整理，不再帶舊版本重存。沒有「改知識庫與人設」的內部帳號不再看到新增、複製、刪除角色與虛擬人綁定；只有「改知識庫與人設」的帳號在原始文件模式只能看長期記憶（`MEMORY.md` 需要「改其他設定」）；唯讀文案依實際權限顯示。長的角色名稱與保護規則內容自動換行或截斷，刪除鈕不再被擠出側欄。
+
+## [2026-11-18]
+
+### Added
+
+- **[2026-11-18]** **對外客服新增專案權限與所屬廠商**：正式帳號可逐專案授予「改知識庫與人設」及「改其他設定」，原有編輯授權升級後保留兩種。帳號與專案可設定「所屬廠商」，廠商帳號只讀得到明確授權的同廠商專案。最高管理員可替管理員開啟「管理廠商帳號」，讓專人建立、重設密碼、停用及替正式廠商一般帳號代發或撤銷 API 金鑰，包含其他人建立的帳號。
+
+### Changed
+
+- **[2026-11-18]** **唯讀專案可看與匯出對話紀錄**：對話列表、單段歷史及匯出使用專案讀取權，刪除仍需「改其他設定」。一般帳號改由管理員代發 API 金鑰，既有金鑰照原本的期限與撤銷規則驗證。
+
+- **[2026-11-18]** **重啟後第一批題目不再整批慢半秒**：Brain 映像檔沒有 `.pyc`，第一題才建的 OpenAI client 會連帶 import `httpcore2`、openai 的 chat 資源，工具表也是第一題才載入，每個 worker 都在第一批題目上現場編譯這些模組，期間同一個 worker 的其他題目都在等。背景預熱現在先建好工具表，並對每個專案建好 Gemini client 與 LLM client（只建物件、不連線），第一題直接沿用。compose 讓 Backend 等 Brain ready 才啟動，一起重啟時預熱拿不到模型設定與金鑰；這兩項現在在 readiness 放行後每 2 秒重試（最多約 2 分鐘），Backend 一回應就補完；只重試連不到 Backend 或它回 5xx 的項目，專案金鑰綁定壞掉之類的設定錯誤記 warning 後不再重試，補熱也不重建工具表。隔離環境（鶴記真實資料、LLM／TTS 用假服務、決策走真的 Jev）重啟後馬上 1 秒 100 題：聽到第一句中位數原本比第二批慢 0.6～0.9 秒，現在慢 0.2～0.3 秒；p95 仍比第二批慢 0.5～0.8 秒，原因還沒找到。
+
+- **[2026-11-18]** **Gemini 語音預設改為直連 Google，可在後台切換**：沒有綁專案金鑰的請求，以前一律經 `TTS_GEMINI_URL` 的轉接服務合成；現在預設用本系統的 Gemini 金鑰（後台 API 金鑰或 `GEMINI_API_KEY`）直接呼叫 Google，費用算在這把金鑰。ROOT 可在「模型供應商 → Gemini 語音」（`/admin/model-providers/voice`）改成經轉接服務，Backend 各 worker 約 3 秒內生效、不用重開；沒有 Gemini 金鑰時不能選直連，沒設 `TTS_GEMINI_URL` 時不能選轉接。沒在後台存過時照新的 `TTS_GEMINI_ROUTE`（`direct`／`relay`，預設 `direct`，其他值啟動時報錯）。專案綁了自己的金鑰時照舊一律用它直連。Gemini 聲音改為固定的 30 個 Google 預設聲音（不再向轉接服務查 `/api/voices`），任一條路線可用就登錄，切換路線不影響可選的聲音；有設 `TTS_GEMINI_URL` 就照舊背景探測。直連的整段合成也改用每站的時限，失敗訊息不再寫成「Project」。`PUT /api/v1/settings/model-providers` 新增選填欄位 `tts_gemini_route`，`GET` 回應新增 `tts_gemini`。
+
+- **[2026-11-18]** **部署文件補上主機參考規格**：`docs/operations/11_DEPLOYMENT.md` 依實測換算「1 秒內同時 100 題」需要的 CPU、記憶體、GPU 與硬碟，並說明每核可接的題數與量測主機的限制。
+
+- **[2026-11-18]** **Brain 每題 CPU 減少約一半**：1 秒內同時進來 100 題時，Brain 每題約用 0.3 核秒（原約 0.45～0.75）。同一把 Gemini 金鑰共用一個 client，不再每題重建 SSL context；向 Backend 讀模型設定改用共用連線；商品型錄同一秒內沿用上次確認的結果（後台改型錄最慢 1 秒生效），掃描時不再逐檔逐層檢查巢狀型錄；停用文件清單與知識庫設定在檔案沒變時不重新解析；workspace 目錄 5 秒內確認過就不再逐一 mkdir；檢索去重改用矩陣運算。隔離環境（鶴記真實資料、LLM／TTS 用假服務）量到聽到第一句中位數約快 0.8 秒。
+
+### Security
+
+- **[2026-11-18]** **代理層的輸入邊界再收緊**：重複的 `project_id`（query 寫兩次，或 JSON 裡同一個鍵出現兩次）一律回 422，不再取其中一個；轉送前重組 JSON 時改用跳脫輸出，內容含沒配對的 Unicode 代理字元不再變成 500；建立與刪除專案的 body 在 FastAPI 解析前先限制在 64 KiB，超過回 413，不必等整份讀完。
+
+- **[2026-11-18]** **刪除人設不再能刪掉整個專案工作區**：人設 ID 原本接受「..」這類只有點的字串，刪除時路徑會指到工作區本身，有專案編輯權的帳號就能把該專案的知識庫、人設等檔案全部刪掉。現在人設 ID 必須以英文字母或數字開頭，刪除前也確認目標確實是 `personas/` 底下的一層資料夾。另外，最高管理員啟用或停用共用技能時必須明寫一個 `scope=shared`；沒寫或重複時回 422，避免 Backend 當共用放行、Brain 卻切換到同名的專案技能。
+
+- **[2026-11-18]** **Brain 的 internal 路由不再經 catch-all 直通**：`/api/v1/internal/*`（斷路器重置、金鑰指紋、模型設定刷新）沒有對應的 Backend 路由時，catch-all 會帶著 internal token 轉給 Brain，任何登入帳號都能呼叫；對外入口的 nginx 原本就擋下這個前綴，但容器網路內仍可直達。現在 catch-all 一律回 404，後台改用 Backend 自己的路由呼叫這些功能。
+
+- **[2026-11-18]** **Backend 轉給 Brain 的路徑與授權時看到的不一致**：代理層對解碼過一次的路徑做所有授權判斷，轉送時卻原樣接進網址，Brain 會再解碼一次。網址裡經過特別編碼的路徑因此能避開專案授權、Backend 專屬路由（備份、用量、檔案上傳）與共用技能限制，讀寫沒有授權的專案資料；編碼過的 `?`／`#` 也能讓 Brain 收到另一組 query。另外驗證中介層與代理以重組後的網址判斷公開路徑，同樣可能把非公開路徑當成公開。Dev 已重現跨專案讀取。現在轉送前重新編碼路徑，Brain 收到的就是授權過的同一個字串；`?`、`#`、`%` 以字面送達（例如含 `#` 的對話 ID 不再 404）；query 用授權時解析的同一份原文；公開路徑判斷改看 ASGI 的原始路徑。以真的 uvicorn 與假 Brain 驗證 Brain 實際收到的路徑。
+
+- **[2026-11-18]** **Backend 授權一個專案，Brain 卻在另一個專案執行**：Backend 只從 query 與帶 JSON `Content-Type` 的 body 找 `project_id`，Brain 卻還會讀沒有 `Content-Type` 的 JSON body、空的或重複的 `project_id`（空值落到預設專案、重複取最後一個）、`message.project_id`，以及呼叫端自帶的 `X-Brain-Project` 標頭。有某個專案權限的帳號或 Embed key 因此能讀寫、對話於沒有授權的專案（含預設專案）；dev 已重現讀到別的專案的知識文件。現在代理先在大小上限內讀完 body，從所有來源找專案，空白、重複或不一致回 422；授權後轉給 Brain 的 query、JSON body 與可信標頭都只帶授權過的專案 ID，呼叫端的 `X-Brain-*` 標頭不再轉送，Brain 對話信封優先採用可信標頭。另外：先讀 body 再授權，超大的 JSON body 直接 413，不會為了找專案整個讀進記憶體；公開的 `/api/v1/health` 只接受讀取，其他方法要登入；Brain 的技能清單與「重新載入」也用正規化後的專案 ID。
+
+- **[2026-11-18]** **建立專案技能可以在 Brain 執行任意程式**：有專案編輯權的帳號建立技能時，技能 ID 直接當目錄名稱，能寫到共用技能或別的專案；名稱與說明被拼進 `main.py` 與 `skill.yaml`，技能載入時就會執行。現在技能 ID 只收英文字母、數字與底線且不能以數字開頭（Brain 的建立與所有技能路由、Backend 代理、後台表單同一條規則），目錄必須落在目標資料夾內；`skill.yaml` 以 `yaml.safe_dump` 產生，`main.py` 只放技能 ID。Brain 的技能路由也改用正規化後的專案 ID（與 Backend 授權的相同），拒絕 `.`、`..`。
+
+### Fixed
+
 - **[2026-11-18]** **一筆壞掉的用量不再拖著整批一起丟掉**：背景寫入改版後，只要同一批裡有一筆數字存不進 SQLite（例如 `units` 是 NaN 會變成 NULL、token 數超過 64 位元），整個交易回滾、重試三次後連同最多 499 筆正常事件一起丟棄，呼叫端與 `flush_usage_events()` 卻都回成功。現在這類事件在入列前就擋下（`record_usage_event` 回 None、`POST /brain/usage/events` 回 400）；整批因鎖以外的原因寫不進去時改逐筆重寫，只丟真正壞掉的那幾筆，`flush_usage_events()` 有事件沒寫進去就回 False。停機改呼叫 `shutdown_usage_writer()`：會叫醒正在退避的寫入執行緒，等寫鎖、最後一次重試與執行緒結束共用同一個 5 秒期限，鎖在期限內放開就寫得進去（以前可能還在睡、錯過整個停機時段）。另外排進佇列的是事件副本，呼叫端改動拿回的 dict 不再改到帳本；事件清單改依發生時間由新到舊排序，不再依各 worker 的提交順序。多 process 只支援各自啟動（spawn）的 worker，已寫進 Brain 規格。
 
 - **[2026-11-18]** **舊的人設名稱不再讓整份人設清單失敗**：收緊人設 ID 規則後，以前建立的 `_sales`、`-night`、`.draft` 這類名稱一出現，整個專案的人設清單就回 500，也刪不掉。現在只有建立與複製時要求英文字母或數字開頭；既有名稱照常列出、讀取與刪除。`.`、`..` 與任何不是 `personas/` 底下一層的名稱一律拒絕，刪除前的目錄檢查不變；手動放進去、連舊規則都不合的資料夾在清單裡略過。
@@ -221,11 +236,97 @@
 
 - **[2026-11-18]** **技能儲存中切換不再誤問「捨棄並離開」**：後台技能編輯器按下儲存後、伺服器還沒回應前，按別的技能的「編輯」、切換技能或換頁，以前會跳「捨棄並離開」，但內容其實已經在寫入。現在先等儲存結束：存成功就直接切過去，存失敗或儲存期間又改了內容才照常詢問。導覽防護（`NavigationGuardContext`）新增「儲存中」狀態，其他編輯器之後也能沿用。
 
+### Removed
+
+- **[2026-11-18]** **移除 `docker-compose.avatar-motion-pilot.yml`**：動作實驗室試用期間用來讓 avatar 改跑本機映像、並關閉 watchtower 換版的覆寫檔；試用程式已合進 main，照一般流程部署，`docs/guides/avatar-motion-lab.md` 同步更新。
+
+## [2026-11-17]
+
+### Changed
+
+- **[2026-11-17]** **前後台操作與手機版修正**：前台快速問題切換知識庫時清除舊題目與答案快取，忽略切換前尚未完成的回應；手機與矮視窗的快速問題改依視窗配置高度，題目可捲動。中文等輸入法組字時按 Enter 不會提前送出，設定的下拉選單各有明確的無障礙名稱。後台技能草稿離開、關閉或切換技能前會提醒，技能檔案載入失敗時不能編輯或儲存（以免空白內容覆寫伺服器上的技能），儲存進行中關閉鈕停用、等存完再關；記憶分頁末頁不再重複，窄畫面按鈕可完整操作；網站嵌入金鑰表單改用原生對話框，支援鍵盤焦點與 Escape（下拉選單開著時 Escape 只關選單，不會連表單一起關掉），驗證及儲存錯誤直接顯示在表單內；儲存成功但清單刷新失敗時，表單照樣關閉，改提示「已建立／已更新 網站嵌入金鑰，但清單刷新失敗」。
+
+- **[2026-11-17]** **VoxCPM 滿載時先重試再換引擎**：即時串流打 VoxCPM 收到 429（`queue=reject` 沒空位）時，隔 `TTS_VOXCPM_BUSY_RETRY_SECONDS`（預設 0.5 秒）重試最多 `TTS_VOXCPM_BUSY_RETRIES` 次。預設 0（不重試）：實測單台 VoxCPM 每秒只消化約 2 句，重試 2 次只多保住 2～3 句、延遲多約 1 秒；節點變多後再調高。重試不會讓首音超過 `TTS_STREAM_FIRST_BYTE_SECONDS`（保留 1 秒給下一家），其他錯誤不重試。
+
+- **[2026-11-17]** **部署文件補上「依流量配 worker 數」**：`docs/operations/11_DEPLOYMENT.md` 新增 Brain 4／8／16 workers 在每秒 10、20 題的實測與換機器時的配法（約「尖峰每秒題數 ÷ 1.2」，最少 8）；更正 `api-chat` 的 `BRAIN_WORKERS` 預設為 16 與每個 worker 的資源用量。
+
+- **[2026-11-17]** **即時串流遇到 VoxCPM 滿載時不再排隊白等**：`/api/v1/tts/stream` 打 VoxCPM 時帶 `queue=reject`（`TTS_VOXCPM_STREAM_QUEUE`，預設 `reject`，設 `wait` 恢復舊行為）。節點同時處理數滿時立刻回 429，Backend 直接換下一家，不再排隊十幾秒、等滿首音逾時才換。VoxCPM360 從 c7a0a47 起支援 `queue`（正式節點已更新）；舊版節點不認得這個表單欄位，照舊排隊。整段合成（`/v1/audio/speech`）不帶，照節點預設排隊。
+
+### Fixed
+
 - **[2026-11-17]** **伺服器先查好知識庫的回合不再被模型重查一次**：系統提示寫著「第一輪 search_knowledge 一定要叫」「必須先呼叫此工具再回答」，但伺服器已經先查好、這一輪也不提供這個工具；模型照提示再叫一次，被丟掉後整段重送，多等一次 LLM（約 1 秒），正式站抽查 18 輪有 13 輪如此。先查的那一輪現在把這幾句改寫成「已經查好、結果在對話裡」，提示與實際流程一致。
 
 - **[2026-11-17]** **一批人同時講完時對話不再因「database is locked」丟失**：16 個對話 worker 同時寫 `sessions.db` 時，SQLite 的等鎖不保證先來先拿，原本 5 秒的上限會讓排在後面的寫入失敗，整輪回答丟掉；真實 LLM 壓測時同時 32 輪曾出現。等鎖上限改為 30 秒（每筆寫入都很短，實測同時 128 輪 0 失敗、最久等約 1.3 秒）。對話紀錄寫入失敗也不再回 502 `LLM_OVERLOAD`（會讓人去查模型），改回 503 `INTERNAL_ERROR`，錯誤紀錄記為 `storage_failure`。
 
+## [2026-11-16]
+
+### Added
+
+- **[2026-11-16]** **決策鏈新增 Gemini Decisions，預設排第一站**：每輪決策、記憶過濾、答不出來判斷、回答選圖、個資掃描都先問 Gemini Decisions（模型 `gemini-decision-1`），失敗或逾時再照後台順序往下（Clef 主／備援、Jev、OpenAI）。金鑰用後台「模型供應商」的 Gemini 金鑰（沒存過就用 `.env` 的 `GEMINI_API_KEY`），以 `x-goog-api-key` 送出；題目與答案格式與 System One 相同，請求改用 `input` 陣列。實測單次 0.35～0.52 秒，每站時限至少 1 秒。之前在後台存過決策順序的部署，讀設定時自動把新的站插在目錄位置（最前面）並照預設開啟，其他站順序與開關不變；要改回去在後台調順序或關掉它。
+
+### Changed
+
+- **[2026-11-16]** **A2A 支援 Backend 多 process**：拿掉 `A2A_ENABLED` 必須搭配 `BACKEND_WORKERS=1` 的啟動限制，讓 Backend 在預設 4 個 process 下也能同時開 A2A。收進來的 SSE inbox、SQLite WAL 佇列與憑證註冊／換發仍由取得 Redis leader 租約的單一 process 負責（`BACKEND_WORKERS > 1` 時連不上 Redis 一律不自認 leader，續約短暫失敗在本機租約到期時間扣除安全邊際前保留領導權、到期即讓出，且 `is_leader` 與 SSE 重連迴圈一致以本機 monotonic 到期時間防護、不無退避重連；以 `SET NX` 重取租約時不取消自身仍在執行的 Brain／回覆任務並執行 `requeue_processing_events`，跳過 `processing_owner` 為自己且仍在 `_active_event_ids` 的列、只重排其他過時或中斷列，若重排寫庫暫時失敗則設待補旗標於後續輪次自動補跑；`requeue_processing_events` 亦寫入 `first_failed_at` 且將超過 10 分鐘期限、`created_at` 逾期或無 `first_failed_at` 但 `attempts >= 5` 的舊卡住列直接標成 `FAILED`；已寫入 `reply_message` 與 `reply_task_id` 者直接沿用原 `taskId` 重送、不再重複呼叫 Brain，尚未完成 Brain 呼叫者重排後由新 leader 呼叫；leader 並每 30 秒回收 `processing_owner` 為自己但無本機活動任務的孤兒 `PROCESSING` 列，失去租約或未預期例外會記 log 並依持有者防護完成／抑制／失敗退回佇列；停機 `stop()` 切換 SQLite 250ms 短 `busy_timeout` 並將總時限壓在 8 秒內，先等進行中的回覆送完再釋放租約與關閉 client；呼叫 Brain 支援 `A2A_BRAIN_TIMEOUT_SECONDS` 讀取逾時以免共用 SSE client 無限阻塞；回覆遇本機限流或 Hub HTTP 429 每次重試仍受共用限流管理、不扣減 `attempts` 並依 `max(Retry-After, 2^attempts)`（支援秒數與 HTTP-date、上限 60 秒）寫入 `next_retry_at` 延後重試，5xx／網路／換憑證後仍失敗採指數退避（2、4、8…上限 60 秒），共用同一 10 分鐘總期限）；三個送出端點（`GET /api/v1/internal/a2a/peers`、`POST /api/v1/internal/a2a/tasks`、`POST /api/v1/internal/a2a/groups/messages`）與 leader 解耦，每個 process 依路徑 `.stat()`（`mtime_ns`、`ino`、`size`）懶載入原子寫入的加密憑證（開檔後另以 `os.fstat` 驗證 `0600` 權限），僅在 401／403 換憑證後的單次重試跳過限流（不額外扣額度也不繼承給背景 task），仍失敗回 503；回應皆附 `X-OpenVMan-Worker-ID` 標頭（僅 `/peers` 本文另外帶 `worker_id` 與 `is_leader`，`/tasks` 與 `/groups/messages` 本文不回 `worker_id` 以免 PID 進入 Brain LLM 上下文）；送出限流 `A2ARateLimiter` 改用 Redis Lua 滑動視窗跨 process 共用計數（超過回 429）。
+
+- **[2026-11-16]** **個資掃描改走整條決策鏈**：`PRIVACY_FILTER_ENABLED` 開啟時的個資偵測以前只問 Clef（`decide(providers={"clef"})`），不送 Jev、OpenAI 等外部服務；現在跟當輪決策一樣照後台設定的決策順序備援，Clef 不在或逾時時改問下一家。我們的資料沒有不能送外部服務的限制。逾時仍是 `PRIVACY_CLEF_TIMEOUT_SECONDS`（名稱不變），同時掃描上限、只偵測不改寫內容的行為都不變。
+
+- **[2026-11-16]** **只有 IndexTTS 會先打文字正規化**：`TTS_NORMALIZE_PROVIDERS` 預設從 `indextts,indextts-nurse,voxcpm,cosyvoice` 改為 `indextts,indextts-nurse`。VoxCPM、CosyVoice 改成跟 Gemini TTS、Edge 一樣只做本地清理（去 markdown／表情符號），送原文、不轉簡體。正規化服務會把每一句記下並排進它的審核佇列，我們的測試與壓測流量會一起灌進去，每句也多等 0.4～0.5 秒。沒指定引擎時可能落到 IndexTTS，照舊正規化。要恢復舊行為就在 `.env` 寫回原本的清單。
+
+- **[2026-11-16]** **dev 的 Backend 改成跟正式站一樣多 process**：以前 `ENV=dev` 一律用 `uvicorn --reload` 啟動，`--reload` 只能單一 process，所以就算 `BACKEND_WORKERS=4`，dev 也只有 1 個 process，限流、鎖、監控計數這類多 process 才會出的問題在 dev 測不到，壓測數字也偏低。現在 dev 照 `BACKEND_WORKERS`（預設 4）開 process、不自動重載，改 Backend 程式後要 `docker restart` 該容器；`BACKEND_WORKERS=1` 時維持自動重載。
+
+- **[2026-11-16]** **Brain 每個呼叫者的請求上限從每分鐘 90 調到 1,200**：上限是依呼叫者計算（每把 API key、Embed key、每個登入帳號各一份），一把 Embed key 常由整群 kiosk 共用，90（約每秒 1.5 題）只夠十幾台；1,200 約每秒 20 題，夠 100 台以上，仍擋得住失控的迴圈。`REQUEST_RATE_LIMIT_PER_MINUTE` 可覆寫。
+
+- **[2026-11-16]** **對話服務預設改為 16 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 8 改為 16。隔離環境量測（`docs/plans/brain-100-concurrency.md`「每個 process 的容量」）每個對話 worker 約撐每秒 1～1.25 題，8 個在每秒 10 題時聽到第一句 p95 5.7 秒，16 個為 2.7～3.5 秒；每個 worker 約 0.4～0.5 GB，閒置不吃 CPU。
+
+- **[2026-11-16]** **Gemini TTS、Edge 不再先打文字正規化**：`/api/v1/tts/stream` 與 `/v1/audio/speech` 以前不分引擎，每句中文都先呼叫 `NORMALIZE_API_URL`（數字念成中文、轉簡體），實測每句 0.36～0.54 秒。現在只有 `TTS_NORMALIZE_PROVIDERS` 列出的引擎（預設 `indextts,indextts-nurse,voxcpm,cosyvoice`）才打；Gemini TTS、Edge 自己會念數字，只做去 markdown／表情符號的本地清理，送原文（不轉簡體）。沒指定引擎時可能落到自架引擎，照舊正規化。Gemini 串流失敗時直接回錯誤、不會改由自架引擎接手，所以不會有未正規化的文字送進自架引擎。
+
+- **[2026-11-16]** **Avatar SDK 的 pushPcm 預設先緩衝 150 ms**：新增初始化選項 `audioLeadMs`（預設 150，0～2000）。每段話開頭先扣住這段時間的 PCM，再一起送進嘴型模型並開始播；以前照播放速度每 100 ms 送一包時，嘴型模型只拿到一小段音訊，嘴幾乎不張開，而且包與包之間的空檔會立刻清掉嘴型緩衝。佇列播完後再等 300 ms 沒有新音訊才結束說話，`speaking` 的 `start` 改在第一段音訊真正開始播時才派送。`audioLeadMs: 0` 完全維持舊行為；宿主已自行扣住開頭的請改設 0。
+
+- **[2026-11-16]** **Avatar SDK 的 silent 模式不再需要瀏覽器放行音訊**：`audioOutput: "silent"` 改用頁面時鐘排程每段音訊、以 OfflineAudioContext 解碼整段音檔，不建立 AudioContext；沒被使用者點過的視窗（kiosk 開機後、`window.open` 開出的視窗）也能 `pushPcm` 對嘴，不再丟 `AUTOPLAY_BLOCKED`。speaking 事件、`pushPcm`／`playAudio` 的 Promise 與嘴型時間軸不變；`speaker` 模式照舊。另外，嘴型用的 WebGL 畫布失效（`webglcontextlost`）時改為停止貼嘴型、只留人物影片，並以 `error` 事件 `WEBGL_CONTEXT_LOST` 通知，不再貼上半透明暗塊。
+
+- **[2026-11-16]** **Embed key 的人物清單只列讀得到的人物**：`GET /api/v1/characters` 帶 Embed key 時，全域公開人物也要在金鑰允許的人物內才列出。以前清單會列出所有全域公開人物，但 `/static/characters/*` 依金鑰白名單回 403，SDK 選到就讀不到素材。
+
+## [2026-11-13]
+
+### Added
+
+- **[2026-11-13]** **「AI 整理排版」逐帳號開放**：AI 整理會用到 AI 額度，現在最高管理員與管理員一律可以用，其他帳號預設不能用，由管理員在帳號設定勾「可以用 AI 整理排版」開放（正式帳號、建立帳號、角色調整、臨時帳號批次都可以設）。沒有權限的帳號在「新增資料」只看到「直接放進知識庫」，文件頁也沒有「AI 整理排版」；Backend 同樣會擋：要求整理回 403 並寫明原因，匯入沒指定時照直接放進知識庫處理。帳號資料表新增 `ai_cleanup_access` 欄位（schema 27），既有帳號一律從關閉開始。
+
+- **[2026-11-13]** **知識庫「所有題目」清單**：快速問答以前只能一個分類一個分類看，現在新增「所有題目」分頁（`/admin/knowledge/questions`），把全部題目攤成一張清單，可依語言、分類（含子分類）、狀態（隱藏、分類被隱藏、不在選單上、沒有答案、有圖片或連結、文件已停用）、來源篩選並搜尋題目與答案，每個選項旁顯示題數。點一題回到文件分頁打開它的分類並捲到那一題。Brain 新增只讀的 `GET /knowledge/qa/questions`。
+
+### Changed
+
+- **[2026-11-13]** **Backend 預設開 4 個 process**：`backend` 容器以 `uvicorn --workers ${BACKEND_WORKERS}` 啟動（Compose 預設 4，直接執行預設 1）。多 process 下原本只在記憶體的狀態改成共用：解鎖密碼失敗次數、API key 與 embed key 每分鐘上限放 Redis（以前多 process 時上限等於乘上 process 數）；文字模式攝影機的事件狀態放 Redis（以前同一位訪客可能每個 process 各打一次招呼）；帳號資料庫啟動 migration 以檔案鎖依序執行（以前全新資料庫同時啟動，搶輸的 process 起不來，已用四個 process 同時初始化的測試重現）；素材包工作登錄角色加 Redis 鎖；`/metrics/prometheus` 改 prometheus_client 多 process 模式、`/metrics` 的計數與耗時跨 process 加總，事件清單加上 1,000 筆上限。`A2A_ENABLED` 搭配多 process 時啟動失敗。隔離環境（假 LLM、假 TTS、8 個對話 worker）主機較閒時每秒 20 題聽到第一句 14.2 → 2.2 秒；完整驗收流程與跨 process 檢查（`scripts/experiments/brain-worker-split/multiprocess_checks.py`）通過。
+
+- **[2026-11-13]** **對話服務預設改為 8 個 worker**：`api-chat` 的 `BRAIN_WORKERS` 預設從 4 改為 8（每個約 0.3 GB）。隔離環境假 LLM 實測，瞬間 100 人第一句 5.4 → 3.8 秒、瞬間 200 人 9.7 → 6.6 秒，每秒 20 題 p95 5.4 → 1.7 秒；結果見 `docs/plans/brain-100-concurrency.md`。已有 `.env` 寫明 `BRAIN_WORKERS` 的部署照舊。
+
+- **[2026-11-13]** **Backend 同時轉給 Brain 的對話不再卡在 100 段**：每段對話串流從開始到回答結束都佔一條連線，Backend 連 Brain 的 httpx 預設最多 100 條，等空連線的時限又跟連線逾時共用 2 秒，所以同一個 Backend process 同時超過 100 段對話時，多出來的直接回 504。上限改為 1,000 條（閒置保留 200），等空連線改為 30 秒，連線逾時仍是 `BRAIN_PROXY_CONNECT_TIMEOUT_SECONDS`。隔離環境假 LLM 實測：瞬間 200 人原本 4／8／12 個對話 worker 分別有 40%／27%／23% 回 504，修正後 0；2 個 worker 每秒 20 題原本 43／600 失敗，修正後 0。
+
+- **[2026-11-13]** **台語判斷可以先問 Gemini Decisions（預設關閉）**：`AUDIO_LANGUAGE_DECISION_ENABLED=true` 時，`POST /brain/internal/audio-language` 與 Live 的台語判斷同時送出 Gemini Decisions（`gemini-decision-1`，一次問「是不是華語／英語／西語／日語／韓語」五題是非題）和原本的 `LIVE_AUDIO_LANGUAGE_ID_MODEL`。Decisions 有把握就直接回：華語 ≥ 0.8 或英西 ≥ 0.75 判為該語言，華語 ≤ 0.65 且英西日韓都 < 0.5 判為台語；其他情況（多半是日韓分數偏高，真人台語常被聽成韓語）或 Decisions 失敗、逾時（`AUDIO_LANGUAGE_DECISION_TIMEOUT_SECONDS`，預設 2 秒）時等原本的模型，最壞情況跟關閉時一樣。不直接問「是不是台語」：它把台灣腔、台灣情境也算進去，華語常給 0.4～0.6。50 句實測（真人台語連續劇 20 句、合成華語 10 句、合成英西日韓各 5 句）：Decisions 自己下判斷的句子零誤判，台語 12/20、華語 10/10、英西 10/10 不必等原本的模型（p50 約 0.4 秒，原本 1.8 秒），合併後台語 20/20（原本 19/20）。華語只有合成語音，帶台灣腔的真人華語未驗證，所以預設關閉。每句的分數與判定記在 log `audio_language_decision`，用量照 `audio_language` 記帳。實驗腳本見 `scripts/experiments/audio-language-decision/`。
+
+- **[2026-11-13]** **快速問答的分類點名稱就展開**：以前只有底下有子分類的才會展開，只有題目的分類要點小箭頭；現在點名稱就打開右邊的編輯畫面並展開，已經選著又開著的再點一次就收起。
+
+- **[2026-11-13]** **選型篩選的設定檔不出現在文件樹**：`knowledge/products/`（含底下各商品線資料夾）的 `_catalog.yaml` 不再由 `GET /knowledge/base/documents` 列出，後台的文件樹、文件數與批次全選都看不到；搜尋索引照舊。資料夾只剩這個設定檔時，刪除資料夾會說明裡面有選型設定、不能從後台刪，不會默默刪掉。
+
+- **[2026-11-13]** **搬文件不再讓圖譜重新抽取**：單一文件搬移與整個資料夾搬移都會把圖譜快取（指紋、抽取結果、現有圖譜的來源路徑）一起換成新路徑，下一次重建圖譜時搬過的文件不用再呼叫 LLM。
+
+- **[2026-11-13]** **產品規格表可以分商品線**：`filter_products` 改讀 `knowledge/products/<商品線>/_catalog.yaml`，同一個專案可放多份型錄，各自定義欄位。只有一份時工具說明與參數和以前一字不差；多份時多一個必填的 `catalog` 參數指定型錄。舊的 `knowledge/products/_catalog.yaml` 版面仍可讀，搬資料前後工具都不會消失。新增 `move_knowledge_folder`，整個資料夾一次搬完，索引只重建一次。
+
+- **[2026-11-13]** **watchtower 改為每小時檢查**：檢查間隔從 300 秒改為 3600 秒，減少對 Docker Hub 的查詢，避免請求限流擋住 CI 發布與換版。推上 `main` 後正式站最慢一小時換版。
+
+- **[2026-11-13]** **Brain 對話與後台管理分流**：新增 `api-chat` 對話角色與多 worker，後台與排程固定單程序；Backend 可用 `BRAIN_CHAT_URL` 分流並以空值回退。對話與用量 SQLite 使用 WAL，共用技能狀態、檔案與記憶表寫入鎖，跨程序共用限流及 PII 併發額度；Prometheus 彙總同一次容器啟動的各 worker。新增 admin 定時維護有新對話的專案，以及角色、分流與真實多程序回歸測試。部署、回退及仍維持 worker 獨立的斷路器限制見 `brain/README.md`。
+
+### Fixed
+
 - **[2026-11-13]** **Brain 匯入 PDF 可以用了**：PDF 轉文字靠 PyMuPDF，但它從未列在 `brain/api/requirements.txt`、image 裡沒裝，知識庫匯入 PDF 一直失敗。現在加入 `pymupdf>=2.1,<3`（授權為 AGPL），改用新版的 `import pymupdf`，並新增 PDF 轉文字的測試。
+
+## [2026-11-12]
+
+### Changed
+
+- **[2026-11-12]** **Backend 的 Pillow 升到 13**：10.x 的 libtiff 編碼器有記憶體外洩與當掉的漏洞（我們不輸出 TIFF，實際碰不到，但沒有理由留著）。Backend 全套測試在 Pillow 13 下與 10 結果相同。avatar-pipeline 的 protobuf 維持 4.25：mediapipe 0.10.14 只支援 protobuf 5 以下，換成 5.29.6 會讓人臉特徵點擷取載入失敗。
+
+### Fixed
 
 - **[2026-11-12]** **Brain 重建後缺 httpx 而無法啟動**：`brain/api/requirements.txt` 只寫 `google-genai>=0.3.0`，CI 重建時解到 google-genai 3.2，新版不再依賴 httpx，而 Brain 直接 `import httpx` 卻沒有自己列，正式站 Brain 自 17:16 起持續重啟。現在明列 `httpx`、`networkx`，google-genai 限制在 3 以下、openai 在 4 以下；新增測試檢查 Brain 直接匯入的第三方套件都有寫進 requirements。
 
@@ -243,20 +344,35 @@
 
 - **[2026-11-12]** **私有角色與背景的檔案不能再借公開角色的路徑讀到**：`/static/characters/{id}/…` 與 `/static/backgrounds/{id}/…` 只檢查網址第一段 ID 的權限，讀檔時卻只確認檔案在整個素材根目錄底下；借任何公開角色的 ID 加上 `..%2F<私有ID>/…`，未登入也能讀到其他專案的私有角色檔案（背景需登入）。現在檔案必須落在該 ID 自己的目錄內，含 NUL 等字元的路徑回 404 而不是 500，並加測試覆蓋三種繞過寫法。
 
+## [2026-11-11]
+
+### Changed
+
+- **[2026-11-11]** **語言優先搜尋不再白查整張知識庫**：使用者語言的段落不夠時，候選窗會逐次加倍；以前要等同語言結果湊滿或查完整張表才停，問「保固多久」「hi」這類同語言相關段落少的題目每次都查 8 輪。現在確定再擴大也不會改變結果時就停：字面命中已全部拿到、向量窗尾已超過相關度門檻、被截掉或還沒進向量窗口的段落都過不了門檻。結果與排序跟查完整張表完全相同（工業示範專案 70 題比對 0 筆不同），查詢輪數 213 減為 116。隔離環境 100 人同時提問各跑三輪：查滿 8 輪的提問 50 → 0，知識檢索 p95 3.8 → 2.2 秒，聽到第一句的中位數平均 5.5 → 4.5 秒。
+
+- **[2026-11-11]** **問答表混了不同語言時逐題分開**：客戶的表常常中英西混在一起，以前整份判成一種語言，英文題會跟著放進「中文」分類，搜尋也排錯。現在判出兩種以上語言時，系統逐題補上語言欄（人寫的不改），每題放進自己語言的分類；只有一種語言的表照舊。現有 145 份問答檔、1,370 題實測沒有一題被誤判成別的語言，中英西混成一張表時 279 題對 278 題。
+
+- **[2026-11-11]** **匯入後會提示要回頭看的地方**：匯入結果列出沒讀進去的欄位（例如「來源檔」「備註」）、看不懂的語言值、還沒有的語言分類、沒有答案的題目、找不到的圖片，以及表格為什麼被當成一般文件。整份被擋下時，一次列出所有沒有題目或答案衝突的題目，不用一次改一個。答案裡有 `##` 開頭的行、沒收尾的 ```` ``` ```` 或題目換行時，也一次列出所有這類題目。同一張表（含 Excel 同一張工作表）重複的欄名也會提示；表裡每題都自己填了分類時，不會說成已依語言分開。
+
+- **[2026-11-11]** **watchtower 改用社群維護的版本**：`containrrr/watchtower` 已停止維護，改用 `nickfedor/watchtower:1.24.0`（版本固定），不再需要 `--api-version` 參數；檢查間隔維持 5 分鐘。原本放在本機、未進版本控制的 `docker-compose.override.yml` 已刪除，設定都在 `docker-compose.yml`。
+
+- **[2026-11-11]** **Embedding 批次並行維持 1**：新增隔離 gateway 的並行 1／2 對照腳本與 Compose 設定，檢查吞吐、查詢／文件 p95、GPU 顯存與向量一致性。兩輪純查詢在並行 2 較慢，混合文件的聊天查詢延遲沒有穩定改善，因此不調整正式預設值。方法與結果見 `scripts/experiments/embedding-load/README.md`。
+
+- **[2026-11-11]** **Brain 重用重複問題的查詢向量**：新增每 worker 的有界 LRU 與同鍵請求合併，減少熱門題與同輪知識／記憶搜尋重複呼叫 embedding。快取依專案、gateway client 與完整 query identities 隔離；先確認可查詢資料表，只快取驗證成功的首選向量，錯誤與暫時回退不快取，等待者逾時不取消共用計算。新增入口、快取與實際 HTTP 次數指標，`EMBEDDING_QUERY_CACHE_SIZE=0` 可關閉。HTTP Chat 與 Gemini Live 共用，文件索引不變，規格與驗證方式見 `brain/README.md`。
+
+### Fixed
+
 - **[2026-11-11]** **攝影機畫面描述能送進對話了**：Gateway worker 把畫面描述轉給 Backend 時打的是已退役的 `/internal/enrich`，被登入檢查擋下（401），描述一直沒存進 session。改送 `/api/v1/internal/enrich`，路徑與路由共用同一個常數，並加測試確認轉送目標是已註冊的路由。
 
 - **[2026-11-11]** **換版後第一句台語不再被當成華語**：watchtower 換版時 Backend 跟 Brain 一起重啟，Brain 預熱台語判斷時拿不到金鑰（ConnectError）就放棄，部署後第一個講台語的人要等 2.5 秒以上的冷啟動，判斷逾時而被當成華語。現在第一次預熱失敗會每 2 秒重試，最多約 10 秒；各專案的預熱仍只試一次，Backend 真的掛了也不拖慢啟動。
 
-- **[2026-11-10]** **新分類排在同層最後**：`POST /brain/knowledge/qa/nodes` 的 `order` 改為選填，沒給時排在同層最後；以前固定給 1.0，子分類排過序時新分類會掉到第二個。
+- **[2026-11-11]** **多人同時對話時，每輪都整表重建記憶**：每輪寫回記憶摘要後都會跑一次完整的記憶維護（讀整張記憶表、重算摘要向量、整表覆寫），沒有節流也沒有互斥，100 人同時問就有 100 份在跑，背景執行緒與 embedding 都被占滿。現在同一專案同時只跑一份，期間進來的請求合併成跑完再補一次，呼叫端不再等鎖；每輪對話後多呼叫的那次節流維護也拿掉了。
 
 ### Removed
 
-- **[2026-11-26]** **移除人設層級的聯絡圖片**：刪除 `PUT /brain/personas/contact-image`、Backend 代理 `/api/v1/personas/contact-image` 與 `persona_contact_image*` 函式，改用專案層級的 `reply-links`（見上）；路徑直接 404，不留相容層。回覆欄位 `contact_image_id`／`contact_image_kind` 名稱不變，官方前台顯示 QR 的程式不用動。已在人設 `AVATAR.json` 設過 `contact_image_id` 的專案（例如鶴記 kiosk 人設的 EVAK QR）需在後台「回覆附件」重設一次，檔案裡舊的欄位不再被讀取。
-- **[2026-11-18]** **移除 `docker-compose.avatar-motion-pilot.yml`**：動作實驗室試用期間用來讓 avatar 改跑本機映像、並關閉 watchtower 換版的覆寫檔；試用程式已合進 main，照一般流程部署，`docs/guides/avatar-motion-lab.md` 同步更新。
-
 - **[2026-11-11]** **整理文件**：做完且規則已寫進規格的 9 份計畫從 `docs/plans/` 移除（帳號 API 金鑰、串接能力探索、知識庫易用性、專案 Gemini 金鑰、專案資源範圍、R2T2 串流、前後台共用語音核心、入口拆分、Embedding 意圖影子），原文可查 Git 歷史；Jev 決策層計畫與前台費茨法則評估移到 `docs/archive/`。刪除含對話逐字稿與供應商浮水印討論的 2026-03 調研稿；角色動作測試頁移除測試流水帳、暫存路徑與客戶名稱，只留操作步驟與診斷旗標。`docs/README.md` 的計畫只列還有待做的項目，實驗另成一節。過時的規格、維運手冊、指南用詞與 OpenSpec 規格依現況更新。
 
-- **[2026-11-10]** 刪除後台沒有用到的 `ManualQaModal` 與 `ExplorerSidebar`。
+## [2026-11-10]
 
 ### Added
 
@@ -270,7 +386,59 @@
 
 - **[2026-11-10]** **快速問答的題目不用拖曳也能排序**：每題多了上移、下移與「移到第幾題」，手機與觸控螢幕也能用；搜尋時可以用「移到第幾題」。
 
+### Changed
+
+- **[2026-11-10]** **後台其他頁面改成不用懂系統也看得懂**：`Avatar` 頁改名「虛擬人」；語音辨識的「語言分流」改「辨識語言」，「試辨識」「串流試聽」改「比較辨識結果」「邊講邊聽寫」；系統狀態、用量、記憶、工具與技能、模型供應商的英文與工程詞換成白話，用量的事件類型顯示中文。`ROOT` 改「最高管理員」，「孤兒資源」改「沒有歸屬專案」，「Embed 金鑰」改「網站嵌入金鑰」，並寫明跟帳號 API 金鑰的差別。角色的分頁改叫個性與說話方式、工作規則、工具使用說明、長期記憶，不再顯示檔案路徑；人物、背景與角色的代號改選填，留空由系統產生。對話紀錄以最後一句話當標題，匯出、刪除有文字，篩選說明不再只靠滑鼠提示。工作區的新文件、上傳、重建都有文字，手機也有上傳與重建。寬螢幕第一次進後台時側欄預設展開。
+
+- **[2026-11-10]** **「文件」段落不再列出快速問答的問答文件**：已掛在快速問答的問答文件只在「快速問答」段落管理，文件頁尾顯示文件名稱而不是 `qa/檔名`。還沒掛上去的問答文件仍留在 `qa` 資料夾，找得到也刪得掉。
+
+- **[2026-11-10]** **小助理不再蓋住問題清單的按鈕**：每題的加圖片、加連結、隱藏、刪除改靠左。
+
+- **[2026-11-10]** **匯入一般文件預設不經 AI**：後台「新增資料」的預設改成「直接放進知識庫」，內容不變，系統自動切段，AI 回答時查得到。AI 整理排版改成要選才用，排在第二個選項，適合掃描錯字多、排版很亂的檔案；每批上傳開始後回到直接放入。問答表不受影響。只改後台畫面：它現在預設送 `normalize: false`，`POST /brain/knowledge/raw/commit` 不帶 `normalize` 時仍是 `true`。
+
+- **[2026-11-10]** **同名問答表重傳改成合併**：新題加入，新檔沒有的舊題留著，隱藏狀態與各分類的位置不動；同一題的答案不同時整份不匯入，畫面列出是哪幾題；舊檔沒填的圖片或連結會補上。分類已經刪掉的文件重傳時只更新內容，不會回到選單。匯入表可以加 `path` 欄（別名「路徑」「分類」），用 `/` 分層指定每題放在哪個分類，沒有的分類會自動建立。有語言欄的表匯入後維持 CSV，每題的語言才不會丟失。Excel 也支援這兩欄。
+
+### Fixed
+
+- **[2026-11-10]** **新分類排在同層最後**：`POST /brain/knowledge/qa/nodes` 的 `order` 改為選填，沒給時排在同層最後；以前固定給 1.0，子分類排過序時新分類會掉到第二個。
+
+- **[2026-11-10]** **有產品型錄的專案每輪重複解析全部產品檔**：組 prompt 和決定工具時各解析一次，鶴記 118 篇每輪多花約 0.3 秒純 CPU，多人同時問就互相排隊。現在檔案或停用狀態沒變就沿用上次結果，新增、修改、刪除或停用文件會立刻生效。
+
+- **[2026-11-10]** **語音對話中麥克風停不掉**：伺服器辨識（VAD）連續說話時，每句上傳辨識期間按鈕都被鎖住；虛擬人回答中麥克風暫時關閉，按鈕卻顯示「按我說話」，按下去會打斷回答再開麥，講完也會自己打開。現在語音對話期間按鈕固定顯示「按這裡停止」且隨時可按，回答中按它只結束收音，講完不再自動開麥。語音對話沒開時，回答中按麥克風仍是插話。
+
+- **[2026-11-10]** **英文句子提到 Español 不再被判成西文**：`detect_language` 看到 ¿¡ñ 就判西文，「Do you have a menu in Español?」會得到西文回答，QA 逐題打標也用同一套規則。現在英文功能字比西語多時算英文；只有 ¿¡ñ 或西語字較多時仍是西文。已存的語言標籤不會自動重算。
+
+### Removed
+
+- **[2026-11-10]** 刪除後台沒有用到的 `ManualQaModal` 與 `ExplorerSidebar`。
+
+## [2026-11-06]
+
+### Added
+
 - **[2026-11-06]** **新增資料畫面提供範例檔下載**：問答表（Excel、CSV）與整理好的文件（Markdown）各一份，內容是虛構的服務中心，不含任何客戶資料，工作人員可以照著填。檔案放在 `frontend/admin/public/templates/`。
+
+### Changed
+
+- **[2026-11-06]** **上傳前先選要不要讓 AI 整理**：「新增資料」的勾選框「不要讓 AI 修改內容」放在拖放區下面，選了檔案就開始上傳，由上往下操作的人來不及勾；勾了之後也一直留著，下一批亂筆記就不會被整理。現在拖放區上面是兩個選項「讓 AI 整理排版（適合亂亂的筆記）」（預設）與「照原樣放進去，不讓 AI 改（適合已經整理好的文件）」，每批上傳開始後回到預設。匯入結果的文件列寫出這批用的是哪一種（「AI 已整理排版」或「照原樣放入」）；接手別處開始的匯入時不知道，就不寫。內容被拒絕的列改成「重新選檔案」（打開選檔視窗），沒傳到伺服器的也一樣；只有檔案已在伺服器、處理或連線出錯時才是「再試一次」（伺服器略過卻沒附原因的也算這種）。問答表答案有 `##`、```` ``` ```` 或題目換行時，拒絕原因改成「「題目」這題的答案裡有「##」或「```」符號，或題目有換行，請在檔案裡刪掉這些符號或換行，存檔後重新上傳」。
+
+- **[2026-11-06]** **知識庫快速問答的小地方**：第一層叫「中文」「English」「Español」這類名字的分類，在樹上名稱旁標「語言」；重新命名這種分類時，輸入框下方提醒改名後同語言的問答表不會再自動放進來、訪客選單也切不到這個語言。名稱對照與前台 `quickQaText.ts`、Brain `qa_nodes.py` 的 `LANGUAGE_LABELS` 一致，有測試比對。每題的隱藏按鈕改寫成動作：「隱藏這題」，已隱藏時「已隱藏 · 改回顯示」。新增分類的名稱欄提示字改成「例如：停車與交通」。
+
+- **[2026-11-06]** **後台快速問答可以放選單專用題目、把同一題放到多個分類**：分類編輯多了「新增選單題目（不填答案）」，訪客點了照一般問題回答；存過的題目可以按「也放到其他分類」，放過去的是同一題，改答案每個分類一起變，清單上寫出「這題也放在：…」，刪除鍵在這種題目上改成「從這裡拿掉」。刪光一個分類或某份檔案的題目現在可以存檔。刪除分類的確認改寫成題目和答案會留在文件裡；QA 文件不再顯示必失敗的「AI 整理排版」。存檔會帶上載入時的版本，文件頁存檔也會，別處改過時會請你重新載入，不會互相蓋掉。一份檔案分給多個分類時，存其中一個分類不再重排檔案，各分類保留自己的順序；刪掉分類後，開著的分類會重新讀取，「也放在」跟著更新。AI 整理排版的 QA 文件檢查改用統一後的路徑，`./` 這類寫法繞不過去。
+
+### Fixed
+
+- **[2026-11-06]** **知識庫未存的文件修改會被移動蓋掉**：開著的文件改了沒存，從樹上「⋯ › 移動…」、拖到別的資料夾、多選批次移動或改語言，都會重新讀檔，把修改蓋回伺服器版且不詢問。現在搬移只換路徑與文件資訊，編輯中的內容與「未儲存」都留著；批次改語言不再重讀文件。把這份還沒存的文件拖進快速問答（會收成題目、刪掉原文件）會被擋下，提示先儲存。
+
+- **[2026-11-06]** **刪光某份檔案的題目後，題目會變成新分類冒回來**：分類的題目來自兩份以上檔案時，刪掉其中一份的全部題目再存檔，那份檔案不會被改寫，之後會自己長成一個新分類。快速問答編輯器現在擋下這種存檔，說明「『某檔』的題目不能全部刪掉，至少留一題；要整份移除，請到左邊「文件」刪除那份檔案」；自己輸入的題目不寫檔名。
+
+- **[2026-11-06]** **沒有 LLM 時「AI 整理排版」會說整理不了**：`POST /brain/knowledge/renormalize/preview` 與 `/renormalize` 在 LLM 呼叫失敗或結果沒通過檢查時回 400，`detail` 是白話原因，文件不變；以前會把原文當成整理結果回傳，預覽看起來像整理過，還能「套用」。匯入時的 AI 整理維持失敗就退回原文。
+
+- **[2026-11-06]** **知識庫在實際瀏覽器裡的版面問題**：「移到…」對話框的分類一多會畫到對話框外面，和按鈕疊在一起（1280×720 約 15 個分類就會發生），捲動改放在 `fieldset` 外層。長檔名結尾全是中文時會疊到語言標籤與「⋯」，十幾個中文字的檔名又不會被切開，只差尾巴的兩份看起來一樣；現在依顯示寬度保留結尾，放不下時開頭先讓，結尾再從左邊裁。小助理在 1280×720 蓋住分類編輯的儲存與文件的檢視切換，高度改成留出視窗上方 20rem，手機打開時也不再蓋住儲存；小助理的層級也從對話框之上降到之下，1024×768 開著時不會再蓋住對話框的確認鈕（所有頁面都適用）。手機的回答語言面板底部超出畫面；文件的語言下拉在 320×568 往上開時被頁首切掉，下拉現在看外層實際可用的空間決定方向與高度。手機目錄抽屜開著時，操作結果的提示被擋在抽屜後面。文件預覽遇到長網址時整個預覽要橫向捲動。匯入進度出現時把手機版面往下推 22px。
+
+## [2026-11-05]
+
+### Added
 
 - **[2026-11-05]** **QA CSV 每題可以標語言**：CSV 新增選填的 `language` 欄（別名 `lang`、`語言`），檢索的語言排序先看每題的語言，沒標才看文件語言，一份 CSV 可以混多種語言。既有 CSV 可用 `python -m scripts.label_qa_languages <project_id>` 依規則打標，預設只預覽，加 `--write` 才寫入，有值的列不會被改，人工指定語言的文件略過。不需要遷移資料表，語言存在段落的 `metadata`。上傳採納目前會把 CSV 轉成 Markdown，這一欄只對保持 CSV 的文件有效。
 
@@ -280,35 +448,7 @@
 
 - **[2026-11-05]** **有問題與答案欄的 Excel 會進快速問答**：每個非空工作表都有這兩欄時，整本視為問答表，不經 AI 整理，圖片、連結、顯示欄照讀。只要有一張工作表不是，整本照一般文件處理。
 
-- **[2026-11-02]** **新增可選的批次 ASR 引擎 `gemini-live-batch`**：`POST /api/v1/asr/transcribe` 收整檔，每個請求開一條新的 Gemini Live 工作階段（`ASR_GEMINI_STREAM_MODEL`），關掉伺服器 VAD，以 `activityStart`／`activityEnd` 框住音訊並在前面補 0.3 秒靜音，收到 `generationComplete` 結束；靜音回空字串。憑證同串流：專案綁了 Gemini 金鑰就用專案的，否則用部署預設；帶專案語言分流與逐詞詞表（`customVocabulary`）。與其他批次引擎共用單站預算、斷路器與 `upstream_attempt` 紀錄。與 `r2t2-dev` 一樣只有被選到才用，不進預設鏈也不當備援，且不能指定為台語引擎；帳號／專案授權、後台標籤與試辨識都已列出。沒有新增環境變數。同 18 段英文短句（1.7–5.3 秒）實測，整檔含解碼中位約 1.4 秒、p90 約 1.7 秒，`openai` 為 0.88／1.46 秒；要即時回應的呼叫端應改用 WSS 串流 `gemini-live`。`gateway/asr_stream.py` 的 Live 訊息與語言對應抽到 `gateway/gemini_transcription.py` 共用，串流行為不變。比較腳本在 `scripts/experiments/gemini-asr/`。
-
-- **[2026-10-30]** **第二台 IndexTTS 以獨立引擎 `indextts-nurse` 接入**：顯示名稱「IndexTTS（nurse24h）」，與 `TTS_INDEXTTS_URL` 那台並存、設定與行為互不影響。新增 `TTS_INDEXTTS_NURSE_URL`（留空＝不啟用、不列出）與 `TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER`（預設 `hayley`），compose 一併傳給 backend 與 gateway-worker。沿用同一個 `IndexTTSAdapter`（依 provider 名稱、網址、預設角色建立第二個實例），整段走 `/tts`、串流走 `/tts_stream`，健康檢查打 `/health`（`/health` 回應多一項 `index-tts-nurse`）；這台不驗證，不送 `X-Internal-Token`。兩台都有 `hayley` 等同名聲音，這台的聲音登錄成 `indextts-nurse:<名稱>`（`runtime_key` 存上游原名），選單、帳號授權、專案允許聲音都用這個 ID，送上游前換回原名；`/v1/audio/speech` 快取 key 本來就含 provider，兩台不共用音檔。只在被指名時使用（請求帶 provider、帳號／專案預設聲音是這台的、或專案引擎順位列了它），不排進部署預設備援鏈與台語預設順序，別的引擎失敗也不會換到它；國語、英文的 IndexTTS 自動換台仍只換到主要那台。後台「語音 → TTS 試聽」的引擎選單、帳號聲音授權、專案的允許聲音與 TTS 引擎順位都能選它，前台與後台試聽選它時走串流端點並帶 provider。新增 backend 測試涵蓋設定、未設定時不列出、聲音 ID 不衝突、合成與串流打到這台、快取 key 分開、不進備援鏈。
-
-- **[2026-10-29]** **avatar-pipeline 支援透明人物、圖片輸入與首尾銜接**：中繼檔改為每幀關鍵幀的 FFV1 BGRA，經 ffmpeg 管線讀幀（OpenCV 讀不到透明通道）；來源帶透明（PNG／WebP、`alpha_mode=1` 的 VP8／VP9 WebM，後者強制用 libvpx 解碼）時輸出 `yuva420p` 的 VP9，幀同步標記維持不透明，臉部偵測前把透明像素鋪成中性灰。可直接輸入 PNG／JPG／WebP，解碼一次後以 `loop` 濾鏡做成 10 秒靜止片段；不用 `-loop 1`，因為帶 C2PA 簽章或 IEND 後有多餘位元組的 PNG 在那種讀法下會永遠卡住。新階段 `loop` 比較首尾幀，差超過門檻（預設 6.0）就接上倒放片段，CLI 新增 `--loop auto|always|off` 與 `--seam-threshold`，完成 JSON 多回 `alpha`、`seam_difference`、`ping_pong`。單一 ffmpeg 步驟超過 900 秒即中止。
-
-- **[2026-10-28]** **後台試聽可指定 VoxCPM 模型（VH-387 LoRA 驗收用）**：語音試聽選 VoxCPM 時，管理員多一個「模型」選單，選項取自 VoxCPM `/api/v1/catalog`（`full::` 完整 checkpoint、`lora::` LoRA），預設沿用目前載入的模型，不列出載入「最後一個 epoch」的訓練目錄項目（label 結尾為 `/ latest`），避免看不出版本而選錯；LoRA 疊在目前載入的底模上套用；只有選了未載入的 `full::` 底模才提示 VoxCPM 需重新載入約 30～40 秒、期間其他 Vox 語音也會等待。新增 `GET /api/v1/tts/voxcpm/models`（管理員），`/v1/audio/speech` 新增選填 `model_id`，只有管理員指定 `provider: voxcpm` 時接受並轉給 CastVoice，格式不符回 422、非管理員回 403，快取依模型分開。正式對話與串流端點不帶模型，行為不變。
-
-- **[2026-10-28]** 同服務的衍生網址改為自動推導：R2T2 正式／開發串流從各自的批次基底網址產生，HTTP／HTTPS 對應 WS／WSS；Cosy 詞表從合成網址產生。保留各端點完整網址覆寫，詞表可用 `TTS_HANJI_CONVERT_ENABLED=false` 獨立停用；引擎可用清單、實際連線與 TTS 快取都使用生效網址。
-
-- **[2026-10-28]** 台語 TTS 串接 `.35` 的文字詞表 API：VoxCPM（整段與串流）與 CosyVoice 各自使用環境設定指定的詞表，CosyVoice 以 `annotate=none` 避免上游二次轉換。新增 `TTS_HANJI_CONVERT_URL`、`TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION`；每家引擎從原文獨立轉換，轉換失敗走既有備援，國語 Vox 不查台語詞表，台語文字保留字形，音檔快取依語言與詞表設定隔離。
-
-- **[2026-10-28]** 新增 `scripts/experiments/llm-wiki/` 實驗：比較把同主題 QA 編譯成 wiki 頁（Karpathy llm-wiki 做法）與現行檢索的回答品質，以及用 LLM lint 找知識庫矛盾。全部唯讀，產出放 repo 外。結果見該目錄 `REPORT.md`：QA 與 wiki 小節一起檢索在 24 題可答題答對 21～22 題（正式預查 15～16 題），延遲不變；編譯忠實度 97.5%；3.8-flash 分組加整包 lint 抓回 5/5 個埋入矛盾。另發現正式預查只取 3 筆、0.68 門檻擋掉「停車」這類有答案的問題，兩者都未修改。
-
-- **[2026-10-23]** 正式動作 E2E 可指定 viewport／DPR，並透過實際設定介面進入展示機台模式；補 2160×3840 直向全螢幕真實對話、語音及停止檢查，保存逐幀分析、時間軸與慢放錄影。未重現現場整頁黑閃，保留擷取間隔及高解析度錄影負載的限制。
-
-- **[2026-10-22]** 新增真實 SDK／WASM 的 WebM、MP4 與混播效能對照腳本：以相同四播放器及動作流程量測掉幀、連續畫面停頓與完整交接延遲，分別保留桌面／375 寬度的原始樣本及量測後錄影。另提供單播放器、18 秒連續語音的原生 SDK 對嘴基準，檢查實際音訊訊號及嘴型繪製。混播使用獨立實驗快取，正式兩院人物仍維持 WebM；首輪有短停頓及一筆取樣標記異常，結果與限制詳列於動作測試指南。
-
-- **[2026-10-22]** 新增獨立的 `/experiments/avatar-motion/` 角色分段測試頁：同一份現有影片與對嘴資料可切換待機／思考／說話測試區段、循環、停止及錄製實際 SDK 畫面與聲音，附離線測試語音、控制器回歸測試與真實 Chrome E2E。這是技術預覽，尚未接入正式對話或 SDK 公開動作 API。
-
 ### Changed
-
-- **[2026-11-10]** **匯入一般文件預設不經 AI**：後台「新增資料」的預設改成「直接放進知識庫」，內容不變，系統自動切段，AI 回答時查得到。AI 整理排版改成要選才用，排在第二個選項，適合掃描錯字多、排版很亂的檔案；每批上傳開始後回到直接放入。問答表不受影響。只改後台畫面：它現在預設送 `normalize: false`，`POST /brain/knowledge/raw/commit` 不帶 `normalize` 時仍是 `true`。
-
-- **[2026-11-10]** **同名問答表重傳改成合併**：新題加入，新檔沒有的舊題留著，隱藏狀態與各分類的位置不動；同一題的答案不同時整份不匯入，畫面列出是哪幾題；舊檔沒填的圖片或連結會補上。分類已經刪掉的文件重傳時只更新內容，不會回到選單。匯入表可以加 `path` 欄（別名「路徑」「分類」），用 `/` 分層指定每題放在哪個分類，沒有的分類會自動建立。有語言欄的表匯入後維持 CSV，每題的語言才不會丟失。Excel 也支援這兩欄。
-
-- **[2026-11-06]** **上傳前先選要不要讓 AI 整理**：「新增資料」的勾選框「不要讓 AI 修改內容」放在拖放區下面，選了檔案就開始上傳，由上往下操作的人來不及勾；勾了之後也一直留著，下一批亂筆記就不會被整理。現在拖放區上面是兩個選項「讓 AI 整理排版（適合亂亂的筆記）」（預設）與「照原樣放進去，不讓 AI 改（適合已經整理好的文件）」，每批上傳開始後回到預設。匯入結果的文件列寫出這批用的是哪一種（「AI 已整理排版」或「照原樣放入」）；接手別處開始的匯入時不知道，就不寫。內容被拒絕的列改成「重新選檔案」（打開選檔視窗），沒傳到伺服器的也一樣；只有檔案已在伺服器、處理或連線出錯時才是「再試一次」（伺服器略過卻沒附原因的也算這種）。問答表答案有 `##`、```` ``` ```` 或題目換行時，拒絕原因改成「「題目」這題的答案裡有「##」或「```」符號，或題目有換行，請在檔案裡刪掉這些符號或換行，存檔後重新上傳」。
-
-- **[2026-11-06]** **知識庫快速問答的小地方**：第一層叫「中文」「English」「Español」這類名字的分類，在樹上名稱旁標「語言」；重新命名這種分類時，輸入框下方提醒改名後同語言的問答表不會再自動放進來、訪客選單也切不到這個語言。名稱對照與前台 `quickQaText.ts`、Brain `qa_nodes.py` 的 `LANGUAGE_LABELS` 一致，有測試比對。每題的隱藏按鈕改寫成動作：「隱藏這題」，已隱藏時「已隱藏 · 改回顯示」。新增分類的名稱欄提示字改成「例如：停車與交通」。
 
 - **[2026-11-05]** **知識庫上傳即匯入，每個檔案的結果留在畫面上**：沒有選任何文件時，右側顯示「新增資料」，頁首的同名按鈕也回到這裡。選檔或拖放後自動上傳並匯入，不再有「採納上傳」，也不會把以前留下的檔案帶入。每個檔案一列，寫出上傳中、排隊中、AI 整理中、已加入或已更新、放進哪個快速問答分類幾題，或沒匯入的原因；可以查看、改名、再試一次，留到按「清除結果」，離開頁面再回來還在（同一個瀏覽器分頁）。不支援的格式與超過大小上限的檔案只有那一列失敗，其餘照常匯入。可以勾選略過 AI 整理、選放到哪個資料夾。以前留下的檔案另外列出，可全部匯入或逐個移除。文件處理中時狀態自動更新（3 秒起逐步拉長到 15 秒，5 分鐘沒有變動就停，下次有變動再開始），不必重新整理頁面。
 
@@ -324,86 +464,13 @@
 
 - **[2026-11-05]** **匯入的問答放進同語言的分類**：新的問答分類會放到第一層名稱符合語言的分類底下（名稱對照與前台快速問答相同，有測試鎖住兩邊一致）；專案沒有語言分類時維持放最上層，不會自動建立。
 
-- **[2026-11-06]** **後台快速問答可以放選單專用題目、把同一題放到多個分類**：分類編輯多了「新增選單題目（不填答案）」，訪客點了照一般問題回答；存過的題目可以按「也放到其他分類」，放過去的是同一題，改答案每個分類一起變，清單上寫出「這題也放在：…」，刪除鍵在這種題目上改成「從這裡拿掉」。刪光一個分類或某份檔案的題目現在可以存檔。刪除分類的確認改寫成題目和答案會留在文件裡；QA 文件不再顯示必失敗的「AI 整理排版」。存檔會帶上載入時的版本，文件頁存檔也會，別處改過時會請你重新載入，不會互相蓋掉。一份檔案分給多個分類時，存其中一個分類不再重排檔案，各分類保留自己的順序；刪掉分類後，開著的分類會重新讀取，「也放在」跟著更新。AI 整理排版的 QA 文件檢查改用統一後的路徑，`./` 這類寫法繞不過去。
-
 - **[2026-11-05]** **快速問答樹不再綁死一份文件**：一份 QA 文件可以分給多個節點，同一題也可以掛在多個節點（`POST`／`DELETE /brain/knowledge/qa/nodes/{id}/entries`），改答案時所有節點一起變；節點也可以放不屬於任何文件的選單專用題目，點下去走一般問答。`PUT /nodes/{id}/merged` 只更新這個節點的題目，同檔其他列、自訂欄與別的節點的 index 都保留，存檔前會讀回比對，內容對不上就回 400、不寫入，只接受 `knowledge/` 底下的 QA 文件；合併檢視新增 `original_q`（用來認改名）、`also_in` 與 `base_version`（節點已有題目卻沒帶版本，或載入後內容被改過時存檔回 409；列都刪光時用 `?base_version=`）。文件頁存檔、刪除、搬移、覆蓋上傳與建立筆記改和問答存檔用同一把鎖，`GET /knowledge/document` 多回 `content_hash`，`PUT` 帶 `base_hash` 時載入後被改過回 409；覆蓋上傳已掛在問答樹上的文件仍是 QA 文件。拖文件進分類時，併不進去的內容（放不下的欄位、前言、不同的圖片網址）改回 400，不再刪掉來源。行為改變：`source_file` 仍必填，選單專用題目要明確送空字串；刪節點只拿掉分類與掛載，不再刪文件，裡面的題目也不會跑到別的節點；`GET /nodes` 不再替沒掛節點的 QA 文件自動建節點，要進選單請把文件拖進問答樹；刪文件時只會連帶刪掉因此變空的節點，其他空分類保留；清理未使用圖片時，沒掛節點的文件引用的圖也算有用到。
 
 - **[2026-11-05]** **後台問答列表改得更緊湊，順序可以用拖的**：問答編輯與節點的合併檢視共用同一種列表，問題和答案的輸入框隨內容長高，不再固定佔大格子；圖片與連結沒填時收成小按鈕；每列左邊有拖曳把手，放下時會顯示落點。「調整順序與可見性」視窗也可以拖曳排序，上下箭頭保留給不方便拖曳的人。CSV 的 `index` 會跟著新順序更新，之後同步不會排回去。
 
 - **[2026-11-05]** **展示機台解鎖後直接結束，帳號與登出移到上方工具列**：現場人員長按標題輸入密碼後，裝置上開啟的展示機台模式直接結束，不必再進設定按「結束展示機台模式」，那顆按鈕也拿掉了。後台帳號勾選的展示機台維持原樣，只暫時叫出設定與登出。帳號名稱與登出不再獨佔畫面最底下一條：名稱移到上方工具列的標題下方，登出排在按鈕列最後，全螢幕時也在同一個位置。
 
-- **[2026-11-04]** **前台改成一般訪客也看得懂**：登入頁預設只有一個密碼欄，有帳號的人再點「我有帳號」；文案改白話，手機直接顯示表單。手機上方按鈕保留文字。麥克風按鈕直接寫出操作（按我說話、說完按這裡），窄畫面獨立一排；輸入框提示改短。對話區拿掉「訪客對話／對話紀錄」標題，沒對話時顯示提示，參考資料的檔名與原文只給管理者看。設定頁改用白話欄名，引擎、語言、回答方式與展示機台收進「進階設定」，沒改動時只留「關閉」。帳號列改排在版面內，不再壓到人物；手機舞台高度略降，讓輸入框留在第一屏。
-
-- **[2026-11-02]** **撤銷超過 7 天的帳號 API 金鑰自動刪除**：一次性驗證用的金鑰撤銷後只會把清單拉長。backend 啟動時清除撤銷超過 7 天的列，撤銷動作本身仍留在 auth audit。
-
-- **[2026-11-02]** **批次 ASR 成功時記錄實際引擎**：`/api/v1/asr/transcribe` 成功時多記一行 `asr_transcribed`（帳號、專案、指定與實際引擎、語言、分流、耗時、request id）。經 proxy 的呼叫端常丟掉回應裡的 `provider`，之前從 log 查不出實際走哪個引擎。
-
-- **[2026-11-02]** **帳號 API 金鑰頁預設收起已撤銷的金鑰**：撤銷過的金鑰只留作稽核紀錄，清單一長就看不出哪幾把還有效。現在預設只列未撤銷的，需要時按「顯示已撤銷（N）」展開，資料不動。
-
-- **[2026-10-30]** 後台「帳號 → 編輯／管理」的臨時帳號批次紀錄改版：拿掉說明句與下拉選單，改為標題旁的批數、可換行的狀態篩選鈕（附各狀態批數）與次要的重新整理鈕；每批一列顯示建立時間、彩色狀態標籤、帳號組數與效期，後台權限與撤銷靠右，已撤銷的批次不再顯示停用按鈕；每組帳號的密碼與狀態收進可用鍵盤展開的明細（剛產生的那批預設展開），首次載入顯示骨架、空清單與篩選無結果各有提示，API 與行為不變。
-
-- **[2026-11-02]** **批次 ASR 分流只有台語時不再判斷語言**：`/api/v1/asr/transcribe` 實際生效的分流只有 `nan` 時，不呼叫 Flash-Lite 判斷，直接用台語引擎並回 `language: "nan"`、`language_check: null`。整段回應不再被判斷拖住，也不會把台語判成華語。分流同時含其他語言時照舊判斷。整合指南補上建議：前端已讓使用者選好語言時，帶單一語言的 `language_routes`。
-
-- **[2026-10-30]** **Brain 回答路徑每個節點都有短時限、整輪有預算，log 說得出是哪一站逾時、等了多久**：LLM 每站分連線（`LLM_CONNECT_TIMEOUT_SECONDS` 3 秒）、串流首字與 chunk 間隔（`LLM_FIRST_TOKEN_TIMEOUT_SECONDS` 7 秒）、串流整段（`LLM_REQUEST_TIMEOUT_SECONDS` 20 秒，原本 20 秒同時當首字逾時、慢慢滴的串流沒有上限）、回合內非串流（`LLM_NONSTREAM_TIMEOUT_SECONDS` 10 秒），一次呼叫跨所有站最多 `LLM_FIRST_TOKEN_BUDGET_SECONDS` 15 秒，用完不再開下一站、照舊回 502 `LLM_OVERLOAD`；`max_retries` 仍為 0。整輪 `CHAT_TURN_BUDGET_SECONDS` 30 秒（從收到請求起算）：用完不再開下一輪工具，改用已取得的工具結果作答，工具時限也不超過剩餘預算。`search_knowledge`（含伺服器先查）改用 `KNOWLEDGE_SEARCH_TIMEOUT_SECONDS` 6 秒（原本跟一般工具同為 30 秒），某條查詢逾時就不再查其餘查詢、到 8 成時間不做圖譜擴展，帶已查到的段落；圖譜擴展 `KNOWLEDGE_GRAPH_TIMEOUT_SECONDS` 1 秒。查詢 embedding 改為每次 `EMBEDDING_QUERY_TIMEOUT_SECONDS` 2 秒、最多重試 `EMBEDDING_QUERY_MAX_RETRIES` 1 次（原本跟建索引一樣 30 秒 × 4 次，最壞約 123 秒）；建索引、記憶整理、建圖譜等不在聊天回合內的呼叫維持原本的長時限。`/brain/chat` 與 `/brain/chat/stream` 加上整個請求的保險時限（預設 90 秒，由上述預算推得，原本 `queue.get()` 沒有時限），逾時設取消旗標、回 504 `GATEWAY_TIMEOUT`（串流為 `error` 事件）並記 `chat_deadline_exceeded`，`chat_cancelled` 多 `cause` 欄位區分用戶端離開與逾時。失敗原因碼新增 `timeout_connect`／`timeout_first_token`／`timeout_stall`／`timeout_total`／`budget_exhausted`，與 `transient_error` 分開；斷路器仍當暫時性失敗。`llm_route_attempt` 多 `node`、`outcome`、`elapsed_ms`、`mode`、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`／`error`，`trace_id` 改用本輪的 trace id（原本 agent loop 每次呼叫各自產生）；檢索節點（`rag_embed_query`、`rag_query`、`rag_vector`、`rag_lexical`、`rag_graph`）與 auto recall 各記一筆 `node_attempt`；串流已送出句子後換站記 `llm_restart_after_partial_text`；逾時後仍在跑的工具與 auto recall 執行緒跑完時記 `node_orphan_finished`。生產鏈三站都卡住時，原本到 502 要等約 60 秒（加上檢索最壞 30 秒），現在約 15 秒（加檢索最多 6 秒）。新增以本機假伺服器（接受後不回、送一段後停住、持續慢滴）實測的測試。
-
-- **[2026-10-30]** **小助理只剩內建的 Live2D Haru，拿掉影片人物與 VRM 小助理，前台拿掉 3D 模式**：取代 2026-09-03 起「每個影片人物自動列成 `video-<char_id>` 小助理」的做法（commit 468c2e80），以及 2026-10-29 衍生小助理縮圖權限與「Matex」改「人物影片」標籤兩項。`GET /api/v1/avatar/mascots` 只回 Haru（`engine: "2d"`，欄位 `mascot_id`、`label`、`engine`、`model_url`、`thumbnail_url`、`fit`、`builtin` 加上原本的 `source`／`in_project_scope`／`owner_project_id`），不再有 `vrm_url`、`character_id`、`size_bytes`、`updated_at`，`"3d"` 與 `"video"` 兩種引擎不存在了。刪除 `POST /api/v1/avatar/mascots`（上傳 VRM）、`POST /api/v1/avatar/mascots/from-character`、`PATCH`／`DELETE /api/v1/avatar/mascots/{mascot_id}`、`POST /api/v1/avatar/mascots/{mascot_id}/thumbnail` 與 `GET /static/mascots/...`，舊路徑直接 404（集合路徑的 POST 回 405），admin nginx 的 `/static/mascots/` location 一併拿掉；`AVATAR_MASCOTS_DIR`、`AVATAR_MASCOT_MAX_UPLOAD_BYTES`、`AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES` 與 `GET /api/v1/uploads/limits` 的兩個小助理欄位移除，`/data/mascots` 不再讀取。小助理資源類型、專案的 `allowed_mascots`／`default_mascot_id` 與帳號預設的 `mascot_id` 照舊，只是可選的只有 `haru-live2d`，不需要資料庫 migration；舊環境留下的其他小助理資源列不會出現在清單裡。後台拿掉 Avatar 的「小助理」分頁與 `/admin/avatar/mascots` 路由（直接不是頁面），連同自動截縮圖上傳的整條流程、右下角小助理的切換選單與影片引擎的 PCM 嘴型；右下角浮動助理固定是 Haru。虛擬人（Persona）的綁定選單只列 2D 人物，帳號與 admin 資源範圍裡的「VRM」改稱「小助理」。前台拿掉 3D 模式與 VRM 選擇，只剩 2D 影片人物；舊偏好的 3d 一律當成 2d：前台移除 3D（VRM）渲染模式與小助理清單，舞台只保留 2D 影片角色（OpenVmanAvatarRuntime WASM）；設定視窗不再列出 VRM 角色，舊的 `avatar.render_mode`／`vrmAvatarId` 偏好（含伺服器端存的 `renderMode: "3d"`）一律忽略，開場照常載入 2D 人物。`PUT /api/v1/settings/my-preferences` 收到 `renderMode`、`vrmAvatarId` 時直接丟掉、不回 422，讀取時也不再回傳。`public/vendor/ai-avatar-bot/widget.html` 只剩內建 Live2D（Haru），僅接受 `model`、`fit` 參數與 `mouth`／`mouth-stop` 訊息，VRM、VRMA 手勢與影片角色引擎皆已移除。
-
-- **[2026-10-29]** **後台 Avatar 頁的上傳與新增流程改版，小助理分頁重新整理，衍生影片小助理的縮圖不再破圖**：「人物」分頁以「從影片或圖片產生人物」為主要路徑，來源欄位改為「來源影片或圖片」，接受 MP4／MOV／M4V／WebM 影片或 PNG／JPG／WebP 正面人像，旁邊列出各自上限並簡短說明圖片做成 10 秒循環、透明背景保留、首尾接不上會自動補倒放；轉檔進度新增「檢查首尾銜接」階段，`prepare` 改稱「準備來源」。直接上傳 `01.webm`＋資料檔改為收合的「上傳現成素材包」進階區。人物、背景、小助理的檔案欄位都可點選或拖放、鍵盤可操作並有焦點外框，選好後顯示檔名、大小與預覽（透明圖片以棋盤格襯底），送出前先擋下格式不符或超過大小上限的檔案，伺服器的 413／415 說明仍原樣顯示。欄位改為有標籤的輸入框，可用範圍改用共用 `Select`，卡片主標題改為顯示名稱、ID 退為次要資訊。小助理分頁依 VRM、Live2D、人物影片分組，標出由人物自動帶入的項目並說明要到人物分頁管理；沒有縮圖或縮圖載入失敗時改顯示名稱首字加類型的佔位；「使用」改為次要按鈕、使用中的卡片加外框，並註明只換後台右下角的小助理、不影響前台；上傳區標明只收 VRM（100 MB 內，縮圖選填 10 MB 內）。backend 的 `GET /static/mascots/video-<char_id>/thumbnail.png` 原本照小助理資源檢查權限，但由人物自動衍生的影片小助理沒有登錄成小助理資源，除 Haru 以外的卡片縮圖全部 404；現在這類項目改依底下人物的權限判斷（只提供 `thumbnail.png`，沒有權限回 404），有登錄成小助理資源的照舊。新增前端上傳規則、拖放欄位、首尾銜接階段、分組與佔位的測試，以及衍生小助理縮圖權限的 backend 測試。後台右下角小助理選單裡影片引擎的標籤由「Matex」改為「人物影片」，和小助理分頁一致。
-
-- **[2026-10-29]** **所有上傳端點改為邊讀邊擋，並依實際內容驗格式**：大小超過上限立刻停止（413），格式不符或讀不出來回 415，皆附中文 `detail`。圖片以 magic bytes 認 PNG／JPEG／WebP、最長邊 8192；音訊與影片先過 ffprobe 驗格式與長度。新上限：ASR 轉寫／試辨識 25 MB、5 分鐘；`/api/v1/uploads` 影片 2 分鐘、送 VLM 最多 60 張影格；影片轉素材包 200 MB（原 512 MB）、60 秒，並可改傳 25 MB 以內的 PNG／JPEG／WebP 人像（存檔保留實際副檔名）；背景 25 MB、小助理縮圖／QA 圖片／視覺影格 10 MB；Office 檔解壓後 500 MB、10,000 個檔案以內；Brain 代理請求本體 110 MB；知識文件副檔名改為白名單。知識庫 `target_dir` 不可含 `..` 或絕對路徑，raw 上傳只能寫進 `raw/`，Brain 端的知識上傳也自行檢查大小與路徑。admin 容器 nginx 的 `/api/` 由 200m 降為 100m，與外圈一致，只有 `POST /api/v1/avatar/jobs` 放寬到 200m（外圈 host vhost 也新增同一條，需執行 `infra/nginx/native/deploy.sh` 才會生效）。每項上限都有環境變數（見 `.env.example`），`GET /api/v1/uploads/limits` 回傳整組數字，後台知識庫與 ASR 測試畫面據此顯示上限並在送出前先擋。細節見 `docs/specs/01_BACKEND_SPEC.md`「上傳限制」與 `brain/README.md`。
-
-- **[2026-10-28]** **拿掉 NEN LLM 供應商**：主對話鏈只剩 Gemini、OpenAI、Groq。Backend 與 Brain 的 `NEN_API_KEY`、`NEN_BASE_URL` 設定、後台「模型供應商」的 NEN 一站與金鑰、Brain 接受的後台供應商清單、compose 傳入的兩個環境變數、`.env.example` 與文件範例一併移除，`openspec/specs/nen-llm-provider/` 規格與專屬測試刪除（封存的原始提案保留）。正式資料庫沒有存過含 NEN 的主對話設定或金鑰；`.env` 的 `LLM_FALLBACK_CHAIN` 若仍寫著 `nen:<model>`，該站拿不到金鑰會被略過。
-- **[2026-10-28]** **虛擬人 runtime 一律同源載入引擎，檔名與文字統一**：`frontend/app/public/js/OpenVmanAvatarRuntime.js` 移除一段在特定網域改從外部網址下載 WASM 的分支（本專案的網域從未走到），改為固定同源載入；WASM 檔改名為 `public/wasm/OpenVmanAvatarRuntime.wasm`，與 runtime 及 SDK 公開路徑一致，admin Nginx 的 SDK 轉送跟著改，SDK 公開路徑不變。runtime 的註解與 iOS 17.4 以下的版本提示改為繁體中文。前台 Nginx 拿掉舊 `/js/DHLiveMini2.js` 轉址，舊的 `/js/DHLiveMini2.js`、`/wasm/DHLiveMini2.wasm` 直接 404。新增測試：runtime 出現外部網址、引擎檔名或載入路徑回到舊名、註解出現簡體字就失敗。無頭 Chromium 實測新路徑可完成 WASM 初始化，且沒有對外請求。
-- **[2026-10-28]** **embedding 與 avatar-pipeline 映像的建置工具升級，修補 uv 與 pip 漏洞**：embedding 的 uv 由 0.11.21 升到 0.13.6，修 GHSA-hq85-5cpj-mr62（Critical，內建 CA 清單信任金鑰已外洩的 emSign 中繼憑證，建置時連 PyPI 的 TLS 可能被攔截；0.13.4 起修好）。兩個映像裡的 pip 原本都是基底映像帶的 25.0.1，改為建置時升到 26.2 以上，修 CVE-2026-13346 等：embedding 的 pip 在 `python -m venv` 建出的 venv 裡，所以在 builder 安裝依賴前一併升級；avatar-pipeline 原本只在 builder 升級，runner 用的仍是基底映像的 pip，改在 runner 升級。兩者都只在安裝套件時觸發，執行中的服務不受影響。avatar-pipeline 新映像跑同一段影片的 478 點臉部關鍵點與舊映像完全一致。
-- **[2026-10-27]** **拿掉 repo 內附的 IndexTTS 伺服器**：刪除 `backend/index-tts-vllm/`（vLLM 版 IndexTTS 原始碼、Dockerfile 與範例音檔）、compose 的 `index-tts-vllm` 服務與 `indextts` profile，以及 backend／gateway-worker 掛進 `/indextts-assets` 的兩條唯讀掛載；`.env.example` 拿掉 `INDEXTTS_*` 與 `TORCH_CUDA_ARCH_LIST`。本機從來沒有起這個容器，連帶也清掉它 `keras==2.9.0` 的 Critical 漏洞。IndexTTS 改為只透過 `TTS_INDEXTTS_URL` 連外部節點，backend 的 adapter、聲音清單、台語備援順序與健康檢查都不變。為這組巢狀掛載而設的 `test_readonly_mount_parents.py`、測那份伺服器程式的 `test_indextts_internal_auth.py` 一併移除；文件隱私檢查放行範例主機名 `shared-gpu-node`；一次性遷移腳本 `migrate_account_resources.py` 找不到 speaker.json 時只會記一筆來源問題。
-- **[2026-10-27]** **admin 與 avatar 前端依賴安全升級**：admin 的 `vitest` 3.2 → 4.1.12（帶出 `tinypool` 2.x，修 Critical），並在原版本範圍內更新 `vite` 6.4.5、`postcss`、`nanoid` 5.1.16、`jsdom` 底下的 `undici`、`onnxruntime-web` 底下的 `protobufjs` 等；app 更新 `vite` 6.4.5、`vue` 3.5.44、`brace-expansion` 等。三個前端 `pnpm audit` 都歸零。vitest 4 的 `restoreAllMocks` 不再清 `vi.mock` 的呼叫次數，GraphView 測試改為每次先 `clearAllMocks`；admin 補宣告 `@types/node`（原本靠 vitest 3 間接帶入）。app 的測試直接 import `esbuild`、`@vue/compiler-sfc`，原本是靠 node_modules 裡殘留的套件才跑得起來，現在補成 devDependency，`@vue/server-renderer` 改從 `vue/server-renderer` 取用。avatar-pipeline 的 `protobuf` 4.25.9 維持不動：CVE-2026-0994 只有 5.29.6／6.33.5 修好，但 mediapipe 0.10.14 宣告 `protobuf<5,>=4.25.3`，實測換上 5.29.6 後建立 `FaceDetection` 時解析 `CalculatorGraphConfig` 就丟 `RuntimeError`，一幀都跑不出來；這個漏洞在用 `json_format` 解析不受信任的 JSON 時才會觸發，pipeline 沒有用到 `json_format`。
-- **[2026-10-25]** **前端 Docker 建置階段基底映像全面升級至 Node.js 26.12.1 Alpine**：`frontend/app/Dockerfile` 與 `frontend/admin/Dockerfile` 的 Node.js 建置基底由 `node:24.22.1-alpine` 升級為 `node:26.12.1-alpine`。全面啟用最新 V8 引擎，具備原生 Type Stripping、低記憶體佔用與更高效的垃圾回收（GC），並完整防禦 2026-10-21 官方緊急安全性公告（CVE-2026-111497 Brotli 解碼器越界寫入 RCE 漏洞、CVE-2026-105482、CVE-2026-105483/106069 等）。
-- **[2026-10-22]** **admin 與 avatar 容器的 nginx 升到 1.31.8，修補 2026-10 的五個 nginx CVE**：兩個映像的 runner 由 `nginx:1.27-alpine`（1.27.5）換成 `nginx:1.31.8-alpine`，和主機 nginx 同版，修補 CVE-2026-15176、CVE-2026-93479、CVE-2026-95101、CVE-2026-97629、CVE-2026-97205（1.31.7+／1.30.6+ 才修好），1.27.5 也一併脫離先前的 CVE-2026-42533 等漏洞。admin 的 TLS 設定加上 `ssl_session_tickets off;`：CVE-2026-97629（TLS session ticket 偽造）在 shared session cache 又沒設 `ssl_session_ticket_key` 時觸發，版本已修，這裡再多一層保險，session 復用改由 shared cache 負責。admin 的 dev stage（Alpine 3.24 的 apk nginx 1.30.6）本來就已修好，不用動。
-- **[2026-10-22]** **後台各頁的頁首與內容區對齊同一條左緣，工具、用量、知識庫搜尋、對話紀錄改用共用頁首**：四頁的頁首改用 `PageHeader`，內容區改用新的共用 `.page-body`，內距跟著頁首走（手機 1rem、40rem 以上 2rem）。原本內容區固定 2rem，手機上比標題多縮一截。知識庫搜尋的搜尋列與結果卡片改用共用的 `.card`／`.input`／`.btn`／`.chip`，手機上輸入框獨占一排，結果卡片不再撐出畫面造成橫向捲動，拿掉每張卡片都一樣的「RAG chunk」標籤與不能點卻會變色的 hover；搜尋框、範圍與 Top K 補上可讀的標籤。工具頁的「重新載入」改成次要按鈕，和其他頁的重新整理一致；技能卡片的「編輯」在窄卡片上不再折成兩行。對話紀錄第二排篩選在沒有「清除篩選」時改為三等分，和上一排同寬。同一批也把其他頁的內容內距收成 `.page-body`：專案與權限底下的專案、帳號、帳號 API 金鑰、Embed 金鑰，系統狀態的健康，以及語音、記憶、模型供應商、Avatar，原本 `p-8`、`p-6 lg:p-8`、`p-6 md:p-8`、`p-4 md:p-6` 各寫各的，手機或平板上和標題差 0.5～1rem；帳號 API 金鑰的子頁標題改成和兄弟頁一樣的 `section-header`；模型供應商內容改為靠左，和頁首同一條左緣，底部儲存列跟著新內距調整。系統健康的「重新整理」也改成次要按鈕。對話紀錄的篩選合成一個四欄格線，搜尋占兩欄，起訖時間在它下面，語言對齊角色、清除篩選對齊排序。新增測試：原始碼出現手寫的 `<header className="page-header">`，或頁面自己寫內容區內距（`page-scroll` 帶 padding、`p-8 space-y-*`、非卡片的 `p-N md:p-M`）就失敗。
-- **[2026-10-22]** **backend 的 PyJWT 升到 2.15.1**：處理 2.13.0 的 Dependabot 安全警示。登入 token 固定用 HS256、密鑰在伺服器端，這批警示多半是公鑰被當成 HMAC 密鑰的情況，原本就碰不到，但它是 runtime 套件，所以照樣升級。
-- **[2026-10-22]** **avatar-sdk 建置工具升級**：`frontend/avatar-sdk` 的 `vite` 升到 6.4.5，`postcss` 升到 8.5.31，`source-map-js` 升到 1.2.2，`nanoid` 升到 3.3.20，處理 Dependabot 安全警示。這些都只在 admin 映像建置 SDK 時用到，正式站執行時不會載入。合併取代 Dependabot #46～#48。
-- **[2026-10-22]** 正式 Vman 的元復醫院與創造智能醫院衛教助理接入 `hciot-motion` 單人物動作試用：待機／思考依對話與語音合成狀態切換，實際語音開始前等待中立說話底片就位，停止取消尚未播放的音訊。新增比心／道別按鈕、兩院預設人物與專案指派，SDK／嵌入頁使用獨立的中立 8 秒底片；動作包未就緒可退回底片。前台以專用本機映像及 Compose override 部署，僅此試用容器停用 watchtower 換版。
-
-- **[2026-10-22]** **拿掉內建的 Frieren 與 VRM 3D 小助理**：內建小助理只留 Haru（Live2D），3D 模型改成只用上傳的 VRM。auth 資料庫 schema 26 刪掉 `qqman`、`vrm-sample` 兩筆資源（授權、範圍、指派跟著清除），帳號與專案預設指到它們的改成不指定；前台 3D 模式不再預設 `qqman`。正式環境原本放 `qqman` 模型的 `/data/mascots/qqman` 已搬到 `/data/backups/mascots-qqman-20261022`；其他環境若還留著這個資料夾，它會被當成上傳的小助理列出，可在後台刪除。
-- **[2026-10-22]** 動作測試頁改用 HCIOT 四支素材，重新產生新人物的逐幀幾何與同步標記，獨立安裝於受保護的角色子目錄；等待指令影片作待機／說話底片，新增比心及道別單次播放後回待機。沿用有界快取與單一 WASM，啟動前驗證素材 manifest，補五狀態真實 E2E 與單次動作回歸測試。
-
-- **[2026-10-22]** 角色動作測試頁新增共用 Blob 的動作起點快取：最多三個待命播放器、低記憶體裝置降為兩個，循環回收舊播放器準備下一輪，同一個 WASM 持續渲染。移除重複等幀，完整交接計時包含淡化，錄影與畫面同步淡化；新增快取、取消與不重載素材的回歸驗證。
-
-- **[2026-10-22]** 角色動作測試頁在啟動 SDK 前檢查登入與角色存取權限；未登入時提供登入及重新檢查入口，避免受保護素材的 404 變成不明的 `Character data request failed`。補匿名入口、同頁登入恢復與拒絕存取的回歸測試，素材權限維持不變。
-
-- Updated frontend Docker build stages to Node.js 24.22.1 LTS for the latest Node.js security fixes.
-- **[2026-10-21]** **「更多動作」選單改成共用元件，手機頁首改用 `PageHeader`**：原本在帳號頁的 `AccountRowMenu` 搬到 `components/ActionMenu.tsx`（屬性 `accountName` 改名 `label`），帳號列表與知識庫頁首都用它；知識庫的採納與重新索引改由同一份定義產生寬畫面按鈕與手機選單項目。`PageHeader` 加 `className`，工作區與角色管理的手機頁首改用它，不再手寫頁首結構。操作不變。
-- **[2026-10-21]** **後台頁首與分頁統一規格**：新增共用的 `PageHeader`、`PageTabs`（`components/app/PageHeader.tsx`）與 `SegmentedControl`。每頁主標題由同一個頁首管理，內距與左緣一致，標題前不再放圖示；第一層分頁一律是標題下方的底線分頁，只排一列、放不下就橫捲並把選中分頁捲進畫面。專案與權限、系統狀態、語音、Avatar、模型供應商、記憶管理、知識庫都改用它，原本的灰色膠囊、橘色分段、小型分段與 Avatar 手機直列分頁都拿掉。帳號的建立／管理與編輯器的編輯／並排／預覽改用共用的分段切換。分頁殼裡的內頁（專案管理、系統健康、API 金鑰、Embed 金鑰、權限圖譜）標題改用 `page-section-title`，不再和外層主標題同級。320、375、768、1440 寬度實測十個頁面的標題上緣一致、分頁列單行。
-- **[2026-10-21]** **後台分頁鍵盤操作一致、Avatar 與專案頁改用繁中文案**：方向鍵與 Home／End 切換分頁抽成共用函式，語音、模型供應商、Avatar 素材與共用分頁殼都用它；模型供應商與 Avatar 素材分頁補上 tab／tabpanel 關聯。Avatar 的人物、背景、小助理分頁與上傳表單、專案頁的新增與刪除、工作區編輯器的英文文案改成繁中。
-- **[2026-10-21]** **`/v1/audio/speech` 與 `/api/v1/tts/stream` 選引擎一致**：選引擎、選聲音與台語互備抽成共用的 `plan_tts_voice`，兩個端點都走它。`/v1/audio/speech` 另收選填的 `speech_language`、`language`、`language_routes`：台語且專案開了分流時換 CosyVoice／VoxCPM，主引擎失敗先換同一位的另一家，國語、英文在沒指定引擎與聲音時用 IndexTTS。OpenAI 用戶端不送這些欄位，行為不變。兩個端點只差在回傳方式（整段並有快取，或串流）。Avatar SDK 的 `ask()` 合成語音時多帶 `project_id` 與新的 `tts.language` 選項，對話模式也能唸台語。
-- **[2026-10-21]** **VoxCPM 預設聲音改成 Hayley**：沒指定聲音、也沒設 `TTS_VOXCPM_DEFAULT_VOICE` 時，VoxCPM 改用 `voxcpm2-cosy-young-female-02`（原本是 `young-female-01`）。IndexTTS 的 `hayley`、CosyVoice 的 `young-female-02` 本來就是 Hayley，IndexTTS 失敗備援到 VoxCPM 時聲音不再換人。
-- **[2026-10-20]** **預設專案改成可設定，`default` 變成它的別名**：新增 `DEFAULT_PROJECT_ID`（根目錄 `.env`，Brain 與 Backend 同讀，未設定時照舊是 `default`）。沒帶 `project_id` 的請求與 `project_id=default` 都解析成這個專案：Brain 在 `normalize_project_id` 換，Backend 在 Brain 代理的專案授權、語音專案解析、WebSocket 與 A2A 預設值處先換成正式 ID 再查授權與專案限制（`app/project_ids.py`）。`GET /api/v1/projects` 每個專案多帶 `is_default`，後台與前台找不到上次選的專案時改落到預設專案，不再挑清單第一個。預設專案不可刪除（以解析後的 ID 比對，不會經由別名刪到它）；開機的舊目錄遷移改搬進預設專案，不再建回 `default` 目錄；預設專案改成別的 ID 後，殘留的 `default` 目錄不再列出。
-- **[2026-10-20]** **聲音選單顯示名稱，Hayley 在各引擎都認得出來**：`GET /api/v1/tts/providers` 每個引擎多帶 `voice_items[].label`，後台 TTS 試聽、後台聊天與前台設定的聲音選單改顯示名稱，送出的仍是聲音 ID。同一位錄音者在各引擎的 ID 不同，名稱一律以錄音者開頭：CosyVoice `young-female-02`、VoxCPM `voxcpm2-cosy-young-female-02` 都顯示「Hayley · 青年女聲 02（臺灣台語）」，IndexTTS `hayley` 顯示「Hayley」。後端啟動同步聲音資源時用同一套名稱，資源權限清單也跟著改。聲音 ID 不變，既有授權與專案設定不受影響。
-- **[2026-10-20]** **建立管理員時可直接設登入預設值與資源上限**：後台「建立帳號」選管理員角色後，表單直接出現「登入預設值」（專案、人物、聲音、背景）與「資源上限」（勾「限制可用資源」再挑清單，ROOT 才能不設限），建立成功後接著寫入上限；上限寫入失敗會明說帳號已建立、請到編輯頁再設一次。受限的管理員建立管理員時一律設上限，預選建立者自己看得到的全部再讓他往下縮，不會開出一個不受限的管理員。不再要求建完後從更多動作選單回頭設定。「資源上限」的欄位抽成共用元件，事後編輯面板也用它。
-- **[2026-10-20]** **後台三張資源勾選清單共用同一個分組元件**：帳號「資源權限」、管理員「資源上限」、專案「資源與語音設定」的人物、背景、聲音、引擎清單都改用同一個元件：依專案或引擎分區段、可收合、每段可整段勾選（全選鈕移到區段標題列右側，不再放在 summary 裡）、搜尋框（名稱、ID、引擎）與「只看已選」篩選，篩選中區段一律展開。帳號列表加搜尋框（帳號名稱或角色）。正在編輯的資源權限有未儲存修改時，切到別的帳號或離開頁面會先提示捨棄或留下。
-- **[2026-10-20]** **串接方交付說明模板**：新增 `docs/guides/integration-handover-template.md`，交付帳號給串接方時複製填寫：登入入口、API key、可用專案表、先查能力、一輪辨識→對話→合成的 curl、台語與語言規則、錯誤碼與限流、注意事項。帳號、專案 ID、網址都是示例值，實際值交付時另填。
-- **[2026-10-20]** **後台記住每個分頁上次停的子視圖**：從側欄切到別頁再切回來，回到上次停的子分頁（專案與權限的帳號／API 金鑰／圖譜、Avatar 的人物／背景／VRM、語音、知識庫、記憶、模型供應商、系統狀態），不再每次掉回預設頁；明確點回預設頁也會被記住。記在這個帳號的瀏覽器儲存（`brain-sub-view:<分頁>`），直接輸入網址仍以網址為準。
-- **[2026-10-20]** **後端測試提速**：`hash_password` 的 bcrypt cost 可由 `AUTH_BCRYPT_ROUNDS` 設定（預設仍 12，限 4 到 31，驗證照既有雜湊自己的 cost 走），單元測試設 4；`backend/requirements.txt` 加 `pytest-xdist`，`python -m pytest tests/ -n auto` 平行跑。本機 1559 個測試從 8 分鐘降到 40 秒以內。
-- **[2026-10-20]** **後台「資源權限」對管理員帳號講明清單不生效**：對 admin／ROOT 開這個對話框時，頂端改成說明「不受這份清單限制：看得到全部資源、本來就能進後台；勾選只決定登入預設值與他替別人授權時能分配的專案專屬資源，要縮小範圍請用資源上限」，並隱藏「允許進入管理後台」勾選（後端對管理員本來就忽略它）。一般帳號畫面不變。後端不變。
-- **[2026-10-20]** **後台帳號「資源權限」清單分區段**：虛擬人物（含 VRM）與背景依擁有的專案分成「全域」「專案專屬：某專案」「專案已刪除」，聲音依引擎分區段，取代原本的「語音廠牌」下拉篩選與攤平清單。每個區段可收合（第一次打開時有勾選的區段展開）、標題列顯示已選數並可整段全選／全部不選；人物列左側顯示影片第一格當預覽（只預載 metadata、不播放）；類別層的「全選」照舊作用於整類。只有一個區段的類別（專案、辨識引擎）不加標題。後端與 API 不變。
-
 ### Fixed
-
-- **[2026-11-11]** **多人同時對話時，每輪都整表重建記憶**：每輪寫回記憶摘要後都會跑一次完整的記憶維護（讀整張記憶表、重算摘要向量、整表覆寫），沒有節流也沒有互斥，100 人同時問就有 100 份在跑，背景執行緒與 embedding 都被占滿。現在同一專案同時只跑一份，期間進來的請求合併成跑完再補一次，呼叫端不再等鎖；每輪對話後多呼叫的那次節流維護也拿掉了。
-
-- **[2026-11-10]** **有產品型錄的專案每輪重複解析全部產品檔**：組 prompt 和決定工具時各解析一次，鶴記 118 篇每輪多花約 0.3 秒純 CPU，多人同時問就互相排隊。現在檔案或停用狀態沒變就沿用上次結果，新增、修改、刪除或停用文件會立刻生效。
-
-- **[2026-11-10]** **語音對話中麥克風停不掉**：伺服器辨識（VAD）連續說話時，每句上傳辨識期間按鈕都被鎖住；虛擬人回答中麥克風暫時關閉，按鈕卻顯示「按我說話」，按下去會打斷回答再開麥，講完也會自己打開。現在語音對話期間按鈕固定顯示「按這裡停止」且隨時可按，回答中按它只結束收音，講完不再自動開麥。語音對話沒開時，回答中按麥克風仍是插話。
-
-- **[2026-11-10]** **英文句子提到 Español 不再被判成西文**：`detect_language` 看到 ¿¡ñ 就判西文，「Do you have a menu in Español?」會得到西文回答，QA 逐題打標也用同一套規則。現在英文功能字比西語多時算英文；只有 ¿¡ñ 或西語字較多時仍是西文。已存的語言標籤不會自動重算。
-
-- **[2026-11-06]** **知識庫未存的文件修改會被移動蓋掉**：開著的文件改了沒存，從樹上「⋯ › 移動…」、拖到別的資料夾、多選批次移動或改語言，都會重新讀檔，把修改蓋回伺服器版且不詢問。現在搬移只換路徑與文件資訊，編輯中的內容與「未儲存」都留著；批次改語言不再重讀文件。把這份還沒存的文件拖進快速問答（會收成題目、刪掉原文件）會被擋下，提示先儲存。
-
-- **[2026-11-06]** **刪光某份檔案的題目後，題目會變成新分類冒回來**：分類的題目來自兩份以上檔案時，刪掉其中一份的全部題目再存檔，那份檔案不會被改寫，之後會自己長成一個新分類。快速問答編輯器現在擋下這種存檔，說明「『某檔』的題目不能全部刪掉，至少留一題；要整份移除，請到左邊「文件」刪除那份檔案」；自己輸入的題目不寫檔名。
-
-- **[2026-11-06]** **沒有 LLM 時「AI 整理排版」會說整理不了**：`POST /brain/knowledge/renormalize/preview` 與 `/renormalize` 在 LLM 呼叫失敗或結果沒通過檢查時回 400，`detail` 是白話原因，文件不變；以前會把原文當成整理結果回傳，預覽看起來像整理過，還能「套用」。匯入時的 AI 整理維持失敗就退回原文。
-
-- **[2026-11-06]** **知識庫在實際瀏覽器裡的版面問題**：「移到…」對話框的分類一多會畫到對話框外面，和按鈕疊在一起（1280×720 約 15 個分類就會發生），捲動改放在 `fieldset` 外層。長檔名結尾全是中文時會疊到語言標籤與「⋯」，十幾個中文字的檔名又不會被切開，只差尾巴的兩份看起來一樣；現在依顯示寬度保留結尾，放不下時開頭先讓，結尾再從左邊裁。小助理在 1280×720 蓋住分類編輯的儲存與文件的檢視切換，高度改成留出視窗上方 20rem，手機打開時也不再蓋住儲存；小助理的層級也從對話框之上降到之下，1024×768 開著時不會再蓋住對話框的確認鈕（所有頁面都適用）。手機的回答語言面板底部超出畫面；文件的語言下拉在 320×568 往上開時被頁首切掉，下拉現在看外層實際可用的空間決定方向與高度。手機目錄抽屜開著時，操作結果的提示被擋在抽屜後面。文件預覽遇到長網址時整個預覽要橫向捲動。匯入進度出現時把手機版面往下推 22px。
 
 - **[2026-11-05]** **分類拖不進同層的分類、操作圖示蓋住名稱**：同層的分類拖上去時畫面顯示可以放，放下其實只是排序；滑鼠移到分類上，操作圖示蓋住名稱，點名稱會誤觸「隱藏」，點移動圖示會變成「刪除」。現在拖曳分上緣、中間、下緣三區，動作都在「⋯」裡。文件拖到樹下方的空白一律移到文件最上層，不會再接到目前選的分類或移出知識庫。選中或還原巢狀分類時，上層會自動展開（原本展開路徑對不到任何一列）。分類相關的錯誤訊息改成白話，不再出現 `Node not found`、「節點」與內部編號。
 
@@ -435,6 +502,14 @@
 
 - **[2026-11-05]** **對話紀錄不再因為到期或輪數上限而消失**：對話紀錄與進行中的 session 分開存放。`sessions`、`messages` 照舊給模型當上下文，超過 `MAX_SESSION_TTL_MINUTES`（維持 30 天）會清除；新的 `conversations`、`conversation_messages` 不會到期也沒有輪數上限，只有明確刪除才會消失，後台查詢、匯出、`GET /chat/history` 與每日備份都改讀這裡。原本對話 30 天沒更新就會被刪，而且是下次有人存取時才發生，閒置專案會一次清空；長對話超過輪數上限時舊訊息也會消失。升級後第一次開啟各專案的資料庫時，會自動把現有對話複製過去。閒置超過 30 天的 session 不能再接話，但紀錄還在。
 
+## [2026-11-04]
+
+### Changed
+
+- **[2026-11-04]** **前台改成一般訪客也看得懂**：登入頁預設只有一個密碼欄，有帳號的人再點「我有帳號」；文案改白話，手機直接顯示表單。手機上方按鈕保留文字。麥克風按鈕直接寫出操作（按我說話、說完按這裡），窄畫面獨立一排；輸入框提示改短。對話區拿掉「訪客對話／對話紀錄」標題，沒對話時顯示提示，參考資料的檔名與原文只給管理者看。設定頁改用白話欄名，引擎、語言、回答方式與展示機台收進「進階設定」，沒改動時只留「關閉」。帳號列改排在版面內，不再壓到人物；手機舞台高度略降，讓輸入框留在第一屏。
+
+### Fixed
+
 - **[2026-11-04]** **文件變短後，舊內容不再殘留在知識索引**：重新索引只新增或更新 chunk，從 CSV 或文件刪掉的尾段會一直留著，刪掉的問答還查得到，舊 metadata 也跟著留下。現在寫入後會刪掉該文件新版本沒有的 chunk；文件被清空時，舊 chunk 全部移除。既有殘留需另外清理一次。
 
 - **[2026-11-04]** **前台手機版輸入框不再被帳號列蓋住，另修三個易用性問題**：單欄版面（68.75rem 以下）的帳號列原本浮在畫面上，手機會蓋住輸入框、麥克風與送出鈕，平板會壓到標題；現在排在頁面最下面，全螢幕模式不變。點推薦題或快速問題時，對話紀錄只顯示題目本身（送給模型的內容仍帶主題），不再露出「型錄 Q&A (94題)」這類分類名。快速問題面板的標題不再重複。登入出錯時游標回到要修正的欄位。
@@ -443,9 +518,31 @@
 
 - **[2026-11-04]** **前台 `/login` 重新整理或直接開不再 404**：登入過期時前端只在瀏覽器裡把網址換成 `/login`，但前台 nginx 改成純靜態後沒有這條路由，一重新整理、開書籤或貼連結就是 404。現在 `/login` 回 `index.html`（不快取）；其他不存在的路徑仍回 404，缺檔的 chunk 不會被當成 HTML。
 
+## [2026-11-03]
+
+### Fixed
+
 - **[2026-11-03]** **IndexTTS 不再被背景探測誤判成掛掉**：探測打 `/health/ready`，外部節點沒有這個端點（回 404），所以 `TTS_INDEXTTS_URL` 那台一直被標成掛掉：備援鏈跳過它，沒指定引擎的串流請求直接改走 Edge，聲音跟著換掉；只有明確指定 IndexTTS 的請求不受影響。現在改探 `/health`，與 `indextts-nurse` 相同。
 
 - **[2026-11-03]** **VoxCPM 背景探測抓得到推論 worker 死掉**：探測原本看 `/api/v1/tts/health`，worker 被 OOM 殺掉時它仍回 `ok`，健康狀態顯示正常、斷路器也不會標成掛掉。現在改看 `/api/v1/health`（worker 死掉回 503 `worker_dead`，與合成前的檢查相同），下一輪探測就會標成掛掉，備援鏈直接跳過；worker 恢復後自動解除。
+
+## [2026-11-02]
+
+### Added
+
+- **[2026-11-02]** **新增可選的批次 ASR 引擎 `gemini-live-batch`**：`POST /api/v1/asr/transcribe` 收整檔，每個請求開一條新的 Gemini Live 工作階段（`ASR_GEMINI_STREAM_MODEL`），關掉伺服器 VAD，以 `activityStart`／`activityEnd` 框住音訊並在前面補 0.3 秒靜音，收到 `generationComplete` 結束；靜音回空字串。憑證同串流：專案綁了 Gemini 金鑰就用專案的，否則用部署預設；帶專案語言分流與逐詞詞表（`customVocabulary`）。與其他批次引擎共用單站預算、斷路器與 `upstream_attempt` 紀錄。與 `r2t2-dev` 一樣只有被選到才用，不進預設鏈也不當備援，且不能指定為台語引擎；帳號／專案授權、後台標籤與試辨識都已列出。沒有新增環境變數。同 18 段英文短句（1.7–5.3 秒）實測，整檔含解碼中位約 1.4 秒、p90 約 1.7 秒，`openai` 為 0.88／1.46 秒；要即時回應的呼叫端應改用 WSS 串流 `gemini-live`。`gateway/asr_stream.py` 的 Live 訊息與語言對應抽到 `gateway/gemini_transcription.py` 共用，串流行為不變。比較腳本在 `scripts/experiments/gemini-asr/`。
+
+### Changed
+
+- **[2026-11-02]** **撤銷超過 7 天的帳號 API 金鑰自動刪除**：一次性驗證用的金鑰撤銷後只會把清單拉長。backend 啟動時清除撤銷超過 7 天的列，撤銷動作本身仍留在 auth audit。
+
+- **[2026-11-02]** **批次 ASR 成功時記錄實際引擎**：`/api/v1/asr/transcribe` 成功時多記一行 `asr_transcribed`（帳號、專案、指定與實際引擎、語言、分流、耗時、request id）。經 proxy 的呼叫端常丟掉回應裡的 `provider`，之前從 log 查不出實際走哪個引擎。
+
+- **[2026-11-02]** **帳號 API 金鑰頁預設收起已撤銷的金鑰**：撤銷過的金鑰只留作稽核紀錄，清單一長就看不出哪幾把還有效。現在預設只列未撤銷的，需要時按「顯示已撤銷（N）」展開，資料不動。
+
+- **[2026-11-02]** **批次 ASR 分流只有台語時不再判斷語言**：`/api/v1/asr/transcribe` 實際生效的分流只有 `nan` 時，不呼叫 Flash-Lite 判斷，直接用台語引擎並回 `language: "nan"`、`language_check: null`。整段回應不再被判斷拖住，也不會把台語判成華語。分流同時含其他語言時照舊判斷。整合指南補上建議：前端已讓使用者選好語言時，帶單一語言的 `language_routes`。
+
+### Fixed
 
 - **[2026-11-02]** **批次 ASR 用量不再被串流 WAV 灌成 134217 秒**：ffmpeg 管線或串流 TTS 產生的 WAV，header 把長度填成 `0xFFFFFFFF`，用量記錄直接照 header 算就記成 `2^31 / 16000` 秒。現在用量採用上傳時 ffprobe 量到的秒數，不再量第二次；聊天附件算 ASR／ffmpeg 逾時用的音訊長度同樣改用 ffprobe。既有的錯誤紀錄不會自動修正。
 
@@ -455,6 +552,22 @@
 
 - **[2026-11-02]** **ASR 詞表不再進知識庫索引**：`ASR_PROMPT.md` 沒有排除在索引外，有詞表的專案都被嵌入 2 筆，回答時可能當成知識檢索到。現在列入保留路徑；既有的舊資料在下次重建知識索引時清除。
 
+## [2026-10-30]
+
+### Added
+
+- **[2026-10-30]** **第二台 IndexTTS 以獨立引擎 `indextts-nurse` 接入**：顯示名稱「IndexTTS（nurse24h）」，與 `TTS_INDEXTTS_URL` 那台並存、設定與行為互不影響。新增 `TTS_INDEXTTS_NURSE_URL`（留空＝不啟用、不列出）與 `TTS_INDEXTTS_NURSE_DEFAULT_CHARACTER`（預設 `hayley`），compose 一併傳給 backend 與 gateway-worker。沿用同一個 `IndexTTSAdapter`（依 provider 名稱、網址、預設角色建立第二個實例），整段走 `/tts`、串流走 `/tts_stream`，健康檢查打 `/health`（`/health` 回應多一項 `index-tts-nurse`）；這台不驗證，不送 `X-Internal-Token`。兩台都有 `hayley` 等同名聲音，這台的聲音登錄成 `indextts-nurse:<名稱>`（`runtime_key` 存上游原名），選單、帳號授權、專案允許聲音都用這個 ID，送上游前換回原名；`/v1/audio/speech` 快取 key 本來就含 provider，兩台不共用音檔。只在被指名時使用（請求帶 provider、帳號／專案預設聲音是這台的、或專案引擎順位列了它），不排進部署預設備援鏈與台語預設順序，別的引擎失敗也不會換到它；國語、英文的 IndexTTS 自動換台仍只換到主要那台。後台「語音 → TTS 試聽」的引擎選單、帳號聲音授權、專案的允許聲音與 TTS 引擎順位都能選它，前台與後台試聽選它時走串流端點並帶 provider。新增 backend 測試涵蓋設定、未設定時不列出、聲音 ID 不衝突、合成與串流打到這台、快取 key 分開、不進備援鏈。
+
+### Changed
+
+- **[2026-10-30]** 後台「帳號 → 編輯／管理」的臨時帳號批次紀錄改版：拿掉說明句與下拉選單，改為標題旁的批數、可換行的狀態篩選鈕（附各狀態批數）與次要的重新整理鈕；每批一列顯示建立時間、彩色狀態標籤、帳號組數與效期，後台權限與撤銷靠右，已撤銷的批次不再顯示停用按鈕；每組帳號的密碼與狀態收進可用鍵盤展開的明細（剛產生的那批預設展開），首次載入顯示骨架、空清單與篩選無結果各有提示，API 與行為不變。
+
+- **[2026-10-30]** **Brain 回答路徑每個節點都有短時限、整輪有預算，log 說得出是哪一站逾時、等了多久**：LLM 每站分連線（`LLM_CONNECT_TIMEOUT_SECONDS` 3 秒）、串流首字與 chunk 間隔（`LLM_FIRST_TOKEN_TIMEOUT_SECONDS` 7 秒）、串流整段（`LLM_REQUEST_TIMEOUT_SECONDS` 20 秒，原本 20 秒同時當首字逾時、慢慢滴的串流沒有上限）、回合內非串流（`LLM_NONSTREAM_TIMEOUT_SECONDS` 10 秒），一次呼叫跨所有站最多 `LLM_FIRST_TOKEN_BUDGET_SECONDS` 15 秒，用完不再開下一站、照舊回 502 `LLM_OVERLOAD`；`max_retries` 仍為 0。整輪 `CHAT_TURN_BUDGET_SECONDS` 30 秒（從收到請求起算）：用完不再開下一輪工具，改用已取得的工具結果作答，工具時限也不超過剩餘預算。`search_knowledge`（含伺服器先查）改用 `KNOWLEDGE_SEARCH_TIMEOUT_SECONDS` 6 秒（原本跟一般工具同為 30 秒），某條查詢逾時就不再查其餘查詢、到 8 成時間不做圖譜擴展，帶已查到的段落；圖譜擴展 `KNOWLEDGE_GRAPH_TIMEOUT_SECONDS` 1 秒。查詢 embedding 改為每次 `EMBEDDING_QUERY_TIMEOUT_SECONDS` 2 秒、最多重試 `EMBEDDING_QUERY_MAX_RETRIES` 1 次（原本跟建索引一樣 30 秒 × 4 次，最壞約 123 秒）；建索引、記憶整理、建圖譜等不在聊天回合內的呼叫維持原本的長時限。`/brain/chat` 與 `/brain/chat/stream` 加上整個請求的保險時限（預設 90 秒，由上述預算推得，原本 `queue.get()` 沒有時限），逾時設取消旗標、回 504 `GATEWAY_TIMEOUT`（串流為 `error` 事件）並記 `chat_deadline_exceeded`，`chat_cancelled` 多 `cause` 欄位區分用戶端離開與逾時。失敗原因碼新增 `timeout_connect`／`timeout_first_token`／`timeout_stall`／`timeout_total`／`budget_exhausted`，與 `transient_error` 分開；斷路器仍當暫時性失敗。`llm_route_attempt` 多 `node`、`outcome`、`elapsed_ms`、`mode`、`timeout_s`、`first_token_ms`、`streamed_chars`、`error_type`／`error`，`trace_id` 改用本輪的 trace id（原本 agent loop 每次呼叫各自產生）；檢索節點（`rag_embed_query`、`rag_query`、`rag_vector`、`rag_lexical`、`rag_graph`）與 auto recall 各記一筆 `node_attempt`；串流已送出句子後換站記 `llm_restart_after_partial_text`；逾時後仍在跑的工具與 auto recall 執行緒跑完時記 `node_orphan_finished`。生產鏈三站都卡住時，原本到 502 要等約 60 秒（加上檢索最壞 30 秒），現在約 15 秒（加檢索最多 6 秒）。新增以本機假伺服器（接受後不回、送一段後停住、持續慢滴）實測的測試。
+
+- **[2026-10-30]** **小助理只剩內建的 Live2D Haru，拿掉影片人物與 VRM 小助理，前台拿掉 3D 模式**：取代 2026-09-03 起「每個影片人物自動列成 `video-<char_id>` 小助理」的做法（commit 468c2e80），以及 2026-10-29 衍生小助理縮圖權限與「Matex」改「人物影片」標籤兩項。`GET /api/v1/avatar/mascots` 只回 Haru（`engine: "2d"`，欄位 `mascot_id`、`label`、`engine`、`model_url`、`thumbnail_url`、`fit`、`builtin` 加上原本的 `source`／`in_project_scope`／`owner_project_id`），不再有 `vrm_url`、`character_id`、`size_bytes`、`updated_at`，`"3d"` 與 `"video"` 兩種引擎不存在了。刪除 `POST /api/v1/avatar/mascots`（上傳 VRM）、`POST /api/v1/avatar/mascots/from-character`、`PATCH`／`DELETE /api/v1/avatar/mascots/{mascot_id}`、`POST /api/v1/avatar/mascots/{mascot_id}/thumbnail` 與 `GET /static/mascots/...`，舊路徑直接 404（集合路徑的 POST 回 405），admin nginx 的 `/static/mascots/` location 一併拿掉；`AVATAR_MASCOTS_DIR`、`AVATAR_MASCOT_MAX_UPLOAD_BYTES`、`AVATAR_MASCOT_THUMBNAIL_MAX_UPLOAD_BYTES` 與 `GET /api/v1/uploads/limits` 的兩個小助理欄位移除，`/data/mascots` 不再讀取。小助理資源類型、專案的 `allowed_mascots`／`default_mascot_id` 與帳號預設的 `mascot_id` 照舊，只是可選的只有 `haru-live2d`，不需要資料庫 migration；舊環境留下的其他小助理資源列不會出現在清單裡。後台拿掉 Avatar 的「小助理」分頁與 `/admin/avatar/mascots` 路由（直接不是頁面），連同自動截縮圖上傳的整條流程、右下角小助理的切換選單與影片引擎的 PCM 嘴型；右下角浮動助理固定是 Haru。虛擬人（Persona）的綁定選單只列 2D 人物，帳號與 admin 資源範圍裡的「VRM」改稱「小助理」。前台拿掉 3D 模式與 VRM 選擇，只剩 2D 影片人物；舊偏好的 3d 一律當成 2d：前台移除 3D（VRM）渲染模式與小助理清單，舞台只保留 2D 影片角色（OpenVmanAvatarRuntime WASM）；設定視窗不再列出 VRM 角色，舊的 `avatar.render_mode`／`vrmAvatarId` 偏好（含伺服器端存的 `renderMode: "3d"`）一律忽略，開場照常載入 2D 人物。`PUT /api/v1/settings/my-preferences` 收到 `renderMode`、`vrmAvatarId` 時直接丟掉、不回 422，讀取時也不再回傳。`public/vendor/ai-avatar-bot/widget.html` 只剩內建 Live2D（Haru），僅接受 `model`、`fit` 參數與 `mouth`／`mouth-stop` 訊息，VRM、VRMA 手勢與影片角色引擎皆已移除。
+
+### Fixed
+
 - **[2026-10-30]** **帳號「登入後預設值」的聲音選單標出引擎**：兩台 IndexTTS（.35 與 nurse24h）都有 Hayley，選單原本只寫「Hayley」，分不出要設哪一台；現在寫成「Hayley（IndexTTS）」「Hayley（IndexTTS（nurse24h））」。
 
 <!-- >>> 上游逾時與斷路器 -->
@@ -463,58 +576,300 @@
 
 - **[2026-10-30]** **TTS 合成與 ASR 轉檔不再卡住整個 backend**：`/v1/audio/speech`、`/api/v1/tts/stream` 原本在 async 路由裡同步呼叫 TTS 引擎，backend 只有一個 process，任一台引擎卡住（最久 120 秒）時所有請求都跟著停；批次 ASR 的 ffmpeg 轉檔（最久 60 秒）也一樣。兩者改在 worker thread 執行，新增測試確認合成與轉檔不在 event loop 上跑。各節點逾時上限與整條鏈的總時限另案調整。
 
+## [2026-10-29]
+
+### Added
+
+- **[2026-10-29]** **avatar-pipeline 支援透明人物、圖片輸入與首尾銜接**：中繼檔改為每幀關鍵幀的 FFV1 BGRA，經 ffmpeg 管線讀幀（OpenCV 讀不到透明通道）；來源帶透明（PNG／WebP、`alpha_mode=1` 的 VP8／VP9 WebM，後者強制用 libvpx 解碼）時輸出 `yuva420p` 的 VP9，幀同步標記維持不透明，臉部偵測前把透明像素鋪成中性灰。可直接輸入 PNG／JPG／WebP，解碼一次後以 `loop` 濾鏡做成 10 秒靜止片段；不用 `-loop 1`，因為帶 C2PA 簽章或 IEND 後有多餘位元組的 PNG 在那種讀法下會永遠卡住。新階段 `loop` 比較首尾幀，差超過門檻（預設 6.0）就接上倒放片段，CLI 新增 `--loop auto|always|off` 與 `--seam-threshold`，完成 JSON 多回 `alpha`、`seam_difference`、`ping_pong`。單一 ffmpeg 步驟超過 900 秒即中止。
+
+### Changed
+
+- **[2026-10-29]** **後台 Avatar 頁的上傳與新增流程改版，小助理分頁重新整理，衍生影片小助理的縮圖不再破圖**：「人物」分頁以「從影片或圖片產生人物」為主要路徑，來源欄位改為「來源影片或圖片」，接受 MP4／MOV／M4V／WebM 影片或 PNG／JPG／WebP 正面人像，旁邊列出各自上限並簡短說明圖片做成 10 秒循環、透明背景保留、首尾接不上會自動補倒放；轉檔進度新增「檢查首尾銜接」階段，`prepare` 改稱「準備來源」。直接上傳 `01.webm`＋資料檔改為收合的「上傳現成素材包」進階區。人物、背景、小助理的檔案欄位都可點選或拖放、鍵盤可操作並有焦點外框，選好後顯示檔名、大小與預覽（透明圖片以棋盤格襯底），送出前先擋下格式不符或超過大小上限的檔案，伺服器的 413／415 說明仍原樣顯示。欄位改為有標籤的輸入框，可用範圍改用共用 `Select`，卡片主標題改為顯示名稱、ID 退為次要資訊。小助理分頁依 VRM、Live2D、人物影片分組，標出由人物自動帶入的項目並說明要到人物分頁管理；沒有縮圖或縮圖載入失敗時改顯示名稱首字加類型的佔位；「使用」改為次要按鈕、使用中的卡片加外框，並註明只換後台右下角的小助理、不影響前台；上傳區標明只收 VRM（100 MB 內，縮圖選填 10 MB 內）。backend 的 `GET /static/mascots/video-<char_id>/thumbnail.png` 原本照小助理資源檢查權限，但由人物自動衍生的影片小助理沒有登錄成小助理資源，除 Haru 以外的卡片縮圖全部 404；現在這類項目改依底下人物的權限判斷（只提供 `thumbnail.png`，沒有權限回 404），有登錄成小助理資源的照舊。新增前端上傳規則、拖放欄位、首尾銜接階段、分組與佔位的測試，以及衍生小助理縮圖權限的 backend 測試。後台右下角小助理選單裡影片引擎的標籤由「Matex」改為「人物影片」，和小助理分頁一致。
+
+- **[2026-10-29]** **所有上傳端點改為邊讀邊擋，並依實際內容驗格式**：大小超過上限立刻停止（413），格式不符或讀不出來回 415，皆附中文 `detail`。圖片以 magic bytes 認 PNG／JPEG／WebP、最長邊 8192；音訊與影片先過 ffprobe 驗格式與長度。新上限：ASR 轉寫／試辨識 25 MB、5 分鐘；`/api/v1/uploads` 影片 2 分鐘、送 VLM 最多 60 張影格；影片轉素材包 200 MB（原 512 MB）、60 秒，並可改傳 25 MB 以內的 PNG／JPEG／WebP 人像（存檔保留實際副檔名）；背景 25 MB、小助理縮圖／QA 圖片／視覺影格 10 MB；Office 檔解壓後 500 MB、10,000 個檔案以內；Brain 代理請求本體 110 MB；知識文件副檔名改為白名單。知識庫 `target_dir` 不可含 `..` 或絕對路徑，raw 上傳只能寫進 `raw/`，Brain 端的知識上傳也自行檢查大小與路徑。admin 容器 nginx 的 `/api/` 由 200m 降為 100m，與外圈一致，只有 `POST /api/v1/avatar/jobs` 放寬到 200m（外圈 host vhost 也新增同一條，需執行 `infra/nginx/native/deploy.sh` 才會生效）。每項上限都有環境變數（見 `.env.example`），`GET /api/v1/uploads/limits` 回傳整組數字，後台知識庫與 ASR 測試畫面據此顯示上限並在送出前先擋。細節見 `docs/specs/01_BACKEND_SPEC.md`「上傳限制」與 `brain/README.md`。
+
+### Fixed
+
 - **[2026-10-29]** **後台上傳欄位的圖示跟著選到的檔案類型**：「從影片或圖片產生人物」選了圖片時，檔名旁仍顯示影片圖示；現在選好檔案後依實際類型顯示影片或圖片圖示，沒選檔案時維持欄位原本的圖示。
 
+## [2026-10-28]
+
+### Added
+
+- **[2026-10-28]** **後台試聽可指定 VoxCPM 模型（VH-387 LoRA 驗收用）**：語音試聽選 VoxCPM 時，管理員多一個「模型」選單，選項取自 VoxCPM `/api/v1/catalog`（`full::` 完整 checkpoint、`lora::` LoRA），預設沿用目前載入的模型，不列出載入「最後一個 epoch」的訓練目錄項目（label 結尾為 `/ latest`），避免看不出版本而選錯；LoRA 疊在目前載入的底模上套用；只有選了未載入的 `full::` 底模才提示 VoxCPM 需重新載入約 30～40 秒、期間其他 Vox 語音也會等待。新增 `GET /api/v1/tts/voxcpm/models`（管理員），`/v1/audio/speech` 新增選填 `model_id`，只有管理員指定 `provider: voxcpm` 時接受並轉給 CastVoice，格式不符回 422、非管理員回 403，快取依模型分開。正式對話與串流端點不帶模型，行為不變。
+
+- **[2026-10-28]** 同服務的衍生網址改為自動推導：R2T2 正式／開發串流從各自的批次基底網址產生，HTTP／HTTPS 對應 WS／WSS；Cosy 詞表從合成網址產生。保留各端點完整網址覆寫，詞表可用 `TTS_HANJI_CONVERT_ENABLED=false` 獨立停用；引擎可用清單、實際連線與 TTS 快取都使用生效網址。
+
+- **[2026-10-28]** 台語 TTS 串接 `.35` 的文字詞表 API：VoxCPM（整段與串流）與 CosyVoice 各自使用環境設定指定的詞表，CosyVoice 以 `annotate=none` 避免上游二次轉換。新增 `TTS_HANJI_CONVERT_URL`、`TTS_VOXCPM_HANJI_VERSION`、`TTS_COSYVOICE_HANJI_VERSION`；每家引擎從原文獨立轉換，轉換失敗走既有備援，國語 Vox 不查台語詞表，台語文字保留字形，音檔快取依語言與詞表設定隔離。
+
+- **[2026-10-28]** 新增 `scripts/experiments/llm-wiki/` 實驗：比較把同主題 QA 編譯成 wiki 頁（Karpathy llm-wiki 做法）與現行檢索的回答品質，以及用 LLM lint 找知識庫矛盾。全部唯讀，產出放 repo 外。結果見該目錄 `REPORT.md`：QA 與 wiki 小節一起檢索在 24 題可答題答對 21～22 題（正式預查 15～16 題），延遲不變；編譯忠實度 97.5%；3.8-flash 分組加整包 lint 抓回 5/5 個埋入矛盾。另發現正式預查只取 3 筆、0.68 門檻擋掉「停車」這類有答案的問題，兩者都未修改。
+
+### Changed
+
+- **[2026-10-28]** **拿掉 NEN LLM 供應商**：主對話鏈只剩 Gemini、OpenAI、Groq。Backend 與 Brain 的 `NEN_API_KEY`、`NEN_BASE_URL` 設定、後台「模型供應商」的 NEN 一站與金鑰、Brain 接受的後台供應商清單、compose 傳入的兩個環境變數、`.env.example` 與文件範例一併移除，`openspec/specs/nen-llm-provider/` 規格與專屬測試刪除（封存的原始提案保留）。正式資料庫沒有存過含 NEN 的主對話設定或金鑰；`.env` 的 `LLM_FALLBACK_CHAIN` 若仍寫著 `nen:<model>`，該站拿不到金鑰會被略過。
+
+- **[2026-10-28]** **虛擬人 runtime 一律同源載入引擎，檔名與文字統一**：`frontend/app/public/js/OpenVmanAvatarRuntime.js` 移除一段在特定網域改從外部網址下載 WASM 的分支（本專案的網域從未走到），改為固定同源載入；WASM 檔改名為 `public/wasm/OpenVmanAvatarRuntime.wasm`，與 runtime 及 SDK 公開路徑一致，admin Nginx 的 SDK 轉送跟著改，SDK 公開路徑不變。runtime 的註解與 iOS 17.4 以下的版本提示改為繁體中文。前台 Nginx 拿掉舊 `/js/DHLiveMini2.js` 轉址，舊的 `/js/DHLiveMini2.js`、`/wasm/DHLiveMini2.wasm` 直接 404。新增測試：runtime 出現外部網址、引擎檔名或載入路徑回到舊名、註解出現簡體字就失敗。無頭 Chromium 實測新路徑可完成 WASM 初始化，且沒有對外請求。
+
+- **[2026-10-28]** **embedding 與 avatar-pipeline 映像的建置工具升級，修補 uv 與 pip 漏洞**：embedding 的 uv 由 0.11.21 升到 0.13.6，修 GHSA-hq85-5cpj-mr62（Critical，內建 CA 清單信任金鑰已外洩的 emSign 中繼憑證，建置時連 PyPI 的 TLS 可能被攔截；0.13.4 起修好）。兩個映像裡的 pip 原本都是基底映像帶的 25.0.1，改為建置時升到 26.2 以上，修 CVE-2026-13346 等：embedding 的 pip 在 `python -m venv` 建出的 venv 裡，所以在 builder 安裝依賴前一併升級；avatar-pipeline 原本只在 builder 升級，runner 用的仍是基底映像的 pip，改在 runner 升級。兩者都只在安裝套件時觸發，執行中的服務不受影響。avatar-pipeline 新映像跑同一段影片的 478 點臉部關鍵點與舊映像完全一致。
+
+### Fixed
+
 - **[2026-10-28]** **VoxCPM 一律先查台語詞表**：VoxCPM 跟 CosyVoice 一樣只講台語（聲音全標 `nan-TW`），原本 VoxCPM 只在請求帶 `nan` 時才套 V6，後台試聽或沒帶語言的請求會把原文直接送過去。現在兩家不看請求語言，送出前一律查詞表，`/v1/audio/speech`、`/api/v1/tts/stream` 指定這兩家時文字前處理與快取也一律當台語。後台試聽因此不需要語言選項，稍早加上的「華語／台語」選單拿掉。
+
 - **[2026-10-28]** **後台對話與前台整檔合成帶上這一輪的語言**：台語這一輪要帶語言，Backend 才會改用台語引擎、並在 CosyVoice 失敗時改由 VoxCPM 備援，但兩處原本都沒帶。後台對話頁用語音送出時，把 ASR 判出的語言帶進回覆的預先合成與播放（`speech_language`），共用語音控制器不再丟掉辨識結果的語言，TTS 快取依語言分開；前台改走整檔合成時（例如講台語換成 CosyVoice）原本只帶 `project_id`，現在與串流一樣帶 `language_routes`、`speech_language`。Avatar SDK 的語言由串接方以 `tts.language` 指定，不變。
+
+## [2026-10-27]
+
+### Changed
+
+- **[2026-10-27]** **拿掉 repo 內附的 IndexTTS 伺服器**：刪除 `backend/index-tts-vllm/`（vLLM 版 IndexTTS 原始碼、Dockerfile 與範例音檔）、compose 的 `index-tts-vllm` 服務與 `indextts` profile，以及 backend／gateway-worker 掛進 `/indextts-assets` 的兩條唯讀掛載；`.env.example` 拿掉 `INDEXTTS_*` 與 `TORCH_CUDA_ARCH_LIST`。本機從來沒有起這個容器，連帶也清掉它 `keras==2.9.0` 的 Critical 漏洞。IndexTTS 改為只透過 `TTS_INDEXTTS_URL` 連外部節點，backend 的 adapter、聲音清單、台語備援順序與健康檢查都不變。為這組巢狀掛載而設的 `test_readonly_mount_parents.py`、測那份伺服器程式的 `test_indextts_internal_auth.py` 一併移除；文件隱私檢查放行範例主機名 `shared-gpu-node`；一次性遷移腳本 `migrate_account_resources.py` 找不到 speaker.json 時只會記一筆來源問題。
+
+- **[2026-10-27]** **admin 與 avatar 前端依賴安全升級**：admin 的 `vitest` 3.2 → 4.1.12（帶出 `tinypool` 2.x，修 Critical），並在原版本範圍內更新 `vite` 6.4.5、`postcss`、`nanoid` 5.1.16、`jsdom` 底下的 `undici`、`onnxruntime-web` 底下的 `protobufjs` 等；app 更新 `vite` 6.4.5、`vue` 3.5.44、`brace-expansion` 等。三個前端 `pnpm audit` 都歸零。vitest 4 的 `restoreAllMocks` 不再清 `vi.mock` 的呼叫次數，GraphView 測試改為每次先 `clearAllMocks`；admin 補宣告 `@types/node`（原本靠 vitest 3 間接帶入）。app 的測試直接 import `esbuild`、`@vue/compiler-sfc`，原本是靠 node_modules 裡殘留的套件才跑得起來，現在補成 devDependency，`@vue/server-renderer` 改從 `vue/server-renderer` 取用。avatar-pipeline 的 `protobuf` 4.25.9 維持不動：CVE-2026-0994 只有 5.29.6／6.33.5 修好，但 mediapipe 0.10.14 宣告 `protobuf<5,>=4.25.3`，實測換上 5.29.6 後建立 `FaceDetection` 時解析 `CalculatorGraphConfig` 就丟 `RuntimeError`，一幀都跑不出來；這個漏洞在用 `json_format` 解析不受信任的 JSON 時才會觸發，pipeline 沒有用到 `json_format`。
+
+### Fixed
+
 - **[2026-10-27]** **動作片段結尾不再播進下一段**：控制器原本只在每次畫面更新（rAF）時檢查是否播到片段結尾；重負載或低階機台畫面更新變慢時，4K 直式實測待機循環會超過結尾 0.02～0.65 秒，短暫播到思考片段開頭的影格。現在另依影片時間排計時器，在結尾前 0.04 秒準時檢查；播到結尾先停在片段最後一幀再交接，交接期間不會播進下一段；交接失敗時恢復播放，不會卡在暫停。獨立測試頁與正式 Vman 共用同一個控制器。
+
 - **[2026-10-27]** **醫院動作試用的思考切說話不再先停住**：原本一開始交接就凍結畫面、暫停思考影片，等新播放器解出畫面、WASM 畫出新影片才淡化，桌機實測完全靜止約 0.2 秒，4K 直式 kiosk 更久。現在新播放器先在背景播放與解碼，WASM 照常畫思考動作；確認新畫面已解碼才凍結並切換來源，凍結只剩切換到 WASM 畫出新影片的那一小段。等待中被新的切換取消時，已開始播放的待命影片會退回片段起點（共用快取新增 `release()`）；舊動作播到片段結尾就直接切換，不會播進下一段的影格。循環與單次動作結束的行為不變。
+
+## [2026-10-25]
+
+### Changed
+
+- **[2026-10-25]** **前端 Docker 建置階段基底映像全面升級至 Node.js 26.12.1 Alpine**：`frontend/app/Dockerfile` 與 `frontend/admin/Dockerfile` 的 Node.js 建置基底由 `node:24.22.1-alpine` 升級為 `node:26.12.1-alpine`。全面啟用最新 V8 引擎，具備原生 Type Stripping、低記憶體佔用與更高效的垃圾回收（GC），並完整防禦 2026-10-21 官方緊急安全性公告（CVE-2026-111497 Brotli 解碼器越界寫入 RCE 漏洞、CVE-2026-105482、CVE-2026-105483/106069 等）。
+
+## [2026-10-23]
+
+### Added
+
+- **[2026-10-23]** 正式動作 E2E 可指定 viewport／DPR，並透過實際設定介面進入展示機台模式；補 2160×3840 直向全螢幕真實對話、語音及停止檢查，保存逐幀分析、時間軸與慢放錄影。未重現現場整頁黑閃，保留擷取間隔及高解析度錄影負載的限制。
+
+### Fixed
+
 - **[2026-10-23]** **動作試用的道別偶爾卡住不回待機**：道別是動作包的最後一段，結束在影片檔尾。控制器每個畫面只在「影片仍在播放」時檢查是否到片段結尾；若最後 0.04 秒（25 fps 的最後一幀）沒有剛好輪到一次檢查，影片會自行 ended 並轉成 paused，之後條件永遠不成立，就一直停在道別。現在 ended 也算播到結尾；手動暫停仍不算。獨立測試頁與正式 Vman 共用這個控制器，兩邊一起修好。部署後實驗頁 E2E 的完整示範曾因此失敗一次。
+
+## [2026-10-22]
+
+### Added
+
+- **[2026-10-22]** 新增真實 SDK／WASM 的 WebM、MP4 與混播效能對照腳本：以相同四播放器及動作流程量測掉幀、連續畫面停頓與完整交接延遲，分別保留桌面／375 寬度的原始樣本及量測後錄影。另提供單播放器、18 秒連續語音的原生 SDK 對嘴基準，檢查實際音訊訊號及嘴型繪製。混播使用獨立實驗快取，正式兩院人物仍維持 WebM；首輪有短停頓及一筆取樣標記異常，結果與限制詳列於動作測試指南。
+
+- **[2026-10-22]** 新增獨立的 `/experiments/avatar-motion/` 角色分段測試頁：同一份現有影片與對嘴資料可切換待機／思考／說話測試區段、循環、停止及錄製實際 SDK 畫面與聲音，附離線測試語音、控制器回歸測試與真實 Chrome E2E。這是技術預覽，尚未接入正式對話或 SDK 公開動作 API。
+
+### Changed
+
+- **[2026-10-22]** **admin 與 avatar 容器的 nginx 升到 1.31.8，修補 2026-10 的五個 nginx CVE**：兩個映像的 runner 由 `nginx:1.27-alpine`（1.27.5）換成 `nginx:1.31.8-alpine`，和主機 nginx 同版，修補 CVE-2026-15176、CVE-2026-93479、CVE-2026-95101、CVE-2026-97629、CVE-2026-97205（1.31.7+／1.30.6+ 才修好），1.27.5 也一併脫離先前的 CVE-2026-42533 等漏洞。admin 的 TLS 設定加上 `ssl_session_tickets off;`：CVE-2026-97629（TLS session ticket 偽造）在 shared session cache 又沒設 `ssl_session_ticket_key` 時觸發，版本已修，這裡再多一層保險，session 復用改由 shared cache 負責。admin 的 dev stage（Alpine 3.24 的 apk nginx 1.30.6）本來就已修好，不用動。
+
+- **[2026-10-22]** **後台各頁的頁首與內容區對齊同一條左緣，工具、用量、知識庫搜尋、對話紀錄改用共用頁首**：四頁的頁首改用 `PageHeader`，內容區改用新的共用 `.page-body`，內距跟著頁首走（手機 1rem、40rem 以上 2rem）。原本內容區固定 2rem，手機上比標題多縮一截。知識庫搜尋的搜尋列與結果卡片改用共用的 `.card`／`.input`／`.btn`／`.chip`，手機上輸入框獨占一排，結果卡片不再撐出畫面造成橫向捲動，拿掉每張卡片都一樣的「RAG chunk」標籤與不能點卻會變色的 hover；搜尋框、範圍與 Top K 補上可讀的標籤。工具頁的「重新載入」改成次要按鈕，和其他頁的重新整理一致；技能卡片的「編輯」在窄卡片上不再折成兩行。對話紀錄第二排篩選在沒有「清除篩選」時改為三等分，和上一排同寬。同一批也把其他頁的內容內距收成 `.page-body`：專案與權限底下的專案、帳號、帳號 API 金鑰、Embed 金鑰，系統狀態的健康，以及語音、記憶、模型供應商、Avatar，原本 `p-8`、`p-6 lg:p-8`、`p-6 md:p-8`、`p-4 md:p-6` 各寫各的，手機或平板上和標題差 0.5～1rem；帳號 API 金鑰的子頁標題改成和兄弟頁一樣的 `section-header`；模型供應商內容改為靠左，和頁首同一條左緣，底部儲存列跟著新內距調整。系統健康的「重新整理」也改成次要按鈕。對話紀錄的篩選合成一個四欄格線，搜尋占兩欄，起訖時間在它下面，語言對齊角色、清除篩選對齊排序。新增測試：原始碼出現手寫的 `<header className="page-header">`，或頁面自己寫內容區內距（`page-scroll` 帶 padding、`p-8 space-y-*`、非卡片的 `p-N md:p-M`）就失敗。
+
+- **[2026-10-22]** **backend 的 PyJWT 升到 2.15.1**：處理 2.13.0 的 Dependabot 安全警示。登入 token 固定用 HS256、密鑰在伺服器端，這批警示多半是公鑰被當成 HMAC 密鑰的情況，原本就碰不到，但它是 runtime 套件，所以照樣升級。
+
+- **[2026-10-22]** **avatar-sdk 建置工具升級**：`frontend/avatar-sdk` 的 `vite` 升到 6.4.5，`postcss` 升到 8.5.31，`source-map-js` 升到 1.2.2，`nanoid` 升到 3.3.20，處理 Dependabot 安全警示。這些都只在 admin 映像建置 SDK 時用到，正式站執行時不會載入。合併取代 Dependabot #46～#48。
+
+- **[2026-10-22]** 正式 Vman 的元復醫院與創造智能醫院衛教助理接入 `hciot-motion` 單人物動作試用：待機／思考依對話與語音合成狀態切換，實際語音開始前等待中立說話底片就位，停止取消尚未播放的音訊。新增比心／道別按鈕、兩院預設人物與專案指派，SDK／嵌入頁使用獨立的中立 8 秒底片；動作包未就緒可退回底片。前台以專用本機映像及 Compose override 部署，僅此試用容器停用 watchtower 換版。
+
+- **[2026-10-22]** **拿掉內建的 Frieren 與 VRM 3D 小助理**：內建小助理只留 Haru（Live2D），3D 模型改成只用上傳的 VRM。auth 資料庫 schema 26 刪掉 `qqman`、`vrm-sample` 兩筆資源（授權、範圍、指派跟著清除），帳號與專案預設指到它們的改成不指定；前台 3D 模式不再預設 `qqman`。正式環境原本放 `qqman` 模型的 `/data/mascots/qqman` 已搬到 `/data/backups/mascots-qqman-20261022`；其他環境若還留著這個資料夾，它會被當成上傳的小助理列出，可在後台刪除。
+
+- **[2026-10-22]** 動作測試頁改用 HCIOT 四支素材，重新產生新人物的逐幀幾何與同步標記，獨立安裝於受保護的角色子目錄；等待指令影片作待機／說話底片，新增比心及道別單次播放後回待機。沿用有界快取與單一 WASM，啟動前驗證素材 manifest，補五狀態真實 E2E 與單次動作回歸測試。
+
+- **[2026-10-22]** 角色動作測試頁新增共用 Blob 的動作起點快取：最多三個待命播放器、低記憶體裝置降為兩個，循環回收舊播放器準備下一輪，同一個 WASM 持續渲染。移除重複等幀，完整交接計時包含淡化，錄影與畫面同步淡化；新增快取、取消與不重載素材的回歸驗證。
+
+- **[2026-10-22]** 角色動作測試頁在啟動 SDK 前檢查登入與角色存取權限；未登入時提供登入及重新檢查入口，避免受保護素材的 404 變成不明的 `Character data request failed`。補匿名入口、同頁登入恢復與拒絕存取的回歸測試，素材權限維持不變。
+
+- **[2026-10-22]** Updated frontend Docker build stages to Node.js 24.22.1 LTS for the latest Node.js security fixes.
+
+### Fixed
+
 - **[2026-10-22]** 修正全螢幕手機對話框高度塌陷、輸入列與登入工具列互相遮擋；輸入列補實底與邊框，輸入欄可縮、送出與停止維持可辨識的按鈕外觀，停止色彩使用有效 RGB token。一般頁打字時的舞台縮小不再套用到全螢幕。動作揭幕另加入目標片段的解碼幀檢查，再等待 WASM 呈現，避免只憑 `play()`／元素已繪製就交接；尚未把使用者回報的瞬間閃爍判定為已定位或已解決。 正式 E2E 可另記整頁合成幀、遮罩與頁面生命週期事件，追查整頁黑閃；保留網路中斷造成的失敗紀錄。
 
 - **[2026-10-22]** 醫院動作試用與獨立測試頁的思考→說話交接減少閃跳：快取準備期間維持原動作，新畫面呈現後以 180 ms 緩進緩出交接，再回收舊解碼器；取消淡化時延續當下可見合成畫面。正式前台待機／說話共用底片時不再歸零或更換播放器，背景快取完成會更新準備狀態，保留正常區段循環；補快取回填與連續底片測試及真實交接錄影探針。
 
 - **[2026-10-22]** **Avatar 頁切換專案時不會被前一個專案的清單蓋掉**：一般帳號在背景或小助理還在載入時切換專案，新專案的載入會被「載入中」擋掉，前一個專案晚回來的清單又會被當成新專案的，要換分頁才會重新載入。現在每次載入會記住是哪個專案發的，回來時已經換到別的專案就丟掉；「載入中」也分專案記，不會擋掉新專案的載入。
+
 - **[2026-10-22]** **不能進後台的帳號列不出同專案的對話紀錄**：`GET /api/v1/sessions` 原本只要有專案讀取權就能列出整個專案所有人的對話 ID 與內容摘要，展示機台或純 API 帳號的 token 外流就看得到別人的對話。現在跟匯出、刪除一樣需要專案編輯權（ROOT、管理員，或開了後台權限的一般帳號），其餘回 403。前台介面不使用這支 API；接續自己的對話仍可用 `/api/v1/chat/history` 帶自己的 `session_id`。
+
 - **[2026-10-22]** **可進後台的一般帳號在 Avatar 頁看得到所屬專案的人物**：Avatar 頁列人物、背景、小助理時沒帶專案，一般帳號只拿到自己被直接授權的素材，專案專屬的人物一個都看不到，也就沒有「試用」可按。一般帳號改成帶目前選的專案查詢，換專案時清單跟著換；管理員照舊列出所有專案的素材。
+
 - **[2026-10-22]** **後台「試用」人物、「使用」背景後，前台顯示的就是那一個**：原本後台直接寫前台的偏好鍵，前台登入後被伺服器存的偏好與專案別偏好蓋掉，專案專屬的人物也因為沒切到它的專案而找不到，打開來是別的人物。現在後台改在同源 localStorage 留一筆一次性指令（`avatar.admin_handoff`，帶帳號、資源所屬專案與人物或背景），前台開場清單與舞台載完後取走並刪除，只接受同一帳號、兩分鐘內的指令，再照設定視窗按「套用」的路徑切專案、換人物（3D 舞台時切回 2D）、換背景，並存成帳號偏好；不在帳號清單內的專案、人物、背景只留提示不套用，背景網址一律取伺服器清單的。展示機台未解鎖時忽略。不用網址參數。小助理的「使用」只換後台自己的小助理，不再多開一個前台分頁。
+
 - **[2026-10-22]** **手機清單在未存提醒按「取消」時不再收起**：角色管理與工作區的手機抽屜裡點了別的項目、在未存提醒選「取消」，抽屜維持開啟；確定切換才關閉，焦點回到開啟鈕。共用的未存防護改成等確認視窗關掉後才執行切換，視窗開著時頁面其他地方無法取得焦點。
+
 - **[2026-10-22]** **受限管理員的 Embed 金鑰與用量只限範圍內專案**：權限 E2E 實測，只開鶴記dev 的管理員看得到別的專案的 Embed 金鑰，也能新增、修改、刪除，用量頁看到的是全系統、連 ROOT 的用量都查得到。現在 Embed 金鑰的列表、建立、修改、刪除都依資源上限判斷，範圍外一律 404；用量查詢指定範圍外的專案回 404，沒指定時只查範圍內的專案（Brain 的 `/brain/usage/*` 新增可重複的 `project_ids` 篩選）。ROOT 與未設限的管理員不變。
+
 - **[2026-10-22]** **可進後台的一般帳號點 Avatar、語音 ASR 不再整頁變成「權限不足」**：這兩頁會打只限管理員的 `/api/v1/avatar/jobs`、`/api/v1/asr/engines`，回 403 時整個後台翻成權限不足。Avatar 的人物、背景、小助理對一般帳號改成唯讀：上傳、從影片產生、改名、刪除只給管理員，也不再替缺縮圖的小助理自動截圖上傳；ASR 分頁的批次試辨識只給管理員，詞表、語言分流、串流試聽照舊。
+
 - **[2026-10-22]** **角色管理與工作區的未存修改不再被無提示蓋掉**：切換角色（側欄、手機抽屜、頁首下拉）、切換 SOUL／AGENTS／TOOLS／MEMORY 分頁、新增或複製角色後切過去，以及工作區換文件、開新文件、重新整理文件清單，有未存修改都先問「捨棄或留下」，選留下時草稿原封不動。角色清單的重抓與開文件拆開：儲存、綁定虛擬人、按重新整理都只更新清單，不再重開文件，存完 AGENTS.md 不會跳回 SOUL.md，儲存成功的訊息也不會一閃就消失。角色卡的刪除鈕由「DEL」改成「刪除」並補無障礙名稱；工作區側欄的圖示按鈕改中文提示並補無障礙名稱，檔案數改顯示「N 份文件」。
+
+## [2026-10-21]
+
+### Changed
+
+- **[2026-10-21]** **「更多動作」選單改成共用元件，手機頁首改用 `PageHeader`**：原本在帳號頁的 `AccountRowMenu` 搬到 `components/ActionMenu.tsx`（屬性 `accountName` 改名 `label`），帳號列表與知識庫頁首都用它；知識庫的採納與重新索引改由同一份定義產生寬畫面按鈕與手機選單項目。`PageHeader` 加 `className`，工作區與角色管理的手機頁首改用它，不再手寫頁首結構。操作不變。
+
+- **[2026-10-21]** **後台頁首與分頁統一規格**：新增共用的 `PageHeader`、`PageTabs`（`components/app/PageHeader.tsx`）與 `SegmentedControl`。每頁主標題由同一個頁首管理，內距與左緣一致，標題前不再放圖示；第一層分頁一律是標題下方的底線分頁，只排一列、放不下就橫捲並把選中分頁捲進畫面。專案與權限、系統狀態、語音、Avatar、模型供應商、記憶管理、知識庫都改用它，原本的灰色膠囊、橘色分段、小型分段與 Avatar 手機直列分頁都拿掉。帳號的建立／管理與編輯器的編輯／並排／預覽改用共用的分段切換。分頁殼裡的內頁（專案管理、系統健康、API 金鑰、Embed 金鑰、權限圖譜）標題改用 `page-section-title`，不再和外層主標題同級。320、375、768、1440 寬度實測十個頁面的標題上緣一致、分頁列單行。
+
+- **[2026-10-21]** **後台分頁鍵盤操作一致、Avatar 與專案頁改用繁中文案**：方向鍵與 Home／End 切換分頁抽成共用函式，語音、模型供應商、Avatar 素材與共用分頁殼都用它；模型供應商與 Avatar 素材分頁補上 tab／tabpanel 關聯。Avatar 的人物、背景、小助理分頁與上傳表單、專案頁的新增與刪除、工作區編輯器的英文文案改成繁中。
+
+- **[2026-10-21]** **`/v1/audio/speech` 與 `/api/v1/tts/stream` 選引擎一致**：選引擎、選聲音與台語互備抽成共用的 `plan_tts_voice`，兩個端點都走它。`/v1/audio/speech` 另收選填的 `speech_language`、`language`、`language_routes`：台語且專案開了分流時換 CosyVoice／VoxCPM，主引擎失敗先換同一位的另一家，國語、英文在沒指定引擎與聲音時用 IndexTTS。OpenAI 用戶端不送這些欄位，行為不變。兩個端點只差在回傳方式（整段並有快取，或串流）。Avatar SDK 的 `ask()` 合成語音時多帶 `project_id` 與新的 `tts.language` 選項，對話模式也能唸台語。
+
+- **[2026-10-21]** **VoxCPM 預設聲音改成 Hayley**：沒指定聲音、也沒設 `TTS_VOXCPM_DEFAULT_VOICE` 時，VoxCPM 改用 `voxcpm2-cosy-young-female-02`（原本是 `young-female-01`）。IndexTTS 的 `hayley`、CosyVoice 的 `young-female-02` 本來就是 Hayley，IndexTTS 失敗備援到 VoxCPM 時聲音不再換人。
+
+### Fixed
+
 - **[2026-10-21]** **角色管理在手機上也能新增、複製、刪除角色**：原本整個側欄在手機上隱藏，只剩頁首的切換下拉。頁首加「管理角色」按鈕，把側欄當抽屜打開（角色庫、刪除、新增／複製表單、重新整理都在裡面），選了角色、按 Esc 或關閉鈕都會關閉並把焦點還給按鈕（知識庫檔案樹選了檔案或快速問答節點也一樣，原本焦點會掉到頁面最上層）。抽屜的開關與焦點處理沿用知識庫檔案樹的 `useMobileTreeDrawer`。
+
 - **[2026-10-21]** **「更多動作」選單不再超出畫面**：選單依按鈕位置決定往左或往右展開，兩邊都放不下時縮到可用寬度。知識庫手機頁首的「更多」在右側，320 寬度原本往右開、右半截在畫面外。
+
 - **[2026-10-21]** **Avatar 頁剩下的英文文案改成繁中**：上傳表單欄位（來源影片、影片、資料檔、圖片、模型、縮圖）、卡片按鈕（試用、使用、改名）、轉檔工作的移除與幀數、載入中與空清單、背景與小助理 ID 提示、刪除與改名的狀態訊息。主標題「Avatar」照側欄名稱保留。
+
 - **[2026-10-21]** **知識庫手機頁首收成一列操作**：手機上語言分流按鈕只留圖示，「採納上傳」「重新索引」收進「更多」選單，保留檔案樹與「新增來源」；320 寬度頁首高度由約 341px 降到約 171px。寬畫面照舊全部列出。
+
 - **[2026-10-21]** **角色管理與工作區在手機上有頁面標題**：兩頁的主標題原本只在手機會隱藏的側欄裡。手機改用共用頁首顯示主標題；角色管理另加角色下拉選單，手機也能切換角色（原本整個角色清單在手機上都看不到）。工作區編輯區的提示文字換行原本顯示成字面上的 `\n`，一併修正。
+
 - **[2026-10-21]** **工作區與角色管理的儲存列避開小助理、窄畫面不再重疊**：兩個編輯器改用共用的模式切換與儲存列（`components/editor/EditorControls.tsx`），儲存列登記底部高度，小助理往上讓；工作區工具列在窄畫面讓檔名占一行、刪除與模式切換換到下一行。320、375 寬度實測儲存鈕未被遮住、無橫向捲動。
+
 - **[2026-10-21]** **知識庫頁首在平板寬度不再擠壓**：標題與頁籤先占基本寬度，放不下時操作列整組換行；768、1024 寬度標題維持單行。
+
 - **[2026-10-21]** **模型設定與資源上限的草稿不再無提示消失**：模型供應商有未儲存修改時，離開頁面與按「重新載入」都先確認；管理員「資源上限」面板向離開防護登記草稿，只改限制模式就收合也會提示。
+
 - **[2026-10-21]** **對話紀錄與記憶讀取失敗時不再同時顯示空清單**：讀取失敗、空清單、有資料三種狀態互斥，失敗時在列表位置顯示錯誤與「重新載入」，筆數顯示「筆數未知」而不是 0；重新整理失敗但還有舊資料時另外標明。
+
 - **[2026-10-21]** **管理員資源上限可以設語音辨識引擎**：`PUT /api/v1/users/{id}/scope` 讀取時有 `asr_engines`，寫入的對應卻漏了它，上限存不進 ASR，受限管理員因此一個引擎都指派不出去。補上寫入，後台上限面板加「語音辨識引擎」一組，權限圖譜的 ASR 圖層也畫出上限連線；受限管理員替新管理員預選的上限包含 ASR。
+
 - **[2026-10-21]** **預設專案別名補齊 Embed 金鑰與設定檢查**：綁定 `default` 的 Embed 金鑰也換算成預設專案（Brain 代理、語音專案解析、金鑰綁定比對），呼叫端帶別名或正式 ID 都視為同一個專案。Backend 對不合法的 `DEFAULT_PROJECT_ID` 與 Brain 一樣退回 `default`，兩邊不會解析成不同專案。
+
 - **[2026-10-21]** **後台登入成功後清掉「暫時連不上伺服器」狀態**：登入或登出時一併清除，之後登出不會誤顯示連線錯誤畫面。
+
+## [2026-10-20]
+
+### Changed
+
+- **[2026-10-20]** **預設專案改成可設定，`default` 變成它的別名**：新增 `DEFAULT_PROJECT_ID`（根目錄 `.env`，Brain 與 Backend 同讀，未設定時照舊是 `default`）。沒帶 `project_id` 的請求與 `project_id=default` 都解析成這個專案：Brain 在 `normalize_project_id` 換，Backend 在 Brain 代理的專案授權、語音專案解析、WebSocket 與 A2A 預設值處先換成正式 ID 再查授權與專案限制（`app/project_ids.py`）。`GET /api/v1/projects` 每個專案多帶 `is_default`，後台與前台找不到上次選的專案時改落到預設專案，不再挑清單第一個。預設專案不可刪除（以解析後的 ID 比對，不會經由別名刪到它）；開機的舊目錄遷移改搬進預設專案，不再建回 `default` 目錄；預設專案改成別的 ID 後，殘留的 `default` 目錄不再列出。
+
+- **[2026-10-20]** **聲音選單顯示名稱，Hayley 在各引擎都認得出來**：`GET /api/v1/tts/providers` 每個引擎多帶 `voice_items[].label`，後台 TTS 試聽、後台聊天與前台設定的聲音選單改顯示名稱，送出的仍是聲音 ID。同一位錄音者在各引擎的 ID 不同，名稱一律以錄音者開頭：CosyVoice `young-female-02`、VoxCPM `voxcpm2-cosy-young-female-02` 都顯示「Hayley · 青年女聲 02（臺灣台語）」，IndexTTS `hayley` 顯示「Hayley」。後端啟動同步聲音資源時用同一套名稱，資源權限清單也跟著改。聲音 ID 不變，既有授權與專案設定不受影響。
+
+- **[2026-10-20]** **建立管理員時可直接設登入預設值與資源上限**：後台「建立帳號」選管理員角色後，表單直接出現「登入預設值」（專案、人物、聲音、背景）與「資源上限」（勾「限制可用資源」再挑清單，ROOT 才能不設限），建立成功後接著寫入上限；上限寫入失敗會明說帳號已建立、請到編輯頁再設一次。受限的管理員建立管理員時一律設上限，預選建立者自己看得到的全部再讓他往下縮，不會開出一個不受限的管理員。不再要求建完後從更多動作選單回頭設定。「資源上限」的欄位抽成共用元件，事後編輯面板也用它。
+
+- **[2026-10-20]** **後台三張資源勾選清單共用同一個分組元件**：帳號「資源權限」、管理員「資源上限」、專案「資源與語音設定」的人物、背景、聲音、引擎清單都改用同一個元件：依專案或引擎分區段、可收合、每段可整段勾選（全選鈕移到區段標題列右側，不再放在 summary 裡）、搜尋框（名稱、ID、引擎）與「只看已選」篩選，篩選中區段一律展開。帳號列表加搜尋框（帳號名稱或角色）。正在編輯的資源權限有未儲存修改時，切到別的帳號或離開頁面會先提示捨棄或留下。
+
+- **[2026-10-20]** **串接方交付說明模板**：新增 `docs/guides/integration-handover-template.md`，交付帳號給串接方時複製填寫：登入入口、API key、可用專案表、先查能力、一輪辨識→對話→合成的 curl、台語與語言規則、錯誤碼與限流、注意事項。帳號、專案 ID、網址都是示例值，實際值交付時另填。
+
+- **[2026-10-20]** **後台記住每個分頁上次停的子視圖**：從側欄切到別頁再切回來，回到上次停的子分頁（專案與權限的帳號／API 金鑰／圖譜、Avatar 的人物／背景／VRM、語音、知識庫、記憶、模型供應商、系統狀態），不再每次掉回預設頁；明確點回預設頁也會被記住。記在這個帳號的瀏覽器儲存（`brain-sub-view:<分頁>`），直接輸入網址仍以網址為準。
+
+- **[2026-10-20]** **後端測試提速**：`hash_password` 的 bcrypt cost 可由 `AUTH_BCRYPT_ROUNDS` 設定（預設仍 12，限 4 到 31，驗證照既有雜湊自己的 cost 走），單元測試設 4；`backend/requirements.txt` 加 `pytest-xdist`，`python -m pytest tests/ -n auto` 平行跑。本機 1559 個測試從 8 分鐘降到 40 秒以內。
+
+- **[2026-10-20]** **後台「資源權限」對管理員帳號講明清單不生效**：對 admin／ROOT 開這個對話框時，頂端改成說明「不受這份清單限制：看得到全部資源、本來就能進後台；勾選只決定登入預設值與他替別人授權時能分配的專案專屬資源，要縮小範圍請用資源上限」，並隱藏「允許進入管理後台」勾選（後端對管理員本來就忽略它）。一般帳號畫面不變。後端不變。
+
+- **[2026-10-20]** **後台帳號「資源權限」清單分區段**：虛擬人物（含 VRM）與背景依擁有的專案分成「全域」「專案專屬：某專案」「專案已刪除」，聲音依引擎分區段，取代原本的「語音廠牌」下拉篩選與攤平清單。每個區段可收合（第一次打開時有勾選的區段展開）、標題列顯示已選數並可整段全選／全部不選；人物列左側顯示影片第一格當預覽（只預載 metadata、不播放）；類別層的「全選」照舊作用於整類。只有一個區段的類別（專案、辨識引擎）不加標題。後端與 API 不變。
+
+- **[2026-10-20]** **Brain 聊天回合少兩次 LLM 呼叫**：有知識庫的專案一律先查，不再由每輪決策判定要不要查（`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`，預設開啟；Clef 實測多數問題落在不確定帶，原本要多一次只為了產生 `search_knowledge` 呼叫的 LLM 呼叫，還有把門診時間判成否、答題時沒有知識庫的）；閒聊多一次約 0.3 秒檢索，關掉回到是→先查、不確定→強制工具那一輪、否→不查。工具收掉、只能作答的第一輪在呼叫前先告訴模型「工具已經用完，直接以文字回答」，不等它叫一次被收回的工具、被丟掉後再催（原本每次多一輪約 0.75 秒）。估省每輪 0.8～2 秒（推測，依正式環境單筆 trace）。
+
+- **[2026-10-20]** **台語備援鏈改由順位設定驅動**：台語那一輪的引擎順序照專案 `tts_engine_order`，沒設就用 `.env` 的 `TTS_TAIWANESE_FALLBACK_ORDER`（預設 `cosyvoice,voxcpm,indextts`）；每一站聲音對成同一個人，全部失敗才退 Edge。以後調順序改設定即可，不用動程式。
+
+- **[2026-10-20]** **台語備援第三順位 IndexTTS**：台語這一輪 CosyVoice、VoxCPM 都失敗時先退 IndexTTS 的 `TTS_INDEXTTS_DEFAULT_CHARACTER`（hayley，與 CosyVoice 預設同一位、念華語），IndexTTS 也失敗才退 Edge；專案設了引擎順位就照順位、沒列的不試。所有引擎回零長度或只有 WAV 檔頭的音訊一律視為失敗往下退（IndexTTS 停機時會回 200 空檔）。
+
+### Fixed
+
 - **[2026-10-20]** **開機遷移不再把學習紀錄搬出 `.learnings/`**：一次性舊目錄遷移裡有一步會把各專案 `workspace/.learnings/*.md` 搬到 workspace 根目錄，與現行版面（`knowledge.workspace` 會把它們搬回 `.learnings/`）相反。遷移以預設專案裡的 marker 判斷是否跑過，預設專案換成沒有 marker 的專案時會重跑一次。這一步已移除。
+
 - **[2026-10-20]** **後台手機版頁首與工具列不再把字擠成直排**：九個頁面（對話紀錄、用量、專案管理、Embed 金鑰、模型供應商、系統健康、工具與技能、記憶管理、知識庫搜尋）的釘頂頁首改用共用的 `.page-header`／`.page-heading`／`.page-actions`，窄畫面時標題與操作各占一列、按鈕整顆換行；`.btn` 一律不折字。知識庫工具列、記憶篩選列與專案列表的重新整理鈕同樣改為整顆換行。320、375、414 寬度實測無橫向捲動、無按鈕折字。
+
 - **[2026-10-20]** **小助理不再蓋住聊天送出鈕與設定儲存鈕**：擁有底部操作列的頁面（聊天輸入列、模型供應商的儲存列）把列高登記到 `--ov-bottom-bar`，右下角的小助理按鈕與視窗統一往上讓，拖曳時也不會壓到那一列；桌面與手機同一條規則。
+
 - **[2026-10-20]** **專案「資源與語音設定」載入失敗時不再能儲存**：讀不到專案設定時表單是空清單，而空清單對後端代表不限制，一按儲存就把專案限制整個解掉。現在要讀到才開放儲存，錯誤旁提供「重新讀取」。
+
 - **[2026-10-20]** **後端暫時連不上不再被當成登入失效**：開站問 `GET /api/v1/auth/admin-me` 遇到連線失敗或 5xx（後端重啟、代理 502）時，改顯示「暫時連不上伺服器」與重試鈕，保留登入狀態；只有 401 才導向登入頁。
+
 - **[2026-10-20]** **帳號列表的搜尋與收合也走未儲存防護**：收合資源上限面板（列上按鈕或選單）與資源權限面板會先問是否捨棄修改；搜尋時正在編輯的那一列不會被濾掉，面板與草稿保留。
+
 - **[2026-10-20]** **後台儲存「資源權限」不再清掉既有的辨識引擎授權**：表單初始化重建授權清單時漏了 `asr_engines`，而後端 `PUT /api/v1/users/{id}/access` 是整份覆蓋，只要在對話框按儲存，帳號原有的 ASR 引擎授權就會被清空。現在會帶回既有授權（沒授權過的不預勾）；辨識引擎區塊也拿掉沒有作用的「登入後預設值」下拉（沒有帳號層級的預設引擎）。
+
 - **[2026-10-20]** **後台「資源上限」載入失敗時不再能儲存**：讀不到管理員目前的上限時，表單裡是預設的「不設限」，ROOT 一按儲存就會把限制整個解掉。現在要讀到才開放儲存，錯誤訊息旁提供「重新讀取」。
+
 - **[2026-10-20]** **`/api/v1/tts/stream` 備援時補上 `X-TTS-Fallback` 與 `X-TTS-Fallback-Reason`**：整段合成的路徑（CosyVoice、VoxCPM 失敗後的備援、其餘引擎）原本只換 `X-TTS-Provider`，呼叫端看得出換了引擎卻看不出第一站為什麼失敗；現在與 `/api/v1/tts` 一樣，發生備援時帶 `X-TTS-Fallback: true` 與第一站的錯誤描述，`pcm16k` 輸出也帶。沒有備援時這兩個標頭不出現。
+
 - **[2026-10-20]** **chat 的 `tts_text` 不再逐句打 normalize API**：`spoken_form` 本來就以 `normalize_url=""` 要求只做本地正規化，但 `prepare_tts_text` 把空字串當成「沒指定」退回 `NORMALIZE_API_URL`，有設定的部署上 `/chat/stream` 每個 `sentence`／`done` 事件與 `/chat` 的 JSON 都同步多打一次遠端（實測每次 0.4～0.6 秒，且卡住 Backend 的事件迴圈，其他同時進行的請求跟著等）。現在空字串在同步與非同步版本都代表不打 API；`/tts`、`/tts/stream` 沒帶 `normalize_url`，照舊走設定檔的 API。
+
 - **[2026-10-20]** **退掉 2D 人物的 requestVideoFrameCallback 幀時鐘，恢復角標幀序**：10/19 上線的幀時鐘在正式機實測會卡住好幾幀（`characterVideo` 是 `display:none`，Chrome 對沒畫出來的 video 幾乎不觸發 rVFC），123 個取樣有 110 個幀序對不上，嘴部貼片套到錯的幀，表現為「嘴／下巴有點歪」。runtime 改回每幀讀右上角角標（從實際畫出的像素解碼，必然正確），角落修補照舊由角標讀取觸發；`avatarFrameClock.ts` 移除。
-- **[2026-10-19]** **後台 Avatar 響應式版面**：手機下將上傳欄位、檔案選擇器、素材分頁與卡片操作按鈕直向排列，`md` 起回到橫向；角色、背景、小助理卡片採可縮至零的網格欄位，長名稱與轉換進度可換行。共用頂列的專案選單可縮短名稱，展開清單限制在手機視窗內，保留既有手機導覽抽屜。
+
+## [2026-10-19]
 
 ### Added
 
 - **[2026-10-19]** **專案可自訂引擎順位**：`project_policies` 新增 `tts_engine_order`、`asr_engine_order`（`GET`／`PUT /api/v1/projects/{id}/policy`；schema 25 獨立遷移，既有資料庫啟動時補欄位）。TTS：請求沒指定引擎與聲音時照專案順位試（只試列出的引擎；空的用部署鏈 indextts → voxcpm → cosyvoice → gemini-tts → gcp-tts → aws-polly → edge-tts），`/tts/stream` 沒指定引擎時由順位第一個在跑的引擎決定串流分支，台語分流 CosyVoice／VoxCPM 誰先也照順位；指定了引擎的請求不受影響。ASR：批次辨識在呼叫端指定的引擎之後照專案順位試（有允許清單時須為其子集；空的用部署鏈）。串流 ASR 引擎仍是帳號偏好。
+
 - **[2026-10-19]** **後台專案引擎順位**：資源與語音設定可新增、上移、下移及移除 TTS 與批次 ASR 引擎順位，留空沿用部署順序；縮限允許的 ASR 引擎時同步移除順位中不再允許的項目。
+
 - **[2026-10-19]** **chat 回應加 `tts_text`**：`POST /api/v1/chat`、`/chat/accept` 的 JSON 與 `/chat/stream` 的 `sentence`／`done` 事件多帶 `tts_text`——`reply`（或該句）去掉 markdown 與 emoji、電話與長數字轉逐字讀法、保留繁體的版本，給自己接 TTS 的整合方直接送引擎；本服務的 `/tts/stream` 行為不變。由 Backend 代理層加入（`app/chat_tts_text.py`），只做本地正規化，逐句串流不多一次往返。
+
 - **[2026-10-19]** **影片一鍵轉虛擬人素材包（`avatar-pipeline` 服務）**：新增獨立 compose 服務 `avatar-pipeline/`（arq worker，MediaPipe + ffmpeg，無 torch），把無聲正面影片轉成 `01.webm` + `combined_data.json.gz`，與既有素材包逐幀、逐欄位相同。後台新增 `POST /api/v1/avatar/jobs`（multipart：`char_id`、`label`、`video`、`project_id`）排程轉換，`GET /api/v1/avatar/jobs`、`GET /api/v1/avatar/jobs/{job_id}` 追進度，轉完自動建成角色並登錄到指定專案，`DELETE /api/v1/avatar/jobs/{job_id}` 清掉紀錄。佇列 `vman:avatar-pipeline`、狀態 key `vman:avatar-pipeline:job:<id>`；加密金鑰只放 `avatar-pipeline/.env`（`AVATAR_BUNDLE_KEY`）。backend 新增 `AVATAR_JOBS_DIR`（預設 `/data/avatar-jobs`）與 `AVATAR_SOURCE_MAX_UPLOAD_BYTES`（預設 512MB）。CI 的 `docker-publish` 矩陣加入 `avatar-pipeline`（amd64 + arm64）。
 
 - **[2026-10-19]** **正式專案可綁定專屬 Gemini 金鑰**：ROOT 以 `GET`／`PUT`／`DELETE /api/v1/projects/{project_id}/gemini-credential` 查看、儲存／更換或改回共用設定（後台專案頁新增對應設定）；Auth DB migration 24 新增 `project_gemini_credentials`，金鑰加密保存在 Backend，API 與後台只回名稱、遮罩、來源與設定狀態。未綁定的專案沿用共用 Gemini 設定；已綁定的專案在金鑰失效、無法解密或查詢失敗時不改用共用金鑰。Brain 主對話與模型探索、Gemini Live、語音語言判斷與背景 Gemini 呼叫，以及 Backend 的 Gemini 串流 ASR、台語判斷與 Gemini TTS 都依專案選用金鑰；金鑰切換、TTS 快取與用量依專案隔離，Live 每段會話固定開始時的金鑰。綁定專屬金鑰的專案 TTS 直接呼叫 Google（模型由新增的 `TTS_GEMINI_MODEL` 設定，預設 `gemini-3.8-flash-tts`），不經 Gemini TTS Console；錯誤訊息不帶金鑰，串流在出錯或提前關閉時都會釋放上游連線。
+
+### Changed
+
+- **[2026-10-19]** **台語 TTS 引擎互為備援**：`POST /api/v1/tts/stream` 台語這一輪 CosyVoice 失敗先改 VoxCPM、VoxCPM 失敗先改 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設，專案限制聲音時只換到清單裡的聲音），兩家都失敗才退 Edge；`X-TTS-Provider` 照實標最後念的引擎。`TTSRouterService.synthesize` 新增 `partners`。華語指定 CosyVoice 的行為不變。
+
+- **[2026-10-19]** **（已於 10/20 退回）2D 人物幀同步改用 requestVideoFrameCallback**：新增共用模組 `frontend/shared/avatar/avatarFrameClock.ts`，以瀏覽器回報的 `mediaTime` 直接算出畫面上那一幀（25 fps 下即幀序），runtime 不再每幀讀右上角 2×2 角標做 GPU 回讀；角落修補改在 runtime 複製影片幀後直接進行。沒有 rVFC 的瀏覽器、以及換角色後第一幀還沒畫出來前，照舊走角標路徑。素材包仍打角標，舊版 runtime 與舊素材不受影響。
+
+### Fixed
+
+- **[2026-10-19]** **後台 Avatar 響應式版面**：手機下將上傳欄位、檔案選擇器、素材分頁與卡片操作按鈕直向排列，`md` 起回到橫向；角色、背景、小助理卡片採可縮至零的網格欄位，長名稱與轉換進度可換行。共用頂列的專案選單可縮短名稱，展開清單限制在手機視窗內，保留既有手機導覽抽屜。
+
+- **[2026-10-19]** **`/api/v1/tts/providers` 各引擎的 `default_voice`**：帳號／專案沒有偏好該引擎的聲音時，原本顯示清單第一個（字母排序下 CosyVoice 是 `child-female-01`），但實際念的是部署預設（`young-female-02`）。現在依序取專案／帳號偏好 → 部署預設（`TTS_COSYVOICE_DEFAULT_VOICE`、`TTS_VOXCPM_DEFAULT_VOICE`、`TTS_INDEXTTS_DEFAULT_CHARACTER`、Edge 聲音）→ 清單第一個。
+
+- **[2026-10-19]** **前台 runtime 載入與登入頁競態**：`OpenVmanAvatarRuntime.js` 不再在載入當下就抓 `#canvas_video`，改成每次繪圖前查、缺 canvas 的那一幀安靜跳過。先前 session 失效（401）讓 App 切到登入頁、卸掉 canvas 時腳本才載完，會在第 31 行炸掉、`createQtAppInstance` 永遠不存在，之後的重試又等同一個已經 load 過的 `<script>`，舞台卡在載入中直到手動重新整理。TS 端載入失敗也會移除那個 `<script>` 標籤，讓重試真的重載。
+
+- **[2026-10-19]** **TTS 依語言選引擎與需求不一致（VH-384）**：台語自動切換以前改用 VoxCPM，但 VoxCPM 照字唸，Brain 的台語回答是華語文字，唸出來是華語；國語、英文沒有依語言路由，只是剛好用專案預設聲音；使用者選台語但打字時不會切換；`/api/v1/tts/stream` 也看不出用了哪個引擎。現在 `/api/v1/tts/stream` 的語言取 ASR 的 `speech_language`，沒有時用新增的 `language`（使用者選的語言）：台語（專案分流含台語）改用 CosyVoice（會轉成台文，停用時改 VoxCPM），國語、英文在呼叫端沒指定 provider 與 voice 時用 IndexTTS；回應一律帶 `X-TTS-Provider`。CosyVoice 預設聲音改成 `young-female-02`（Hayley，與 IndexTTS 的 hayley 同一位），前台講台語時也改切 CosyVoice。CosyVoice 只能整段合成，台語第一聲約 1.8 秒（9 字）到 3.2 秒（30 字）。
+
+- **[2026-10-19]** **Brain 對話限流實際上是整個專案共用**：限流依專案、來源 IP 與頻道計數，但 Brain 只收 Backend 的請求，來源 IP 永遠是 Backend，同一專案所有人、所有機台共用每分鐘 90 次。現在依 Backend 驗證後傳來的呼叫者（每把 API key、Embed key、每個登入帳號）各自計數，沒有呼叫者時才用 IP。
+
+## [2026-10-16]
+
+### Changed
+
+- **[2026-10-16]** **新增 2D 人物素材指南**：`docs/guides/avatar-character-assets.md` 記錄 DHLiveMini2 要求的檔案格式、右上角幀同步標記與姿態矩陣（缺了會出現人物但嘴型不動）、用 `POST /api/v1/avatar` 帶 `project_id` 上架專案專屬人物，以及驗收步驟。起因是 local_01 第一版嘴型全透明，且重新部署時人物被改成全域公開。
+
+### Fixed
+
+- **[2026-10-16]** **Brain 晚於 Backend 部署時，`/openapi.json` 停在舊的 Brain schema**：Backend 只在啟動時合併一次 Brain 的 OpenAPI，Backend 先換新版、Brain 後換時，`/api/v1/chat` 的 `ChatResponse` 等新欄位要等 Backend 下次重啟才出現；啟動當下 Brain 連不上則一直只有 Backend 的部分。現在合併結果快取 5 分鐘，過期時在背景重抓（這次先回舊的，不讓請求等 Brain），Brain 連不上時保留上一份合併結果。
+
+- **[2026-10-16]** **前台設定選單紅字與黑字混在一起，編號範例人物與 3D 很佔位**：人物、TTS 引擎、聲音、ASR、上傳背景的選單改成專案範圍內（黑字）在前、範圍外（紅字）在後，同組維持原本順序；人物選單另外把只有編號、沒取名字的範例人物（000～007）與 3D（VRM）統一放到最後。
+
+- **[2026-10-16]** **2D 人物右上角幀同步標記閃爍與修復接縫**：新增共用 TypeScript 模組 `avatarFrameSyncRepair.ts`，由前台及 SDK adapter 管理生命週期；保留原始同步讀值後，以左側及下側乾淨邊界重建右上角 16×16 背景，外緣逐步融合，避免直接複製鄰近背景留下方形色塊。`putImageData` 保留其他人物像素與 RGBA，不受 `copy` 合成模式影響。WASM 工具產生的 JS 內容維持原樣，載入入口改名為 `OpenVmanAvatarRuntime.js`，舊前台 JS 路徑由 Nginx 相容轉送；SDK 公開路徑維持不變。前台、SDK 及嵌入 widget 共用修正，3D VRM 不需變更。補同步讀值、雙向漸層、融合邊界、畫布狀態、小尺寸畫布與卸載還原回歸測試，SDK Docker builder 納入共用 TS 模組，Nginx 路徑回歸測試納入後台預設測試指令。
+
+- **[2026-10-16]** **前台設定換專案後，人物、聲音等選單沒跟著換**：設定面板裡換專案只當草稿、只預覽人設清單，人物、TTS、ASR、背景的清單仍是舊專案的，要關掉重開才會更新。現在選了專案就立即套用，依專案而定的欄位改跟新專案的清單與預設，舞台人物也跟著換。
+
+- **[2026-10-16]** **人物全改成專案專屬後，ROOT 在別的專案選不到其他專案的人物**：ROOT 不受專案清單限制，靠的是全域資源都列出來；人物改成各專案專屬後，ROOT 在 AWS-dev 就看不到 default 的 009 等人物。現在 ROOT 在任何專案的資源清單（`/projects/{id}/resources`、帶 `project_id` 的人物／背景／小助理列表與能力查詢）也列出其他專案的專屬資源與孤兒資源，標成 `in_project_scope: false`（前後台照舊以紅字標示）；一般帳號不變。
+
+- **[2026-10-16]** **Brain 對話限流回 400**：同一專案、來源與頻道每分鐘超過 90 次對話時回 400，跟空訊息分不出來；改成 429、`detail.error_code` 為 `LLM_OVERLOAD`，並帶 `Retry-After` 與 `retry_after_ms`。
+
+- **[2026-10-16]** **`/api/v1/chat` 的 OpenAPI 200 是空 schema，TTS／ASR 參數沒有說明（VH-371、VH-379）**：Brain 新增 `ChatResponse` 文件模型（`reply`、`session_id`、`trace_id`、`answer_source`、`knowledge_searched`、`no_answer`、`citations`、`history` 等，只描述不過濾欄位）；OpenAPI 合併時代理路由的預設空回應改用 Brain 寫好的版本，`chat/stream` 的 `done` 事件指向同一份。`/api/v1/chat`、`/chat/stream` 列出 400（`INVALID_REQUEST`／`SESSION_EXPIRED`）與 429。`/api/v1/tts/stream` 的 `text`、`character`、`provider`、`voice`、`project_id`、`language_routes`、`speech_language`、`format` 與 `/api/v1/asr/transcribe` 的 `file`、`project_id`、`language_routes`、`provider` 都有欄位說明，含台語要怎麼帶。串接指南新增「用台語念回答」與「機台與伺服器代理」（憑證選擇、對話紀錄、拒答句）。
+
+- **[2026-10-16]** **人物全改成專案專屬後，SDK 的人物清單是空的**：`GET /api/v1/characters` 只列全域公開人物。現在帶 `X-Embed-Key` 時另外列出金鑰綁定專案的專屬與 ROOT 指派人物（限金鑰允許的人物）；不帶憑證時照舊。嵌入說明補上由網站伺服器轉發人物素材並加上金鑰的做法（SDK 的影片請求帶不了標頭）。
+
+- **[2026-10-16]** **全域人物改成專案專屬後，帳號身上的舊授權仍能直接讀素材**：人物素材路由對一般帳號先看帳號的直接授權，資源從全域改成某專案專屬後，以前被授權過的帳號在別的專案選單看不到，直接輸入 `/static/characters/<id>/...` 卻仍回 200。現在專案專屬資源只看所屬專案與 ROOT 指派，帳號授權只對全域資源有效。
+
+- **[2026-10-16]** **對話請求被拒時錯誤碼標成 `BRAIN_UNAVAILABLE`**：`POST /api/v1/chat`、`/chat/stream` 遇到空訊息、超過長度上限或內容檢查擋下時回 400，`detail.error_code` 卻是 `BRAIN_UNAVAILABLE`，照錯誤碼判斷的串接端會以為 Brain 掛了；前台把這個碼當成致命錯誤，還會跳出整頁「暫時無法使用」。協定新增 `INVALID_REQUEST`（`contracts/schemas/v1/server_error.schema.json`，生成檔同步），這類 400 改回 `INVALID_REQUEST`，session 上限仍是 `SESSION_EXPIRED`；前台改顯示「這句話無法送出，請換個說法再試一次」。
+
+- **[2026-10-16]** **前台偶爾第一次開不出虛擬人、要重新整理；開場人物沒照專案預設**：舞台與專案資料同時開跑，舞台在專案還沒決定時用不分專案的清單載入帳號預設，之後專案偏好或專案預設改了設定值卻沒重新載入，畫面與選單的人物對不上（AWS-dev 專案預設 1014，ROOT 進來看到的是 0713）；換專案也一樣只改設定值。現在舞台等專案決定才挑人物，換專案後跟著載入新專案的人物。開場失敗不再直接停在錯誤畫面：先以 2、4、8 秒自動重試，引擎始終起不來時整頁重新載入一次（5 分鐘內最多一次），之後才顯示錯誤。廠商腳本第一次下載失敗時，失敗的 `<script>` 會從頁面移除，重試才會重新下載，以前重試會一直等不到結果，只能重新整理。載入人物不再等影片開始播放，背景分頁的 `play()` 不結束時不會卡在「切換展示角色中」；重疊的人物載入以最後一個為準，較慢的舊請求不會把舊人物寫回引擎。
+
+- **[2026-10-16]** **專案範圍的 API 沒帶 `project_id` 回 404「Resource not found」（VH-371）**：串接方會以為專案不存在，而且這項檢查在欄位驗證之前，連空訊息也看不到 422。現在沒帶 `project_id` 回 422 `project_id is required`，query 與 body 的值不一致回 422 `project_id in query and body must match`；專案不存在或看不到仍回 404，不洩漏存在與否。OpenAPI 與串接指南同步。
+
+- **[2026-10-16]** **OpenAPI 與實際回應不一致（VH-371）**：`POST /api/v1/chat/stream` 的 200 標成 `application/json`，實際是 `text/event-stream`；專案範圍的代理路由（`/api/v1/chat`、知識庫、記憶等）沒帶 `project_id` 時回 404，OpenAPI 沒列；帳號 API key 超過每分鐘上限回 429，OpenAPI 也沒列。原因是 Backend 代理路由只有預設的 JSON 回應，合併 Brain 的 schema 時又整份蓋掉 Brain 的 `responses`。現在 `chat/stream` 只列 `text/event-stream` 並說明 `sentence`／`done`／`error` 事件，需要專案的代理路由列出 404 與原因（缺 `project_id` 後來改為 422，見上一則），所有接受 API key 的操作列出 429 與 `Retry-After`，合併時改為逐個狀態碼合併（Brain 的 422 不再被蓋掉）。執行行為不變；串接指南的錯誤表補上缺 `project_id` 與限流的適用範圍。
+
+- **[2026-10-16]** **專案資源範圍程式碼優化與請求數收斂**：
+  - 前台 TTS 403 退回重構：`useTtsStreamer.ts` 的 `onFallback` 回呼直接帶入結構化 `{ voice, provider, reason }` 物件，避免 `useAvatarConversation.ts` 以脆弱的正則表達式解析錯誤文字。
+  - 前台測試品質重構：抽取 `settingsOptions.ts` 純函式（`buildCharacterOptions`、`buildTtsVoiceOptions` 等），將原先在 `rootScopeMarking.test.mjs` 中依賴原始碼模板文字的正則比對改為資料轉換單元測試。
+  - 後台權限圖譜請求數最佳化：`AccessGraph.tsx` 初始化時僅查詢各專案政策限制（`fetchProjectPolicy`），移除初始化對所有專案的 `fetchProjectResources` 併行請求；改為使用者點開專案節點時按需非同步載入資源與指派連線，並新增單元測試驗證按需載入行為。
+
+- **[2026-10-16]** **後台 Avatar 管理頁看不到專案專屬的人物、背景、小助理**：管理頁列表不帶 `project_id`，後端此時連 ROOT 也只列全域與孤兒資源，例如 AWS-dev 的 `local_01` 不會出現。`GET /api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/avatar/mascots` 不帶專案時，ROOT 改為也列出各專案的專屬資源（`source="project"`），每項新增 `owner_project_id`；非 ROOT 帳號不變，仍只看得到全域資源。計算集中在 `project_resources.unscoped_resource_sources`。
+
+- **[2026-10-16]** **虛擬人前台看不到專案專屬人物**：開機時繪製流程在專案決定前就先抓一次不帶 `project_id` 的 `/api/v1/avatar`，專案決定後再帶專案抓一次；前一次較晚回來時會把清單蓋掉，專案專屬人物（例如 AWS-dev 的 `local_01`）就從選單消失。`useAvatarCatalog` 改成只採用最後發出的請求結果。人物選單的 2D 項目也拿掉每一項都一樣的「· openVman 2D」，只顯示人物名稱（VRM 仍標「· VRM」）。
+
+## [2026-10-15]
+
+### Added
 
 - **[2026-10-15]** **ROOT 專案資源豁免與範圍標示（`in_project_scope`）**：
   - 後端：ROOT 帳號豁免於 `project_policies` 的白名單限制（涵蓋 TTS 聲音、批次與串流 ASR、人物、背景、小助理），但專案預設值仍適用；admin、一般帳號與 Embed key 維持受限。
@@ -522,7 +877,9 @@
   - 快取隔離：有聲音限制的專案中，ROOT 的 `/v1/audio/speech` 結果一律存在獨立的快取命名空間（`project:<id>:root`），不論聲音是否在清單內；ROOT 合成失敗時仍會退回 Edge，這份結果不能被一般成員命中。
   - 前台（frontend/app）：TTS 或 ASR 遇到 403 錯誤時不再觸發全域「權限不足」頁面，而是降級為專案預設聲音並以單行通知提示；其餘 API 的 403（對話、專案、角色等）照舊顯示整頁「權限不足」。
   - 後台（frontend/admin）：`ProjectPolicyDialog`、Chat 頁聲音選單與語音試聽面板中，將 `in_project_scope === false` 項目以主題 danger token（`text-danger`）標示紅字並加註「（不在專案範圍內，一般使用者無法使用）」；`ProjectPolicyDialog` 合併 `/projects/{id}/resources` 的專案自訂與指派資源，讓非 ROOT 管理員能將專案專屬資源設為預設值；替換 `ResourceSourceBadge` 與 `AccessGraphCanvas` 的寫死顏色，全面改用主題 tokens。
+
 - **[2026-10-15]** **專案資源範圍與 ROOT 指派（人物、背景、小助理、聲音、ASR）**：Auth DB migration 23 新增 `resources.owner_project_id` 欄位與 `project_resource_assignments` 關聯表，並在 `project_policies` 擴充允許人物、背景、小助理清單與專案預設值（`allowed_characters`、`default_character_id`、`allowed_backgrounds`、`default_background_id`、`allowed_mascots`、`default_mascot_id`）。虛擬人資源支援「全域」與「專案專屬」歸屬；ROOT 可透過 `POST/DELETE /api/v1/projects/{project_id}/assignments` 直接將全域或專屬資源指派給特定專案。專案實際有效資源為帳號授權清單與專案專屬、ROOT 指派資源之聯集（`grant ∪ project ∪ assigned`），專案與指派資源免受帳號授權上限約束。專案預設值優先於帳號預設值生效；前台虛擬人支援專案預設載入與以專案為單位的記憶回退鏈（`useAvatarBootstrap` 與 `storageUtils`）。後台提供專案資源列表 API（`GET /api/v1/projects/{project_id}/resources`）、專案政策設定視窗、ROOT 即時資源指派區、上傳歸屬專案選取，以及資源來源標籤（專案專屬、ROOT 指派、孤兒資源、全域）；權限圖譜支援顯示專案專屬資源與 ROOT 指派連線（綠色虛線）。刪除專案時，其專屬資源保留為孤兒資源（`owner_project_id=NULL`）供 ROOT 檢視管理，指派關聯則自動連帶清除。
+
 - **[2026-10-15]** **記錄帳號最後登入時間，後台帳號列表改成單一主要動作＋更多選單**：Auth DB migration 22（`add_users_last_login_at`）在 `users` 新增可為 NULL 的 `last_login_at`，正式帳號（`/api/v1/auth/login`、`/admin-login`）與臨時帳號（`/temporary-login`、`/admin-temporary-login`）登入成功時寫入；密碼錯、帳號停用、沒有後台權限（403）或臨時批次過期都不寫，也不動 `updated_at`、不寫稽核。升級前沒有紀錄，既有帳號一律從 NULL（「從未登入」）開始。後台帳號 API（`GET /api/v1/users` 與各帳號操作回應）新增 `last_login_at` 與 `api_key_last_used_at`（該帳號所有 API key，含已撤銷，最近一次被使用的時間）；`/api/v1/auth/me` 與登入回應不變。後台「專案與權限 → 帳號 → 編輯／管理」的正式帳號列表每列只留「資源權限」，其餘收進「⋯」更多動作選單，分「帳號設定」（資源上限、變更角色、重設密碼）與「安全與危險」（登出所有裝置、停用／啟用、刪除，刪除為紅字放最後），各動作的顯示權限不變；尚不能刪除時項目照樣列出並寫明原因。選單可用方向鍵、Home／End 移動，Esc 關閉並把焦點還給觸發鈕，點選單外關閉。狀態改為精簡標籤（「授權 N 項」「未授權」，一般使用者被開放後台時標「可進後台」），每列顯示「最後登入 N 天前」（滑過顯示完整時間）或「從未登入」，有 API 使用時加「API 最近使用」；列表可切換「最久未使用優先」排序（登入與 API 使用取較晚者，從未使用的排最前），方便清理帳號。
 
 - **[2026-10-15]** **Avatar SDK `ask()` 改用逐句串流**：`ask()` 改送 `POST /api/v1/chat/stream`，第一句一到就呼叫 `POST /v1/audio/speech` 合成並開始念，不等整段回答。同時只跑一個語音請求，合成中到的句子併成下一個請求（每輪請求數不隨句數暴增，Embed key 配額也省）；各段音訊用新的 `AvatarAudio.queueAudio()` 接在時間軸後面播，句子之間不中斷。新增 `sentence` 事件（`{ index, text }`）給宿主做逐句字幕；`reply` 事件仍只派送一次，內容是 `done.reply`。串流的 `error` 事件照 HTTP 錯誤對應：401／403 為 `UNAUTHORIZED`、429 為 `RATE_LIMITED`（`retryAfterSeconds` 由 `detail.retry_after_ms` 換算）、其餘為 `CHAT_FAILED`；串流出錯會停掉已開口的部分。`interrupt()`、新的 `ask()` 與 `destroy()` 會連同串流與還沒送出的合成一起中斷，在 `done` 之前被中斷的 `ask()` 回傳已收到的句子、不派送 `reply`，這一輪也不寫入紀錄；`done` 之後（語音還在播）才中斷則回傳完整回答，`reply` 已派送過。一輪 `ask()` 會用掉 1 個串流請求加上 1 個以上的語音請求（原本固定 2 個），Embed key 配額請依此估算。整輪沒有 `sentence` 時整段合成 `done.reply`。部署沒有串流路由（404／405）且 `/chat` 可用時，該 instance 之後都改走 `/api/v1/chat`。一輪中若下一句還沒合成好，`speaking` 可能先 `stop` 再 `start`。
@@ -530,6 +887,39 @@
 - **[2026-10-15]** **權限圖譜加上臨時帳號與語言分流**：`/admin/access-graph` 新增「臨時帳號」圖層鈕（預設關閉），讀 `GET /api/v1/temporary-accounts/batches`，每一批畫成帳號圈上的一顆六角形節點並連到它授權的專案與資源（登入預設以粗線表示），非使用中的批次標狀態，已過期或撤銷的批次與停用帳號一起受「停用帳號」鈕控制；點批次列出時間、預設、專案與批內帳號，搜尋可用臨時帳號名稱。該 API 回傳的明文密碼在頁面讀入時就丟棄。專案改為同時讀每個專案的 `GET /api/v1/knowledge/settings` 取語言分流：有中文以外的分流時在專案名稱下標小字（例如「中·台」），tooltip 與專案細節列出完整語言，讀不到只影響該專案。後端不變。
 
 - **[2026-10-15]** **虛擬人前台文字模式改用逐句串流**：文字模式送 `POST /api/v1/chat/stream`，第一句一到就開始合成語音，不再等整段回答與寫入紀錄。句子依序排進 TTS（同時只跑一個 `/api/v1/tts/stream`，合成中累積的句子併成下一個請求），聲音進同一個播放佇列，對嘴不中斷；字幕在每段開口時接到同一個氣泡。`done` 照 `/chat` 的回應處理附圖、引用、session、決策除錯與 `turn_id`／`accept`；以 `done.reply` 為最終字幕。思考中補句照舊合併重送，開口後補的話算下一輪；停止、插話會中止串流（這輪不寫入歷史）；串流出錯或 `accept` 被拒時停掉已開口的回答。部署沒有串流路由（404／405，且 `/chat` 不是同樣回 404）時自動改走 `/api/v1/chat`。延遲量測新增 `first_sentence` 時間點與 `brain_first_sentence` 分段（backend `/api/v1/metrics/turn` 接受此時間點）。
+
+### Changed
+
+- **[2026-10-15]** **主機 nginx 可讓其他專案掛路徑而不改 repo**：`infra/nginx/native/openvman.conf.template`（與參考檔 `146-openvman.conf`）在 HTTPS server 區塊的兜底 location 之前加入 `include /etc/nginx/openvman-extra/*.conf;`。其他專案（例如 `/arwin/`）把自己的 `location` 放在主機的 `/etc/nginx/openvman-extra/`，不進 openVman 版控；資料夾空的或不存在時行為不變。做法見 `infra/nginx/native/README.md`。
+
+- **[2026-10-15]** **Auth DB migration 拆檔**：各 migration 的 SQL 與版本清單從 `backend/app/auth/database.py` 移到新的 `schema_migrations.py`，`database.py` 只留連線設定與套用 migration 的流程（加入 migration 22 後超過單檔 1000 行上限，CI 的 `test_entry_boundaries` 擋下）。行為與 schema 不變。
+
+- **[2026-10-15]** **權限圖譜篩選與介面**：`/admin/access/graph` 的篩選列重新整理成「專案」「資源」兩個多選選單與「帳號／連線／圖層」三組切換鈕。新增依專案聚焦（只畫能存取所選專案的帳號與他們的資源，同類任一、跨類都要；ROOT 與不受限 admin 一律保留）、依資源聚焦（選人物、聲音或辨識引擎，圖層關著也會畫出）、依角色（ROOT／管理員／一般）、依類型（正式／臨時批次，取代原本的「臨時帳號」鈕）與依連線種類（授權／預設／管理範圍，只拿掉線不拿掉節點）；「停用帳號」照舊。專案與資源的細節多了「只看能存取這裡的帳號」鈕。有篩選時列出「N 個篩選」標籤可逐一移除或清除全部（圖層保留），頁首帳號數改為「篩選後 X / 總數」，圖例淡化被篩掉的項目並與篩選鈕共用同一組圖示，篩到沒有帳號時顯示目前條件與清除鈕，手機寬度下次要的條件收進「更多條件」。篩選只影響畫面：細節面板照實列出所有能存取的帳號，搜尋也找得到被篩掉的節點（標「已篩掉」）。篩選狀態存在 sessionStorage（依登入帳號分開，重新整理保留、關分頁即清除），不寫進網址，因為後台換頁時會把網址整理成標準路徑並移除其他查詢參數。篩選改變節點集合時重新排版，不沿用舊座標。前端純函式 `filterAccessGraph` 附單元測試；不改後端、不加依賴。
+
+- **[2026-10-15]** **重設密碼與強制登出不再讓帳號 API key 失效**：key 驗證不再比對帳號的 `token_version`，重設密碼、撤銷登入 session 只作廢登入，串接用的 key 照常可用，避免每次改密碼都要重發 key 給整合方。停用帳號、變更角色、帳號改為非正式帳號、key 過期或個別撤銷仍會讓 key 失效。懷疑帳號外洩時，除了重設密碼也要到「API 金鑰」逐把撤銷。
+
+- **[2026-10-15]** **移除過時的程式碼圖譜提示**：repo 根目錄的 `graphify-out/` 已於 2026-04-17 移除，`.codex/hooks.json` 的「有 graph.json 就提示先讀 GRAPH_REPORT.md」hook 與 `AGENTS.md` 對應說明一直沒有作用，一併刪除。各專案知識庫圖譜（`<workspace>/graphify-out/`）不受影響。
+
+- **[2026-10-15]** **後台側欄整理**：側欄改為 Workspace（對話、語音、對話紀錄、知識庫搜尋）、Knowledge（知識庫、記憶管理、工作區）、Character（角色管理、Avatar、工具與技能）、System（專案與權限、模型供應商、用量、系統狀態）四組。原「專案管理」「帳號管理」「權限圖譜」「Embed 金鑰」合併為帶分頁的「專案與權限」頁：專案 `/admin/access`、帳號 `/admin/access/accounts`（臨時建立 `/admin/access/accounts/temporary`、編輯／管理 `/admin/access/accounts/manage`，帳號分頁內以分段控制切換）、API 金鑰 `/admin/access/api-keys`、權限圖譜 `/admin/access/graph`、Embed 金鑰 `/admin/access/embed-keys`；一般帳號只看得到專案與 API 金鑰分頁，直連帳號、權限圖譜或 Embed 金鑰分頁顯示「權限不足」（補上 Embed 金鑰原本直連未擋的缺口）。原「系統健康」「系統監控」合併為「系統狀態」頁：健康 `/admin/system`、監控 `/admin/system/monitoring`，只掛目前分頁，離開健康分頁即停止 30 秒輪詢、未進監控分頁不載入 Grafana iframe。路由解析支援兩層子路徑，權限改由 `requiredRouteAccess()` 單一來源判斷。**舊路徑 `/admin/projects`、`/admin/accounts`（含 `/temporary`、`/manage`、`/api-keys`）、`/admin/access-graph`、`/admin/embed-keys`、`/admin/health`、`/admin/monitoring` 不轉址、直接失效**，書籤與外部連結需改用新路徑。後端不變。
+
+### Fixed
+
+- **[2026-10-15]** **專案資源範圍第一輪 Review 修正與契約統一**：
+  - 修復上傳專案資源時使用不存在的 `ResourceAccess.WRITE` 錯誤，全數改用 `ResourceAccess.MUTATE` 並補齊非 ROOT 管理員上傳測試。
+  - 修復 `/api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/mascots` 列表在帶 `?project_id=` 時未檢查專案讀取權限之漏洞（未授權專案一律回 404）。
+  - 修復靜態檔案授權（`/static/characters/`、`/static/backgrounds/`、`/static/mascots/`）無法讀取專案專屬與 ROOT 指派檔案問題（一般帳號只要具備所屬或指派專案的 READ 權限即放行；Embed key 限綁定專案）。
+  - 統一前後端欄位契約：`/projects/{id}/resources` 的 `defaults` 鍵一律使用 resource_type（`avatar_character`、`avatar_background`、`avatar_mascot`、`custom_voice`、`asr_engine`），移除重複別名；指派 API 與後台設定全面統一使用後端標準 enum 與 `resource_id`。
+  - 修復 TTS 預設回歸行為（恢復 0bb101e2 行為，僅在專案/指派資源參與時生效）與 Embed key 專案預設聲音直接採用修復。
+  - 修復前台虛擬人四級選擇順序（本專案偏好 → 專案預設 → 帳號預設 → 清單第一個），相容同專案舊格式偏好，並通過正則測試與專案切換測試。
+  - 修復權限圖譜 ROOT 指派連線（`assigned`，綠色虛線）與圖例、專案限制標籤，以及點擊專案即時串接 `/projects/{id}/resources` 顯示各資源來源標示。
+
+- **[2026-10-15]** **排除的 VoxCPM／CosyVoice 聲音不再留在授權清單**：`TTS_VOXCPM_EXCLUDED_VOICES`／`TTS_COSYVOICE_EXCLUDED_VOICES` 原本只讓同步略過、不會刪掉以前登錄的聲音，所以 9/2 登錄、上游已不提供的 `barbet-hung-yi-lee`一直留在資源表，隨「授權全部資源」被授權給帳號，清單看得到、選了卻合成失敗。Backend 啟動同步聲音後新增 `drop_excluded_voices`：該 provider 排除清單上的已登錄聲音連同授權與 admin 範圍一起刪除（外鍵 CASCADE）；只比對同一家 provider，不會誤刪別家同名聲音。
+
+- **[2026-10-15]** **虛擬人前台同分頁重新登入後人物不顯示**：DHLiveMini2.js 在 script 載入時就固定抓住當下的 `#canvas_video`，而 vendor script 與 WASM instance 每頁只載一次。同一分頁登出再登入（或從權限不足頁返回）會卸載整個 App、建一顆新 canvas，引擎卻繼續畫在已脫離頁面的舊 canvas 上，舞台只剩背景，錯誤畫面的重試也沒用，只能手動重新整理。`useOpenVmanAvatarRuntime` 現在記下 vendor 綁定的 canvas，`initWasm` 發現它已不在頁面上時整頁重新載入，再由新頁面重新初始化。與帳號、人物或影片解析度無關。
+
+## [2026-10-14]
+
+### Added
 
 - **[2026-10-14]** **後台「權限圖譜」頁**：新增 `/admin/access-graph`（側欄在帳號管理下方，admin／ROOT 可見，一般帳號直連會看到權限不足），把帳號與專案的授權畫成可拖曳、縮放、平移的同心圓網路圖：內圈專案、中圈帳號、外圈人物／聲音／辨識引擎（人物預設開，聲音與辨識引擎以篩選鈕開啟，也可隱藏停用帳號）。細線為授權清單、粗線為登入預設、虛線為 admin 的管理範圍；ROOT 與不受限 admin 標「ROOT：全部」／「不受限」，只畫預設那條線，不連到每個專案。點節點會高亮鄰居並在側欄列出角色、旗標、預設值與可存取專案（專案則列出能存取的帳號與全權限帳號），可搜尋並置中節點，附圖例。唯讀，編輯仍在帳號管理頁。只用既有的 `GET /api/v1/users`、`/users/access-options` 與 `/users/{id}/scope`，後端不變；授權清單為空或 `null` 的帳號照樣畫成孤立節點。版面以新增的前端依賴 `d3-force` 處理碰撞與拖曳（整頁 lazy chunk 含 d3-force，gzip 後約 16 KB），SVG 自繪，顏色走既有主題 tokens，深淺色都適用。
 
@@ -543,70 +933,27 @@
 
 - **[2026-10-14]** **TTS 串流可指定輸出 16 kHz raw PCM（給 MatesX 對嘴）**：`POST /api/v1/tts/stream` 新增選填 `format`。省略或空字串照舊回引擎原本的格式（前台虛擬人依賴，一個 byte 都不變）；`"pcm16k"` 則不論走哪個引擎（含台語分流、VoxCPM 失敗退回、IndexTTS 代理、Edge 串流與 CosyVoice／其餘整段合成）都改成串流回 16 kHz、單聲道、16-bit little-endian raw PCM，`Content-Type: audio/l16;rate=16000;channels=1`；其他值回 422。Gemini 的 24 kHz raw PCM 與 WAV（逐 chunk 解析 RIFF，不假設 data 在第 44 byte，接受串流 WAV 未知長度，必要時降成單聲道、16-bit）在程序內以有狀態 polyphase FIR 重採樣，chunk 邊界不會爆音；MP3 與其他格式邊收邊餵給 ffmpeg 子程序解碼，客戶端斷線時一併結束。本機實測：Gemini 24k 首包多約 5–9 ms、每秒音訊約 50–70 ms CPU；VoxCPM 48k WAV 首包多約 4 ms、每秒約 80–100 ms CPU；16 kHz WAV 只剝檔頭，幾乎無成本；MP3 首包多約 80–100 ms（ffmpeg 啟動）、每秒約 17 ms CPU。`scripts/integration_client.py` 新增 `--tts-format pcm16k`。VoxCPM 走 `format=pcm16k` 時改帶 `sample_rate=16000` 請 GB10 節點直接輸出 16 kHz WAV（2026-10-14 該節點上線此欄位），我們這端只剝檔頭；節點回 422 且錯誤點名 `sample_rate`（不認得此欄位）時自動改要 48 kHz 再由我們轉換，其他 422 照常回錯不重送。重採樣在執行緒裡算，不佔住 event loop：原本每塊 8 KB 在 async generator 裡同步算約 10–17 ms，多路串流同時進行時會拖慢其他請求（PR Agent 審查指出，已加測試）。
 
+### Fixed
+
+- **[2026-10-14]** **後台帳號列表不再因授權不完整的帳號整個 500**：正式機有 4 個帳號只被授權辨識引擎、沒有專案／人物／聲音，`GET /api/v1/users` 讀取時套用寫入規則（三類至少各一）驗證而 500，後台帳號管理頁打不開。讀取改用不檢查最少數量的 `AccountResourceGrantsView`（臨時帳號批次的讀取同樣處理），寫入授權仍要求三類至少各一。
+
+- **[2026-10-14]** **用戶端中斷 `POST /api/v1/chat` 後不再把整輪跑完**：使用者打斷數位人、整合方 abort fetch 時，Backend 原本照樣等 Brain 回應，Brain 也看不到斷線，LLM、工具、每輪決策與寫入對話紀錄全部照跑，白花 token 與延遲預算。現在 Backend 代理在等 Brain（連線與讀取回應）期間發現用戶端離開，就關掉往 Brain 的請求並回 499（只記一行 log）；Brain 的 `/brain/chat` 收到斷線後設下取消旗標，生成在下一個安全點停止：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前，進行中的每輪決策請求也一併取消。已送出的那一次 LLM 請求收不回來，但不會再開下一步；答案在斷線後才出來時不挑附圖、不寫入。取消的回合不寫對話、日誌與記憶（帶 `turn_id` 的回合也不暫存），記 `chat_cancelled` 事件（`trace_id`、停在哪個階段 `stage`、已完成的工具步數與 LLM 呼叫次數），不算生成失敗。Starlette 的 `request.is_disconnected()` 在 `BaseHTTPMiddleware` 後面永遠是 false（兩個服務都有這種 middleware），因此兩邊各加一層最外層的 ASGI middleware（`ClientDisconnectMiddleware`）看原始 `receive` 的斷線訊息；兩份程式碼由測試保證一致。SSE 與正常回應不受影響，正常請求不多等。
+
+- **[2026-10-14]** **`no_answer` 看得出「檢索到了但其實沒有答案」**：正式機實測在醫院專案問「火星上有幾座醫院？」，檢索門檻刻意放寬而帶回幾段院內服務 QA，回答說資料中沒有提到，`no_answer` 卻是 false，整合方無法據此換成拒答句。相似度門檻切不乾淨（各 10 題實測，相關最低 0.711、無關最高 0.719），改為有引用時再以決策鏈問一題「回覆是不是在說查不到」（purpose `no_answer`，預設逾時 0.8 秒，`NO_ANSWER_JUDGE_ENABLED` 可關；後台斷路器標為「查無答案判斷」），判斷失敗照舊只看引用。10 句中英文真實回覆實測全對，每句約 0.12 秒。
+
+- **[2026-10-14]** **Edge TTS 恢復可用**：微軟改了 Edge 朗讀服務的連線驗證，edge-tts 7.2.8 連線一律回 403（`WSServerHandshakeError`），不論有沒有專案限制都合成失敗，連帶其他 TTS 失敗時的 Edge 保底也失效。`backend/requirements.txt` 改為 `edge-tts>=7.3.1,<8`；同一段文字 7.2.8 回 403、7.3.1 正常產生音訊（2026-10-14 實測）。為了下次不必等現場沒聲音才發現：Backend 每 `TTS_EDGE_PROBE_INTERVAL_SECONDS`（預設 1800 秒）試念一句，結果與已安裝版本放在 `GET /healthz` 的 `dependencies.edge-tts`（失敗時整體狀態為 degraded），並輸出 Prometheus 指標 `vman_edge_tts_up`；Dockerfile 最後一層每次建置都以 `EDGE_TTS_REFRESH`（CI 帶 run id）略過快取、裝最新的 `edge-tts<8`。CI 只在 backend 檔案有變時重建，Edge 再壞時手動執行 Docker Publish 即可（見 `docs/operations/11_DEPLOYMENT.md`）。
+
+## [2026-10-13]
+
+### Added
+
 - **[2026-10-13]** **專案層的語音限制**：每個專案可設定允許的 ASR 引擎、預設引擎、台語分流引擎，以及允許的聲音與預設聲音（Auth DB 新表 `project_policies`，migration 20；`GET/PUT /api/v1/projects/{project_id}/policy`，改設定需 admin，受限 admin 只能放自己範圍內的資源）。實際能用的是帳號授權 ∩ 專案限制，套用在批次 ASR（明確指定、預設順序、備援、台語分流）、上傳媒體轉寫（`/api/v1/uploads` 新增 `project_id`）、串流 ASR（管理員也受限）、TTS（含台語換引擎；專案沒開 Edge 聲音時合成失敗直接回錯誤，不默默換成 Edge）與 Embed key。`/api/v1/me/capabilities`、`/api/v1/tts/providers`、`/v1/audio/speech` 新增選填 `project_id`。後台專案管理頁新增「語音設定」視窗。前台虛擬人的串流與整檔合成都帶 `project_id`（整檔原本沒帶，Edge 等聲音不受專案限制）。沒設定的專案行為不變。
 
 - **[2026-10-13]** **正式語音串接驗證紀錄**：以既有帳號 API key 經正式 HTTPS 入口實測 5 個批次及 3 個串流 ASR、兩專案 RAG、標準庫 CLI 與 5 家 TTS；記錄通過結果及尚未修復的過期 VoxCPM 聲音、Edge 空音訊假成功、IP 憑證不匹配問題。詳見 `docs/plans/integration-capabilities-asr.md`。
 
 - **[2026-10-13]** **帳號串接能力探索與單次語音選擇**：新增 `GET /api/v1/me/capabilities`，彙整帳號可用專案、角色、吉祥物、背景、TTS 聲音及 ASR batch／stream／browser 模式、部署設定與預設值；不接受 Embed key，`configured` 不代表即時健康。批次 ASR 可用 form `provider` 指定已授權、已設定的單次引擎，失敗回 502 且不暗中備援；一般帳號可在串流 ASR query `engine` 選擇已授權引擎，TTS 可選跨 provider 的已授權聲音並驗證 metadata，均不修改偏好。提供完整串接指南及 Python 標準庫 CLI，依 Content-Type 保存 WAV／MP3／PCM，TLS 預設驗證，搭配隔離 HTTP 測試。
 
-- **[2026-10-12]** **帳號 API 金鑰**：正式帳號可建立多把具期限、獨立撤銷與使用紀錄的 key，以 Bearer 呼叫既有 HTTP／WebSocket 應用 API。權限沿用帳號與即時資源授權；金鑰只顯示一次、資料庫只存雜湊，管理 key 需登入 session。後台新增 `/admin/accounts/api-keys`，用量依 key ID 歸屬，OpenAPI 標示 Bearer／Cookie／Embed 驗證方式，並提供 ASR 整合文件。
-
-### Fixed
-
-- **[2026-10-19]** **`/api/v1/tts/providers` 各引擎的 `default_voice`**：帳號／專案沒有偏好該引擎的聲音時，原本顯示清單第一個（字母排序下 CosyVoice 是 `child-female-01`），但實際念的是部署預設（`young-female-02`）。現在依序取專案／帳號偏好 → 部署預設（`TTS_COSYVOICE_DEFAULT_VOICE`、`TTS_VOXCPM_DEFAULT_VOICE`、`TTS_INDEXTTS_DEFAULT_CHARACTER`、Edge 聲音）→ 清單第一個。
-- **[2026-10-19]** **前台 runtime 載入與登入頁競態**：`OpenVmanAvatarRuntime.js` 不再在載入當下就抓 `#canvas_video`，改成每次繪圖前查、缺 canvas 的那一幀安靜跳過。先前 session 失效（401）讓 App 切到登入頁、卸掉 canvas 時腳本才載完，會在第 31 行炸掉、`createQtAppInstance` 永遠不存在，之後的重試又等同一個已經 load 過的 `<script>`，舞台卡在載入中直到手動重新整理。TS 端載入失敗也會移除那個 `<script>` 標籤，讓重試真的重載。
-- **[2026-10-19]** **TTS 依語言選引擎與需求不一致（VH-384）**：台語自動切換以前改用 VoxCPM，但 VoxCPM 照字唸，Brain 的台語回答是華語文字，唸出來是華語；國語、英文沒有依語言路由，只是剛好用專案預設聲音；使用者選台語但打字時不會切換；`/api/v1/tts/stream` 也看不出用了哪個引擎。現在 `/api/v1/tts/stream` 的語言取 ASR 的 `speech_language`，沒有時用新增的 `language`（使用者選的語言）：台語（專案分流含台語）改用 CosyVoice（會轉成台文，停用時改 VoxCPM），國語、英文在呼叫端沒指定 provider 與 voice 時用 IndexTTS；回應一律帶 `X-TTS-Provider`。CosyVoice 預設聲音改成 `young-female-02`（Hayley，與 IndexTTS 的 hayley 同一位），前台講台語時也改切 CosyVoice。CosyVoice 只能整段合成，台語第一聲約 1.8 秒（9 字）到 3.2 秒（30 字）。
-- **[2026-10-19]** **Brain 對話限流實際上是整個專案共用**：限流依專案、來源 IP 與頻道計數，但 Brain 只收 Backend 的請求，來源 IP 永遠是 Backend，同一專案所有人、所有機台共用每分鐘 90 次。現在依 Backend 驗證後傳來的呼叫者（每把 API key、Embed key、每個登入帳號）各自計數，沒有呼叫者時才用 IP。
-- **[2026-10-16]** **Brain 晚於 Backend 部署時，`/openapi.json` 停在舊的 Brain schema**：Backend 只在啟動時合併一次 Brain 的 OpenAPI，Backend 先換新版、Brain 後換時，`/api/v1/chat` 的 `ChatResponse` 等新欄位要等 Backend 下次重啟才出現；啟動當下 Brain 連不上則一直只有 Backend 的部分。現在合併結果快取 5 分鐘，過期時在背景重抓（這次先回舊的，不讓請求等 Brain），Brain 連不上時保留上一份合併結果。
-- **[2026-10-16]** **前台設定選單紅字與黑字混在一起，編號範例人物與 3D 很佔位**：人物、TTS 引擎、聲音、ASR、上傳背景的選單改成專案範圍內（黑字）在前、範圍外（紅字）在後，同組維持原本順序；人物選單另外把只有編號、沒取名字的範例人物（000～007）與 3D（VRM）統一放到最後。
-- **[2026-10-16]** **2D 人物右上角幀同步標記閃爍與修復接縫**：新增共用 TypeScript 模組 `avatarFrameSyncRepair.ts`，由前台及 SDK adapter 管理生命週期；保留原始同步讀值後，以左側及下側乾淨邊界重建右上角 16×16 背景，外緣逐步融合，避免直接複製鄰近背景留下方形色塊。`putImageData` 保留其他人物像素與 RGBA，不受 `copy` 合成模式影響。WASM 工具產生的 JS 內容維持原樣，載入入口改名為 `OpenVmanAvatarRuntime.js`，舊前台 JS 路徑由 Nginx 相容轉送；SDK 公開路徑維持不變。前台、SDK 及嵌入 widget 共用修正，3D VRM 不需變更。補同步讀值、雙向漸層、融合邊界、畫布狀態、小尺寸畫布與卸載還原回歸測試，SDK Docker builder 納入共用 TS 模組，Nginx 路徑回歸測試納入後台預設測試指令。
-- **[2026-10-16]** **前台設定換專案後，人物、聲音等選單沒跟著換**：設定面板裡換專案只當草稿、只預覽人設清單，人物、TTS、ASR、背景的清單仍是舊專案的，要關掉重開才會更新。現在選了專案就立即套用，依專案而定的欄位改跟新專案的清單與預設，舞台人物也跟著換。
-- **[2026-10-16]** **人物全改成專案專屬後，ROOT 在別的專案選不到其他專案的人物**：ROOT 不受專案清單限制，靠的是全域資源都列出來；人物改成各專案專屬後，ROOT 在 AWS-dev 就看不到 default 的 009 等人物。現在 ROOT 在任何專案的資源清單（`/projects/{id}/resources`、帶 `project_id` 的人物／背景／小助理列表與能力查詢）也列出其他專案的專屬資源與孤兒資源，標成 `in_project_scope: false`（前後台照舊以紅字標示）；一般帳號不變。
-- **[2026-10-16]** **Brain 對話限流回 400**：同一專案、來源與頻道每分鐘超過 90 次對話時回 400，跟空訊息分不出來；改成 429、`detail.error_code` 為 `LLM_OVERLOAD`，並帶 `Retry-After` 與 `retry_after_ms`。
-- **[2026-10-16]** **`/api/v1/chat` 的 OpenAPI 200 是空 schema，TTS／ASR 參數沒有說明（VH-371、VH-379）**：Brain 新增 `ChatResponse` 文件模型（`reply`、`session_id`、`trace_id`、`answer_source`、`knowledge_searched`、`no_answer`、`citations`、`history` 等，只描述不過濾欄位）；OpenAPI 合併時代理路由的預設空回應改用 Brain 寫好的版本，`chat/stream` 的 `done` 事件指向同一份。`/api/v1/chat`、`/chat/stream` 列出 400（`INVALID_REQUEST`／`SESSION_EXPIRED`）與 429。`/api/v1/tts/stream` 的 `text`、`character`、`provider`、`voice`、`project_id`、`language_routes`、`speech_language`、`format` 與 `/api/v1/asr/transcribe` 的 `file`、`project_id`、`language_routes`、`provider` 都有欄位說明，含台語要怎麼帶。串接指南新增「用台語念回答」與「機台與伺服器代理」（憑證選擇、對話紀錄、拒答句）。
-- **[2026-10-16]** **人物全改成專案專屬後，SDK 的人物清單是空的**：`GET /api/v1/characters` 只列全域公開人物。現在帶 `X-Embed-Key` 時另外列出金鑰綁定專案的專屬與 ROOT 指派人物（限金鑰允許的人物）；不帶憑證時照舊。嵌入說明補上由網站伺服器轉發人物素材並加上金鑰的做法（SDK 的影片請求帶不了標頭）。
-- **[2026-10-16]** **全域人物改成專案專屬後，帳號身上的舊授權仍能直接讀素材**：人物素材路由對一般帳號先看帳號的直接授權，資源從全域改成某專案專屬後，以前被授權過的帳號在別的專案選單看不到，直接輸入 `/static/characters/<id>/...` 卻仍回 200。現在專案專屬資源只看所屬專案與 ROOT 指派，帳號授權只對全域資源有效。
-- **[2026-10-16]** **對話請求被拒時錯誤碼標成 `BRAIN_UNAVAILABLE`**：`POST /api/v1/chat`、`/chat/stream` 遇到空訊息、超過長度上限或內容檢查擋下時回 400，`detail.error_code` 卻是 `BRAIN_UNAVAILABLE`，照錯誤碼判斷的串接端會以為 Brain 掛了；前台把這個碼當成致命錯誤，還會跳出整頁「暫時無法使用」。協定新增 `INVALID_REQUEST`（`contracts/schemas/v1/server_error.schema.json`，生成檔同步），這類 400 改回 `INVALID_REQUEST`，session 上限仍是 `SESSION_EXPIRED`；前台改顯示「這句話無法送出，請換個說法再試一次」。
-- **[2026-10-16]** **前台偶爾第一次開不出虛擬人、要重新整理；開場人物沒照專案預設**：舞台與專案資料同時開跑，舞台在專案還沒決定時用不分專案的清單載入帳號預設，之後專案偏好或專案預設改了設定值卻沒重新載入，畫面與選單的人物對不上（AWS-dev 專案預設 1014，ROOT 進來看到的是 0713）；換專案也一樣只改設定值。現在舞台等專案決定才挑人物，換專案後跟著載入新專案的人物。開場失敗不再直接停在錯誤畫面：先以 2、4、8 秒自動重試，引擎始終起不來時整頁重新載入一次（5 分鐘內最多一次），之後才顯示錯誤。廠商腳本第一次下載失敗時，失敗的 `<script>` 會從頁面移除，重試才會重新下載，以前重試會一直等不到結果，只能重新整理。載入人物不再等影片開始播放，背景分頁的 `play()` 不結束時不會卡在「切換展示角色中」；重疊的人物載入以最後一個為準，較慢的舊請求不會把舊人物寫回引擎。
-- **[2026-10-16]** **專案範圍的 API 沒帶 `project_id` 回 404「Resource not found」（VH-371）**：串接方會以為專案不存在，而且這項檢查在欄位驗證之前，連空訊息也看不到 422。現在沒帶 `project_id` 回 422 `project_id is required`，query 與 body 的值不一致回 422 `project_id in query and body must match`；專案不存在或看不到仍回 404，不洩漏存在與否。OpenAPI 與串接指南同步。
-- **[2026-10-16]** **OpenAPI 與實際回應不一致（VH-371）**：`POST /api/v1/chat/stream` 的 200 標成 `application/json`，實際是 `text/event-stream`；專案範圍的代理路由（`/api/v1/chat`、知識庫、記憶等）沒帶 `project_id` 時回 404，OpenAPI 沒列；帳號 API key 超過每分鐘上限回 429，OpenAPI 也沒列。原因是 Backend 代理路由只有預設的 JSON 回應，合併 Brain 的 schema 時又整份蓋掉 Brain 的 `responses`。現在 `chat/stream` 只列 `text/event-stream` 並說明 `sentence`／`done`／`error` 事件，需要專案的代理路由列出 404 與原因（缺 `project_id` 後來改為 422，見上一則），所有接受 API key 的操作列出 429 與 `Retry-After`，合併時改為逐個狀態碼合併（Brain 的 422 不再被蓋掉）。執行行為不變；串接指南的錯誤表補上缺 `project_id` 與限流的適用範圍。
-
-- **[2026-10-16]** **專案資源範圍程式碼優化與請求數收斂**：
-  - 前台 TTS 403 退回重構：`useTtsStreamer.ts` 的 `onFallback` 回呼直接帶入結構化 `{ voice, provider, reason }` 物件，避免 `useAvatarConversation.ts` 以脆弱的正則表達式解析錯誤文字。
-  - 前台測試品質重構：抽取 `settingsOptions.ts` 純函式（`buildCharacterOptions`、`buildTtsVoiceOptions` 等），將原先在 `rootScopeMarking.test.mjs` 中依賴原始碼模板文字的正則比對改為資料轉換單元測試。
-  - 後台權限圖譜請求數最佳化：`AccessGraph.tsx` 初始化時僅查詢各專案政策限制（`fetchProjectPolicy`），移除初始化對所有專案的 `fetchProjectResources` 併行請求；改為使用者點開專案節點時按需非同步載入資源與指派連線，並新增單元測試驗證按需載入行為。
-
-- **[2026-10-16]** **後台 Avatar 管理頁看不到專案專屬的人物、背景、小助理**：管理頁列表不帶 `project_id`，後端此時連 ROOT 也只列全域與孤兒資源，例如 AWS-dev 的 `local_01` 不會出現。`GET /api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/avatar/mascots` 不帶專案時，ROOT 改為也列出各專案的專屬資源（`source="project"`），每項新增 `owner_project_id`；非 ROOT 帳號不變，仍只看得到全域資源。計算集中在 `project_resources.unscoped_resource_sources`。
-
-- **[2026-10-16]** **虛擬人前台看不到專案專屬人物**：開機時繪製流程在專案決定前就先抓一次不帶 `project_id` 的 `/api/v1/avatar`，專案決定後再帶專案抓一次；前一次較晚回來時會把清單蓋掉，專案專屬人物（例如 AWS-dev 的 `local_01`）就從選單消失。`useAvatarCatalog` 改成只採用最後發出的請求結果。人物選單的 2D 項目也拿掉每一項都一樣的「· openVman 2D」，只顯示人物名稱（VRM 仍標「· VRM」）。
-
-- **[2026-10-15]** **專案資源範圍第一輪 Review 修正與契約統一**：
-  - 修復上傳專案資源時使用不存在的 `ResourceAccess.WRITE` 錯誤，全數改用 `ResourceAccess.MUTATE` 並補齊非 ROOT 管理員上傳測試。
-  - 修復 `/api/v1/avatar`、`/api/v1/backgrounds`、`/api/v1/mascots` 列表在帶 `?project_id=` 時未檢查專案讀取權限之漏洞（未授權專案一律回 404）。
-  - 修復靜態檔案授權（`/static/characters/`、`/static/backgrounds/`、`/static/mascots/`）無法讀取專案專屬與 ROOT 指派檔案問題（一般帳號只要具備所屬或指派專案的 READ 權限即放行；Embed key 限綁定專案）。
-  - 統一前後端欄位契約：`/projects/{id}/resources` 的 `defaults` 鍵一律使用 resource_type（`avatar_character`、`avatar_background`、`avatar_mascot`、`custom_voice`、`asr_engine`），移除重複別名；指派 API 與後台設定全面統一使用後端標準 enum 與 `resource_id`。
-  - 修復 TTS 預設回歸行為（恢復 0bb101e2 行為，僅在專案/指派資源參與時生效）與 Embed key 專案預設聲音直接採用修復。
-  - 修復前台虛擬人四級選擇順序（本專案偏好 → 專案預設 → 帳號預設 → 清單第一個），相容同專案舊格式偏好，並通過正則測試與專案切換測試。
-  - 修復權限圖譜 ROOT 指派連線（`assigned`，綠色虛線）與圖例、專案限制標籤，以及點擊專案即時串接 `/projects/{id}/resources` 顯示各資源來源標示。
-
 ### Changed
-
-- **[2026-10-20]** **Brain 聊天回合少兩次 LLM 呼叫**：有知識庫的專案一律先查，不再由每輪決策判定要不要查（`CHAT_PREFETCH_KNOWLEDGE_ALWAYS`，預設開啟；Clef 實測多數問題落在不確定帶，原本要多一次只為了產生 `search_knowledge` 呼叫的 LLM 呼叫，還有把門診時間判成否、答題時沒有知識庫的）；閒聊多一次約 0.3 秒檢索，關掉回到是→先查、不確定→強制工具那一輪、否→不查。工具收掉、只能作答的第一輪在呼叫前先告訴模型「工具已經用完，直接以文字回答」，不等它叫一次被收回的工具、被丟掉後再催（原本每次多一輪約 0.75 秒）。估省每輪 0.8～2 秒（推測，依正式環境單筆 trace）。
-- **[2026-10-20]** **台語備援鏈改由順位設定驅動**：台語那一輪的引擎順序照專案 `tts_engine_order`，沒設就用 `.env` 的 `TTS_TAIWANESE_FALLBACK_ORDER`（預設 `cosyvoice,voxcpm,indextts`）；每一站聲音對成同一個人，全部失敗才退 Edge。以後調順序改設定即可，不用動程式。
-- **[2026-10-20]** **台語備援第三順位 IndexTTS**：台語這一輪 CosyVoice、VoxCPM 都失敗時先退 IndexTTS 的 `TTS_INDEXTTS_DEFAULT_CHARACTER`（hayley，與 CosyVoice 預設同一位、念華語），IndexTTS 也失敗才退 Edge；專案設了引擎順位就照順位、沒列的不試。所有引擎回零長度或只有 WAV 檔頭的音訊一律視為失敗往下退（IndexTTS 停機時會回 200 空檔）。
-- **[2026-10-19]** **台語 TTS 引擎互為備援**：`POST /api/v1/tts/stream` 台語這一輪 CosyVoice 失敗先改 VoxCPM、VoxCPM 失敗先改 CosyVoice，聲音依 `voxcpm2-cosy-<id>` ↔ `<id>` 對應成同一個人（對不到用該引擎預設，專案限制聲音時只換到清單裡的聲音），兩家都失敗才退 Edge；`X-TTS-Provider` 照實標最後念的引擎。`TTSRouterService.synthesize` 新增 `partners`。華語指定 CosyVoice 的行為不變。
-- **[2026-10-19]** **（已於 10/20 退回）2D 人物幀同步改用 requestVideoFrameCallback**：新增共用模組 `frontend/shared/avatar/avatarFrameClock.ts`，以瀏覽器回報的 `mediaTime` 直接算出畫面上那一幀（25 fps 下即幀序），runtime 不再每幀讀右上角 2×2 角標做 GPU 回讀；角落修補改在 runtime 複製影片幀後直接進行。沒有 rVFC 的瀏覽器、以及換角色後第一幀還沒畫出來前，照舊走角標路徑。素材包仍打角標，舊版 runtime 與舊素材不受影響。
-- **[2026-10-15]** **主機 nginx 可讓其他專案掛路徑而不改 repo**：`infra/nginx/native/openvman.conf.template`（與參考檔 `146-openvman.conf`）在 HTTPS server 區塊的兜底 location 之前加入 `include /etc/nginx/openvman-extra/*.conf;`。其他專案（例如 `/arwin/`）把自己的 `location` 放在主機的 `/etc/nginx/openvman-extra/`，不進 openVman 版控；資料夾空的或不存在時行為不變。做法見 `infra/nginx/native/README.md`。
-
-- **[2026-10-15]** **Auth DB migration 拆檔**：各 migration 的 SQL 與版本清單從 `backend/app/auth/database.py` 移到新的 `schema_migrations.py`，`database.py` 只留連線設定與套用 migration 的流程（加入 migration 22 後超過單檔 1000 行上限，CI 的 `test_entry_boundaries` 擋下）。行為與 schema 不變。
-
-- **[2026-10-15]** **權限圖譜篩選與介面**：`/admin/access/graph` 的篩選列重新整理成「專案」「資源」兩個多選選單與「帳號／連線／圖層」三組切換鈕。新增依專案聚焦（只畫能存取所選專案的帳號與他們的資源，同類任一、跨類都要；ROOT 與不受限 admin 一律保留）、依資源聚焦（選人物、聲音或辨識引擎，圖層關著也會畫出）、依角色（ROOT／管理員／一般）、依類型（正式／臨時批次，取代原本的「臨時帳號」鈕）與依連線種類（授權／預設／管理範圍，只拿掉線不拿掉節點）；「停用帳號」照舊。專案與資源的細節多了「只看能存取這裡的帳號」鈕。有篩選時列出「N 個篩選」標籤可逐一移除或清除全部（圖層保留），頁首帳號數改為「篩選後 X / 總數」，圖例淡化被篩掉的項目並與篩選鈕共用同一組圖示，篩到沒有帳號時顯示目前條件與清除鈕，手機寬度下次要的條件收進「更多條件」。篩選只影響畫面：細節面板照實列出所有能存取的帳號，搜尋也找得到被篩掉的節點（標「已篩掉」）。篩選狀態存在 sessionStorage（依登入帳號分開，重新整理保留、關分頁即清除），不寫進網址，因為後台換頁時會把網址整理成標準路徑並移除其他查詢參數。篩選改變節點集合時重新排版，不沿用舊座標。前端純函式 `filterAccessGraph` 附單元測試；不改後端、不加依賴。
-
-- **[2026-10-15]** **重設密碼與強制登出不再讓帳號 API key 失效**：key 驗證不再比對帳號的 `token_version`，重設密碼、撤銷登入 session 只作廢登入，串接用的 key 照常可用，避免每次改密碼都要重發 key 給整合方。停用帳號、變更角色、帳號改為非正式帳號、key 過期或個別撤銷仍會讓 key 失效。懷疑帳號外洩時，除了重設密碼也要到「API 金鑰」逐把撤銷。
-
-- **[2026-10-15]** **移除過時的程式碼圖譜提示**：repo 根目錄的 `graphify-out/` 已於 2026-04-17 移除，`.codex/hooks.json` 的「有 graph.json 就提示先讀 GRAPH_REPORT.md」hook 與 `AGENTS.md` 對應說明一直沒有作用，一併刪除。各專案知識庫圖譜（`<workspace>/graphify-out/`）不受影響。
-
-- **[2026-10-15]** **後台側欄整理**：側欄改為 Workspace（對話、語音、對話紀錄、知識庫搜尋）、Knowledge（知識庫、記憶管理、工作區）、Character（角色管理、Avatar、工具與技能）、System（專案與權限、模型供應商、用量、系統狀態）四組。原「專案管理」「帳號管理」「權限圖譜」「Embed 金鑰」合併為帶分頁的「專案與權限」頁：專案 `/admin/access`、帳號 `/admin/access/accounts`（臨時建立 `/admin/access/accounts/temporary`、編輯／管理 `/admin/access/accounts/manage`，帳號分頁內以分段控制切換）、API 金鑰 `/admin/access/api-keys`、權限圖譜 `/admin/access/graph`、Embed 金鑰 `/admin/access/embed-keys`；一般帳號只看得到專案與 API 金鑰分頁，直連帳號、權限圖譜或 Embed 金鑰分頁顯示「權限不足」（補上 Embed 金鑰原本直連未擋的缺口）。原「系統健康」「系統監控」合併為「系統狀態」頁：健康 `/admin/system`、監控 `/admin/system/monitoring`，只掛目前分頁，離開健康分頁即停止 30 秒輪詢、未進監控分頁不載入 Grafana iframe。路由解析支援兩層子路徑，權限改由 `requiredRouteAccess()` 單一來源判斷。**舊路徑 `/admin/projects`、`/admin/accounts`（含 `/temporary`、`/manage`、`/api-keys`）、`/admin/access-graph`、`/admin/embed-keys`、`/admin/health`、`/admin/monitoring` 不轉址、直接失效**，書籤與外部連結需改用新路徑。後端不變。
 
 - **[2026-10-13]** **個資偵測預設關，改成先問一題總判斷**：`PRIVACY_FILTER_ENABLED` 預設改為 false（正式環境原本靠預設值開著，部署後會關閉，需要時在 `.env` 設 true）。開啟時先問 Clef「有沒有任何個資」一題，有才問 7 類細項：一次 7 題約 0.85 秒，總判斷一題約 0.11 秒，同一批 52 句也是個資句 25/25、誤報 0/27，而大部分訊息沒有個資，Clef 用量約降為八分之一。總判斷說有、細項都沒過門檻時記為 `unclassified`，後台顯示「個資」。
 
@@ -619,123 +966,309 @@
 - **[2026-10-13]** **模型知道專案會說哪些語言**：知識庫分流兩條以上時，文字對話與 Live 的 system prompt 都會列出「你會說的語言：國語、台語…」，被問到會說什麼語言時要全部講到。原本人設與知識庫都是中文，創造智能醫院衛教助理分流勾了國台語，問「你會說什麼」卻只答「主要用國語」。只有一條分流的專案不加這行。
 
 - **[2026-10-13]** **決策 Debug 只給管理者，展開前只顯示一行**（外部測試回報）：判讀面板會顯示「模型判定你：挫折 97%」與模型名稱，原本任何登入帳號（含展場用的臨時帳號）都能打開。現在 Brain 只對 admin／root 的正式登入回傳判讀（embed、API 金鑰也不行），前台也只對這兩種角色顯示按鈕。面板預設只露一行摘要（供應商・耗時・語氣），按「詳細」才展開整張表，不再一打開就蓋住虛擬人的臉，判讀到達時高度也不會從一行跳成整張。後台模型供應商頁的「儲存設定」固定在捲動區底部；「使用部署預設」改名為「移除後台金鑰，改用 .env」並說明會用哪個環境變數。
+
 - **[2026-10-13]** **規劃流程改為自由選擇**：一般修改不強制先寫計畫，需要規劃時只維護一份記錄，不重複抄寫 Markdown 與 OpenSpec。OpenSpec 僅在使用者明確要求時啟用，保留既有工具與文件供協作者選用；功能變更更新相關既有文件。
 
 - **[2026-10-13]** **模型供應商頁補上維運用的細節**（外部測試回報）：金鑰欄位旁標示來源（來自 .env／後台已存（加密）／無法解密／未設定），兩者遮罩一樣、原本分不出來；存檔後 Backend 立即叫 Brain 重讀設定（`POST /brain/internal/model-providers/refresh`），成功時提示「已儲存並立即生效」，Brain 沒回應時提示約 10 秒內生效；狀態異常的站旁有「重置」按鈕（`POST /api/v1/settings/model-providers/health/reset`，ROOT），只清那一站的失敗紀錄、不動未存的修改。決策鏈的 OpenAI Decisions 跨公網，每站至少給 1.5 秒（10/8 起正式機 0 次成功、3 次在 0.6～1.5 秒逾時），仍受整次請求期限限制。
+
 - **[2026-10-13]** **文件去識別化與精簡**：文件與實驗附件改用示例帳號／專案／部署資訊，保留協定、數值與評分並重核附件 checksum；移除 31 份過時或重複草稿、已退場實驗的 4 份逐筆 JSONL 與 1 份 smoke dump，修正引用及題庫檔名。新增文件隱私檢查、回歸測試與 Contracts CI，將題庫／標準答案／必要結果與可刪除的中間檔分開說明。
 
 - **[2026-10-13]** **加密 secret 改名為 `MODEL_PROVIDER_ENCRYPTION_SECRET`**：它加密的是「模型供應商」頁所有類別的金鑰，舊名 `DECISION_PROVIDER_ENCRYPTION_SECRET` 是只有決策頁時留下的，不讀舊名。部署時要把 `.env` 那一行改名並 `docker compose up -d backend gateway-worker`（watchtower 換 image 沿用容器原本的環境變數，不會重讀 `.env`）。`ensure-runtime-secrets.sh` 在資料庫已有加密金鑰、`.env` 還是舊名時會指出要改名。
+
 - **[2026-10-13]** **「再給我看看剛剛那張圖」會把剛剛的圖再顯示一次**：附圖原本只從這一輪的知識庫檢索結果挑，這類問句多半不查知識庫，所以不會顯示圖。每輪決策加一題 `wants_previous_picture`（決策證據裡附過圖的回答會標註），判定為是時把這段對話最近顯示過的 3 張圖連同當時的問題放進附圖候選，交給原本的選圖決策挑。30 句標註（Clef）：該判是的 10/10、不該判的 20/20，原有的語氣、指定語言、網路判斷全部不變，每輪多約 50 ms。可用 `TURN_DECISIONS_PREVIOUS_PICTURE_ENABLED=false` 關掉。只接 HTTP 聊天。前台決策 Debug 面板加上這一題的標籤，並新增測試比對 Brain 的題目清單（前台不認得的題目會讓整份判讀被丟掉、面板不顯示）。
+
 - **[2026-10-13]** **模型供應商頁改成分頁，正式機補上加密 secret**：頁面分「主對話模型」「決策模型」「API 金鑰」三個分頁（`/admin/model-providers`、`/decision`、`/keys`），切分頁不會丟掉未存的修改，有未存修改的分頁標一個點，「儲存設定」一次存全部。正式機只靠 watchtower 部署、從沒跑過 `ensure-runtime-secrets.sh`，`.env` 一直沒有 `DECISION_PROVIDER_ENCRYPTION_SECRET`，後台存任何金鑰都回 503（10/8 決策頁起就如此）；已補上並重建 backend。腳本的防護改成資料庫裡真的有已加密的金鑰才拒絕產生新 secret（DB 存在但從沒存過金鑰的機器照常產生；讀不到 DB 時保守拒絕）。`data/backups/` 加入 `.gitignore`（裡面的 Auth DB 備份含密碼雜湊）。
-- **[2026-10-12]** **失敗的模型供應商不再每輪都先試一次**：主對話鏈與決策鏈原本每一輪都從第一站開始，key 失效或端點卡住時，每輪都要先吃一次錯誤或等滿逾時（主對話最多 20 秒）。新增 `brain/api/core/provider_health.py` 斷路器：401／403 排到最後直到換 key 或重開、配額用完冷卻 5 分鐘、逾時／5xx／連線錯誤連續 2 次冷卻 60 秒；站不會被拿掉，健康的都失敗後仍會試。Brain 新增 `GET /brain/internal/provider-health`，後台「模型供應商」頁每站顯示「已跳過：金鑰無效」「冷卻中，約 N 秒後再試」。另外 `scripts/ensure-runtime-secrets.sh` 在 Auth DB 已存在、加密 secret 卻不見時改成停下來報錯（原本會悄悄產生新值，讓後台存的 key 全部解不開）；Backend 啟動時對解不開的 key 記 ERROR，`/healthz` 增加 `model_provider_keys` 並標 `degraded`。
-- **[2026-10-12]** **後台「決策模型」改成通用的「模型供應商」，主對話 LLM 鏈也能在後台設定**：頁面路徑改為 `/admin/model-providers`，API 改為 `GET/PUT /api/v1/settings/model-providers`（舊路徑直接 404），只有 ROOT 能看能改（原本 admin 也能改全站金鑰）。頁面分「決策模型」「主對話模型」兩類，各自排順序、啟用；主對話可改每家的模型名稱（留空沿用 `LLM_FALLBACK_CHAIN`）。API key 改成每家一把（Clef、Jev、OpenAI、Gemini、Groq、NEN），各類共用，同一把 OpenAI key 同時給決策與主對話。Auth DB 遷移 v19 把舊的 `decision_provider_settings`／`decision_provider_secrets` 複製到 `model_provider_settings`／`model_provider_secrets`，已存的 key 照樣解得開；舊表保留不刪，部署後退回舊版程式仍讀得到升級當下的決策設定；加密 secret 仍是 `DECISION_PROVIDER_ENCRYPTION_SECRET`。Brain 的決策與主對話都向 Backend `GET /api/v1/internal/model-providers` 取各自那一段（共用 `core/model_provider_config.py` 的 10 秒快取與失敗沿用上次設定）；頁面只送出有改動的類別，只改決策時主對話不受影響；主對話那一區存過之前照環境變數跑鏈（後台存過的 key 仍會取代同一家的環境變數 key），部署不必改設定；每區可「改回部署設定」。後台存的 key 解不開（加密 secret 換過或遺失）時退回部署環境的 key 並在頁面標示，不再當成「已清除」；後台設定的主對話鏈完全沒有可用 key 時，Brain 改照環境變數跑。
-- **[2026-10-12]** **回答附圖改由決策模型挑選**：原本直接顯示距離最近那筆引用的圖，問題本身不需要查知識庫時（「我聽不懂，請一步一步說明」「請用英文回答，這項產品有保固嗎？」）最近那筆只是勉強沾邊，常是型錄封面；最近 203 次附圖回答中 155 次附圖那題跟使用者問的不像。現在 `search_knowledge` 一有附圖結果，就在背景把使用者問題與前 5 筆附圖候選交給決策鏈選最能回答的一筆（可選「都沒有」），跟模型寫回答同時進行，選圖約 0.2～0.3 秒；選中別張就顯示那張，都沒有或信心低於 0.6 就不附圖。評測（Clef、信心門檻 0.6）：該顯示的 15 題選對 12 題、不該顯示的 23 題擋下 21 題（沒擋下的 2 題其實相關）；Jev 14／15、22／23。關閉（`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`）、逾時或失敗時照舊。同日拿掉工業示範專案（開發） 與正式工業示範專案問答 #91～#94（型錄版本、電源頻率、公司全名、總公司電話）的封面附圖。
-- **[2026-10-12]** **上一輪拆檔留下的假邊界收掉**：`gemini_live.py` 的三個 mixin 改成各自持有狀態的元件（`GeminiLiveTurns`、`GeminiLiveAudio`、`GeminiLiveTranscripts`），共用的身分、設定與事件送出放在唯讀的 `LiveSessionContext`，session 只負責連線、收訊、重連與協調；`web_tools.py` 拿掉模組 `__getattr__` 轉發與轉手包裝，2md HTTP client 歸 `infra/two_md_transport.py`、端點與斷路器歸 `infra/two_md_coordination.py`；`routes/admin.py` 拿掉相容轉出口與轉接函式，音色目錄、音色授權、資源同步由各自模組持有 HTTP client，設定由進入點傳入；`backend/app/auth/repositories.py` 刪除，呼叫端直接 import 擁有者模組，例外類別集中在 `repository_errors.py`。測試改成 patch 真正的擁有者，或改測對外行為；行為不變。
-- **[2026-10-12]** **HTTP 聊天與 Gemini Live 共用「這一輪先查什麼」**：每輪決策之後要先查哪些、知識庫用什麼查詢、關閉 session recall 時取消記憶查詢，原本 `core/agent_loop.py` 與 `live/gemini_turns.py`／`core/chat_service.py` 各寫一份，現在集中在 `core/turn_reads.py`，兩個入口只負責執行與把結果放回各自的協定。行為差異只有一項：Live 先查知識庫原本只用這一句，追問句（「那價格呢？」）查不到上一句講的型號；現在跟 HTTP 一樣另加「上一句＋這一句」一條查詢。多模態訊息的文字欄位不是字串時忽略，不再變成 "None"。
-- **[2026-10-12]** **拆分接近千行上限的六個模組（行為不變）**：`backend/app/auth/repositories.py` 999 → 79 行（各 repository 與共用規則拆成獨立模組，順便消掉既有 repository 反向 import 的循環）、`frontend/admin/src/pages/KnowledgeBase.tsx` 993 → 446 行（拖放、批次選取、QA 節點對話框改成 hook 與子元件）、`brain/api/live/gemini_live.py` 968 → 452 行（每輪決策與工具、音訊、轉錄改成 mixin，37 個方法內容逐一比對未變）、`frontend/app/src/composables/useAvatarChat.ts` 950 → 478 行（WebSocket、文字回合、視覺輸入分出；回傳 API 不變）、`backend/app/routes/admin.py` 936 → 357 行（音色目錄、音色授權、ASR 引擎與資源同步移出路由）、`brain/api/tools/builtin/web_tools.py` 861 → 517 行（SSRF 檢查移到 `safety/url_policy.py`，2md 斷路器、預算與 fallback 迴圈移到 `infra/`）。原模組保留轉出口，既有 import 不用改；測試只調整幾處 patch 路徑，以後 patch `detect_audio_language`、`run_turn_decision_async` 要指向 `live.gemini_audio`、`live.gemini_turns`，patch `admin._excluded_voices` 不再影響 `/api/v1/tts/providers`。backend 1,171、Brain 1,235、後台 581、前台 297 個測試通過。
 
 ### Fixed
 
-- **[2026-10-15]** **排除的 VoxCPM／CosyVoice 聲音不再留在授權清單**：`TTS_VOXCPM_EXCLUDED_VOICES`／`TTS_COSYVOICE_EXCLUDED_VOICES` 原本只讓同步略過、不會刪掉以前登錄的聲音，所以 9/2 登錄、上游已不提供的 `barbet-hung-yi-lee`一直留在資源表，隨「授權全部資源」被授權給帳號，清單看得到、選了卻合成失敗。Backend 啟動同步聲音後新增 `drop_excluded_voices`：該 provider 排除清單上的已登錄聲音連同授權與 admin 範圍一起刪除（外鍵 CASCADE）；只比對同一家 provider，不會誤刪別家同名聲音。
-
-- **[2026-10-15]** **虛擬人前台同分頁重新登入後人物不顯示**：DHLiveMini2.js 在 script 載入時就固定抓住當下的 `#canvas_video`，而 vendor script 與 WASM instance 每頁只載一次。同一分頁登出再登入（或從權限不足頁返回）會卸載整個 App、建一顆新 canvas，引擎卻繼續畫在已脫離頁面的舊 canvas 上，舞台只剩背景，錯誤畫面的重試也沒用，只能手動重新整理。`useOpenVmanAvatarRuntime` 現在記下 vendor 綁定的 canvas，`initWasm` 發現它已不在頁面上時整頁重新載入，再由新頁面重新初始化。與帳號、人物或影片解析度無關。
-
-- **[2026-10-14]** **後台帳號列表不再因授權不完整的帳號整個 500**：正式機有 4 個帳號只被授權辨識引擎、沒有專案／人物／聲音，`GET /api/v1/users` 讀取時套用寫入規則（三類至少各一）驗證而 500，後台帳號管理頁打不開。讀取改用不檢查最少數量的 `AccountResourceGrantsView`（臨時帳號批次的讀取同樣處理），寫入授權仍要求三類至少各一。
-
-- **[2026-10-14]** **用戶端中斷 `POST /api/v1/chat` 後不再把整輪跑完**：使用者打斷數位人、整合方 abort fetch 時，Backend 原本照樣等 Brain 回應，Brain 也看不到斷線，LLM、工具、每輪決策與寫入對話紀錄全部照跑，白花 token 與延遲預算。現在 Backend 代理在等 Brain（連線與讀取回應）期間發現用戶端離開，就關掉往 Brain 的請求並回 499（只記一行 log）；Brain 的 `/brain/chat` 收到斷線後設下取消旗標，生成在下一個安全點停止：每次 LLM 呼叫與每個 fallback 站之前、串流 chunk 之間（同時關掉 provider 串流）、每輪工具之前，進行中的每輪決策請求也一併取消。已送出的那一次 LLM 請求收不回來，但不會再開下一步；答案在斷線後才出來時不挑附圖、不寫入。取消的回合不寫對話、日誌與記憶（帶 `turn_id` 的回合也不暫存），記 `chat_cancelled` 事件（`trace_id`、停在哪個階段 `stage`、已完成的工具步數與 LLM 呼叫次數），不算生成失敗。Starlette 的 `request.is_disconnected()` 在 `BaseHTTPMiddleware` 後面永遠是 false（兩個服務都有這種 middleware），因此兩邊各加一層最外層的 ASGI middleware（`ClientDisconnectMiddleware`）看原始 `receive` 的斷線訊息；兩份程式碼由測試保證一致。SSE 與正常回應不受影響，正常請求不多等。
-
-- **[2026-10-14]** **`no_answer` 看得出「檢索到了但其實沒有答案」**：正式機實測在醫院專案問「火星上有幾座醫院？」，檢索門檻刻意放寬而帶回幾段院內服務 QA，回答說資料中沒有提到，`no_answer` 卻是 false，整合方無法據此換成拒答句。相似度門檻切不乾淨（各 10 題實測，相關最低 0.711、無關最高 0.719），改為有引用時再以決策鏈問一題「回覆是不是在說查不到」（purpose `no_answer`，預設逾時 0.8 秒，`NO_ANSWER_JUDGE_ENABLED` 可關；後台斷路器標為「查無答案判斷」），判斷失敗照舊只看引用。10 句中英文真實回覆實測全對，每句約 0.12 秒。
-
-- **[2026-10-14]** **Edge TTS 恢復可用**：微軟改了 Edge 朗讀服務的連線驗證，edge-tts 7.2.8 連線一律回 403（`WSServerHandshakeError`），不論有沒有專案限制都合成失敗，連帶其他 TTS 失敗時的 Edge 保底也失效。`backend/requirements.txt` 改為 `edge-tts>=7.3.1,<8`；同一段文字 7.2.8 回 403、7.3.1 正常產生音訊（2026-10-14 實測）。為了下次不必等現場沒聲音才發現：Backend 每 `TTS_EDGE_PROBE_INTERVAL_SECONDS`（預設 1800 秒）試念一句，結果與已安裝版本放在 `GET /healthz` 的 `dependencies.edge-tts`（失敗時整體狀態為 degraded），並輸出 Prometheus 指標 `vman_edge_tts_up`；Dockerfile 最後一層每次建置都以 `EDGE_TTS_REFRESH`（CI 帶 run id）略過快取、裝最新的 `edge-tts<8`。CI 只在 backend 檔案有變時重建，Edge 再壞時手動執行 Docker Publish 即可（見 `docs/operations/11_DEPLOYMENT.md`）。
-
 - **[2026-10-13]** **對外入口不再轉送 `/api/v1/internal/`**：`/api/v1/internal/model-providers` 回傳全部模型金鑰明文，原本從公開網址與內網 8787 都打得到，只靠 `GATEWAY_INTERNAL_TOKEN` 擋；而這個 token 也會用明文 HTTP 送到另一台機器的 IndexTTS 節點。admin 容器的 nginx 現在對 `/api/v1/internal/` 一律回 404（同 `/brain/`），容器之間照常直接打 `backend:8200`；新增測試防止被改回去。
+
 - **[2026-10-13]** **決策的部署預設不再啟用 Clef 備援端點**：備援是 CPU 機器，一次判斷要好幾秒，必定超過每站時限，還吃掉後面 Jev 的時間。正式機在測試者按「改回部署設定」後四站全開，每輪判斷都退回 baseline。現在部署預設為 Clef 主端點、Jev、OpenAI，備援仍可在後台手動啟用。
+
 - **[2026-10-13]** **決策斷路器依用途分開計算**：同一站的失敗次數原本所有決策用途共用，Clef 只有大請求（每輪決策）逾時時，穿插成功的小請求（附圖選擇）會把次數歸零，斷路器永遠不跳過它（正式機連續 5 次逾時、狀態仍是空的）。現在依用途分開記；後台模型供應商頁一站取最嚴重的狀態並標出用途（例如「冷卻中…（每輪判斷）」）。
+
 - **[2026-10-13]** **Clef 每輪決策不再多半逾時轉 Jev**：今天 Clef 主端點的每輪決策有六成逾時。Clef 單次約 450～800 ms（約每 1,000 tokens 0.5 秒，同時有其他決策請求時更慢；前綴快取幾乎沒有幫助，實測重用 100% 仍要 466 ms），每站時限 0.6 秒剛好卡在中間，加上「要再看之前的圖」這題又多約 50 tokens。每站時限預設改為 0.8 秒（逾時要先等滿 0.6 秒再加 Jev 約 0.35 秒，比讓 Clef 跑完慢；Clef 真的掛掉時斷路器連續兩次失敗就先跳過 60 秒），「要再看之前的圖」只在對話顯示過圖時才問。
+
 - **[2026-10-13]** **再看剛剛那張圖時不再回「已為你切換到知識圖譜頁面」**：正式機實測圖已正確附上，但模型以為要自己打開圖，呼叫 `request_action` 切頁面並這樣回答。判定為要再看之前的圖時，system prompt 加一行當輪提示說明圖會附在回答旁邊、不要切換頁面；也不要猜是哪一張或描述內容（選圖跟回答並行，模型看不到結果；前面有兩張圖時曾附沉水泵那張、文字卻講 EUSR）。
+
 - **[2026-10-13]** **受限管理者的聲音清單沿用權限上限**：`GET /api/v1/tts/providers` 與能力探索只列可存取聲音，避免清單出現實際合成時會被拒絕的範圍外音色；聲音解析與清單明確沿用同一個授權 runtime。
 
 - **[2026-10-13]** **用量時間軸測試不再看機器快慢**：`test_scope_events_carry_timeline_offsets` 假設寫一筆帳本一定少於 250ms，冷的 SQLite 第一次寫入就超過，起點不會被釘在 0；改用遠大於寫入時間的延遲，驗的仍是「延遲比 scope 長時起點不為負」。
-- **[2026-10-12]** **「我聽不懂，請一步一步說明」判不出困惑**：每輪決策的語氣選項只寫一個英文字（"Confused."），Clef 只能猜字面，這句的困惑信心 0.49～0.74，過不了 0.8 門檻，前台 Debug 顯示「未確定」。五個語氣選項改寫成可觀察的線索（困惑：說聽不懂、問某個詞的意思、要求更簡單或一步一步說明；挫折：抱怨、不耐煩、問題一直沒解決；急迫：現在就要或有截止時間；輕鬆：開玩笑、閒聊）。20 句標註：語氣套用正確 14 → 17、有情緒的 12 句套用 6 → 9、套錯 0 → 0，這句信心 0.98；30 句舊題組語氣欄 30 → 29（「講個笑話」改判輕鬆）。每輪約多 56 tokens、27 ms。
-- **[2026-10-12]** **決策設定測試使用實際 alias**：修正測試以小寫 constructor 參數傳入有 `validation_alias` 的設定欄位，參數被忽略而誤判功能設定；改驗證大寫 alias 的 constructor 與環境變數兩條路徑，保留閾值順序錯誤的驗證。正式設定程式不變；最後 Brain 非 integration 全套 1,243 passed、1 skipped、15 deselected。
-- **[2026-10-12]** **圖文混合的一句先查知識庫時查錯句子**：先查知識庫只收純文字的 user 訊息，這一句若是「文字＋圖片」的清單格式會被略過，拿上一句（或空字串）去查（PR Agent 審查 2b35df8）。現在取出清單裡的文字部分；這一句完全沒有文字時不先查，照原本強制工具的流程讓模型自己寫查詢。目前 HTTP 聊天的 user 訊息都是純文字，之後支援對話傳圖時才會遇到。
-- **[2026-10-12]** **產品篩選參數錯誤時不再變成無條件選型**：`filter_products` 在轉換前拒絕舊 `where`、未知參數與情境欄位、缺少或型別錯誤的 `conditions`／`sort`，避免條件被丟棄後回傳全部產品或任意首款。布林與非數值 `limit` 明確報錯；保留整數浮點值及 `0` 表示不限的供應商相容行為。新增工具入口回歸測試，確認合法多欄排序與缺值仍分開列為 `unknown`。
 
-### Documentation
+## [2026-10-12]
 
-- **[2026-10-16]** **新增 2D 人物素材指南**：`docs/guides/avatar-character-assets.md` 記錄 DHLiveMini2 要求的檔案格式、右上角幀同步標記與姿態矩陣（缺了會出現人物但嘴型不動）、用 `POST /api/v1/avatar` 帶 `project_id` 上架專案專屬人物，以及驗收步驟。起因是 local_01 第一版嘴型全透明，且重新部署時人物被改成全域公開。
+### Added
+
+- **[2026-10-12]** **帳號 API 金鑰**：正式帳號可建立多把具期限、獨立撤銷與使用紀錄的 key，以 Bearer 呼叫既有 HTTP／WebSocket 應用 API。權限沿用帳號與即時資源授權；金鑰只顯示一次、資料庫只存雜湊，管理 key 需登入 session。後台新增 `/admin/accounts/api-keys`，用量依 key ID 歸屬，OpenAPI 標示 Bearer／Cookie／Embed 驗證方式，並提供 ASR 整合文件。
+
+### Changed
+
+- **[2026-10-12]** **失敗的模型供應商不再每輪都先試一次**：主對話鏈與決策鏈原本每一輪都從第一站開始，key 失效或端點卡住時，每輪都要先吃一次錯誤或等滿逾時（主對話最多 20 秒）。新增 `brain/api/core/provider_health.py` 斷路器：401／403 排到最後直到換 key 或重開、配額用完冷卻 5 分鐘、逾時／5xx／連線錯誤連續 2 次冷卻 60 秒；站不會被拿掉，健康的都失敗後仍會試。Brain 新增 `GET /brain/internal/provider-health`，後台「模型供應商」頁每站顯示「已跳過：金鑰無效」「冷卻中，約 N 秒後再試」。另外 `scripts/ensure-runtime-secrets.sh` 在 Auth DB 已存在、加密 secret 卻不見時改成停下來報錯（原本會悄悄產生新值，讓後台存的 key 全部解不開）；Backend 啟動時對解不開的 key 記 ERROR，`/healthz` 增加 `model_provider_keys` 並標 `degraded`。
+
+- **[2026-10-12]** **後台「決策模型」改成通用的「模型供應商」，主對話 LLM 鏈也能在後台設定**：頁面路徑改為 `/admin/model-providers`，API 改為 `GET/PUT /api/v1/settings/model-providers`（舊路徑直接 404），只有 ROOT 能看能改（原本 admin 也能改全站金鑰）。頁面分「決策模型」「主對話模型」兩類，各自排順序、啟用；主對話可改每家的模型名稱（留空沿用 `LLM_FALLBACK_CHAIN`）。API key 改成每家一把（Clef、Jev、OpenAI、Gemini、Groq、NEN），各類共用，同一把 OpenAI key 同時給決策與主對話。Auth DB 遷移 v19 把舊的 `decision_provider_settings`／`decision_provider_secrets` 複製到 `model_provider_settings`／`model_provider_secrets`，已存的 key 照樣解得開；舊表保留不刪，部署後退回舊版程式仍讀得到升級當下的決策設定；加密 secret 仍是 `DECISION_PROVIDER_ENCRYPTION_SECRET`。Brain 的決策與主對話都向 Backend `GET /api/v1/internal/model-providers` 取各自那一段（共用 `core/model_provider_config.py` 的 10 秒快取與失敗沿用上次設定）；頁面只送出有改動的類別，只改決策時主對話不受影響；主對話那一區存過之前照環境變數跑鏈（後台存過的 key 仍會取代同一家的環境變數 key），部署不必改設定；每區可「改回部署設定」。後台存的 key 解不開（加密 secret 換過或遺失）時退回部署環境的 key 並在頁面標示，不再當成「已清除」；後台設定的主對話鏈完全沒有可用 key 時，Brain 改照環境變數跑。
+
+- **[2026-10-12]** **回答附圖改由決策模型挑選**：原本直接顯示距離最近那筆引用的圖，問題本身不需要查知識庫時（「我聽不懂，請一步一步說明」「請用英文回答，這項產品有保固嗎？」）最近那筆只是勉強沾邊，常是型錄封面；最近 203 次附圖回答中 155 次附圖那題跟使用者問的不像。現在 `search_knowledge` 一有附圖結果，就在背景把使用者問題與前 5 筆附圖候選交給決策鏈選最能回答的一筆（可選「都沒有」），跟模型寫回答同時進行，選圖約 0.2～0.3 秒；選中別張就顯示那張，都沒有或信心低於 0.6 就不附圖。評測（Clef、信心門檻 0.6）：該顯示的 15 題選對 12 題、不該顯示的 23 題擋下 21 題（沒擋下的 2 題其實相關）；Jev 14／15、22／23。關閉（`CHAT_REFERENCE_MEDIA_DECISION_ENABLED=false`）、逾時或失敗時照舊。同日拿掉工業示範專案（開發） 與正式工業示範專案問答 #91～#94（型錄版本、電源頻率、公司全名、總公司電話）的封面附圖。
+
+- **[2026-10-12]** **上一輪拆檔留下的假邊界收掉**：`gemini_live.py` 的三個 mixin 改成各自持有狀態的元件（`GeminiLiveTurns`、`GeminiLiveAudio`、`GeminiLiveTranscripts`），共用的身分、設定與事件送出放在唯讀的 `LiveSessionContext`，session 只負責連線、收訊、重連與協調；`web_tools.py` 拿掉模組 `__getattr__` 轉發與轉手包裝，2md HTTP client 歸 `infra/two_md_transport.py`、端點與斷路器歸 `infra/two_md_coordination.py`；`routes/admin.py` 拿掉相容轉出口與轉接函式，音色目錄、音色授權、資源同步由各自模組持有 HTTP client，設定由進入點傳入；`backend/app/auth/repositories.py` 刪除，呼叫端直接 import 擁有者模組，例外類別集中在 `repository_errors.py`。測試改成 patch 真正的擁有者，或改測對外行為；行為不變。
+
+- **[2026-10-12]** **HTTP 聊天與 Gemini Live 共用「這一輪先查什麼」**：每輪決策之後要先查哪些、知識庫用什麼查詢、關閉 session recall 時取消記憶查詢，原本 `core/agent_loop.py` 與 `live/gemini_turns.py`／`core/chat_service.py` 各寫一份，現在集中在 `core/turn_reads.py`，兩個入口只負責執行與把結果放回各自的協定。行為差異只有一項：Live 先查知識庫原本只用這一句，追問句（「那價格呢？」）查不到上一句講的型號；現在跟 HTTP 一樣另加「上一句＋這一句」一條查詢。多模態訊息的文字欄位不是字串時忽略，不再變成 "None"。
+
+- **[2026-10-12]** **拆分接近千行上限的六個模組（行為不變）**：`backend/app/auth/repositories.py` 999 → 79 行（各 repository 與共用規則拆成獨立模組，順便消掉既有 repository 反向 import 的循環）、`frontend/admin/src/pages/KnowledgeBase.tsx` 993 → 446 行（拖放、批次選取、QA 節點對話框改成 hook 與子元件）、`brain/api/live/gemini_live.py` 968 → 452 行（每輪決策與工具、音訊、轉錄改成 mixin，37 個方法內容逐一比對未變）、`frontend/app/src/composables/useAvatarChat.ts` 950 → 478 行（WebSocket、文字回合、視覺輸入分出；回傳 API 不變）、`backend/app/routes/admin.py` 936 → 357 行（音色目錄、音色授權、ASR 引擎與資源同步移出路由）、`brain/api/tools/builtin/web_tools.py` 861 → 517 行（SSRF 檢查移到 `safety/url_policy.py`，2md 斷路器、預算與 fallback 迴圈移到 `infra/`）。原模組保留轉出口，既有 import 不用改；測試只調整幾處 patch 路徑，以後 patch `detect_audio_language`、`run_turn_decision_async` 要指向 `live.gemini_audio`、`live.gemini_turns`，patch `admin._excluded_voices` 不再影響 `/api/v1/tts/providers`。backend 1,171、Brain 1,235、後台 581、前台 297 個測試通過。
 
 - **[2026-10-12]** 固定產品資料驗收流程：說明產品 Markdown frontmatter 與既有 QA CSV 的分工、新批次先核對並凍結標準答案再測量，以及單一離線核對入口。金鑰掃描只排除本批兩份回答中特定來源檔案的 SHA-256 行，另以回歸測試確認金鑰仍會被偵測。
+
 - **[2026-10-12]** 驗收產物只上版原始證據與腳本：117 篇筆記、型錄／catalog 副本、評分輸入包與 summary 由凍結快照及原始回答重建，不重複提交。新增來源重建與防覆蓋檢查；說明新資料需另建快照、核對並凍結新標準答案，不能沿用舊評分。
+
 - **[2026-10-12]** **117 款產品的新題驗收**：20 題先凍結、每題 3 次，用 11:28 封存 checkout 的 Brain 正式生成鏈與實際模型／決策／工具跑 60 個獨立 session，得到 28 對／26 部分對／6 錯。來源、回答、分題評分與工具稽核放在 `scripts/experiments/product-notes/acceptance/20261012_117/`，結論更新原本 `REPORT.md`。工具運算、條件解析和回答漏款分開記錄；未經 HTTP／ASR／TTS，不代表最新程式或部署後整體驗收。正式與 dev 的 workspace／LanceDB 967 個檔案前後雜湊一致；原始鏡像檢查 exit 1 的 99 筆語言快取差異保留，另驗證補算語言後完整 metadata 相同，沒有 sync 或 reindex。
+
+- **[2026-10-12]** **鏡頭判讀改問 Clef，VLM 退居備援**：攝影機每秒一幀（text 模式 `POST /api/v1/vision/describe` 與 Live 的 `client_video_frame` 共用），原本要 VLM 輸出 JSON 再解析，正式環境沒開 VLM 所以鏡頭按鈕從未出現。現在把畫面以 data URL 放進 Clef 的 `images`，每個視覺事件（`vision_events.EVENT_DEFINITIONS`：訪客正臉、火焰濃煙）一題 `noul`，機率 ≥ 0.5 算成立，觸發規則不變（連續 3 幀觸發、5 幀解除）。Clef 失敗或逾時且有設定 VLM 時改問 VLM，兩者都沒有就當這幀沒有事件。`GET /api/v1/vision/health` 先探 Clef 的 `/health`，不通才看 VLM；backend 健康頁多一項 `vision-clef`。設定 `VISION_CLEF_URL`（預設 `https://decision-primary.example.com/v1/systemone`，留空只用 VLM）、`VISION_CLEF_MODEL`（`clef-flash`）、`VISION_CLEF_TIMEOUT_SECONDS`（5 秒；第一次收圖曾花 16 秒），金鑰沿用 `CLEF_API_KEY`。2026-10-09 以 33 張 640×480 照片各跑 3 輪：Clef 每張 p50 410 ms、抓到訪客 15/18、誤報 0/63、火焰 6/6；OpenAI Decisions 276 ms 但訪客只抓到 9/18；Gemini flash-lite VLM 18/18 但每張 1.3 秒，跟不上每秒一幀。Clef 單卡每秒約處理 3 張畫面，每輪對話決策共用同一張卡：1 台機台開鏡頭時決策 p50 355 ms，2 台 532 ms，4 台起超過每站 0.6 秒時限、改由 Jev 回答。
+
+- **[2026-10-12]** **需要知識庫的回合先查再叫 LLM**：每輪決策高信心判定 `needs_knowledge=True`、且不必同時強制上網或查記憶時，Brain 在第一次 LLM 呼叫前自己跑 `search_knowledge`（同一個工具實作；查詢是原句，加上「上一句問題＋這一句」一條，讓「那它的揚程呢？」查得到上一句的型號），結果以已完成的工具呼叫放進對話，省掉只產生工具呼叫的那一次（約 1.2 秒）。第一次呼叫不強制工具、不再給 `search_knowledge`，選型題在這一輪叫 `filter_products`；fast 模式仍是最多一輪模型自選的工具。伺服器補的工具呼叫帶 Gemini 的 thought_signature 略過值，否則 Gemini 3 回 400、換下一站多等約 2.7 秒。規格表的系統提示規則補「對話裡已有 `search_knowledge` 結果時只叫 `filter_products`」。`CHAT_PREFETCH_KNOWLEDGE_SEARCH`（預設開）可關閉；判定為否或不確定時流程不變，Live 不受影響。工業示範專案（開發） fast 改前／改後各 3 次：追問與換題 8 題每輪 LLM 2.0 → 1.25 次、p50 3.4 → 2.4 秒，正確數相同；20 題每輪 2.12 → 1.87 次、p50 4.15 → 4.16 秒（選型題仍要篩選＋作答兩次），正確 23 → 23、錯 13 → 8。模型仍叫已收回的 `search_knowledge` 時，原本提示「直接以文字回答」並算掉 fast 唯一的工具輪，選型題沒篩選就答錯（69 輪 2 次）；改成提示「已查過，要篩選就叫 `filter_products`」且這一輪不算（只一次），修正前後各 3 次匿名評分：20 題錯 29 → 26、追問部分對 2 → 0。結果在 `docs/plans/turn-latency.md` 第 2 項。
+
+### Fixed
+
+- **[2026-10-12]** **「我聽不懂，請一步一步說明」判不出困惑**：每輪決策的語氣選項只寫一個英文字（"Confused."），Clef 只能猜字面，這句的困惑信心 0.49～0.74，過不了 0.8 門檻，前台 Debug 顯示「未確定」。五個語氣選項改寫成可觀察的線索（困惑：說聽不懂、問某個詞的意思、要求更簡單或一步一步說明；挫折：抱怨、不耐煩、問題一直沒解決；急迫：現在就要或有截止時間；輕鬆：開玩笑、閒聊）。20 句標註：語氣套用正確 14 → 17、有情緒的 12 句套用 6 → 9、套錯 0 → 0，這句信心 0.98；30 句舊題組語氣欄 30 → 29（「講個笑話」改判輕鬆）。每輪約多 56 tokens、27 ms。
+
+- **[2026-10-12]** **決策設定測試使用實際 alias**：修正測試以小寫 constructor 參數傳入有 `validation_alias` 的設定欄位，參數被忽略而誤判功能設定；改驗證大寫 alias 的 constructor 與環境變數兩條路徑，保留閾值順序錯誤的驗證。正式設定程式不變；最後 Brain 非 integration 全套 1,243 passed、1 skipped、15 deselected。
+
+- **[2026-10-12]** **圖文混合的一句先查知識庫時查錯句子**：先查知識庫只收純文字的 user 訊息，這一句若是「文字＋圖片」的清單格式會被略過，拿上一句（或空字串）去查（PR Agent 審查 2b35df8）。現在取出清單裡的文字部分；這一句完全沒有文字時不先查，照原本強制工具的流程讓模型自己寫查詢。目前 HTTP 聊天的 user 訊息都是純文字，之後支援對話傳圖時才會遇到。
+
+- **[2026-10-12]** **產品篩選參數錯誤時不再變成無條件選型**：`filter_products` 在轉換前拒絕舊 `where`、未知參數與情境欄位、缺少或型別錯誤的 `conditions`／`sort`，避免條件被丟棄後回傳全部產品或任意首款。布林與非數值 `limit` 明確報錯；保留整數浮點值及 `0` 表示不限的供應商相容行為。新增工具入口回歸測試，確認合法多欄排序與缺值仍分開列為 `unknown`。
+
+- **[2026-10-12]** **前台「決策 Debug」按鈕蓋住「快速問題」**：兩顆都釘在舞台右上角，Debug 蓋住快速問題圓鈕上半部，非展示機台模式都看得到（2026-10-12 驗收）。Debug 移到快速問題正下方，樣式改用共用主題 tokens（原本寫死深色與 px），淺色主題下跟頁面一致；新增版面測試，兩者再重疊或寫回固定色、px 會失敗。
+
+## [2026-10-09]
+
+### Changed
+
+- **[2026-10-09]** 新增計畫 `docs/plans/turn-latency.md`（Draft）：每輪從講完到聽到聲音 p50 約 7 秒的拆解（Brain 4 秒、每輪 LLM 2 次各約 1.3 秒、TTS 等整段回答才開始），依效益排序的待做，外部 Clef 包裝層建議，以及決策功能（e9b49ee 等）的審查待辦。
+
+- **[2026-10-09]** **系統提示改成固定內容在前**：Gemini 隱式快取只認完全相同的開頭，近 3 天只有 25% 輸入 tokens 命中（36 萬／142 萬）。原本 REQUEST CONTEXT（trace_id、精確到秒的時間）夾在人設與回答規則之間、自動回憶插在人設前面；現在回答規則與詞表移到人設後面，自動回憶、REQUEST CONTEXT、對話摘要、回答語言、語氣與檢索提示放最後。正式工業示範專案兩個不同問題的系統提示相同開頭從 79% 提高到 96%；新增測試檢查每輪內容不會插到固定內容之前。
+
+### Fixed
+
+- **[2026-10-09]** **模型第一輪只回文字時，補上的查詢被 Gemini 拒絕、換站多等約 2.7 秒**：強制查詢那一輪模型沒叫工具時，伺服器會補一筆 `search_knowledge`（以及需要時的 `search_web`、`search_memory`），但這筆是這一輪第一筆工具呼叫，Gemini 3 要求帶 thought_signature，沒帶就回 400、整輪改由下一站重來。現在伺服器補的呼叫若是第一筆就帶官方的略過值 `skip_thought_signature_validator`；排在模型自己的呼叫之後時不需要簽章。
+
+- **[2026-10-09]** **Gemini Live 預取知識庫後前台沒有引用與圖片**：每輪決策判定要查知識庫時，Brain 先替模型查好並告訴它「已查過」，模型就不再呼叫 `search_knowledge`，而預取路徑從沒送 `server_search_results`，前台的引用與媒體不會出現。預取完成且仍是同一輪時，現在照一般工具呼叫送出引用（共用同一個送出函式）；模型照樣呼叫時拿快取，不重送。
+
+- **[2026-10-09]** **Gemini Live 決策被新回合取消時整條連線斷掉**：工具呼叫等決策、或文字回合等決策時，若新的一輪（語音轉錄、`send_turn_complete`）取消了決策 task，`CancelledError` 會穿出 listener 或 relay dispatch，listener 結束、連線被關、這輪回答遺失。現在決策 task 被取消只算沒有決策，呼叫端自己被取消才往上拋。語音轉錄進來時也會清掉上一輪的決策，決策沒回來前不會拿上一輪的 policy 配這一句。
+
+- **[2026-10-09]** **Gemini Live 文字回合預取沒有總時限**：知識庫、網路、記憶並行預取完才送給模型，`search_web` 最長約 20 秒，使用者講完到模型開口全在乾等。現在預取總時限 `LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`（預設 1 秒），逾時的那項取消並改列 `required_reads` 讓模型自己查；`[視覺事件]` 回合不再跑決策與預取。
+
+- **[2026-10-09]** 測試 `test_failed_provider_chain_builds_baseline_and_never_raises` 時好時壞：它 patch `decision_router.decide`，但 `turn_decisions` 直接 import `decide`，實際呼叫到真的決策路由，結果取決於前面測試留下的設定快取。改成 patch `turn_decisions.decide`。
+
+- **[2026-10-09]** **每輪決策多等 1 秒、Clef 從沒被用到**：每輪送 14 題給決策供應鏈，Clef（.32 本機）要約 2,000 tokens、960 ms，主備兩站都在每站 0.4 秒時逾時，每輪固定由 Jev 回答、多等約 1.03 秒（正式環境實測 9 輪皆如此）。輸入語言 9 題（佔六成 tokens）改由既有規則判斷、拿掉只進 prompt 資訊的意圖題，剩 5 題約 700～1,000 tokens，Clef 0.39～0.52 秒；每站時限預設改 0.6 秒。上網題補「新聞、天氣、匯率才算，問本專案產品不算」，明確語言的選項寫語言名稱（只寫 `nan` 時 Clef 認不出台語）。30 句標註訊息：5 題＋Clef 判錯 0 個欄位，原 14 題＋Jev 判錯 6 個（上網 3、記憶 2、語氣 1）。
 
 ## [2026-10-08]
 
 ### Added
+
 - **[2026-10-08]** **虛擬人決策 Debug**：前台舞台提供預設關閉的判讀面板，開啟後顯示當輪實際供應商、14 個 typed 判讀項目、機率／信心度、採用門檻結果與套用策略；HTTP `decision_debug=true` 與 Live `set_decision_debug` 可啟用暫時診斷，Live 訊息以 client turn ID 關聯並忽略舊回合事件。關閉／切換 session 或專案時清除，判讀情緒不寫入對話、delivery 暫存、usage 或日誌。
+
 - **[2026-10-08]** **每輪對話決策輔助**：HTTP Chat 與 Gemini Live finalized text 以單一 typed batch 分別判斷 knowledge／web／memory 需求、輸入與回答語言、混用語言及當輪語氣；HTTP policy 綁在 server-owned generation context，Live 文字回合在 generation 前執行必要的唯讀 reads，並以有界 JSON envelope 傳遞不可信參考結果。高信心「不需要 knowledge」可略過強制 RAG，其他信號不改既有工具權限、模式、session recall toggle 或 save-memory 授權。2 秒 shared budget、每 hop 0.4 秒；四 hop、設定或逾時失敗時使用原本的 RAG、語言與 persona 路徑繼續回答。決策 evidence 只包含原句、最多 6 則 user／assistant 歷史與 allowlisted 語言／工具代碼；tone 不持久化。
+
 - **[2026-10-08]** **可調整的決策供應鏈**：本地 Guard Agent 規則無法判斷時，依 Admin 設定順序呼叫 Clef 主／備援端點、Jev System One、OpenAI Decisions；ROOT／admin 可在「System → 決策模型」調整 hop 順序、啟用狀態與 API key。金鑰以 `DECISION_PROVIDER_ENCRYPTION_SECRET` 加密存入 Auth DB，Admin API 不回傳明文，audit 與 usage 不記判斷原文。各 provider 共用 typed `noul`／`choice`／`score` contract；OpenAI 使用專用 `POST /v1/decisions`（預設 `gpt-6-luna`），不是 chat completion。Brain 對每個 hop 記 provider、model、用途、耗時、狀態與 usage；全部失敗時沿用各功能既有安全退路。
+
 - **[2026-10-08]** **Clef-Flash 公開 HTTPS 網域**：主機 nginx 為 `decision-primary.example.com` 終止 Let's Encrypt TLS，並反向代理到本機 `127.0.0.1:18100`；獨立 vhost 不影響既有 `api.example.com`，共用既有 certbot Docker 續期排程。
-- **[2026-10-06]** **Brain 產品規格篩選工具 `filter_products`**：專案在 `knowledge/products/` 放 `_catalog.yaml`（欄位、型別、單位由專案自訂）與每個產品一篇帶 YAML frontmatter 的筆記，模型在第一輪與 `search_knowledge` 平行呼叫，依條件篩選、多情境、多欄排序，缺值列為未知而非不符合；沒有規格表的專案不會看到這個工具。參數是結構化的 `scenarios[]`（`conditions`、`sort`、`limit`，欄位以專案欄位做 enum，值收字串再依型別轉換）；最初版本要模型把 JSON 寫在字串裡，工業示範專案（開發） fast 實測約三成呼叫因 JSON 寫壞或排序少 `direction` 被退回，改成結構化後 48 次呼叫退回 0～1 次。有規格表的專案在系統提示加一條規則，要求選型類問題第一輪同時呼叫篩選與檢索：只寫在工具說明時，需要篩選的 16 題×2 次只有 9 次呼叫，加規則與結構化參數後 20 題×3 次中需要篩選的 48 次有 43～45 次拿到篩選結果。結果的每一列改附全部規格：原本只回條件與排序用到的欄位，模型篩了 3HP 卻沒依揚程排序時拿不到揚程，就回「型錄未提及」。語意沿用產品筆記實驗第三輪驗證過的篩選引擎（C 組 55／2／3）。附工業示範專案 EDW、EUB-M 的範例規格表 `scripts/experiments/product-notes/catalog/_catalog.yaml`，15 篇實驗筆記可直接載入、篩選結果與凍結答案一致。計畫 `docs/plans/product-spec-filter.md`（Draft）。
-- **[2026-10-06]** **展示機台帳號與解鎖 API**：`users.kiosk`（預設關，遷移在 `auth/database.py` 的 `_add_kiosk_flag`，schema 版本 16）；`/auth/me`、各登入回應與 `GET /api/v1/users` 帶 `kiosk`；`PUT /api/v1/users/{id}/access`、`POST /api/v1/users`、角色調整與 `POST /api/v1/temporary-accounts/batches` 可設定，權限沿用帳號管理規則，改了不會把使用中的機台登出。新增 `POST /api/v1/auth/verify-password`（`{password}` → 204；錯誤回 400 不回 401，免得前台當成登入過期把機台登出；5 分鐘內錯 5 次回 429 並帶 `Retry-After`，記在記憶體、每個帳號分開算；不換 session；embed key 身分 403）。
-- **[2026-10-06]** **知識庫文件批次操作**：檔案樹「多選」後可勾選多個檔案（資料夾一次勾底下全部），批次移動到資料夾、設定語言或刪除。逐檔呼叫既有 API、不新增端點；顯示進度，部分失敗照樣做完並列出原因（例如目標已有同名檔），失敗的保持勾選可重試。
-- **[2026-10-06]** **前台訪客模式與迎賓體驗**（UX 審查 2026-10-06）：前台設定「切換成展示機台」（這台裝置記住）、後台帳號勾「展示機台」（登入即進入，正式帳號與臨時批次都可設）或網址 `?kiosk=1` 進入；藏起設定與帳號列、登出，現場人員長按標題 3 秒輸入帳號密碼可暫時叫出、先顯示「點一下開始對話」解鎖音訊並開始收音；標題改成角色名稱加狀態（在線／聆聽中／思考中／說話中），不再是「openVman 控制台」；收音時輸入框右側有即時音量條（另開一條麥克風串流只量音量）；還沒開口前在輸入框上方列出快速問答的推薦問題（各主題輪流取題、最多 4 題，手機 2 題）；訪客模式閒置 2 分鐘清空對話、關麥克風、回到開始畫面，下一位來賓看不到上一個人的對話；手機點輸入框時舞台縮成一小條讓出位置給鍵盤（viewport 加 `interactive-widget=resizes-content`）。
-- **[2026-10-06]** **後台聊天「修正成 QA」**：AI 回答的操作列可以把這一輪的問答改好後直接存進問答節點，沿用知識庫手動輸入問答的 API 與檔案格式，存完自動重建索引；同題只改答案，預設不出現在前台快速問題按鈕。
-- **[2026-10-05]** **後台語音辨識分頁改成完整的測試台**：可以編輯專案詞表（`ASR_PROMPT.md`，顯示幾個詞、幾條誤聽對照）；勾語言分流；批次試辨識一次勾多個引擎、同一段音檔同時送出比較，輸入有 VAD 收音（講完一句自動送出，可連續講）與上傳，顯示實際引擎、耗時、套用的分流與詞表、台語判斷，填參考文字就算錯字率（跟 voice_e2e 同算法），最近 5 段可回放；新增串流試聽，邊講邊出字。後端：`/api/v1/asr/preview` 多收 `project_id`、`language_routes`，跟正式對話一樣套詞表與台語判斷（引擎照選的跑），回傳 `glossary`、`language_check`、`language_routes`；`/api/v1/asr/stream` 多一個只有管理員能用的 `engine` 參數。原本錄音鈕用到不存在的 `btn-secondary` 樣式，一起改掉。
-- **[2026-10-02]** 講話中插話的分類端點（預設不用）：新增登入保護的 `POST /api/v1/voice/interrupt`（`{transcript, reply_text}` → `{action: "STOP" | "IGNORE"}`），先丟掉完整出現在回答裡的文字（當成喇叭回音），再交給既有 GuardAgent／Jev 判斷。前台串流辨識接好了，但開關 `INTERRUPT_WHILE_SPEAKING`（`useAvatarVoiceInput.ts`）預設關：回音過濾只擋完全相同的文字，辨識錯一個字就擋不住，現場喇叭與麥克風的回音消除還沒實測，開了可能讓虛擬人自己打斷自己。虛擬人出聲時所有引擎照舊停止收音。
 
 - **[2026-10-08]** **整理 Gemini Live 決策 helper**：將 finalized text envelope 與預取查詢比對移至 `gemini_payloads.py`、`gemini_tool_execution.py`，讓 Live 會話模組通過 1,000 行 CI 邊界檢查。
 
+## [2026-10-07]
+
+### Changed
+
+- **[2026-10-07]** 實驗 `scripts/experiments/fts-ngram/`：knowledge 表的全文索引改用 ngram 斷詞，工業示範專案（開發） 145 題前 5 名命中 123 → 128，多命中的幾乎都是語音辨識聽錯的句子；型號縮寫查詢（「EUBL 有哪些馬力」）兩種都撈不到，未採用。
+
+- **[2026-10-07]** `docs/specs/03_BRAIN_SPEC.md` 改寫成只描述現況：workspace 結構改成實際的 `/data/projects/<id>/`，拿掉 `~/.openclaw/` 目錄樹、OpenClaw 設計來源、日期與實驗數字，以及已不存在的模組、環境變數、SSE 串流與影子模式；更正 embedding 精度（CUDA bf16、CPU fp32）、Session 存活時間（30 天）、輸入過長回 400 不截斷、每日摘要不呼叫 LLM、Action request 由前端執行等敘述。
+
+- **[2026-10-07]** Embedding gateway 的 `POST /embed` 多收 `input_type: "search_query"`：EmbeddingGemma 用「task: search result | query: 」前綴，identity 的 input_semantics 是 `search_query`，文件端不變。jtai 的 85 題口語改寫題用這個前綴前 5 名命中 80，question answering 前綴 75（BGE 83）；openVman 自己的資料仍是 question answering 較好，Brain 照舊送 `query`。
+
+- **[2026-10-07]** **Embedding 環境變數精簡**：模型、revision、批次大小、雲端 embedding 的模型與網址等預設值只寫在程式（`brain/embedding/app.py`、`brain/api/config.py`），compose 不再重複列一份（embedding 服務只傳 Bearer token 與雲端 API key，api 只留 token 的預設串接），`.env.example` 只留 `EMBEDDING_ACTIVE_VERSION`、`EMBEDDING_THRESHOLDS`。好處是預設值改了，watchtower 換 image 就生效，不必重建容器才吃到新的環境變數。Gateway 的 `EMBEDDING_BATCH_SIZE` 程式預設改成正式在用的 8，`EMBEDDING_PROVIDER_FALLBACKS` 程式預設含 `gemma`；EmbeddingGemma 固定 768 維，拿掉截短選項。
+
+- **[2026-10-07]** **Embedding 預設改用 EmbeddingGemma 2，取代 BGE-M3**：因供應鏈政策要移除 BAAI 的 bge-m3，換成 Google 的 `google/embeddinggemma-2`（Apache 2.0，768 維，revision 釘在 `914f7f89…`）。工業示範專案實測打平：正式檢索路徑跨語言 47/48（BGE 46/48）、選型題前 5 段涵蓋應列型號 47%（23%）、語音辨識打錯字的查詢 25 對 25；89 題實際問答盲測 16 勝 16 負 57 平，回應時間相同（`scripts/experiments/embeddinggemma2/`）。
+  - Embedding gateway 新增 `gemma` 提供者（sentence-transformers、bf16；查詢加 question answering 前綴、文件加標題），`POST /embed` 多收選填的 `titles`（跟 `texts` 等長）；呼叫端給 `acceptable_identities` 時照呼叫端的順序挑（原本照 gateway 的 fallback 順序，BGE 在前會搶走 Gemma）。`EMBEDDING_PROVIDER_FALLBACKS` 預設 `bge,gemma,…`：沒指定 identity 的呼叫端（共用端點的其他 stack）仍拿到 BGE。新增 `EMBEDDING_GEMMA_MODEL`／`_REVISION`（固定 768 維）；transformers 升到 5.19（huggingface_hub 跟著升到 1.33）、加 `sentence-transformers[image]` 6.1。Gateway 啟動時一律在背景載入模型並預熱：EmbeddingGemma 從磁碟載入要幾十秒，原本只靠 compose healthcheck 觸發，沒有 healthcheck 時第一個請求會逾時；`EMBEDDING_GEMMA_REVISION` 的程式預設也釘在 `914f7f89…`，不再靠 compose 補。
+  - Brain `EMBEDDING_ACTIVE_VERSION` 預設 `gemma`，版本順序 `gemma,bge,…`。新版本寫進另一組資料表（`knowledge__gemma`、`memories__gemma`），BGE 的表不動；新表建好前查詢自動退回 BGE。上線後執行 `python -m scripts.migrate_embedding_version --from bge`：每個專案重建知識庫索引、長期記憶逐筆用新模型重算後寫入新表（記憶沒有原始檔可以重建）。知識庫索引時把檔名當標題送給 gateway。
+
+- **[2026-10-07]** **向量門檻統一寫成 cosine 相似度，每個 embedding 版本一組**：原本有的寫 LanceDB 距離（`RAG_DISTANCE_CUTOFF` 1.0、`RAG_FTS_DISTANCE_CUTOFF` 1.1、`RAG_MEMORY_DISTANCE_BONUS`）、有的寫 cosine（`RAG_DEDUP_SIMILARITY_THRESHOLD`、`MEMORY_MERGE_SIMILARITY_THRESHOLD`、`CHUNK_SEMANTIC_THRESHOLD`、`WEB_SEARCH_MIN_RELEVANCE`／`_RELEVANCE_RATIO`），夢境整理寫「1 − 距離」（`DREAMING_SIMILARITY_THRESHOLD`），換模型時同一個數字意思完全不同（工業示範專案段落兩兩相似度中位數 BGE 0.50、Gemma 0.74）。這些設定全部拿掉，改成 `memory/thresholds.py` 的一張表、可用 `EMBEDDING_THRESHOLDS`（JSON，依版本覆寫）調整；BGE 的值是原設定的換算（行為不變），Gemma 的檢索門檻在正式檢索路徑實測校正（0.68、FTS 0.63），去重、合併、切段與網路結果重排以 BGE 門檻在同一批資料上的分位數換算。查詢退回另一個版本的索引時用那個版本的門檻。`search_records` 的 `distance_cutoff` 參數改為 `min_similarity`。
+
+- **[2026-10-07]** embedding gateway 的測試從 worktree 跑時會 import 到外層主目錄的程式（`conftest.py` 把上層目錄由近到遠插到 `sys.path` 最前面，最外層反而排第一），改成最近的上層優先。
+
 ### Fixed
 
-- **[2026-10-12]** **前台「決策 Debug」按鈕蓋住「快速問題」**：兩顆都釘在舞台右上角，Debug 蓋住快速問題圓鈕上半部，非展示機台模式都看得到（2026-10-12 驗收）。Debug 移到快速問題正下方，樣式改用共用主題 tokens（原本寫死深色與 px），淺色主題下跟頁面一致；新增版面測試，兩者再重疊或寫回固定色、px 會失敗。
-- **[2026-10-09]** **模型第一輪只回文字時，補上的查詢被 Gemini 拒絕、換站多等約 2.7 秒**：強制查詢那一輪模型沒叫工具時，伺服器會補一筆 `search_knowledge`（以及需要時的 `search_web`、`search_memory`），但這筆是這一輪第一筆工具呼叫，Gemini 3 要求帶 thought_signature，沒帶就回 400、整輪改由下一站重來。現在伺服器補的呼叫若是第一筆就帶官方的略過值 `skip_thought_signature_validator`；排在模型自己的呼叫之後時不需要簽章。
-- **[2026-10-09]** **Gemini Live 預取知識庫後前台沒有引用與圖片**：每輪決策判定要查知識庫時，Brain 先替模型查好並告訴它「已查過」，模型就不再呼叫 `search_knowledge`，而預取路徑從沒送 `server_search_results`，前台的引用與媒體不會出現。預取完成且仍是同一輪時，現在照一般工具呼叫送出引用（共用同一個送出函式）；模型照樣呼叫時拿快取，不重送。
-- **[2026-10-09]** **Gemini Live 決策被新回合取消時整條連線斷掉**：工具呼叫等決策、或文字回合等決策時，若新的一輪（語音轉錄、`send_turn_complete`）取消了決策 task，`CancelledError` 會穿出 listener 或 relay dispatch，listener 結束、連線被關、這輪回答遺失。現在決策 task 被取消只算沒有決策，呼叫端自己被取消才往上拋。語音轉錄進來時也會清掉上一輪的決策，決策沒回來前不會拿上一輪的 policy 配這一句。
-- **[2026-10-09]** **Gemini Live 文字回合預取沒有總時限**：知識庫、網路、記憶並行預取完才送給模型，`search_web` 最長約 20 秒，使用者講完到模型開口全在乾等。現在預取總時限 `LIVE_GEMINI_PREFETCH_TIMEOUT_SECONDS`（預設 1 秒），逾時的那項取消並改列 `required_reads` 讓模型自己查；`[視覺事件]` 回合不再跑決策與預取。
-- **[2026-10-09]** 測試 `test_failed_provider_chain_builds_baseline_and_never_raises` 時好時壞：它 patch `decision_router.decide`，但 `turn_decisions` 直接 import `decide`，實際呼叫到真的決策路由，結果取決於前面測試留下的設定快取。改成 patch `turn_decisions.decide`。
-- **[2026-10-09]** **每輪決策多等 1 秒、Clef 從沒被用到**：每輪送 14 題給決策供應鏈，Clef（.32 本機）要約 2,000 tokens、960 ms，主備兩站都在每站 0.4 秒時逾時，每輪固定由 Jev 回答、多等約 1.03 秒（正式環境實測 9 輪皆如此）。輸入語言 9 題（佔六成 tokens）改由既有規則判斷、拿掉只進 prompt 資訊的意圖題，剩 5 題約 700～1,000 tokens，Clef 0.39～0.52 秒；每站時限預設改 0.6 秒。上網題補「新聞、天氣、匯率才算，問本專案產品不算」，明確語言的選項寫語言名稱（只寫 `nan` 時 Clef 認不出台語）。30 句標註訊息：5 題＋Clef 判錯 0 個欄位，原 14 題＋Jev 判錯 6 個（上網 3、記憶 2、語氣 1）。
 - **[2026-10-07]** **embedding 失敗一次就整個服務停擺一分鐘**：gateway 對失敗的 provider 冷卻 60 秒再改用下一家，但移除 BGE 與雲端備援後只剩 Gemma 一家，冷卻等於所有請求都回 503。實測另一個程式佔滿 GPU 造成一次 OOM 後，GPU 第 14 秒就放掉，服務仍拒絕到第 66 秒。現在所有 provider 都在冷卻時每秒放一個請求去試，同一實驗在 GPU 放掉後立即恢復；健康檢查照舊冷卻，模型壞掉時不會每 15 秒重載。
+
 - **[2026-10-07]** **embedding 多人同時查詢要排隊好幾秒**：gateway 一次只算一個請求，32 人同時查詢時每秒只處理 12 個、查詢 p50 2.8 秒。短查詢的時間幾乎都是固定開銷（1 句 91 ms、32 句 99 ms），現在排隊中的請求合成一批算（最多 64 段、16,000 字），查詢比文件先算、連續 4 批查詢後讓一批文件。純查詢 32 併發：每秒 12.3 → 116.8 個，p50 2.8 秒 → 272 ms；混 20% 長文件時查詢 p50 5.6 秒 → 316 ms，文件 p50 約 15 秒（Brain 逾時 30 秒、jtai 120 秒）。VRAM 峰值不變（長文件 64 段時 6.7 GB），閒置回到 1.6 GB；合批前後向量 cos ≥ 0.9999。
+
 - **[2026-10-07]** **後台與前台的引擎說明寫錯**：帳號頁「語音辨識引擎」說不授權就「用全站預設」，但後台的全站預設 09-24 就拔掉了（沒選過的人用部署設定的 `ASR_PROVIDER`），說明改成只講授權；瀏覽器內建辨識寫「在使用者裝置上辨識、語音不會送到伺服器」，實際上 Chrome 會把語音送到 Google，改成「由瀏覽器廠商的服務辨識，不經過本站伺服器、不帶專案詞表」。
+
 - **[2026-10-07]** backend 測試 `test_session_backup_routes_are_root_only` 在 FastAPI 0.142 找不到路由：`include_router` 的路由改包在 `_IncludedRouter`，`app.routes` 不再攤平，測試改成遞迴展開。
+
 - **[2026-10-07]** **外國客人打招呼被回中文**：「hi there」「hola」這類一兩個字的招呼都歸專案主要語言（工業示範專案是中文）。現在短句裡有只屬於一種語言的招呼或客套話（hi、hello、thanks、good morning／hola、gracias、buenos días…）就照該語言判斷、回答與檢索；「ok」、型號這類看不出語言的照舊歸主要語言。
+
 - **[2026-10-07]** **選型題只列規格表裡的款式，還說「共 N 款」**：工業示範專案的規格表只收了 EDW 與 EUB-M（2～7.5HP），系統提示卻要求「以 `filter_products` 的 matches 為準」，跨系列的問題（例如「3 吋、揚程 20 米以上有哪幾款」）漏掉 STEEL、EUS 等系列。現在規則寫明規格表收錄的範圍（`_catalog.yaml` 的 `title`），範圍外的款式依 `search_knowledge` 片段補列並說明比較範圍。fast 模式的檢索片段湊不齊其他系列的表，所以工業示範專案的規格表已擴大到全型錄（117 款）。
-- **[2026-10-06]** **後台錯誤訊息是「Request failed: 500」或整頁 HTML**：後端沒給說明時改依狀態碼講人話（例如 502／503／504「後端服務暫時連不上（可能正在重新部署），請等一分鐘再試」、409「資料剛被別人改過」），部署中 nginx 回的 HTML 錯誤頁不再原樣塞進訊息，欄位驗證錯誤（422）只列出是哪些欄位，連不上伺服器時說網路；後端給的中文說明照用。工具確認卡片與 TTS 試聽的錯誤也改用同一套。
-- **[2026-10-06]** **前台聊天出錯時直接顯示「BRAIN_ERROR: HTTP 500」這類原文**：改成白話說明（例如「現在詢問的人比較多，請稍候再問一次」「網路連線中斷，請確認網路後再試」），全螢幕錯誤的標題也不再是錯誤碼；原始錯誤碼與訊息寫在瀏覽器 console。
-- **[2026-10-06]** **OpenAI Whisper 的中文辨識結果是簡體**：其他引擎都轉繁體，只有 Whisper 原樣回傳。現在中文轉繁體；有日文假名就不轉（會把「学校」改成「學校」）。
-- **[2026-10-06]** **後台試辨識上傳長檔時，R2T2 串流的定稿少了後半段、R2T2 批次多等 20 幾秒**：同一段音檔同時送到同一台的批次和串流會互相排隊；串流送完後只等 3 秒沒新定稿就收，排隊晚到的後幾句被截掉。全部引擎照樣同時送（跟正式環境多人同時用一樣；同一台同時收到批次和串流時，秒數含排隊時間），R2T2 串流改成等伺服器關線才收（它收到 EOS 一定回最後一則定稿再關，最多等 30 秒）；Gemini 不會自己關線，維持靜下來就收。上傳的檔案串流引擎改用 4 倍速送，不用乾等整段長度，秒數旁標「4 倍速送」；麥克風講的照真實速度送。串流引擎那一列辨識中會即時顯示目前聽到的字（已定稿加上講到一半的暫定字幕），定稿後換成最終結果。
-- **[2026-10-06]** **R2T2 批次辨識也把西文、日文、韓文當中文解碼**：`/transcribe` 的 `language` 寫死 `Chinese`，跟串流同一個問題。現在 `transcribe()` 多收 `routes`，R2T2（`r2t2`、`r2t2-dev`）照專案生效的分流帶語言，規則與串流共用 `language_routes.r2t2_language`：只有一種語言帶該語言，多種語言帶 `zhen`，沒有分流或只有台語當華語（自動判斷可能把台語判成英文、葡萄牙文；串流原本沒有分流時送 `zhen`，一併改成華語）。非中文輸出不轉繁。兩台批次端點實測：指定語言時中英西日韓全對。聊天附件等沒有分流的批次辨識照舊當華語。
-- **[2026-10-06]** **R2T2 dev 串流（`r2t2-dev-live`）經過前台一句都收不到**：辨識中會送一則空的 `{}`，backend 把沒有 `status` 的訊息當成失敗，整條連線斷掉、前台退回批次。現在沒有 `status` 的訊息當心跳略過，只有明確不是 `success` 才算失敗。
-- **[2026-10-06]** **R2T2 串流把西文、日文、韓文都當中文解碼**：握手的 `language` 寫死 `Chinese`，R2T2 不會自己判斷語言，西文「bomba」被聽成「炸彈」、日韓夾進中文字。現在照這條連線的分流帶語言：只有一種語言時帶 `English`／`Spanish`／`Japanese`／`Korean`／`Chinese`，多種語言時送 `zhen` 讓 R2T2 自己判斷。非中文的輸出不再做簡轉繁（會把日文「学校」改成「學校」）。實測五種語言各 3 句，指定語言全對。多語言專案含西日韓時仍要另外決定語言來源。
-- **[2026-10-05]** **工業示範專案（開發） 檢索時沒有圖譜擴充**：`scripts/project_mirror.py sync` 只複製了 `graphify-out/` 檔案，檢索用的 LanceDB `note_graph` 表沒帶過去，測試專案的檢索跟正式不一樣。現在 `sync` 一併複製、`check` 一併比對（差異顯示為 `lancedb:note_graph`）；工業示範專案（開發） 已重新同步。
-- **[2026-10-05]** R2T2 串流實驗腳本 `scripts/experiments/r2t2/stream.py` 改讀 `.env` 的 `ASR_R2T2_SECRET_KEY`，跟正式設定同一個來源，不再在腳本裡另寫一份。
-- **[2026-10-05]** **voice_e2e 跑完沒有刪掉測試對話**：刪對話要專案的編輯權限，測試帳號 example-user 只有讀取，`/api/v1/sessions/batch-delete` 一直被 Backend 回 404，對話留在工業示範專案（開發）。用 `--user` 跑時改在 api 容器裡刪（跟簽 token 一樣進容器），`--token` 打遠端時照舊走 API。
-- **[2026-10-02]** **合併補句時舊回答可能仍寫入 Brain**：可合併 HTTP 回合加入 `turn_id`／遞增 `turn_revision`，答案先暫存，前台完整接收目前版本後透過 `/api/v1/chat/accept` 確認，才原子寫入問題與回答並執行日誌／記憶更新。取消、被取代或未接收的答案不落庫；確認重試不重複寫入，下一輪等待上一輪確認以保留完整歷史。後台 Chat、外部 SDK 與未提供回合欄位的 API 維持既有流程。
-- **[2026-10-02]** **`/api/v1/tts/stream` 指定 Edge 卻回 200 空音檔**：只要設了 IndexTTS 網址，這個端點不管指定哪家都先送 IndexTTS；IndexTTS 沒在跑時連上就斷，回空音檔。現在只有沒指定或指定 IndexTTS 才走它，VoxCPM 失敗也直接退到 Edge。前台 Edge 聲音本來走整段合成，不受影響；voice_e2e 的念回答步驟被影響。voice_e2e 念回答的秒數原本把回應當 wav 算，Edge 回 mp3 時記成 0，改用 ffprobe 讀實際長度。
-- **[2026-10-02]** **一次問好幾件事時，英文提問被用中文回答、逐條列出查不到的項目，念到 50 秒**：fast 模式模型想再查資料被擋下時，程式補一句中文催促「手邊資料沒有的內容就說明查不到」，這句是模型最後讀到的話，蓋過了 system prompt 的回答語言與長度。現在催促訊息改成「查不到的部分合併成一句帶過，不要逐項說明」，後面再附一次這一輪的回答語言與長度。工業示範專案（開發） 同一批 36 題：英文最長 63 → 29 個單字、超過上限 1/12 → 0/12，Markdown 列點 1 → 0 題。
-- **[2026-10-02]** **「¿Quién eres?」這類短西語問句被用中文回答**：兩個字以下的句子歸專案主要語言，但 ¿、¡、ñ 只有西語會用；現在有這些符號就判成西語。
-- **[2026-10-01]** **部署時 Brain 重啟那半分鐘，台語分流被默默關掉**：Backend 查不到專案語言分流就退回「只有中文」，那段時間講台語都被當華語。現在查不到時沿用上次查到的設定（即使快取已過期）；只有從沒查到過的專案才退回中文。
-- **[2026-10-01]** **簡轉繁出現「着」「裏」「爲」這類台灣不用的字形**：OpenCC 從 `s2t` 改成 `s2tw`（台灣標準字形），「自動着脫裝置」變成「自動著脫裝置」；不用 `s2twp`，它會把「軟件」這類詞改成台灣說法，等於改寫使用者講的話。影響小米、R2T2 的辨識結果與文件匯入。
-- **[2026-10-01]** **快速問答選了英文、西語，按鈕還是中文；後台隱藏的主題前台照樣顯示**：介面文字（返回、關閉、載入中、空分類）改成跟著路徑上的語言分類（中文／English／Español，也認日本語、한국어）切換，還沒選語言時用中文；前台每一層都略過後台設成隱藏的主題。
-- **[2026-10-01]** **停用的知識文件仍會經由知識圖譜被帶回答案**：向量檢索會略過後台停用的文件，但知識圖譜擴充直接按路徑抓相鄰文件的段落，沒有檢查是否停用。工業示範專案把英西問答改成快速問答後停用了原本的 `EVAK_QA.en.md`／`.es.md`，英文、西語提問的引用來源仍出現這兩份。現在圖譜擴充也略過停用的文件。
-- **[2026-09-30]** 後台在取得帳號可用專案清單前不載入專案頁面或小助理；無權限使用 default 的帳號先回退至清單中的可用專案，再發出頁面請求，清單載入失敗可重試。沒有可用專案時阻擋專案頁面並保留專案／帳號管理入口。
-- **[2026-09-30]** 從非預設專案的對話紀錄開啟 Chat 時保留專案參數；桌面、手機與對話側欄連結改由目前專案狀態產生，避免開新分頁時落到 default。
-- **[2026-09-30]** 後台子頁改用可直達的固定路徑：語音辨識、知識圖譜、Avatar 背景／小助理、記憶新增、帳號建立／管理皆由 URL 決定畫面；保留舊 `?view=` 深連結並正規化。明確頁面網址省略專案時採用 default，避免保存偏好覆蓋分享網址；Chat 指定對話參數保留到 lazy 頁面消費。側欄使用帶專案與公開前綴的原生連結，支援新分頁開啟。
 
-### Documentation
+### Removed
 
-- **[2026-10-09]** 新增計畫 `docs/plans/turn-latency.md`（Draft）：每輪從講完到聽到聲音 p50 約 7 秒的拆解（Brain 4 秒、每輪 LLM 2 次各約 1.3 秒、TTS 等整段回答才開始），依效益排序的待做，外部 Clef 包裝層建議，以及決策功能（e9b49ee 等）的審查待辦。
-- **[2026-10-07]** 實驗 `scripts/experiments/fts-ngram/`：knowledge 表的全文索引改用 ngram 斷詞，工業示範專案（開發） 145 題前 5 名命中 123 → 128，多命中的幾乎都是語音辨識聽錯的句子；型號縮寫查詢（「EUBL 有哪些馬力」）兩種都撈不到，未採用。
-- **[2026-10-07]** `docs/specs/03_BRAIN_SPEC.md` 改寫成只描述現況：workspace 結構改成實際的 `/data/projects/<id>/`，拿掉 `~/.openclaw/` 目錄樹、OpenClaw 設計來源、日期與實驗數字，以及已不存在的模組、環境變數、SSE 串流與影子模式；更正 embedding 精度（CUDA bf16、CPU fp32）、Session 存活時間（30 天）、輸入過長回 400 不截斷、每日摘要不呼叫 LLM、Action request 由前端執行等敘述。
+- **[2026-10-07]** **移除 Xiaomi-CocktailASR-1 語音辨識引擎（`xiaomi`）**：主機 192.0.2.19 已停機、部署設定早已停用，且專案逐步移除中國來源元件（同 BGE-M3）。拿掉批次轉寫函式與備援順序裡的 `xiaomi`、`ASR_XIAOMI_URL` 設定、`SERVER_ASR_PROVIDERS`、後台授權清單與前台引擎選單；`.env` 還留著 `ASR_XIAOMI_URL` 也不會出錯（直接忽略）。舊資料在 backend 啟動時清理：已註冊的 `asr_engine/xiaomi` 系統資源刪除，帳號授權與 admin 範圍裡的 xiaomi 隨外鍵一起刪掉；帳號存的 ASR 偏好若是程式已不認得的引擎就改回空字串，等於沒選過、用部署的 `ASR_PROVIDER`。`ASR_PROVIDER=xiaomi` 會被備援順序略過，照其他已設定的引擎辨識。
+
+- **[2026-10-07]** **BGE-M3 與雲端 embedding 備援**：EmbeddingGemma 2 上線、全部專案重建索引，共用 embedding 端點的 jtai 也切換完成後，移除 BGE-M3（BAAI，供應鏈政策）：gateway 的 BGE 提供者、FlagEmbedding、joblib、Gemini／OpenAI／Voyage embedding 轉接與它們的設定，Brain 的 `bge`／`gemini`／`openai`／`voyage` 版本與 `EMBEDDING_EXPECTED_*`、`EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES`、`EMBEDDING_GEMINI_*`／`OPENAI_*`／`VOYAGE_*` 設定，以及只為這次遷移寫的 `scripts/migrate_embedding_version.py`。Gateway 只剩 `gemma`，沒指定 identity 的呼叫也拿到 Gemma；Brain 的版本機制（新版本寫進另一組資料表、建好前查詢退回）保留給下次換模型。Brain readiness 改成一律檢查 gateway 的模型與維度（原本只在 BGE 時檢查）。各專案舊的 BGE 資料表（`knowledge`、`memories`）Brain 已不再讀寫。
+
+## [2026-10-06]
+
+### Added
+
+- **[2026-10-06]** **Brain 產品規格篩選工具 `filter_products`**：專案在 `knowledge/products/` 放 `_catalog.yaml`（欄位、型別、單位由專案自訂）與每個產品一篇帶 YAML frontmatter 的筆記，模型在第一輪與 `search_knowledge` 平行呼叫，依條件篩選、多情境、多欄排序，缺值列為未知而非不符合；沒有規格表的專案不會看到這個工具。參數是結構化的 `scenarios[]`（`conditions`、`sort`、`limit`，欄位以專案欄位做 enum，值收字串再依型別轉換）；最初版本要模型把 JSON 寫在字串裡，工業示範專案（開發） fast 實測約三成呼叫因 JSON 寫壞或排序少 `direction` 被退回，改成結構化後 48 次呼叫退回 0～1 次。有規格表的專案在系統提示加一條規則，要求選型類問題第一輪同時呼叫篩選與檢索：只寫在工具說明時，需要篩選的 16 題×2 次只有 9 次呼叫，加規則與結構化參數後 20 題×3 次中需要篩選的 48 次有 43～45 次拿到篩選結果。結果的每一列改附全部規格：原本只回條件與排序用到的欄位，模型篩了 3HP 卻沒依揚程排序時拿不到揚程，就回「型錄未提及」。語意沿用產品筆記實驗第三輪驗證過的篩選引擎（C 組 55／2／3）。附工業示範專案 EDW、EUB-M 的範例規格表 `scripts/experiments/product-notes/catalog/_catalog.yaml`，15 篇實驗筆記可直接載入、篩選結果與凍結答案一致。計畫 `docs/plans/product-spec-filter.md`（Draft）。
+
+- **[2026-10-06]** **展示機台帳號與解鎖 API**：`users.kiosk`（預設關，遷移在 `auth/database.py` 的 `_add_kiosk_flag`，schema 版本 16）；`/auth/me`、各登入回應與 `GET /api/v1/users` 帶 `kiosk`；`PUT /api/v1/users/{id}/access`、`POST /api/v1/users`、角色調整與 `POST /api/v1/temporary-accounts/batches` 可設定，權限沿用帳號管理規則，改了不會把使用中的機台登出。新增 `POST /api/v1/auth/verify-password`（`{password}` → 204；錯誤回 400 不回 401，免得前台當成登入過期把機台登出；5 分鐘內錯 5 次回 429 並帶 `Retry-After`，記在記憶體、每個帳號分開算；不換 session；embed key 身分 403）。
+
+- **[2026-10-06]** **知識庫文件批次操作**：檔案樹「多選」後可勾選多個檔案（資料夾一次勾底下全部），批次移動到資料夾、設定語言或刪除。逐檔呼叫既有 API、不新增端點；顯示進度，部分失敗照樣做完並列出原因（例如目標已有同名檔），失敗的保持勾選可重試。
+
+- **[2026-10-06]** **前台訪客模式與迎賓體驗**（UX 審查 2026-10-06）：前台設定「切換成展示機台」（這台裝置記住）、後台帳號勾「展示機台」（登入即進入，正式帳號與臨時批次都可設）或網址 `?kiosk=1` 進入；藏起設定與帳號列、登出，現場人員長按標題 3 秒輸入帳號密碼可暫時叫出、先顯示「點一下開始對話」解鎖音訊並開始收音；標題改成角色名稱加狀態（在線／聆聽中／思考中／說話中），不再是「openVman 控制台」；收音時輸入框右側有即時音量條（另開一條麥克風串流只量音量）；還沒開口前在輸入框上方列出快速問答的推薦問題（各主題輪流取題、最多 4 題，手機 2 題）；訪客模式閒置 2 分鐘清空對話、關麥克風、回到開始畫面，下一位來賓看不到上一個人的對話；手機點輸入框時舞台縮成一小條讓出位置給鍵盤（viewport 加 `interactive-widget=resizes-content`）。
+
+- **[2026-10-06]** **後台聊天「修正成 QA」**：AI 回答的操作列可以把這一輪的問答改好後直接存進問答節點，沿用知識庫手動輸入問答的 API 與檔案格式，存完自動重建索引；同題只改答案，預設不出現在前台快速問題按鈕。
+
+- **[2026-10-06]** **批次辨識多一個引擎 Confucius4-R2T2（`r2t2`）**：網易有道開源、Qwen3-ASR-1.7B。`/transcribe` 帶 `language` 與專案詞表 `context`，輸出簡體轉繁體；設 `ASR_R2T2_URL` 才排進備援順序，使用者可在聊天室選它。工業示範專案 10 題合成語音帶詞表：錯字率 6.9%、專有名詞 13/18、p50 0.28 秒，Breeze 5.8%、14/18、約 1.0 秒；R2T2 會把台語寫成台語漢字，台語分流照舊用 Breeze。
+
+- **[2026-10-06]** 前台新增 Confucius4-R2T2 串流引擎 `r2t2-live`，與 Gemini Live 並存、與批次 `r2t2` 分開授權。Backend 依帳號偏好轉接 R2T2、帶專案詞表、重切 PCM 片段、增量累加與繁體定稿；停止時補齊尾段再送 EOS。未設定或上游失敗沿用批次備援，台語分流維持 Breeze。
+
+### Changed
+
 - **[2026-10-06]** `brain/README.md` 改寫成依主題組織的 Brain 說明，移除已退場功能（BGE 意圖影子、Jev 影子、SemIf）的歷程與實測紀錄，並依程式更正過時說法（Brain 僅內部呼叫、子套件路徑、session 存在各專案的 SQLite、增量重建索引、記憶自動召回預設開、隱私過濾只偵測不遮罩）。`.env.example` 拿掉不存在的 `PRIVACY_FILTER_EGRESS_ENABLED`，`AUTO_RECALL_ENABLED` 預設改註明為 true。
+
 - **[2026-10-06]** 根目錄 `README.md` 改寫成依主題組織的專案說明（架構、功能、部署、開發、文件索引），只描述目前部署中使用的元件；移除依時間追加的功能段落、實驗紀錄、已退場與未啟用元件的說明（IndexTTS、VLM、A2A 改列「選用元件」），細節改連到 `docs/`。隱私一節更正為「送 LLM 前偵測個資並記錄、提醒，不改寫內容」。
+
 - **[2026-10-06]** 產品筆記實驗第三輪（`scripts/experiments/product-notes/round3/`，交辦 `TASK.md`，結論在 `REPORT.md` 第三輪一節）：加對照組 D（全部 15 篇筆記、不給篩選工具），沿用 12 題再加 8 題新題、每題每組跑 3 次。60 份回答（對／部分對／錯）：A 9／14／37、B 14／19／27、C（篩選工具）55／2／3、D 45／10／5；C 對 D 同題同次 14 勝 41 平 5 敗，贏在漏款、排序與必要限定。新題 C 87.5% 低於舊題 94.4%；C 有 2 次條件解析失敗，C／D 參考資料格式長度也不同，優勢不能全歸給篩選運算。重新生成的 15 篇筆記規格、正文與出處檢查 0 錯；篩選工具與第二輪逐位元組相同。鏡像檢查 exit 0、workspace／LanceDB 未變；正式程式與知識庫未變。
+
 - **[2026-10-06]** R2T2 實驗報告的部署表改成新的主機與 dev 機，並補 10/05 晚的複測：正式路徑送 `Chinese`＋詞表，型號題 17/24、錯字率 8.6%；dev 機新版送 `zhen` 會逐句自動判斷語言，中英西日韓 15/15、型號題 18/24、台語不再判成葡萄牙文（錯字率 0.78），同語言連講時第二句起串流字幕幾乎等於定稿。
+
 - **[2026-10-06]** R2T2 實驗報告加 2026-10-05 多語複測：指定語言時中英西日韓全對、不指定會把西日韓當中文；Gemini 3.5 transcribe 多語全對但型號只聽對 6/24（R2T2＋詞表 17～19/24）；另補同時多路、經過 backend 的串流驗證，以及台語真人 75 句（R2T2 錯字率 0.78～1.03，台語仍只能走 Breeze 0.36）。
+
+- **[2026-10-06]** **Gemini 串流辨識帶專案詞表**：連線時把專案 `ASR_PROMPT.md` 的正確詞逐詞放進 `inputAudioTranscription.customVocabulary`（最多 100 個；Brain `/brain/internal/asr-glossary` 多回 `vocabulary` 逐詞清單，以頓號、逗號、分號或換行分詞，含空白的詞如「DIVA PRO」算一個）。工業示範專案 20 句×4 種合成聲音×有無雜訊共 160 句，直接打 Gemini 比較：專有名詞命中率 31% → 87%、字錯率 0.39 → 0.19，定稿延遲不變；逐句比 113 句變好、9 句變差（變差的多是原本就整句聽錯，詞表詞被塞進去）。`mode: SMART` 在合成語音上沒有差別，沒有開。後台詞表說明改成這個分詞規則，不再寫 Gemini 不吃詞表。
+
+- **[2026-10-06]** 管理員資源上限端點（`GET`／`PUT /api/v1/users/{user_id}/scope`）與其 models 從 `backend/app/auth/routes.py` 搬到 `admin_scope_routes.py`，掛在同一個 `users_router`、路徑不變：展示機台的改動讓 `routes.py` 超過 1000 行，Contracts CI 的檔案大小檢查失敗。
+
+- **[2026-10-06]** **R2T2 主機與 dev 機對調**：`r2t2`／`r2t2-live` 與 `r2t2-dev`／`r2t2-dev-live` 對應的機器互換，只改部署設定（`ASR_R2T2_*`、`ASR_R2T2_DEV_*`）。引擎 id 與授權不變，已授權 `r2t2-live` 的帳號（含 80 個臨時帳號）之後都送新的主機。後台與前台的引擎說明、`.env.example`、README、Backend 規格與實驗腳本的變數對應一起改。
+
+### Fixed
+
+- **[2026-10-06]** **後台錯誤訊息是「Request failed: 500」或整頁 HTML**：後端沒給說明時改依狀態碼講人話（例如 502／503／504「後端服務暫時連不上（可能正在重新部署），請等一分鐘再試」、409「資料剛被別人改過」），部署中 nginx 回的 HTML 錯誤頁不再原樣塞進訊息，欄位驗證錯誤（422）只列出是哪些欄位，連不上伺服器時說網路；後端給的中文說明照用。工具確認卡片與 TTS 試聽的錯誤也改用同一套。
+
+- **[2026-10-06]** **前台聊天出錯時直接顯示「BRAIN_ERROR: HTTP 500」這類原文**：改成白話說明（例如「現在詢問的人比較多，請稍候再問一次」「網路連線中斷，請確認網路後再試」），全螢幕錯誤的標題也不再是錯誤碼；原始錯誤碼與訊息寫在瀏覽器 console。
+
+- **[2026-10-06]** **OpenAI Whisper 的中文辨識結果是簡體**：其他引擎都轉繁體，只有 Whisper 原樣回傳。現在中文轉繁體；有日文假名就不轉（會把「学校」改成「學校」）。
+
+- **[2026-10-06]** **後台試辨識上傳長檔時，R2T2 串流的定稿少了後半段、R2T2 批次多等 20 幾秒**：同一段音檔同時送到同一台的批次和串流會互相排隊；串流送完後只等 3 秒沒新定稿就收，排隊晚到的後幾句被截掉。全部引擎照樣同時送（跟正式環境多人同時用一樣；同一台同時收到批次和串流時，秒數含排隊時間），R2T2 串流改成等伺服器關線才收（它收到 EOS 一定回最後一則定稿再關，最多等 30 秒）；Gemini 不會自己關線，維持靜下來就收。上傳的檔案串流引擎改用 4 倍速送，不用乾等整段長度，秒數旁標「4 倍速送」；麥克風講的照真實速度送。串流引擎那一列辨識中會即時顯示目前聽到的字（已定稿加上講到一半的暫定字幕），定稿後換成最終結果。
+
+- **[2026-10-06]** **R2T2 批次辨識也把西文、日文、韓文當中文解碼**：`/transcribe` 的 `language` 寫死 `Chinese`，跟串流同一個問題。現在 `transcribe()` 多收 `routes`，R2T2（`r2t2`、`r2t2-dev`）照專案生效的分流帶語言，規則與串流共用 `language_routes.r2t2_language`：只有一種語言帶該語言，多種語言帶 `zhen`，沒有分流或只有台語當華語（自動判斷可能把台語判成英文、葡萄牙文；串流原本沒有分流時送 `zhen`，一併改成華語）。非中文輸出不轉繁。兩台批次端點實測：指定語言時中英西日韓全對。聊天附件等沒有分流的批次辨識照舊當華語。
+
+- **[2026-10-06]** **R2T2 dev 串流（`r2t2-dev-live`）經過前台一句都收不到**：辨識中會送一則空的 `{}`，backend 把沒有 `status` 的訊息當成失敗，整條連線斷掉、前台退回批次。現在沒有 `status` 的訊息當心跳略過，只有明確不是 `success` 才算失敗。
+
+- **[2026-10-06]** **R2T2 串流把西文、日文、韓文都當中文解碼**：握手的 `language` 寫死 `Chinese`，R2T2 不會自己判斷語言，西文「bomba」被聽成「炸彈」、日韓夾進中文字。現在照這條連線的分流帶語言：只有一種語言時帶 `English`／`Spanish`／`Japanese`／`Korean`／`Chinese`，多種語言時送 `zhen` 讓 R2T2 自己判斷。非中文的輸出不再做簡轉繁（會把日文「学校」改成「學校」）。實測五種語言各 3 句，指定語言全對。多語言專案含西日韓時仍要另外決定語言來源。
+
+- **[2026-10-06]** **R2T2 dev 引擎**：新增可授權的 `r2t2-dev`（批次）與 `r2t2-dev-live`（串流），設定 `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_STREAM_URL`、`ASR_R2T2_DEV_SECRET_KEY`。帳號自己選了才用，失敗不換台，也不排進其他引擎的備援順序；批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒），等不到交給下一家引擎。
+
+## [2026-10-05]
+
+### Added
+
+- **[2026-10-05]** **後台語音辨識分頁改成完整的測試台**：可以編輯專案詞表（`ASR_PROMPT.md`，顯示幾個詞、幾條誤聽對照）；勾語言分流；批次試辨識一次勾多個引擎、同一段音檔同時送出比較，輸入有 VAD 收音（講完一句自動送出，可連續講）與上傳，顯示實際引擎、耗時、套用的分流與詞表、台語判斷，填參考文字就算錯字率（跟 voice_e2e 同算法），最近 5 段可回放；新增串流試聽，邊講邊出字。後端：`/api/v1/asr/preview` 多收 `project_id`、`language_routes`，跟正式對話一樣套詞表與台語判斷（引擎照選的跑），回傳 `glossary`、`language_check`、`language_routes`；`/api/v1/asr/stream` 多一個只有管理員能用的 `engine` 參數。原本錄音鈕用到不存在的 `btn-secondary` 樣式，一起改掉。
+
+### Changed
+
 - **[2026-10-05]** 新增 `scripts/experiments/product-notes/`：AI 產生 Obsidian 式產品筆記能不能改善跨產品選型問答。比現行檢索（A）、加最相近 3 篇筆記（B）、再加 frontmatter 篩選工具（C）。第一輪 EUS（型錄沒有逐型號規格）10 題：A 5／3／2、B 9／1／0、C 9／1／0（對／部分對／錯）；第二輪 EUB-M＋EDW 完整規格表 12 題：A 2／1／9、B 2／4／6、C 11／1／0。C 看得到全部規格、B 只有 3 篇，進步還不能全歸功於篩選；筆記數字 0 錯但正文有語意與出處錯誤，不能直接入庫。資料夾整理成單一 `README.md`／`TASK.md`／`REPORT.md`，各輪資料放 `round1/`、`round2/`。只動實驗目錄，正式程式與知識庫未變。
+
 - **[2026-10-05]** `docs/plans/thin-entry-refactor.md`、`docs/plans/r2t2-streaming-asr.md` 標為 Done（已提交並部署，使用者授權結案）；`full-duplex-voice.md` 改為進行中，並列入 `docs/README.md`。
+
+- **[2026-10-05]** **後台試辨識不用重傳、也能比串流和瀏覽器辨識**：音檔留在頁面上，之後再勾的引擎直接拿畫面上的幾段（最多 5 段）去跑，取消勾選只是隱藏、勾回來不重跑；每段有「重跑」，改了分流或詞表可以用同一段再比。Gemini Live、R2T2 串流也能勾：同一段音檔照真實速度送進 `/api/v1/asr/stream` 取定稿，秒數是講完到定稿（4 倍速送時文字一樣，但 R2T2 要追積壓、時間多 2～4 秒，所以不加速）。瀏覽器內建辨識只能聽麥克風，按「開始講話」時跟 VAD 一起聽，每段歸給 VAD 切出的那一句；上傳的音檔與重跑時標示不能用。`GET /api/v1/asr/engines` 多回 `stream`（設定齊全的串流引擎）。
+
+- **[2026-10-05]** **後台語音頁搬到 `/admin/voice`**：TTS 試聽 `/admin/voice`、語音辨識 `/admin/voice/asr`（原本語音辨識掛在 `/admin/tts/asr` 底下）。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址；內部頁籤 key 由 `Tts` 改為 `Voice`。
+
+- **[2026-10-05]** **後台試辨識同時送給勾選的引擎**：原本一家一家依序送，最慢的那家要等前面都回來才開始。每家是不同機器，一家各送一句不會互相排隊，耗時照舊由後端各自量。收音一律走 VAD（講完一句自動送出，可以連續講），拿掉「錄一段」與另外的「自動斷句」開關；上傳音檔保留。
+
+- **[2026-10-05]** **後台試辨識只列設定齊全的引擎**：新增管理員用的 `GET /api/v1/asr/engines`（`{"engines": [...]}`，照 fallback 順序），沒設定網址或金鑰的引擎（例如已停用的小米）不再出現；原本選了會被備援接走，看起來像它辨識的。
+
+- **[2026-10-05]** **共用 VAD 移除 `per-utterance` 模式與 `commitMode` 選項**：原本給前台用（講完一句就關麥克風），前台改連續收音後已沒有呼叫端。`VadRecognizer`／`createSpeechController` 一律連續收音，雜音轉不出字時安靜略過；admin 三個呼叫端拿掉 `commitMode: "continuous"`。
+
+- **[2026-10-05]** Brain `SessionStore` 寫入訊息、偵測語言、裁掉舊訊息抽成共用函式，`append_message` 與合併回合的 `accept_chat_turn` 不再各寫一份。
+
+### Fixed
+
+- **[2026-10-05]** **工業示範專案（開發） 檢索時沒有圖譜擴充**：`scripts/project_mirror.py sync` 只複製了 `graphify-out/` 檔案，檢索用的 LanceDB `note_graph` 表沒帶過去，測試專案的檢索跟正式不一樣。現在 `sync` 一併複製、`check` 一併比對（差異顯示為 `lancedb:note_graph`）；工業示範專案（開發） 已重新同步。
+
+- **[2026-10-05]** R2T2 串流實驗腳本 `scripts/experiments/r2t2/stream.py` 改讀 `.env` 的 `ASR_R2T2_SECRET_KEY`，跟正式設定同一個來源，不再在腳本裡另寫一份。
+
+- **[2026-10-05]** **voice_e2e 跑完沒有刪掉測試對話**：刪對話要專案的編輯權限，測試帳號 example-user 只有讀取，`/api/v1/sessions/batch-delete` 一直被 Backend 回 404，對話留在工業示範專案（開發）。用 `--user` 跑時改在 api 容器裡刪（跟簽 token 一樣進容器），`--token` 打遠端時照舊走 API。
+
+- **[2026-10-05]** **VoxCPM 推論 worker 死掉時，每句都等 120 秒才退到 Edge**：VoxCPM 的 health 照回 ok，openVman 每次合成都等滿 120 秒逾時才退到 Edge（2026-10-01 持續約 7 小時）。現在 VoxCPM adapter 合成前先查 `/api/v1/health`（最多等 2 秒、結果快取 10 秒），回 503 或連不上就立刻失敗退到下一家；health 沒有 worker 欄位時回 200 就照常合成。
+
+## [2026-10-02]
+
+### Added
+
+- **[2026-10-02]** 講話中插話的分類端點（預設不用）：新增登入保護的 `POST /api/v1/voice/interrupt`（`{transcript, reply_text}` → `{action: "STOP" | "IGNORE"}`），先丟掉完整出現在回答裡的文字（當成喇叭回音），再交給既有 GuardAgent／Jev 判斷。前台串流辨識接好了，但開關 `INTERRUPT_WHILE_SPEAKING`（`useAvatarVoiceInput.ts`）預設關：回音過濾只擋完全相同的文字，辨識錯一個字就擋不住，現場喇叭與麥克風的回音消除還沒實測，開了可能讓虛擬人自己打斷自己。虛擬人出聲時所有引擎照舊停止收音。
+
+- **[2026-10-02]** **虛擬人還在想時可以補一句，兩句一起回答**：前台麥克風原本在虛擬人「思考中」就關掉，補的那句收不到；就算收到，也會取消前一句、只答後一句。現在麥克風只在虛擬人出聲（合成聲音、播放、字幕還在跑）時關；思考中（回答還沒回來）再講或再打一句，前台中止還在等的請求，把兩句用換行接起來重送一次，對話裡也只留一則合併後的使用者訊息。回答一到就不再合併，之後講的話照舊當新的一輪。快速問答帶著出處，不參與合併。Breeze（台語分流）用的 VAD 從「講完一句就關麥克風」改成連續收音，跟串流辨識一樣在虛擬人出聲時暫停、講完自動恢復；瀏覽器內建辨識一次只收一句，不支援補一句。延遲量測多一種 `outcome: "merged"`（被合併的前一輪，不算失敗），Backend `/api/v1/metrics/turn` 一併接受。講話中插話（階段 B）尚未實作，見 `docs/plans/full-duplex-voice.md`。
+
+- **[2026-10-02]** **回答長度改成每個專案自己填秒數**：後台知識庫的「分流」設定多一欄「回答長度上限（秒）」，旁邊即時換算成各語言字數（20 秒＝中日韓約 80 字、英西約 30 個單字；語速由 Brain 的 `speech_rates` 提供，前後端不各寫一份）。預設 20 秒，填 0 不加長度規則。上午的 80 字上限原本套在所有專案，ESG 要照抄完整 QA 答案也被要求縮短；現在 ESG 設 0，元復醫院、釣魚的人設本來就寫 40 字，設 10 秒讓兩邊一致。Brain `GET/PUT /brain/knowledge/settings` 多 `reply_seconds`（PUT 不帶就保留原值）與唯讀的 `speech_rates`。
+
+- **[2026-10-02]** **測試專案鏡像（`scripts/project_mirror.py`）**：語音模擬與提示詞實驗改在「工業示範專案（開發）」跑，測試對話與每日記憶摘要才不會寫進正式工業示範專案。`check` 比對兩邊的知識庫、原始資料、詞表、人設、文件設定與語言分流，不一樣就 exit 1；`sync` 由正式複製到測試專案（先備份、沿用正式專案的知識圖譜、重建索引）。`scripts/voice_e2e/run.py` 的 `--project` 是測試專案時會先檢查，不一致就停下。voice_e2e README 補上「會寫進專案每日記憶摘要」這項副作用（原本誤寫為不會）。工業示範專案題庫 `industrial.json` 改成預設跑在工業示範專案（開發），測試帳號 `example-user` 的專案權限也從工業示範專案換成工業示範專案（開發）。
+
+### Changed
+
 - **[2026-10-02]** 新增 `docs/plans/full-duplex-voice.md`（Draft）：語音對話不再一問一答的評估。現況是虛擬人思考與講話時麥克風寫死關閉、新的一句取代舊的；計畫分兩階段：思考中補一句合併回答（含 Brain 接收確認後落庫），講話中插話（需先在現場實測瀏覽器回音消除）。
+
+- **[2026-10-02]** **語音打斷改由 Jev 判斷規則判不出的長句（預設開）**：`JEV_INTERRUPT_ENABLED` 預設改 true。自寫 30 題規則 23/30、Jev 29/30，附和、對旁人說話不再誤停；只有規則判不出的那段長句多等最多 0.6 秒，沒有 `TYPESAFE_API_KEY`、失敗或逾時都維持中斷。
+
+- **[2026-10-02]** **移除 A2A 的 Jev 預先過濾**：`A2A_JEV_PREFILTER_ENABLED`、`A2A_JEV_NO_REPLY_THRESHOLD` 刪掉；正式環境 A2A 沒開（佇列資料庫從未建立），預先過濾也從未啟用。A2A 本身不變，要不要回仍由 Brain 決定。
+
+- **[2026-10-02]** **Jev 每次呼叫都記進用量**：記憶寫入把關、語言背景校正、串流定稿判斷、召回篩選共用的 `core/jev_client.jev_nouls` 每次呼叫（成功、失敗、逾時都算）記一筆 `provider=typesafe`、`kind=jev_<用途>`，附 token 數與 `raw.status`。原本只有影子觀測會記，正式環境又看不到 info log，數不出各功能每天打幾次。
+
+- **[2026-10-02]** **移除 Jev 影子觀測與知識庫段落 Jev 篩選**：兩者預設關閉、正式環境從未開啟，影子還會把對話送到外部。刪掉 `core/jev_shadow.py`、`_jev_screen` 與 `JEV_SHADOW_ENABLED`／`_SAMPLE_RATE`／`_TIMEOUT_SECONDS`／`_COOLDOWN_SECONDS`／`_DAILY_CALL_CAP`、`RAG_JEV_SCREEN_ENABLED`／`_EVIDENCE_THRESHOLD`／`_INJECTION_THRESHOLD`。Jev 網址改名 `JEV_BASE_URL`（舊名 `JEV_SHADOW_BASE_URL` 照讀）。
+
+- **[2026-10-02]** **回答長度改成硬上限，拿掉「要詳細規格可以更長」的例外**：上一版「約 N 字為原則，要詳細規格或一次問好幾件事時最多約 40 秒」上線後實測工業示範專案同一批 36 題，中文中位 79 字、超過 80 字 5/12，英西超過 30 個單字 6–7/12，模型常拿例外當理由寫長。改成 jtai 的寫法「每次回覆嚴格不超過 N 字，超過即違規，寧可精簡也不可超過；一次問好幾件事時每件只講重點」（中日韓 80 字、英西 30 個單字），同一批題目中文中位 49 字、超過 1/12，英文超過 2/12、西文 0/12。只改提示詞，不截斷回答。
+
+### Fixed
+
+- **[2026-10-02]** **合併補句時舊回答可能仍寫入 Brain**：可合併 HTTP 回合加入 `turn_id`／遞增 `turn_revision`，答案先暫存，前台完整接收目前版本後透過 `/api/v1/chat/accept` 確認，才原子寫入問題與回答並執行日誌／記憶更新。取消、被取代或未接收的答案不落庫；確認重試不重複寫入，下一輪等待上一輪確認以保留完整歷史。後台 Chat、外部 SDK 與未提供回合欄位的 API 維持既有流程。
+
+- **[2026-10-02]** **`/api/v1/tts/stream` 指定 Edge 卻回 200 空音檔**：只要設了 IndexTTS 網址，這個端點不管指定哪家都先送 IndexTTS；IndexTTS 沒在跑時連上就斷，回空音檔。現在只有沒指定或指定 IndexTTS 才走它，VoxCPM 失敗也直接退到 Edge。前台 Edge 聲音本來走整段合成，不受影響；voice_e2e 的念回答步驟被影響。voice_e2e 念回答的秒數原本把回應當 wav 算，Edge 回 mp3 時記成 0，改用 ffprobe 讀實際長度。
+
+- **[2026-10-02]** **一次問好幾件事時，英文提問被用中文回答、逐條列出查不到的項目，念到 50 秒**：fast 模式模型想再查資料被擋下時，程式補一句中文催促「手邊資料沒有的內容就說明查不到」，這句是模型最後讀到的話，蓋過了 system prompt 的回答語言與長度。現在催促訊息改成「查不到的部分合併成一句帶過，不要逐項說明」，後面再附一次這一輪的回答語言與長度。工業示範專案（開發） 同一批 36 題：英文最長 63 → 29 個單字、超過上限 1/12 → 0/12，Markdown 列點 1 → 0 題。
+
+- **[2026-10-02]** **「¿Quién eres?」這類短西語問句被用中文回答**：兩個字以下的句子歸專案主要語言，但 ¿、¡、ñ 只有西語會用；現在有這些符號就判成西語。
+
+## [2026-10-01]
+
+### Changed
+
+- **[2026-10-01]** **回答長度改用「念多久」限制，中文也一起管**：原本只有英西有「約 40 個單字」，中文沒有上限；實測工業示範專案同一批問題中英西回答中位數都要念 16–18 秒，一次問好幾件事的題目念到 35–46 秒。現在每種語言都寫「以 20 秒內念完為原則，要詳細規格或一次問好幾件事時最多約 40 秒」，再依實測語速換成字數（VoxCPM 一般中文句每秒 3.1 字、Edge 4.7 字，取 4 字；英西每秒約 1.5 詞）：中日韓約 80／160 字、英西約 30／60 個單字。同一題中英西念的秒數差不到一成，西語念得久是寫得長、不是語速慢。
+
+- **[2026-10-01]** 入口與大型模組依職責拆分：前台 `App.vue` 僅組裝畫面與 composables；Backend `main.py` 將 TTS／ASR／文件端點、OpenAPI、監控與生命週期委派至對應模組；Brain `main.py` 委派啟動預熱及 HTTP 監控，Gemini Live 將傳輸、訊息編碼及工具執行與會話分開。維持既有 API、授權、串流及備援行為，加入入口邊界及自有正式程式千行上限檢查。
+
+### Fixed
+
+- **[2026-10-01]** **部署時 Brain 重啟那半分鐘，台語分流被默默關掉**：Backend 查不到專案語言分流就退回「只有中文」，那段時間講台語都被當華語。現在查不到時沿用上次查到的設定（即使快取已過期）；只有從沒查到過的專案才退回中文。
+
+- **[2026-10-01]** **簡轉繁出現「着」「裏」「爲」這類台灣不用的字形**：OpenCC 從 `s2t` 改成 `s2tw`（台灣標準字形），「自動着脫裝置」變成「自動著脫裝置」；不用 `s2twp`，它會把「軟件」這類詞改成台灣說法，等於改寫使用者講的話。影響小米、R2T2 的辨識結果與文件匯入。
+
+- **[2026-10-01]** **快速問答選了英文、西語，按鈕還是中文；後台隱藏的主題前台照樣顯示**：介面文字（返回、關閉、載入中、空分類）改成跟著路徑上的語言分類（中文／English／Español，也認日本語、한국어）切換，還沒選語言時用中文；前台每一層都略過後台設成隱藏的主題。
+
+- **[2026-10-01]** **停用的知識文件仍會經由知識圖譜被帶回答案**：向量檢索會略過後台停用的文件，但知識圖譜擴充直接按路徑抓相鄰文件的段落，沒有檢查是否停用。工業示範專案把英西問答改成快速問答後停用了原本的 `EVAK_QA.en.md`／`.es.md`，英文、西語提問的引用來源仍出現這兩份。現在圖譜擴充也略過停用的文件。
+
+## [2026-09-30]
+
+### Added
+
+- **[2026-09-30]** **語音對話模擬（`scripts/voice_e2e/`）**：不用對著前台講話，也能測完整的一輪語音對話。腳本用系統自己的 TTS（edge-tts、VoxCPM 等）念題目，或讀真人錄音，照前台的節奏送進串流辨識（`/api/v1/asr/stream`，每 0.1 秒 3200 bytes）與批次辨識（`/api/v1/asr/transcribe`），再問 `/api/v1/chat`，也可以用 `/api/v1/tts/stream` 念出回答；每一輪記錄錯字率、專有名詞有沒有聽對、回答有沒有講到預期的字，以及各段耗時。`--user` 在 backend 容器裡替帳號簽短效 token，不用存密碼；可以混入雜訊；跑完刪掉建立的對話。題庫在 `scripts/voice_e2e/cases/`：工業示範專案 10 題（合成語音）、台語連續劇真人錄音 75 句（批次辨識＋台語判斷；一次一句 69/75 判成台語，同時 3 句則全部超過 2.5 秒逾時），打分與題庫格式有單元測試（`tests/test_voice_e2e.py`）。
+
+- **[2026-09-30]** **專案詞表也帶給 Breeze 與 OpenAI 辨識**：Breeze-ASR-360 1.4 起 `/transcribe` 多了選填的 `prompt` 欄位（Whisper 前文；gb10 那邊實測 12 句含「污泥泵」「DIVA」「沉水泵」「EUBL」「泵浦」的合成音 12 句修正，台語 40 句回歸沒有硬塞詞表的字，延遲 +0.01 秒）。Backend 語音辨識前向 Brain 新的內部端點 `GET /brain/internal/asr-glossary` 取專案詞表（快取 60 秒），帶給 Breeze 與 OpenAI（gpt-4o-mini-transcribe 的 `prompt`）；Xiaomi、SenseVoice、Gemini Live 不吃提示詞，照舊。只帶正確的詞：`ASR_PROMPT.md` 裡「常見誤聽：A→B」這類對照行只給對話模型看，送給辨識引擎會把錯字也教給它。同一專案每次送同一串字，Breeze 才能併批。
+
+- **[2026-09-30]** **專案詞表幫 Brain 對回語音誤聽**：Gemini Live 辨識會把「沉水泵」聽成「沉睡泵」、「DIVA」聽成「低瓦」，而轉錄模型不吃背景知識（實測 `systemInstruction` 給不給結果一字不差）。Brain 每輪對話提示多一段：訊息可能是語音辨識結果、這個專案的專有名詞有哪些（讀專案 workspace 的 `ASR_PROMPT.md`，原本給 Whisper 的詞庫，2026-07 起沒人讀）；模型在理解問題與寫知識庫查詢時自己對回，不多一次模型呼叫。工業示範專案實測：「低瓦有攪拌器嗎」從答非所問變成答對；詞表加「常見誤聽：UNI本→污泥泵」這類對照後，原本修不回的三句都答對；「奔騰電腦」這類無關問題不被帶偏（`scripts/experiments/asr-glossary/`）。畫面上的使用者文字仍是原本辨識的結果。
+
+- **[2026-09-30]** **語言分流可以選日文、韓文**：後台知識庫的分流、文件語言、對話紀錄篩選與備份、前台語言開關都多了日本語、한국어。使用者訊息有假名就是日文、有諺文就是韓文（依比例判斷，中文句子夾一個日文品牌不會整句變日文），不再一律算中文；日韓不送 Jev 校正（Jev 只問中英西，會被校回中文）。每輪的回答語言提示多了日本語、한국어，長度比照中文 2 到 3 句。Gemini Live 辨識的語言提示對應 ja-JP、ko-KR。實測（合成語音，`scripts/experiments/ja-ko/`）：串流辨識日韓字錯率 4% 以內；用日韓文問工業示範專案型錄 8 題全查到；Jev 判斷定稿 7 組對 5 組、沒有改錯。TTS 實測：Gemini TTS 與 Edge-TTS 的日韓聲音念得完全正確，VoxCPM 可念但有錯字，CosyVoice 較差，IndexTTS 不能念日韓；中文與韓文可以同時勾。
+
+### Changed
+
 - **[2026-09-30]** 供應鏈報告恢復 Azure、D-ID、HeyGen 真人方案說明，保留遠端算圖與費用差異；依本次調查補充 MatesX／DHLiveMini2 最符合目前真人效果、本地運算與成本需求的結論。
 
 - **[2026-09-30]** 供應鏈報告全文改用直接中文，真人比較表只列候選方案，分開列出「建立人物需要的素材」與「說話時怎麼對嘴」。
@@ -743,118 +1276,92 @@
 - **[2026-09-30]** 供應鏈報告將 DHLiveMini2 列為真人 Avatar 核心替換 P0；修正 three-vrm 的功能等效判斷，新增真人串流／自架商業與寫實 3D 路線比較，保留外部 TTS、素材重建與部署驗收邊界。
 
 - **[2026-09-30]** 補齊後台 Canonical Routes 與子頁直達、網址正規化與部署行為說明，更新前端規格中的早期路由描述。
+
 - **[2026-09-30]** 新增前台費茨法則評估與紅色供應鏈替代方案調查；本次維持前台與供應鏈程式碼現狀。
 
-### Reliability
-
-- **[2026-10-06]** **R2T2 dev 引擎**：新增可授權的 `r2t2-dev`（批次）與 `r2t2-dev-live`（串流），設定 `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_STREAM_URL`、`ASR_R2T2_DEV_SECRET_KEY`。帳號自己選了才用，失敗不換台，也不排進其他引擎的備援順序；批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒），等不到交給下一家引擎。
-- **[2026-10-05]** **VoxCPM 推論 worker 死掉時，每句都等 120 秒才退到 Edge**：VoxCPM 的 health 照回 ok，openVman 每次合成都等滿 120 秒逾時才退到 Edge（2026-10-01 持續約 7 小時）。現在 VoxCPM adapter 合成前先查 `/api/v1/health`（最多等 2 秒、結果快取 10 秒），回 503 或連不上就立刻失敗退到下一家；health 沒有 worker 欄位時回 200 就照常合成。
-- **[2026-09-30]** 專案詞表缺失、讀取失敗或編碼錯誤時不再中斷對話；快取改用奈秒時間、大小與檔案身分，提示以跳脫的 `<glossary>` 標記為參考資料。
-- **[2026-09-30]** 串流辨識啟動加入世代隔離與 ready 逾時；停止期間才取得的麥克風立即釋放，重複啟動共用同一次收音。停止後最多保留 5 秒接最後定稿，重新啟動或卸載會清理舊連線。
-- **[2026-09-30]** 回應攜帶自身語言上下文，獨立視覺回答不再繼承上一句台語的 VoxCPM 分流；補上華語、打字及過期回應的行為測試。
-- **[2026-09-30]** 後端 ASR 串流離開前等待雙向工作取消完成，接收工作例外會回報前端以啟動備援。
-- **[2026-09-30]** 修正檢索門檻實驗的結論邊界，補回語音授權與 VAD 部署限制。
-
-### Changed
-
-- **[2026-10-12]** **鏡頭判讀改問 Clef，VLM 退居備援**：攝影機每秒一幀（text 模式 `POST /api/v1/vision/describe` 與 Live 的 `client_video_frame` 共用），原本要 VLM 輸出 JSON 再解析，正式環境沒開 VLM 所以鏡頭按鈕從未出現。現在把畫面以 data URL 放進 Clef 的 `images`，每個視覺事件（`vision_events.EVENT_DEFINITIONS`：訪客正臉、火焰濃煙）一題 `noul`，機率 ≥ 0.5 算成立，觸發規則不變（連續 3 幀觸發、5 幀解除）。Clef 失敗或逾時且有設定 VLM 時改問 VLM，兩者都沒有就當這幀沒有事件。`GET /api/v1/vision/health` 先探 Clef 的 `/health`，不通才看 VLM；backend 健康頁多一項 `vision-clef`。設定 `VISION_CLEF_URL`（預設 `https://decision-primary.example.com/v1/systemone`，留空只用 VLM）、`VISION_CLEF_MODEL`（`clef-flash`）、`VISION_CLEF_TIMEOUT_SECONDS`（5 秒；第一次收圖曾花 16 秒），金鑰沿用 `CLEF_API_KEY`。2026-10-09 以 33 張 640×480 照片各跑 3 輪：Clef 每張 p50 410 ms、抓到訪客 15/18、誤報 0/63、火焰 6/6；OpenAI Decisions 276 ms 但訪客只抓到 9/18；Gemini flash-lite VLM 18/18 但每張 1.3 秒，跟不上每秒一幀。Clef 單卡每秒約處理 3 張畫面，每輪對話決策共用同一張卡：1 台機台開鏡頭時決策 p50 355 ms，2 台 532 ms，4 台起超過每站 0.6 秒時限、改由 Jev 回答。
-- **[2026-10-12]** **需要知識庫的回合先查再叫 LLM**：每輪決策高信心判定 `needs_knowledge=True`、且不必同時強制上網或查記憶時，Brain 在第一次 LLM 呼叫前自己跑 `search_knowledge`（同一個工具實作；查詢是原句，加上「上一句問題＋這一句」一條，讓「那它的揚程呢？」查得到上一句的型號），結果以已完成的工具呼叫放進對話，省掉只產生工具呼叫的那一次（約 1.2 秒）。第一次呼叫不強制工具、不再給 `search_knowledge`，選型題在這一輪叫 `filter_products`；fast 模式仍是最多一輪模型自選的工具。伺服器補的工具呼叫帶 Gemini 的 thought_signature 略過值，否則 Gemini 3 回 400、換下一站多等約 2.7 秒。規格表的系統提示規則補「對話裡已有 `search_knowledge` 結果時只叫 `filter_products`」。`CHAT_PREFETCH_KNOWLEDGE_SEARCH`（預設開）可關閉；判定為否或不確定時流程不變，Live 不受影響。工業示範專案（開發） fast 改前／改後各 3 次：追問與換題 8 題每輪 LLM 2.0 → 1.25 次、p50 3.4 → 2.4 秒，正確數相同；20 題每輪 2.12 → 1.87 次、p50 4.15 → 4.16 秒（選型題仍要篩選＋作答兩次），正確 23 → 23、錯 13 → 8。模型仍叫已收回的 `search_knowledge` 時，原本提示「直接以文字回答」並算掉 fast 唯一的工具輪，選型題沒篩選就答錯（69 輪 2 次）；改成提示「已查過，要篩選就叫 `filter_products`」且這一輪不算（只一次），修正前後各 3 次匿名評分：20 題錯 29 → 26、追問部分對 2 → 0。結果在 `docs/plans/turn-latency.md` 第 2 項。
-- **[2026-10-09]** **系統提示改成固定內容在前**：Gemini 隱式快取只認完全相同的開頭，近 3 天只有 25% 輸入 tokens 命中（36 萬／142 萬）。原本 REQUEST CONTEXT（trace_id、精確到秒的時間）夾在人設與回答規則之間、自動回憶插在人設前面；現在回答規則與詞表移到人設後面，自動回憶、REQUEST CONTEXT、對話摘要、回答語言、語氣與檢索提示放最後。正式工業示範專案兩個不同問題的系統提示相同開頭從 79% 提高到 96%；新增測試檢查每輪內容不會插到固定內容之前。
-- **[2026-10-07]** Embedding gateway 的 `POST /embed` 多收 `input_type: "search_query"`：EmbeddingGemma 用「task: search result | query: 」前綴，identity 的 input_semantics 是 `search_query`，文件端不變。jtai 的 85 題口語改寫題用這個前綴前 5 名命中 80，question answering 前綴 75（BGE 83）；openVman 自己的資料仍是 question answering 較好，Brain 照舊送 `query`。
-- **[2026-10-07]** **Embedding 環境變數精簡**：模型、revision、批次大小、雲端 embedding 的模型與網址等預設值只寫在程式（`brain/embedding/app.py`、`brain/api/config.py`），compose 不再重複列一份（embedding 服務只傳 Bearer token 與雲端 API key，api 只留 token 的預設串接），`.env.example` 只留 `EMBEDDING_ACTIVE_VERSION`、`EMBEDDING_THRESHOLDS`。好處是預設值改了，watchtower 換 image 就生效，不必重建容器才吃到新的環境變數。Gateway 的 `EMBEDDING_BATCH_SIZE` 程式預設改成正式在用的 8，`EMBEDDING_PROVIDER_FALLBACKS` 程式預設含 `gemma`；EmbeddingGemma 固定 768 維，拿掉截短選項。
-- **[2026-10-07]** **Embedding 預設改用 EmbeddingGemma 2，取代 BGE-M3**：因供應鏈政策要移除 BAAI 的 bge-m3，換成 Google 的 `google/embeddinggemma-2`（Apache 2.0，768 維，revision 釘在 `914f7f89…`）。工業示範專案實測打平：正式檢索路徑跨語言 47/48（BGE 46/48）、選型題前 5 段涵蓋應列型號 47%（23%）、語音辨識打錯字的查詢 25 對 25；89 題實際問答盲測 16 勝 16 負 57 平，回應時間相同（`scripts/experiments/embeddinggemma2/`）。
-  - Embedding gateway 新增 `gemma` 提供者（sentence-transformers、bf16；查詢加 question answering 前綴、文件加標題），`POST /embed` 多收選填的 `titles`（跟 `texts` 等長）；呼叫端給 `acceptable_identities` 時照呼叫端的順序挑（原本照 gateway 的 fallback 順序，BGE 在前會搶走 Gemma）。`EMBEDDING_PROVIDER_FALLBACKS` 預設 `bge,gemma,…`：沒指定 identity 的呼叫端（共用端點的其他 stack）仍拿到 BGE。新增 `EMBEDDING_GEMMA_MODEL`／`_REVISION`（固定 768 維）；transformers 升到 5.19（huggingface_hub 跟著升到 1.33）、加 `sentence-transformers[image]` 6.1。Gateway 啟動時一律在背景載入模型並預熱：EmbeddingGemma 從磁碟載入要幾十秒，原本只靠 compose healthcheck 觸發，沒有 healthcheck 時第一個請求會逾時；`EMBEDDING_GEMMA_REVISION` 的程式預設也釘在 `914f7f89…`，不再靠 compose 補。
-  - Brain `EMBEDDING_ACTIVE_VERSION` 預設 `gemma`，版本順序 `gemma,bge,…`。新版本寫進另一組資料表（`knowledge__gemma`、`memories__gemma`），BGE 的表不動；新表建好前查詢自動退回 BGE。上線後執行 `python -m scripts.migrate_embedding_version --from bge`：每個專案重建知識庫索引、長期記憶逐筆用新模型重算後寫入新表（記憶沒有原始檔可以重建）。知識庫索引時把檔名當標題送給 gateway。
-- **[2026-10-07]** **向量門檻統一寫成 cosine 相似度，每個 embedding 版本一組**：原本有的寫 LanceDB 距離（`RAG_DISTANCE_CUTOFF` 1.0、`RAG_FTS_DISTANCE_CUTOFF` 1.1、`RAG_MEMORY_DISTANCE_BONUS`）、有的寫 cosine（`RAG_DEDUP_SIMILARITY_THRESHOLD`、`MEMORY_MERGE_SIMILARITY_THRESHOLD`、`CHUNK_SEMANTIC_THRESHOLD`、`WEB_SEARCH_MIN_RELEVANCE`／`_RELEVANCE_RATIO`），夢境整理寫「1 − 距離」（`DREAMING_SIMILARITY_THRESHOLD`），換模型時同一個數字意思完全不同（工業示範專案段落兩兩相似度中位數 BGE 0.50、Gemma 0.74）。這些設定全部拿掉，改成 `memory/thresholds.py` 的一張表、可用 `EMBEDDING_THRESHOLDS`（JSON，依版本覆寫）調整；BGE 的值是原設定的換算（行為不變），Gemma 的檢索門檻在正式檢索路徑實測校正（0.68、FTS 0.63），去重、合併、切段與網路結果重排以 BGE 門檻在同一批資料上的分位數換算。查詢退回另一個版本的索引時用那個版本的門檻。`search_records` 的 `distance_cutoff` 參數改為 `min_similarity`。
-- **[2026-10-07]** embedding gateway 的測試從 worktree 跑時會 import 到外層主目錄的程式（`conftest.py` 把上層目錄由近到遠插到 `sys.path` 最前面，最外層反而排第一），改成最近的上層優先。
-- **[2026-10-06]** **Gemini 串流辨識帶專案詞表**：連線時把專案 `ASR_PROMPT.md` 的正確詞逐詞放進 `inputAudioTranscription.customVocabulary`（最多 100 個；Brain `/brain/internal/asr-glossary` 多回 `vocabulary` 逐詞清單，以頓號、逗號、分號或換行分詞，含空白的詞如「DIVA PRO」算一個）。工業示範專案 20 句×4 種合成聲音×有無雜訊共 160 句，直接打 Gemini 比較：專有名詞命中率 31% → 87%、字錯率 0.39 → 0.19，定稿延遲不變；逐句比 113 句變好、9 句變差（變差的多是原本就整句聽錯，詞表詞被塞進去）。`mode: SMART` 在合成語音上沒有差別，沒有開。後台詞表說明改成這個分詞規則，不再寫 Gemini 不吃詞表。
-- **[2026-10-06]** 管理員資源上限端點（`GET`／`PUT /api/v1/users/{user_id}/scope`）與其 models 從 `backend/app/auth/routes.py` 搬到 `admin_scope_routes.py`，掛在同一個 `users_router`、路徑不變：展示機台的改動讓 `routes.py` 超過 1000 行，Contracts CI 的檔案大小檢查失敗。
-- **[2026-10-05]** **後台試辨識不用重傳、也能比串流和瀏覽器辨識**：音檔留在頁面上，之後再勾的引擎直接拿畫面上的幾段（最多 5 段）去跑，取消勾選只是隱藏、勾回來不重跑；每段有「重跑」，改了分流或詞表可以用同一段再比。Gemini Live、R2T2 串流也能勾：同一段音檔照真實速度送進 `/api/v1/asr/stream` 取定稿，秒數是講完到定稿（4 倍速送時文字一樣，但 R2T2 要追積壓、時間多 2～4 秒，所以不加速）。瀏覽器內建辨識只能聽麥克風，按「開始講話」時跟 VAD 一起聽，每段歸給 VAD 切出的那一句；上傳的音檔與重跑時標示不能用。`GET /api/v1/asr/engines` 多回 `stream`（設定齊全的串流引擎）。
-- **[2026-10-06]** **R2T2 主機與 dev 機對調**：`r2t2`／`r2t2-live` 與 `r2t2-dev`／`r2t2-dev-live` 對應的機器互換，只改部署設定（`ASR_R2T2_*`、`ASR_R2T2_DEV_*`）。引擎 id 與授權不變，已授權 `r2t2-live` 的帳號（含 80 個臨時帳號）之後都送新的主機。後台與前台的引擎說明、`.env.example`、README、Backend 規格與實驗腳本的變數對應一起改。
-- **[2026-10-05]** **後台語音頁搬到 `/admin/voice`**：TTS 試聽 `/admin/voice`、語音辨識 `/admin/voice/asr`（原本語音辨識掛在 `/admin/tts/asr` 底下）。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址；內部頁籤 key 由 `Tts` 改為 `Voice`。
-- **[2026-10-05]** **後台試辨識同時送給勾選的引擎**：原本一家一家依序送，最慢的那家要等前面都回來才開始。每家是不同機器，一家各送一句不會互相排隊，耗時照舊由後端各自量。收音一律走 VAD（講完一句自動送出，可以連續講），拿掉「錄一段」與另外的「自動斷句」開關；上傳音檔保留。
-- **[2026-10-05]** **後台試辨識只列設定齊全的引擎**：新增管理員用的 `GET /api/v1/asr/engines`（`{"engines": [...]}`，照 fallback 順序），沒設定網址或金鑰的引擎（例如已停用的小米）不再出現；原本選了會被備援接走，看起來像它辨識的。
-- **[2026-10-05]** **共用 VAD 移除 `per-utterance` 模式與 `commitMode` 選項**：原本給前台用（講完一句就關麥克風），前台改連續收音後已沒有呼叫端。`VadRecognizer`／`createSpeechController` 一律連續收音，雜音轉不出字時安靜略過；admin 三個呼叫端拿掉 `commitMode: "continuous"`。
-- **[2026-10-05]** Brain `SessionStore` 寫入訊息、偵測語言、裁掉舊訊息抽成共用函式，`append_message` 與合併回合的 `accept_chat_turn` 不再各寫一份。
-- **[2026-10-02]** **語音打斷改由 Jev 判斷規則判不出的長句（預設開）**：`JEV_INTERRUPT_ENABLED` 預設改 true。自寫 30 題規則 23/30、Jev 29/30，附和、對旁人說話不再誤停；只有規則判不出的那段長句多等最多 0.6 秒，沒有 `TYPESAFE_API_KEY`、失敗或逾時都維持中斷。
-- **[2026-10-02]** **移除 A2A 的 Jev 預先過濾**：`A2A_JEV_PREFILTER_ENABLED`、`A2A_JEV_NO_REPLY_THRESHOLD` 刪掉；正式環境 A2A 沒開（佇列資料庫從未建立），預先過濾也從未啟用。A2A 本身不變，要不要回仍由 Brain 決定。
-- **[2026-10-02]** **Jev 每次呼叫都記進用量**：記憶寫入把關、語言背景校正、串流定稿判斷、召回篩選共用的 `core/jev_client.jev_nouls` 每次呼叫（成功、失敗、逾時都算）記一筆 `provider=typesafe`、`kind=jev_<用途>`，附 token 數與 `raw.status`。原本只有影子觀測會記，正式環境又看不到 info log，數不出各功能每天打幾次。
-- **[2026-10-02]** **移除 Jev 影子觀測與知識庫段落 Jev 篩選**：兩者預設關閉、正式環境從未開啟，影子還會把對話送到外部。刪掉 `core/jev_shadow.py`、`_jev_screen` 與 `JEV_SHADOW_ENABLED`／`_SAMPLE_RATE`／`_TIMEOUT_SECONDS`／`_COOLDOWN_SECONDS`／`_DAILY_CALL_CAP`、`RAG_JEV_SCREEN_ENABLED`／`_EVIDENCE_THRESHOLD`／`_INJECTION_THRESHOLD`。Jev 網址改名 `JEV_BASE_URL`（舊名 `JEV_SHADOW_BASE_URL` 照讀）。
-- **[2026-10-02]** **回答長度改成硬上限，拿掉「要詳細規格可以更長」的例外**：上一版「約 N 字為原則，要詳細規格或一次問好幾件事時最多約 40 秒」上線後實測工業示範專案同一批 36 題，中文中位 79 字、超過 80 字 5/12，英西超過 30 個單字 6–7/12，模型常拿例外當理由寫長。改成 jtai 的寫法「每次回覆嚴格不超過 N 字，超過即違規，寧可精簡也不可超過；一次問好幾件事時每件只講重點」（中日韓 80 字、英西 30 個單字），同一批題目中文中位 49 字、超過 1/12，英文超過 2/12、西文 0/12。只改提示詞，不截斷回答。
-- **[2026-10-01]** **回答長度改用「念多久」限制，中文也一起管**：原本只有英西有「約 40 個單字」，中文沒有上限；實測工業示範專案同一批問題中英西回答中位數都要念 16–18 秒，一次問好幾件事的題目念到 35–46 秒。現在每種語言都寫「以 20 秒內念完為原則，要詳細規格或一次問好幾件事時最多約 40 秒」，再依實測語速換成字數（VoxCPM 一般中文句每秒 3.1 字、Edge 4.7 字，取 4 字；英西每秒約 1.5 詞）：中日韓約 80／160 字、英西約 30／60 個單字。同一題中英西念的秒數差不到一成，西語念得久是寫得長、不是語速慢。
-- **[2026-10-01]** 入口與大型模組依職責拆分：前台 `App.vue` 僅組裝畫面與 composables；Backend `main.py` 將 TTS／ASR／文件端點、OpenAPI、監控與生命週期委派至對應模組；Brain `main.py` 委派啟動預熱及 HTTP 監控，Gemini Live 將傳輸、訊息編碼及工具執行與會話分開。維持既有 API、授權、串流及備援行為，加入入口邊界及自有正式程式千行上限檢查。
-
 - **[2026-09-30]** **連不上的 ASR 引擎自動暫停 60 秒**：小米 CocktailASR 那台（舊節點）停機後仍在備援順序裡，Breeze 一掛每句話都要先白等 3.3 秒連線失敗才換 SenseVoice。批次辨識現在遇到連線層失敗（`httpx.ConnectError`／`ConnectTimeout`、`openai.APIConnectionError`）就把那個引擎暫停 60 秒不排入，時間到由下一個請求再試；HTTP 錯誤碼不算（機器還活著）；全部都暫停時照樣全試。另外部署設定已停用小米：根目錄 `.env` 註解掉 `ASR_XIAOMI_URL`，使用者可自選的引擎拿掉 xiaomi。
+
 - **[2026-09-30]** **Brain 啟動時預熱台語判斷**：部署重啟後的第一句台語，Brain 判斷要 2.5 秒（之後約 1.2 秒），超過 Backend 的上限，被當成不是台語；每次 push 觸發 watchtower 重新部署都會碰到。多出來的是第一次載入 google-genai（1.2 秒）與建 client（0.17 秒）。背景預熱現在最先載入套件、建好共用 client、呼叫一次 `models.get`（不花 token，約 0.1 秒）。
+
 - **[2026-09-30]** **台語判斷回報結果與耗時**：批次辨識（`/api/v1/asr/transcribe`）在台語分流時多回 `language_check: {"result", "ms"}`，`result` 是語言代碼、`timeout` 或 `failed`。原本逾時和「判成華語」回應長得一樣（`language: null`），只能翻 log 數逾時，數錯過一次（見下一條）；語音模擬（`scripts/voice_e2e/`）的彙總表多了「判斷逾時」「判斷ms」兩欄。
+
 - **[2026-09-30]** **台語判斷少等 0.25–0.35 秒**：台語分流時，Breeze 轉寫約 1 秒就好，要等台語判斷（2.5 秒上限）才送出。Brain 端判斷耗時 p50 從 1.54 降到 1.24 秒、p90 從 1.73 降到 1.51 秒（真人台語 21 句，同時 1–3 句各跑 4 輪）。逾時本來就少：這批測試只有 Brain 部署重啟後的第一句逾時（碰上啟動預熱與 Gemini 冷啟動）；先前記的「同時 2–3 句約 15–20% 逾時」是數 log 時沒帶時區、把容器啟動以來的逾時都算進去，已更正。拆開量：Gemini flash-lite 聽音檔 1.2–1.7 秒是大宗（只送前 3 秒幾乎沒變快、沒有思考 token、提示詞太短用不上脈絡快取），另外 Backend 每次跑 ffmpeg 0.15 秒、Brain 每次新建 Gemini client 0.1–0.18 秒。現在上傳的已是 16 kHz 單聲道 WAV（前台 VAD 的格式）就直接送，Brain 重複使用同一個 client。
+
 - **[2026-09-30]** **定稿在句子裡夾進別種文字就用暫定字幕**：中文、韓文同時勾時，韓文「이 펌프의」定稿成「이 泵의」，Jev 覺得兩句都合理（0.77／0.72）挑不出來。暫定字幕是純韓文、定稿在韓文句子裡夾漢字（或中文句子夾諺文、假名）時直接用暫定字幕，不問 Jev；日文不套（定稿把假名轉漢字是正常的）。
+
 - **[2026-09-30]** **Jev 判斷定稿的語言情境跟著這一輪走**：原本讀後台設定的整份分流，現在 Backend 把這條連線實際生效的分流（前台臨時關掉的語言不算）一起送給 `POST /brain/internal/asr-judge`（新增 `languages` 欄位），跟每輪動態產生的回答語言提示一致。
-- **[2026-09-29]** **虛擬人講完自動恢復收音**：回答期間麥克風會停（免得收到自己的聲音），以前講完不會恢復，每輪都要重按麥克風。現在回答結束（含 TTS 合成第一段聲音前的空檔、播放、字幕）後自動恢復，6 秒沒開口才關（剛按下麥克風時仍是 10 秒）；回答中使用者自己按掉麥克風就不會自動打開。Gemini Live 串流辨識在回答期間改為正常關閉連線、講完再連，避免閒置連線被斷掉後被當成「串流不可用」而一直退回批次辨識。
-- **[2026-09-29]** **Gemini Live 辨識的語言提示跟著專案走**：原本全站共用 `ASR_GEMINI_STREAM_LANGUAGES`（zh-TW、en-US、es-ES），現在前台連線帶專案與語言分流，依分流產生（已備好日文 ja-JP、韓文 ko-KR 的對應，以後開日韓專案不用改串流這段）；沒帶專案才用環境變數。
-- **[2026-09-29]** **英文、西語回答縮短**：虛擬人會念出回答，同一句拒答中文 67–89 字約 15 秒，西語 330–400 字元要講 25–30 秒（模型翻中文固定句時順手加長）。每輪指定回答語言時，英西多一句「資訊量跟中文一樣，2 到 3 句、約 40 個單字以內，要詳細規格時才寫長」。
-- **[2026-09-29]** **知識庫距離門檻 0.85 → 1.0**：工業示範專案中英西各 12 題相關提問，0.85 只命中 34 題（「絕緣等級是什麼」「著脫座要怎麼選」的正確段落在 0.89–0.90 被擋掉），1.0 全部命中；西語、英文不少題的正確段落落在 0.86–1.05。代價是閒聊題會多帶幾段不相關的知識庫內容（醫院 4 題閒聊從 2 段變 9 段，工業示範專案 9 題閒聊仍是 0 段），由模型判斷不採用，top_k 上限不變。評估腳本與結果在 `scripts/experiments/kb-cutoff/`。
-- **[2026-09-29]** **虛擬人前台暫時藏起「即時」對話模式**：設定視窗的「對話模式」（即時＝Gemini Live 當對話模型／標準＝一般 Brain）整塊隱藏，一律用標準模式。原因是「Gemini Live 即時語音」容易跟 ASR 選單的「Gemini Live」辨識搞混，實際也沒在用。以前存成即時的帳號與瀏覽器開啟時當成標準。程式保留，`frontend/app/src/types/voiceMode.ts` 的 `LIVE_VOICE_MODE_AVAILABLE` 改回 `true` 即恢復。
-- **[2026-09-29]** **後台 Chat 也藏起 Live 模式**：標題列的 Text／Live 切換拿掉，一律用 Text（一般 Brain 回答），同樣是沒人在用、名稱又跟 ASR 的「Gemini Live」辨識撞名。存過 live 的瀏覽器開啟時退回 Text。程式保留，`frontend/admin/src/pages/Chat.tsx` 的 `LIVE_CHAT_AVAILABLE` 改回 `true` 即恢復。
-- **[2026-09-29]** **ASR 選單的「Gemini 串流」改名為「Gemini Live」**：只改顯示名稱，引擎代號（`gemini-live`）與行為不變。
-- **[2026-09-29]** **拔掉後台的「全站預設 ASR 引擎」**：原本 ROOT 可在後台「語音」頁替所有沒選過引擎的人指定引擎（正式環境被設成 xiaomi，蓋過 `.env` 的 breeze），前台與後台 Chat 的選單也有一個看不出是哪家的「預設（依系統設定）」。現在沒選過的人一律用部署設定 `ASR_PROVIDER`，選單直接顯示實際在用的引擎（沒授權給該帳號也列出來）；移除 `GET/PUT/DELETE /api/v1/settings/asr-provider`，auth 資料庫 migration 14 刪掉殘留的設定。試辨識改為 `POST /api/v1/asr/preview`（限 admin），可帶 `provider` 指定引擎、只影響這一次，回傳實際辨識的引擎（備援接手時看得出來）。正式環境沒選過引擎的帳號會從 xiaomi 換成 breeze。
-- **[2026-09-24]** **前台下拉選單改成自己畫的清單**：虛擬人前台的下拉原本是原生 `<select>`，收起來的框有套樣式，點開的選項清單卻由作業系統畫（白底、系統字型、藍色選取條），CSS 管不到。`CustomSelect.vue` 改成按鈕加 HTML 選項清單，外觀與操作對齊後台 `Select.tsx`：主題色標示選中項、滑過變色、方向鍵／Home／End／Enter／Esc／打字跳選、點外面收起、下方空間不夠往上開。清單以 `position: fixed` 擺放，不會被設定視窗的捲動區裁掉；Esc 只收清單、不關設定視窗。所有下拉共用這個元件，用法（`v-model`、`change`）不變。
-- **[2026-09-24]** **語言分流改成排序、不再過濾文件**：原本分流會把其他語言的文件整批濾掉，只勾英、西時中文文件（以及判斷不出語言、歸為中文的文件）永遠查不到，等於中文非勾不可；只有中文寫到的內容，英文提問也拿不到。改成所有文件都查得到，語言只決定誰先進 top_k：使用者語言優先，不夠再用主要語言、最後其他語言補；回答照樣用使用者的語言。工業示範專案這種中英西三版本的型錄仍拿同語言的原文（去重時其他語言版本讓位）。使用者語言沒勾分流時不為它擴查整個知識庫。文字與 Live 查詢遇到「hi」這類短句改用主要語言，不再固定中文。後台「分流」說明同步更新。
-- **[2026-09-24]** **短句與語言優先順序**：「hi」「ok」「hola」這種一兩個字的短句判斷不出語言，改歸專案主要語言（知識庫分流排第一的，後台「分流」可用上移調整順序、第一個標「主要」），標籤與 AI 回覆都用主要語言，不再標英文卻回中文；有中文字就是中文；短句不送 Jev。分流順序改為後台排定的優先順序。
-
-### Removed
-
-- **[2026-10-07]** **移除 Xiaomi-CocktailASR-1 語音辨識引擎（`xiaomi`）**：主機 192.0.2.19 已停機、部署設定早已停用，且專案逐步移除中國來源元件（同 BGE-M3）。拿掉批次轉寫函式與備援順序裡的 `xiaomi`、`ASR_XIAOMI_URL` 設定、`SERVER_ASR_PROVIDERS`、後台授權清單與前台引擎選單；`.env` 還留著 `ASR_XIAOMI_URL` 也不會出錯（直接忽略）。舊資料在 backend 啟動時清理：已註冊的 `asr_engine/xiaomi` 系統資源刪除，帳號授權與 admin 範圍裡的 xiaomi 隨外鍵一起刪掉；帳號存的 ASR 偏好若是程式已不認得的引擎就改回空字串，等於沒選過、用部署的 `ASR_PROVIDER`。`ASR_PROVIDER=xiaomi` 會被備援順序略過，照其他已設定的引擎辨識。
-
-### Added
-
-- **[2026-10-02]** **虛擬人還在想時可以補一句，兩句一起回答**：前台麥克風原本在虛擬人「思考中」就關掉，補的那句收不到；就算收到，也會取消前一句、只答後一句。現在麥克風只在虛擬人出聲（合成聲音、播放、字幕還在跑）時關；思考中（回答還沒回來）再講或再打一句，前台中止還在等的請求，把兩句用換行接起來重送一次，對話裡也只留一則合併後的使用者訊息。回答一到就不再合併，之後講的話照舊當新的一輪。快速問答帶著出處，不參與合併。Breeze（台語分流）用的 VAD 從「講完一句就關麥克風」改成連續收音，跟串流辨識一樣在虛擬人出聲時暫停、講完自動恢復；瀏覽器內建辨識一次只收一句，不支援補一句。延遲量測多一種 `outcome: "merged"`（被合併的前一輪，不算失敗），Backend `/api/v1/metrics/turn` 一併接受。講話中插話（階段 B）尚未實作，見 `docs/plans/full-duplex-voice.md`。
-- **[2026-10-02]** **回答長度改成每個專案自己填秒數**：後台知識庫的「分流」設定多一欄「回答長度上限（秒）」，旁邊即時換算成各語言字數（20 秒＝中日韓約 80 字、英西約 30 個單字；語速由 Brain 的 `speech_rates` 提供，前後端不各寫一份）。預設 20 秒，填 0 不加長度規則。上午的 80 字上限原本套在所有專案，ESG 要照抄完整 QA 答案也被要求縮短；現在 ESG 設 0，元復醫院、釣魚的人設本來就寫 40 字，設 10 秒讓兩邊一致。Brain `GET/PUT /brain/knowledge/settings` 多 `reply_seconds`（PUT 不帶就保留原值）與唯讀的 `speech_rates`。
-- **[2026-10-02]** **測試專案鏡像（`scripts/project_mirror.py`）**：語音模擬與提示詞實驗改在「工業示範專案（開發）」跑，測試對話與每日記憶摘要才不會寫進正式工業示範專案。`check` 比對兩邊的知識庫、原始資料、詞表、人設、文件設定與語言分流，不一樣就 exit 1；`sync` 由正式複製到測試專案（先備份、沿用正式專案的知識圖譜、重建索引）。`scripts/voice_e2e/run.py` 的 `--project` 是測試專案時會先檢查，不一致就停下。voice_e2e README 補上「會寫進專案每日記憶摘要」這項副作用（原本誤寫為不會）。工業示範專案題庫 `industrial.json` 改成預設跑在工業示範專案（開發），測試帳號 `example-user` 的專案權限也從工業示範專案換成工業示範專案（開發）。
-
-- **[2026-10-06]** **批次辨識多一個引擎 Confucius4-R2T2（`r2t2`）**：網易有道開源、Qwen3-ASR-1.7B。`/transcribe` 帶 `language` 與專案詞表 `context`，輸出簡體轉繁體；設 `ASR_R2T2_URL` 才排進備援順序，使用者可在聊天室選它。工業示範專案 10 題合成語音帶詞表：錯字率 6.9%、專有名詞 13/18、p50 0.28 秒，Breeze 5.8%、14/18、約 1.0 秒；R2T2 會把台語寫成台語漢字，台語分流照舊用 Breeze。
-- **[2026-10-06]** 前台新增 Confucius4-R2T2 串流引擎 `r2t2-live`，與 Gemini Live 並存、與批次 `r2t2` 分開授權。Backend 依帳號偏好轉接 R2T2、帶專案詞表、重切 PCM 片段、增量累加與繁體定稿；停止時補齊尾段再送 EOS。未設定或上游失敗沿用批次備援，台語分流維持 Breeze。
-
-- **[2026-09-30]** **語音對話模擬（`scripts/voice_e2e/`）**：不用對著前台講話，也能測完整的一輪語音對話。腳本用系統自己的 TTS（edge-tts、VoxCPM 等）念題目，或讀真人錄音，照前台的節奏送進串流辨識（`/api/v1/asr/stream`，每 0.1 秒 3200 bytes）與批次辨識（`/api/v1/asr/transcribe`），再問 `/api/v1/chat`，也可以用 `/api/v1/tts/stream` 念出回答；每一輪記錄錯字率、專有名詞有沒有聽對、回答有沒有講到預期的字，以及各段耗時。`--user` 在 backend 容器裡替帳號簽短效 token，不用存密碼；可以混入雜訊；跑完刪掉建立的對話。題庫在 `scripts/voice_e2e/cases/`：工業示範專案 10 題（合成語音）、台語連續劇真人錄音 75 句（批次辨識＋台語判斷；一次一句 69/75 判成台語，同時 3 句則全部超過 2.5 秒逾時），打分與題庫格式有單元測試（`tests/test_voice_e2e.py`）。
-- **[2026-09-30]** **專案詞表也帶給 Breeze 與 OpenAI 辨識**：Breeze-ASR-360 1.4 起 `/transcribe` 多了選填的 `prompt` 欄位（Whisper 前文；gb10 那邊實測 12 句含「污泥泵」「DIVA」「沉水泵」「EUBL」「泵浦」的合成音 12 句修正，台語 40 句回歸沒有硬塞詞表的字，延遲 +0.01 秒）。Backend 語音辨識前向 Brain 新的內部端點 `GET /brain/internal/asr-glossary` 取專案詞表（快取 60 秒），帶給 Breeze 與 OpenAI（gpt-4o-mini-transcribe 的 `prompt`）；Xiaomi、SenseVoice、Gemini Live 不吃提示詞，照舊。只帶正確的詞：`ASR_PROMPT.md` 裡「常見誤聽：A→B」這類對照行只給對話模型看，送給辨識引擎會把錯字也教給它。同一專案每次送同一串字，Breeze 才能併批。
-- **[2026-09-30]** **專案詞表幫 Brain 對回語音誤聽**：Gemini Live 辨識會把「沉水泵」聽成「沉睡泵」、「DIVA」聽成「低瓦」，而轉錄模型不吃背景知識（實測 `systemInstruction` 給不給結果一字不差）。Brain 每輪對話提示多一段：訊息可能是語音辨識結果、這個專案的專有名詞有哪些（讀專案 workspace 的 `ASR_PROMPT.md`，原本給 Whisper 的詞庫，2026-07 起沒人讀）；模型在理解問題與寫知識庫查詢時自己對回，不多一次模型呼叫。工業示範專案實測：「低瓦有攪拌器嗎」從答非所問變成答對；詞表加「常見誤聽：UNI本→污泥泵」這類對照後，原本修不回的三句都答對；「奔騰電腦」這類無關問題不被帶偏（`scripts/experiments/asr-glossary/`）。畫面上的使用者文字仍是原本辨識的結果。
-- **[2026-09-30]** **語言分流可以選日文、韓文**：後台知識庫的分流、文件語言、對話紀錄篩選與備份、前台語言開關都多了日本語、한국어。使用者訊息有假名就是日文、有諺文就是韓文（依比例判斷，中文句子夾一個日文品牌不會整句變日文），不再一律算中文；日韓不送 Jev 校正（Jev 只問中英西，會被校回中文）。每輪的回答語言提示多了日本語、한국어，長度比照中文 2 到 3 句。Gemini Live 辨識的語言提示對應 ja-JP、ko-KR。實測（合成語音，`scripts/experiments/ja-ko/`）：串流辨識日韓字錯率 4% 以內；用日韓文問工業示範專案型錄 8 題全查到；Jev 判斷定稿 7 組對 5 組、沒有改錯。TTS 實測：Gemini TTS 與 Edge-TTS 的日韓聲音念得完全正確，VoxCPM 可念但有錯字，CosyVoice 較差，IndexTTS 不能念日韓；中文與韓文可以同時勾。
-- **[2026-09-29]** **虛擬人前台可以打斷回答**：前台原本就有打斷功能（`chat.interrupt()`），卻沒接到任何按鈕，只能等虛擬人講完或趕快講下一句。現在虛擬人在想、在講或字幕還在跑時，送出鈕變成「停止」（輸入框打了字時仍是送出，送出會先停掉目前的回答），沒開視窗時按 Esc 也會停；沉浸模式下 Esc 先停講話，再按一次才離開。標準模式回覆一到狀態就回 IDLE，所以「回答中」同時看播放與字幕。
-- **[2026-09-29]** **前台設定跟著帳號走**：虛擬人前台設定視窗按「套用」的專案、人設、角色、語音引擎與聲音、標準／即時模式、回覆深度、背景、VRM、鏡頭預覽大小，原本只存在瀏覽器，換電腦或清掉瀏覽器資料就回到預設。現在同時存到帳號（新端點 `GET/PUT /api/v1/settings/my-preferences`，auth 資料庫 migration 15 `account_preferences`），開場先拿帳號存的設定（最多等 3 秒）再挑專案與聲音；帳號還沒存過時，把這台瀏覽器之前存的上傳。只合併這次改到的欄位，兩台裝置各改各的不會互蓋。嵌入金鑰（訪客共用）不存。
-- **[2026-09-29]** **整輪延遲量測**：前台每一輪記下開始講話、講完、ASR 回來、送出、Brain 回完、TTS 第一段聲音、開始播放的時間點，送到新端點 `POST /api/v1/metrics/turn`（需登入），每輪一行 JSON 寫進 `backend/logs/turn_timing.jsonl`（主機掛載，部署不會清掉），附分段 `durations_ms`（asr／send／brain／tts_first_audio／to_playback／total）與專案、ASR 引擎、TTS 等資訊；用 `jq` 撈法見 README「整輪延遲量測」。
-- **[2026-09-24]** **Gemini 串流語音辨識**：前台 ASR 選單新增「Gemini 串流」（`gemini-live`），經新 WebSocket `/api/v1/asr/stream` 邊錄邊送 16 kHz PCM 給 gemini-3.5-transcribe-live：講話中顯示暫定字幕，停頓約 0.5 秒後定稿（實測中英兩句都在講完 0.5–0.7 秒內定稿），同一連線可連續多句，不需前端偵測靜音。帳號要在帳號頁被授權；連不上或未授權自動退回 VAD＋批次辨識；台語分流時改用 Breeze 批次。用量以音訊秒數記帳。
 
 ### Fixed
 
+- **[2026-09-30]** 後台在取得帳號可用專案清單前不載入專案頁面或小助理；無權限使用 default 的帳號先回退至清單中的可用專案，再發出頁面請求，清單載入失敗可重試。沒有可用專案時阻擋專案頁面並保留專案／帳號管理入口。
+
+- **[2026-09-30]** 從非預設專案的對話紀錄開啟 Chat 時保留專案參數；桌面、手機與對話側欄連結改由目前專案狀態產生，避免開新分頁時落到 default。
+
+- **[2026-09-30]** 後台子頁改用可直達的固定路徑：語音辨識、知識圖譜、Avatar 背景／小助理、記憶新增、帳號建立／管理皆由 URL 決定畫面；保留舊 `?view=` 深連結並正規化。明確頁面網址省略專案時採用 default，避免保存偏好覆蓋分享網址；Chat 指定對話參數保留到 lazy 頁面消費。側欄使用帶專案與公開前綴的原生連結，支援新分頁開啟。
+
+- **[2026-09-30]** 專案詞表缺失、讀取失敗或編碼錯誤時不再中斷對話；快取改用奈秒時間、大小與檔案身分，提示以跳脫的 `<glossary>` 標記為參考資料。
+
+- **[2026-09-30]** 串流辨識啟動加入世代隔離與 ready 逾時；停止期間才取得的麥克風立即釋放，重複啟動共用同一次收音。停止後最多保留 5 秒接最後定稿，重新啟動或卸載會清理舊連線。
+
+- **[2026-09-30]** 回應攜帶自身語言上下文，獨立視覺回答不再繼承上一句台語的 VoxCPM 分流；補上華語、打字及過期回應的行為測試。
+
+- **[2026-09-30]** 後端 ASR 串流離開前等待雙向工作取消完成，接收工作例外會回報前端以啟動備援。
+
+- **[2026-09-30]** 修正檢索門檻實驗的結論邊界，補回語音授權與 VAD 部署限制。
+
 - **[2026-09-30]** **離題問句在 fast 模式回 502**：fast 模式查完知識庫就不再提供工具，模型卻照系統提示呼叫 `search_web`，參數照抄 `search_knowledge` 的 `queries`，被拒絕幾次後回空白，Brain 回 502，使用者收不到回答（語音模擬「棒球英豪是什麼意思」三題重現）。agent loop 現在不執行這一輪沒提供的工具，改請模型直接用文字作答；參數正確也不執行，否則等於繞過 fast 模式的上網限制。曾試過同時把上網工具從 fast 模式的提示拿掉，但天氣題因此不再呼叫天氣技能，離題問句也改用模型自己的知識作答，所以沒有採用。
-- **[2026-09-29]** **Gemini Live 辨識講長句會被截斷**：閒置計時只在定稿時重算，暫定字幕不算，一句話講超過 10 秒沒停頓就被關掉。收到暫定字幕也重新計時。
-- **[2026-09-29]** **串流辨識的定稿把對的暫定字幕蓋掉**：Gemini Live 辨識講話中的暫定字幕是「who am i」，停頓後的定稿卻送出「OMI」「O and I」，偶爾定稿成韓文。定稿跟最後的暫定字幕不同時，Backend 問 Brain 新的內部端點 `POST /brain/internal/asr-judge`：兩段文字各自問 Jev 像不像正確辨識的一句話（情境帶專案名稱與語言分流，閒聊也算合理），暫定字幕高出 0.2 以上才換，否則照定稿；不重送音訊，只有兩者不同時多約 0.3 秒。離線 20 組 18 組挑對、0 組把對的定稿換掉（`scripts/experiments/asr-final-judge/`）。每次判斷記在 `backend/logs/asr_final_judge.jsonl`。
-- **[2026-09-29]** **長回答的字幕講到一半整段跳出來**：標準模式的字幕是前端打字機（約 22 字／秒）跟著語音逐字顯示，但 TTS 一下載完（還沒播完）就把剩下的字一次倒出來，回答越長越明顯；句與句之間斷音兩次，3 秒的欠載看門狗也會倒字。改成打字機自己跑完，只有出錯、停止播放或打斷時才一次顯示；聲音一恢復就取消看門狗。
-- **[2026-09-29]** **西語隨便問都撈到無關的知識庫段落**：關鍵字（FTS）比對命中的段落原本不看距離一律放行。工業示範專案加了西語版型錄後，「¿Qué tiempo hará mañana?」這種跟產品無關的問題也因為「qué」撈回 3 段問答。現在 FTS 命中的段落會補算與問題的距離，超過 `rag_fts_distance_cutoff`（預設 1.1，一般門檻 0.85）就丟掉；型號這類字面命中但語意偏遠的相關段落（約 0.94）仍保留。
-- **[2026-09-29]** **語音辨識回報的引擎不準**：`POST /api/v1/asr/transcribe` 回傳的 `provider` 原本是帳號偏好的引擎，偏好的掛掉、由備援接手時仍寫偏好的那個；改成實際辨識的引擎，全部失敗時為空字串。
-- **[2026-09-29]** **台語分流時偶爾一句話要等二十幾秒才回**：開了台語分流的專案，語音辨識要等 Breeze 轉寫和「是不是台語」的判斷都回來才繼續。判斷通常 1.9 秒（真人語料 p50），但 95 句裡有一句拖到 22.7 秒，原本要等到 35 秒逾時。改成判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時就當不是台語、照原本的 TTS 回答。
-- **[2026-09-29]** **Breeze 把同一句話轉成兩三遍**：真人台語朗讀 20 句有 3 句整句重複 2–3 次，原樣送進 Brain 等於使用者講了三遍。整段剛好是同一句重複時收成一次（4 個字以下不動，部分重複不動）。
-- **[2026-09-29]** **西語提問卻用中文回答**：下午加的「本專案主要語言：繁體中文」會被模型當成回答語言，工業示範專案西語提問 6 題裡 2 題整句回中文（照抄人設裡「型錄資料未提及此規格」「請洽詢工業示範專案企業…」等中文固定句），另 2 題夾雜中文。改成每一輪在 system prompt 明講「這一輪的回答語言」（規則判斷；短句用主要語言、台語語音用繁體中文、判斷不出來才請模型看原句），並要求知識庫與人設的中文固定說法翻成回答語言；改後同樣 6 題全用西語。Live 的預設語言句改成只在判斷不出來時適用。
-- **[2026-09-24]** **前台設定每次打開又回到預設**：設定 store 以前用 watch 把每次變動都寫回 localStorage，開場抓清單時的暫時清空、清單失敗時退回帳號預設也被存下去：專案清單 502 一次或載入到一半就重整，存的專案、人設、語音、VRM 就永久變回預設；2D 清單失敗一次還會把模式存成 3D。改成只有按「套用」才寫入（`saveSettings()`），開場一律以存過的值（`savedSettings()`）挑選，退回只影響這次。設定視窗改成只記使用者動過的欄位：清單還在載入時打開、看一下別的專案再切回來、換引擎後按取消再打開，都不會再把空值或預設值當成選擇存下去。「自動」語音引擎可以還原；語音引擎與聲音成對寫入；後台 Chat 載入時退回的 TTS 不再寫回與前台共用的鍵；帳號自己的舊鍵優先於未登入時遷出的鍵。
-- **[2026-09-24]** **語言分流不必含中文**：後台「分流」拿掉各語言的說明文字；至少勾一條、不一定是中文（純英文知識庫只勾 English）。只有一條不分流；多條時第一條（zh、en、es、nan 順序）是查不到時的退路。前台臨時開關同樣至少留一條。
-- **[2026-09-24]** **台語分流不該每句都換 VoxCPM**：原本只要專案開了台語分流，打字、快速問答、講華語也全被換成 VoxCPM（同事選 Gemini TTS 卻聽到 VoxCPM）。改成這一輪是語音且 ASR 判成台語（`speech_language=nan`）才換；前台記住上一句是否為台語語音，後端同條件核對。
-- **[2026-09-24]** **前台（/openvman/）白畫面**：589c303 把虛擬人前台改成靜態 build 後，index.html 以 `/assets/index-*.js` 載入，但主機 nginx 的根目錄轉發清單沒有 `assets`，CSS 回 HTML、JS 404。template 加上 `assets`；同時把主機上被直接改過、template 沒有的 `client_max_body_size 100m` 補回 template，免得部署時被拿掉又出 413。
-- **[2026-09-24]** **備份讀取不清除對話**：預覽與正式備份改用單一 SQLite 快照讀取摘要與訊息，不觸發聊天的 TTL 清理，保留尚在資料庫的過期對話。
-- **[2026-09-24]** **ASR 撤權後忽略舊偏好**：設定 API 與 worker 共用目前授權判定；正式／臨時帳號撤權後不再把舊引擎當 preferred，既有系統預設與 fallback 策略維持不變。
-- **[2026-09-24]** **錄音閒置與 fallback 狀態**：continuous 模式持續說話不會被 10 秒閒置計時停錄；VAD 啟動失敗後的舊回傳不再覆寫錄音器狀態與自動停止計時器。
-- **[2026-09-24]** **語言搜尋候選不足**：逐步擴大候選窗，確認完整候選後才退回中文；擴展詞向量在單次查詢內重用。Live 文字新回合清除前一句語音語言判定。
-- **[2026-09-24]** **Live 用量歸屬與關閉清算**：Backend 以已驗證的呼叫者產生帳號／金鑰身分標頭，Brain 將其寫入秒數事件；中途離開也清算剩餘音訊，listener 取消不會中斷已開始的入帳，正常完成後關閉不重複記錄。
+
+## [2026-09-29]
+
+### Added
+
+- **[2026-09-29]** **虛擬人前台可以打斷回答**：前台原本就有打斷功能（`chat.interrupt()`），卻沒接到任何按鈕，只能等虛擬人講完或趕快講下一句。現在虛擬人在想、在講或字幕還在跑時，送出鈕變成「停止」（輸入框打了字時仍是送出，送出會先停掉目前的回答），沒開視窗時按 Esc 也會停；沉浸模式下 Esc 先停講話，再按一次才離開。標準模式回覆一到狀態就回 IDLE，所以「回答中」同時看播放與字幕。
+
+- **[2026-09-29]** **前台設定跟著帳號走**：虛擬人前台設定視窗按「套用」的專案、人設、角色、語音引擎與聲音、標準／即時模式、回覆深度、背景、VRM、鏡頭預覽大小，原本只存在瀏覽器，換電腦或清掉瀏覽器資料就回到預設。現在同時存到帳號（新端點 `GET/PUT /api/v1/settings/my-preferences`，auth 資料庫 migration 15 `account_preferences`），開場先拿帳號存的設定（最多等 3 秒）再挑專案與聲音；帳號還沒存過時，把這台瀏覽器之前存的上傳。只合併這次改到的欄位，兩台裝置各改各的不會互蓋。嵌入金鑰（訪客共用）不存。
+
+- **[2026-09-29]** **整輪延遲量測**：前台每一輪記下開始講話、講完、ASR 回來、送出、Brain 回完、TTS 第一段聲音、開始播放的時間點，送到新端點 `POST /api/v1/metrics/turn`（需登入），每輪一行 JSON 寫進 `backend/logs/turn_timing.jsonl`（主機掛載，部署不會清掉），附分段 `durations_ms`（asr／send／brain／tts_first_audio／to_playback／total）與專案、ASR 引擎、TTS 等資訊；用 `jq` 撈法見 README「整輪延遲量測」。
 
 ### Changed
 
-- **[2026-09-24]** **台語分流接上前台語音**：前台 app 的語音一律先經 Backend ASR（Live 模式也是），所以台語分流改在這裡生效：
-  交集含台語時 ASR 改用 Breeze、另請 Brain 聽是不是台語（新 `POST /brain/internal/audio-language`），結果隨訊息
-  `speech_language` 存成訊息語言並讓知識庫查台語文件；TTS 原本不是 VoxCPM／CosyVoice 就改 VoxCPM（先於帳號聲音授權）。
-  前台設定視窗新增「語言分流」，只能在後台開的範圍內臨時關掉／勾回（`GET /api/v1/language-routes`，存在瀏覽器、依專案分開）。
-  Live 文字回合的語言判定綁定該回合：先清前一句，再套這一句帶的 `speech_language`。
-- **[2026-09-24]** **主模型預設改 gemini-3.5-flash-lite**：`config.py` 的 `llm_model` 與 `.env.example`、文件範例跟正式環境一致（正式本來就由 `.env` 設 3.5-flash-lite，行為不變）；文件裡的備援鏈範例也換成正式用的 gemini → openai → groq → nen。
+- **[2026-09-29]** **虛擬人講完自動恢復收音**：回答期間麥克風會停（免得收到自己的聲音），以前講完不會恢復，每輪都要重按麥克風。現在回答結束（含 TTS 合成第一段聲音前的空檔、播放、字幕）後自動恢復，6 秒沒開口才關（剛按下麥克風時仍是 10 秒）；回答中使用者自己按掉麥克風就不會自動打開。Gemini Live 串流辨識在回答期間改為正常關閉連線、講完再連，避免閒置連線被斷掉後被當成「串流不可用」而一直退回批次辨識。
+
+- **[2026-09-29]** **Gemini Live 辨識的語言提示跟著專案走**：原本全站共用 `ASR_GEMINI_STREAM_LANGUAGES`（zh-TW、en-US、es-ES），現在前台連線帶專案與語言分流，依分流產生（已備好日文 ja-JP、韓文 ko-KR 的對應，以後開日韓專案不用改串流這段）；沒帶專案才用環境變數。
+
+- **[2026-09-29]** **英文、西語回答縮短**：虛擬人會念出回答，同一句拒答中文 67–89 字約 15 秒，西語 330–400 字元要講 25–30 秒（模型翻中文固定句時順手加長）。每輪指定回答語言時，英西多一句「資訊量跟中文一樣，2 到 3 句、約 40 個單字以內，要詳細規格時才寫長」。
+
+- **[2026-09-29]** **知識庫距離門檻 0.85 → 1.0**：工業示範專案中英西各 12 題相關提問，0.85 只命中 34 題（「絕緣等級是什麼」「著脫座要怎麼選」的正確段落在 0.89–0.90 被擋掉），1.0 全部命中；西語、英文不少題的正確段落落在 0.86–1.05。代價是閒聊題會多帶幾段不相關的知識庫內容（醫院 4 題閒聊從 2 段變 9 段，工業示範專案 9 題閒聊仍是 0 段），由模型判斷不採用，top_k 上限不變。評估腳本與結果在 `scripts/experiments/kb-cutoff/`。
+
+- **[2026-09-29]** **虛擬人前台暫時藏起「即時」對話模式**：設定視窗的「對話模式」（即時＝Gemini Live 當對話模型／標準＝一般 Brain）整塊隱藏，一律用標準模式。原因是「Gemini Live 即時語音」容易跟 ASR 選單的「Gemini Live」辨識搞混，實際也沒在用。以前存成即時的帳號與瀏覽器開啟時當成標準。程式保留，`frontend/app/src/types/voiceMode.ts` 的 `LIVE_VOICE_MODE_AVAILABLE` 改回 `true` 即恢復。
+
+- **[2026-09-29]** **後台 Chat 也藏起 Live 模式**：標題列的 Text／Live 切換拿掉，一律用 Text（一般 Brain 回答），同樣是沒人在用、名稱又跟 ASR 的「Gemini Live」辨識撞名。存過 live 的瀏覽器開啟時退回 Text。程式保留，`frontend/admin/src/pages/Chat.tsx` 的 `LIVE_CHAT_AVAILABLE` 改回 `true` 即恢復。
+
+- **[2026-09-29]** **ASR 選單的「Gemini 串流」改名為「Gemini Live」**：只改顯示名稱，引擎代號（`gemini-live`）與行為不變。
+
+- **[2026-09-29]** **拔掉後台的「全站預設 ASR 引擎」**：原本 ROOT 可在後台「語音」頁替所有沒選過引擎的人指定引擎（正式環境被設成 xiaomi，蓋過 `.env` 的 breeze），前台與後台 Chat 的選單也有一個看不出是哪家的「預設（依系統設定）」。現在沒選過的人一律用部署設定 `ASR_PROVIDER`，選單直接顯示實際在用的引擎（沒授權給該帳號也列出來）；移除 `GET/PUT/DELETE /api/v1/settings/asr-provider`，auth 資料庫 migration 14 刪掉殘留的設定。試辨識改為 `POST /api/v1/asr/preview`（限 admin），可帶 `provider` 指定引擎、只影響這一次，回傳實際辨識的引擎（備援接手時看得出來）。正式環境沒選過引擎的帳號會從 xiaomi 換成 breeze。
+
+### Fixed
+
+- **[2026-09-29]** **Gemini Live 辨識講長句會被截斷**：閒置計時只在定稿時重算，暫定字幕不算，一句話講超過 10 秒沒停頓就被關掉。收到暫定字幕也重新計時。
+
+- **[2026-09-29]** **串流辨識的定稿把對的暫定字幕蓋掉**：Gemini Live 辨識講話中的暫定字幕是「who am i」，停頓後的定稿卻送出「OMI」「O and I」，偶爾定稿成韓文。定稿跟最後的暫定字幕不同時，Backend 問 Brain 新的內部端點 `POST /brain/internal/asr-judge`：兩段文字各自問 Jev 像不像正確辨識的一句話（情境帶專案名稱與語言分流，閒聊也算合理），暫定字幕高出 0.2 以上才換，否則照定稿；不重送音訊，只有兩者不同時多約 0.3 秒。離線 20 組 18 組挑對、0 組把對的定稿換掉（`scripts/experiments/asr-final-judge/`）。每次判斷記在 `backend/logs/asr_final_judge.jsonl`。
+
+- **[2026-09-29]** **長回答的字幕講到一半整段跳出來**：標準模式的字幕是前端打字機（約 22 字／秒）跟著語音逐字顯示，但 TTS 一下載完（還沒播完）就把剩下的字一次倒出來，回答越長越明顯；句與句之間斷音兩次，3 秒的欠載看門狗也會倒字。改成打字機自己跑完，只有出錯、停止播放或打斷時才一次顯示；聲音一恢復就取消看門狗。
+
+- **[2026-09-29]** **西語隨便問都撈到無關的知識庫段落**：關鍵字（FTS）比對命中的段落原本不看距離一律放行。工業示範專案加了西語版型錄後，「¿Qué tiempo hará mañana?」這種跟產品無關的問題也因為「qué」撈回 3 段問答。現在 FTS 命中的段落會補算與問題的距離，超過 `rag_fts_distance_cutoff`（預設 1.1，一般門檻 0.85）就丟掉；型號這類字面命中但語意偏遠的相關段落（約 0.94）仍保留。
+
+- **[2026-09-29]** **語音辨識回報的引擎不準**：`POST /api/v1/asr/transcribe` 回傳的 `provider` 原本是帳號偏好的引擎，偏好的掛掉、由備援接手時仍寫偏好的那個；改成實際辨識的引擎，全部失敗時為空字串。
+
+- **[2026-09-29]** **台語分流時偶爾一句話要等二十幾秒才回**：開了台語分流的專案，語音辨識要等 Breeze 轉寫和「是不是台語」的判斷都回來才繼續。判斷通常 1.9 秒（真人語料 p50），但 95 句裡有一句拖到 22.7 秒，原本要等到 35 秒逾時。改成判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時就當不是台語、照原本的 TTS 回答。
+
+- **[2026-09-29]** **Breeze 把同一句話轉成兩三遍**：真人台語朗讀 20 句有 3 句整句重複 2–3 次，原樣送進 Brain 等於使用者講了三遍。整段剛好是同一句重複時收成一次（4 個字以下不動，部分重複不動）。
+
+- **[2026-09-29]** **西語提問卻用中文回答**：下午加的「本專案主要語言：繁體中文」會被模型當成回答語言，工業示範專案西語提問 6 題裡 2 題整句回中文（照抄人設裡「型錄資料未提及此規格」「請洽詢工業示範專案企業…」等中文固定句），另 2 題夾雜中文。改成每一輪在 system prompt 明講「這一輪的回答語言」（規則判斷；短句用主要語言、台語語音用繁體中文、判斷不出來才請模型看原句），並要求知識庫與人設的中文固定說法翻成回答語言；改後同樣 6 題全用西語。Live 的預設語言句改成只在判斷不出來時適用。
+
+## [2026-09-24]
 
 ### Added
+
+- **[2026-09-24]** **Gemini 串流語音辨識**：前台 ASR 選單新增「Gemini 串流」（`gemini-live`），經新 WebSocket `/api/v1/asr/stream` 邊錄邊送 16 kHz PCM 給 gemini-3.5-transcribe-live：講話中顯示暫定字幕，停頓約 0.5 秒後定稿（實測中英兩句都在講完 0.5–0.7 秒內定稿），同一連線可連續多句，不需前端偵測靜音。帳號要在帳號頁被授權；連不上或未授權自動退回 VAD＋批次辨識；台語分流時改用 Breeze 批次。用量以音訊秒數記帳。
 
 - **[2026-09-24]** **台語辨識實驗與 Live 音訊語言判斷**（`scripts/experiments/taigi/`）：合成醫院情境台語 8 句，Breeze 8/8 直接翻成
   華語、Xiaomi 約 4/8、Gemini Live 3.8 只聽懂 2/8、OpenAI 約 1/8、SenseVoice 0/8（全吐日文假名）；gemini-3.1-flash-lite
@@ -867,46 +1374,74 @@
   分流改由知識庫設定勾選（`GET/PUT /brain/knowledge/settings`、後台知識庫標題列「分流」按鈕），不看有哪些文件：
   勾台語才多聽這一次；只勾中文就不做語言篩選。拿掉 `LIVE_AUDIO_LANGUAGE_ID_PROJECTS`。Live 查知識庫最多等 3 秒拿
   台語判斷結果，台語就查台語文件（文件語言也認台羅與台語漢字，可手動標）。
+
 - **[2026-09-24]** **文件語言判斷修正**：長篇中文文件某處一個 ñ 會被判成西語；改成漢字多於拉丁字就先判中文。
+
 - **[2026-09-24]** **對話紀錄模糊搜尋**：搜尋框以空白分成多個關鍵字，每個都要出現在同一段對話但不管順序；繁簡與
   「污／汙」「後台／後臺」互通（OpenCC t2s，Brain 新增 `opencc-python-reimplemented`）。對話紀錄頁、
   匯出與聊天側欄都適用。
+
 - **[2026-09-24]** **知識庫依語言分流**：同一份內容可放中英西三個版本，使用者用哪種語言問就只查同語言的文件、用原文回答，
   查不到才退回中文（文字與 Live 都適用，Graph RAG 相關段落也同語言）。文件語言依內容自動判斷並存在
   `.doc_meta.json`，後台知識庫可手動指定（檔案樹標出 EN／ES）；只有中文文件的專案行為不變。
+
+### Changed
+
+- **[2026-09-24]** **前台下拉選單改成自己畫的清單**：虛擬人前台的下拉原本是原生 `<select>`，收起來的框有套樣式，點開的選項清單卻由作業系統畫（白底、系統字型、藍色選取條），CSS 管不到。`CustomSelect.vue` 改成按鈕加 HTML 選項清單，外觀與操作對齊後台 `Select.tsx`：主題色標示選中項、滑過變色、方向鍵／Home／End／Enter／Esc／打字跳選、點外面收起、下方空間不夠往上開。清單以 `position: fixed` 擺放，不會被設定視窗的捲動區裁掉；Esc 只收清單、不關設定視窗。所有下拉共用這個元件，用法（`v-model`、`change`）不變。
+
+- **[2026-09-24]** **語言分流改成排序、不再過濾文件**：原本分流會把其他語言的文件整批濾掉，只勾英、西時中文文件（以及判斷不出語言、歸為中文的文件）永遠查不到，等於中文非勾不可；只有中文寫到的內容，英文提問也拿不到。改成所有文件都查得到，語言只決定誰先進 top_k：使用者語言優先，不夠再用主要語言、最後其他語言補；回答照樣用使用者的語言。工業示範專案這種中英西三版本的型錄仍拿同語言的原文（去重時其他語言版本讓位）。使用者語言沒勾分流時不為它擴查整個知識庫。文字與 Live 查詢遇到「hi」這類短句改用主要語言，不再固定中文。後台「分流」說明同步更新。
+
+- **[2026-09-24]** **短句與語言優先順序**：「hi」「ok」「hola」這種一兩個字的短句判斷不出語言，改歸專案主要語言（知識庫分流排第一的，後台「分流」可用上移調整順序、第一個標「主要」），標籤與 AI 回覆都用主要語言，不再標英文卻回中文；有中文字就是中文；短句不送 Jev。分流順序改為後台排定的優先順序。
+
+- **[2026-09-24]** **台語分流接上前台語音**：前台 app 的語音一律先經 Backend ASR（Live 模式也是），所以台語分流改在這裡生效：
+  交集含台語時 ASR 改用 Breeze、另請 Brain 聽是不是台語（新 `POST /brain/internal/audio-language`），結果隨訊息
+  `speech_language` 存成訊息語言並讓知識庫查台語文件；TTS 原本不是 VoxCPM／CosyVoice 就改 VoxCPM（先於帳號聲音授權）。
+  前台設定視窗新增「語言分流」，只能在後台開的範圍內臨時關掉／勾回（`GET /api/v1/language-routes`，存在瀏覽器、依專案分開）。
+  Live 文字回合的語言判定綁定該回合：先清前一句，再套這一句帶的 `speech_language`。
+
+- **[2026-09-24]** **主模型預設改 gemini-3.5-flash-lite**：`config.py` 的 `llm_model` 與 `.env.example`、文件範例跟正式環境一致（正式本來就由 `.env` 設 3.5-flash-lite，行為不變）；文件裡的備援鏈範例也換成正式用的 gemini → openai → groq → nen。
+
+### Fixed
+
+- **[2026-09-24]** **前台設定每次打開又回到預設**：設定 store 以前用 watch 把每次變動都寫回 localStorage，開場抓清單時的暫時清空、清單失敗時退回帳號預設也被存下去：專案清單 502 一次或載入到一半就重整，存的專案、人設、語音、VRM 就永久變回預設；2D 清單失敗一次還會把模式存成 3D。改成只有按「套用」才寫入（`saveSettings()`），開場一律以存過的值（`savedSettings()`）挑選，退回只影響這次。設定視窗改成只記使用者動過的欄位：清單還在載入時打開、看一下別的專案再切回來、換引擎後按取消再打開，都不會再把空值或預設值當成選擇存下去。「自動」語音引擎可以還原；語音引擎與聲音成對寫入；後台 Chat 載入時退回的 TTS 不再寫回與前台共用的鍵；帳號自己的舊鍵優先於未登入時遷出的鍵。
+
+- **[2026-09-24]** **語言分流不必含中文**：後台「分流」拿掉各語言的說明文字；至少勾一條、不一定是中文（純英文知識庫只勾 English）。只有一條不分流；多條時第一條（zh、en、es、nan 順序）是查不到時的退路。前台臨時開關同樣至少留一條。
+
+- **[2026-09-24]** **台語分流不該每句都換 VoxCPM**：原本只要專案開了台語分流，打字、快速問答、講華語也全被換成 VoxCPM（同事選 Gemini TTS 卻聽到 VoxCPM）。改成這一輪是語音且 ASR 判成台語（`speech_language=nan`）才換；前台記住上一句是否為台語語音，後端同條件核對。
+
+- **[2026-09-24]** **前台（/openvman/）白畫面**：589c303 把虛擬人前台改成靜態 build 後，index.html 以 `/assets/index-*.js` 載入，但主機 nginx 的根目錄轉發清單沒有 `assets`，CSS 回 HTML、JS 404。template 加上 `assets`；同時把主機上被直接改過、template 沒有的 `client_max_body_size 100m` 補回 template，免得部署時被拿掉又出 413。
+
+- **[2026-09-24]** **備份讀取不清除對話**：預覽與正式備份改用單一 SQLite 快照讀取摘要與訊息，不觸發聊天的 TTL 清理，保留尚在資料庫的過期對話。
+
+- **[2026-09-24]** **ASR 撤權後忽略舊偏好**：設定 API 與 worker 共用目前授權判定；正式／臨時帳號撤權後不再把舊引擎當 preferred，既有系統預設與 fallback 策略維持不變。
+
+- **[2026-09-24]** **錄音閒置與 fallback 狀態**：continuous 模式持續說話不會被 10 秒閒置計時停錄；VAD 啟動失敗後的舊回傳不再覆寫錄音器狀態與自動停止計時器。
+
+- **[2026-09-24]** **語言搜尋候選不足**：逐步擴大候選窗，確認完整候選後才退回中文；擴展詞向量在單次查詢內重用。Live 文字新回合清除前一句語音語言判定。
+
+- **[2026-09-24]** **Live 用量歸屬與關閉清算**：Backend 以已驗證的呼叫者產生帳號／金鑰身分標頭，Brain 將其寫入秒數事件；中途離開也清算剩餘音訊，listener 取消不會中斷已開始的入帳，正常完成後關閉不重複記錄。
+
+## [2026-09-23]
+
+### Added
+
 - **[2026-09-23]** **對話備份依語言分檔**（VH-389）：Brain 每天 03:00 把所有專案的對話匯出到
   `/data/backups/sessions/<時間>/<專案>/{zh,en,es}.jsonl`，保留最近 30 份，同時只跑一個、先寫暫存再改名。
   後台「對話紀錄」頁對 ROOT 顯示備份區塊（預覽＝dry-run、立即備份、最近 5 份）；對外只有 Backend
   `/api/v1/backups/sessions`（限 ROOT），catch-all 代理擋掉 `backups`。設定見 `.env.example` 的 `SESSION_BACKUP_*`。
   備份與正式資料同一個資料卷，異地保存要另外同步。
+
 - **[2026-09-23]** **訊息存語言，Jev 背景校正**：`messages.language` 新欄位，使用者訊息寫入時先用規則判，再在背景問 Jev，
   結果不同才改寫（`JEV_LANGUAGE_ENABLED` 預設 true）。只分 zh／en／es，其他語言與判斷不出來的都算中文。
   36 句比較：Jev 36/36、規則 33/36、主對話 LLM 33/36（`scripts/experiments/lang-detect/`）。
   舊訊息用 `brain/api/scripts/backfill_message_language.py` 逐則問 Jev 補齊（正式 136 則已補：Jev 改掉規則
   判錯的 3 則，含中英混雜的 A2A 測試句與亂碼「su3cl」）。
 
-### Changed
-
-- **[2026-09-23]** **回覆語言跟著使用者**：文字對話回答規則（`core/prompt_templates.py`）與 Live 系統指令
-  （`internal_routes.py`）從「除非使用者要求，一律繁體中文」改成「用使用者最新一句話的語言回答，
-  中文或無法判斷時用繁體中文」。專案 SOUL.md 若寫死語言仍以 SOUL 為準。
-- **[2026-09-23]** **Live 收音轉錄從沒存進歷史**：Gemini 把 `inputTranscription` 包在 `serverContent` 裡，程式只看頂層，
-  語音模式下使用者講的話沒有 `user_transcription` 事件、也沒寫進對話紀錄（`live/gemini_live.py`）。
-- **[2026-09-23]** **Live 回覆與記憶封存每輪重複**：f6d58a1（09-22）讓 `GeminiLiveSession` 自己存回覆與封存，但
-  `internal_routes` 的 Live bridge 原本就會再存一次；正式環境 7 組相鄰 assistant 有 6 組完全相同。
-  bridge 改成只存打字輸入的使用者訊息，其餘交給 `GeminiLiveSession`。既有重複資料未清。
-- **[2026-09-23]** **Live 英西字幕黏字**：逐段輸出轉錄被 `strip()`，字間空格落在段落頭尾而被吃掉（"suciade"），
-  字幕、自訂語音送 TTS 的文字與存進歷史的回覆都受影響（`live/gemini_live.py`、`internal_routes.py`）。
-  實測小鶴 Live 3.8：中英西語音提問都以同語言回覆，講完到出聲 1.7–3.7 秒。
-- **[2026-09-23]** **正式環境設定 `WHISPER_API_KEY`**（沿用 OpenAI key）：openai 轉錄引擎可用，也會進所有專案的
-  ASR 備援鏈（本地引擎全掛時才用）。
-
-### Added
-
 - **[2026-09-23]** **對話紀錄頁補齊 JTI 的歷史紀錄功能**（VH-388）：勾選後可「刪除已選」（新端點
   `POST /brain/sessions/batch-delete`，逐筆回報 deleted／missing，部分不存在不讓整批失敗）；
   列表每頁 50 筆分頁（摘要仍一次抓、排序篩選在前端，只切畫面）；匯出可勾「簡化格式」
   （`simple=true`，每則訊息只留 role、content、created_at）。
+
 - **[2026-09-23]** **對話紀錄依語言篩選**（VH-388 最後一項）：session 摘要多 `language`，列表與匯出都可帶
   `language=` 篩選，後台加「語言」下拉與每筆語言標籤。以最後一則使用者訊息的字元與常用字
   判斷（中日韓看字元、英西看 ¿¡ñ 與常用字），不呼叫模型也不加欄位，舊對話直接可篩。
@@ -914,6 +1449,7 @@
 - **[2026-09-23]** **記憶召回改由 Jev 篩相關記憶**（`memory/auto_recall.py`，`AUTO_RECALL_USE_JEV_FILTER` 預設 true）：
   命中記憶在同一次呼叫逐筆問相關性，≥ 0.5 才條列給主對話，每輪省掉 LLM 摘要那次呼叫
   （實打 535–722 ms）；失敗退回原本的 LLM 摘要。會把記憶原文送 Jev（使用者同意）。
+
 - **[2026-09-23]** **知識庫段落 Jev 篩選**（`search_knowledge`，`RAG_JEV_SCREEN_ENABLED` 預設 false）：逐段問能否當
   答案依據與是否夾帶指令。EVAK 50 題離線：答案段落 54/54 保留、其他段落濾掉 143/196、每題平均剩
   2.1 段；p50 520 ms。每輪強制檢索都會多這段延遲，所以預設關。
@@ -921,6 +1457,7 @@
 - **[2026-09-23]** **後台 Live「自訂語音」接上前端 TTS**：relay 在 `custom` 下會清掉 Gemini 音訊，但後台沒有接 TTS，
   一直無聲。`useLiveSession` 新增 `onAssistantTurnComplete`，每輪 `is_final` 時交出整輪文字，
   聊天頁用既有的 `playTts()`（使用者選的 TTS 供應商與聲音）播放。
+
 - **[2026-09-23]** **語音打斷與 A2A 的 Jev 選用閘門**（backend `app/jev_client.py`，皆預設關）：
   `JEV_INTERRUPT_ENABLED` 讓規則判不出的長句改問 Jev（自寫 30 題規則 23/30、Jev 29/30；逾時 0.6 秒
   或失敗維持中斷）；`A2A_JEV_PREFILTER_ENABLED` 在 Jev 的 no_reply 機率 ≥ 0.9 時省掉整輪 Brain。
@@ -931,6 +1468,7 @@
   5/20，Jev 20/20，實打 Jev 0.89／0.06）。現在問 Jev「這句是否明確要求長期記住」，≥ 0.5 才寫；
   只送當前使用者訊息，2 秒逾時、沒 key 或失敗退回 regex。`JEV_MEMORY_GATE_ENABLED`（預設
   true）、`JEV_GATE_TIMEOUT_SECONDS`（預設 2）。
+
 - **[2026-09-23]** **Jev 影子多問一題 prompt injection**：同一次呼叫加 `injection` noul，log 多 `injection_score`，
   只記不擋；現行 `guardrails.py` 只有 4 條英文 regex、中文攻擊全漏（自寫 20 題 11/20，Jev 20/20）。
 
@@ -945,6 +1483,77 @@
   - 成功呼叫以 `provider=typesafe`、`kind=intent_shadow` 記進 `usage.db`。
   - 新設定 `JEV_SHADOW_*` 與 `TYPESAFE_API_KEY`，見
     `scripts/experiments/jev/OPERATIONS.md`。
+
+### Changed
+
+- **[2026-09-23]** **回覆語言跟著使用者**：文字對話回答規則（`core/prompt_templates.py`）與 Live 系統指令
+  （`internal_routes.py`）從「除非使用者要求，一律繁體中文」改成「用使用者最新一句話的語言回答，
+  中文或無法判斷時用繁體中文」。專案 SOUL.md 若寫死語言仍以 SOUL 為準。
+
+- **[2026-09-23]** **Live 收音轉錄從沒存進歷史**：Gemini 把 `inputTranscription` 包在 `serverContent` 裡，程式只看頂層，
+  語音模式下使用者講的話沒有 `user_transcription` 事件、也沒寫進對話紀錄（`live/gemini_live.py`）。
+
+- **[2026-09-23]** **Live 回覆與記憶封存每輪重複**：f6d58a1（09-22）讓 `GeminiLiveSession` 自己存回覆與封存，但
+  `internal_routes` 的 Live bridge 原本就會再存一次；正式環境 7 組相鄰 assistant 有 6 組完全相同。
+  bridge 改成只存打字輸入的使用者訊息，其餘交給 `GeminiLiveSession`。既有重複資料未清。
+
+- **[2026-09-23]** **Live 英西字幕黏字**：逐段輸出轉錄被 `strip()`，字間空格落在段落頭尾而被吃掉（"suciade"），
+  字幕、自訂語音送 TTS 的文字與存進歷史的回覆都受影響（`live/gemini_live.py`、`internal_routes.py`）。
+  實測小鶴 Live 3.8：中英西語音提問都以同語言回覆，講完到出聲 1.7–3.7 秒。
+
+- **[2026-09-23]** **正式環境設定 `WHISPER_API_KEY`**（沿用 OpenAI key）：openai 轉錄引擎可用，也會進所有專案的
+  ASR 備援鏈（本地引擎全掛時才用）。
+
+### Fixed
+
+- **[2026-09-23]** **Gemini 在模型吐出空參數 tool call 後整輪 400**：模型偶爾呼叫工具卻不帶參數（`arguments=""`），
+  這筆寫回對話歷史後，Gemini OpenAI 相容端點下一輪回 400 `INVALID_ARGUMENT`（dev 實測重現：
+  只有空字串參數是這個錯）。`llm_client` 建 `LLMToolCall` 時把空參數統一成 `"{}"`，參數缺漏
+  交給工具 schema 驗證回報。非串流與串流兩條路徑都處理。
+
+- **[2026-09-23]** **OpenAI ASR 把英文、西語硬轉成中文**：`_transcribe_openai` 寫死 `whisper-1` 與 `language="zh"`，
+  西語句子被翻成中文且翻錯、中文是簡體；base URL 還誤讀 `VISION_LLM_BASE_URL`，設了 VLM 就把語音
+  送到 VLM 閘道。改成不指定語言、模型可設（`ASR_OPENAI_MODEL`，預設 `gpt-4o-mini-transcribe`，中文出
+  繁體、西語正確）、獨立的 `ASR_OPENAI_BASE_URL`。多語實測見 `scripts/experiments/asr-multilingual/REPORT.md`。
+
+- **[2026-09-23]** **Gemini Live 的中文轉錄是簡體**：`inputAudioTranscription`／`outputAudioTranscription` 帶
+  `languageCodes`（新設定 `LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`，預設 `zh-TW`）後直接回繁體
+  （2026-09-23 以 edge-tts 語音實測；單數 `languageCode` 會被 API 拒絕）。
+
+- **[2026-09-23]** **後台 Live 模式完全沒有聲音**：2026-04 把 TTS 從 relay 移到前端時，`brain_live_relay.py` 不分
+  `voice_source` 一律清掉 Gemini 音訊；avatar 送 `custom` 自己跑 `/tts_stream` 沒事，後台聊天頁的
+  「Gemini 語音」只播 relay 送來的音訊，就一直無聲。現在只有 `voice_source=custom` 才清。
+  後台「自訂語音」在 Live 下仍無聲（前端沒有接 TTS），另案處理。
+
+- **[2026-09-23]** **Gemini Live 重連時送訊息可能 AttributeError**：`ensure_connected()` 之後又讀 `self._transport`，
+  中間的 await 期間重連流程可能把它清成 None。改成 `ensure_connected()` 回傳這次的連線物件。
+
+- **[2026-09-23]** **Gemini Live 的 save_memory 沒有任何授權檢查**：文字模式有「使用者明確要求才寫」，Live 的
+  `_save_memory` 直接寫入，模型想存就存。現在兩條路徑共用同一個閘門。
+
+- **[2026-09-23]** **embedding 批次峰值 VRAM 過高**：compose 預設 `EMBEDDING_BATCH_SIZE` 由 32 降到 8。32 段 8000 字
+  實測峰值 5880→2810 MiB、耗時 8.5→5.5 秒；原本加上 VoxCPM 的 10 GB 幾乎吃滿 16 GB 的 A4000。
+
+- **[2026-09-23]** **embedding 服務的 VRAM 只漲不降**：bge-m3 權重約 2 GB，但 PyTorch 會把大批次
+  （`EMBEDDING_BATCH_SIZE=32` × `EMBEDDING_MAX_LENGTH=8192`）的峰值記憶體留在快取
+  裡不還，跑了幾天的容器常駐到約 4.7 GB，擠壓同卡的 VoxCPM。現在每次推論後、
+  仍持有 `EMBEDDING_MAX_CONCURRENCY` semaphore 時呼叫 `torch.cuda.empty_cache()`；
+  以前只在 OOM 重試時才釋放。CPU 裝置不受影響。每次釋放超過 64 MB 會記一行
+  `CUDA cache released texts=… reserved_mb=前->後 allocated_mb=…`，用來觀察常駐量
+  是否仍隨時間上漲。
+
+### Removed
+
+- **[2026-09-23]** **BGE embedding 意圖影子**（`core/intent_shadow.py`、`INTENT_SHADOW_*` 設定、
+  `scripts/experiments/intent-shadow/evaluate.py` 與 `OPERATIONS.md`）：用 centroid
+  相似度猜意圖，2026-09-23 dev 多輪對話實測只有 9/19，並有一筆知識庫問題誤判閒聊。
+  改由 Jev 影子觀測；排程測試移到 `test_jev_shadow.py`。評估報告與逐筆結果保留。
+  embedding 本身仍負責知識庫檢索，不受影響。舊 `.env` 留著 `INTENT_SHADOW_*` 不會出錯
+  （設定忽略未知欄位）。
+
+## [2026-09-22]
+
+### Added
 
 - **[2026-09-22]** **TTS 與 Gemini Live 的用量記帳**：在此之前只有 LLM 呼叫進帳本，Live 與 TTS
   完全沒有計量——`brain/api/live/` 與 TTS router 裡一行記錄都沒有，連「有沒有人
@@ -974,33 +1583,15 @@
     讓「誰擁有帳本」失去單一答案；因此 Backend 改用 HTTP 寫入，與它代理讀取
     `/brain/usage/summary` 的方向對稱。記帳失敗只留 warning，不影響合成結果。
 
-### Removed
-
-- **[2026-10-07]** **BGE-M3 與雲端 embedding 備援**：EmbeddingGemma 2 上線、全部專案重建索引，共用 embedding 端點的 jtai 也切換完成後，移除 BGE-M3（BAAI，供應鏈政策）：gateway 的 BGE 提供者、FlagEmbedding、joblib、Gemini／OpenAI／Voyage embedding 轉接與它們的設定，Brain 的 `bge`／`gemini`／`openai`／`voyage` 版本與 `EMBEDDING_EXPECTED_*`、`EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES`、`EMBEDDING_GEMINI_*`／`OPENAI_*`／`VOYAGE_*` 設定，以及只為這次遷移寫的 `scripts/migrate_embedding_version.py`。Gateway 只剩 `gemma`，沒指定 identity 的呼叫也拿到 Gemma；Brain 的版本機制（新版本寫進另一組資料表、建好前查詢退回）保留給下次換模型。Brain readiness 改成一律檢查 gateway 的模型與維度（原本只在 BGE 時檢查）。各專案舊的 BGE 資料表（`knowledge`、`memories`）Brain 已不再讀寫。
-- **[2026-09-23]** **BGE embedding 意圖影子**（`core/intent_shadow.py`、`INTENT_SHADOW_*` 設定、
-  `scripts/experiments/intent-shadow/evaluate.py` 與 `OPERATIONS.md`）：用 centroid
-  相似度猜意圖，2026-09-23 dev 多輪對話實測只有 9/19，並有一筆知識庫問題誤判閒聊。
-  改由 Jev 影子觀測；排程測試移到 `test_jev_shadow.py`。評估報告與逐筆結果保留。
-  embedding 本身仍負責知識庫檢索，不受影響。舊 `.env` 留著 `INTENT_SHADOW_*` 不會出錯
-  （設定忽略未知欄位）。
-- **[2026-09-22]** **SemIf 本機語意分流實驗退場**: `scripts/experiments/semif/` 的 compose、runner 與
-  操作手冊刪除——它教的是怎麼跑一個結論已定（21/32 題隨選項順序改答案，不採用）的
-  實驗。逐筆結果、`cases.jsonl`（Jev 評估用同一份 fixture）、`runner_used.py`（產生
-  穩定性結果時的程式快照）與 REPORT 保留並改名至 `semif-evidence/`，因為
-  SemIf 報告本身與 `browser-intent/P0-COMPATIBILITY.md` 的結論都引用它們。
-  五處引用改指新路徑或 Jev 報告。
-
-### Experiments
 - **[2026-09-22]** 新增隔離的 Jev 官方 API 分流／語音打斷離線實驗，沿用 SemIf 同一份 48 筆合成案例（fixture SHA256 相符）與統計方式，透過 `typesafe-sdk` 呼叫 `POST /v1/systemone` 的 Choice 問題類型；正反序各一輪共 96 次呼叫全數正確、零順序翻轉，p50 約 258–275 ms。憑證使用根目錄 `.env` 的 `TYPESAFE_API_KEY`，並在 `.env.example` 提供欄位；不變更正式服務路由。
-- **[2026-09-21]** 保存 A2A 隔離私有圈的真實 Hub／SSE／Brain 回覆證據；完成派工、durable enqueue、雙向 ACK 與約 9.55 秒往返，正式 A2A 開關保持關閉。
-- **[2026-09-21]** 追加 SemIf 固定輸入與全排列穩定性診斷：32 題 × 24 種選項順序 × 3 次，保存凍結排程、逐筆分數與輸入 hash，分開統計重跑差異及順序敏感性；同輸入三次完全一致，但 21/32 題隨排列改答案，維持不接管正式路由。
-- **[2026-09-20]** 新增隔離的 SemIf 語意分流／語音打斷離線實驗，提供繁體中文合成案例、固定上游與模型版本、選項順序穩定性及延遲量測；不變更正式服務路由。
 
 ### Changed
+
 - **[2026-09-22]** **用量頁篩選器**: 日期改為快捷區間（最近 7／14／30／90 天、自訂），選快捷時直接
   算好起訖日，不用開兩個日期欄位。Embed key 從手打 ID 改為下拉選單，清單只有
   admin 能讀，非 admin 靜默留空改用手動輸入；選了專案會把金鑰清單縮到該專案。
   `Select` 新增 `label` prop，欄位名稱顯示在觸發器內選中值前面，省掉外面那行標題。
+
 - **[2026-09-22]** **虛擬人前端正式環境改送靜態檔**: `frontend/app` 的 image 原本 runner 跑
   `pnpm dev`——每個使用者打開頁面都在讓 Vite 現場轉譯 TypeScript，掛著 HMR client
   與 esbuild 常駐程序。改成在 builder 內 `pnpm build`，runner 換 `nginx:1.27-alpine`
@@ -1008,38 +1599,25 @@
   hash，被快取會讓舊分頁去要已不存在的 chunk 而白屏），`assets/` 永久快取。
   admin 的 proxy 設定不變。開發熱重載改由 `docker-compose.dev.yml` 以
   `build.target: builder` + `command: pnpm dev` 提供。
+
 - **[2026-09-22]** **前端共用語音核心抽取（ASR / VAD / TTS / 偏好儲存）**：將 `frontend/app`（Vue）與 `frontend/admin`（React）各自維護且漂移的語音辨識、VAD、語音合成與儲存邏輯統一抽取至無框架 TypeScript 模組庫 `frontend/shared/speech/`（`@shared/speech`）。
   - **純音訊工具**：統一 `wav.ts` 音訊編解碼、重採樣與 RMS 音量分析。
   - **ASR 與辨識核心**：統一 `browser-recognizer.ts`、`server-recorder.ts`、`vad-recognizer.ts` 與決策狀態機 `controller.ts`；錯誤訊息集中管理（D6），支援預設伺服器引擎（D1）、瀏覽器故障自動記憶體降級（D2）、閒置自動停止（D3）、VAD 模式（D4/D5）、預設系統設定選項（D7）與樂觀更新還原（D8）。
   - **TTS 串流與排程**：抽取 `pcm-stream.ts`、`scheduler.ts`、`selection.ts`（D9 成對驗證）、`fallback.ts`（D10 讀取並展示 `X-TTS-Fallback-Reason` 後端原因提示）與 `cache.ts`（LRU 快取）。
   - **儲存與相容性**：提供 `storage.ts` 統一使用 `speech.*` 鍵名並具備舊鍵向後相容無縫遷移（D11，舊鍵讀取後遷移且保留不刪）。兩端前端改為純薄層轉接，並更新 Docker 與建置管線以保證兩端各自獨立 build、test 全綠。
 
-- **[2026-09-21]** **後台聊天室接上 ASR 引擎選擇**: 後台聊天室原本寫死瀏覽器內建辨識，跟帳號授權
-  與「語音」頁的設定完全無關——per-account 授權上線時漏了這個介面。現在依帳號
-  生效的引擎決定行為：`browser` 維持連續聆聽、講完自動送；其餘引擎改為錄音後
-  上傳 `/api/v1/asr/transcribe`，按一下收音、再按一次送出。輸入列多一個引擎選單
-  （來源是授權清單 `allowed`，只有一個可選時不顯示）。引擎名稱與說明抽到
-  `components/asrEngines.ts`，跟「語音」頁共用。後端未變更。
 - **[2026-09-22]** **後台伺服器 ASR 引擎加上 VAD**: 伺服器引擎本身沒有斷句，原本只能「按一下錄、
   再按一下送」。改用 Live 模式既有的 Silero VAD（`useVad`，在瀏覽器本機執行，
   聲音不外送）切出每一句，包成 16 kHz WAV 上傳——操作變成跟瀏覽器辨識一樣：開著
   一直聽、講完自動送，「聆聽中／等待語音」也有真的訊號。VAD 起不來時（模型或
   ONNX WASM 載不到，後者來自 jsdelivr CDN）自動退回按鍵錄音。
+
 - **[2026-09-22]** **虛擬人聊天室的伺服器 ASR 引擎加上 VAD**: 同一套 Silero VAD（新增依賴
   `@ricky0123/vad-web`，按麥克風時才動態載入）。模型與 worklet 直接用後台 nginx 在
   同源提供的 `/admin/vad/`，不在版本庫裡再放一份。一次按鍵收一句：講完自動收音
   結束並送出，跟瀏覽器辨識同一種操作；VAD 偵測到講話時提示換成「聆聽中…講完會
   自動送出」。VAD 載不到時退回按鍵錄音並直接開始錄；麥克風權限被拒則照實回報，
   不當成 VAD 故障。
-- **[2026-09-21]** **聊天室語音引擎切換**: 使用者可以替自己的對話選語音辨識引擎，選擇存在帳號上，
-  重開瀏覽器沿用。新增 `browser`（瀏覽器內建辨識，語音留在使用者裝置上，不送到
-  伺服器），以及後台的「開放使用者自選」勾選區決定哪些引擎出現在聊天室選單裡。
-  引擎由後端依帳號查，不接受呼叫端指定，否則管理者的開放清單形同虛設；選過但
-  之後被關閉的引擎會自動回退成全站設定。瀏覽器辨識在不支援的瀏覽器、或使用者
-  拒絕麥克風／沒有麥克風時，當場退回伺服器引擎。後台試辨識與聊天室都會顯示
-  這一次實測到的轉寫耗時。Migration 12 為 `account_defaults` 新增 `asr_provider`。
-
-### Changed
 
 - **[2026-09-22]** **Gemini Live 升級到 `gemini-3.8-live`**：預設模型由 `gemini-3.1-flash-live-preview`
   換成 `gemini-3.8-live`（`brain/api/config.py`）。同時處理遷移文件列出的破壞性
@@ -1055,36 +1633,6 @@
   supported for this model」。
 
 ### Fixed
-
-- **[2026-09-23]** **Gemini 在模型吐出空參數 tool call 後整輪 400**：模型偶爾呼叫工具卻不帶參數（`arguments=""`），
-  這筆寫回對話歷史後，Gemini OpenAI 相容端點下一輪回 400 `INVALID_ARGUMENT`（dev 實測重現：
-  只有空字串參數是這個錯）。`llm_client` 建 `LLMToolCall` 時把空參數統一成 `"{}"`，參數缺漏
-  交給工具 schema 驗證回報。非串流與串流兩條路徑都處理。
-- **[2026-09-23]** **OpenAI ASR 把英文、西語硬轉成中文**：`_transcribe_openai` 寫死 `whisper-1` 與 `language="zh"`，
-  西語句子被翻成中文且翻錯、中文是簡體；base URL 還誤讀 `VISION_LLM_BASE_URL`，設了 VLM 就把語音
-  送到 VLM 閘道。改成不指定語言、模型可設（`ASR_OPENAI_MODEL`，預設 `gpt-4o-mini-transcribe`，中文出
-  繁體、西語正確）、獨立的 `ASR_OPENAI_BASE_URL`。多語實測見 `scripts/experiments/asr-multilingual/REPORT.md`。
-- **[2026-09-23]** **Gemini Live 的中文轉錄是簡體**：`inputAudioTranscription`／`outputAudioTranscription` 帶
-  `languageCodes`（新設定 `LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`，預設 `zh-TW`）後直接回繁體
-  （2026-09-23 以 edge-tts 語音實測；單數 `languageCode` 會被 API 拒絕）。
-- **[2026-09-23]** **後台 Live 模式完全沒有聲音**：2026-04 把 TTS 從 relay 移到前端時，`brain_live_relay.py` 不分
-  `voice_source` 一律清掉 Gemini 音訊；avatar 送 `custom` 自己跑 `/tts_stream` 沒事，後台聊天頁的
-  「Gemini 語音」只播 relay 送來的音訊，就一直無聲。現在只有 `voice_source=custom` 才清。
-  後台「自訂語音」在 Live 下仍無聲（前端沒有接 TTS），另案處理。
-- **[2026-09-23]** **Gemini Live 重連時送訊息可能 AttributeError**：`ensure_connected()` 之後又讀 `self._transport`，
-  中間的 await 期間重連流程可能把它清成 None。改成 `ensure_connected()` 回傳這次的連線物件。
-- **[2026-09-23]** **Gemini Live 的 save_memory 沒有任何授權檢查**：文字模式有「使用者明確要求才寫」，Live 的
-  `_save_memory` 直接寫入，模型想存就存。現在兩條路徑共用同一個閘門。
-- **[2026-09-23]** **embedding 批次峰值 VRAM 過高**：compose 預設 `EMBEDDING_BATCH_SIZE` 由 32 降到 8。32 段 8000 字
-  實測峰值 5880→2810 MiB、耗時 8.5→5.5 秒；原本加上 VoxCPM 的 10 GB 幾乎吃滿 16 GB 的 A4000。
-
-- **[2026-09-23]** **embedding 服務的 VRAM 只漲不降**：bge-m3 權重約 2 GB，但 PyTorch 會把大批次
-  （`EMBEDDING_BATCH_SIZE=32` × `EMBEDDING_MAX_LENGTH=8192`）的峰值記憶體留在快取
-  裡不還，跑了幾天的容器常駐到約 4.7 GB，擠壓同卡的 VoxCPM。現在每次推論後、
-  仍持有 `EMBEDDING_MAX_CONCURRENCY` semaphore 時呼叫 `torch.cuda.empty_cache()`；
-  以前只在 OOM 重試時才釋放。CPU 裝置不受影響。每次釋放超過 64 MB 會記一行
-  `CUDA cache released texts=… reserved_mb=前->後 allocated_mb=…`，用來觀察常駐量
-  是否仍隨時間上漲。
 
 - **[2026-09-22]** **Gemini Live 沒有保存模型回覆，切回文字模式後上下文斷掉**：
   `live/gemini_live.py` 只在 `_save_input_transcription()` 存過使用者發言，模型
@@ -1104,6 +1652,7 @@
   fallback chain 靠 `except ValueError: raise` 讓空回覆不在下一個 hop 重試，型別
   不能改），route 改回 502 `LLM_OVERLOAD` + `retry_after_ms`，並在兩條錯誤路徑都
   記 `log_exception` 帶 trace_id。
+
 - **[2026-09-22]** **按下麥克風後頭一兩秒收不到音**: 兩個前端的 VAD 每次按鍵都重新載套件、抓 ORT
   WASM 與 2 MB 模型、要麥克風、建 worklet，第一次一兩秒、之後幾百毫秒，而畫面在
   這段期間已顯示「等待語音」——開頭說的字其實收不到。改成實例只建一次、跨次按鍵
@@ -1111,51 +1660,52 @@
   `destroy()`），並新增 `starting` 狀態：真的開始收音之前按鈕與輸入框顯示「麥克風
   啟動中…」，不假裝已經在聽。後台 Live 模式共用 `useVad`，一併受惠。`useVad`
   原本沒有測試，補了 7 個。
+
 - **[2026-09-22]** **後台聊天室工具列蓋住輸入框**: 工具列原本 `absolute` 疊在 textarea 上，靠固定的
   `padding-bottom` 預留高度。加上 ASR 引擎選單後控制項換行，工具列長高蓋住正在打的
   字。改放正常流、在 textarea 下方，任何高度都不會蓋到內容。
-- **[2026-09-21]** **虛擬人聊天室重整後設定變回預設**: 知識庫、人物、吉祥物、語音引擎、聲音、背景
-  每次開啟都被帳號預設蓋掉。偏好其實有存，但開場抓清單時 `fetchProjects`／
-  `fetchTtsProviders` 先把欄位清成空字串，store 的 `watch` 把空字串寫回
-  localStorage，接著又直接套 `accountDefault()`。改成先記下還原的值再清空，並讓
-  選過的值優先：仍在清單內就沿用，被收回授權或刪除才退回帳號預設。語音引擎與
-  聲音當成一組判斷；背景的預設值是 `dark`，改用新增的 `hasPref()` 看有沒有存過。
-- **[2026-09-21]** **虛擬人聊天室按了麥克風沒反應**: 按鈕的收音狀態永遠綁瀏覽器辨識，但切換用的是
-  帳號選定的引擎。選了伺服器引擎時按下去其實有在錄音，按鈕卻毫無變化。改成綁
-  實際在收音的引擎；AI 說話時暫停收音的邏輯有同一個錯，一併修正。
-- **[2026-09-21]** **收音狀態看不出來**: 兩個前端都補上明確提示。虛擬人端：收音中按鈕有呼吸動畫
-  （留在按鈕內，不外擴蓋到輸入框）、輸入框提示改成「收音中…」並變色、新增
-  「辨識中」轉圈狀態，另有 `aria-live` 狀態給螢幕閱讀器。後台：按鈕文字依引擎
-  顯示「收音中 · 再按送出」或「聆聽中／等待語音」，辨識中顯示轉圈且不可再按。
+
 - **[2026-09-22]** **後台聊天室沒開 VLM 也有鏡頭按鈕**: 後台從來沒查過 `/vision/health`，按鈕一律
   顯示。新增 `useVisionAvailable`，規則與虛擬人端相同（問到之前與 401 都不顯示、
   5xx 才 fail-open），沒開 VLM 時按鈕整個不出現。
-- **[2026-09-21]** **沒開 VLM 卻出現鏡頭按鈕**: 開場的 `/vision/health` 偶爾跑在工作階段就緒前面
-  而拿到 401，前端的 fail-open 把它當成「後端掛了、先當作可用」。401/403 改為
-  重問一次，仍失敗就維持不顯示；5xx 與網路錯誤照舊 fail-open。
-- **[2026-09-21]** **Prompt 與專案模板預設強制純文字**: 在全域回答規則（`DEFAULT_ANSWER_RULES`、`NO_TOOLS_ANSWER_RULES`）與新專案模板（`WORKSPACE_TEMPLATES`）中明定純文字格式規範，嚴禁 Markdown 格式（`**` 粗體星號、`*` 斜體、`#` 標題、`-` 列表分點或反引號）與 emoji，防止 LLM 在規格與數值周圍輸出星號導致字幕顯示及前端樣式異常。
-- **[2026-09-21]** **語音頁分頁不記位置**: `Tts.tsx` 用裸 `useState`，是後台唯一沒存的頂層分頁。
-  改用 `useLocalStorageState`（`admin.tts.active_tab`，帶允許值清單）。順手補上
-  該檔測試的 `localStorage.clear()`——分頁一旦會持久化，案例之間就會互相污染。
-- **[2026-09-21]** **後台子視圖重整後掉回預設**: 只記了分頁沒記 `?view=`，從沒帶路由的網址進來
-  （登入後轉址就是）會還原分頁卻掉子視圖。改記 `brain-active-sub-view`，且寫在
-  正規化網址的 effect 裡而不是 `applyRoute`——從網址直接進來的路由不經過後者，
-  寫在那邊會讓舊子視圖殘留到沒有子視圖的分頁上。
-- **[2026-09-21]** **偏好寫入在無痕模式會炸掉畫面**: `writePref`／`readPref` 沒有 try/catch，
-  Safari 無痕下 `setItem` 丟 `QuotaExceededError`，而它是從 store 的 `watch()`
-  裡呼叫的，例外會竄進 Vue 的響應式系統。一併補上 `removePref`（同時清掉未綁定
-  的舊鍵，否則 `readPref` 的舊值回退會把它復活）。
-- **[2026-09-21]** **後台下拉選單樣式**: `select.input` 補上 `appearance: none`。先前只有頭像端的
-  `CustomSelect` 修過，後台四處原生 `<select>`（帳號權限、角色、批次臨時帳號）
-  仍由瀏覽器另外畫一層邊框與箭頭，看起來像沒套樣式。一併讓 option 跟著深淺色走。
-- **[2026-09-21]** **回覆深度選項排版**: `.mode-toggle` 原本寫死兩欄，三個選項會排成 2+1，最後一個
-  獨佔一列。改成依選項數平均分欄；窄螢幕仍疊成一欄（`grid-auto-flow` 需一併改回
-  `row`，只覆寫 `grid-template-columns` 蓋不掉）。
-- **[2026-09-21]** **ASR 試辨識上傳音檔**: 修正選了檔案卻顯示「未選擇任何檔案」——清空 input 的
-  `value` 會一併清空 `files`，那行被放在讀取檔案之前。同時把真實檔名一起送出，
-  先前寫死 `preview.webm` 會讓上傳的 mp3 在後端以 webm 解碼而轉檔失敗。
+
+### Removed
+
+- **[2026-09-22]** **SemIf 本機語意分流實驗退場**: `scripts/experiments/semif/` 的 compose、runner 與
+  操作手冊刪除——它教的是怎麼跑一個結論已定（21/32 題隨選項順序改答案，不採用）的
+  實驗。逐筆結果、`cases.jsonl`（Jev 評估用同一份 fixture）、`runner_used.py`（產生
+  穩定性結果時的程式快照）與 REPORT 保留並改名至 `semif-evidence/`，因為
+  SemIf 報告本身與 `browser-intent/P0-COMPATIBILITY.md` 的結論都引用它們。
+  五處引用改指新路徑或 Jev 報告。
+
+## [2026-09-21]
+
+### Added
+
+- **[2026-09-21]** 保存 A2A 隔離私有圈的真實 Hub／SSE／Brain 回覆證據；完成派工、durable enqueue、雙向 ACK 與約 9.55 秒往返，正式 A2A 開關保持關閉。
+
+- **[2026-09-21]** 追加 SemIf 固定輸入與全排列穩定性診斷：32 題 × 24 種選項順序 × 3 次，保存凍結排程、逐筆分數與輸入 hash，分開統計重跑差異及順序敏感性；同輸入三次完全一致，但 21/32 題隨排列改答案，維持不接管正式路由。
+
+- **[2026-09-21]** **Temporary Login Password History**: Admin batch records now show full login passwords with copy controls instead of internal `tmp-…` usernames. New batches save account-bound Fernet ciphertext in auth schema migration 10 while retaining bcrypt login verification. Admin-only batch responses expose nullable `accounts[].password` with `Cache-Control: no-store`; legacy or undecryptable records show「密碼未保存」. `AUTH_TEMPORARY_PASSWORD_SECRET` optionally separates encryption from the session secret. See `docs/operations/account-administration.md` for key preservation and rotation.
+
+- **[2026-09-21]** **Admin Account Management Tabs**: Reorganized the Admin Accounts page into two keyboard-accessible top-level tabs:「建立帳號」(Create Account) and「編輯／管理」(Edit / Manage). The page title and concise tab labels share a compact header without repeated subtitles. Formal account lists and temporary batch history live under management, separate from creation forms. Batch history supports an all/unused/active/expired/revoked status dropdown, matching counts, and refresh without resetting the filter. Newly generated temporary passwords remain available when switching between the main tabs. Account actions retain their resource grants, resource ceilings, credential resets, suspension, session revocation, and safe deletion controls. See `docs/operations/account-administration.md` for the workflow.
 
 ### Changed
+
+- **[2026-09-21]** **後台聊天室接上 ASR 引擎選擇**: 後台聊天室原本寫死瀏覽器內建辨識，跟帳號授權
+  與「語音」頁的設定完全無關——per-account 授權上線時漏了這個介面。現在依帳號
+  生效的引擎決定行為：`browser` 維持連續聆聽、講完自動送；其餘引擎改為錄音後
+  上傳 `/api/v1/asr/transcribe`，按一下收音、再按一次送出。輸入列多一個引擎選單
+  （來源是授權清單 `allowed`，只有一個可選時不顯示）。引擎名稱與說明抽到
+  `components/asrEngines.ts`，跟「語音」頁共用。後端未變更。
+
+- **[2026-09-21]** **聊天室語音引擎切換**: 使用者可以替自己的對話選語音辨識引擎，選擇存在帳號上，
+  重開瀏覽器沿用。新增 `browser`（瀏覽器內建辨識，語音留在使用者裝置上，不送到
+  伺服器），以及後台的「開放使用者自選」勾選區決定哪些引擎出現在聊天室選單裡。
+  引擎由後端依帳號查，不接受呼叫端指定，否則管理者的開放清單形同虛設；選過但
+  之後被關閉的引擎會自動回退成全站設定。瀏覽器辨識在不支援的瀏覽器、或使用者
+  拒絕麥克風／沒有麥克風時，當場退回伺服器引擎。後台試辨識與聊天室都會顯示
+  這一次實測到的轉寫耗時。Migration 12 為 `account_defaults` 新增 `asr_provider`。
 
 - **[2026-09-21]** **Experiment Artifact Hygiene**: Move SemIf console logs to the ignored local logs directory while retaining structured evaluation evidence. Ignore runtime logs and gateway temporary data; scope catalog PDF/CSV exclusions to the actual local artifacts.
 
@@ -1167,18 +1717,93 @@
 
 - **[2026-09-21]** **A2A Validation Readability**: Consolidate absent/blank input and length checks, simplify optional context normalization, and share task/group type regression cases without changing errors or outbound payloads.
 
-- **[2026-09-20]** **Intent Shadow Readability**: Separate centroid initialization from query scoring, centralize observation input limits, and remove redundant test setup without changing classification or scheduling behavior.
-
-- **[2026-09-15]** **Avatar Page Modules**: Split character, background, and mascot panels into `components/avatar/`, with shared asset styles and a `useMascotSnapshotQueue` hook. The page retains form state, asset loading, and the snapshot iframe; tab and upload behavior are unchanged. The snapshot comment now correctly describes recapturing missing thumbnails or URLs outside `/static/mascots/`.
 - **[2026-09-21]** **Embed Key Repository Module**: Move Embed key storage to `auth/embed_keys_repository.py` and shared exception/time primitives to `auth/_repository_base.py`. Keep the existing `auth.repositories` import entry point and declare its public repositories, errors, batch types, constants, and helpers in `__all__`, so wildcard imports include account repositories as well as Embed key symbols. Database transactions and authorization behavior are unchanged. See `docs/operations/account-administration.md` for module boundaries.
+
+### Fixed
+
+- **[2026-09-21]** **虛擬人聊天室重整後設定變回預設**: 知識庫、人物、吉祥物、語音引擎、聲音、背景
+  每次開啟都被帳號預設蓋掉。偏好其實有存，但開場抓清單時 `fetchProjects`／
+  `fetchTtsProviders` 先把欄位清成空字串，store 的 `watch` 把空字串寫回
+  localStorage，接著又直接套 `accountDefault()`。改成先記下還原的值再清空，並讓
+  選過的值優先：仍在清單內就沿用，被收回授權或刪除才退回帳號預設。語音引擎與
+  聲音當成一組判斷；背景的預設值是 `dark`，改用新增的 `hasPref()` 看有沒有存過。
+
+- **[2026-09-21]** **虛擬人聊天室按了麥克風沒反應**: 按鈕的收音狀態永遠綁瀏覽器辨識，但切換用的是
+  帳號選定的引擎。選了伺服器引擎時按下去其實有在錄音，按鈕卻毫無變化。改成綁
+  實際在收音的引擎；AI 說話時暫停收音的邏輯有同一個錯，一併修正。
+
+- **[2026-09-21]** **收音狀態看不出來**: 兩個前端都補上明確提示。虛擬人端：收音中按鈕有呼吸動畫
+  （留在按鈕內，不外擴蓋到輸入框）、輸入框提示改成「收音中…」並變色、新增
+  「辨識中」轉圈狀態，另有 `aria-live` 狀態給螢幕閱讀器。後台：按鈕文字依引擎
+  顯示「收音中 · 再按送出」或「聆聽中／等待語音」，辨識中顯示轉圈且不可再按。
+
+- **[2026-09-21]** **沒開 VLM 卻出現鏡頭按鈕**: 開場的 `/vision/health` 偶爾跑在工作階段就緒前面
+  而拿到 401，前端的 fail-open 把它當成「後端掛了、先當作可用」。401/403 改為
+  重問一次，仍失敗就維持不顯示；5xx 與網路錯誤照舊 fail-open。
+
+- **[2026-09-21]** **Prompt 與專案模板預設強制純文字**: 在全域回答規則（`DEFAULT_ANSWER_RULES`、`NO_TOOLS_ANSWER_RULES`）與新專案模板（`WORKSPACE_TEMPLATES`）中明定純文字格式規範，嚴禁 Markdown 格式（`**` 粗體星號、`*` 斜體、`#` 標題、`-` 列表分點或反引號）與 emoji，防止 LLM 在規格與數值周圍輸出星號導致字幕顯示及前端樣式異常。
+
+- **[2026-09-21]** **語音頁分頁不記位置**: `Tts.tsx` 用裸 `useState`，是後台唯一沒存的頂層分頁。
+  改用 `useLocalStorageState`（`admin.tts.active_tab`，帶允許值清單）。順手補上
+  該檔測試的 `localStorage.clear()`——分頁一旦會持久化，案例之間就會互相污染。
+
+- **[2026-09-21]** **後台子視圖重整後掉回預設**: 只記了分頁沒記 `?view=`，從沒帶路由的網址進來
+  （登入後轉址就是）會還原分頁卻掉子視圖。改記 `brain-active-sub-view`，且寫在
+  正規化網址的 effect 裡而不是 `applyRoute`——從網址直接進來的路由不經過後者，
+  寫在那邊會讓舊子視圖殘留到沒有子視圖的分頁上。
+
+- **[2026-09-21]** **偏好寫入在無痕模式會炸掉畫面**: `writePref`／`readPref` 沒有 try/catch，
+  Safari 無痕下 `setItem` 丟 `QuotaExceededError`，而它是從 store 的 `watch()`
+  裡呼叫的，例外會竄進 Vue 的響應式系統。一併補上 `removePref`（同時清掉未綁定
+  的舊鍵，否則 `readPref` 的舊值回退會把它復活）。
+
+- **[2026-09-21]** **後台下拉選單樣式**: `select.input` 補上 `appearance: none`。先前只有頭像端的
+  `CustomSelect` 修過，後台四處原生 `<select>`（帳號權限、角色、批次臨時帳號）
+  仍由瀏覽器另外畫一層邊框與箭頭，看起來像沒套樣式。一併讓 option 跟著深淺色走。
+
+- **[2026-09-21]** **回覆深度選項排版**: `.mode-toggle` 原本寫死兩欄，三個選項會排成 2+1，最後一個
+  獨佔一列。改成依選項數平均分欄；窄螢幕仍疊成一欄（`grid-auto-flow` 需一併改回
+  `row`，只覆寫 `grid-template-columns` 蓋不掉）。
+
+- **[2026-09-21]** **ASR 試辨識上傳音檔**: 修正選了檔案卻顯示「未選擇任何檔案」——清空 input 的
+  `value` 會一併清空 `files`，那行被放在讀取檔案之前。同時把真實檔名一起送出，
+  先前寫死 `preview.webm` 會讓上傳的 mp3 在後端以 webm 解碼而轉檔失敗。
+
+- **[2026-09-21]** **A2A Skill Validation**: Reject non-string task/group fields, boolean delegation hops, and invalid or oversized context IDs before contacting Backend. Normalize blank context IDs to absent, document the existing UTF-8 byte limit, and align tool declarations. Replace stale error-message expectations with field-specific regression tests and a loopback HTTP transport check.
+
+## [2026-09-20]
 
 ### Added
 
+- **[2026-09-20]** 新增隔離的 SemIf 語意分流／語音打斷離線實驗，提供繁體中文合成案例、固定上游與模型版本、選項順序穩定性及延遲量測；不變更正式服務路由。
+
 - **[2026-09-20]** **Embedding Intent Shadow**: Add opt-in, sampled BGE intent observations for ordinary chat and SSE without changing routing, prompts, or forced knowledge search. Limit each process to one background task with no queue, HTTP timeout, no retries, and failure cooldown; pin embedding identity and omit message text from observation logs. Add fault-injection tests and a frozen 64-case evaluation (52 correct; one knowledge-to-chat error), so predictions remain observational.
+
+### Changed
+
+- **[2026-09-20]** **Intent Shadow Readability**: Separate centroid initialization from query scoring, centralize observation input limits, and remove redundant test setup without changing classification or scheduling behavior.
+
+### Fixed
+
+- **[2026-09-20]** **Interruption Guard**: Handle single-word stop commands before noise filtering; ignore recognized acknowledgements, continue/negated-stop phrases, and quoted background speech while preserving later corrections and new questions. Treat transcript-free `client_interrupt` events as explicit stop controls, preserving the avatar stop action. Add classifier and WebSocket/task-cancellation regression coverage; no model inference is introduced.
+
+## [2026-09-16]
+
+### Added
 
 - **[2026-09-16]** **Collapsible Navigation Groups**: Workspace, Knowledge, and System now collapse independently on desktop and mobile. Group preferences are account-scoped and shared across both menus; the active group opens on initial load and navigation, while other groups default to collapsed.
 
 - **[2026-09-16]** **TTS Preview**: Add `/admin/tts` with authorized provider/voice selection, editable sample text, direct speech playback, cancellation, and actual-provider fallback feedback. Preview uses the existing authenticated speech API and does not create chat history.
+
+### Fixed
+
+- **[2026-09-16]** **Docker Publish Reuse**: Replace last-commit path filtering with fingerprints of committed Docker build inputs, including automatically discovered COPY/ADD sources and ignore files. Reuse only matching published source tags, so multi-commit pushes and cancelled or failed builds cannot relabel stale `latest` images. Pin Backend builds to the resolved base manifest digest, log the complete push range and decision, and run image-reuse regression tests before publishing. The first run rebuilds images that lack fingerprint tags.
+
+- **[2026-09-16]** **Voice Default Consistency**: Derive the provider from registered voice metadata on every defaults write, preserving explicit provider choices for legacy metadata. Grant narrowing now skips replacement voices with unknown providers and clears both voice fields when none are usable; login stays available while the provider list is empty and TTS fails closed. Regression tests cover malformed metadata, login/TTS authorization, all defaults write paths, descendant batch visibility versus mutation rights, and the repository import contract. Correct repository iterable and optional-value type hints.
+
+## [2026-09-15]
+
+### Added
 
 - **[2026-09-15]** **Administrator Delegation**: Administrators can now create administrators and manage the accounts they created directly, instead of every administrator action above `user` requiring ROOT. Role changes and password resets stay ROOT-only, and no administrator can manage its own account through the account APIs.
 
@@ -1189,19 +1814,93 @@
 
   The account list shows the whole delegation subtree, but only directly created accounts are editable — releasing the whole subtree would let a demoted intermediary still reach its grandchildren.
 
+- **[2026-09-15]** **888a2a-lite Agent-to-Agent Network Integration**: Added an optional Backend-owned inbound SSE bridge and Backend-facaded Brain skills for the legacy `/hub/v1` Hub. Private-circle access uses an injected registration-only `A2A_HUB_KEY`; durable SQLite WAL enqueue-before-ACK, replay deduplication, Redis leader coordination, bounded delivery, and anti-echo suppression protect at-least-once processing. Gated by `A2A_ENABLED=false` by default.
+
+- **[2026-09-15]** **2md Web Tool Herd Protection**: Standardized the immutable `TWO_MD_BASE_URLS` order for `web-primary.example.com`, `web-fallback.example.com`, and `web-tertiary.example.com`; added bounded sequential fallback, shared deadlines, full-jitter delays, local single-flight, optional Redis circuit/half-open coordination, usage-safe telemetry, and explicit exclusion of OCR/deep-crawl async features from synchronous chat.
+
+### Changed
+
+- **[2026-09-15]** **Avatar Page Modules**: Split character, background, and mascot panels into `components/avatar/`, with shared asset styles and a `useMascotSnapshotQueue` hook. The page retains form state, asset loading, and the snapshot iframe; tab and upload behavior are unchanged. The snapshot comment now correctly describes recapturing missing thumbnails or URLs outside `/static/mascots/`.
+
+## [2026-09-14]
+
+### Added
+
+- **[2026-09-14]** **Embedding Gateway & Client Exponential Backoff Retries**: Added resilient HTTP retry handling with exponential backoff, jitter, and `Retry-After` header parsing across `GeminiApiProvider`, `OpenAiApiProvider`, and `VoyageApiProvider` in `brain/embedding/registry.py`, as well as `GatewayRemoteTextEmbedder` in `brain/api/memory/embedder.py` for handling HTTP 429 and transient 5xx responses under high concurrency. Local BGE embeddings catch CUDA out-of-memory errors and automatically retry with batch size 1. Configurable via `EMBEDDING_MAX_RETRIES`, `EMBEDDING_RETRY_BASE_DELAY`, and `EMBEDDING_RETRY_MAX_DELAY`.
+
+### Changed
+
+- **[2026-09-14]** **Restore Account Creation Resource Permissions**: Restored resource permissions selection directly within the formal account creation form, allowing administrators to configure grants and default resources during user creation while still retaining the ability to modify permissions from the account list afterwards.
+
 ### Fixed
 
-- **[2026-09-21]** **A2A Skill Validation**: Reject non-string task/group fields, boolean delegation hops, and invalid or oversized context IDs before contacting Backend. Normalize blank context IDs to absent, document the existing UTF-8 byte limit, and align tool declarations. Replace stale error-message expectations with field-specific regression tests and a loopback HTTP transport check.
-
-- **[2026-09-20]** **Interruption Guard**: Handle single-word stop commands before noise filtering; ignore recognized acknowledgements, continue/negated-stop phrases, and quoted background speech while preserving later corrections and new questions. Treat transcript-free `client_interrupt` events as explicit stop controls, preserving the avatar stop action. Add classifier and WebSocket/task-cancellation regression coverage; no model inference is introduced.
-
-- **[2026-09-16]** **Docker Publish Reuse**: Replace last-commit path filtering with fingerprints of committed Docker build inputs, including automatically discovered COPY/ADD sources and ignore files. Reuse only matching published source tags, so multi-commit pushes and cancelled or failed builds cannot relabel stale `latest` images. Pin Backend builds to the resolved base manifest digest, log the complete push range and decision, and run image-reuse regression tests before publishing. The first run rebuilds images that lack fingerprint tags.
-- **[2026-09-16]** **Voice Default Consistency**: Derive the provider from registered voice metadata on every defaults write, preserving explicit provider choices for legacy metadata. Grant narrowing now skips replacement voices with unknown providers and clears both voice fields when none are usable; login stays available while the provider list is empty and TTS fails closed. Regression tests cover malformed metadata, login/TTS authorization, all defaults write paths, descendant batch visibility versus mutation rights, and the repository import contract. Correct repository iterable and optional-value type hints.
 - **[2026-09-14]** **Administrator Scope Fail-Closed**: Runtime lookup errors now abort administrator resource resolution instead of granting unrestricted access. Scope regression tests cover runtime/repository failures, explicit repository injection, resource lists, and ROOT behavior. The account administration guide clarifies existing zero-grant account creation and required access-update validation.
+
 - **[2026-09-14]** **Knowledge Upload Limits**: Admin knowledge and workspace uploads now fetch `GET /api/v1/uploads/limits` before sending files instead of enforcing a hard-coded 5 MiB limit. Backend applies `DOCUMENT_MAX_UPLOAD_BYTES` to raw uploads and text passthrough uploads as well as converted documents, and blocks generic proxy paths from bypassing those handlers.
+
+## [2026-09-10]
+
+### Fixed
+
 - **[2026-09-10]** **Midnight Date Boundaries**: Dreaming compares completion timestamps in `DREAMING_TIMEZONE` (legacy timestamps without an offset are UTC) and uses one configured local date for each cycle's daily memories and report. Admin Usage now uses `Asia/Taipei` for its default dates, inclusive date selection, event display, and trend buckets, sending UTC half-open query boundaries. The timeseries endpoint accepts `report_timezone=UTC|Asia/Taipei` (default UTC).
 
-### Breaking Changes
+## [2026-09-09]
+
+### Added
+
+- **[2026-09-09]** **Administrator Resource Scopes**: Added fine-grained resource ceilings that ROOT can assign to administrators (`admin_resource_scopes` and `admin_scope_state` tables, `AdminScopeRepository`, `GET/PUT /api/v1/users/{user_id}/scope`). Scoped administrators can only see and grant resources within their assigned pool; narrowing a scope transitively revokes out-of-scope grants and repoints dangling defaults, caps assignable options in `/api/v1/users/access-options`, and provides an inline management panel (`AdminScopePanel`) in the Admin Accounts page.
+
+- **[2026-09-09]** **CosyVoice3 TTS Provider**: Added `CosyVoiceAdapter` (`backend/app/providers/cosyvoice_adapter.py`) supporting 臺灣台語 synthesis via CastAgent-compatible `/v1/*` endpoints, integrated into the router fallback chain (IndexTTS → VoxCPM → CosyVoice → Gemini → GCP → AWS → Edge-TTS), health probes (`cosyvoice`), buffered endpoint on `POST /api/v1/tts/stream`, and configured via `TTS_COSYVOICE_URL`, `TTS_COSYVOICE_API_KEY`, `TTS_COSYVOICE_DEFAULT_VOICE`, and `TTS_COSYVOICE_EXCLUDED_VOICES`.
+
+- **[2026-09-09]** **CDI GPU Device Reservations**: Switched compose GPU definitions to Container Device Interface (`driver: cdi`, `nvidia.com/gpu=all`), preventing systemd `daemon-reload` from clearing container GPU cgroup permissions.
+
+## [2026-09-03]
+
+### Added
+
+- **[2026-09-03]** **Admin Usage Page**: New 用量 page showing total LLM calls and tokens, average tokens and latency per call, the average number of LLM calls per conversation turn, provider and model breakdowns, and the recent events grouped by trace so a turn's calls sit together. Filters cover date range, project, principal type (account or embed key), and principal id.
+
+- **[2026-09-03]** **Embed-Key Principal**: Third-party pages can now drive a conversation with a public `X-Embed-Key` instead of a session. A key binds one project, an exact-origin allowlist, default character/persona/voice, a per-minute rate limit, and a daily quota; the fail-closed auth middleware resolves it into a restricted principal limited to chat, characters, TTS providers/stream, speech, health, and character files, emits CORS only for keyed requests, and forwards `X-Principal-Type`/`X-Principal-Id` so the usage ledger can be summarised per key. Administrators manage keys at `/api/v1/embed-keys` and on the new Admin **Embed 金鑰** page.
+
+- **[2026-09-03]** **Repository Security Audit Skill**: Added the versioned `.agents/skills/security-audit` methodology and lock record so future audits use the same reproducible checks. Local Claude/KiloCode symlink aliases remain ignored.
+
+### Changed
+
+- **[2026-09-03]** **VoxCPM Streaming TTS Endpoint**: Connected VoxCPM360's low-latency streaming endpoint (`/api/v1/synthesize/stream`) via `VoxCPMAdapter.open_stream` and `/api/v1/tts/stream`, returning `audio/wav; rate=48000` streams directly from the GPU. Integrated with `frontend/app` (`useTtsStreamer.ts`) for real-time PCM resampling and lip sync, and with `frontend/admin` (`synthesizeSpeech`) to cut synthesis latency down to ~1s without waiting for full MP3 transcoding.
+
+- **[2026-09-03]** **Mascot Auto-play**: When the mascot is expanded, AI text replies automatically play TTS with lip-sync; collapsing it stops the reply that is playing and disables auto-play until it is expanded again. Live voice conversations are not affected by the mascot state.
+
+- **[2026-09-03]** **RRF Retrieval Fusion**: `search_knowledge` now fuses the per-query result lists (AI-rewritten queries plus the original user message) with Reciprocal Rank Fusion instead of comparing raw distances across queries, so a chunk surfaced by several queries ranks first; the fused list keeps up to `KNOWLEDGE_SEARCH_MERGE_LIMIT` (default 5) chunks rather than a single query's `top_k`. Records expose `_rrf_score`.
+
+- **[2026-09-03]** **Admin Streaming TTS Playback**: The Admin chat now plays `/api/v1/tts/stream` responses as they arrive: PCM chunks are scheduled into an AudioContext while the rest is still being synthesised, the mascot receives volume and 16 kHz PCM from the same chunks, and the finished stream is rebuilt into a proper WAV for cache replay. The stream endpoint is used for the automatic provider too, and the Backend routes an unspecified provider to VoxCPM's stream when IndexTTS is not configured.
+
+- **[2026-09-03]** **Follow-up Round Cap**: After the parallel first search round the model may add at most `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS` (default 1) more tool rounds before tools are withdrawn and it must answer, bounding a turn to three LLM calls in the worst case; the prompt also tells the model not to re-search just to double-check.
+
+- **[2026-09-03]** **Web Search Relevance Filter**: `search_web` results are reranked by embedding similarity to the user's question (`WEB_SEARCH_MIN_RELEVANCE`, `WEB_SEARCH_RELEVANCE_RATIO`) and a configurable domain blocklist (`WEB_SEARCH_BLOCKED_DOMAINS`) drops generic pages such as encyclopedia entries; the tool schema now asks the model for specific, place- and entity-qualified queries. Reranking is best-effort and falls back to the engine order when embedding is unavailable.
+
+- **[2026-09-03]** **Parallel First Search Round**: The first LLM call now uses `tool_choice=required` instead of pinning `search_knowledge`, so the model decides in one shot which searches a turn needs; `search_knowledge` is added automatically with the raw user message when it is left out, and knowledge base and `search_web` run in the same parallel round. A question that needs the web now costs two LLM calls instead of three. `FORCED_TOOL_MAX_TOKENS` defaults to 400 to leave room for several calls.
+
+- **[2026-09-03]** **Strict Two-Pass Chat Turn**: An ordinary user turn now always searches the knowledge base before answering. The first LLM call pins `tool_choice` to `search_knowledge` (`CHAT_FORCE_KNOWLEDGE_SEARCH`, default on, applied only when that tool is registered for the persona/project and never over a slash-command forced tool), and later calls drop `search_knowledge` while keeping every other tool such as `search_web` (`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`, default on), so the model can neither answer from memory nor re-query the knowledge base, yet can still reach the web for questions like the weather; an empty provider reply is nudged once before failing. Streaming moved to the answering call, which is the pass that produces the long text; a provider that ignores the forced `tool_choice` and returns text has that text accepted as the answer with a warning instead of looping. Turning both settings off restores the previous `tool_choice=auto` multi-round behaviour.
+
+## [2026-09-02]
+
+### Added
+
+- **[2026-09-02]** **Video Character Mascots**: Admins can register an existing video avatar character as the corner mascot. Mascot visibility follows both mascot and character grants, and host-played TTS is forwarded as 16 kHz mono PCM so the video runtime can lip-sync without duplicate audio output.
+
+- **[2026-09-02]** **First-Class NEN LLM Provider**: Added dedicated `NEN_API_KEY` and `NEN_BASE_URL` settings and explicit `nen:<model>` fallback hops. NEN continues to use the OpenAI-compatible transport while retaining its own provider identity in routing, health, metrics, and usage records, so it no longer occupies the shared primary-provider or OpenAI settings.
+
+- **[2026-09-02]** **Token Usage Ledger**: Brain now records every LLM call (input / output / cached / reasoning tokens, provider, model, latency) into an append-only SQLite ledger at `brain/data/usage.db`, attributed to the user, project, session and trace of the request via a context scope. Streaming calls request `stream_options.include_usage` (toggle `LLM_STREAM_INCLUDE_USAGE`). `/brain/chat` responses carry a per-turn `usage` summary, Brain exposes `/brain/usage/summary` and `/brain/usage/events`, and Backend fronts them at `/api/v1/usage/*` with non-admin accounts scoped to their own user id.
+
+- **[2026-09-02]** **VoxCPM Provider**: Added `VoxCPMAdapter` (`backend/app/providers/voxcpm_adapter.py`) calling the VoxCPM360 gateway's CastAgent-compatible `/api/v1/tts/synthesize`, wired into the fallback chain after IndexTTS, the Admin provider/voice registry, the backend health payload (`voxcpm`), and configured via `TTS_VOXCPM_URL` / `TTS_VOXCPM_API_KEY` / `TTS_VOXCPM_DEFAULT_VOICE`.
+
+- **[2026-09-02]** **Admin Session Management Page**: Added a dedicated Sessions workspace for cross-persona browsing, filtering, sorting, batch export, deletion, and one-click deep links back into Chat.
+
+- **[2026-09-02]** **Filtered Chat Session Export**: Added Admin JSON export for one, selected, or all filtered sessions, including the supported public message metadata while excluding internal-only fields.
+
+- **[2026-09-02]** **Scoped Portal Project Editing**: Allowed portal-enabled formal and temporary accounts to edit explicitly granted project content while reserving project creation, deletion, and global resource mutation for administrators.
+
+### Changed
 
 - **[2026-09-02]** **Unified API Route Families**: The Backend HTTP and WebSocket surface collapses into three families — `/api/v1/*` for the application API, `/v1/audio/*` for OpenAI-compatible endpoints, and `/static/*` for served files. Only `/healthz`, `/metrics`, `/metrics/prometheus`, `/docs`, `/redoc`, and `/openapi.json` stay at the root. Every retired path returns **404** from the Backend and from both nginx configurations: there is no redirect, alias, rewrite, or transition period, and the `410` stubs for the iframe-era embed routes are deleted. Update every caller before deploying.
 
@@ -1236,60 +1935,91 @@
 
   Asset URLs returned by the mascot, background, and character APIs (`vrm_url`, `thumbnail_url`, `url`) now start with `/static/`. The Avatar SDK's documented script URL is `/static/sdk/openvman-avatar-sdk.js` and its default `assetsBaseUrl` is `/static/characters/`.
 
-### Added
-- **[2026-09-15]** **888a2a-lite Agent-to-Agent Network Integration**: Added an optional Backend-owned inbound SSE bridge and Backend-facaded Brain skills for the legacy `/hub/v1` Hub. Private-circle access uses an injected registration-only `A2A_HUB_KEY`; durable SQLite WAL enqueue-before-ACK, replay deduplication, Redis leader coordination, bounded delivery, and anti-echo suppression protect at-least-once processing. Gated by `A2A_ENABLED=false` by default.
-- **[2026-09-15]** **2md Web Tool Herd Protection**: Standardized the immutable `TWO_MD_BASE_URLS` order for `web-primary.example.com`, `web-fallback.example.com`, and `web-tertiary.example.com`; added bounded sequential fallback, shared deadlines, full-jitter delays, local single-flight, optional Redis circuit/half-open coordination, usage-safe telemetry, and explicit exclusion of OCR/deep-crawl async features from synchronous chat.
-- **[2026-09-21]** **Temporary Login Password History**: Admin batch records now show full login passwords with copy controls instead of internal `tmp-…` usernames. New batches save account-bound Fernet ciphertext in auth schema migration 10 while retaining bcrypt login verification. Admin-only batch responses expose nullable `accounts[].password` with `Cache-Control: no-store`; legacy or undecryptable records show「密碼未保存」. `AUTH_TEMPORARY_PASSWORD_SECRET` optionally separates encryption from the session secret. See `docs/operations/account-administration.md` for key preservation and rotation.
-- **[2026-09-14]** **Embedding Gateway & Client Exponential Backoff Retries**: Added resilient HTTP retry handling with exponential backoff, jitter, and `Retry-After` header parsing across `GeminiApiProvider`, `OpenAiApiProvider`, and `VoyageApiProvider` in `brain/embedding/registry.py`, as well as `GatewayRemoteTextEmbedder` in `brain/api/memory/embedder.py` for handling HTTP 429 and transient 5xx responses under high concurrency. Local BGE embeddings catch CUDA out-of-memory errors and automatically retry with batch size 1. Configurable via `EMBEDDING_MAX_RETRIES`, `EMBEDDING_RETRY_BASE_DELAY`, and `EMBEDDING_RETRY_MAX_DELAY`.
-- **[2026-09-21]** **Admin Account Management Tabs**: Reorganized the Admin Accounts page into two keyboard-accessible top-level tabs:「建立帳號」(Create Account) and「編輯／管理」(Edit / Manage). The page title and concise tab labels share a compact header without repeated subtitles. Formal account lists and temporary batch history live under management, separate from creation forms. Batch history supports an all/unused/active/expired/revoked status dropdown, matching counts, and refresh without resetting the filter. Newly generated temporary passwords remain available when switching between the main tabs. Account actions retain their resource grants, resource ceilings, credential resets, suspension, session revocation, and safe deletion controls. See `docs/operations/account-administration.md` for the workflow.
-- **[2026-09-09]** **Administrator Resource Scopes**: Added fine-grained resource ceilings that ROOT can assign to administrators (`admin_resource_scopes` and `admin_scope_state` tables, `AdminScopeRepository`, `GET/PUT /api/v1/users/{user_id}/scope`). Scoped administrators can only see and grant resources within their assigned pool; narrowing a scope transitively revokes out-of-scope grants and repoints dangling defaults, caps assignable options in `/api/v1/users/access-options`, and provides an inline management panel (`AdminScopePanel`) in the Admin Accounts page.
-- **[2026-09-09]** **CosyVoice3 TTS Provider**: Added `CosyVoiceAdapter` (`backend/app/providers/cosyvoice_adapter.py`) supporting 臺灣台語 synthesis via CastAgent-compatible `/v1/*` endpoints, integrated into the router fallback chain (IndexTTS → VoxCPM → CosyVoice → Gemini → GCP → AWS → Edge-TTS), health probes (`cosyvoice`), buffered endpoint on `POST /api/v1/tts/stream`, and configured via `TTS_COSYVOICE_URL`, `TTS_COSYVOICE_API_KEY`, `TTS_COSYVOICE_DEFAULT_VOICE`, and `TTS_COSYVOICE_EXCLUDED_VOICES`.
-- **[2026-09-09]** **CDI GPU Device Reservations**: Switched compose GPU definitions to Container Device Interface (`driver: cdi`, `nvidia.com/gpu=all`), preventing systemd `daemon-reload` from clearing container GPU cgroup permissions.
-- **[2026-09-03]** **Admin Usage Page**: New 用量 page showing total LLM calls and tokens, average tokens and latency per call, the average number of LLM calls per conversation turn, provider and model breakdowns, and the recent events grouped by trace so a turn's calls sit together. Filters cover date range, project, principal type (account or embed key), and principal id.
-- **[2026-09-03]** **Embed-Key Principal**: Third-party pages can now drive a conversation with a public `X-Embed-Key` instead of a session. A key binds one project, an exact-origin allowlist, default character/persona/voice, a per-minute rate limit, and a daily quota; the fail-closed auth middleware resolves it into a restricted principal limited to chat, characters, TTS providers/stream, speech, health, and character files, emits CORS only for keyed requests, and forwards `X-Principal-Type`/`X-Principal-Id` so the usage ledger can be summarised per key. Administrators manage keys at `/api/v1/embed-keys` and on the new Admin **Embed 金鑰** page.
-- **[2026-09-02]** **Video Character Mascots**: Admins can register an existing video avatar character as the corner mascot. Mascot visibility follows both mascot and character grants, and host-played TTS is forwarded as 16 kHz mono PCM so the video runtime can lip-sync without duplicate audio output.
-- **[2026-09-02]** **First-Class NEN LLM Provider**: Added dedicated `NEN_API_KEY` and `NEN_BASE_URL` settings and explicit `nen:<model>` fallback hops. NEN continues to use the OpenAI-compatible transport while retaining its own provider identity in routing, health, metrics, and usage records, so it no longer occupies the shared primary-provider or OpenAI settings.
-- **[2026-09-02]** **Token Usage Ledger**: Brain now records every LLM call (input / output / cached / reasoning tokens, provider, model, latency) into an append-only SQLite ledger at `brain/data/usage.db`, attributed to the user, project, session and trace of the request via a context scope. Streaming calls request `stream_options.include_usage` (toggle `LLM_STREAM_INCLUDE_USAGE`). `/brain/chat` responses carry a per-turn `usage` summary, Brain exposes `/brain/usage/summary` and `/brain/usage/events`, and Backend fronts them at `/api/v1/usage/*` with non-admin accounts scoped to their own user id.
-- **[2026-09-02]** **VoxCPM Provider**: Added `VoxCPMAdapter` (`backend/app/providers/voxcpm_adapter.py`) calling the VoxCPM360 gateway's CastAgent-compatible `/api/v1/tts/synthesize`, wired into the fallback chain after IndexTTS, the Admin provider/voice registry, the backend health payload (`voxcpm`), and configured via `TTS_VOXCPM_URL` / `TTS_VOXCPM_API_KEY` / `TTS_VOXCPM_DEFAULT_VOICE`.
-- **[2026-09-03]** **Repository Security Audit Skill**: Added the versioned `.agents/skills/security-audit` methodology and lock record so future audits use the same reproducible checks. Local Claude/KiloCode symlink aliases remain ignored.
-- **[2026-09-02]** **Admin Session Management Page**: Added a dedicated Sessions workspace for cross-persona browsing, filtering, sorting, batch export, deletion, and one-click deep links back into Chat.
-- **[2026-09-02]** **Filtered Chat Session Export**: Added Admin JSON export for one, selected, or all filtered sessions, including the supported public message metadata while excluding internal-only fields.
-- **[2026-09-02]** **Scoped Portal Project Editing**: Allowed portal-enabled formal and temporary accounts to edit explicitly granted project content while reserving project creation, deletion, and global resource mutation for administrators.
-- **[2026-08-31]** **Watchtower Docker 29 Compatibility**: Configured the default deployment to use Watchtower Docker API `1.44`, matching Docker Engine 29's minimum API requirement while retaining label-only updates.
-- **[2026-08-31]** **Docker Hub Multi-Architecture CI/CD**: Added `docker-publish.yml` using Node.js 24-compatible Docker actions, Buildx, and QEMU. Backend, Admin, and Avatar images publish `linux/amd64` + `linux/arm64`; CUDA/PyTorch Brain API and Embedding images publish `linux/amd64`.
-- **[2026-08-31]** **Worktree HMR Compose Override**: Made `docker-compose.yml` the production-first, public-registry deployment with Watchtower enabled by default, and added `docker-compose.dev.yml` to restore source mounts, Python reload mode, frontend HMR volumes, and Watchtower isolation for Git worktrees.
-- **[2026-08-28]** **GitHub Actions Node.js 24 Runtime**: Upgraded the protocol-contracts workflow to `actions/checkout@v6` and `actions/setup-python@v7` so action internals no longer target the deprecated Node.js 20 runtime.
-- **[2026-08-28]** **External Tool Feature Flags**: Added `URL2MD_SEARCH_ENABLED`, `URL2MD_READ_ENABLED`, and `WIKI_PUBLISH_ENABLED`, all defaulting to `true`; disabled tools are removed from HTTP tool registration and Gemini Live declarations after Brain restart.
-- **[2026-08-28]** **2md Web Tools and David888 Wiki Publisher**: Replaced the legacy URL-only web tool with `search_web(query)` and `read_web_page(url)` backed by `web-primary.example.com`, `web-fallback.example.com`, and `web-tertiary.example.com` fallback order. Added `publish_wiki(path, markdown)` for long reports and sharing; the tool returns only the public `shareUrl`, never the private edit URL. The same tools are available in HTTP chat and Gemini Live sessions.
-- **[2026-08-26]** **ROOT Account Role**: Added a single `ROOT` role above `admin` (`ROOT > admin > user`) with a centralized actor/target policy (`backend/app/auth/policy.py`) enforced at the repository layer, so no access path can skip it. ROOT can create, disable, delete and reset administrators; administrators can only manage regular and temporary accounts and cannot promote themselves. ROOT itself cannot be created, deleted, demoted or reassigned through the admin API. High-privilege operations write audit events that never contain passwords or hashes, and role or password changes immediately revoke the target's sessions. The ROOT username is selected through `AUTH_ROOT_USERNAME`; documentation does not publish the deployed login name.
-- **[2026-08-26]** **Shared Inference Endpoints**: Exposed the embedding and VLM services through the edge nginx under `/api/embedding` and `/api/vlm`, both Bearer-authenticated with rate and connection limits. The embedding base URL is itself the embed endpoint, and an OpenAI-compatible path (`/api/embedding/v1/embeddings`) lets consumers point an off-the-shelf OpenAI client at the service.
-- **[2026-07-08]** **Gemini TTS Provider**: Added `GeminiTTSAdapter` (`backend/app/providers/gemini_tts_adapter.py`) integrating the Gemini TTS Console API into the backend's TTS fallback chain, with dedicated config settings (`TTS_GEMINI_*`) and pytest coverage (`test_gemini_adapter.py`, `test_gemini_config.py`).
-- **[2026-05-28]** **Dynamic Gemini Model Discovery**: Implemented a dynamic model discovery service (`model_discovery.py`) using the `google-genai` SDK to query, filter (for `generateContent` actions), and sort available models dynamically (Pro -> Flash -> Flash-Lite -> Others) with a thread-safe 10-minute TTL cache.
-- **[2026-05-28]** **Dynamic Fallback Chain Generation**: Overhauled fallback chain generation (`models_config.py` and `fallback_chain.py`) to lazily initialize a Gemini client and dynamically expand Gemini provider hops into the dynamically discovered model list.
-- **[2026-05-28]** **Fallback Graceful Degradation**: Added graceful degradation safety net that falls back to static `FALLBACK_MODELS` if dynamic API discovery fails due to network or credential errors.
-- **[2026-05-28]** **Dynamic Model Fallback Testing**: Added comprehensive pytest coverage for dynamic discovery, sorting logic, graceful degradation on error, and fallback chain integration (`test_llm_fallback_chain.py`).
-
-### Changed / Fixed
-- **[2026-09-14]** **Restore Account Creation Resource Permissions**: Restored resource permissions selection directly within the formal account creation form, allowing administrators to configure grants and default resources during user creation while still retaining the ability to modify permissions from the account list afterwards.
-- **[2026-09-03]** **VoxCPM Streaming TTS Endpoint**: Connected VoxCPM360's low-latency streaming endpoint (`/api/v1/synthesize/stream`) via `VoxCPMAdapter.open_stream` and `/api/v1/tts/stream`, returning `audio/wav; rate=48000` streams directly from the GPU. Integrated with `frontend/app` (`useTtsStreamer.ts`) for real-time PCM resampling and lip sync, and with `frontend/admin` (`synthesizeSpeech`) to cut synthesis latency down to ~1s without waiting for full MP3 transcoding.
-- **[2026-09-03]** **Mascot Auto-play**: When the mascot is expanded, AI text replies automatically play TTS with lip-sync; collapsing it stops the reply that is playing and disables auto-play until it is expanded again. Live voice conversations are not affected by the mascot state.
-- **[2026-09-03]** **RRF Retrieval Fusion**: `search_knowledge` now fuses the per-query result lists (AI-rewritten queries plus the original user message) with Reciprocal Rank Fusion instead of comparing raw distances across queries, so a chunk surfaced by several queries ranks first; the fused list keeps up to `KNOWLEDGE_SEARCH_MERGE_LIMIT` (default 5) chunks rather than a single query's `top_k`. Records expose `_rrf_score`.
-- **[2026-09-03]** **Admin Streaming TTS Playback**: The Admin chat now plays `/api/v1/tts/stream` responses as they arrive: PCM chunks are scheduled into an AudioContext while the rest is still being synthesised, the mascot receives volume and 16 kHz PCM from the same chunks, and the finished stream is rebuilt into a proper WAV for cache replay. The stream endpoint is used for the automatic provider too, and the Backend routes an unspecified provider to VoxCPM's stream when IndexTTS is not configured.
-- **[2026-09-03]** **Follow-up Round Cap**: After the parallel first search round the model may add at most `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS` (default 1) more tool rounds before tools are withdrawn and it must answer, bounding a turn to three LLM calls in the worst case; the prompt also tells the model not to re-search just to double-check.
-- **[2026-09-03]** **Web Search Relevance Filter**: `search_web` results are reranked by embedding similarity to the user's question (`WEB_SEARCH_MIN_RELEVANCE`, `WEB_SEARCH_RELEVANCE_RATIO`) and a configurable domain blocklist (`WEB_SEARCH_BLOCKED_DOMAINS`) drops generic pages such as encyclopedia entries; the tool schema now asks the model for specific, place- and entity-qualified queries. Reranking is best-effort and falls back to the engine order when embedding is unavailable.
-- **[2026-09-03]** **Parallel First Search Round**: The first LLM call now uses `tool_choice=required` instead of pinning `search_knowledge`, so the model decides in one shot which searches a turn needs; `search_knowledge` is added automatically with the raw user message when it is left out, and knowledge base and `search_web` run in the same parallel round. A question that needs the web now costs two LLM calls instead of three. `FORCED_TOOL_MAX_TOKENS` defaults to 400 to leave room for several calls.
-- **[2026-09-03]** **Strict Two-Pass Chat Turn**: An ordinary user turn now always searches the knowledge base before answering. The first LLM call pins `tool_choice` to `search_knowledge` (`CHAT_FORCE_KNOWLEDGE_SEARCH`, default on, applied only when that tool is registered for the persona/project and never over a slash-command forced tool), and later calls drop `search_knowledge` while keeping every other tool such as `search_web` (`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`, default on), so the model can neither answer from memory nor re-query the knowledge base, yet can still reach the web for questions like the weather; an empty provider reply is nudged once before failing. Streaming moved to the answering call, which is the pass that produces the long text; a provider that ignores the forced `tool_choice` and returns text has that text accepted as the answer with a warning instead of looping. Turning both settings off restores the previous `tool_choice=auto` multi-round behaviour.
 - **[2026-09-02]** **Bounded Crawler DNS Resolution**: Added a five-second DNS lookup timeout before crawler provider requests so slow or stalled resolution cannot hold a fetch indefinitely.
+
 - **[2026-09-02]** **Security Audit Remediation**: Hardened project authorization for dreaming and session mutations, bound gateway job visibility to submitting accounts, and required administrator access for DLQ inspection. Memory deletion now rejects LanceQL expression syntax; API-managed skills cannot replace executable `main.py` files. Added private-IP SSRF blocking to crawler and 2md URL reads, strict TTS provider/voice authorization, fail-closed embedding authentication, 32-byte JWT secret enforcement, bounded QA image reads, canonical workspace containment, and trust-boundary checks for LLM tool output and long-term memory writes. Removed hardcoded browser WebSocket credentials, wildcard credentialed CORS, Grafana anonymous/default access, widget wildcard messaging, and unsandboxed graph iframe execution.
+
 - **[2026-09-02]** **Admin UI Consistency**: Standardized semantic colors, shared page headings, buttons, and inputs across the Admin portal without changing their behavior.
+
+## [2026-09-01]
+
+### Changed
+
 - **[2026-09-01]** **Production Admin Runtime**: Changed the default Compose stack and Docker Hub workflow to build the Admin `runner` stage instead of the Vite development stage. The runner now retains the shared HTTPS nginx edge routes while serving the pre-built Admin bundle; the worktree override alone selects Vite/HMR.
+
 - **[2026-09-01]** **Memory Listing Runtime Dependency**: Replaced the Admin memory list's implicit pandas conversion with LanceDB's native Arrow records, preserving date ordering, pagination, and vector exclusion without requiring pandas in the production Brain API image.
+
+## [2026-08-31]
+
+### Added
+
+- **[2026-08-31]** **Watchtower Docker 29 Compatibility**: Configured the default deployment to use Watchtower Docker API `1.44`, matching Docker Engine 29's minimum API requirement while retaining label-only updates.
+
+- **[2026-08-31]** **Docker Hub Multi-Architecture CI/CD**: Added `docker-publish.yml` using Node.js 24-compatible Docker actions, Buildx, and QEMU. Backend, Admin, and Avatar images publish `linux/amd64` + `linux/arm64`; CUDA/PyTorch Brain API and Embedding images publish `linux/amd64`.
+
+- **[2026-08-31]** **Worktree HMR Compose Override**: Made `docker-compose.yml` the production-first, public-registry deployment with Watchtower enabled by default, and added `docker-compose.dev.yml` to restore source mounts, Python reload mode, frontend HMR volumes, and Watchtower isolation for Git worktrees.
+
+### Changed
+
 - **[2026-08-31]** **Single-File Default Deployment**: Removed the registry-only Compose override. A fresh host now uses `docker compose up -d --remove-orphans`, defaults to the public `tbdavid2019` namespace, and falls back to Dockerfile builds only when a published image is unavailable.
+
+## [2026-08-28]
+
+### Added
+
+- **[2026-08-28]** **GitHub Actions Node.js 24 Runtime**: Upgraded the protocol-contracts workflow to `actions/checkout@v6` and `actions/setup-python@v7` so action internals no longer target the deprecated Node.js 20 runtime.
+
+- **[2026-08-28]** **External Tool Feature Flags**: Added `URL2MD_SEARCH_ENABLED`, `URL2MD_READ_ENABLED`, and `WIKI_PUBLISH_ENABLED`, all defaulting to `true`; disabled tools are removed from HTTP tool registration and Gemini Live declarations after Brain restart.
+
+- **[2026-08-28]** **2md Web Tools and David888 Wiki Publisher**: Replaced the legacy URL-only web tool with `search_web(query)` and `read_web_page(url)` backed by `web-primary.example.com`, `web-fallback.example.com`, and `web-tertiary.example.com` fallback order. Added `publish_wiki(path, markdown)` for long reports and sharing; the tool returns only the public `shareUrl`, never the private edit URL. The same tools are available in HTTP chat and Gemini Live sessions.
+
+## [2026-08-26]
+
+### Added
+
+- **[2026-08-26]** **ROOT Account Role**: Added a single `ROOT` role above `admin` (`ROOT > admin > user`) with a centralized actor/target policy (`backend/app/auth/policy.py`) enforced at the repository layer, so no access path can skip it. ROOT can create, disable, delete and reset administrators; administrators can only manage regular and temporary accounts and cannot promote themselves. ROOT itself cannot be created, deleted, demoted or reassigned through the admin API. High-privilege operations write audit events that never contain passwords or hashes, and role or password changes immediately revoke the target's sessions. The ROOT username is selected through `AUTH_ROOT_USERNAME`; documentation does not publish the deployed login name.
+
+- **[2026-08-26]** **Shared Inference Endpoints**: Exposed the embedding and VLM services through the edge nginx under `/api/embedding` and `/api/vlm`, both Bearer-authenticated with rate and connection limits. The embedding base URL is itself the embed endpoint, and an OpenAI-compatible path (`/api/embedding/v1/embeddings`) lets consumers point an off-the-shelf OpenAI client at the service.
+
+### Changed
+
 - **[2026-08-26]** **Temporary Credential Redaction**: Temporary accounts previously stored the one-time password itself as the account `username`, so it surfaced in audit-visible fields. The accounts are now renamed to `tmp-<id>`. A first attempt at this migration silently applied to zero rows — it compared the case-preserving locator against the lowercased `username_normalized` — and is superseded by a corrected migration.
+
 - **[2026-08-26]** **Retired `/api/gpu/*` Prefix**: Shared inference now lives at `/api/embedding` and `/api/vlm`. The prefix described a deployment detail rather than the interface, and inference services do not necessarily run on a GPU. `POST /api/embedding/embed` still resolves for consumers already wired to it.
+
+## [2026-08-12]
+
+### Changed
+
 - **[2026-08-12]** **AnyDoc Document Conversion**: Adopted Firecrawl AnyDoc's Rust-backed Python binding for fallback and direct conversion while retaining the existing pdf-inspector and Docling ingestion stages.
+
+## [2026-07-13]
+
+### Changed
+
 - **[2026-07-13]** **Keyless Avatar SDK**: Changed the public Avatar JavaScript SDK to accept host-provided complete audio or 16 kHz mono PCM chunks through `playAudio()` and `pushPcm()`. Removed the public Embed backend API, API-key middleware/store/CLI, and Embed Keys admin page while preserving internal frontend API, WebSocket, and TTS routes.
+
+## [2026-07-08]
+
+### Added
+
+- **[2026-07-08]** **Gemini TTS Provider**: Added `GeminiTTSAdapter` (`backend/app/providers/gemini_tts_adapter.py`) integrating the Gemini TTS Console API into the backend's TTS fallback chain, with dedicated config settings (`TTS_GEMINI_*`) and pytest coverage (`test_gemini_adapter.py`, `test_gemini_config.py`).
+
+### Changed
+
 - **[2026-07-08]** **`.env` Consolidation**: Merged `backend/.env`, `brain/.env`, and the root `.env` into a single root-level `.env` / `.env.example`. `docker-compose.yml`'s `api` and `backend` services now both use `env_file: ./.env`, so deployment only requires maintaining one file (`cp .env.example .env`) instead of three. Along the way, removed a duplicated dead-write `TTS_GEMINI_URL` entry, backfilled missing documented settings (Docling, PDF Inspector/Repair, Avatar uploads, TTS Cache) that existed in `config.py` but not in any example file, and deleted `infra/.env.example` / `backend/index-tts-vllm/.env.example` (never actually wired to an `env_file:` — those values were always sourced via compose `${VAR}` interpolation from the root `.env`).
+
+## [2026-05-28]
+
+### Added
+
+- **[2026-05-28]** **Dynamic Gemini Model Discovery**: Implemented a dynamic model discovery service (`model_discovery.py`) using the `google-genai` SDK to query, filter (for `generateContent` actions), and sort available models dynamically (Pro -> Flash -> Flash-Lite -> Others) with a thread-safe 10-minute TTL cache.
+
+- **[2026-05-28]** **Dynamic Fallback Chain Generation**: Overhauled fallback chain generation (`models_config.py` and `fallback_chain.py`) to lazily initialize a Gemini client and dynamically expand Gemini provider hops into the dynamically discovered model list.
+
+- **[2026-05-28]** **Fallback Graceful Degradation**: Added graceful degradation safety net that falls back to static `FALLBACK_MODELS` if dynamic API discovery fails due to network or credential errors.
+
+- **[2026-05-28]** **Dynamic Model Fallback Testing**: Added comprehensive pytest coverage for dynamic discovery, sorting logic, graceful degradation on error, and fallback chain integration (`test_llm_fallback_chain.py`).
 
 ## [0.10.0] - 2026-05-25
 

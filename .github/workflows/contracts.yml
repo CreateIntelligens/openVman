@@ -18,6 +18,8 @@ on:
       - "scripts/experiments/**"
       - "scripts/voice_e2e/cases/**"
       - "scripts/check_document_privacy.py"
+      - "scripts/check_changelog.py"
+      - "tests/test_changelog.py"
       - "tests/test_document_privacy.py"
       - "contracts/**"
       - "brain/api/protocol/**"
@@ -56,6 +58,12 @@ jobs:
 
       - name: Test documentation privacy checks
         run: python3 -m pytest tests/test_document_privacy.py -q
+
+      - name: Check CHANGELOG has one section per day
+        run: python3 scripts/check_changelog.py
+
+      - name: Test CHANGELOG layout checks
+        run: python3 -m pytest tests/test_changelog.py -q
 
       - name: Run backend protocol tests
         run: python3 -m pytest brain/api/tests/contracts/test_protocol_events.py -v

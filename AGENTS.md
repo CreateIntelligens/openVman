@@ -96,7 +96,7 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 
 ## Documentation & Delivery Policy
 
-- Every code, configuration, architecture, public API, or external integration change MUST update `CHANGELOG.md` under `[Unreleased]` in the same change.
+- Every code, configuration, architecture, public API, or external integration change MUST update `CHANGELOG.md` in the same change. Pushing to `main` deploys, so there is no `[Unreleased]` section: add the entry under the `## [YYYY-MM-DD]` section for the day it ships (create it at the top if missing), start it with `**[YYYY-MM-DD]**` of that day, and put it under the one `### Added`, `### Changed`, `### Security`, `### Fixed` or `### Removed` heading of that section, in that order. CI runs `python3 scripts/check_changelog.py`; `python3 scripts/check_changelog.py --fix` regroups entries that landed in the wrong place (for example after a merge).
 - Every user-visible or operational change MUST update the relevant `README.md` or detailed document in the same change. Brain changes normally update `brain/README.md`; cross-service changes also update the root `README.md`.
 - New tools and external services MUST document their tool names, request/response contract, provider or fallback order, authentication requirements, and important safety rules.
 - Before reporting completion, inspect `git diff --name-only` and `git status --short` and verify that the required changelog and README/documentation updates are included, including untracked files. A code-only change is incomplete.
