@@ -473,3 +473,77 @@ def test_speech_cache_key_changes_with_the_gemini_route(monkeypatch):
     _save_route("relay")
     assert asyncio.run(speak()) == b"relay"
     assert synthesized == ["direct", "relay"]
+
+
+def test_speech_cache_key_changes_when_project_gemini_key_rotates(monkeypatch):
+    """專案更換 Gemini 金鑰時，快取鍵必須改變，且不把原始金鑰寫進快取鍵。"""
+    from types import SimpleNamespace
+
+    from app.auth.models import AccountRole
+    from app.auth.project_gemini_credentials import GeminiCredential
+    from app.providers.base import NormalizedTTSResult
+    from app.routes import tts
+
+    store: dict[str, object] = {}
+    synthesized: list[str] = []
+    active_key = ["project-secret-v1"]
+
+    async def cache_get(key):
+        return store.get(key)
+
+    async def cache_put(key, entry, _ttl):
+        store[key] = entry
+
+    async def plan(*_args, **_kwargs):
+        return SimpleNamespace(provider="gemini-tts", voice="Kore", partners=())
+
+    async def spoken(text, *_args, **_kwargs):
+        return text
+
+    class Service:
+        def synthesize(self, request, **_kwargs):
+            synthesized.append(active_key[0])
+            return SimpleNamespace(
+                result=NormalizedTTSResult(
+                    audio_bytes=active_key[0].encode(), content_type="audio/wav",
+                    sample_rate=24000, provider="gemini-tts",
+                    route_kind="provider", route_target="gemini-tts", latency_ms=1.0,
+                ),
+                fallback=False, fallback_reason="",
+            )
+
+    runtime = SimpleNamespace(
+        config=SimpleNamespace(model_provider_encryption_secret="s" * 32),
+    )
+    monkeypatch.setattr(tts, "get_tts_config", lambda: _config(tts_cache_enabled=True))
+    monkeypatch.setattr(tts, "get_auth_runtime", lambda: runtime)
+    monkeypatch.setattr(
+        tts,
+        "resolve_gemini_credential",
+        lambda _pid, _rt: GeminiCredential(active_key[0], "project", "pgc_1", True),
+    )
+    monkeypatch.setattr(tts, "cache_get", cache_get)
+    monkeypatch.setattr(tts, "cache_put", cache_put)
+    monkeypatch.setattr(tts, "plan_tts_voice", plan)
+    monkeypatch.setattr(tts, "spoken_text", spoken)
+    monkeypatch.setattr(tts, "_get_service", lambda: Service())
+    monkeypatch.setattr(tts.voice_policy, "request_policy", lambda *_a: ("proj-1", None))
+    monkeypatch.setattr(tts.voice_access, "tts_fallback_voice", lambda *_a, **_k: None)
+    current = SimpleNamespace(
+        embed_key=None, api_key=None,
+        user=SimpleNamespace(id="u1", role=AccountRole.ROOT, username="ai360"),
+    )
+
+    async def speak() -> bytes:
+        response = await tts.create_speech(
+            tts.SpeechRequest(input="你好", project_id="proj-1"), current,
+        )
+        await asyncio.sleep(0)
+        return response.body
+
+    assert asyncio.run(speak()) == b"project-secret-v1"
+    assert asyncio.run(speak()) == b"project-secret-v1"  # cache hit
+    active_key[0] = "project-secret-v2"
+    assert asyncio.run(speak()) == b"project-secret-v2"  # rotated key busts cache
+    assert synthesized == ["project-secret-v1", "project-secret-v2"]
+    assert all("project-secret" not in key for key in store)

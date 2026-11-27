@@ -228,6 +228,11 @@ describe("knowledge api", () => {
     expect(result.filename).toBe(DEFAULT_QA_EXPORT_FILENAME);
     expect(parseContentDispositionFilename("attachment; filename*=UTF-8''%ZZ")).toBe(DEFAULT_QA_EXPORT_FILENAME);
     expect(parseContentDispositionFilename('attachment; filename="qa_backup.xlsx"')).toBe("qa_backup.xlsx");
+    expect(parseContentDispositionFilename('attachment; filename="a;b\\"c.xlsx"')).toBe('a;b"c.xlsx');
+    expect(parseContentDispositionFilename("attachment; filename=plain_export.xlsx; size=10")).toBe("plain_export.xlsx");
+    expect(parseContentDispositionFilename(`attachment; filename="${"\\".repeat(5000)}`)).toBe(
+      DEFAULT_QA_EXPORT_FILENAME,
+    );
   });
 
   it("rejects exportQaExcel when the server returns an error status", async () => {

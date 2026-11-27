@@ -136,6 +136,13 @@
 
 ### Security
 
+- **[2026-11-27]** **修補 9 項 CodeQL 靜態分析告警（#205、#208、#210～#216）**：
+  - Backend TTS 快取範圍（`backend/app/routes/tts.py`）：Gemini 金鑰快取識別改以伺服器密鑰做 keyed `hmac.digest(..., "sha256")`，不再對 `api_key` 做無金鑰 `hashlib.sha256`（#211）。
+  - Backend Brain 代理錯誤回應（`backend/app/brain_proxy.py`、`backend/app/auth/brain_project_access.py`）：`_BodyTooLarge`（413）、`InvalidProjectId`（422）與 `AiCleanupRefused`（403）改回傳固定文案或理由碼對照表，不再直接輸出 `str(exc)`（#210、#212、#213）。
+  - Brain 原子寫檔權限（`brain/api/infra/file_lock.py`）：`atomic_write_text` 新檔保留 `mkstemp` 預設 `0o600`、既有檔以 `0o700` 遮罩，不再寫出 `0o644` 或對其他使用者開放權限（#205）；`backend/tests/config/test_single_container_stack.py` 測試 stub 權限由 `0o755` 收緊為 `0o700`（#208）。
+  - 後台 `Content-Disposition` 檔名解析（`frontend/admin/src/api/knowledge.ts`）：移除可造成回溯的引號正則，改為線性掃描（#216）；`PersonaForm.test.tsx` 改用純字串子字串比對取代未錨定網址正則（#215）。
+  - TTS relay 壓測腳本（`scripts/experiments/tts-relay/run.py`）：移除寫死的 `verify=False`，預設啟用 TLS 憑證驗證並新增 `--ca-cert` 供自簽憑證測試使用（#214）。
+
 - **[2026-11-19]** **知識索引不再收進符號連結與硬連結**：重建索引時，`knowledge/` 底下指向工作區其他檔案（例如 `AGENTS.md`）的符號連結會被當成知識收進去，廠商在對話裡就問得到工作規則。`iter_indexable_documents` 與 `iter_knowledge_documents` 現在略過符號連結、經過連結資料夾的檔案（解析後的位置必須和原本路徑相同，所以 `knowledge/` 底下的檔案解析後一定還在 `knowledge/`），以及有其他名稱的硬連結（記 warning）。知識庫清單與快速問答也跟著略過這些檔案；工作區裡一般的文件照舊進索引。
 
 - **[2026-11-18]** **代理層的輸入邊界再收緊**：重複的 `project_id`（query 寫兩次，或 JSON 裡同一個鍵出現兩次）一律回 422，不再取其中一個；轉送前重組 JSON 時改用跳脫輸出，內容含沒配對的 Unicode 代理字元不再變成 500；建立與刪除專案的 body 在 FastAPI 解析前先限制在 64 KiB，超過回 413，不必等整份讀完。

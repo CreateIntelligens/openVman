@@ -15,7 +15,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
-from app.ai_cleanup_guard import AiCleanupRefused, guard_ai_cleanup
+from app.ai_cleanup_guard import (
+    REFUSAL as AI_CLEANUP_REFUSAL,
+    AiCleanupRefused,
+    guard_ai_cleanup,
+)
 from app.auth import brain_project_access
 from app.auth.dependencies import (
     WEB_SEARCH_HEADER,
@@ -482,10 +486,14 @@ async def proxy_to_brain(
         return JSONResponse(status_code=404, content={"detail": "Resource not found"})
     # 先讀 body（受大小上限保護）：授權要看 body 裡的 project_id，不能為了授權
     # 先把整個 body 不設上限地讀進記憶體。
+    max_body_bytes = get_tts_config().brain_proxy_max_body_bytes
     try:
-        body = await _read_capped_body(request, get_tts_config().brain_proxy_max_body_bytes)
-    except _BodyTooLarge as exc:
-        return JSONResponse(status_code=413, content={"detail": str(exc)})
+        body = await _read_capped_body(request, max_body_bytes)
+    except _BodyTooLarge:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": f"請求內容超過上限（{max_body_bytes // (1024 * 1024)} MB）"},
+        )
     if vendor and alias:
         if request.method in {"GET", "DELETE"}:
             fields = [request.query_params.get("path")]
@@ -509,7 +517,10 @@ async def proxy_to_brain(
             content={"detail": "Resource not found"},
         )
     except brain_project_access.InvalidProjectId as exc:
-        return JSONResponse(status_code=422, content={"detail": str(exc)})
+        return JSONResponse(
+            status_code=422,
+            content={"detail": brain_project_access.invalid_project_id_detail(exc.code)},
+        )
     except HTTPException as exc:
         if vendor and exc.status_code == 403:
             return JSONResponse(status_code=403, content={"detail": "沒有權限使用這個功能。"})
@@ -525,8 +536,8 @@ async def proxy_to_brain(
         headers[_PROJECT_WRITES_HEADER] = project_writes
     try:
         body = guard_ai_cleanup(normalized_path, request.method, body, current)
-    except AiCleanupRefused as exc:
-        return JSONResponse(status_code=403, content={"detail": str(exc)})
+    except AiCleanupRefused:
+        return JSONResponse(status_code=403, content={"detail": AI_CLEANUP_REFUSAL})
     # 範圍可能只寫在 body，要讀完 body 才判斷得了。
     refusal = skill_request_refusal(
         request, normalized_path, body, current, project_id,

@@ -57,7 +57,7 @@ def _entrypoint_command(env: dict[str, str]) -> str:
         stub = os.path.join(tmp, "uvicorn")
         with open(stub, "w", encoding="utf-8") as fh:
             fh.write('#!/bin/sh\necho "$@"\n')
-        os.chmod(stub, 0o755)
+        os.chmod(stub, 0o700)
         script = BACKEND_ROOT / "docker/start-backend-container.sh"
         # 腳本會 mkdir /app/logs；換成暫存目錄跑，不碰真實路徑。
         body = script.read_text(encoding="utf-8").replace("/app/logs", f"{tmp}/logs")

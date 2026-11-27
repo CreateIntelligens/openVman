@@ -148,6 +148,16 @@ def test_file_lock_is_reentrant_and_atomic_write_preserves_permissions(tmp_path)
     assert path.read_text() == "updated"
     assert path.stat().st_mode & 0o777 == 0o600
 
+    fresh = tmp_path / "fresh.json"
+    atomic_write_text(fresh, "created")
+    assert fresh.stat().st_mode & 0o777 == 0o600
+
+    world_readable = tmp_path / "wide.json"
+    world_readable.write_text("wide")
+    world_readable.chmod(0o644)
+    atomic_write_text(world_readable, "narrowed")
+    assert world_readable.stat().st_mode & 0o077 == 0
+
 
 def test_shared_skill_state_uses_writable_data_outside_readonly_packages(tmp_path):
     shared = tmp_path / "packages"

@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import random
+import ssl
 import statistics
 import time
 
@@ -97,11 +98,18 @@ async def main():
     parser.add_argument("--rates", type=float, nargs="+", default=[2, 5, 10])
     parser.add_argument("--seconds", type=float, default=20)
     parser.add_argument("--modes", nargs="+", default=["direct", "backend"])
+    parser.add_argument(
+        "--ca-cert",
+        help="Optional CA/certificate PEM path for trusting a local/self-signed HTTPS endpoint",
+    )
     parser.add_argument("--output")
     args = parser.parse_args()
     limits = httpx.Limits(max_connections=500, max_keepalive_connections=100)
     out = []
-    async with httpx.AsyncClient(verify=False, timeout=60, limits=limits) as client:
+    verify: bool | ssl.SSLContext = (
+        ssl.create_default_context(cafile=args.ca_cert) if args.ca_cert else True
+    )
+    async with httpx.AsyncClient(verify=verify, timeout=60, limits=limits) as client:
         for rate in args.rates:
             for mode in args.modes:
                 row = await stage(client, mode, rate, args.seconds, args)

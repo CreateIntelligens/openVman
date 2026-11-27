@@ -41,14 +41,15 @@ def file_lock(path: Path) -> Iterator[None]:
 
 
 def atomic_write_text(path: Path, content: str) -> None:
-    """Publish complete UTF-8 content while preserving existing permissions."""
+    """Publish complete UTF-8 content without exposing the file to other users."""
     path = Path(path)
-    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
+    mode = (path.stat().st_mode & 0o700) if path.exists() else None
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".write-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
-        os.chmod(temporary, mode)
+        if mode is not None and mode != 0o600:
+            os.chmod(temporary, mode)
         os.replace(temporary, path)
     finally:
         Path(temporary).unlink(missing_ok=True)

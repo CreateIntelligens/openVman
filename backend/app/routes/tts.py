@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
+import hmac
 import logging
 from collections.abc import AsyncIterator
 from urllib.parse import quote
@@ -289,9 +289,18 @@ async def create_speech(
                 credential = resolve_gemini_credential(project_id, runtime)
                 project_key = credential.source == "project"
                 if project_key or provider == "gemini-tts":
-                    fingerprint = hashlib.sha256(
-                        credential.api_key.encode("utf-8"),
-                    ).hexdigest()[:12]
+                    runtime_cfg = getattr(runtime, "config", None)
+                    mac_secret = (
+                        getattr(runtime_cfg, "model_provider_encryption_secret", None)
+                        or getattr(runtime_cfg, "session_jwt_secret", None)
+                    )
+                    if not isinstance(mac_secret, str) or not mac_secret.strip():
+                        mac_secret = "openvman-tts-cache-v1"
+                    fingerprint = hmac.digest(
+                        mac_secret.encode("utf-8"),
+                        b"openvman:tts-cache:gemini:v1\0" + credential.api_key.encode("utf-8"),
+                        "sha256",
+                    ).hex()[:12]
                     cache_scope += (
                         f"|project:{project_id}:gemini:"
                         f"{credential.credential_id}:{fingerprint}"

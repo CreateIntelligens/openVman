@@ -278,7 +278,7 @@ describe("PersonaForm saving", () => {
     const loadError = screen.getByRole("alert");
     const section = screen.getByRole("region", { name: "保護規則" });
     const fieldParagraph = within(section).getByText("- https://example.com/long");
-    const extraParagraph = within(section).getByText(/https:\/\/example\.com\/extra/);
+    const extraParagraph = within(section).getByText("https://example.com/extra", { exact: false });
 
     for (const el of [heading, loadError, fieldParagraph, extraParagraph]) {
       expect(el.className).toMatch(/break-words|\[overflow-wrap:anywhere\]/);
