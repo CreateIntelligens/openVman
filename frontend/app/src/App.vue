@@ -210,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { BROWSER_ASR } from "@shared/speech";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import AvatarMotionControls from "./components/avatar/AvatarMotionControls.vue";
@@ -231,8 +231,7 @@ import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { useAsrPreferences } from "./composables/useAsrPreferences";
 import { useAvatarStage } from "./composables/useAvatarStage";
 import { useAvatarConversation } from "./composables/useAvatarConversation";
-import { useAvatarFrameWatchdog } from "./composables/useAvatarFrameWatchdog";
-import { markUserActivated, reportClientEvent, startRafSampler } from "./composables/useClientDiagnostics";
+import { useMediaRecoveryLifecycle } from "./composables/useMediaRecoveryLifecycle";
 import { useAvatarVoiceInput } from "./composables/useAvatarVoiceInput";
 import { useAvatarCamera } from "./composables/useAvatarCamera";
 import { useImmersiveView } from "./composables/useImmersiveView";
@@ -389,33 +388,16 @@ const { handleTtsChange, handleTtsVoiceChange,
   handleReplyModeChange, handleLockedLanguageChange } = useAvatarSettings(settings, bootstrap, showSettings, stage.syncCharacter);
 const { applyAdminHandoff } = useAdminHandoff({ settings, bootstrap, stage, visitor, handleProjectChange });
 
-let stopFrameWatchdog: (() => void) | undefined;
+const { reportPageOpen } = useMediaRecoveryLifecycle({ settings, stage, conversation, getSessionId });
 onMounted(async () => {
-  stopFrameWatchdog = useAvatarFrameWatchdog({
-    media: stage.media,
-    canMonitor: () => conversation.isStarted.value && !rendererDisabled.value
-      && !wasm.motionSnapshot.value.transitioning && !wasm.motionBusy(),
-    autoplayOnPause: () => !wasm.motionEnabled.value,
-    isResponding: () => avatarResponding.value,
-    drawCount: wasm.vendorDrawCount,
-    report: (event, fields) => reportClientEvent(event, {
-      project_id: settings.projectId, session_id: getSessionId() ?? undefined, ...fields,
-    }),
-  });
-  window.addEventListener("pointerdown", markUserActivated, { capture: true, passive: true });
-  startRafSampler();
   await settingsReady();
-  reportClientEvent("page_open", { project_id: settings.projectId, session_id: getSessionId() ?? "" });
+  reportPageOpen();
   const projectReady = bootstrap.fetchInitialProjectData();
   void Promise.allSettled([
     bootstrap.fetchTtsProviders(), bootstrap.fetchBackgrounds(),
     projectReady, camera.fetchVisionHealth(),
     stage.bootstrapRenderer(projectReady),
   ]).then(applyAdminHandoff);
-});
-onUnmounted(() => {
-  stopFrameWatchdog?.();
-  window.removeEventListener("pointerdown", markUserActivated, true);
 });
 </script>
 
