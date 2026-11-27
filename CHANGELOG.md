@@ -27,6 +27,8 @@
 
 ### Fixed
 
+- **[2026-11-27]** **知識庫清單的語言版本排在一起，中文主檔在前**：原本照檔名排，`EVAK_CATALOG.en.md`、`.es.md` 會排在主檔 `EVAK_CATALOG.md` 前面。現在同一份文件的各語言版本（檔名去掉 `.<語言>` 後相同）排在一起，順序是中文主檔、台、en、es、日、韓（`frontend/admin/src/components/kb/helpers.ts` 的 `compareTreeNodes`）；語言標籤不變，中文主檔不加標籤。
+
 - **[2026-11-27]** **後台映像建置 SDK 時補上共用的聲音時鐘檢查檔**：`frontend/admin/Dockerfile` 的 `avatar-sdk-builder` 階段只複製 `frontend/shared/avatar`，SDK 改用 `frontend/shared/speech/tts/playbackClockWatch.ts` 後 Docker Publish 的 admin 映像建置失敗（本機測試抓不到）。補上 COPY，並新增 `tests/test_sdk_docker_inputs.py`（Contracts CI 會跑）：SDK 原始碼引用的每個 `shared/` 檔都要被這個階段複製。
 
 - **[2026-11-27]** **官方前台恢復停住的畫面和聲音**。畫面依序在暫停或回到前景時恢復播放、以影片時間和畫布繪製次數偵測卡頓並嘗試重播、仍卡住時等回答結束再提示重新載入。聲音時鐘停住時先嘗試恢復，必要時由使用者點擊重建並重送原題。重新載入會建立新會話，因為 WebSocket 協定沒有接回舊 session 的欄位。

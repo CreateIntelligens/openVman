@@ -134,6 +134,30 @@ export function isManagedQaDocument(document: KnowledgeDocumentSummary): boolean
   return document.source_type === "qa" && document.qa_attached === true && isInQaStorage(document.path);
 }
 
+// 同一份文件的各語言版本（`型錄.md`、`型錄.en.md`）排在一起，中文主檔在前，
+// 其他語言照這個順序；單純照檔名排，`.en.md` 會排到主檔前面。
+const TREE_LANGUAGE_ORDER = ["zh", "nan", "en", "es", "ja", "ko"];
+const LANGUAGE_SUFFIX = new RegExp(`\\.(${TREE_LANGUAGE_ORDER.join("|")})(\\.[^.]+)$`, "i");
+
+function treeLanguage(node: TreeNode): string {
+  const declared = node.doc?.language;
+  if (declared) return declared.toLowerCase();
+  return node.name.match(LANGUAGE_SUFFIX)?.[1].toLowerCase() ?? "zh";
+}
+
+function languageRank(node: TreeNode): number {
+  const index = TREE_LANGUAGE_ORDER.indexOf(treeLanguage(node));
+  return index === -1 ? TREE_LANGUAGE_ORDER.length : index;
+}
+
+export function compareTreeNodes(a: TreeNode, b: TreeNode): number {
+  if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+  if (a.type === "folder") return a.name.localeCompare(b.name);
+  const group = a.name.replace(LANGUAGE_SUFFIX, "$2").localeCompare(b.name.replace(LANGUAGE_SUFFIX, "$2"));
+  if (group !== 0) return group;
+  return languageRank(a) - languageRank(b) || a.name.localeCompare(b.name);
+}
+
 export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: string[]): TreeNode {
   const root: TreeNode = { name: "knowledge", path: "knowledge", type: "folder", children: [] };
 
@@ -173,10 +197,7 @@ export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: str
   }
 
   function sortChildren(node: TreeNode): void {
-    node.children.sort((a, b) => {
-      if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
+    node.children.sort(compareTreeNodes);
     node.children.forEach(sortChildren);
   }
   sortChildren(root);

@@ -67,6 +67,22 @@ describe("buildTree", () => {
     expect(tree.children[0].children.map((c) => c.name)).toEqual(["spare.md"]);
   });
 
+  it("keeps language versions of a document together with the Chinese master first", () => {
+    const tree = buildTree([
+      doc("knowledge/EVAK_CATALOG.es.md", { source_type: "upload", language: "es" }),
+      doc("knowledge/EVAK_CATALOG.en.md", { source_type: "upload", language: "en" }),
+      doc("knowledge/ABOUT.md", { source_type: "upload", language: "zh" }),
+      doc("knowledge/EVAK_CATALOG.md", { source_type: "upload", language: "zh" }),
+      doc("knowledge/EVAK_CATALOG.ja.md", { source_type: "upload", language: "ja" }),
+      doc("knowledge/EVAK_CATALOG.nan.md", { source_type: "upload", language: "nan" }),
+      doc("knowledge/EVAK_CATALOG.ko.md", { source_type: "upload" }),
+    ], ["knowledge/manuals"]);
+    expect(tree.children.map((c) => c.name)).toEqual([
+      "manuals", "ABOUT.md", "EVAK_CATALOG.md", "EVAK_CATALOG.nan.md", "EVAK_CATALOG.en.md",
+      "EVAK_CATALOG.es.md", "EVAK_CATALOG.ja.md", "EVAK_CATALOG.ko.md",
+    ]);
+  });
+
   it("only hides the QA storage folder", () => {
     const tree = buildTree(
       [doc("knowledge/faq.csv"), doc("knowledge/qa-notes/a.md", { source_type: "upload", qa_attached: undefined })],
