@@ -150,6 +150,8 @@
 
 ### Fixed
 
+- **[2026-11-27]** **角色管理表格模式不再為了一行標題顯示「其他內容」**：SOUL／AGENTS 開頭的 `# 標題` 只是檔名或舊版的角色名稱，扣掉它之後兩份文件都沒有表格以外的段落時，整塊「其他內容（一般不用改）」不顯示（保護規則區原本就這樣處理）；那一行照原樣保留在檔案裡。真的有表格以外的段落時照舊顯示。
+
 - **[2026-11-26]** **runtime 預先壓縮**：avatar image 建置時把 `OpenVmanAvatarRuntime.wasm`／`.js` 先壓成 `.gz`（`gzip -9 -k`），avatar nginx 開 `gzip_static`：收 gzip 的用戶端直接拿到壓縮檔（wasm 5,005,745 → 2,415,902 bytes），不必每個請求現場壓縮（約 0.2 秒 CPU），而且帶 `Content-Length`、`Last-Modified` 與原檔相同，SDK 的存檔比對照常運作。admin 那層的即時 gzip 只在上游沒壓時才作用。
 
 - **[2026-11-26]** **驗證請求不再佔用 Backend 的事件迴圈，卡住時記下卡在哪裡**：`FailClosedAuthMiddleware` 的 `authenticate_request`、preflight 的金鑰白名單比對與錯誤回應的 CORS 判斷都會同步讀 Auth DB（SQLite）與 Redis，現在改在 thread pool 執行；資料庫偶爾卡住時只拖慢那幾個請求，不再讓整個 worker 的串流一起停。`backend/app/loop_lag.py` 另開看門狗執行緒，事件迴圈停住超過門檻兩倍時記一行 `event_loop_stall_stack`（當下的呼叫堆疊），之後再有卡頓能直接看到原因。壓測用的 `resource_monitor.py` 每秒多記 `io_some_ms`／`io_full_ms`（`/proc/pressure/io`，這一秒內等磁碟的毫秒數）。

@@ -434,6 +434,7 @@ export default function PersonaForm({
               </FieldGroup>
             )}
 
+            {(hasExtraContent(docs.soul.draft.other) || hasExtraContent(docs.agents.draft.other)) && (
             <details className="card group px-4 py-3">
               <summary className="cursor-pointer text-sm font-medium text-content">
                 其他內容（一般不用改）
@@ -458,6 +459,7 @@ export default function PersonaForm({
                 />
               </div>
             </details>
+            )}
 
             <GuardrailsSection
               value={docs.guardrails.draft}
@@ -539,6 +541,14 @@ function FieldInput({
       />
     </div>
   );
+}
+
+/**
+ * 欄位以外還有沒有真正的內容。開頭的「# 標題」只是檔名或舊版的角色名稱，單獨一行時不算，
+ * 整塊「其他內容」就不顯示（存檔時那一行照原樣保留）。
+ */
+function hasExtraContent(other: string): boolean {
+  return other.replace(/^#(?!#)[ \t]+.*(?:\n|$)/, "").trim() !== "";
 }
 
 function OtherInput({

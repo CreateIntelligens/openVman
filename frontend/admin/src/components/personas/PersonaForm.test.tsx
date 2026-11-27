@@ -292,3 +292,22 @@ describe("PersonaForm saving", () => {
     expect(within(section).getByText(/禁止談論政治/)).toBeTruthy();
   });
 });
+
+describe("PersonaForm other content", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("hides the other-content box when the files only carry their leading title", async () => {
+    vi.mocked(fetchPersonaSoul).mockResolvedValueOnce({ content: "# 鶴記顧問\n\n## 角色設定\n\n你是顧問。\n\n## 回應風格\n\n- 簡短\n" } as never);
+    vi.mocked(fetchPersonaAgents).mockResolvedValueOnce({ content: "# 諮詢工作流程 (AGENTS)\n\n## 角色與任務\n\n- 查型錄\n", exists: true } as never);
+    render(form());
+    await field("角色設定");
+    expect(screen.queryByText("其他內容（一般不用改）")).toBeNull();
+  });
+
+  it("still shows paragraphs that belong to no field", async () => {
+    vi.mocked(fetchPersonaSoul).mockResolvedValueOnce({ content: "# 鶴記顧問\n\n## 角色設定\n\n你是顧問。\n\n## 備註\n\n展場限定\n" } as never);
+    render(form());
+    await field("角色設定");
+    expect(await screen.findByText("其他內容（一般不用改）")).toBeTruthy();
+  });
+});
