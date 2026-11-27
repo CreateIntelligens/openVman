@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-11-27]** **畫面卡住重新載入後接回同一段對話**：點「畫面卡住了，點一下重新載入」前，把目前對話 id、專案與角色存進這個分頁的 sessionStorage（`frontend/app/src/composables/sessionResume.ts`），載入後取一次就刪；10 分鐘內且專案、角色相同時，即時模式用既有的 `client_init.capabilities.session_id` 接回（Gateway 轉成 `chat_session_id`），文字模式沿用為對話 id。不改協定與後端；對話 id 只留在原本的分頁裡，不會給到別處。畫面上的訊息不補回，接續的是 Brain 端的上下文；開頁紀錄的 `detail` 會標 `resumed_conversation`。
+
 - **[2026-11-27]** **Avatar SDK 卡頓偵測**。人物影片在前景暫停時嘗試重播，影片時間或音訊時鐘持續停住時送出 `VIDEO_STALLED` 或 `AUDIO_STALLED`。宿主可在使用者點擊時呼叫 `rebuildAudio()` 重建音訊。
 
 - **[2026-11-27]** **官方前台用戶端紀錄**。新增需登入的 `POST /api/v1/metrics/client-event`，記錄頁面 ID、事件時間、失敗類型、重試次數、瀏覽器、連線與可見狀態、操作與影片狀態、畫面更新率及專案／會話 ID。每筆附帳號與收件時間，寫入 `backend/logs/client_events.jsonl`，可用 `CLIENT_EVENT_LOG` 改路徑。`POST /api/v1/metrics/turn` 新增選填 `client`，附操作狀態、更新率、影片狀態與失敗類型。
@@ -31,7 +33,7 @@
 
 - **[2026-11-27]** **後台映像建置 SDK 時補上共用的聲音時鐘檢查檔**：`frontend/admin/Dockerfile` 的 `avatar-sdk-builder` 階段只複製 `frontend/shared/avatar`，SDK 改用 `frontend/shared/speech/tts/playbackClockWatch.ts` 後 Docker Publish 的 admin 映像建置失敗（本機測試抓不到）。補上 COPY，並新增 `tests/test_sdk_docker_inputs.py`（Contracts CI 會跑）：SDK 原始碼引用的每個 `shared/` 檔都要被這個階段複製。
 
-- **[2026-11-27]** **官方前台恢復停住的畫面和聲音**。畫面依序在暫停或回到前景時恢復播放、以影片時間和畫布繪製次數偵測卡頓並嘗試重播、仍卡住時等回答結束再提示重新載入。聲音時鐘停住時先嘗試恢復，必要時由使用者點擊重建並重送原題。重新載入會建立新會話，因為 WebSocket 協定沒有接回舊 session 的欄位。
+- **[2026-11-27]** **官方前台恢復停住的畫面和聲音**。畫面依序在暫停或回到前景時恢復播放、以影片時間和畫布繪製次數偵測卡頓並嘗試重播、仍卡住時等回答結束再提示重新載入。聲音時鐘停住時先嘗試恢復，必要時由使用者點擊重建並重送原題。重新載入後 10 分鐘內、同專案同角色會接回同一段對話（見下一條）。
 
 - **[2026-11-27]** **PR Agent 審查兩項修正**：共用 Gemini 金鑰改成先讀版本再讀金鑰，兩次讀取之間剛好換金鑰時，結果只會存進之後不再使用的舊版本快取；`scripts/check_changelog.py` 只把 `## [x.y.z]`（可加 ` - YYYY-MM-DD`）當舊版本段落，其他無法辨識的 `##` 標題（例如 `## [2026-11-27] - release`）一律報錯，不再略過檢查。
 

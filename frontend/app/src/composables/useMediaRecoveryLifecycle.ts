@@ -1,4 +1,5 @@
 import { onMounted, onUnmounted } from "vue";
+import { saveResumeSession, takeResumeSession } from "./sessionResume";
 import { useAvatarFrameWatchdog } from "./useAvatarFrameWatchdog";
 import {
   markUserActivated,
@@ -33,6 +34,14 @@ export function useMediaRecoveryLifecycle({ settings, stage, conversation, getSe
       isResponding: () => conversation.avatarResponding.value,
       drawCount: wasm.vendorDrawCount,
       report,
+      reload: () => {
+        saveResumeSession({
+          conversationId: conversation.chat.conversationId() ?? "",
+          projectId: settings.projectId,
+          personaId: settings.personaId,
+        });
+        window.location.reload();
+      },
     });
     window.addEventListener("pointerdown", markUserActivated, { capture: true, passive: true });
     startRafSampler();
@@ -42,5 +51,12 @@ export function useMediaRecoveryLifecycle({ settings, stage, conversation, getSe
     window.removeEventListener("pointerdown", markUserActivated, true);
   });
 
-  return { reportPageOpen: () => report("page_open") };
+  /** 設定載入後：記下開頁，並接回重新載入前那段對話（10 分鐘內、同專案同角色）。 */
+  function reportPageOpen(): void {
+    const resumed = takeResumeSession(settings.projectId, settings.personaId);
+    if (resumed) conversation.chat.resumeConversation(resumed);
+    report("page_open", resumed ? { detail: "resumed_conversation" } : {});
+  }
+
+  return { reportPageOpen };
 }
