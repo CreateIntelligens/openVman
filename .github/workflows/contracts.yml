@@ -20,6 +20,7 @@ on:
       - "scripts/check_document_privacy.py"
       - "scripts/check_changelog.py"
       - "tests/test_changelog.py"
+      - "tests/test_sdk_docker_inputs.py"
       - "tests/test_document_privacy.py"
       - "contracts/**"
       - "brain/api/protocol/**"
@@ -64,6 +65,9 @@ jobs:
 
       - name: Test CHANGELOG layout checks
         run: python3 -m pytest tests/test_changelog.py -q
+
+      - name: Check the SDK image stage copies every shared import
+        run: python3 -m pytest tests/test_sdk_docker_inputs.py -q
 
       - name: Run backend protocol tests
         run: python3 -m pytest brain/api/tests/contracts/test_protocol_events.py -v
