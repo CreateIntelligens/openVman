@@ -188,7 +188,7 @@
 
 `source_file` 與 `source_path` 只接受 `knowledge/` 底下的文件，路徑含 `.` 開頭的資料夾（`.qa_images`）也不行，比對前先統一寫法。存回文件前一律讀回比對，讀出來的內容和預期不同（例如答案裡有 `## ` 開頭的行）就回 400，所有檔案與節點都不動；寫到一半失敗會還原檔案、節點與新檔的 meta。
 
-問答存檔、文件頁存檔、刪除、搬移、覆蓋上傳、建立筆記與匯入都進同一把鎖（`knowledge_admin.qa_document_lock`，不可重入），路徑先統一寫法。`GET /knowledge/document` 回 `content_hash`，`PUT` 帶回 `base_hash` 時，載入後被改過就回 409，避免開著的舊全文蓋掉問答剛存的內容；不帶就不檢查。覆蓋上傳已在問答樹上的文件時仍是 QA 文件，並同步節點。
+問答存檔、文件頁存檔、刪除、搬移、覆蓋上傳、建立筆記與匯入都進同一把鎖（`knowledge_admin.qa_document_lock`，不可重入），路徑先統一寫法。`GET /knowledge/document` 回 `content_hash`，`PUT` 帶回 `base_hash` 時，載入後被改過就回 409，避免開著的舊全文蓋掉問答剛存的內容；檔案還不存在時以空字串的雜湊比對；不帶就不檢查。`PUT` 的回應另帶新版本的 `content_hash`。比對與寫入另在 `document_save_lock`（跨行程檔案鎖）裡，與人設 API 共用。覆蓋上傳已在問答樹上的文件時仍是 QA 文件，並同步節點。
 
 已知限制：共用文件在文件頁改題目文字時，系統分不出是改名還是刪舊加新，新題會放進第一個引用的節點。文件頁打錯引號讓 CSV 暫時少很多題時，改回來後拆分回不來，要重新掛。
 
@@ -469,7 +469,7 @@ HTTP Chat、SSE 與 Gemini Live 依已驗證的 `X-OpenVMan-Web-Search` 控制 `
 * 每日日誌依 persona 分目錄（`memory/<persona_id>/`）；長期記憶檢索依記錄 `metadata.persona_id` 過濾（空值或 `global` 為共用）。
 * `AVATAR.json` 記錄 persona 綁定的 avatar 角色（`POST /brain/personas/avatar`）。
 * 管理端點：`GET/POST/DELETE /brain/personas`、`POST /brain/personas/clone`。
-* 角色管理頁的文件端點：`GET/PUT /brain/personas/soul`、`GET/PUT /brain/personas/agents`（`{project_id, persona_id, content}`）與唯讀的 `GET /brain/personas/guardrails`（`{content, template, linked, max_chars, content_hash}`：`content` 是專案目前的內容，未設定或檔案是連結時為空字串；`template` 是建議範本，給有權限的內部帳號一鍵帶入；`linked` 表示檔案是連結；`content_hash` 與工作區文件 API 相同，存檔時當 `base_hash` 帶回，別處改過就回 409）。路徑由角色代號組出；廠商請求（`X-OpenVMan-Vendor`）拒絕符號連結與硬連結，內部請求照一般工作區規則解析，但解析後必須仍是某個角色的 `SOUL.md`／`AGENTS.md`，否則 403。非預設角色要有自己的 `SOUL.md`，只剩 `AGENTS.md` 的孤立資料夾讀寫都回 404；`agents` 在角色有 `SOUL.md` 但還沒有 `AGENTS.md` 時，儲存會建立該角色的 `AGENTS.md`，讀取回 404。保護規則的寫入只走工作區文件 API，需要「改其他設定」（`X-OpenVMan-Project-Writes: edit_settings`）。
+* 角色管理頁的文件端點：`GET/PUT /brain/personas/soul`、`GET/PUT /brain/personas/agents`（`{project_id, persona_id, content, base_hash?}`；GET 回 `{content, content_hash}`，PUT 帶 `base_hash` 且檔案已被改過回 409，檔案還不存在時以空字串的雜湊比對，成功回新的 `content_hash`）與唯讀的 `GET /brain/personas/guardrails`（`{content, template, linked, max_chars, content_hash}`：`content` 是專案目前的內容，未設定或檔案是連結時為空字串；`template` 是建議範本，給有權限的內部帳號一鍵帶入；`linked` 表示檔案是連結；`content_hash` 與工作區文件 API 相同，存檔時當 `base_hash` 帶回，別處改過就回 409）。路徑由角色代號組出；廠商請求（`X-OpenVMan-Vendor`）拒絕符號連結與硬連結，內部請求照一般工作區規則解析，但解析後必須仍是某個角色的 `SOUL.md`／`AGENTS.md`，否則 403。非預設角色要有自己的 `SOUL.md`，只剩 `AGENTS.md` 的孤立資料夾讀寫都回 404；`agents` 在角色有 `SOUL.md` 但還沒有 `AGENTS.md` 時，儲存會建立該角色的 `AGENTS.md`，讀取回 404。保護規則的寫入只走工作區文件 API，需要「改其他設定」（`X-OpenVMan-Project-Writes: edit_settings`）。
 
 ### 13. 對話紀錄 (Sessions)
 

@@ -356,6 +356,28 @@ def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+def saved_content_hash(content: str) -> str:
+    """Hash ``content`` as the next read of the saved file will see it.
+
+    讀檔用 utf-8-sig 與一般換行模式：開頭的 BOM 會去掉、CRLF 與單獨的 CR 會變成 LF。
+    存檔回給畫面的雜湊要和下次 GET 算出來的一樣，不然下一次存檔就會被當成衝突。
+    """
+    as_read = content.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    return content_hash(as_read)
+
+
+@contextmanager
+def document_save_lock(project_id: str = "default") -> Iterator[None]:
+    """Serialize hash-checked document saves of one project across workers.
+
+    同一份 SOUL.md 會從人設 API（表格）和工作區文件 API（原始文件）兩條路存，兩邊要搶同一把鎖，
+    比對雜湊到寫入之間才不會被插隊。鎖放在專案根目錄的一個固定檔，不在每份文件旁邊留下
+    鎖檔（知識庫資料夾裡多一個檔就刪不掉資料夾）。
+    """
+    with file_lock(get_workspace_root(project_id) / ".document-saves"):
+        yield
+
+
 def write_text_atomic(path: Path, content: str) -> None:
     """Replace ``path`` in one step, so a failed write leaves the old file intact."""
     mode = path.stat().st_mode & 0o777 if path.exists() else 0o644

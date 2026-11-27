@@ -126,7 +126,8 @@ export async function fetchKnowledgeDocument(path: string, vendor = false) {
 export function saveKnowledgeDocument(
   path: string, content: string, baseHash?: string, vendor = false, projectId?: string,
 ) {
-  return put<{ status: string; document: KnowledgeDocumentSummary }>(
+  // content_hash 是剛存好的版本，下一次存檔帶回去；舊版 Brain 沒有這個欄位。
+  return put<{ status: string; document: KnowledgeDocumentSummary; content_hash?: string }>(
     knowledgeDocumentPath("/document", vendor),
     {
       path,

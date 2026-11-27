@@ -93,6 +93,9 @@ export default function Personas() {
        const [selectedPath, setSelectedPath] = useState("");
        const [draftContent, setDraftContent] = useState("");
        const [loadedContent, setLoadedContent] = useState("");
+       // 載入（或上次存好）時的版本，存檔時帶回：表格模式、別的分頁或別的帳號已經存過就會被拒絕，
+       // 不會整份蓋掉別人的修改。被拒時草稿留在編輯器裡。
+       const loadedHash = useRef<string | undefined>(undefined);
 
        const [status, setStatus] = useState<Status>(null);
        const [loadingList, setLoadingList] = useState(false);
@@ -178,6 +181,7 @@ export default function Personas() {
                      const response = await fetchKnowledgeDocument(path);
                      if (requestId !== latestDocumentRequest.current) return;
                      setSelectedPath(response.path);
+                     loadedHash.current = response.content_hash;
                      setDraftContent(response.content);
                      setLoadedContent(response.content);
               } catch (error) {
@@ -200,6 +204,7 @@ export default function Personas() {
                      return;
               }
               ++latestDocumentRequest.current;
+              loadedHash.current = undefined;
               setLoadingDocument(false);
               setSelectedPath("");
               setDraftContent("");
@@ -228,14 +233,15 @@ export default function Personas() {
               setStatus(null);
 
               try {
-                     await saveKnowledgeDocument(selectedPath, draftContent);
+                     const saved = await saveKnowledgeDocument(selectedPath, draftContent, loadedHash.current);
                      if (requestId !== latestDocumentRequest.current) return;
+                     loadedHash.current = saved?.content_hash;
                      setStatus({ type: "success", message: `已儲存「${personaDocLabel(selectedPath)}」` });
                      setLoadedContent(draftContent);
                      await loadPersonas(selectedPersona?.persona_id);
               } catch (error) {
                      if (requestId === latestDocumentRequest.current) {
-                            setStatus({ type: "error", message: String(error) });
+                            setStatus({ type: "error", message: error instanceof Error ? error.message : String(error) });
                      }
               } finally {
                      setSaving(false);

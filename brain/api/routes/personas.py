@@ -11,10 +11,12 @@ from knowledge.workspace import (
     GUARDRAILS_MAX_CHARS,
     GUARDRAILS_TEMPLATE,
     content_hash,
+    document_save_lock,
     ensure_workspace_scaffold,
     get_workspace_root,
     guardrails_link_problem,
     resolve_workspace_document,
+    saved_content_hash,
     write_text_atomic,
 )
 from personas.personas import (
@@ -148,29 +150,52 @@ class PersonaDocumentPut(BaseModel):
     project_id: str = "default"
     persona_id: str = "default"
     content: str
+    # GET 回的 content_hash；帶了就檢查檔案在載入後沒被別人改過，舊畫面不會整份蓋掉新內容。
+    # 檔案還不存在時以空字串的雜湊為準，兩個人同時新建也只有先存的成功。
+    base_hash: str | None = None
+
+
+STALE_DOCUMENT_DETAIL = "這份文件在你編輯時被改過了，請重新載入後再存檔"
+
+
+def _read_document(path: Path) -> dict[str, str]:
+    content = path.read_text(encoding="utf-8-sig")
+    return {"content": content, "content_hash": content_hash(content)}
+
+
+def _write_document(path: Path, payload: PersonaDocumentPut) -> dict[str, str]:
+    # 和工作區文件 API 共用的跨行程鎖（原始文件模式也存同一份檔案）：比對到寫入之間
+    # 不能被別的存檔插隊。沒帶 base_hash 的舊呼叫方式也進鎖，才不會插進別人的比對與寫入之間。
+    with document_save_lock(payload.project_id):
+        if payload.base_hash:
+            try:
+                current = path.read_text(encoding="utf-8-sig")
+            except FileNotFoundError:
+                current = ""
+            if content_hash(current) != payload.base_hash:
+                raise HTTPException(status_code=409, detail=STALE_DOCUMENT_DETAIL)
+        write_text_atomic(path, payload.content)
+    return {"status": "ok", "content_hash": saved_content_hash(payload.content)}
 
 
 @router.get("/personas/soul", summary="讀取角色的 SOUL.md")
 def get_persona_soul(
     persona_id: str = "default", project_id: str = "default", vendor: VendorRequest = False,
 ):
-    path = _persona_soul_path(persona_id, project_id, vendor)
-    return {"content": path.read_text(encoding="utf-8-sig")}
+    return _read_document(_persona_soul_path(persona_id, project_id, vendor))
 
 
 @router.put("/personas/soul", summary="儲存角色的 SOUL.md")
 def put_persona_soul(payload: PersonaDocumentPut, vendor: VendorRequest = False):
     path = _persona_soul_path(payload.persona_id, payload.project_id, vendor)
-    write_text_atomic(path, payload.content)
-    return {"status": "ok"}
+    return _write_document(path, payload)
 
 
 @router.get("/personas/agents", summary="讀取角色的 AGENTS.md")
 def get_persona_agents(
     persona_id: str = "default", project_id: str = "default", vendor: VendorRequest = False,
 ):
-    path = _persona_document_path(persona_id, project_id, "AGENTS.md", vendor=vendor)
-    return {"content": path.read_text(encoding="utf-8-sig")}
+    return _read_document(_persona_document_path(persona_id, project_id, "AGENTS.md", vendor=vendor))
 
 
 @router.put("/personas/agents", summary="儲存角色的 AGENTS.md")
@@ -178,8 +203,7 @@ def put_persona_agents(payload: PersonaDocumentPut, vendor: VendorRequest = Fals
     path = _persona_document_path(
         payload.persona_id, payload.project_id, "AGENTS.md", create=True, vendor=vendor,
     )
-    write_text_atomic(path, payload.content)
-    return {"status": "ok"}
+    return _write_document(path, payload)
 
 
 @router.get("/personas/guardrails", summary="讀取專案的保護規則（唯讀）")
@@ -194,13 +218,14 @@ def get_persona_guardrails(project_id: str = "default"):
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=422, detail="保護規則的檔案讀不出來，請技術人員檢查檔案內容。") from exc
     # 沒設定時 content 為空字串；template 給有權限的內部帳號一鍵帶入建議內容。
-    # content_hash 與工作區文件 API 相同，存檔時帶回，舊畫面不會蓋掉較新的內容。
+    # content_hash 與工作區文件 API 相同，存檔時帶回，舊畫面不會蓋掉較新的內容；
+    # 檔案還不存在時是空字串的雜湊，兩個人同時第一次建立也只有先存的成功。連結不能存，給空字串。
     return {
         "content": content,
         "template": GUARDRAILS_TEMPLATE,
         "linked": linked,
         "max_chars": GUARDRAILS_MAX_CHARS,
-        "content_hash": content_hash(content) if path.is_file() and not linked else "",
+        "content_hash": "" if linked else content_hash(content),
     }
 
 

@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from knowledge.workspace import ensure_workspace_scaffold
+from knowledge.workspace import content_hash, ensure_workspace_scaffold
 from routes import knowledge, personas
 
 
@@ -37,7 +37,7 @@ def test_vendor_persona_soul_read_write_and_summary():
     route = "/brain/personas/soul"
     for persona_id, path in (("default", workspace / "SOUL.md"), ("support", support / "SOUL.md")):
         assert client.get(route, params={"persona_id": persona_id}, headers=headers).json() == {
-            "content": files[path],
+            "content": files[path], "content_hash": content_hash(files[path]),
         }
         put = client.put(route, headers=headers, json={
             "persona_id": persona_id, "content": "更新後的人設",

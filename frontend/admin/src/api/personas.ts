@@ -93,39 +93,63 @@ export function setPersonaAvatar(
 // 角色管理的讀寫一律帶明確的專案：存檔途中切換專案時，後面的請求不能改用新專案。
 const inProject = (projectId?: string) => projectId ?? getActiveProjectId();
 
+/**
+ * 空字串的 content_hash（Brain 的 sha256 前 16 碼）。檔案還不存在時存檔帶這個值：
+ * 兩個人同時第一次建立，後存的會收到 409，不會蓋掉先存的。Brain 測試釘住同一個值。
+ */
+export const EMPTY_CONTENT_HASH = "e3b0c44298fc1c14";
+
+export interface PersonaDocument {
+  content: string;
+  /** 存檔時當 base_hash 帶回；舊版 Brain 沒有這個欄位。 */
+  content_hash?: string;
+}
+
+export interface PersonaDocumentSaved {
+  status: string;
+  /** 剛存好的版本；下一次存檔帶這個值。 */
+  content_hash?: string;
+}
+
+/** 帶了 base_hash，檔案在載入後被別處改過就會收到 409，不會整份蓋掉別人的修改。 */
+function documentBody(personaId: string, content: string, projectId?: string, baseHash?: string) {
+  return {
+    project_id: inProject(projectId),
+    persona_id: personaId,
+    content,
+    ...(baseHash ? { base_hash: baseHash } : {}),
+  };
+}
+
 export function fetchPersonaSoul(personaId: string, projectId?: string) {
-  return get<{ content: string }>(personaPath("/soul"), {
+  return get<PersonaDocument>(personaPath("/soul"), {
     persona_id: personaId, project_id: inProject(projectId),
   });
 }
 
-export function savePersonaSoul(personaId: string, content: string, projectId?: string) {
-  return put<{ status: string }>(personaPath("/soul"), {
-    project_id: inProject(projectId),
-    persona_id: personaId,
-    content,
-  });
+export function savePersonaSoul(personaId: string, content: string, projectId?: string, baseHash?: string) {
+  return put<PersonaDocumentSaved>(personaPath("/soul"), documentBody(personaId, content, projectId, baseHash));
 }
 
-/** 角色的工作規則（AGENTS.md）。角色還沒有自己的檔案時 `exists` 是 false。 */
-export async function fetchPersonaAgents(personaId: string, projectId?: string) {
+/** 角色的工作規則（AGENTS.md）。角色還沒有自己的檔案時 `exists` 是 false，版本是空字串的雜湊。 */
+export async function fetchPersonaAgents(
+  personaId: string, projectId?: string,
+): Promise<PersonaDocument & { exists: boolean }> {
   try {
-    const response = await get<{ content: string }>(personaPath("/agents"), {
+    const response = await get<PersonaDocument>(personaPath("/agents"), {
       persona_id: personaId, project_id: inProject(projectId),
     });
-    return { content: response.content, exists: true };
+    return { content: response.content, exists: true, content_hash: response.content_hash };
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return { content: "", exists: false };
+    if (error instanceof ApiError && error.status === 404) {
+      return { content: "", exists: false, content_hash: EMPTY_CONTENT_HASH };
+    }
     throw error;
   }
 }
 
-export function savePersonaAgents(personaId: string, content: string, projectId?: string) {
-  return put<{ status: string }>(personaPath("/agents"), {
-    project_id: inProject(projectId),
-    persona_id: personaId,
-    content,
-  });
+export function savePersonaAgents(personaId: string, content: string, projectId?: string, baseHash?: string) {
+  return put<PersonaDocumentSaved>(personaPath("/agents"), documentBody(personaId, content, projectId, baseHash));
 }
 
 export interface GuardrailsResponse {
@@ -136,7 +160,7 @@ export interface GuardrailsResponse {
   /** 檔案是連結：AI 不採用，也不能從這裡改。 */
   linked?: boolean;
   max_chars?: number;
-  /** 存檔時帶回；別處已經改過就會被拒絕，不會蓋掉較新的內容。 */
+  /** 存檔時帶回；別處已經改過就會被拒絕，不會蓋掉較新的內容。還沒有檔案時是空字串的雜湊。 */
   content_hash?: string;
 }
 

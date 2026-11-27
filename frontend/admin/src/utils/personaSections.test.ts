@@ -7,6 +7,7 @@ import {
   parseSections,
   sameSections,
   sectionProblems,
+  serializeChecked,
   serializeSections,
   type SectionDocument,
 } from "./personaSections";
@@ -17,7 +18,13 @@ const edit = (document: SectionDocument, fields: Record<string, string>, other?:
   fields: { ...document.fields, ...fields },
   other: other ?? document.other,
 });
-const save = (document: SectionDocument, title?: string) => serializeSections(document, SOUL_TITLES, { title });
+// 每一次寫回都順便跑存檔前的讀回檢查：合法的文件不能被它擋下。
+const save = (document: SectionDocument, title?: string) => {
+  const checked = serializeChecked(document, SOUL_TITLES, { title });
+  expect(checked.intact).toBe(true);
+  expect(checked.text).toBe(serializeSections(document, SOUL_TITLES, { title }));
+  return checked.text;
+};
 
 // 實際用到的範本：沒改過的文件存檔要一個位元都不差。
 const TEMPLATES = [
@@ -120,7 +127,11 @@ describe("persona sections", () => {
     "# 客服 Persona SOUL\n\n你是客服。\n\n## 角色定位\n- 覆蓋",
     "沒有大標題的人設",
   ])("settles after one save, even with another edit in between: %#", (source) => {
-    const once = save(edit(soul(source), { 回應風格: "溫和親切" }), "客服");
+    const first = edit(soul(source), { 回應風格: "溫和親切" });
+    // 第 3 份會被存檔前檢查擋下（大標題下的 ## 段落會跑到其他內容），讀回檢查要跟著不通過。
+    expect(serializeChecked(first, SOUL_TITLES, { title: "客服" }).intact)
+      .toBe(sectionProblems(first, SOUL_TITLES).length === 0);
+    const once = serializeSections(first, SOUL_TITLES, { title: "客服" });
     const reparsed = soul(once);
     expect(save(reparsed, "客服")).toBe(once);
     const twice = save(edit(reparsed, { 回應風格: "溫和" }), "客服");
@@ -177,5 +188,70 @@ describe("persona sections", () => {
 
     const fenced = edit(parsed, { 角色設定: "你是小安。\n\n```md\n## 說話禁忌\n```" });
     expect(sectionProblems(fenced, SOUL_TITLES)).toEqual([]);
+  });
+});
+
+describe("persona sections regressions (form review 2026-11-27)", () => {
+  const agents = (content: string) => parseSections(content, AGENTS_TITLES, "角色與任務");
+
+  it("keeps a custom section out of the field when the last field is cleared", () => {
+    const parsed = agents("# 工作規則\n\n## 角色與任務\n\n回答問題\n\n## 自訂\n\n甲\n");
+    const reparsed = agents(serializeSections(edit(parsed, { 角色與任務: "" }), AGENTS_TITLES));
+    expect(reparsed.fields.角色與任務).toBe("");
+    expect(reparsed.other).toBe("# 工作規則\n\n## 自訂\n\n甲");
+
+    const style = soul("## 回應風格\n\n溫和\n\n## 自訂\n\n甲\n");
+    const cleared = soul(save(edit(style, { 回應風格: "" })));
+    expect(cleared.fields).toEqual({ 角色設定: "", 回應風格: "" });
+    expect(cleared.other).toBe("## 自訂\n\n甲");
+  });
+
+  it("saves paragraphs of other content in the order the user put them", () => {
+    const parsed = soul("## 角色設定\n\nA\n\n## X\n\nx\n\n## Y\n\ny\n");
+    const swapped = "## Y\n\ny\n\n## X\n\nx";
+    expect(soul(save(edit(parsed, {}, swapped))).other).toBe(swapped);
+
+    const around = soul("# 人設\n\n## X\n\nx\n\n## 角色設定\n\nA\n\n## Y\n\ny\n\n## Z\n\nz\n");
+    const reordered = "# 人設\n\n## Z\n\nz\n\n## X\n\nx\n\n## Y\n\ny";
+    const reparsed = soul(save(edit(around, {}, reordered)));
+    expect(reparsed.other).toBe(reordered);
+    expect(reparsed.fields.角色設定).toBe("A");
+  });
+
+  it("does not split YAML front matter into fields", () => {
+    const block = soul("---\ndescription: |\n  ## 角色設定\n  不是欄位\n---\n\n## 角色設定\n\n真的\n");
+    expect(block.fields.角色設定).toBe("真的");
+    expect(block.other).toBe("---\ndescription: |\n  ## 角色設定\n  不是欄位\n---");
+    const edited = soul(save(edit(block, { 角色設定: "改過" })));
+    expect(edited.other).toBe(block.other);
+    expect(edited.fields.角色設定).toBe("改過");
+
+    const comment = soul("---\n## 角色設定\nmodel: a\n---\n\n你是小V。\n");
+    expect(comment.fields.角色設定).toBe("你是小V。");
+    expect(comment.other).toBe("---\n## 角色設定\nmodel: a\n---");
+    expect(save(edit(comment, { 角色設定: "你是小安。" }))).toBe("---\n## 角色設定\nmodel: a\n---\n\n你是小安。\n");
+  });
+
+  it("only counts headings and fences at the top level, not indented inside list items", () => {
+    const heading = soul("## 角色設定\n\n- 項目\n  ## 回應風格\n  子內容\n\n## 回應風格\n\n真的\n");
+    expect(heading.fields).toEqual({ 角色設定: "- 項目\n  ## 回應風格\n  子內容", 回應風格: "真的" });
+    expect(heading.other).toBe("");
+
+    const fence = soul("## 角色設定\n\n1. 範例：\n\n    ```md\n## 回應風格\n示範\n    ```\n\n## 回應風格\n\n真的\n");
+    expect(fence.fields).toEqual({
+      角色設定: "1. 範例：\n\n    ```md\n## 回應風格\n示範\n    ```",
+      回應風格: "真的",
+    });
+    expect(fence.other).toBe("");
+    expect(sectionProblems(fence, SOUL_TITLES)).toEqual([]);
+  });
+
+  it("blocks a save whose result would not read back as the form shows it", () => {
+    const parsed = soul("你是小V。");
+    const unsafe = edit(parsed, { 角色設定: "---\na: 1\n---\n你是小安。" });
+    expect(serializeChecked(unsafe, SOUL_TITLES).intact).toBe(false);
+    expect(serializeChecked(edit(parsed, { 角色設定: "你是小安。" }), SOUL_TITLES)).toEqual({
+      text: "你是小安。\n", intact: true,
+    });
   });
 });

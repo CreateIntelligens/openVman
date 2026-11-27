@@ -152,6 +152,10 @@
 
 ### Fixed
 
+- **[2026-11-27]** **角色管理存檔不再蓋掉別人的修改，表格模式不再把文件拆錯**：
+  - 並行寫入：`GET /brain/personas/soul`、`/brain/personas/agents` 回 `content_hash`，兩者的 `PUT` 接受選填 `base_hash`，檔案在載入後被改過回 409「這份文件在你編輯時被改過了，請重新載入後再存檔」，成功回新的 `content_hash`；不帶 `base_hash` 照舊覆寫。檔案還不存在時以空字串的雜湊比對，`PUT /knowledge/document` 帶 `base_hash` 時也一樣（以前檔案不存在就跳過檢查，兩個人同時第一次建立保護規則會掉一份），回應也帶新的 `content_hash`；`GET /brain/personas/guardrails` 在檔案不存在時的 `content_hash` 改成空字串的雜湊。比對與寫入放進同一把跨行程鎖（`document_save_lock`），人設 API 與工作區文件 API 共用。後台表格模式與原始文件模式都帶 `base_hash`（工作規則、保護規則還沒有檔案時帶空檔案的版本），存好後換成回傳的新版本；被拒時顯示訊息、草稿留在畫面上。Backend 代理原樣轉送，不用改。
+  - 表格拆欄（`personaSections`）：只認頂格、不在程式碼區塊與開頭 YAML front matter 裡的 `## ` 標題，清單裡縮排的標題與縮排的程式碼區塊不再拆成欄位或把真正的欄位擠到其他內容；front matter 裡的 `## 角色設定` 不再變成欄位。清空最後一個欄位時留下空標題，後面的自訂段落不會在下次讀回時被收進欄位；在「其他內容」裡調換段落順序會照新順序存。存檔前把寫出的文字再解析一次，欄位或其他內容讀回來不一樣就不存，並說明原因。
+
 - **[2026-11-27]** **角色管理表格模式不再為了一行標題顯示「其他內容」**：SOUL／AGENTS 開頭的 `# 標題` 只是檔名或舊版的角色名稱，扣掉它之後兩份文件都沒有表格以外的段落時，整塊「其他內容（一般不用改）」不顯示（保護規則區原本就這樣處理）；那一行照原樣保留在檔案裡。真的有表格以外的段落時照舊顯示。
 
 - **[2026-11-26]** **runtime 預先壓縮**：avatar image 建置時把 `OpenVmanAvatarRuntime.wasm`／`.js` 先壓成 `.gz`（`gzip -9 -k`），avatar nginx 開 `gzip_static`：收 gzip 的用戶端直接拿到壓縮檔（wasm 5,005,745 → 2,415,902 bytes），不必每個請求現場壓縮（約 0.2 秒 CPU），而且帶 `Content-Length`、`Last-Modified` 與原檔相同，SDK 的存檔比對照常運作。admin 那層的即時 gzip 只在上游沒壓時才作用。

@@ -257,6 +257,13 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 Backend 驗證廠商帳號後，以內部權杖和 `X-OpenVMan-Vendor` 標頭轉送。人設清單採精簡欄位，`/brain/personas/soul`、`/brain/personas/agents` 由已授權專案與角色代號定位唯一檔案（拒絕符號連結與硬連結），`/brain/personas/guardrails` 只能讀；保護規則的寫入只走工作區文件 API，需要 `edit_settings`。知識庫操作複核實際路徑。廠商對話、SSE、歷史及匯出只回產品需要的欄位，工具呼叫、提示脈絡及模型用量保留在伺服器。完整對外契約見 [Backend 規格](../docs/specs/01_BACKEND_SPEC.md#廠商後台四頁與-api-授權)。
 
+角色文件存檔的版本檢查（表格模式、原始文件模式、兩個分頁或兩個帳號同時改同一份時，後存的不會整份蓋掉先存的）：
+
+- `GET /brain/personas/soul`、`GET /brain/personas/agents` 回 `{content, content_hash}`；`content_hash` 與 `GET /knowledge/document` 同一算法（`knowledge.workspace.content_hash`，UTF-8 的 SHA-256 十六進位前 16 碼），表格模式與原始文件模式看到的是同一個版本。檔案不存在時照舊回 404。
+- `PUT /brain/personas/soul`、`PUT /brain/personas/agents` 接受選填 `base_hash`：帶了就比對檔案目前內容的雜湊，不符回 409，`detail` 為「這份文件在你編輯時被改過了，請重新載入後再存檔」，檔案不動。檔案還不存在（例如角色第一次存自己的 `AGENTS.md`）時以空字串的雜湊 `e3b0c44298fc1c14` 比對，兩個人同時第一次建立，後存的收到 409。不帶 `base_hash` 時不檢查、照舊整份覆寫（給腳本相容）。成功回 `{status: "ok", content_hash}`，`content_hash` 是下一次 GET 會算出的值（已去掉 BOM、CRLF 換成 LF），下一次存檔直接帶它。
+- `PUT /knowledge/document` 帶 `base_hash` 時採同一規則：檔案還不存在也要比對空字串的雜湊（保護規則第一次建立同樣只有先存的成功）；回應另帶新版本的 `content_hash`。`GET /brain/personas/guardrails` 在檔案還不存在時的 `content_hash` 也改成空字串的雜湊，檔案是連結時仍為空字串。
+- 比對與寫入在同一把跨行程鎖裡（`knowledge.workspace.document_save_lock`，以 `infra.file_lock` 鎖專案根目錄的 `.document-saves.lock`）；人設 API 與工作區文件 API 共用這把鎖，因為兩邊會存同一份 `SOUL.md`／`AGENTS.md`。廠商權限、連結檢查與路徑解析都不變。
+
 ### 逐句串流（`POST /brain/chat/stream`）
 
 與 `POST /brain/chat` 同一個請求與流程（共用 `routes/chat.py` 的 `_generate_chat_response`），回應改成 SSE，讓整合方拿第一句就開始 TTS：

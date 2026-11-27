@@ -21,11 +21,12 @@ const PERSONAS = [
 ];
 
 vi.mock("../api", () => ({
+  EMPTY_CONTENT_HASH: "e3b0c44298fc1c14",
   clonePersona: vi.fn(),
   createPersona: vi.fn(),
   deletePersona: vi.fn().mockResolvedValue({ status: "ok" }),
   fetchAvatarCharacters: vi.fn().mockResolvedValue({ characters: [] }),
-  fetchKnowledgeDocument: vi.fn(async (path: string) => ({ path, content: `內容：${path}` })),
+  fetchKnowledgeDocument: vi.fn(async (path: string) => ({ path, content: `內容：${path}`, content_hash: `hash：${path}` })),
   fetchPersonas: vi.fn(async () => ({ personas: PERSONAS })),
   fetchPersonaSoul: vi.fn(async () => ({ content: "# 預設\n\n## 角色設定\n\n小V" })),
   fetchPersonaAgents: vi.fn(async () => ({ content: "工作規則", exists: true })),
@@ -137,10 +138,31 @@ describe("Personas unsaved changes", () => {
 
     fireEvent.change(draft, { target: { value: "新的 AGENTS" } });
     fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
-    await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalledWith("AGENTS.md", "新的 AGENTS"));
+    await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalledWith("AGENTS.md", "新的 AGENTS", "hash：AGENTS.md"));
     await waitFor(() => expect(screen.getByText("已儲存「工作規則」")).toBeTruthy());
     expect((await editor("預設")).value).toBe("新的 AGENTS");
     expect(opened()).toEqual(["SOUL.md", "AGENTS.md"]);
+  });
+
+  it("saves raw documents against the loaded version and keeps the draft when someone else saved first", async () => {
+    const stale = "這份文件在你編輯時被改過了，請重新載入後再存檔";
+    vi.mocked(saveKnowledgeDocument)
+      .mockResolvedValueOnce({ status: "ok", content_hash: "hash-2", document: { path: "SOUL.md" } as never })
+      .mockRejectedValueOnce(new Error(stale));
+    await renderPage();
+    const draft = await editor("預設");
+    await waitFor(() => expect(draft.value).toBe("內容：SOUL.md"));
+
+    fireEvent.change(draft, { target: { value: "第一次" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
+    await waitFor(() => expect(screen.getByText("已儲存「個性與說話方式」")).toBeTruthy());
+
+    fireEvent.change(await editor("預設"), { target: { value: "第二次，別人先存了" } });
+    fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
+    await waitFor(() => expect(screen.getByText(stale)).toBeTruthy());
+    expect(vi.mocked(saveKnowledgeDocument).mock.calls.map((call) => call[2])).toEqual(["hash：SOUL.md", "hash-2"]);
+    expect((await editor("預設")).value).toBe("第二次，別人先存了");
+    expect(opened()).toEqual(["SOUL.md"]);
   });
 
   it("opens the first persona after deleting the selected one", async () => {

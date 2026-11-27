@@ -328,6 +328,7 @@ async def save_knowledge_document_route(
     # 否則開著的舊全文會蓋掉別處剛存的內容。
     def _save() -> dict[str, Any]:
         from knowledge.qa_nodes import is_qa_document, sync_entries_for_source
+        from knowledge.workspace import document_save_lock
 
         with qa_document_lock:
             if vendor:
@@ -335,19 +336,22 @@ async def save_knowledge_document_route(
             path = _check_workspace_document_write(
                 project_writes, payload.path, payload.project_id, payload.content,
             )
-            if payload.base_hash:
+            # 跨行程的鎖包住比對與寫入；還不存在的檔案以空字串的雜湊比對，
+            # 兩個人同時第一次建立（例如保護規則）時後存的會被擋下，不會蓋掉先存的。
+            with document_save_lock(payload.project_id):
+                if payload.base_hash:
+                    try:
+                        current = read_workspace_document(path, payload.project_id).get("content", "")
+                    except FileNotFoundError:
+                        current = ""
+                    if _content_hash(current) != payload.base_hash:
+                        raise HTTPException(
+                            status_code=409, detail="這份文件在你編輯時被改過了，請重新載入後再存檔",
+                        )
                 try:
-                    current = read_workspace_document(path, payload.project_id).get("content", "")
-                except FileNotFoundError:
-                    current = None
-                if current is not None and _content_hash(current) != payload.base_hash:
-                    raise HTTPException(
-                        status_code=409, detail="這份文件在你編輯時被改過了，請重新載入後再存檔",
-                    )
-            try:
-                document = save_workspace_document(path, payload.content, payload.project_id)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+                    document = save_workspace_document(path, payload.content, payload.project_id)
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
             # QA 文件允許在文件頁編輯：儲存後把掛載中節點的條目同步成檔案現況。
             if is_qa_document(path, payload.project_id):
                 sync_entries_for_source(path, payload.project_id)
@@ -355,7 +359,10 @@ async def save_knowledge_document_route(
 
     document = await asyncio.to_thread(_save)
     schedule_reindex(payload.project_id)
-    return {"status": "ok", "document": document}
+    from knowledge.workspace import saved_content_hash
+
+    # 新版本的雜湊：下次存檔帶回去，不必再讀一次（再讀可能拿到別人剛存的版本）。
+    return {"status": "ok", "document": document, "content_hash": saved_content_hash(payload.content)}
 
 
 def _with_speech_rates(settings: dict) -> dict:

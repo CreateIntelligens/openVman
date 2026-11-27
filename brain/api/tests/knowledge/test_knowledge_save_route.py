@@ -109,6 +109,7 @@ def test_save_knowledge_document_route_schedules_background_reindex(monkeypatch)
             "content": "# Example",
             "project_id": "default",
         },
+        "content_hash": knowledge_routes._content_hash("# Example"),
     }
     assert scheduled["project_id"] == "default"
     assert "task" in scheduled

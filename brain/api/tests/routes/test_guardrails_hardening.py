@@ -55,7 +55,7 @@ def test_internal_accounts_read_hard_linked_persona_files_but_vendors_do_not():
     soul.write_text("硬連結的人設", encoding="utf-8")
     os.link(soul, shared)
     client = _client()
-    assert client.get("/brain/personas/soul", headers=_INTERNAL).json() == {"content": "硬連結的人設"}
+    assert client.get("/brain/personas/soul", headers=_INTERNAL).json()["content"] == "硬連結的人設"
     assert client.put("/brain/personas/soul", headers=_INTERNAL, json={"content": "內部改"}).status_code == 200
     assert client.get("/brain/personas/soul", headers=_VENDOR).status_code == 200  # 存檔換了新檔，不再是硬連結
     os.link(soul, workspace / "knowledge" / "again.md")

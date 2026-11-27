@@ -21,8 +21,9 @@ const GUARDRAILS = "# 保護規則\n\n## 範圍限制\n\n- 不越權\n";
 
 vi.mock("../../api", () => ({
   GUARDRAILS_PATH: "GUARDRAILS.md",
-  fetchPersonaSoul: vi.fn(async () => ({ content: SOUL })),
-  fetchPersonaAgents: vi.fn(async () => ({ content: AGENTS, exists: true })),
+  EMPTY_CONTENT_HASH: "empty-hash",
+  fetchPersonaSoul: vi.fn(async () => ({ content: SOUL, content_hash: "soul-1" })),
+  fetchPersonaAgents: vi.fn(async () => ({ content: AGENTS, exists: true, content_hash: "agents-1" })),
   fetchGuardrails: vi.fn(async () => ({ content: GUARDRAILS, content_hash: "hash-1", max_chars: 5000 })),
   fetchProjectKnowledgeSettings: vi.fn(async () => ({
     language_routes: ["zh", "en"], reply_seconds: 20,
@@ -105,8 +106,8 @@ describe("PersonaForm saving", () => {
     view.rerender(form({ projectId: "project-b" }));
     await act(async () => { first.resolve({ status: "ok" }); });
     await waitFor(() => expect(savePersonaAgents).toHaveBeenCalled());
-    expect(savePersonaSoul).toHaveBeenCalledWith("default", expect.stringContaining("A 專案的人設"), "project-a");
-    expect(savePersonaAgents).toHaveBeenCalledWith("default", "## 角色與任務\n\nA 專案的任務\n", "project-a");
+    expect(savePersonaSoul).toHaveBeenCalledWith("default", expect.stringContaining("A 專案的人設"), "project-a", "soul-1");
+    expect(savePersonaAgents).toHaveBeenCalledWith("default", "## 角色與任務\n\nA 專案的任務\n", "project-a", "agents-1");
     await waitFor(() => expect(leave).toHaveBeenCalled());
   });
 
@@ -122,7 +123,7 @@ describe("PersonaForm saving", () => {
     await act(async () => { pending.resolve({ status: "ok" }); });
     await waitFor(() => expect(screen.getByText(/尚未儲存/)).toBeTruthy());
     expect((await field("角色設定")).value).toBe("第一版，再加一句");
-    expect(savePersonaSoul).toHaveBeenCalledWith("default", "# 預設\n\n## 角色設定\n\n第一版\n", "project-a");
+    expect(savePersonaSoul).toHaveBeenCalledWith("default", "# 預設\n\n## 角色設定\n\n第一版\n", "project-a", "soul-1");
   });
 
   it("loads each document on its own so one failure does not blank the page", async () => {
@@ -309,5 +310,89 @@ describe("PersonaForm other content", () => {
     render(form());
     await field("角色設定");
     expect(await screen.findByText("其他內容（一般不用改）")).toBeTruthy();
+  });
+
+  describe("version checks (base_hash)", () => {
+    const STALE = "這份文件在你編輯時被改過了，請重新載入後再存檔";
+
+    it("saves with the loaded version and uses the returned one next time, even if the user typed meanwhile", async () => {
+      let finish!: (value: { status: string; content_hash: string }) => void;
+      vi.mocked(savePersonaSoul)
+        .mockReturnValueOnce(new Promise((done) => { finish = done; }))
+        .mockResolvedValueOnce({ status: "ok", content_hash: "soul-3" });
+      render(form());
+      const role = await field("角色設定");
+      fireEvent.change(role, { target: { value: "第一版" } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(savePersonaSoul).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(savePersonaSoul).mock.calls[0][3]).toBe("soul-1");
+      fireEvent.change(role, { target: { value: "第二版" } });
+      await act(async () => { finish({ status: "ok", content_hash: "soul-2" }); });
+      await waitFor(() => expect(screen.getByText(/尚未儲存/)).toBeTruthy());
+
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(savePersonaSoul).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(savePersonaSoul).mock.calls[1][3]).toBe("soul-2");
+    });
+
+    it("keeps the draft and the old version when the file changed elsewhere (409)", async () => {
+      vi.mocked(savePersonaSoul)
+        .mockRejectedValueOnce(new Error(STALE))
+        .mockResolvedValueOnce({ status: "ok", content_hash: "soul-2" });
+      render(form());
+      fireEvent.change(await field("角色設定"), { target: { value: "我打了很久的人設" } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(screen.getByText(new RegExp(STALE))).toBeTruthy());
+      expect((await field("角色設定")).value).toBe("我打了很久的人設");
+      expect(guardDirty).toBe(true);
+      expect(fetchPersonaSoul).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(savePersonaSoul).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(savePersonaSoul).mock.calls[1][3]).toBe("soul-1");
+    });
+
+    it("sends the empty-file version when work rules or guardrails do not exist yet", async () => {
+      vi.mocked(fetchPersonaAgents).mockResolvedValueOnce({ content: "", exists: false, content_hash: "empty-hash" });
+      vi.mocked(fetchGuardrails).mockResolvedValueOnce({
+        content: "", content_hash: "", template: GUARDRAILS, max_chars: 5000,
+      });
+      vi.mocked(saveKnowledgeDocument).mockResolvedValueOnce({
+        status: "ok", content_hash: "rules-2", document: { path: "GUARDRAILS.md" } as never,
+      });
+      render(form({ canEditGuardrails: true }));
+      fireEvent.change(await field("角色與任務"), { target: { value: "新的任務" } });
+      fireEvent.change(await field("範圍限制"), { target: { value: "- 新規則" } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalled());
+      expect(vi.mocked(savePersonaAgents).mock.calls[0][3]).toBe("empty-hash");
+      expect(vi.mocked(saveKnowledgeDocument).mock.calls[0][2]).toBe("empty-hash");
+    });
+
+    it("takes the new guardrails version from the save response instead of reading it again", async () => {
+      vi.mocked(saveKnowledgeDocument)
+        .mockResolvedValueOnce({ status: "ok", content_hash: "hash-2", document: { path: "GUARDRAILS.md" } as never })
+        .mockResolvedValueOnce({ status: "ok", content_hash: "hash-3", document: { path: "GUARDRAILS.md" } as never });
+      render(form({ canEditGuardrails: true }));
+      const rules = await field("範圍限制");
+      fireEvent.change(rules, { target: { value: "- 第一次" } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(screen.getByText(/已儲存「保護規則」/)).toBeTruthy());
+      fireEvent.change(rules, { target: { value: "- 第二次" } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(saveKnowledgeDocument).mock.calls.map((call) => call[2])).toEqual(["hash-1", "hash-2"]);
+      expect(fetchGuardrails).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses to save when the written file would not read back as the form shows it", async () => {
+      vi.mocked(fetchPersonaSoul).mockResolvedValueOnce({ content: "你是小V。\n", content_hash: "soul-1" });
+      render(form());
+      fireEvent.change(await field("角色設定"), { target: { value: "---\na: 1\n---\n你是小安。" } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(screen.getByText(/再讀回來會和畫面上的欄位不一樣/)).toBeTruthy());
+      expect(savePersonaSoul).not.toHaveBeenCalled();
+      expect((await field("角色設定")).value).toBe("---\na: 1\n---\n你是小安。");
+    });
   });
 });

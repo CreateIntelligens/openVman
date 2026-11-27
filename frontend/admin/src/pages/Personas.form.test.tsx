@@ -46,8 +46,8 @@ vi.mock("../api", () => ({
   fetchAvatarCharacters: vi.fn().mockResolvedValue({ characters: [] }),
   fetchKnowledgeDocument: vi.fn(async (path: string) => ({ path, content: `內容：${path}` })),
   fetchPersonas: vi.fn(async () => ({ personas: PERSONAS })),
-  fetchPersonaSoul: vi.fn(async () => ({ content: SOUL })),
-  fetchPersonaAgents: vi.fn(async () => ({ content: "- 先查資料再回答\n", exists: true })),
+  fetchPersonaSoul: vi.fn(async () => ({ content: SOUL, content_hash: "soul-1" })),
+  fetchPersonaAgents: vi.fn(async () => ({ content: "- 先查資料再回答\n", exists: true, content_hash: "agents-1" })),
   fetchGuardrails: vi.fn(async () => ({ content: GUARDRAILS })),
   fetchKnowledgeSettings: vi.fn(async () => ({
     language_routes: ["zh", "en"],
@@ -72,6 +72,7 @@ vi.mock("../api", () => ({
   savePersonaSoul: vi.fn().mockResolvedValue({ status: "ok" }),
   setPersonaAvatar: vi.fn().mockResolvedValue({ status: "ok" }),
   GUARDRAILS_PATH: "GUARDRAILS.md",
+  EMPTY_CONTENT_HASH: "e3b0c44298fc1c14",
 }));
 
 const VENDOR = { id: "v1", username: "vendor", role: "user", kind: "formal", vendor_name: "甲商" };
@@ -95,7 +96,7 @@ describe("Personas table mode", () => {
     project.can_edit_knowledge = true;
     project.can_edit_features = false;
     vi.mocked(fetchPersonas).mockImplementation(async () => ({ personas: PERSONAS, persona_count: PERSONAS.length }));
-    vi.mocked(fetchPersonaSoul).mockImplementation(async () => ({ content: SOUL }));
+    vi.mocked(fetchPersonaSoul).mockImplementation(async () => ({ content: SOUL, content_hash: "soul-1" }));
   });
 
   it("opens internal accounts in table mode and writes the field back under its heading", async () => {
@@ -116,6 +117,7 @@ describe("Personas table mode", () => {
       "default",
       "# 預設\n\n## 角色設定\n\n你是小V。\n\n## 回應風格\n\n語氣溫和\n\n## 服務範圍\n\n回答問題\n",
       "proj-test",
+      "soul-1",
     ));
     expect(savePersonaAgents).not.toHaveBeenCalled();
     expect(await screen.findByText("已儲存「個性與說話方式」")).toBeTruthy();
@@ -167,7 +169,7 @@ describe("Personas table mode", () => {
     expect(within(guardrails).queryByRole("textbox")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /儲存設定/ }));
     await waitFor(() => expect(savePersonaAgents).toHaveBeenCalledWith(
-      "default", "回答保固問題\n", "proj-test",
+      "default", "回答保固問題\n", "proj-test", "agents-1",
     ));
     expect(saveKnowledgeDocument).not.toHaveBeenCalled();
   });

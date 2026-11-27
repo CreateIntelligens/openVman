@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
+  EMPTY_CONTENT_HASH,
   GUARDRAILS_PATH,
   fetchGuardrails,
   fetchPersonaAgents,
@@ -21,6 +22,7 @@ import {
   parseSections,
   sameSections,
   sectionProblems,
+  serializeChecked,
   serializeSections,
   type SectionDocument,
 } from "../../utils/personaSections";
@@ -84,13 +86,17 @@ interface DocState {
   draft: SectionDocument;
   /** 讀不到時的原因；這一份只能看不能存，其他份照常。 */
   error: string;
+  /**
+   * 載入（或上次存好）時的版本，存檔時當 base_hash 帶回：別處已經改過就會被拒絕，
+   * 不會整份蓋掉別人的修改。舊版 Brain 沒回版本時是 undefined，存檔不檢查。
+   */
+  hash?: string;
 }
 
 interface Extras {
   agentsExists: boolean;
   guardrailsTemplate: string;
   guardrailsLinked: boolean;
-  guardrailsHash: string;
   guardrailsMax: number;
   settings: KnowledgeSettings | null;
 }
@@ -167,19 +173,28 @@ export default function PersonaForm({
       fetchProjectKnowledgeSettings(projectId),
     ]).then(([soul, agents, guardrails, settings]) => {
       if (request !== latest.current) return;
-      const load = (key: DocKey, result: PromiseSettledResult<{ content: string }>): DocState => {
+      const load = (
+        key: DocKey,
+        result: PromiseSettledResult<{ content: string; content_hash?: string }>,
+        emptyHash?: string,
+      ): DocState => {
         if (result.status === "rejected") return emptyDoc(key, errorText(result.reason));
         const parsed = parsers[key](result.value.content);
-        return { base: parsed, draft: parsed, error: "" };
+        const hash = result.value.content_hash;
+        return { base: parsed, draft: parsed, error: "", hash: hash === "" ? emptyHash : hash };
       };
-      setDocs({ soul: load("soul", soul), agents: load("agents", agents), guardrails: load("guardrails", guardrails) });
       const rules = guardrails.status === "fulfilled" ? guardrails.value : null;
+      setDocs({
+        soul: load("soul", soul),
+        agents: load("agents", agents),
+        // 舊版 Brain 在還沒有保護規則時回空字串：當成空檔案的版本，第一次建立也要比對。
+        guardrails: load("guardrails", guardrails, rules?.linked ? undefined : EMPTY_CONTENT_HASH),
+      });
       const loadedSettings = settings.status === "fulfilled" ? settings.value : null;
       setExtras({
         agentsExists: agents.status === "fulfilled" ? agents.value.exists : true,
         guardrailsTemplate: rules?.template ?? "",
         guardrailsLinked: rules?.linked === true,
-        guardrailsHash: rules?.content_hash ?? "",
         guardrailsMax: rules?.max_chars ?? 5000,
         settings: loadedSettings,
       });
@@ -219,8 +234,14 @@ export default function PersonaForm({
     const texts: Partial<Record<DocKey, string>> = {};
     for (const key of ["soul", "agents", "guardrails"] as const) {
       if (!docDirty(key)) continue;
-      problems.push(...sectionProblems(docs[key].draft, DOC_TITLES[key]).map((problem) => `${DOC_LABELS[key]}：${problem}`));
-      texts[key] = serializeSections(docs[key].draft, DOC_TITLES[key], key === "soul" ? { title: target.label } : {});
+      const found = sectionProblems(docs[key].draft, DOC_TITLES[key]);
+      problems.push(...found.map((problem) => `${DOC_LABELS[key]}：${problem}`));
+      const checked = serializeChecked(docs[key].draft, DOC_TITLES[key], key === "soul" ? { title: target.label } : {});
+      // 寫出去的文字再讀回來要和畫面一樣才存；不一樣代表這份的結構表格模式存不回去，寫了會弄亂。
+      if (!found.length && !checked.intact) {
+        problems.push(`${DOC_LABELS[key]}：存檔後再讀回來會和畫面上的欄位不一樣，為了不弄亂文件這次先不存。請檢查其他內容裡的標題與段落順序，或請內部人員用原始文件模式修改。`);
+      }
+      texts[key] = checked.text;
     }
     if (texts.guardrails !== undefined && texts.guardrails.length > extras.guardrailsMax) {
       problems.push(`保護規則最多 ${extras.guardrailsMax} 字，現在有 ${texts.guardrails.length} 字，請精簡後再存。`);
@@ -232,32 +253,37 @@ export default function PersonaForm({
 
     const stillShowing = () =>
       showing.current.projectId === target.projectId && showing.current.personaId === target.personaId;
-    const settle = (key: DocKey, saved: SectionDocument, text: string) => {
+    const settle = (key: DocKey, saved: SectionDocument, text: string, hash: string | undefined) => {
       if (!stillShowing()) return;
       const parsed = parsers[key](text);
       setDocs((current) => {
         if (!current) return current;
         const draft = current[key].draft;
         // 存檔期間又打了字：保留新的輸入，仍標成未儲存；沒動才換成剛存好的版本。
+        // 版本一律換成剛存好的，下一次存檔才不會被自己這次的存檔擋下。
         const next = sameSections(draft, saved) ? parsed : { ...parsed, fields: draft.fields, other: draft.other };
-        return { ...current, [key]: { ...current[key], base: parsed, draft: next } };
+        return { ...current, [key]: { ...current[key], base: parsed, draft: next, hash } };
       });
     };
+    // 收到 409（別處改過）時不呼叫 settle：草稿原封不動留在畫面上，版本也不換，
+    // 使用者可以先把內容複製起來，再重新載入。
     const steps: Array<{ label: string; run: () => Promise<void> }> = [];
     if (texts.soul !== undefined) {
       const snapshot = docs.soul.draft;
       const text = texts.soul;
+      const baseHash = docs.soul.hash;
       steps.push({ label: DOC_LABELS.soul, run: async () => {
-        await savePersonaSoul(target.personaId, text, target.projectId);
-        settle("soul", snapshot, text);
+        const saved = await savePersonaSoul(target.personaId, text, target.projectId, baseHash);
+        settle("soul", snapshot, text, saved?.content_hash);
       } });
     }
     if (texts.agents !== undefined) {
       const snapshot = docs.agents.draft;
       const text = texts.agents;
+      const baseHash = docs.agents.hash;
       steps.push({ label: DOC_LABELS.agents, run: async () => {
-        await savePersonaAgents(target.personaId, text, target.projectId);
-        settle("agents", snapshot, text);
+        const saved = await savePersonaAgents(target.personaId, text, target.projectId, baseHash);
+        settle("agents", snapshot, text, saved?.content_hash);
         if (stillShowing()) setExtras((current) => current && { ...current, agentsExists: true });
       } });
     }
@@ -265,25 +291,26 @@ export default function PersonaForm({
     if (texts.guardrails !== undefined) {
       const snapshot = docs.guardrails.draft;
       const text = texts.guardrails;
-      const baseHash = extras.guardrailsHash;
+      const baseHash = docs.guardrails.hash;
       steps.push({ label: DOC_LABELS.guardrails, run: async () => {
         // 帶上載入時的版本：別處已經改過就拒絕，舊畫面不會蓋掉較新的內容。
-        await saveKnowledgeDocument(GUARDRAILS_PATH, text, baseHash || undefined, false, target.projectId);
-        // 等新版本雜湊回來再把這份標成已儲存，避免存檔尾聲先清掉未儲存防護。
-        const fresh = await fetchGuardrails(target.projectId).catch(() => null);
-        settle("guardrails", snapshot, text);
-        if (!stillShowing()) return;
-        if (fresh) {
-          setExtras((current) => current && { ...current, guardrailsHash: fresh.content_hash ?? "" });
-        } else {
-          // 沒拿到最新雜湊就不能留著舊值再存，先鎖住並請使用者重新整理。
-          setExtras((current) => current && { ...current, guardrailsHash: "" });
-          setDocs((current) => current && {
-            ...current,
-            guardrails: { ...current.guardrails, error: "未能取得最新版本，請重新整理頁面後再修改。" },
-          });
-          warnings.push("「保護規則」未能取得最新版本，請重新整理頁面後再修改。");
+        const saved = await saveKnowledgeDocument(GUARDRAILS_PATH, text, baseHash, false, target.projectId);
+        // 新版本雜湊以存檔回應為準；再讀一次可能拿到別人剛存的版本。舊版 Brain 沒回才重讀，
+        // 而且等雜湊回來再把這份標成已儲存，避免存檔尾聲先清掉未儲存防護。
+        const freshHash = saved?.content_hash
+          ?? (await fetchGuardrails(target.projectId).catch(() => null))?.content_hash;
+        if (freshHash) {
+          settle("guardrails", snapshot, text, freshHash);
+          return;
         }
+        settle("guardrails", snapshot, text, undefined);
+        if (!stillShowing()) return;
+        // 沒拿到最新雜湊就不能留著舊值再存，先鎖住並請使用者重新整理。
+        setDocs((current) => current && {
+          ...current,
+          guardrails: { ...current.guardrails, error: "未能取得最新版本，請重新整理頁面後再修改。" },
+        });
+        warnings.push("「保護規則」未能取得最新版本，請重新整理頁面後再修改。");
       } });
     }
     if (charsDirty) {

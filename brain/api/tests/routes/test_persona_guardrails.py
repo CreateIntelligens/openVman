@@ -10,6 +10,7 @@ from knowledge import workspace as workspace_module
 from knowledge.workspace import (
     GUARDRAILS_FILENAME,
     GUARDRAILS_TEMPLATE,
+    content_hash,
     ensure_workspace_scaffold,
     iter_indexable_documents,
 )
@@ -44,9 +45,9 @@ def test_vendor_reads_and_writes_agents_for_default_and_other_personas():
         ("support", support / "AGENTS.md", "客服工作規則"),
     ):
         response = client.get(route, params={"persona_id": persona_id}, headers=_VENDOR)
-        assert response.json() == {"content": original}
+        assert response.json() == {"content": original, "content_hash": content_hash(original)}
         saved = client.put(route, headers=_VENDOR, json={"persona_id": persona_id, "content": "新規則"})
-        assert saved.json() == {"status": "ok"}
+        assert saved.json() == {"status": "ok", "content_hash": content_hash("新規則")}
         assert path.read_text(encoding="utf-8") == "新規則"
     # 只多開放 AGENTS.md，其他核心文件仍讀不到、也不能夾帶路徑。
     assert client.put(route, headers=_VENDOR, json={
@@ -114,7 +115,7 @@ def test_guardrails_are_scaffolded_readable_and_have_no_write_route():
         assert heading in GUARDRAILS_TEMPLATE
     client = _client()
     route = "/brain/personas/guardrails"
-    from knowledge.workspace import GUARDRAILS_MAX_CHARS, content_hash
+    from knowledge.workspace import GUARDRAILS_MAX_CHARS
 
     rules = "# 保護規則\n\n## 範圍限制\n\n- 專案規則"
     guardrails.write_text(rules, encoding="utf-8")
@@ -129,7 +130,10 @@ def test_guardrails_are_scaffolded_readable_and_have_no_write_route():
         "content": "  \n", "content_hash": content_hash("  \n"), **common,
     }
     guardrails.unlink()
-    assert client.get(route, headers=_VENDOR).json() == {"content": "", "content_hash": "", **common}
+    # 還不存在時是空字串的雜湊：第一次建立也要比對，兩個人同時建立不會蓋掉先存的。
+    assert client.get(route, headers=_VENDOR).json() == {
+        "content": "", "content_hash": content_hash(""), **common,
+    }
     for method in ("PUT", "POST", "DELETE"):
         assert client.request(method, route, headers=_VENDOR, json={"content": "x"}).status_code == 405
 
