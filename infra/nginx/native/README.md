@@ -178,3 +178,7 @@ the deployment user must have Docker and crontab access.
 The admin bundle hard-codes the same prefix
 (`frontend/admin/src/components/app/navigation.ts`). Making it a template
 variable would let the two drift apart, so both sides keep it literal.
+
+## 存取紀錄格式
+
+這個 vhost 用 `openvman_timed` 格式寫 `/var/log/nginx/access.log`：預設欄位之外多 `rt=`（`$request_time`，整個請求含送完給客戶端的秒數）與 `urt=`（`$upstream_response_time`，上游回應秒數；靜態檔或 nginx 自己回應時是 `-`）。`rt` 大而 `urt` 小，代表時間花在送給客戶端。

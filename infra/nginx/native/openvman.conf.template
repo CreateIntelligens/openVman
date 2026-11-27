@@ -12,10 +12,15 @@ map $http_upgrade $openvman_connection_upgrade {
     ''      close;
 }
 
+# 存取紀錄多記 rt（整個請求花多久，含送完給客戶端）與 urt（上游回應時間），才分得出
+# 01.webm、wasm 這類大檔是我們送得慢，還是手機收得慢。log_format 只能放在 http 層。
+log_format openvman_timed '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for" rt=$request_time urt=$upstream_response_time';
+
 server {
     listen 80;
     listen [::]:80;
     server_name ${PUBLIC_DOMAIN};
+    access_log /var/log/nginx/access.log openvman_timed;
 
     location ^~ /.well-known/acme-challenge/ {
         root ${ACME_WEBROOT};
@@ -33,6 +38,7 @@ server {
     listen [::]:443 ssl;
     http2 on;
     server_name ${PUBLIC_DOMAIN};
+    access_log /var/log/nginx/access.log openvman_timed;
 
     ssl_certificate ${LETSENCRYPT_DIR}/live/${PUBLIC_DOMAIN}/fullchain.pem;
     ssl_certificate_key ${LETSENCRYPT_DIR}/live/${PUBLIC_DOMAIN}/privkey.pem;

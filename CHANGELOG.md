@@ -41,6 +41,8 @@
 
 ### Changed
 
+- **[2026-11-27]** **主機 nginx 存取紀錄記下每個請求花多久**：`infra/nginx/native/` 的 vhost 新增 `log_format openvman_timed`（http 層），兩個 server 區塊改寫 `access_log /var/log/nginx/access.log openvman_timed`，每行多 `rt=$request_time urt=$upstream_response_time`，用來分辨 01.webm、wasm 這類大檔是伺服器送得慢還是用戶端收得慢（11/26 月會有 8 次 01.webm 沒傳完就斷）。要經 `infra/nginx/native/deploy.sh` 部署到主機才生效。
+
 - **[2026-11-24]** **回答改成整段合成一次，不再逐句打 TTS**：SDK 的 `ask()` 與官方前台的文字模式，`sentence` 事件只用來顯示字幕，`done` 到了才以 `done.reply` 打一次 `/api/v1/tts/stream`。逐句時下一段要等上一段下載完才送，第一句短、題數多時第二段的首包趕不上第一段播完，中間就斷音（11/24 重測 100 題時斷音的 2 題都是這種）；每段各自合成，語氣也接不起來。Gemini、VoxCPM、Edge、IndexTTS 的首包跟文字長短無關，整段打只多等其餘句子生完的時間（快速問答約 0.3 秒）；CosyVoice（台語）要整段合成完才出聲，字數越多第一聲越晚。順帶修正：模型中途改寫回答時，已送出、後來收回的句子不再被念出來。SDK 移除只用來接續多段的 `queueAudio`；官方前台的 `replySpeechQueue.ts` 改為 `replySpeech.ts`（`collect`／`finish`／`speak`），等整段回答時維持 `ttsPending`，麥克風不會在開口前打開。壓測腳本 `burst_nodes.py`、`users_e2e.py` 跟著改成 `done` 後才打 TTS，「聽到第一句」因此多含等整段回答的時間，不能直接跟之前的基準比。套用設定（斷線重連）時若回答剛開始出來，`useAvatarChat.disconnect()` 現在會先停掉這一輪，不再讓等念的狀態卡住、麥克風一直關著。被打斷的上一輪 TTS 晚結束時，也不會再把下一輪的 `ttsPending` 清成 false（PR Agent 回報；念完歸零改由 `replySpeech` 依回合管理）。arwin vman.html 用自己的朗讀流程，要另外改。
 - **[2026-11-20]** **快速問答的語言分類與層數判斷拆成獨立模組**：`brain/api/knowledge/qa_category_depth.py`，`qa_nodes.py` 回到千行以內；行為不變，原本從 `qa_nodes` 匯入的名稱照常可用。
 - **[2026-11-20]** **SDK 對話模式改成串流合成語音**：`ask()` 每句改打 `POST /api/v1/tts/stream`（`format: "pcm16k"`），收到第一段 PCM 就開始播放與對嘴，不再等整句合成完；前一段還在播時下一段已在合成。部署沒有這條路由（404／405）時，該 instance 之後退回 `/v1/audio/speech` 整句合成。
