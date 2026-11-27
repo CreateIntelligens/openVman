@@ -32,6 +32,9 @@ class GeminiCredential:
     source: Literal["project", "shared"]
     credential_id: str
     configured: bool
+    # 金鑰每次更新都會變的識別（專案金鑰用 updated_at；credential_id 在覆寫時不變）。
+    # 快取等需要「換金鑰就失效」的地方用它，不必雜湊金鑰本身。
+    version: str = ""
 
 
 class ProjectGeminiCredentialRepository:
@@ -148,6 +151,7 @@ def resolve_gemini_credential(
                 source="project",
                 credential_id=row["credential_id"],
                 configured=True,
+                version=str(row["updated_at"]),
             )
     value = runtime.model_providers.get_credential(
         "gemini", env_default=runtime.config.gemini_api_key,
@@ -157,6 +161,7 @@ def resolve_gemini_credential(
         source="shared",
         credential_id="gemini",
         configured=bool(value),
+        version=runtime.model_providers.credential_version("gemini"),
     )
 
 

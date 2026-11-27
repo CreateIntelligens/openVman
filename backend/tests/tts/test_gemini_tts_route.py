@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -415,7 +416,6 @@ def test_a_read_that_started_before_a_save_cannot_cache_the_old_route(monkeypatc
 
 def test_speech_cache_key_changes_with_the_gemini_route(monkeypatch):
     """切換路線後，/v1/audio/speech 不能回切換前那條路線合成（或備援）的快取音檔。"""
-    from types import SimpleNamespace
 
     from app.auth.models import AccountRole
     from app.providers.base import NormalizedTTSResult
@@ -473,3 +473,87 @@ def test_speech_cache_key_changes_with_the_gemini_route(monkeypatch):
     _save_route("relay")
     assert asyncio.run(speak()) == b"relay"
     assert synthesized == ["direct", "relay"]
+
+
+def test_speech_cache_key_follows_the_project_gemini_key_version(monkeypatch):
+    """專案換金鑰（version 變）時快取失效；快取鍵只看 version，不從金鑰本身算。"""
+    from app.auth.models import AccountRole
+    from app.auth.project_gemini_credentials import GeminiCredential
+    from app.providers.base import NormalizedTTSResult
+    from app.routes import tts
+
+    store: dict[str, object] = {}
+    synthesized: list[str] = []
+    active = {"key": "project-secret", "version": "2026-11-27T01:00:00+00:00"}
+
+    async def cache_get(key):
+        return store.get(key)
+
+    async def cache_put(key, entry, _ttl):
+        store[key] = entry
+
+    async def plan(*_args, **_kwargs):
+        return SimpleNamespace(provider="gemini-tts", voice="Kore", partners=())
+
+    async def spoken(text, *_args, **_kwargs):
+        return text
+
+    class Service:
+        def synthesize(self, request, **_kwargs):
+            synthesized.append(active["version"])
+            return SimpleNamespace(
+                result=NormalizedTTSResult(
+                    audio_bytes=active["version"].encode(),
+                    content_type="audio/wav",
+                    sample_rate=24000, provider="gemini-tts",
+                    route_kind="provider", route_target="gemini-tts",
+                    latency_ms=1.0,
+                ),
+                fallback=False, fallback_reason="",
+            )
+
+    monkeypatch.setattr(
+        tts, "get_tts_config", lambda: _config(tts_cache_enabled=True),
+    )
+    monkeypatch.setattr(tts, "get_auth_runtime", lambda: SimpleNamespace())
+    monkeypatch.setattr(
+        tts,
+        "resolve_gemini_credential",
+        lambda _pid, _rt: GeminiCredential(
+            active["key"], "project", "pgc_1", True, active["version"],
+        ),
+    )
+    monkeypatch.setattr(tts, "cache_get", cache_get)
+    monkeypatch.setattr(tts, "cache_put", cache_put)
+    monkeypatch.setattr(tts, "plan_tts_voice", plan)
+    monkeypatch.setattr(tts, "spoken_text", spoken)
+    monkeypatch.setattr(tts, "_get_service", lambda: Service())
+    monkeypatch.setattr(
+        tts.voice_policy, "request_policy", lambda *_a: ("proj-1", None),
+    )
+    monkeypatch.setattr(
+        tts.voice_access, "tts_fallback_voice", lambda *_a, **_k: None,
+    )
+    current = SimpleNamespace(
+        embed_key=None, api_key=None,
+        user=SimpleNamespace(id="u1", role=AccountRole.ROOT, username="ai360"),
+    )
+
+    async def speak() -> bytes:
+        response = await tts.create_speech(
+            tts.SpeechRequest(input="你好", project_id="proj-1"), current,
+        )
+        await asyncio.sleep(0)
+        return response.body
+
+    first = active["version"].encode()
+    assert asyncio.run(speak()) == first
+    assert asyncio.run(speak()) == first  # cache hit
+    # 同一個 version 下金鑰內容不影響快取鍵：證明沒有拿金鑰去算雜湊。
+    active["key"] = "other-secret-same-version"
+    assert asyncio.run(speak()) == first
+    active["version"] = "2026-11-27T02:00:00+00:00"
+    assert asyncio.run(speak()) == active["version"].encode()
+    assert synthesized == [
+        "2026-11-27T01:00:00+00:00", "2026-11-27T02:00:00+00:00",
+    ]

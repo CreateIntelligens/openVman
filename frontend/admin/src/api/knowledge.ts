@@ -670,6 +670,28 @@ function sanitizeDownloadFilename(name: string): string {
   return name.replace(/[/\\]+/g, "_").trim();
 }
 
+function extractPlainFilename(header: string): string | null {
+  const match = /(?:^|;)[ \t]*filename[ \t]*=[ \t]*/i.exec(header);
+  if (!match) return null;
+  const rest = header.slice(match.index + match[0].length);
+  if (rest.startsWith('"')) {
+    let out = "";
+    for (let i = 1; i < rest.length; i++) {
+      const ch = rest[i];
+      if (ch === "\\" && i + 1 < rest.length) {
+        out += rest[++i];
+      } else if (ch === '"') {
+        return out;
+      } else {
+        out += ch;
+      }
+    }
+    return null;
+  }
+  const end = rest.indexOf(";");
+  return (end === -1 ? rest : rest.slice(0, end)).trim() || null;
+}
+
 /** 從 Content-Disposition 取出檔名（優先 RFC 5987 filename*=UTF-8''...），取不到時用預設值。 */
 export function parseContentDispositionFilename(
   header: string | null,
@@ -686,8 +708,7 @@ export function parseContentDispositionFilename(
       // 百分比編碼格式不正確時改走下一個 fallback
     }
   }
-  const plainMatch = header.match(/(?:^|;)\s*filename\s*=\s*(?:"((?:\\.|[^"])*)"|([^;]+))/i);
-  const plain = plainMatch?.[1]?.replace(/\\(.)/g, "$1") ?? plainMatch?.[2];
+  const plain = extractPlainFilename(header);
   if (plain) {
     const cleaned = sanitizeDownloadFilename(plain);
     if (cleaned) return cleaned;

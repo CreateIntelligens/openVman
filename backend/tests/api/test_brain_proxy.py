@@ -487,6 +487,25 @@ def test_missing_or_conflicting_project_id_says_422(monkeypatch) -> None:
     assert hidden.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_proxy_invalid_project_id_never_echoes_raw_exception_text():
+    from app.auth.brain_project_access import InvalidProjectId
+    from app.brain_proxy import proxy_to_brain
+
+    request, _ = _chunked_request([b"{}"])
+    with (
+        patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
+        patch(
+            "app.auth.brain_project_access.authorize_project_context",
+            new=AsyncMock(side_effect=InvalidProjectId("internal secret detail")),
+        ),
+    ):
+        response = await proxy_to_brain(request, "chat", current=None)
+
+    assert response.status_code == 422
+    assert response.body == b'{"detail":"Invalid project_id"}'
+
+
 def test_default_alias_is_authorized_as_the_configured_default_project(monkeypatch) -> None:
     # 2026-10-20：default 專案拔掉，DEFAULT_PROJECT_ID 指向醫院專案。帶 "default" 的請求
     # 要用醫院專案的授權判斷，不能拿已刪掉的 default 授權，也不能因此變成 404。

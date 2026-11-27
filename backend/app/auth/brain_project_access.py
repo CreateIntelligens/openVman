@@ -38,8 +38,27 @@ _PROJECT_SCOPED_PREFIXES = (
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
+def invalid_project_id_detail(code: str) -> str:
+    """Map an InvalidProjectId reason code to a fixed client-facing message."""
+    if code == "repeated":
+        return "project_id must appear only once"
+    if code == "empty":
+        return "project_id must not be empty"
+    if code == "non_empty_string":
+        return "project_id must be a non-empty string"
+    if code == "mismatch":
+        return "project_id in query and body must match"
+    if code == "required":
+        return "project_id is required"
+    return "Invalid project_id"
+
+
 class InvalidProjectId(Exception):
     """The request did not name exactly one project."""
+
+    def __init__(self, message: str, *, code: str = "") -> None:
+        self.code = code
+        super().__init__(message)
 
 
 def raw_query(request: Request) -> str:
@@ -54,7 +73,7 @@ def raw_query(request: Request) -> str:
 def _reject_repeated_project_id(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     # json.loads 遇到重複的鍵只留最後一個；專案 ID 寫兩次就是請求本身有歧義，不替呼叫端挑。
     if sum(1 for key, _ in pairs if key == "project_id") > 1:
-        raise InvalidProjectId("project_id must appear only once")
+        raise InvalidProjectId("project_id must appear only once", code="repeated")
     return dict(pairs)
 
 
@@ -88,11 +107,11 @@ def _request_project_id(request: Request, body: bytes) -> str | None:
     candidates: list[str] = []
     query_values = request.query_params.getlist("project_id")
     if len(query_values) > 1:
-        raise InvalidProjectId("project_id must appear only once")
+        raise InvalidProjectId("project_id must appear only once", code="repeated")
     for value in query_values:
         query_project_id = canonical_project_id(value)
         if not query_project_id:
-            raise InvalidProjectId("project_id must not be empty")
+            raise InvalidProjectId("project_id must not be empty", code="empty")
         candidates.append(query_project_id)
 
     payload = proxy_json_object(body)
@@ -102,13 +121,13 @@ def _request_project_id(request: Request, body: bytes) -> str | None:
             # 空值在轉送時會被換成授權的專案，不必擋。
             continue
         if not isinstance(body_project_id, str) or not canonical_project_id(body_project_id):
-            raise InvalidProjectId("project_id must be a non-empty string")
+            raise InvalidProjectId("project_id must be a non-empty string", code="non_empty_string")
         candidates.append(canonical_project_id(body_project_id))
 
     if not candidates:
         return None
     if len(set(candidates)) != 1:
-        raise InvalidProjectId("project_id in query and body must match")
+        raise InvalidProjectId("project_id in query and body must match", code="mismatch")
     return candidates[0]
 
 
@@ -231,11 +250,11 @@ async def authorize_project_context(
         and supplied_project_id is not None
         and supplied_project_id != explicit_project_id
     ):
-        raise InvalidProjectId("project_id in query and body must match")
+        raise InvalidProjectId("project_id in query and body must match", code="mismatch")
     if resolved_project_id is None:
         # 缺欄位是請求格式問題，回 422 才不會讓串接方以為專案不存在；
         # 專案看不到仍是 404，不洩漏存在與否。
-        raise InvalidProjectId("project_id is required")
+        raise InvalidProjectId("project_id is required", code="required")
 
     runtime = get_auth_runtime()
     access = _project_access(path, request.method)
