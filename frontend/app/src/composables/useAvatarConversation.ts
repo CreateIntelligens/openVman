@@ -1,5 +1,6 @@
 import { computed, ref, onUnmounted, watch, type Ref } from "vue";
 import { createAvatarMotionAudioGate, resolveAvatarMotionIntent } from "./avatarMotionAudio";
+import { isPlaybackBlocked, playAvatarVideo, unlockMediaInGesture } from "./mediaPlayback";
 import { useAudioPlayer } from "./useAudioPlayer";
 import {
   DEFAULT_TEXT_CHAT_STREAM_ENDPOINT,
@@ -347,9 +348,22 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     replySpeech.speak(greeting.text);
   }
 
+  const stopPromptTap = stage.media.onTap((kind) => {
+    if (kind === "autoplay") {
+      void unlockMediaInGesture(audio, undefined, stage.autoplayUnlocked)
+        .catch((error) => console.warn("[App] media unlock failed:", error));
+    }
+  });
+  let startPlaybackCheck: ReturnType<typeof setTimeout> | undefined;
+
   async function handleStart(): Promise<boolean> {
     try {
-      await audio.resumeContext();
+      const resumed = unlockMediaInGesture(audio, undefined, stage.autoplayUnlocked);
+      clearTimeout(startPlaybackCheck);
+      startPlaybackCheck = setTimeout(() => {
+        if (window.characterVideo?.paused) stage.showAutoplayPrompt();
+      }, 1000);
+      await resumed;
       if (!isStarted.value || !chat.sessionId.value) {
         await chat.connect();
         isStarted.value = true;
@@ -391,8 +405,16 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
         await audio.resumeContext();
         await chat.connect();
 
-        if (window.characterVideo && window.characterVideo.paused) {
-          window.characterVideo.play().catch(e => console.warn("[App] characterVideo play failed:", e));
+        const video = window.characterVideo;
+        if (video?.paused) {
+          const source = video.src;
+          void playAvatarVideo(video).then(() => {
+            if (video === window.characterVideo && video.src === source && !video.paused) stage.autoplayUnlocked();
+          }, (error: unknown) => {
+            if (video !== window.characterVideo || video.src !== source) return;
+            if (isPlaybackBlocked(error)) stage.showAutoplayPrompt(error);
+            else console.warn("[App] characterVideo play failed:", error);
+          });
         }
 
         isStarted.value = true;
@@ -450,7 +472,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   async function handleFatalRetry(): Promise<void> {
     if (fatalError.value?.code === "AVATAR_RENDERER") {
       fatalError.value = null;
-      await bootstrapRenderer();
+      await bootstrapRenderer(undefined, true);
       return;
     }
     fatalError.value = null;
@@ -469,7 +491,12 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     }
   }
 
-  onUnmounted(() => { motionAudio.cancel(); clearUnderrunTimer(); });
+  onUnmounted(() => {
+    clearTimeout(startPlaybackCheck);
+    stopPromptTap();
+    motionAudio.cancel();
+    clearUnderrunTimer();
+  });
 
   return { chat, audio, isStarted, isTyping, avatarSpeaking, avatarResponding, spokenReply, canSend, handleStart, playGreeting, resetForNextVisitor, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
 }

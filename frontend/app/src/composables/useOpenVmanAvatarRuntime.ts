@@ -6,6 +6,8 @@ import {
   type FrameSyncMarkerRepair,
 } from '../../../shared/avatar/avatarFrameSyncRepair'
 import type { OpenVmanAvatarRuntimeInstance } from '../types/openVmanAvatarRuntime'
+import { AvatarLoadError, type LoadFailureType } from './avatarLoadFailure'
+import { isPlaybackBlocked, playAvatarVideo } from './mediaPlayback'
 import {
   installIdleLipSyncBypass,
   type IdleLipSyncBypass,
@@ -48,6 +50,11 @@ function releaseMotionSession(): void {
 // 角色素材由 Backend 在這個前綴下提供（見 api/http.ts 的 ASSET_PATH_PREFIXES）。
 // 舊的預設值 '/assets' 沒有對應的路由，會落到 SPA fallback 拿回 index.html。
 const CHARACTER_ASSETS_BASE = '/static/characters'
+
+interface LoadCharacterOptions {
+  bypassCache?: boolean
+  onPlaybackBlocked?: (error: unknown) => void
+}
 
 function isGzipPayload(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
@@ -188,8 +195,9 @@ export function useOpenVmanAvatarRuntime() {
     }
   })
 
-  async function initWasm(): Promise<OpenVmanAvatarRuntimeInstance> {
+  async function initWasm(onReload?: () => void): Promise<OpenVmanAvatarRuntimeInstance> {
     if (vendorCanvasDetached()) {
+      onReload?.()
       window.location.reload()
       // reload 生效前不要讓呼叫端拿舊 instance 去載角色。
       return new Promise<OpenVmanAvatarRuntimeInstance>(() => {})
@@ -204,8 +212,10 @@ export function useOpenVmanAvatarRuntime() {
     if (runtimeInitPromise) return runtimeInitPromise
 
     error.value = null
+    let failureType: LoadFailureType = 'script'
     try {
       await ensureAvatarRuntimeScript()
+      failureType = 'wasm'
       idleLipSyncBypass ??= installIdleLipSyncBypass()
       frameSyncMarkerRepair ??= installFrameSyncMarkerRepair()
       if (typeof window.createQtAppInstance !== 'function') {
@@ -229,7 +239,7 @@ export function useOpenVmanAvatarRuntime() {
       error.value = caughtError instanceof Error
         ? caughtError.message
         : String(caughtError)
-      throw caughtError
+      throw new AvatarLoadError(failureType, error.value, caughtError)
     }
   }
 
@@ -260,6 +270,7 @@ export function useOpenVmanAvatarRuntime() {
     charId: string,
     assetsBase = CHARACTER_ASSETS_BASE,
     projectId?: string,
+    { bypassCache = false, onPlaybackBlocked }: LoadCharacterOptions = {},
   ): Promise<void> {
     const runtime = runtimeInstance
     if (!runtime) {
@@ -280,6 +291,7 @@ export function useOpenVmanAvatarRuntime() {
     isLoading.value = true
     error.value = null
 
+    let failureType: LoadFailureType = 'unknown'
     try {
       const applyCharacterData = (payload: Uint8Array, dataUrl: string, motion = false) => {
         assertCharacterPayload(payload, dataUrl)
@@ -310,6 +322,7 @@ export function useOpenVmanAvatarRuntime() {
         const session = new AvatarMotionSession({
           baseUrl: `${assetsBase}/${charId}/motions/${HCIOT_MOTION_VERSION}`,
           signal: controller.signal,
+          bypassCache,
           applyData: (payload, url) => applyCharacterData(payload, url, true),
           onChange: (state) => { if (loadId === latestLoad) motionState.value = state },
           onUpdate: () => { if (loadId === latestLoad) motionRevision.value += 1 },
@@ -329,22 +342,32 @@ export function useOpenVmanAvatarRuntime() {
         }
       }
       if (!motionLoaded) {
+        failureType = 'character_data'
         const dataUrl = `${assetsBase}/${charId}/combined_data.json.gz`
-        const response = await fetch(dataUrl, { signal: controller.signal })
+        const response = await fetch(dataUrl, {
+          signal: controller.signal,
+          ...(bypassCache ? { cache: 'reload' } : {}),
+        })
         if (!response.ok) throw new Error(`Failed to fetch ${dataUrl}: ${response.status}`)
         const payload = new Uint8Array(await response.arrayBuffer())
         if (loadId !== latestLoad) return
         applyCharacterData(payload, dataUrl)
+        failureType = 'unknown'
         const video = window.characterVideo
         if (!video) throw new Error('[OpenVmanAvatarRuntime] characterVideo is unavailable')
-        video.src = `${assetsBase}/${charId}/01.webm`
+        video.src = `${assetsBase}/${charId}/01.webm${bypassCache ? `?r=${Date.now()}` : ''}`
         video.loop = true
         video.muted = true
         video.playsInline = true
         video.load()
         // Background tabs may leave play() pending; ordinary character loading must not block on it.
-        video.play().catch((playbackError: unknown) => {
-          console.warn('[OpenVmanAvatarRuntime] Video playback was interrupted or blocked:', playbackError)
+        void playAvatarVideo(video).catch((playbackError: unknown) => {
+          if (loadId !== latestLoad || controller.signal.aborted) return
+          if (isPlaybackBlocked(playbackError)) {
+            onPlaybackBlocked?.(playbackError)
+          } else {
+            console.warn('[OpenVmanAvatarRuntime] Video playback failed:', playbackError)
+          }
         })
       }
 
@@ -357,7 +380,7 @@ export function useOpenVmanAvatarRuntime() {
       const described = describeWasmError(caughtError, runtime)
       error.value = described
       console.error('[OpenVmanAvatarRuntime] loadCharacter failed:', described, caughtError)
-      throw caughtError
+      throw new AvatarLoadError(failureType, described, caughtError)
     } finally {
       if (loadId === latestLoad) isLoading.value = false
     }

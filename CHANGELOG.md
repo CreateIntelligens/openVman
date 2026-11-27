@@ -2,7 +2,13 @@
 
 ## [2026-11-27]
 
+### Added
+
+- **[2026-11-27]** **官方前台用戶端紀錄**。新增需登入的 `POST /api/v1/metrics/client-event`，記錄頁面 ID、事件時間、失敗類型、重試次數、瀏覽器、連線與可見狀態、操作與影片狀態、畫面更新率及專案／會話 ID。每筆附帳號與收件時間，寫入 `backend/logs/client_events.jsonl`，可用 `CLIENT_EVENT_LOG` 改路徑。`POST /api/v1/metrics/turn` 新增選填 `client`，附操作狀態、更新率、影片狀態與失敗類型。
+
 ### Changed
+
+- **[2026-11-27]** **官方前台載入與播放提示**。開頁、載入失敗／重試和播放解鎖會送用戶端紀錄。按開始時同步嘗試播放影片與啟用音訊，自動播放被擋時可點畫面解鎖。上一次角色資料載入失敗時，自動與手動重試會繞過 HTTP 快取。連續載入失敗滿三次時，錯誤畫面依瀏覽器提供開啟方式或低耗電模式建議，並提醒檢查網路。
 
 - **[2026-11-27]** **CHANGELOG 改成一天一段**：原本 `[Unreleased]` 與 `[2026-10-08]` 兩大段裡同一個分類重複出現好幾輪，改成每天一個 `## [YYYY-MM-DD]` 段、新的在上，段內 `Added`→`Changed`→`Security`→`Fixed`→`Removed` 各出現一次；舊段落的 `Documentation`、`Changed / Fixed`、`Breaking Changes` 併入 `Changed`，`Reliability` 併入 `Fixed`，`Experiments` 併入 `Added`。806 條條目內文不變，版本段落（`[0.10.0]` 以前）不動，唯一沒標日期的 Node.js 24.22.1 條目依 git 紀錄補上 `[2026-10-22]`。新增 `scripts/check_changelog.py`（`--fix` 會自動重排，並確認條目沒有增減），Contracts CI 會跑這個檢查與 `tests/test_changelog.py`；`AGENTS.md` 的寫法規則同步更新。
 

@@ -643,6 +643,24 @@ GET /health
 | `vman_chunk_queue_depth` | Gauge | 等待 TTS 處理的文字佇列深度 | < 5 |
 | `vman_error_total` | Counter | 錯誤次數（按 error_code 分類） | 最小化 |
 
+#### 官方前台診斷紀錄
+
+`POST /api/v1/metrics/client-event` 需帳號認證（`get_current_account`）。欄位驗證通過後回 204，每筆加上 `received_at`、`user_id`、`username` 並寫成一行 JSON。預設路徑為 `backend/logs/client_events.jsonl`，可用 `CLIENT_EVENT_LOG` 指定。寫檔出錯時記錄 warning 並回 204。
+
+| 請求欄位 | 型別與限制 |
+|----------|------------|
+| `event` | 必填。可用 `page_open`、`load_failed`、`load_retry`、`autoplay_blocked`、`autoplay_unlocked`、`audio_stalled`、`audio_recovered`、`video_stalled`、`video_recovered`、`reload_offered`、`reload` |
+| `page_id`、`at` | 必填。頁面 ID 1～64 字元、用戶端 ISO 時間最長 40 字元 |
+| `failure_type`、`detail`、`browser` | 字串，最長分別為 48、300、32 字元，預設空字串 |
+| `project_id`、`session_id` | 字串，各最長 128 字元，預設空字串 |
+| `attempt` | 0～100 的整數，預設 0 |
+| `user_activated`、`online` | 布林值，預設分別為 `false` 和 `null`，`online` 可為 `null` |
+| `visibility` | `visible`、`hidden` 或空字串，預設空字串 |
+| `raf_fps` | 0～240 的數值或 `null`，預設 `null` |
+| `video` | 預設 `null`。有值時包含 `paused`（布林）、`ready_state`（整數 0～4）、`network_state`（整數 0～3）、`current_time`（非負秒數）、`error_code`（整數或 `null`） |
+
+`POST /api/v1/metrics/turn` 接受選填 `client`，包含上表的 `user_activated`、`raf_fps`、`video`，以及選填的 `failure_type` 字串，預設空字串。省略 `client` 的舊請求照常回 204，紀錄寫入 `backend/logs/turn_timing.jsonl`，可由 `TURN_TIMING_LOG` 改路徑。兩路由遇到未知欄位或欄位驗證不符時回 422。
+
 ### 13. 優雅關機 (Graceful Shutdown)
 
 當伺服器收到終止訊號時，必須有序地清理資源，避免使用者體驗中斷：

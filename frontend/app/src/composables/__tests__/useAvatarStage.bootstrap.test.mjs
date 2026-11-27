@@ -24,6 +24,7 @@ const fakeModules = {
 const { outputFiles } = await build({
   stdin: {
     contents: `export { useAvatarStage } from "../useAvatarStage";
+      export { AvatarLoadError } from "../avatarLoadFailure";
       export { reactive, ref } from "vue";`,
     resolveDir: __dirname,
     loader: "ts",
@@ -33,7 +34,7 @@ const { outputFiles } = await build({
   external: ["@ricky0123/vad-web"],
   plugins: [fakeModules],
 });
-const { useAvatarStage, reactive, ref } = await import(
+const { useAvatarStage, AvatarLoadError, reactive, ref } = await import(
   `data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString("base64")}`
 );
 
@@ -47,7 +48,7 @@ function deferred() {
   return { promise, resolve: resolvePromise };
 }
 
-function createFakeWasm({ initFailures = 0 } = {}) {
+function createFakeWasm({ initFailures = 0, loadFailures = [] } = {}) {
   let failuresLeft = initFailures;
   const wasm = {
     isReady: ref(false),
@@ -56,6 +57,7 @@ function createFakeWasm({ initFailures = 0 } = {}) {
     currentCharId: ref(null),
     currentProjectId: ref(""),
     loads: [],
+    cacheReloads: [],
     initCalls: 0,
     async initWasm() {
       wasm.initCalls += 1;
@@ -65,8 +67,11 @@ function createFakeWasm({ initFailures = 0 } = {}) {
       }
       wasm.isReady.value = true;
     },
-    async loadCharacter(charId, _assetsBase, projectId = "") {
+    async loadCharacter(charId, _assetsBase, projectId = "", options) {
       wasm.loads.push(charId);
+      wasm.cacheReloads.push(options.bypassCache);
+      const failure = loadFailures.shift();
+      if (failure) throw new AvatarLoadError(failure, "load failed", new TypeError("Failed to fetch"));
       wasm.currentCharId.value = charId;
       wasm.currentProjectId.value = projectId;
     },
@@ -180,6 +185,51 @@ test("when the engine never starts the page reloads once, then shows the error",
   await exhaust(second.stage);
   assert.equal(reloads, 1);
   assert.equal(second.stage.fatalError.value?.code, "AVATAR_RENDERER");
+});
+
+test("retry uses the immediately preceding failure to decide whether to reload cached assets", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const storage = new Map();
+  const previousWindow = globalThis.window;
+  globalThis.window = { sessionStorage: {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+    removeItem: (key) => storage.delete(key),
+  } };
+  t.after(() => { globalThis.window = previousWindow; });
+  const telemetry = [];
+  const baseTime = Date.now() + 60_000;
+  let wallTime = baseTime;
+  t.mock.method(Date, "now", () => wallTime);
+  t.mock.method(globalThis, "fetch", async (path, options) => {
+    assert.equal(path, "/api/v1/metrics/client-event");
+    assert.equal(options.keepalive, true);
+    telemetry.push(JSON.parse(options.body));
+    return new Response(null, { status: 204 });
+  });
+  const wasm = createFakeWasm({ loadFailures: ["character_data", "unknown", "unknown", "character_data"] });
+  const { stage, settings } = createStage(wasm);
+  settings.projectId = "demo";
+  const booting = stage.bootstrapRenderer();
+  for (const delay of [2000, 4000, 8000]) {
+    await flush();
+    wallTime += delay;
+    t.mock.timers.tick(delay);
+  }
+  await booting;
+  assert.deepEqual(wasm.cacheReloads, [false, true, false, false]);
+  assert.equal(storage.get("openvman.avatar.load_failures"), "4");
+  assert.match(stage.fatalError.value.message, /\n也請確認網路連線正常。$/);
+  assert.ok(telemetry.some((event) => event.event === "load_failed" && event.failure_type === "character_data"));
+  assert.ok(telemetry.some((event) => event.event === "load_retry" && event.attempt === 1));
+
+  wallTime += 10_000;
+  await stage.bootstrapRenderer(undefined, true);
+  assert.deepEqual(wasm.cacheReloads, [false, true, false, false, true]);
+  assert.equal(storage.has("openvman.avatar.load_failures"), false);
+  assert.equal(telemetry.at(-1).event, "load_retry");
+  assert.equal(telemetry.at(-1).failure_type, "character_data");
+  assert.equal(telemetry.at(-1).project_id, "demo");
 });
 
 test("switching project loads the character the new project picked", async () => {

@@ -7,6 +7,7 @@
  * 方便跟其他 log 對時間。
  */
 import { apiFetch } from '../api/http'
+import { turnClientState } from './useClientDiagnostics'
 
 export type TurnMark =
   | 'speech_start'
@@ -150,6 +151,7 @@ export function useTurnTiming(options: {
       durations_ms: turnDurations(current.marks),
       reply_chars: current.replyChars,
       ...options.context(),
+      client: turnClientState(),
     })
   }
 

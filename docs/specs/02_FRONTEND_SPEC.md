@@ -68,9 +68,10 @@
 
 `useAvatarStage.bootstrapRenderer` 依序：初始化引擎並等專案決定 → 載入該專案的人物清單 → 挑選人物（偏好、帳號預設、清單第一個）→ 載入角色。
 
-* 失敗時依 2、4、8 秒退避重試；帳號沒有可用人物時不重試。
+* 失敗時依 2、4、8 秒退避重試，依失敗階段記錄 `script`、`wasm`、`character_data` 或 `unknown`；帳號沒有可用人物時不重試。上一次失敗是 `character_data` 時，下一次自動或手動重試用 `cache: "reload"` 抓角色資料，`01.webm` 的請求網址加上 `?r=<時間戳>`。
 * 重試用完且引擎本身沒起來時，整頁重新載入一次（以 sessionStorage 記錄，5 分鐘內不重複），避免無限重新整理。
 * 仍失敗則顯示全螢幕錯誤 `AVATAR_RENDERER`，按「重試」重新跑一次開場流程。
+* 連續失敗次數存在 `sessionStorage` 的 `openvman.avatar.load_failures`，角色成功載入後清除。累積三次以上且進入錯誤畫面時，LINE、Facebook、Instagram 內建瀏覽器會提示改用 Safari 或 Chrome，iPhone／iPad 會提示檢查低耗電模式，各瀏覽器都會顯示網路連線建議。
 * 專案切換後設定值換了人物時，`syncCharacter` 讓舞台跟著載入。
 
 #### 2.5 畫布修補
@@ -88,7 +89,14 @@
 * 每個 chunk 排程時同步經 `onPcmChunk` 交給 `useOpenVmanAvatarRuntime.pushAudio`，寫入 WASM 記憶體後呼叫 `_setAudioBuffer(指標, 長度, chunk 序號)`。嘴型由引擎依音訊自行計算與對時，前台沒有另外的對嘴渲染迴圈。
 * 播放事件與引擎的銜接：第一個 chunk 開始播放時 `beginSpeaking`；佇列自然播完時 `clearAudio` 並 `endSpeaking`；被停止時 `resetSpeaking`。
 * 瀏覽器要求使用者操作後才能出聲。前台在送出第一句、訪客按「點一下開始」、套用設定與錯誤重試時呼叫 `resumeContext()`。
+* 訪客點開始時，在同一個同步手勢內先呼叫影片的 `play()`，再呼叫 `resumeContext()`。載入時若收到 `NotAllowedError`，或點開始一秒後影片仍暫停，舞台顯示「點一下畫面開始」。再點畫面任一處，或用鍵盤啟動提示按鈕，都會再次嘗試影片和音訊播放。播放成功後提示消失；瀏覽器擋下自動播放時角色仍視為已載入。
 * 欠載保護：佇列播完但這一輪尚未結束時，`useAvatarConversation` 啟動 3 秒計時；期間有新的聲音就取消，逾時則把字幕一次顯示完並結束打字狀態。
+
+#### 3.1 用戶端紀錄
+
+官方前台透過 `POST /api/v1/metrics/client-event` 傳送 `page_open`、`load_failed`、`load_retry`、`autoplay_blocked`、`autoplay_unlocked` 和自動整頁重新載入的 `reload`。端點也接受 `audio_stalled`、`audio_recovered`、`video_stalled`、`video_recovered`、`reload_offered`，供後續卡頓偵測使用。除 `page_open`、`reload` 外，同一頁的同種事件每 10 秒最多送一次。
+
+每筆帶同一頁的隨機 ID、時間、瀏覽器分類、網路與可見狀態，以及操作狀態、影片狀態和前景每兩秒取樣的畫面更新率。每輪對話的 `POST /api/v1/metrics/turn` 也附上 `client` 狀態。請求使用 `keepalive`，前台不等待診斷回應。欄位與存檔見 [後端效能監控指標](01_BACKEND_SPEC.md#12-效能監控指標-performance-metrics)。
 
 ### 4. 角色動作片段
 
@@ -360,7 +368,7 @@ Live 模式的行為（`useAvatarTransport.ts`、`useAvatarChat.ts`）：
 `useVisitorMode` 整頁共用。帳號的 `kiosk`（後台勾選，前台關不掉）或這台裝置的設定（設定視窗「進階設定」的「切換成展示機台」，或網址 `?kiosk=1`／`?kiosk=0`，存在 localStorage）任一成立即生效：
 
 * 藏起設定鈕、帳號與登出。長按標題 3 秒開 `UnlockDialog`，以 `POST /api/v1/auth/verify-password` 核對目前帳號密碼；密碼錯回 400（401 會被當成登入過期而登出機台）。裝置上開啟的訪客模式解鎖後直接結束；帳號的 `kiosk` 只暫時叫出設定與登出，重新整理後又藏起來。
-* `StartOverlay` 先要來賓點一下：解鎖 AudioContext、先建立連線，可用時接著開始收音。非訪客模式不顯示。
+* `StartOverlay` 先要來賓點一下。前台在該次手勢內嘗試播放影片並啟用 AudioContext，接著建立連線，能收音時啟動麥克風。非訪客模式不顯示。
 * `useIdleReset`：虛擬人沒在回答，且 2 分鐘沒有點擊、按鍵、觸控、新訊息或辨識活動時，關麥克風、`resetForNextVisitor()`（停止回答、斷線、清空訊息）並回到開始畫面。
 
 #### 11.5 設定視窗

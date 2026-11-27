@@ -2532,6 +2532,110 @@ def test_turn_timing_needs_a_signed_in_account(monkeypatch):
     assert TestClient(module.app).post("/api/v1/metrics/turn", json=_turn_payload()).status_code == 401
 
 
+def _client_video_state():
+    return {
+        "paused": True,
+        "ready_state": 2,
+        "network_state": 1,
+        "current_time": 0.25,
+        "error_code": None,
+    }
+
+
+def _client_event_payload(**overrides):
+    return {
+        "event": "autoplay_blocked",
+        "page_id": "page-1",
+        "at": "2026-11-27T04:00:00.000Z",
+        "failure_type": "video_blocked",
+        "detail": "瀏覽器拒絕自動播放",
+        "video": _client_video_state(),
+        "raf_fps": 30,
+        "browser": "ios_safari",
+        **overrides,
+    }
+
+
+def test_client_event_writes_one_authenticated_json_line(monkeypatch, tmp_path):
+    from app.auth.runtime import get_auth_runtime
+
+    module, _ = _load_main(monkeypatch)
+    log = tmp_path / "client_events.jsonl"
+    monkeypatch.setenv("CLIENT_EVENT_LOG", str(log))
+    client, _ = _authenticated_client(module, admin=False)
+    user = get_auth_runtime().users.get_by_username("test-user")
+    payload = _client_event_payload()
+
+    response = client.post("/api/v1/metrics/client-event", json=payload)
+
+    assert response.status_code == 204
+    assert response.content == b""
+    [line] = log.read_text(encoding="utf-8").splitlines()
+    record = json.loads(line)
+    assert record["user_id"] == user.id
+    assert record["username"] == "test-user"
+    assert record["received_at"]
+    assert {key: record[key] for key in payload} == payload
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"user_id": "spoofed"},
+        {"event": "unknown_event"},
+        {"video": {**_client_video_state(), "ready_state": 5}},
+        {"raf_fps": 241},
+    ],
+)
+def test_client_event_rejects_invalid_payload(monkeypatch, tmp_path, overrides):
+    module, _ = _load_main(monkeypatch)
+    log = tmp_path / "client_events.jsonl"
+    monkeypatch.setenv("CLIENT_EVENT_LOG", str(log))
+    client, _ = _authenticated_client(module, admin=False)
+
+    response = client.post(
+        "/api/v1/metrics/client-event", json=_client_event_payload(**overrides)
+    )
+
+    assert response.status_code == 422
+    assert not log.exists()
+
+
+def test_client_event_needs_a_signed_in_account(monkeypatch, tmp_path):
+    module, _ = _load_main(monkeypatch)
+    log = tmp_path / "client_events.jsonl"
+    monkeypatch.setenv("CLIENT_EVENT_LOG", str(log))
+    response = TestClient(module.app).post(
+        "/api/v1/metrics/client-event", json=_client_event_payload()
+    )
+    assert response.status_code == 401
+    assert not log.exists()
+
+
+def test_client_event_log_write_failure_still_returns_204(monkeypatch, tmp_path, caplog):
+    module, _ = _load_main(monkeypatch)
+    monkeypatch.setenv("CLIENT_EVENT_LOG", str(tmp_path))
+    client, _ = _authenticated_client(module, admin=False)
+
+    assert client.post("/api/v1/metrics/client-event", json=_client_event_payload()).status_code == 204
+    assert "client_event_write_failed" in caplog.text
+
+
+def test_turn_timing_accepts_old_payloads_and_optional_client_state(monkeypatch, tmp_path):
+    module, _ = _load_main(monkeypatch)
+    log = tmp_path / "turn_timing.jsonl"
+    monkeypatch.setenv("TURN_TIMING_LOG", str(log))
+    client, _ = _authenticated_client(module, admin=False)
+    state = {"user_activated": True, "raf_fps": None, "video": _client_video_state()}
+
+    assert client.post("/api/v1/metrics/turn", json=_turn_payload()).status_code == 204
+    assert client.post("/api/v1/metrics/turn", json=_turn_payload(client=state)).status_code == 204
+
+    old, new = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert old["client"] is None
+    assert new["client"] == {**state, "failure_type": ""}
+
+
 # --- /tts/stream format=pcm16k ----------------------------------------------
 
 PCM16K = "audio/l16;rate=16000;channels=1"

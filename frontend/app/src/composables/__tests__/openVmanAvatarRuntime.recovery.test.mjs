@@ -191,6 +191,51 @@ test("loading a character does not wait for video playback to start", async (t) 
   assert.equal(avatar.currentCharId.value, "1014");
 });
 
+test("blocked autoplay notifies the stage and leaves the character loaded", async (t) => {
+  const { document } = createFakeDom();
+  const blocked = new DOMException("User gesture required", "NotAllowedError");
+  const globals = installGlobals(t, {
+    document, runtime: createFakeRuntime(), video: fakeVideo({ play: () => Promise.reject(blocked) }),
+  });
+  globals.makeFactoryAvailable();
+  globalThis.fetch = async () => new Response(characterPayload("1014"));
+  const { useOpenVmanAvatarRuntime } = await loadRuntimeModule();
+  const avatar = useOpenVmanAvatarRuntime();
+  const errors = [];
+  await avatar.initWasm();
+  await avatar.loadCharacter("1014", undefined, undefined, {
+    onPlaybackBlocked: (error) => errors.push(error),
+  });
+  assert.deepEqual(errors, [blocked]);
+  assert.equal(avatar.currentCharId.value, "1014");
+  assert.equal(avatar.error.value, null);
+});
+
+test("character data and video bypass HTTP cache only when requested", async (t) => {
+  const { document } = createFakeDom();
+  const video = fakeVideo();
+  const globals = installGlobals(t, { document, runtime: createFakeRuntime(), video });
+  globals.makeFactoryAvailable();
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return new Response(characterPayload("1014"));
+  };
+  const { useOpenVmanAvatarRuntime } = await loadRuntimeModule();
+  const avatar = useOpenVmanAvatarRuntime();
+  await avatar.initWasm();
+  await avatar.loadCharacter("1014");
+  assert.equal(requests[0].url, "/static/characters/1014/combined_data.json.gz");
+  assert.equal("cache" in requests[0].options, false);
+  assert.equal(video.src, "/static/characters/1014/01.webm");
+
+  await avatar.loadCharacter("1014", undefined, undefined, { bypassCache: true });
+  assert.equal(requests[1].url, requests[0].url);
+  assert.equal(requests[1].options.cache, "reload");
+  assert.ok(requests[1].options.signal instanceof AbortSignal);
+  assert.match(video.src, /^\/static\/characters\/1014\/01\.webm\?r=\d+$/);
+});
+
 test("an older character load that finishes last does not overwrite the newer one", async (t) => {
   // 開場挑人物與使用者切換可能重疊；慢的那個晚回來時不能把舊角色寫回 WASM，
   // 也不能提早把 isLoading 關掉。

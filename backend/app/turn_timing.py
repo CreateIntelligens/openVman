@@ -26,7 +26,7 @@ logger = logging.getLogger("backend.turn_timing")
 
 router = APIRouter(prefix="/api/v1/metrics", tags=["Metrics"])
 
-_DEFAULT_PATH = Path(__file__).resolve().parents[1] / "logs" / "turn_timing.jsonl"
+_LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
 _write_lock = threading.Lock()
 
 TurnMark = Literal[
@@ -40,6 +40,56 @@ TurnMark = Literal[
     "first_audio",
     "playback_start",
 ]
+
+
+class ClientVideoState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    paused: bool
+    ready_state: int = Field(ge=0, le=4)
+    network_state: int = Field(ge=0, le=3)
+    current_time: float = Field(ge=0, allow_inf_nan=False)
+    error_code: int | None
+
+
+class ClientTurnState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_activated: bool
+    raf_fps: float | None = Field(ge=0, le=240)
+    video: ClientVideoState | None
+    failure_type: str = Field(default="", max_length=48)
+
+
+class ClientEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event: Literal[
+        "page_open",
+        "load_failed",
+        "load_retry",
+        "autoplay_blocked",
+        "autoplay_unlocked",
+        "audio_stalled",
+        "audio_recovered",
+        "video_stalled",
+        "video_recovered",
+        "reload_offered",
+        "reload",
+    ]
+    page_id: str = Field(min_length=1, max_length=64)
+    at: str = Field(max_length=40)
+    failure_type: str = Field(default="", max_length=48)
+    detail: str = Field(default="", max_length=300)
+    user_activated: bool = False
+    video: ClientVideoState | None = None
+    raf_fps: float | None = Field(default=None, ge=0, le=240)
+    visibility: Literal["visible", "hidden", ""] = ""
+    online: bool | None = None
+    browser: str = Field(default="", max_length=32)
+    project_id: str = Field(default="", max_length=128)
+    session_id: str = Field(default="", max_length=128)
+    attempt: int = Field(default=0, ge=0, le=100)
 
 
 class TurnTiming(BaseModel):
@@ -62,15 +112,12 @@ class TurnTiming(BaseModel):
     tts_provider: str = Field(default="", max_length=32)
     tts_voice: str = Field(default="", max_length=128)
     reply_chars: int = Field(default=0, ge=0, le=100_000)
+    client: ClientTurnState | None = None
 
 
-def _log_path() -> Path:
-    configured = os.environ.get("TURN_TIMING_LOG", "").strip()
-    return Path(configured) if configured else _DEFAULT_PATH
-
-
-def append_turn(record: dict) -> None:
-    path = _log_path()
+def _append_record(record: dict, env_var: str, filename: str) -> None:
+    configured = os.environ.get(env_var, "").strip()
+    path = Path(configured) if configured else _LOG_DIR / filename
     line = json.dumps(record, ensure_ascii=False)
     with _write_lock:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,20 +125,41 @@ def append_turn(record: dict) -> None:
             handle.write(line + "\n")
 
 
-@router.post("/turn", status_code=status.HTTP_204_NO_CONTENT)
-def record_turn(
-    body: TurnTiming,
-    current: CurrentAccount = Depends(get_current_account),
-) -> Response:
-    record = {
+def append_turn(record: dict) -> None:
+    _append_record(record, "TURN_TIMING_LOG", "turn_timing.jsonl")
+
+
+def _account_record(body: BaseModel, current: CurrentAccount) -> dict:
+    return {
         "received_at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
         "user_id": current.user.id,
         "username": current.user.username,
         **body.model_dump(),
     }
+
+
+@router.post("/turn", status_code=status.HTTP_204_NO_CONTENT)
+def record_turn(
+    body: TurnTiming,
+    current: CurrentAccount = Depends(get_current_account),
+) -> Response:
     try:
-        append_turn(record)
+        append_turn(_account_record(body, current))
     except OSError as exc:
         # 量測失敗不該影響對話；前台也不等這個回應。
         logger.warning("turn_timing_write_failed err=%s", exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/client-event", status_code=status.HTTP_204_NO_CONTENT)
+def record_client_event(
+    body: ClientEvent,
+    current: CurrentAccount = Depends(get_current_account),
+) -> Response:
+    try:
+        _append_record(
+            _account_record(body, current), "CLIENT_EVENT_LOG", "client_events.jsonl"
+        )
+    except OSError as exc:
+        logger.warning("client_event_write_failed err=%s", exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

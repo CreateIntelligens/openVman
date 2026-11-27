@@ -127,6 +127,8 @@ TTS、批次 ASR 與 Brain proxy 的每個外部節點都有連線上限（預�
 
 語音輸入與串流細節見 [前端規格](docs/specs/02_FRONTEND_SPEC.md)，TTS 與中斷處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
 
+官方前台會記錄開頁、載入重試與播放解鎖，方便依頁面 ID 查同一次開頁發生的事件。Backend 預設寫到 `backend/logs/client_events.jsonl`，可用 `CLIENT_EVENT_LOG` 改路徑。詳見[前台診斷流程](docs/specs/02_FRONTEND_SPEC.md#31-用戶端紀錄)與[後端紀錄契約](docs/specs/01_BACKEND_SPEC.md#官方前台診斷紀錄)。
+
 ### 對外嵌入
 
 第三方網站以 Avatar JavaScript SDK（`frontend/avatar-sdk/`，發布於 `/static/sdk/openvman-avatar-sdk.js`）搭配 Embed 金鑰載入角色，以 `playAudio()` 或 `pushPcm()` 提供自己的音訊驅動對嘴，或以 `ask(text)` 走對話模式：經 `POST /api/v1/chat/stream` 逐句取得回答，回答結束後以 `POST /api/v1/tts/stream` 整段合成並播放。整合方式見 [Avatar 外部整合指南](docs/guides/avatar-embed/README.md)。

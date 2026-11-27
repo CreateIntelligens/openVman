@@ -64,6 +64,9 @@ test("a voice turn reports every mark and the total from speech end to playback"
   assert.equal(turn.started_at, "2026-09-29T04:00:11.000Z");
   assert.equal(turn.reply_chars, 13);
   assert.equal(turn.asr_engine, "breeze");
+  assert.deepEqual(turn.client, {
+    user_activated: false, raf_fps: null, video: null, failure_type: "",
+  });
 });
 
 test("a typed turn is measured from sending", () => {

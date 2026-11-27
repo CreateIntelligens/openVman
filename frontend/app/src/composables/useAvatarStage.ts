@@ -1,5 +1,9 @@
 import { computed, onUnmounted, ref } from "vue";
+import { browserFamily, reportClientEvent } from "./useClientDiagnostics";
+import { useMediaPrompt } from "./useMediaPrompt";
 import { useOpenVmanAvatarRuntime } from "./useOpenVmanAvatarRuntime";
+import { classifyLoadFailure, clearLoadFailures, loadFailureAdvice, recordLoadFailure,
+  type LoadFailureType } from "./avatarLoadFailure";
 import type { useAvatarBootstrap } from "./useAvatarBootstrap";
 import { savedSettings, saveSettings, type useSettingsStore } from "../stores/useSettingsStore";
 import { isUploadedAvatarBackgroundId, type AvatarBackgroundId,
@@ -8,9 +12,16 @@ const RENDERER_RETRY_DELAYS_MS = [2000, 4000, 8000];
 const RUNTIME_RELOAD_KEY = "openvman.avatar.runtime_reload_at";
 const RUNTIME_RELOAD_COOLDOWN_MS = 5 * 60 * 1000;
 
-export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bootstrap: ReturnType<typeof useAvatarBootstrap>) {
+export function useAvatarStage(
+  settings: ReturnType<typeof useSettingsStore>,
+  bootstrap: ReturnType<typeof useAvatarBootstrap>,
+  getSessionId: () => string | null = () => null,
+) {
   const rendererBootstrapState = ref<"loading" | "ready" | "error">("loading");
   const fatalError = ref<{ code: string; message: string } | null>(null);
+  const media = useMediaPrompt();
+  const clientContext = () => ({ project_id: settings.projectId, session_id: getSessionId() ?? "" });
+  let lastFailure: LoadFailureType | null = null;
   const { avatarCatalog, characters, preferSaved, accountDefault,
     addSelectionNotice, stageBackgroundFitStyle,
     PREFERRED_CHARACTER_ID } = bootstrap;
@@ -51,13 +62,38 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     if (wasm.isLoading.value) return "切換展示角色中...";
     return "輸入問題";
   });
+
+  function showAutoplayPrompt(error?: unknown): void {
+    if (globalThis.window?.characterVideo?.paused === false) return;
+    if (media.mediaPrompt.value?.kind !== "autoplay") {
+      media.show("autoplay", "點一下畫面開始");
+    }
+    reportClientEvent("autoplay_blocked", {
+      ...clientContext(), failure_type: "video_blocked",
+      detail: error instanceof Error ? error.message : undefined,
+    });
+  }
+
+  function autoplayUnlocked(): void {
+    if (media.mediaPrompt.value?.kind !== "autoplay") return;
+    reportClientEvent("autoplay_unlocked", clientContext());
+    media.clear("autoplay");
+  }
+
+  function loadCharacter(charId: string, bypassCache = false): Promise<void> {
+    media.clear("autoplay");
+    return wasm.loadCharacter(charId, undefined, settings.projectId, {
+      bypassCache, onPlaybackBlocked: showAutoplayPrompt,
+    });
+  }
+
   async function handleCharChange(charId: string): Promise<void> {
     if (!charId) return;
     wasm.clearAudio();
     wasm.resetSpeaking();
     saveSettings({ characterId: charId });
     if (wasm.isReady.value) {
-      await wasm.loadCharacter(charId, undefined, settings.projectId);
+      await loadCharacter(charId);
     }
   }
   function handleBackgroundChange(
@@ -97,11 +133,11 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     bootstrapRun += 1;
   });
 
-  async function bootstrapOnce(projectReady?: Promise<unknown>): Promise<void> {
+  async function bootstrapOnce(projectReady: Promise<unknown> | undefined, bypassCache: boolean): Promise<void> {
     // 等專案決定再挑人物：專案還沒回來時拿不分專案的清單挑，會載到帳號預設，
     // 之後專案偏好與專案預設改了設定值卻沒人重新載入，舞台跟選單對不上。
     await Promise.all([
-      wasm.initWasm(),
+      wasm.initWasm(() => reportClientEvent("reload", clientContext())),
       // 專案資料失敗時照舊用不分專案的清單，不要每次重試都卡在同一個失敗上。
       (projectReady ?? Promise.resolve()).catch(() => undefined),
     ]);
@@ -112,10 +148,10 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     }
     const characterId = pickInitialCharacter();
     if (!characterId) throw new NoCharacterError("帳號沒有可使用的虛擬人物");
-    await wasm.loadCharacter(characterId, undefined, settings.projectId);
+    await loadCharacter(characterId, bypassCache);
   }
 
-  function reloadOnceForRuntime(): boolean {
+  function reloadOnceForRuntime(attempt: number): boolean {
     if (typeof window === "undefined") return false;
     try {
       const last = Number(window.sessionStorage.getItem(RUNTIME_RELOAD_KEY) ?? 0);
@@ -125,34 +161,48 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
       // 記不住重新載入過就不冒險，免得無限重新整理。
       return false;
     }
+    reportClientEvent("reload", { ...clientContext(), failure_type: lastFailure ?? "", attempt });
     window.location.reload();
     return true;
   }
 
-  async function bootstrapRenderer(projectReady?: Promise<unknown>): Promise<void> {
+  async function bootstrapRenderer(projectReady?: Promise<unknown>, manualRetry = false): Promise<void> {
     const run = ++bootstrapRun;
     rendererBootstrapState.value = "loading";
-    for (let attempt = 0; ; attempt += 1) {
+    for (let index = 0; ; index += 1) {
+      const attempt = index + Number(manualRetry);
+      if (attempt > 0) {
+        reportClientEvent("load_retry", { ...clientContext(), failure_type: lastFailure ?? "", attempt });
+      }
       try {
-        await bootstrapOnce(projectReady);
+        await bootstrapOnce(projectReady, attempt > 0 && lastFailure === "character_data");
         if (run !== bootstrapRun) return;
+        lastFailure = null;
+        clearLoadFailures();
         rendererBootstrapState.value = "ready";
         return;
       } catch (error) {
         if (run !== bootstrapRun) return;
-        const delay = RENDERER_RETRY_DELAYS_MS[attempt];
+        lastFailure = classifyLoadFailure(error);
+        const failures = recordLoadFailure();
+        reportClientEvent("load_failed", {
+          ...clientContext(), failure_type: lastFailure, attempt,
+          detail: error instanceof Error ? error.message : String(error),
+        });
+        const delay = RENDERER_RETRY_DELAYS_MS[index];
         if (delay !== undefined && !(error instanceof NoCharacterError)) {
           console.warn("[App] avatar renderer bootstrap failed, retrying:", error);
           await new Promise((resolve) => setTimeout(resolve, delay));
           if (run !== bootstrapRun) return;
           continue;
         }
-        if (!wasm.isReady.value && reloadOnceForRuntime()) return;
+        if (!wasm.isReady.value && reloadOnceForRuntime(attempt)) return;
         rendererBootstrapState.value = "error";
         console.error("[App] avatar renderer bootstrap failed:", error);
+        const advice = loadFailureAdvice(browserFamily(), failures);
         fatalError.value = {
           code: "AVATAR_RENDERER",
-          message: "虛擬人載入失敗，請檢查網路後重試。",
+          message: advice ? `虛擬人載入失敗，請重試。\n${advice}` : "虛擬人載入失敗，請檢查網路後重試。",
         };
         return;
       }
@@ -170,10 +220,10 @@ export function useAvatarStage(settings: ReturnType<typeof useSettingsStore>, bo
     ) return;
     wasm.clearAudio();
     wasm.resetSpeaking();
-    void wasm.loadCharacter(charId, undefined, settings.projectId).catch(() => {
+    void loadCharacter(charId).catch(() => {
       // 錯誤已記在 wasm.error，舞台會顯示；這裡不重複處理。
     });
   }
 
-  return { wasm, fatalError, rendererBootstrapState, rendererDisabled, rendererErrorMessage, loadingText, chatPlaceholder, stageBackgroundClass, stageBackgroundStyle, handleCharChange, handleBackgroundChange, bootstrapRenderer, syncCharacter };
+  return { wasm, fatalError, rendererBootstrapState, rendererDisabled, rendererErrorMessage, loadingText, chatPlaceholder, stageBackgroundClass, stageBackgroundStyle, handleCharChange, handleBackgroundChange, bootstrapRenderer, syncCharacter, media, showAutoplayPrompt, autoplayUnlocked };
 }

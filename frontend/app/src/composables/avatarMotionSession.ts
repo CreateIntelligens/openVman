@@ -11,6 +11,7 @@ const cancelled = () => new DOMException('取消', 'AbortError')
 interface SessionOptions {
   baseUrl: string
   signal: AbortSignal
+  bypassCache?: boolean
   applyData: (payload: Uint8Array, url: string) => void
   onChange: (state: AvatarMotionState) => void
   onUpdate: () => void
@@ -182,7 +183,12 @@ export class AvatarMotionSession {
   }
 
   private async fetch(name: string): Promise<Response> {
-    const response = await fetch(`${this.options.baseUrl}/${name}`, { signal: this.abort.signal })
+    const bypassCache = this.options.bypassCache
+    const query = bypassCache && name === '01.webm' ? `?r=${Date.now()}` : ''
+    const response = await fetch(`${this.options.baseUrl}/${name}${query}`, {
+      signal: this.abort.signal,
+      ...(bypassCache ? { cache: 'reload' } : {}),
+    })
     if (!response.ok) throw new Error(`HCIOT 素材 ${name} HTTP ${response.status}`)
     return response
   }

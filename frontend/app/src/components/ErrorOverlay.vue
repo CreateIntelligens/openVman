@@ -81,6 +81,7 @@ const emit = defineEmits<{
   color: #a9a298;
   margin-bottom: 1.5rem;
   line-height: 1.5;
+  white-space: pre-line;
 }
 .error-overlay__btn {
   min-height: 2.75rem;

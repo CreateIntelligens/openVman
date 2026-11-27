@@ -60,6 +60,11 @@
               :motion-transitioning="wasm.motionSnapshot.value.transitioning"
               :motion-pending="wasm.motionSnapshot.value.cache?.pending ?? 0"
             />
+            <TapPrompt
+              v-if="mediaPrompt && started && !fatalError"
+              :message="mediaPrompt.message"
+              @tap="stage.media.handleTap"
+            />
             <AvatarMotionControls
               v-if="wasm.motionEnabled.value"
               :disabled="rendererDisabled || avatarResponding"
@@ -205,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { BROWSER_ASR } from "@shared/speech";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import AvatarMotionControls from "./components/avatar/AvatarMotionControls.vue";
@@ -217,6 +222,7 @@ import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
 import StartOverlay from "./components/StartOverlay.vue";
+import TapPrompt from "./components/TapPrompt.vue";
 import UnlockDialog from "./components/controls/UnlockDialog.vue";
 import { useAuth } from "./composables/useAuth";
 import QuickQaPanel from "./components/controls/QuickQaPanel.vue";
@@ -225,6 +231,7 @@ import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { useAsrPreferences } from "./composables/useAsrPreferences";
 import { useAvatarStage } from "./composables/useAvatarStage";
 import { useAvatarConversation } from "./composables/useAvatarConversation";
+import { markUserActivated, reportClientEvent, startRafSampler } from "./composables/useClientDiagnostics";
 import { useAvatarVoiceInput } from "./composables/useAvatarVoiceInput";
 import { useAvatarCamera } from "./composables/useAvatarCamera";
 import { useImmersiveView } from "./composables/useImmersiveView";
@@ -268,7 +275,11 @@ const asrEngines = computed(() => {
     in_project_scope: scopeMap.has(e.id) ? scopeMap.get(e.id) : undefined,
   }));
 });
-const stage = useAvatarStage(settings, bootstrap);
+const stage = useAvatarStage(settings, bootstrap, getSessionId);
+function getSessionId(): string | null {
+  return conversation.chat.sessionId.value;
+}
+const { mediaPrompt } = stage.media;
 const { wasm, fatalError, rendererBootstrapState, rendererDisabled,
   rendererErrorMessage, loadingText, chatPlaceholder,
   stageBackgroundClass, stageBackgroundStyle,
@@ -378,7 +389,10 @@ const { handleTtsChange, handleTtsVoiceChange,
 const { applyAdminHandoff } = useAdminHandoff({ settings, bootstrap, stage, visitor, handleProjectChange });
 
 onMounted(async () => {
+  window.addEventListener("pointerdown", markUserActivated, { capture: true, passive: true });
+  startRafSampler();
   await settingsReady();
+  reportClientEvent("page_open", { project_id: settings.projectId, session_id: getSessionId() ?? "" });
   const projectReady = bootstrap.fetchInitialProjectData();
   void Promise.allSettled([
     bootstrap.fetchTtsProviders(), bootstrap.fetchBackgrounds(),
@@ -386,6 +400,7 @@ onMounted(async () => {
     stage.bootstrapRenderer(projectReady),
   ]).then(applyAdminHandoff);
 });
+onUnmounted(() => window.removeEventListener("pointerdown", markUserActivated, true));
 </script>
 
 <style>
