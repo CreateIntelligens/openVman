@@ -81,6 +81,12 @@
 * `idleLipSyncBypass.ts`：待機時不畫引擎的嘴部貼片，避免沒說話時嘴巴微動；開始說話時淡入（200 ms），說完保留 300 ms 後淡出（250 ms）。
 * `frontend/shared/avatar/avatarFrameSyncRepair.ts`：引擎讀取右上角同步標記時，把顯示上的標記以周邊像素補回，引擎讀到的仍是原始標記。
 
+#### 2.6 畫面停住
+
+1. 對話開始後，在前景收到目前人物影片的 `pause` 事件，或回到前景時發現影片已暫停，會立即呼叫 `play()`。瀏覽器要求手勢時顯示「點一下畫面繼續」，在同一次點擊或鍵盤操作中重試。
+2. 每 500 ms 取樣影片時間與 vendor 的 `drawImage` 呼叫數。只在前景、渲染器就緒且對話已開始時取樣，角色載入或動作切換時重新計時。任一訊號停住滿 2000 ms 就記錄原因，影片暫停就播放，影片仍在播但時間停住就從起點重播。再觀察 2000 ms 確認恢復。
+3. 仍停住時等目前回答結束，顯示「畫面卡住了，點一下重新載入」。每頁只提供一次提示，點擊前持續顯示。重新載入會建立新會話，WebSocket 的 `client_init` 沒有接回舊 session 的欄位。
+
 ### 3. 音訊播放與嘴型同步
 
 播放與對嘴共用同一份 PCM：16 kHz、mono、signed 16-bit little-endian。
@@ -90,11 +96,12 @@
 * 播放事件與引擎的銜接：第一個 chunk 開始播放時 `beginSpeaking`；佇列自然播完時 `clearAudio` 並 `endSpeaking`；被停止時 `resetSpeaking`。
 * 瀏覽器要求使用者操作後才能出聲。前台在送出第一句、訪客按「點一下開始」、套用設定與錯誤重試時呼叫 `resumeContext()`。
 * 訪客點開始時，在同一個同步手勢內先呼叫影片的 `play()`，再呼叫 `resumeContext()`。載入時若收到 `NotAllowedError`，或點開始一秒後影片仍暫停，舞台顯示「點一下畫面開始」。再點畫面任一處，或用鍵盤啟動提示按鈕，都會再次嘗試影片和音訊播放。播放成功後提示消失；瀏覽器擋下自動播放時角色仍視為已載入。
+* 開始播放 1500 ms 後，若還在播就取樣 AudioContext 時鐘，隔 400 ms 比對一次。即使狀態是 `running`，時鐘停住也會記錄並嘗試 `resume()`，再等 600 ms 確認。仍停住時顯示「沒有聲音？點一下畫面」，同一頁再次提示時改為「還是沒有聲音的話，請重新整理頁面」。點擊會同步重建音訊並中斷目前回答，300 ms 後以原參數重送經 `handleSend` 送出的題目。開場白等本機播放只重建音訊。新回合與播放重設會取消上一輪待執行的檢查或重送。
 * 欠載保護：佇列播完但這一輪尚未結束時，`useAvatarConversation` 啟動 3 秒計時；期間有新的聲音就取消，逾時則把字幕一次顯示完並結束打字狀態。
 
 #### 3.1 用戶端紀錄
 
-官方前台透過 `POST /api/v1/metrics/client-event` 傳送 `page_open`、`load_failed`、`load_retry`、`autoplay_blocked`、`autoplay_unlocked` 和自動整頁重新載入的 `reload`。端點也接受 `audio_stalled`、`audio_recovered`、`video_stalled`、`video_recovered`、`reload_offered`，供後續卡頓偵測使用。除 `page_open`、`reload` 外，同一頁的同種事件每 10 秒最多送一次。
+官方前台透過 `POST /api/v1/metrics/client-event` 傳送 `page_open`、`load_failed`、`load_retry`、`autoplay_blocked`、`autoplay_unlocked`、`audio_stalled`、`audio_recovered`、`video_stalled`、`video_recovered`、`reload_offered` 與 `reload`。除 `page_open`、`reload` 外，同一頁的同種事件每 10 秒最多送一次。
 
 每筆帶同一頁的隨機 ID、時間、瀏覽器分類、網路與可見狀態，以及操作狀態、影片狀態和前景每兩秒取樣的畫面更新率。每輪對話的 `POST /api/v1/metrics/turn` 也附上 `client` 狀態。請求使用 `keepalive`，前台不等待診斷回應。欄位與存檔見 [後端效能監控指標](01_BACKEND_SPEC.md#12-效能監控指標-performance-metrics)。
 

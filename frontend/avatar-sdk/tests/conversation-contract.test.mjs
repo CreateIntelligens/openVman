@@ -167,6 +167,8 @@ async function loadSdk({
     Uint8Array,
     console,
     document: {
+      addEventListener() {},
+      removeEventListener() {},
       body,
       currentScript: script,
       createElement,
@@ -277,7 +279,7 @@ async function loadSdk({
     },
     queueMicrotask,
     performance: { now: () => performance.now() },
-    window: { clearTimeout, setTimeout },
+    window: { clearTimeout, setTimeout, clearInterval() {}, setInterval() { return 0; } },
   };
   if (withCryptoUuid) {
     context.crypto = { randomUUID: () => globalThis.crypto.randomUUID() };

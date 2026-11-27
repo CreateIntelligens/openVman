@@ -2,6 +2,7 @@ import { computed, ref, onUnmounted, watch, type Ref } from "vue";
 import { createAvatarMotionAudioGate, resolveAvatarMotionIntent } from "./avatarMotionAudio";
 import { isPlaybackBlocked, playAvatarVideo, unlockMediaInGesture } from "./mediaPlayback";
 import { useAudioPlayer } from "./useAudioPlayer";
+import { useAudioStallWatch, type QuestionArgs } from "./useAudioStallWatch";
 import {
   DEFAULT_TEXT_CHAT_STREAM_ENDPOINT,
   useAvatarChat,
@@ -9,6 +10,7 @@ import {
   type UtteranceContext,
 } from "./useAvatarChat";
 import { createReplySpeech } from "./replySpeech";
+import { reportClientEvent } from "./useClientDiagnostics";
 import { useTtsStreamer, type TtsProvider } from "./useTtsStreamer";
 import { useTypewriter } from "./useTypewriter";
 import type { useAvatarStage } from "./useAvatarStage";
@@ -38,6 +40,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   // Audio underrun protection: tracks whether final chunk was received
   let isFinalReceived = false;
   let underrunTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastQuestion: QuestionArgs | null = null;
 
   function clearUnderrunTimer(): void {
     if (underrunTimer !== null) {
@@ -64,13 +67,27 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     onPlaybackStart: () => {
       wasm.beginSpeaking();
       turnTiming.playbackStarted();
+      audioStall.start(lastQuestion);
     },
-    onPlaybackReset: wasm.resetSpeaking,
+    onPlaybackReset: () => {
+      audioStall.reset();
+      wasm.resetSpeaking();
+    },
     onPlaybackEnd: () => {
+      audioStall.reset();
       wasm.clearAudio();
       wasm.endSpeaking();
     },
     onQueueEmpty: onAudioQueueEmpty,
+  });
+  const audioStall = useAudioStallWatch({
+    audio,
+    media: stage.media,
+    report: (event, fields) => reportClientEvent(event, {
+      project_id: settings.projectId, session_id: chat.sessionId.value ?? undefined, ...fields,
+    }),
+    stopResponse: handleStopResponse,
+    resend: (...args) => { void handleSend(...args); },
   });
   const motionAudioPreparing = ref(false);
   const motionAudio = createAvatarMotionAudioGate<ArrayBuffer | string>({
@@ -166,6 +183,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   });
 
   function beginReply(context: UtteranceContext): void {
+    audioStall.reset();
     replySpeech.cancel();
     isFinalReceived = true;
     clearUnderrunTimer();
@@ -213,6 +231,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       return motionAudio.play(data);
     },
     onDisconnect: () => {
+      lastQuestion = null;
       isStarted.value = false;
       ttsPending.value = false;
       motionAudio.cancel();
@@ -311,6 +330,8 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   }, { immediate: true });
 
   function handleStopResponse(): void {
+    audioStall.reset();
+    lastQuestion = null;
     motionAudio.cancel();
     chat.interrupt();
   }
@@ -340,6 +361,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     } catch {
       // 瀏覽器還沒允許出聲時照樣顯示字幕，聲音等使用者互動後的下一句。
     }
+    lastQuestion = null;
     beginReply({ source: "text", speechLanguage: null });
     chat.beginLocalPlayback();
     if (greeting.voice && replySpeakOptions) replySpeakOptions.voice = greeting.voice;
@@ -377,6 +399,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
 
   /** 展示機台換下一位來賓：停掉回答、斷線、清空畫面上的對話，下一句會開新的對話。 */
   function resetForNextVisitor(): void {
+    lastQuestion = null;
     motionAudio.cancel();
     chat.interrupt();
     chat.disconnect();
@@ -394,6 +417,9 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     speechLanguage?: string | null,
     displayText?: string,
   ): Promise<ComposerSendResult> {
+    audioStall.reset();
+    const question: QuestionArgs = [text, sourcePath, referenceText, speechLanguage, displayText];
+    lastQuestion = question;
     turnTiming.begin(chat.mergesWithPending(sourcePath) ? "merged" : "superseded");
     if (
       !isStarted.value
@@ -419,6 +445,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
 
         isStarted.value = true;
       } catch (e) {
+        if (lastQuestion === question) lastQuestion = null;
         console.error("[App] Initial connection failed:", e);
         turnTiming.finish("error");
         return {
@@ -435,6 +462,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       speechLanguage,
       displayText,
     );
+    if (!result.accepted && lastQuestion === question) lastQuestion = null;
     return result.accepted
       ? { accepted: true }
       : {
@@ -492,6 +520,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   }
 
   onUnmounted(() => {
+    audioStall.dispose();
     clearTimeout(startPlaybackCheck);
     stopPromptTap();
     motionAudio.cancel();

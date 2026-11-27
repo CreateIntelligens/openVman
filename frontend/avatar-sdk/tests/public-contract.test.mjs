@@ -29,6 +29,7 @@ export async function loadSdk({
   videoPlayBlocked = false,
   videoPlaySucceeds = true,
   localStorage = memoryStorage(),
+  timers = { setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {} },
 } = {}) {
   let characterStatus = initialCharacterStatus;
   const source = await readFile(bundleUrl, "utf8");
@@ -39,6 +40,8 @@ export async function loadSdk({
     canvasCalls: [],
     clearAudio: 0,
     pushedAudio: 0,
+    audioContexts: 0,
+    audioCloses: 0,
     resumeCalled: 0,
     scheduledStarts: [],
     sourceStarted: 0,
@@ -53,6 +56,8 @@ export async function loadSdk({
   let finishVideoReady;
   let renderingTime = 0;
   let context;
+  let audioContext;
+  const documentEvents = new EventTarget();
   const createElement = (tagName) => {
     const canvasContext = {
       globalAlpha: 1,
@@ -97,6 +102,8 @@ export async function loadSdk({
                 videoListeners.set(type, handlers);
               },
               error: null,
+              currentTime: 0,
+              paused: true,
               load() {
                 runtimeCalls.videoSources.push(this.src);
                 const succeeds = videoLoadResult
@@ -116,7 +123,7 @@ export async function loadSdk({
                   queueMicrotask(finish);
                 }
               },
-              play: async () => {
+              async play() {
                 if (playBlocked) {
                   const error = new Error("The request is not allowed by the user agent");
                   error.name = "NotAllowedError";
@@ -126,6 +133,11 @@ export async function loadSdk({
                   throw new Error("playback rejected");
                 }
                 runtimeCalls.videoPlays += 1;
+                this.paused = false;
+              },
+              pause() {
+                this.paused = true;
+                for (const handler of videoListeners.get("pause") ?? []) handler();
               },
               readyState: 0,
               remove() {
@@ -189,11 +201,15 @@ export async function loadSdk({
     Uint8Array,
     console,
     document: {
+      addEventListener: documentEvents.addEventListener.bind(documentEvents),
       body,
       currentScript: script,
       createElement,
+      dispatchEvent: documentEvents.dispatchEvent.bind(documentEvents),
       getElementById: (id) => elements.get(id) ?? null,
       head,
+      removeEventListener: documentEvents.removeEventListener.bind(documentEvents),
+      visibilityState: "visible",
     },
     fetch: async (url, options) => {
       requests.push({
@@ -225,26 +241,27 @@ export async function loadSdk({
       now: () => renderingTime,
     },
     window: {
+      ...timers,
       addEventListener(type, handler) {
         const handlers = windowListeners.get(type) ?? new Set();
         handlers.add(handler);
         windowListeners.set(type, handlers);
       },
-      clearTimeout,
       localStorage,
       removeEventListener(type, handler) {
         windowListeners.get(type)?.delete(handler);
       },
-      setTimeout,
     },
   };
   context.window.AudioContext = class {
     constructor() {
+      runtimeCalls.audioContexts += 1;
+      audioContext = this;
       this.currentTime = 0;
       this.destination = {};
       this.state = audioState;
     }
-    async close() {}
+    async close() { runtimeCalls.audioCloses += 1; }
     createBuffer(_channels, length, sampleRate) {
       return {
         copyToChannel() {},
@@ -301,6 +318,10 @@ export async function loadSdk({
     requests,
     runtimeCalls,
     sdk: context.window.OpenVmanAvatar,
+    video: () => context.window.characterVideo,
+    setAudioTime(value) {
+      audioContext.currentTime = value;
+    },
     setCharacterStatus(value) {
       characterStatus = value;
     },
@@ -323,8 +344,109 @@ test("initializes without an API key", async () => {
 
   assert.equal(typeof avatar.playAudio, "function");
   assert.equal(typeof avatar.pushPcm, "function");
+  assert.equal(typeof avatar.rebuildAudio, "function");
   assert.equal("speak" in avatar, false);
   assert.equal("setPersona" in avatar, false);
+});
+
+function watchdogTimers(t) {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  return { setTimeout, clearTimeout, setInterval, clearInterval };
+}
+
+test("reports AUDIO_STALLED after a single resume and rebuilds inside the calling gesture", async (t) => {
+  const timers = watchdogTimers(t);
+  const h = await loadSdk({ autoEnd: false, timers });
+  const avatar = await h.sdk.init({ audioLeadMs: 0 });
+  t.after(() => avatar.destroy());
+  const errors = [];
+  avatar.on("error", (error) => errors.push(error));
+  await avatar.pushPcm(new Int16Array([1, 2, 3]));
+
+  t.mock.timers.tick(1500);
+  t.mock.timers.tick(400);
+  assert.equal(h.runtimeCalls.resumeCalled, 1);
+  assert.equal(errors.length, 0);
+  await new Promise(setImmediate);
+  t.mock.timers.tick(600);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].code, "AUDIO_STALLED");
+  assert.equal(errors[0].recoverable, true);
+
+  h.setAudioTime(5);
+  const rebuilt = avatar.rebuildAudio();
+  assert.equal(h.runtimeCalls.audioContexts, 2);
+  assert.equal(h.runtimeCalls.audioCloses, 1);
+  assert.equal(h.runtimeCalls.resumeCalled, 2);
+  assert.equal(h.runtimeCalls.sourceStopped, 1);
+  await rebuilt;
+
+  await avatar.pushPcm(new Int16Array([1, 2]));
+  assert.equal(h.runtimeCalls.scheduledStarts.at(-1), 0);
+  t.mock.timers.tick(1500);
+  h.setAudioTime(1);
+  t.mock.timers.tick(400);
+  assert.equal(errors.length, 1);
+  assert.equal(h.runtimeCalls.resumeCalled, 2);
+});
+
+test("replays a visible pause and reports VIDEO_STALLED once per stationary period", async (t) => {
+  const timers = watchdogTimers(t);
+  const h = await loadSdk({ timers });
+  const avatar = await h.sdk.init({});
+  t.after(() => avatar.destroy());
+  const errors = [];
+  avatar.on("error", (error) => errors.push(error));
+  const video = h.video();
+  h.document.visibilityState = "hidden";
+  h.document.dispatchEvent(new Event("visibilitychange"));
+  video.pause();
+  assert.equal(h.runtimeCalls.videoPlays, 1);
+  h.setRenderingTime(5000);
+  t.mock.timers.tick(500);
+  assert.equal(errors.length, 0);
+  h.document.visibilityState = "visible";
+  h.document.dispatchEvent(new Event("visibilitychange"));
+  assert.equal(h.runtimeCalls.videoPlays, 2);
+
+  h.setRenderingTime(6500);
+  t.mock.timers.tick(1500);
+  assert.equal(errors.length, 0);
+  h.setRenderingTime(7000);
+  t.mock.timers.tick(500);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].code, "VIDEO_STALLED");
+  assert.equal(errors[0].paused, false);
+  assert.equal(errors[0].readyState, 3);
+  h.setRenderingTime(9000);
+  t.mock.timers.tick(2000);
+  assert.equal(errors.length, 1);
+
+  avatar.destroy();
+  video.pause();
+  assert.equal(h.runtimeCalls.videoPlays, 2);
+});
+
+test("the video watchdog leaves first playback to the SDK gesture handler", async (t) => {
+  const timers = watchdogTimers(t);
+  const h = await loadSdk({ videoPlayBlocked: true, timers });
+  const avatar = await h.sdk.init({});
+  t.after(() => avatar.destroy());
+  const errors = [];
+  avatar.on("error", (error) => errors.push(error.code));
+  await Promise.resolve();
+  h.setRenderingTime(4000);
+  t.mock.timers.tick(4000);
+  assert.equal(avatar.videoAwaitingGesture, true);
+  assert.deepEqual(errors, ["AUTOPLAY_BLOCKED"]);
+  assert.equal(h.runtimeCalls.videoPlays, 0);
+  h.gesture();
+  await Promise.resolve();
+  assert.equal(avatar.videoAwaitingGesture, false);
+  assert.equal(h.runtimeCalls.videoPlays, 1);
+  h.setRenderingTime(4500);
+  t.mock.timers.tick(500);
+  assert.deepEqual(errors, ["AUTOPLAY_BLOCKED"]);
 });
 
 test("derives resources from the SDK script origin", async () => {

@@ -475,6 +475,9 @@ export function useOpenVmanAvatarRuntime() {
     motionEnabled: readonly(motionEnabled),
     motionState: readonly(motionState),
     motionSnapshot,
+    vendorDrawCount: () => idleLipSyncBypass?.drawCount() ?? null,
+    // 直接讀播放器現況：片段結尾的暫停與交接不經過 session，computed 的快照會晚一步。
+    motionBusy: () => motionEnabled.value && (motionSession?.snapshot().transitioning ?? false),
     initWasm,
     loadCharacter,
     pushAudio,

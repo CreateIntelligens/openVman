@@ -171,7 +171,11 @@ export class AvatarMotionSession {
         const pending = transition(state, reason).catch((error) => {
           if (!this.disposed) this.recordError(error)
           return false
-        }).finally(() => { if (this.pending === pending) this.pending = null })
+        }).finally(() => {
+          if (this.pending !== pending) return
+          this.pending = null
+          if (!this.disposed) this.options.onUpdate()
+        })
         this.pending = pending
         return pending
       }

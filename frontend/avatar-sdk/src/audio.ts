@@ -1,3 +1,4 @@
+import { watchPlaybackClock, type PlaybackClockTimers } from "../../shared/speech/tts/playbackClockWatch";
 import { OpenVmanAvatarError } from "./errors";
 import type { AvatarRuntime } from "./runtime";
 import type { OpenVmanAvatarAudioOutput } from "./types";
@@ -44,12 +45,15 @@ export class AvatarAudio {
   private speakingTimer: number | null = null;
   private utteranceOpen = false;
   private idleWaiters = new Set<() => void>();
+  private cancelClockCheck: (() => void) | undefined;
 
   constructor(
     private readonly runtime: AvatarRuntime,
     private readonly onSpeakingChange: (speaking: boolean) => void,
     audioOutput: OpenVmanAvatarAudioOutput = "speaker",
     private readonly leadMs: number = DEFAULT_AUDIO_LEAD_MS,
+    private readonly onStall?: () => void,
+    private readonly clockTimers: PlaybackClockTimers = window,
   ) {
     this.player = audioOutput === "silent" ? new ClockPlayer() : new WebAudioPlayer();
   }
@@ -69,7 +73,7 @@ export class AvatarAudio {
       ? await (source as Blob).arrayBuffer()
       : source as ArrayBuffer;
     const scheduled = await this.decodeAndSchedule(encoded, generation);
-    if (scheduled) await this.untilFinished(scheduled);
+    if (scheduled && generation === this.playbackGeneration) await this.untilFinished(scheduled);
   }
 
   private async decodeAndSchedule(
@@ -103,13 +107,13 @@ export class AvatarAudio {
 
   async pushPcm(chunk: Int16Array): Promise<void> {
     if (this.destroyed || chunk.length === 0) return;
+    const generation = this.playbackGeneration;
     await this.prepare();
-    if (this.destroyed) return;
+    if (this.destroyed || generation !== this.playbackGeneration) return;
     this.cancelIdle();
     if (this.leadMs > 0 && (this.leadTimer !== null || !this.utteranceOpen)) {
       this.held.push(chunk);
       if (this.leadTimer === null) {
-        const generation = this.playbackGeneration;
         this.leadTimer = window.setTimeout(() => {
           this.leadTimer = null;
           const held = this.held;
@@ -174,11 +178,13 @@ export class AvatarAudio {
     try {
       this.cancelIdle();
       const startTime = Math.max(this.player.now(), this.nextStartTime);
-      this.announceSpeakingAt(startTime);
+      const startsPlayback = this.sources.size === 0;
       playback = this.player.play(buffer, startTime);
       this.sources.add(playback);
       playback.onended = finish;
       this.nextStartTime = startTime + durationSeconds;
+      if (startsPlayback) this.watchClock();
+      this.announceSpeakingAt(startTime);
     } catch (error) {
       if (playback) this.sources.delete(playback);
       this.finishIfIdle();
@@ -194,6 +200,7 @@ export class AvatarAudio {
   }
 
   interrupt(): void {
+    this.cancelClockCheck?.();
     this.playbackGeneration += 1;
     this.held = [];
     this.utteranceOpen = false;
@@ -216,6 +223,25 @@ export class AvatarAudio {
     this.settleIdleWaiters();
   }
 
+  async rebuild(): Promise<void> {
+    if (this.destroyed || !(this.player instanceof WebAudioPlayer)) return;
+    this.player.close();
+    this.nextStartTime = 0;
+    await this.player.resume();
+  }
+
+  private watchClock(): void {
+    const player = this.player;
+    if (!(player instanceof WebAudioPlayer)) return;
+    this.cancelClockCheck = watchPlaybackClock({
+      timers: this.clockTimers,
+      isPlaying: () => !this.destroyed && this.sources.size > 0,
+      clock: () => player.now(),
+      resume: () => player.resume(),
+      onUnrecovered: () => this.onStall?.(),
+    });
+  }
+
   destroy(): void {
     this.destroyed = true;
     this.interrupt();
@@ -224,6 +250,7 @@ export class AvatarAudio {
 
   private finishIfIdle(): void {
     if (this.sources.size > 0 || this.idleTimer !== null) return;
+    this.cancelClockCheck?.();
     const finish = (): void => {
       this.idleTimer = null;
       if (this.sources.size > 0 || this.leadTimer !== null) return;
@@ -301,6 +328,10 @@ class WebAudioPlayer implements AudioPlayer {
     }
   }
 
+  resume(): Promise<void> {
+    return this.ensureContext().resume();
+  }
+
   decode(encoded: ArrayBuffer): Promise<AudioBuffer> {
     return this.ensureContext().decodeAudioData(encoded);
   }
@@ -333,8 +364,9 @@ class WebAudioPlayer implements AudioPlayer {
   }
 
   close(): void {
-    void this.context?.close();
+    const context = this.context;
     this.context = null;
+    try { void context?.close()?.catch(() => {}); } catch { /* Already closed. */ }
   }
 
   private ensureContext(): AudioContext {

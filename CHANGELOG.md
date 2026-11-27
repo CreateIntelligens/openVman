@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-11-27]** **Avatar SDK 卡頓偵測**。人物影片在前景暫停時嘗試重播，影片時間或音訊時鐘持續停住時送出 `VIDEO_STALLED` 或 `AUDIO_STALLED`。宿主可在使用者點擊時呼叫 `rebuildAudio()` 重建音訊。
+
 - **[2026-11-27]** **官方前台用戶端紀錄**。新增需登入的 `POST /api/v1/metrics/client-event`，記錄頁面 ID、事件時間、失敗類型、重試次數、瀏覽器、連線與可見狀態、操作與影片狀態、畫面更新率及專案／會話 ID。每筆附帳號與收件時間，寫入 `backend/logs/client_events.jsonl`，可用 `CLIENT_EVENT_LOG` 改路徑。`POST /api/v1/metrics/turn` 新增選填 `client`，附操作狀態、更新率、影片狀態與失敗類型。
 
 ### Changed
@@ -24,6 +26,8 @@
   - TTS relay 壓測腳本（`scripts/experiments/tts-relay/run.py`）：移除寫死的 `verify=False`，預設啟用 TLS 憑證驗證並新增 `--ca-cert` 供自簽憑證測試使用（#214）；預設網址 `https://localhost:28787` 是自簽憑證，要加 `--ca-cert infra/nginx/certs/openvman.crt`。
 
 ### Fixed
+
+- **[2026-11-27]** **官方前台恢復停住的畫面和聲音**。畫面依序在暫停或回到前景時恢復播放、以影片時間和畫布繪製次數偵測卡頓並嘗試重播、仍卡住時等回答結束再提示重新載入。聲音時鐘停住時先嘗試恢復，必要時由使用者點擊重建並重送原題。重新載入會建立新會話，因為 WebSocket 協定沒有接回舊 session 的欄位。
 
 - **[2026-11-27]** **PR Agent 審查兩項修正**：共用 Gemini 金鑰改成先讀版本再讀金鑰，兩次讀取之間剛好換金鑰時，結果只會存進之後不再使用的舊版本快取；`scripts/check_changelog.py` 只把 `## [x.y.z]`（可加 ` - YYYY-MM-DD`）當舊版本段落，其他無法辨識的 `##` 標題（例如 `## [2026-11-27] - release`）一律報錯，不再略過檢查。
 

@@ -48,6 +48,9 @@ export interface OpenVmanAvatarEventMap {
   error: {
     code: string;
     message: string;
+    recoverable?: boolean;
+    paused?: boolean;
+    readyState?: number;
     retryAfterSeconds?: number;
     type: "error";
   };
@@ -91,6 +94,8 @@ export interface OpenVmanAvatarInstance {
   ): void;
   playAudio(source: Blob | ArrayBuffer): Promise<void>;
   pushPcm(chunk: Int16Array): Promise<void>;
+  /** Call directly from a user gesture to rebuild the speaker AudioContext. */
+  rebuildAudio(): Promise<void>;
 }
 
 export interface OpenVmanAvatarCharacter {

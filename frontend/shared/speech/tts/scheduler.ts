@@ -60,6 +60,14 @@ export class PcmScheduler {
     return this.audioCtx
   }
 
+  public get clock(): number | null {
+    return this.audioCtx?.currentTime ?? null
+  }
+
+  public get contextState(): AudioContextState | 'none' {
+    return this.audioCtx?.state ?? 'none'
+  }
+
   public ensureContext(): AudioContext {
     if (!this.audioCtx) {
       const AudioContextCtor =
@@ -78,11 +86,19 @@ export class PcmScheduler {
     return this.audioCtx
   }
 
-  public async resumeContext(): Promise<void> {
+  public async resumeContext(force = false): Promise<void> {
     const ctx = this.ensureContext()
-    if (ctx.state === 'suspended') {
+    if (force || ctx.state === 'suspended') {
       await ctx.resume()
     }
+  }
+
+  public rebuildContext(): AudioContext {
+    this.stopAll()
+    const context = this.ensureContext()
+    // WebKit needs resume() in the same user gesture as the new AudioContext.
+    void this.resumeContext(true).catch(() => {})
+    return context
   }
 
   private ensureVolumeAnalyser(ctx: AudioContext): AnalyserNode | null {
@@ -242,7 +258,7 @@ export class PcmScheduler {
     this.flush()
     if (this.audioCtx && !this.externalContext) {
       try {
-        this.audioCtx.close()
+        void this.audioCtx.close()?.catch(() => {})
       } catch {
         // 忽略關閉錯誤
       }

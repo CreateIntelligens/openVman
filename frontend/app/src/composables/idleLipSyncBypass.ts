@@ -16,6 +16,7 @@ interface PatchableCanvasContext {
 }
 
 export interface IdleLipSyncBypass {
+  drawCount(): number
   beginSpeaking(): void
   endSpeaking(): void
   resetSpeaking(): void
@@ -55,6 +56,7 @@ export function installIdleLipSyncBypass(
   let pendingClear: PendingClear | null = null
   let speechStartedAt: number | null = null
   let speechEndedAt: number | null = null
+  let draws = 0
 
   const rawClearRect = (...args: ClearRectArgs): void => {
     originalClearRect.apply(context, args)
@@ -95,6 +97,7 @@ export function installIdleLipSyncBypass(
     pendingClear = { alpha: patchAlpha(), args }
   }
   const drawImageOverride = (...args: unknown[]): void => {
+    draws += 1
     const patchClear = pendingClear
     if (!patchClear || !isLipSyncPatchDraw(args, patchClear)) {
       flushPendingClear()
@@ -123,6 +126,7 @@ export function installIdleLipSyncBypass(
   patched.drawImage = drawImageOverride
 
   return {
+    drawCount: () => draws,
     beginSpeaking(): void {
       const currentTime = now()
       const previousFadeOutCompleted = speechEndedAt !== null

@@ -7,6 +7,8 @@ export function useMediaPrompt() {
   const handlers = new Set<(kind: MediaPromptKind) => void>()
 
   function show(kind: MediaPromptKind, message: string): void {
+    if (mediaPrompt.value?.kind === 'reload') return
+    if (mediaPrompt.value?.kind === 'audio' && (kind === 'autoplay' || kind === 'video')) return
     mediaPrompt.value = { kind, message }
   }
 

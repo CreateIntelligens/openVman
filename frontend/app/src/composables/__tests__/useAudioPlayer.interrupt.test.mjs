@@ -47,6 +47,39 @@ const compiled = ts.transpileModule(source, {
 
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
 const { useAudioPlayer } = await import(moduleUrl);
+const { PcmScheduler } = await import(schedulerUrl);
+
+test("rebuild closes an owned context and synchronously creates and resumes its replacement", (t) => {
+  const previousAudioContext = globalThis.AudioContext;
+  t.after(() => { globalThis.AudioContext = previousAudioContext; });
+  const calls = [];
+  class FakeAudioContext {
+    currentTime = 5;
+    state = "running";
+    constructor() { calls.push(["create", this]); }
+    async close() {
+      calls.push(["close", this]);
+      throw new Error("already closed");
+    }
+    async resume() { calls.push(["resume", this]); }
+  }
+  globalThis.AudioContext = FakeAudioContext;
+  const scheduler = new PcmScheduler({ onPlaybackReset: () => calls.push(["flush"]) });
+  assert.equal(scheduler.clock, null);
+  assert.equal(scheduler.contextState, "none");
+  const original = scheduler.ensureContext();
+  const next = scheduler.rebuildContext();
+  assert.notEqual(next, original);
+  assert.equal(scheduler.context, next);
+  assert.equal(scheduler.clock, 5);
+  assert.equal(scheduler.contextState, "running");
+  assert.deepEqual(calls, [["create", original], ["flush"], ["close", original], ["create", next], ["resume", next]]);
+
+  calls.length = 0;
+  const external = new PcmScheduler({ context: original });
+  assert.equal(external.rebuildContext(), original);
+  assert.deepEqual(calls, [["resume", original]]);
+});
 
 test("flush cancels a chunk that is waiting for AudioContext resume", async () => {
   const previousAudioContext = globalThis.AudioContext;

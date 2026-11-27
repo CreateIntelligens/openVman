@@ -1,5 +1,6 @@
 export type OpenVmanAvatarErrorCode =
   | "AUDIO_PLAYBACK_FAILED"
+  | "AUDIO_STALLED"
   | "AUTOPLAY_BLOCKED"
   | "CHAT_FAILED"
   | "DOM_CONFLICT"
@@ -10,6 +11,7 @@ export type OpenVmanAvatarErrorCode =
   | "RUNTIME_DISPOSED"
   | "SPEECH_FAILED"
   | "UNAUTHORIZED"
+  | "VIDEO_STALLED"
   | "WEBGL_CONTEXT_LOST";
 
 export class OpenVmanAvatarError extends Error {

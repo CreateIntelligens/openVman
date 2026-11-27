@@ -39,6 +39,7 @@ export class AvatarRuntime {
   private readonly frameSyncMarkerRepair: FrameSyncMarkerRepair | null;
   private videoObjectUrl = "";
   private stopAwaitingGesture: (() => void) | null = null;
+  private stopWatchingVideo: (() => void) | undefined;
 
   private constructor(
     instance: AvatarRuntimeInstance,
@@ -205,7 +206,64 @@ export class AvatarRuntime {
     return () => canvas.removeEventListener("webglcontextlost", handleLost);
   }
 
+  watchVideo(
+    onStall: (state: { paused: boolean; readyState: number }) => void,
+    timers = window,
+    now = () => performance.now(),
+  ): void {
+    const video = window.characterVideo;
+    if (!video) return;
+    let lastTime: number | undefined;
+    let lastProgressAt = 0;
+    let attempted = false;
+    let reported = false;
+    const eligible = () => document.visibilityState === "visible"
+      && !this.videoAwaitingGesture && window.characterVideo === video;
+    const recoverPaused = (): void => {
+      if (!eligible() || !video.paused || attempted) return;
+      attempted = true;
+      try { void video.play().catch(() => {}); } catch { /* Report if the clock stays still. */ }
+    };
+    const tick = (): void => {
+      if (!eligible()) {
+        lastTime = undefined;
+        attempted = false;
+        reported = false;
+        return;
+      }
+      const at = now();
+      if (lastTime !== video.currentTime) {
+        if (lastTime !== undefined) attempted = false;
+        lastTime = video.currentTime;
+        lastProgressAt = at;
+        reported = false;
+      }
+      recoverPaused();
+      if (!reported && at - lastProgressAt >= 2000) {
+        reported = true;
+        onStall({ paused: video.paused, readyState: video.readyState });
+      }
+    };
+    const visibilityChanged = (): void => {
+      lastTime = undefined;
+      attempted = false;
+      reported = false;
+      tick();
+    };
+    this.stopWatchingVideo?.();
+    video.addEventListener("pause", recoverPaused);
+    document.addEventListener("visibilitychange", visibilityChanged);
+    const timer = timers.setInterval(tick, 500);
+    this.stopWatchingVideo = () => {
+      timers.clearInterval(timer);
+      video.removeEventListener("pause", recoverPaused);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+    };
+    tick();
+  }
+
   dispose(): void {
+    this.stopWatchingVideo?.();
     this.stopAwaitingGesture?.();
     this.releaseVideoUrl();
     this.idleLipSyncBypass?.resetSpeaking();

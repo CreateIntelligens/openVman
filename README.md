@@ -127,7 +127,7 @@ TTS、批次 ASR 與 Brain proxy 的每個外部節點都有連線上限（預�
 
 語音輸入與串流細節見 [前端規格](docs/specs/02_FRONTEND_SPEC.md)，TTS 與中斷處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
 
-官方前台會記錄開頁、載入重試與播放解鎖，方便依頁面 ID 查同一次開頁發生的事件。Backend 預設寫到 `backend/logs/client_events.jsonl`，可用 `CLIENT_EVENT_LOG` 改路徑。詳見[前台診斷流程](docs/specs/02_FRONTEND_SPEC.md#31-用戶端紀錄)與[後端紀錄契約](docs/specs/01_BACKEND_SPEC.md#官方前台診斷紀錄)。
+官方前台會偵測人物畫面和聲音是否卡住，先嘗試恢復播放，必要時請使用者點擊恢復。開頁、載入重試、播放解鎖與卡頓恢復事件依頁面 ID 串接。Backend 預設寫到 `backend/logs/client_events.jsonl`，可用 `CLIENT_EVENT_LOG` 改路徑。詳見[前台診斷流程](docs/specs/02_FRONTEND_SPEC.md#31-用戶端紀錄)與[後端紀錄契約](docs/specs/01_BACKEND_SPEC.md#官方前台診斷紀錄)。
 
 ### 對外嵌入
 

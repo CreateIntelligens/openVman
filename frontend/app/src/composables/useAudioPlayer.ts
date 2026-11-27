@@ -70,8 +70,13 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
               isPlaying.value = false
        }
 
-       async function resumeContext(): Promise<void> {
-              await scheduler.resumeContext()
+       async function resumeContext(force = false): Promise<void> {
+              await scheduler.resumeContext(force)
+       }
+
+       function rebuildContext(): AudioContext {
+              isPlaying.value = false
+              return scheduler.rebuildContext()
        }
 
        onUnmounted(() => {
@@ -85,5 +90,8 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
               resetSchedule,
               flush,
               resumeContext,
+              clock: () => scheduler.clock,
+              contextState: () => scheduler.contextState,
+              rebuildContext,
        }
 }

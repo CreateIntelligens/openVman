@@ -227,6 +227,10 @@ for await (const chunk of pcmStream) {
 
 立即停止完整音訊與 PCM queue，清除嘴形狀態並派送 `{ state: "stop" }`；`ask()` 進行中時一併中止對話串流與還沒送出的合成。
 
+### `await avatar.rebuildAudio()`
+
+收到 `AUDIO_STALLED` 後，可由宿主顯示按鈕，直接在使用者點擊的處理函式裡呼叫 `rebuildAudio()`。SDK 會停止目前回答與音訊佇列，並在同一次手勢中建立及啟用新的 AudioContext。若要重播，宿主可在方法完成後重新送出音訊或詢問。`audioOutput: "silent"` 的聲音由宿主管理，此方法會直接完成。
+
 ### `avatar.on(type, handler)`／`avatar.off(type, handler)`
 
 新增或移除同一 JavaScript context 內的事件 handler。
@@ -242,7 +246,7 @@ for await (const chunk of pcmStream) {
 | `ready` | `{ type: "ready" }` | runtime 與角色已可用；在 init 完成後訂閱也會收到。 |
 | `speaking` | `{ type, state: "start" \| "stop" }` | 音訊播放狀態。`start` 在第一段音訊真正開始播時才派送；佇列播完後再等 300 ms 沒有新音訊才派送 `stop`（`audioLeadMs: 0` 時播完立即派送），照播放速度送 PCM 的空檔不會斷成好幾段。 |
 | `reply` | `{ type, text, sessionId, traceId }` | 對話模式取得回覆文字，於語音合成前派送。`sessionId` 是這個 instance 的對話 ID，`traceId` 是後端這一輪的追蹤 ID（後端沒給時為空字串），可用來對照後端 log 與對話紀錄。 |
-| `error` | `{ type, code, message, retryAfterSeconds? }` | 音訊、資源、autoplay 或對話錯誤；`retryAfterSeconds` 只在 `RATE_LIMITED` 出現。 |
+| `error` | `{ type, code, message, retryAfterSeconds?, recoverable?, paused?, readyState? }` | 音訊、畫面、資源、autoplay 或對話錯誤。`retryAfterSeconds` 用於 `RATE_LIMITED`，恢復資訊見下方的錯誤碼表。 |
 | `destroyed` | `{ type: "destroyed" }` | instance 已清理。 |
 
 ## CSP
@@ -293,8 +297,10 @@ location /static/characters/ {
 | `DOM_CONFLICT` | 宿主頁已占用 vendor 固定 DOM ID。 |
 | `RESOURCE_LOAD_FAILED` | vendor JS、WASM 或角色資源載入失敗。 |
 | `AUDIO_PLAYBACK_FAILED` | 音訊讀取、解碼或播放失敗。 |
+| `AUDIO_STALLED` | 喇叭模式開始播放 1500 ms 後取樣，400 ms 內音訊時鐘沒有前進，嘗試一次 `resume()` 後再等 600 ms 仍停住。事件帶 `recoverable: true`，宿主可請使用者點擊重建音訊。 |
 | `AUTOPLAY_BLOCKED` | 瀏覽器要求先有 click／tap 等 user gesture。播音訊時（只有 `audioOutput: "speaker"` 會發生）讓呼叫失敗；人物影片被擋時只透過 `error` 事件通知、不讓 `init()` 失敗，使用者點一下影片就開始播（見 `avatar.videoAwaitingGesture`）。 |
 | `WEBGL_CONTEXT_LOST` | 瀏覽器丟掉了嘴型用的 WebGL 畫布。人物影片照常播放、不再貼嘴型，直到重新載入頁面；這個錯誤只透過 `error` 事件通知，不會讓呼叫失敗。 |
+| `VIDEO_STALLED` | 人物影片在前景連續 2000 ms 未前進。SDK 會先嘗試播放暫停的影片，等待初次手勢期間跳過檢查。事件帶 `paused` 和 `readyState`，提示與是否重新載入由宿主決定。 |
 | `UNAUTHORIZED` | 對話請求回 401 或 403。 |
 | `RATE_LIMITED` | 對話請求回 429，可能帶 `retryAfterSeconds`。 |
 | `CHAT_FAILED` | 對話請求失敗或回應缺少 `reply`。 |

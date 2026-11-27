@@ -196,6 +196,14 @@ async function createInstance(
       type: "error",
     });
   });
+  runtime.watchVideo((state) => {
+    emit("error", {
+      code: "VIDEO_STALLED",
+      message: "The character video stopped advancing.",
+      type: "error",
+      ...state,
+    });
+  });
   const audio = new AvatarAudio(
     runtime,
     (speaking) => {
@@ -206,6 +214,12 @@ async function createInstance(
     },
     options.audioOutput ?? "speaker",
     audioLeadMs(options.audioLeadMs),
+    () => emit("error", {
+      code: "AUDIO_STALLED",
+      message: "The audio playback clock stopped advancing.",
+      recoverable: true,
+      type: "error",
+    }),
   );
 
   const runAudio = async (operation: () => Promise<void>): Promise<void> => {
@@ -332,6 +346,13 @@ async function createInstance(
     },
     async pushPcm(chunk) {
       await runAudio(() => audio.pushPcm(chunk));
+    },
+    async rebuildAudio() {
+      if (destroyed || options.audioOutput === "silent") return;
+      await runAudio(() => {
+        conversation.interrupt();
+        return audio.rebuild();
+      });
     },
   };
 

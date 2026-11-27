@@ -47,6 +47,18 @@ function renderVendorFrame(context) {
   context.drawImage({}, 0, 0, 180, 180, ...PATCH_RECT);
 }
 
+test("counts normal draws and suppressed lip patches only while installed", () => {
+  const { calls, canvas, context } = createFakeCanvas();
+  const bypass = installIdleLipSyncBypass(canvas);
+  assert.equal(bypass.drawCount(), 0);
+  renderVendorFrame(context);
+  assert.equal(bypass.drawCount(), 2);
+  assert.equal(calls.filter((call) => call.startsWith("drawImage")).length, 1);
+  bypass.restore();
+  renderVendorFrame(context);
+  assert.equal(bypass.drawCount(), 2);
+});
+
 test("idle lip-sync bypass preserves native idle frames and vendor speaking frames", () => {
   let now = 0;
   const { calls, canvas, context } = createFakeCanvas();
