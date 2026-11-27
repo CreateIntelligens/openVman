@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { leaveFullscreen, runLogout } from "../sessionCleanup";
+import { clearResumeSession } from "./sessionResume";
 import { useAuth } from "./useAuth";
 
 export function useSessionLogout() {
@@ -12,7 +13,10 @@ export function useSessionLogout() {
       setLoggingOut: (value) => {
         loggingOut.value = value;
       },
-      cleanup: leaveFullscreen,
+      cleanup: () => {
+        clearResumeSession();
+        return leaveFullscreen();
+      },
       logout: auth.logout,
     });
   }

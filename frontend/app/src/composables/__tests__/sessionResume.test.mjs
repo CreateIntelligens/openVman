@@ -30,18 +30,22 @@ test("a saved conversation comes back once, within ten minutes, for the same pro
   const storage = memoryStorage();
   let now = 1_000;
   const clock = { now: () => now, storage };
-  saveResumeSession({ conversationId: "c1", projectId: "p", personaId: "kiosk" }, clock);
+  saveResumeSession({ conversationId: "c1", userId: "u1", projectId: "p", personaId: "kiosk" }, clock);
   now += RESUME_WINDOW_MS;
-  assert.equal(takeResumeSession("p", "kiosk", clock), "c1");
-  assert.equal(takeResumeSession("p", "kiosk", clock), null, "taken only once");
+  assert.equal(takeResumeSession("u1", "p", "kiosk", clock), "c1");
+  assert.equal(takeResumeSession("u1", "p", "kiosk", clock), null, "taken only once");
 });
 
 test("an old, mismatched, empty or unreadable entry starts a new conversation", () => {
+  const base = { conversationId: "c1", userId: "u1", projectId: "p", personaId: "a" };
   const cases = [
-    { save: { conversationId: "c1", projectId: "p", personaId: "a" }, later: RESUME_WINDOW_MS + 1, take: ["p", "a"] },
-    { save: { conversationId: "c1", projectId: "p", personaId: "a" }, later: 0, take: ["other", "a"] },
-    { save: { conversationId: "c1", projectId: "p", personaId: "a" }, later: 0, take: ["p", "other"] },
-    { save: { conversationId: "", projectId: "p", personaId: "a" }, later: 0, take: ["p", "a"] },
+    { save: base, later: RESUME_WINDOW_MS + 1, take: ["u1", "p", "a"] },
+    { save: base, later: 0, take: ["u2", "p", "a"] },
+    { save: base, later: 0, take: ["", "p", "a"] },
+    { save: base, later: 0, take: ["u1", "other", "a"] },
+    { save: base, later: 0, take: ["u1", "p", "other"] },
+    { save: { ...base, conversationId: "" }, later: 0, take: ["u1", "p", "a"] },
+    { save: { ...base, userId: "" }, later: 0, take: ["", "p", "a"] },
   ];
   for (const { save, later, take } of cases) {
     const storage = memoryStorage();
@@ -53,10 +57,10 @@ test("an old, mismatched, empty or unreadable entry starts a new conversation", 
   }
   const broken = memoryStorage();
   broken.setItem("openvman.avatar.resume_session", "{not json");
-  assert.equal(takeResumeSession("p", "a", { storage: broken }), null);
+  assert.equal(takeResumeSession("u1", "p", "a", { storage: broken }), null);
   const throwing = { getItem() { throw new Error("denied"); }, setItem() { throw new Error("denied"); }, removeItem() {} };
-  assert.doesNotThrow(() => saveResumeSession({ conversationId: "c", projectId: "p", personaId: "a" }, { storage: throwing }));
-  assert.equal(takeResumeSession("p", "a", { storage: throwing }), null);
+  assert.doesNotThrow(() => saveResumeSession({ ...base, conversationId: "c" }, { storage: throwing }));
+  assert.equal(takeResumeSession("u1", "p", "a", { storage: throwing }), null);
 });
 
 function liveChat(t) {
@@ -80,7 +84,7 @@ function liveChat(t) {
 
 test("live mode asks the gateway to continue the saved conversation and reports it as the conversation id", async (t) => {
   const { chat, FakeSocket } = liveChat(t);
-  chat.resumeConversation("old-conversation");
+  chat.resumeConversation("old-conversation", Date.now() + 60_000);
   const connecting = chat.connect();
   const socket = FakeSocket.last;
   socket.onopen();
@@ -114,9 +118,46 @@ test("text mode continues the saved conversation id in its chat requests", async
   };
   t.after(() => { globalThis.fetch = originalFetch; });
   const chat = useAvatarChat({ mode: "text" });
-  chat.resumeConversation("old-conversation");
+  chat.resumeConversation("old-conversation", Date.now() + 60_000);
   await chat.connect();
   assert.equal(chat.conversationId(), "old-conversation");
   chat.sendMessage("還在嗎"); await tick();
   assert.equal(bodies[0].session_id, "old-conversation");
+});
+
+async function connectLive(chat, FakeSocket, ack) {
+  const connecting = chat.connect();
+  const socket = FakeSocket.last;
+  socket.onopen();
+  const init = socket.sent.at(-1);
+  socket.receive({ event: "server_init_ack", session_id: ack });
+  await connecting;
+  return { socket, init };
+}
+
+test("a saved conversation is dropped once it expires, or on disconnect, project or persona change", async (t) => {
+  for (const drop of [
+    (chat) => chat.resumeConversation("old", Date.now() - 1),
+    (chat) => { chat.resumeConversation("old", Date.now() + 60_000); chat.disconnect(); },
+    (chat) => { chat.resumeConversation("old", Date.now() + 60_000); chat.setProject("other"); },
+    (chat) => { chat.resumeConversation("old", Date.now() + 60_000); chat.setPersona("other"); },
+  ]) {
+    const { chat, FakeSocket } = liveChat(t);
+    drop(chat);
+    const { init } = await connectLive(chat, FakeSocket, "fresh-ws");
+    assert.equal("session_id" in init.capabilities, false);
+    assert.equal(chat.conversationId(), "fresh-ws");
+  }
+});
+
+test("a re-init on the same socket keeps the resumed conversation id; a new socket starts over", async (t) => {
+  const { chat, FakeSocket } = liveChat(t);
+  chat.resumeConversation("old-conversation", Date.now() + 60_000);
+  const { socket } = await connectLive(chat, FakeSocket, "ws-1");
+  chat.reinit("default");
+  socket.receive({ event: "server_init_ack", session_id: "ws-1b" });
+  assert.equal(chat.conversationId(), "old-conversation");
+  chat.disconnect();
+  await connectLive(chat, FakeSocket, "ws-2");
+  assert.equal(chat.conversationId(), "ws-2");
 });

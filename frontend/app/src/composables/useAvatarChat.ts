@@ -60,8 +60,13 @@ export function useAvatarChat(options: ChatOptions = {}) {
        const sessionId = ref<string | null>(null)
        // 重新載入後要接回的對話 id（只用在下一次連線）；即時模式下 Brain 的對話 id
        // 會是這個，而不是新的 WebSocket session id。
-       let pendingResumeId: string | null = null
+       let pendingResume: { id: string; expiresAt: number } | null = null
        let liveConversationId: string | null = null
+
+       function pendingResumeId(): string | null {
+              if (pendingResume && Date.now() > pendingResume.expiresAt) pendingResume = null
+              return pendingResume?.id ?? null
+       }
        const visualState = ref<VisualState>({ ...DEFAULT_VISUAL_STATE })
        let activeSourcePath: string | undefined = undefined
        let activeSourcePathContent: string | undefined = undefined
@@ -86,7 +91,12 @@ export function useAvatarChat(options: ChatOptions = {}) {
               state,
               sessionId,
               isTextMode: () => currentMode === 'text',
-              onOpen: () => sendEvent(_buildClientInit()),
+              onOpen: () => {
+                     // 新的一條連線才重新決定對話 id；同一條連線上因 SESSION_EXPIRED 重新 init
+                     // 時 Gateway 仍沿用原本的 chat_session_id，這裡也要跟著保留。
+                     liveConversationId = null
+                     sendEvent(_buildClientInit())
+              },
               onJsonMessage: handleJsonMessage,
               onClose: clearDecisionDebug,
        })
@@ -95,15 +105,20 @@ export function useAvatarChat(options: ChatOptions = {}) {
        async function connect(url?: string): Promise<void> {
               await transport.connect(url)
               // 文字模式的對話 id 由前台產生；有要接回的就換成原本那個。
-              if (currentMode === 'text' && pendingResumeId) {
-                     sessionId.value = pendingResumeId
-                     pendingResumeId = null
+              const resumeId = pendingResumeId()
+              if (currentMode === 'text' && resumeId) {
+                     sessionId.value = resumeId
+                     pendingResume = null
               }
        }
 
-       /** 下一次連線接回這段對話（重新載入前存下的 id）。 */
-       function resumeConversation(conversationId: string): void {
-              pendingResumeId = conversationId
+       /**
+        * 下一次連線接回這段對話（重新載入前存下的 id），過了 expiresAt 就不用。
+        * 斷線、換專案或角色都會作廢：展示機台換下一位來賓、或開始前換了角色時，
+        * 不能接到上一位的對話（換角色還會讓 Brain 拒絕這個已綁定其他角色的 id）。
+        */
+       function resumeConversation(conversationId: string, expiresAt: number): void {
+              pendingResume = { id: conversationId, expiresAt }
        }
 
        /** 目前這段對話在 Brain 的 id：文字模式就是 sessionId，即時模式可能是接回的舊 id。 */
@@ -229,7 +244,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             surface,
                             voice_source: 'custom',
                             persona_id: currentPersonaId,
-                            ...(pendingResumeId ? { session_id: pendingResumeId } : {}),
+                            ...(pendingResumeId() ? { session_id: pendingResumeId() } : {}),
                             ...(language ? { language } : {}),
                      },
                      timestamp: Date.now(),
@@ -256,11 +271,13 @@ export function useAvatarChat(options: ChatOptions = {}) {
        }
 
        function setProject(projectId: string): void {
+              pendingResume = null
               clearDecisionDebug()
               currentProjectId = projectId
        }
 
        function setPersona(personaId: string): void {
+              pendingResume = null
               clearDecisionDebug()
               currentPersonaId = personaId
        }
@@ -272,8 +289,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
               switch (event) {
                      case 'server_init_ack':
                             sessionId.value = data.session_id as string
-                            liveConversationId = pendingResumeId ?? sessionId.value
-                            pendingResumeId = null
+                            liveConversationId ??= pendingResumeId() ?? sessionId.value
+                            pendingResume = null
                             state.value = 'IDLE'
                             transport.resolvePendingConnect()
                             console.log(`[AvatarChat] Session: ${sessionId.value}`)
@@ -468,6 +485,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Disconnect ─────────────────────────────────────────
        function disconnect(): void {
+              pendingResume = null
               clearDecisionDebug()
               // 斷線會靜默丟掉進行中的文字回合；先讓呼叫端停掉這一輪的聲音與收到一半的句子，
               // 否則等整段回答的狀態（ttsPending）沒有人收尾，麥克風會一直關著。

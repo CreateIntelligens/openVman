@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted } from "vue";
-import { saveResumeSession, takeResumeSession } from "./sessionResume";
+import { RESUME_WINDOW_MS, saveResumeSession, takeResumeSession } from "./sessionResume";
+import { useAuth } from "./useAuth";
 import { useAvatarFrameWatchdog } from "./useAvatarFrameWatchdog";
 import {
   markUserActivated,
@@ -23,6 +24,8 @@ export function useMediaRecoveryLifecycle({ settings, stage, conversation, getSe
       project_id: settings.projectId, session_id: getSessionId() ?? "", ...fields,
     });
   let stopFrameWatchdog: (() => void) | undefined;
+  const { account } = useAuth();
+  const userId = () => account.value?.id ?? "";
 
   onMounted(() => {
     const { wasm } = stage;
@@ -37,6 +40,7 @@ export function useMediaRecoveryLifecycle({ settings, stage, conversation, getSe
       reload: () => {
         saveResumeSession({
           conversationId: conversation.chat.conversationId() ?? "",
+          userId: userId(),
           projectId: settings.projectId,
           personaId: settings.personaId,
         });
@@ -53,8 +57,8 @@ export function useMediaRecoveryLifecycle({ settings, stage, conversation, getSe
 
   /** 設定載入後：記下開頁，並接回重新載入前那段對話（10 分鐘內、同專案同角色）。 */
   function reportPageOpen(): void {
-    const resumed = takeResumeSession(settings.projectId, settings.personaId);
-    if (resumed) conversation.chat.resumeConversation(resumed);
+    const resumed = takeResumeSession(userId(), settings.projectId, settings.personaId);
+    if (resumed) conversation.chat.resumeConversation(resumed, Date.now() + RESUME_WINDOW_MS);
     report("page_open", resumed ? { detail: "resumed_conversation" } : {});
   }
 
