@@ -228,6 +228,38 @@ def test_credential_version_changes_on_every_key_update(context):
     assert KEY not in first.version
 
 
+def test_shared_credential_reads_version_before_key():
+    """換金鑰剛好發生在兩次讀取之間時，只能配到舊版本，不能讓新版本配到舊金鑰。"""
+    state = {"version": "v1", "key": "old-key"}
+
+    class Providers:
+        def credential_version(self, _credential_id):
+            return state["version"]
+
+        def get_credential(self, _credential_id, *, env_default):
+            value = state["key"]
+            state.update(version="v2", key="new-key")
+            return value
+
+    runtime = SimpleNamespace(
+        model_providers=Providers(),
+        config=SimpleNamespace(gemini_api_key=""),
+    )
+    credential = resolve_gemini_credential(None, runtime)
+    assert (credential.version, credential.api_key) == ("v1", "old-key")
+
+    class RotatesBeforeKey(Providers):
+        def credential_version(self, _credential_id):
+            value = state["version"]
+            state.update(version="v3", key="newest-key")
+            return value
+
+    runtime.model_providers = RotatesBeforeKey()
+    credential = resolve_gemini_credential(None, runtime)
+    # 版本較舊、金鑰較新：結果存進舊版本的快取，之後的請求用 v3 不會命中。
+    assert (credential.version, credential.api_key) == ("v2", "newest-key")
+
+
 @pytest.mark.parametrize("failure", [
     "ciphertext", "encryption-secret", "missing-encryption-secret", "empty",
 ])

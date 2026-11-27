@@ -153,6 +153,9 @@ def resolve_gemini_credential(
                 configured=True,
                 version=str(row["updated_at"]),
             )
+    # 先讀版本再讀金鑰：兩次讀取之間若剛好換金鑰，拿到的是舊版本配新金鑰，
+    # 結果只會存進之後不再使用的舊版本快取，不會讓新版本命中舊金鑰的結果。
+    version = runtime.model_providers.credential_version("gemini")
     value = runtime.model_providers.get_credential(
         "gemini", env_default=runtime.config.gemini_api_key,
     )
@@ -161,7 +164,7 @@ def resolve_gemini_credential(
         source="shared",
         credential_id="gemini",
         configured=bool(value),
-        version=runtime.model_providers.credential_version("gemini"),
+        version=version,
     )
 
 

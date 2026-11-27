@@ -70,6 +70,10 @@ def test_well_formed_changelog_passes():
      "must come after"),
     (GOOD.replace("## [2026-11-27]", "## [Unreleased]"), "[Unreleased] section"),
     (GOOD.replace("### Fixed", "### Documentation"), "unknown category"),
+    (GOOD.replace("## [2026-11-26]", "## [2026-11-26] - release")
+         .replace("- **[2026-11-26]** older change", "- undated entry"),
+     "unrecognized heading"),
+    (GOOD.replace("## [0.1.0] - 2026-03-11", "## Notes"), "unrecognized heading"),
 ])
 def test_layout_problems_are_reported(broken, message):
     problems = check_changelog.check(broken)
@@ -120,6 +124,11 @@ def test_fix_regroups_by_day_and_keeps_every_entry():
     assert "## [2026-10-07]\n\n### Fixed\n\n- **[2026-10-07]** reliability" in fixed
     assert fixed.endswith("## [0.1.0] - 2026-03-11\n\n### Added\n- legacy\n")
     assert check_changelog.fix(fixed) == fixed
+
+
+def test_fix_refuses_an_unrecognized_heading():
+    with pytest.raises(ValueError, match="unrecognized heading"):
+        check_changelog.fix(GOOD.replace("## [2026-11-26]", "## [2026-11-26] - release"))
 
 
 def test_fix_refuses_an_undated_entry():

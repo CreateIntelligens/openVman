@@ -30,6 +30,9 @@ LEGACY_CATEGORIES = {
     "Experiments": "Added",
 }
 DATE_HEADING = re.compile(r"^## \[(\d{4}-\d{2}-\d{2})\]\s*$")
+# 舊的版本段落（`## [0.10.0] - 2026-05-25`）照原樣保留；其他寫法都算錯，
+# 免得寫錯的日期標題（例如 `## [2026-11-27] - release`）被當成舊段落而略過檢查。
+VERSION_HEADING = re.compile(r"^## \[\d+\.\d+\.\d+\](?: - \d{4}-\d{2}-\d{2})?\s*$")
 # --fix 會把這種段落的條目分到各自的日期段。
 UNDATED_HEADING = re.compile(r"^## \[Unreleased\]\s*$")
 ENTRY_DATE = re.compile(r"^- \*\*\[(\d{4}-\d{2}-\d{2})\]\*\*")
@@ -132,6 +135,12 @@ def check(text: str) -> list[str]:
             continue
         date = section.date
         if date is None:
+            if not VERSION_HEADING.match(section.heading):
+                problems.append(
+                    f"line {section.line_no}: unrecognized heading {section.heading!r}; "
+                    "use ## [YYYY-MM-DD]",
+                )
+                continue
             seen_version = True
             continue
         if seen_version:
@@ -170,6 +179,10 @@ def fix(text: str) -> str:
     rest: list[Section] = []
     for section in sections:
         if not section.regroupable:
+            if not VERSION_HEADING.match(section.heading):
+                raise ValueError(
+                    f"line {section.line_no}: unrecognized heading {section.heading!r}",
+                )
             rest.append(section)
             continue
         problems, entries = parse_entries(section)
