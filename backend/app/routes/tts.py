@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hmac
 import logging
 from collections.abc import AsyncIterator
 from urllib.parse import quote
@@ -289,21 +288,11 @@ async def create_speech(
                 credential = resolve_gemini_credential(project_id, runtime)
                 project_key = credential.source == "project"
                 if project_key or provider == "gemini-tts":
-                    runtime_cfg = getattr(runtime, "config", None)
-                    mac_secret = (
-                        getattr(runtime_cfg, "model_provider_encryption_secret", None)
-                        or getattr(runtime_cfg, "session_jwt_secret", None)
-                    )
-                    if not isinstance(mac_secret, str) or not mac_secret.strip():
-                        mac_secret = "openvman-tts-cache-v1"
-                    fingerprint = hmac.digest(
-                        mac_secret.encode("utf-8"),
-                        b"openvman:tts-cache:gemini:v1\0" + credential.api_key.encode("utf-8"),
-                        "sha256",
-                    ).hex()[:12]
+                    # version 在每次存金鑰時都會變（credential_id 覆寫時不變），
+                    # 換金鑰後不會命中舊金鑰合成或備援出來的音檔。
                     cache_scope += (
                         f"|project:{project_id}:gemini:"
-                        f"{credential.credential_id}:{fingerprint}"
+                        f"{credential.credential_id}:{credential.version}"
                     )
             # 後台切換路線後不能命中另一條路線合成（或備援）的音檔。專案自己的金鑰
             # 一律直連，跟後台選哪條無關。

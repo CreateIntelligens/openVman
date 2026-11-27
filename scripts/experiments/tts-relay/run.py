@@ -1,6 +1,11 @@
 """Compare TTS first-audio time: straight to the engine vs. through Backend /api/v1/tts/stream.
 
 The difference is what our relay adds. Token comes from OPENVMAN_TOKEN (never written to disk).
+
+TLS certificates are verified. The default --backend-url (https://localhost:28787) serves the
+self-signed dev certificate, so pass it explicitly:
+
+    python scripts/experiments/tts-relay/run.py --ca-cert infra/nginx/certs/openvman.crt
 """
 
 import argparse

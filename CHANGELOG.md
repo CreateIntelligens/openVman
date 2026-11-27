@@ -137,11 +137,11 @@
 ### Security
 
 - **[2026-11-27]** **修補 9 項 CodeQL 靜態分析告警（#205、#208、#210～#216）**：
-  - Backend TTS 快取範圍（`backend/app/routes/tts.py`）：Gemini 金鑰快取識別改以伺服器密鑰做 keyed `hmac.digest(..., "sha256")`，不再對 `api_key` 做無金鑰 `hashlib.sha256`（#211）。
+  - Backend TTS 快取範圍（`backend/app/routes/tts.py`）：Gemini 快取鍵改用 `credential_id` 加金鑰版本（專案金鑰與後台存的共用金鑰是 `updated_at`，部署環境的金鑰是 `env`），不再拿金鑰本身算雜湊（#211、#217）。換金鑰時版本一定會變（覆寫時 `credential_id` 不變），快取照樣失效；上線後既有的 Gemini 快取會全部失效一次。部署環境的共用金鑰換了但沒經後台存，版本不會變，舊快取會用到過期為止。
   - Backend Brain 代理錯誤回應（`backend/app/brain_proxy.py`、`backend/app/auth/brain_project_access.py`）：`_BodyTooLarge`（413）、`InvalidProjectId`（422）與 `AiCleanupRefused`（403）改回傳固定文案或理由碼對照表，不再直接輸出 `str(exc)`（#210、#212、#213）。
-  - Brain 原子寫檔權限（`brain/api/infra/file_lock.py`）：`atomic_write_text` 新檔保留 `mkstemp` 預設 `0o600`、既有檔以 `0o700` 遮罩，不再寫出 `0o644` 或對其他使用者開放權限（#205）；`backend/tests/config/test_single_container_stack.py` 測試 stub 權限由 `0o755` 收緊為 `0o700`（#208）。
+  - Brain 原子寫檔權限（`brain/api/infra/file_lock.py`）：`atomic_write_text` 新檔保留 `mkstemp` 預設 `0o600`、既有檔以 `0o700` 遮罩，不再寫出 `0o644` 或對其他使用者開放權限（#205）。只有讀檔和寫檔是不同 UID 時才有影響（例如用別的使用者跑備份）；compose 裡各服務都用同一個 UID，正常部署不受影響；`backend/tests/config/test_single_container_stack.py` 測試 stub 權限由 `0o755` 收緊為 `0o700`（#208）。
   - 後台 `Content-Disposition` 檔名解析（`frontend/admin/src/api/knowledge.ts`）：移除可造成回溯的引號正則，改為線性掃描（#216）；`PersonaForm.test.tsx` 改用純字串子字串比對取代未錨定網址正則（#215）。
-  - TTS relay 壓測腳本（`scripts/experiments/tts-relay/run.py`）：移除寫死的 `verify=False`，預設啟用 TLS 憑證驗證並新增 `--ca-cert` 供自簽憑證測試使用（#214）。
+  - TTS relay 壓測腳本（`scripts/experiments/tts-relay/run.py`）：移除寫死的 `verify=False`，預設啟用 TLS 憑證驗證並新增 `--ca-cert` 供自簽憑證測試使用（#214）；預設網址 `https://localhost:28787` 是自簽憑證，要加 `--ca-cert infra/nginx/certs/openvman.crt`。
 
 - **[2026-11-19]** **知識索引不再收進符號連結與硬連結**：重建索引時，`knowledge/` 底下指向工作區其他檔案（例如 `AGENTS.md`）的符號連結會被當成知識收進去，廠商在對話裡就問得到工作規則。`iter_indexable_documents` 與 `iter_knowledge_documents` 現在略過符號連結、經過連結資料夾的檔案（解析後的位置必須和原本路徑相同，所以 `knowledge/` 底下的檔案解析後一定還在 `knowledge/`），以及有其他名稱的硬連結（記 warning）。知識庫清單與快速問答也跟著略過這些檔案；工作區裡一般的文件照舊進索引。
 

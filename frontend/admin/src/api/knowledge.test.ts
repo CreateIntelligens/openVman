@@ -230,6 +230,15 @@ describe("knowledge api", () => {
     expect(parseContentDispositionFilename('attachment; filename="qa_backup.xlsx"')).toBe("qa_backup.xlsx");
     expect(parseContentDispositionFilename('attachment; filename="a;b\\"c.xlsx"')).toBe('a;b"c.xlsx');
     expect(parseContentDispositionFilename("attachment; filename=plain_export.xlsx; size=10")).toBe("plain_export.xlsx");
+  });
+
+  it("parses an unterminated run of backslashes in linear time", () => {
+    // 舊正則每多兩個反斜線耗時約乘 2.7，38 個在 Node 約 1 秒；同步回溯沒辦法被測試 timeout
+    // 中斷，所以用有限長度加耗時上限，退回舊寫法時測試會失敗而不是卡住。
+    const header = `attachment; filename="${"\\".repeat(38)}`;
+    const started = performance.now();
+    expect(parseContentDispositionFilename(header)).toBe(DEFAULT_QA_EXPORT_FILENAME);
+    expect(performance.now() - started).toBeLessThan(200);
     expect(parseContentDispositionFilename(`attachment; filename="${"\\".repeat(5000)}`)).toBe(
       DEFAULT_QA_EXPORT_FILENAME,
     );

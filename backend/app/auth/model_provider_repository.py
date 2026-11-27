@@ -255,6 +255,20 @@ class ModelProviderRepository:
             return env_default, "unreadable"
         return value, "admin"
 
+    def credential_version(self, credential_id: str) -> str:
+        """Changes whenever the saved key changes; "env" when none is saved.
+
+        部署環境的 key 要重啟才會換，換了也不會改變這個值。
+        """
+        if credential_id not in CREDENTIAL_IDS:
+            raise InvalidModelProviderSettings("unknown model provider credential")
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                "SELECT updated_at FROM model_provider_secrets WHERE credential_id = ?",
+                (credential_id,),
+            ).fetchone()
+        return str(row["updated_at"]) if row else "env"
+
     def _get_ciphertext(self, credential_id: str) -> str | None:
         if credential_id not in CREDENTIAL_IDS:
             raise InvalidModelProviderSettings("unknown model provider credential")

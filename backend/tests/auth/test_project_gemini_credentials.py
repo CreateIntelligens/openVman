@@ -205,6 +205,29 @@ def test_update_keeps_id_and_project_delete_removes_binding(context):
     assert recreated.api_key == "environment-shared-key"
 
 
+def test_credential_version_changes_on_every_key_update(context):
+    """快取靠 version 判斷換了金鑰：覆寫時 credential_id 不變，version 一定要變。"""
+    runtime, root, _, _, _ = context
+    assert resolve_gemini_credential(None, runtime).version == "env"
+    runtime.model_providers.update(
+        {}, credentials={"gemini": "admin-shared-key"}, actor_id=root.id,
+    )
+    shared = resolve_gemini_credential(None, runtime).version
+    assert shared not in ("", "env")
+    runtime.model_providers.update(
+        {}, credentials={"gemini": "admin-shared-key-2"}, actor_id=root.id,
+    )
+    assert resolve_gemini_credential(None, runtime).version != shared
+
+    _bind(runtime, root)
+    first = resolve_gemini_credential("project-a", runtime)
+    _bind(runtime, root, key="replacement-project-key")
+    second = resolve_gemini_credential("project-a", runtime)
+    assert second.credential_id == first.credential_id
+    assert first.version and second.version != first.version
+    assert KEY not in first.version
+
+
 @pytest.mark.parametrize("failure", [
     "ciphertext", "encryption-secret", "missing-encryption-secret", "empty",
 ])
